@@ -1154,6 +1154,15 @@ appears in this repository.
   BUG-272; `pickerNote` switched on status alone and threw it away — and the
   picker is the control on the path an owner actually walks. Closed as
   [FIXED-382](FIXED_ITEMS.md#fixed-382--the-model-picker-said-unreachable-about-a-provider-that-had-just-answered).
+* **Settings named itself twice, and the round's own new switch named itself not
+  at all.** Settings opened with a heading and a sentence the topbar had already
+  said; `telemetry_export` landed on Permissions with no `CAPABILITY_COPY` entry,
+  so a gate that reaches the network read as *"Governed capability."* in **Other
+  tools**. Both closed as
+  [FIXED-385](FIXED_ITEMS.md#fixed-385--two-surfaces-named-themselves-twice-and-a-new-switch-named-itself-not-at-all),
+  the second with a test: the label map is prose and cannot be derived from the
+  registry, so it is the pair that drifts, and the first capability added after
+  the pair existed drifted it.
 * **A hook rule pushed its own card past a 390px window.** A grid item's default
   `min-width: auto` refuses to shrink below its content, so one unbreakable
   string — an `http` handler's URL — carried the card four pixels wide. Found by

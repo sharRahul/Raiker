@@ -283,6 +283,11 @@ const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   subagents: "Local execution",
   multi_agent_teams: "Local execution",
   web_fetch: "Network",
+  // Backlog #18 — Network, and deliberately not beside `audit_export` in
+  // Workspace. They export the same record and differ in the one way this page
+  // is for: an audit export writes a file beside the log, and this one leaves
+  // the machine.
+  telemetry_export: "Network",
   // BUG-67 — a push is repository work, but what makes it a separate decision is
   // that it leaves the machine. It sits with the other egress switches so the
   // owner reviewing "what can reach the network" sees it.
@@ -714,6 +719,11 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
     label: "Audit export",
     description:
       "Export your own audit record as a redacted file plus a manifest hash over the events it covers.",
+  },
+  telemetry_export: {
+    label: "Telemetry export",
+    description:
+      "Send governed events to an OpenTelemetry collector you name. Identifiers and event types only, unless a destination opts in to redacted content.",
   },
   checkpoint_restore_execution: {
     label: "Checkpoint restore",

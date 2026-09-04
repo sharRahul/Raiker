@@ -397,6 +397,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-382](#fixed-382--the-model-picker-said-unreachable-about-a-provider-that-had-just-answered) | Medium | Models / provider errors / web UI | Fixed 2026-09-04 (BUG-275, raised and closed in this round) |
 | [FIXED-383](#fixed-383--the-model-control-was-an-empty-circle-whenever-no-model-was-chosen) | Low | Web UI / composer | Fixed 2026-09-04 (found by this round's width sweep) |
 | [FIXED-384](#fixed-384--two-path-fields-taught-a-shape-that-cannot-exist-on-two-of-three-platforms) | Low | Web UI / model library | Fixed 2026-09-04 (found by this round's width sweep) |
+| [FIXED-385](#fixed-385--two-surfaces-named-themselves-twice-and-a-new-switch-named-itself-not-at-all) | Low | Web UI / Settings and Permissions | Fixed 2026-09-04 (found by this round's width sweep) |
 
 ---
 
@@ -16792,3 +16793,49 @@ another machine is the same defect with a longer fuse.
 
 **User-interface outcome.** Neither field claims a drive letter on a machine that
 has none, and the field that can answer concretely is the one that does.
+
+---
+
+## FIXED-385 — Two surfaces named themselves twice, and a new switch named itself not at all
+
+**Severity: Low. Area: Web UI / Settings and Permissions. Status: Fixed
+2026-09-04 (found by this round's own width sweep).**
+
+**Observed, in two places that are the same defect from opposite ends.**
+
+**Settings said its own name twice.** The topbar already carries *Settings* and a
+line saying what is in it; the page then opened with `<h2>Settings</h2>` and
+*"Manage your preferences, notifications, security, account, and runtime
+configuration."* — a heading and a sentence before any state. Models, Tasks and
+Extensions all open with one quiet guide link instead ([FIXED-210](#fixed-210--nine-pages-stopped-teaching-and-the-provider-card-stopped-shouting)
+built `GuideLink` for exactly this, in those words: *"it sits where the page
+header's paragraph used to be and takes one line instead of five"*). Settings was
+the outlier.
+
+**Permissions named a switch not at all.** `telemetry_export` — added in this
+same round — landed with no entry in `CAPABILITY_COPY`, so the page rendered it
+as `Telemetry export` from `humanize()` of its identifier, in **Other tools**,
+described as *"Governed capability."* An owner is asked to reason about a gate
+that reaches the network, and the page could not say what it does.
+
+**Root cause of the second, and the reason it gets a test.** `CAPABILITY_COPY`
+and `CAPABILITY_GROUPS` are prose, so they cannot be derived from the registry —
+which makes them precisely the "two lists that have to agree" pair this codebase
+keeps finding drifted. The first capability added after the pair existed drifted
+it.
+
+**Fixed.** Settings keeps a screen-reader heading for the landmark and opens with
+its guide link. `telemetry_export` is grouped under **Network** — deliberately
+not beside `audit_export` in Workspace, because they export the same record and
+differ in the one way this page is for: an audit export writes a file beside the
+log, and this one leaves the machine — and carries a description that says what
+travels and what does not.
+
+**Guarded.** `tests/test_docs_consistency.py::test_every_real_executor_capability_is_described_on_the_permissions_page`
+— every capability with a real executor has a `CAPABILITY_COPY` entry, with the
+dynamically-registered per-service connectors as the one stated exception.
+Removing the new entry makes it fail, which is how it was verified.
+
+**User-interface outcome.** Settings opens with its own state. Permissions names
+the telemetry switch, groups it with the other things that leave the machine, and
+says in one sentence what a destination receives.

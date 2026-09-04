@@ -15,7 +15,14 @@
     for (const item of unread) {
       if (mirrored.has(item.notification_id)) continue;
       mirrored.add(item.notification_id);
-      raiseDesktopNotice({ title: item.title, body: item.body, tag: item.notification_id });
+      raiseDesktopNotice({
+        title: item.title,
+        body: item.body,
+        tag: item.notification_id,
+        // C10 — clicking a notice about background work should land on the
+        // work. Only for the kinds that have somewhere to land.
+        route: item.kind === "task_finished" ? "#/tasks" : undefined,
+      });
     }
   });
 </script>

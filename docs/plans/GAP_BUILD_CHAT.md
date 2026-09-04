@@ -71,11 +71,11 @@ that proves it, what is missing, and the concrete work.
 | [B7](#b7--no-subagents-at-the-models-disposal) | BUILD | TIER 1 | Done |
 | [B8](#b8--mcp-tools-are-unreachable) | BUILD | TIER 1 | Done |
 | [B9](#b9--no-repository-index) | BUILD | TIER 2 | Done |
-| [B10](#b10--no-language-intelligence) | BUILD | TIER 2 | Open |
+| [B10](#b10--no-language-intelligence) | BUILD | TIER 2 | Done 2026-09-03 ([FIXED-366](FIXED_ITEMS.md#fixed-366--build-could-read-a-repository-and-not-understand-it)) |
 | [B11](#b11--no-git-write-path) | BUILD | TIER 2 | Done |
 | [B12](#b12--no-web-access) | BUILD | TIER 2 | Done |
-| [B13](#b13--no-file-tree-and-no-editor) | BUILD | TIER 3 | Open |
-| [B14](#b14--no-diff-review-surface-in-build) | BUILD | TIER 3 | Partial |
+| [B13](#b13--no-file-tree-and-no-editor) | BUILD | TIER 3 | Done 2026-08-30 ([FIXED-321](FIXED_ITEMS.md#fixed-321--build-could-change-a-repository-and-never-show-it)) |
+| [B14](#b14--no-diff-review-surface-in-build) | BUILD | TIER 3 | Done 2026-09-04 ([FIXED-369](FIXED_ITEMS.md#fixed-369--a-reviewer-could-accept-a-change-or-reject-it-and-nothing-between) + [FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one)) |
 | [B15](#b15--terminaloutput-pane) | BUILD | TIER 3 | Partial |
 | [B16](#b16--tool-activity-is-buried) | BUILD | TIER 3 | Done |
 | [B17](#b17--no-way-to-stop-or-steer-a-running-turn) | BUILD | TIER 3 | Done |
@@ -91,15 +91,15 @@ that proves it, what is missing, and the concrete work.
 | [C7](#c7--no-web-access) | CHAT | TIER 1 | Done |
 | [C8](#c8--mcp-tools-unreachable) | CHAT | TIER 1 | Done |
 | [C9](#c9--no-skills-or-reusable-procedures) | CHAT | TIER 1 | Done |
-| [C10](#c10--the-assistant-lives-in-one-browser-tab) | CHAT | TIER 2 | Open |
-| [C11](#c11--background-work-is-not-conversational) | CHAT | TIER 2 | Open |
+| [C10](#c10--the-assistant-lives-in-one-browser-tab) | CHAT | TIER 2 | Partial — the notification half ships ([FIXED-374](FIXED_ITEMS.md#fixed-374--a-routine-ran-all-night-and-told-nobody)); no external channel yet |
+| [C11](#c11--background-work-is-not-conversational) | CHAT | TIER 2 | Done 2026-09-03 ([FIXED-367](FIXED_ITEMS.md#fixed-367--background-work-finished-into-a-status-line)) |
 | [C12](#c12--no-collaboration) | CHAT | TIER 2 | Open |
 | [C13](#c13--no-stop-or-steer) | CHAT | TIER 3 | Done |
 | [C14](#c14--no-message-level-actions) | CHAT | TIER 3 | Done |
-| [C15](#c15--attachments-are-one-way) | CHAT | TIER 3 | Open |
+| [C15](#c15--attachments-are-one-way) | CHAT | TIER 3 | Done — closed by C1 and C4; see the entry |
 | [C16](#c16--governed-turn-based-voice) | CHAT | TIER 3 | Done |
 | [C17](#c17--recall-is-invisible) | CHAT | TIER 3 | Done |
-| [C18](#c18--no-cross-chat-surface) | CHAT | TIER 3 | Open |
+| [C18](#c18--no-cross-chat-surface) | CHAT | TIER 3 | Done 2026-09-03 ([FIXED-368](FIXED_ITEMS.md#fixed-368--where-did-i-say-that-was-answered-what-am-i-working-on-was-not)) |
 
 **2026-08-21 compatibility update.** BUG-216 and MEM-06 are closed. Build now
 has foreground SSH/Daytona command adapters, a persistent container boundary,
@@ -386,10 +386,16 @@ The decision the runtime can record is a *narrowing*: hunk positions in the
 approved diff, validated against it, applied after the immutable-intent hash
 check, and only ever able to remove hunks from what runs.
 
-**Still open: "edit then accept".** It did not come with the other half because
-it is not a smaller version of it — an edit is a **different action**, whose
-bytes no human approved, so it cannot ride that hash and needs its own proposal
-path. Tracked as [BUG-271](TO_BE_FIXED.md#bug-271--a-reviewer-can-narrow-a-change-and-cannot-correct-one).
+✅ **"Edit then accept" landed 2026-09-04, as
+[FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one),
+which closes this entry.** It did not come with the other half because it is not
+a smaller version of it — an edit is a **different action**, whose bytes no human
+approved, so it cannot ride that hash. So it does not ride it: the reviewer's
+patch is submitted as a *new proposal* with its own preview and its own hash, the
+original resolves as denied with the replacement named, and nothing runs until
+the owner approves what they themselves wrote. `POST
+/api/approvals/{id}/replace`, offered in Approvals and in Build's own review
+panel.
 
 #### B15 — Terminal/output pane
 
@@ -692,9 +698,22 @@ declares cli, tui, rest, web_ui, desktop, dashboard, ide, apple_mobile,
 android_mobile and webhooks — but `external_channels_enabled` and
 `notifications_enabled` are both hardcoded `False`
 (`raiker/channels/readiness.py`), so there is no mail, chat-tool or mobile surface
-where the assistant reaches the owner. Scheduled routines therefore run and
-finish with nobody told. **Work:** enable the notification path first (it is the
-cheapest and it makes routines useful), then one external channel end to end.
+where the assistant reaches the owner.
+
+🟡 **The first half of that work is done (2026-09-04,
+[FIXED-374](FIXED_ITEMS.md#fixed-374--a-routine-ran-all-night-and-told-nobody)).**
+"Scheduled routines run and finish with nobody told" was the cheapest and most
+valuable part of this entry, and it is closed: a background task reaching a
+terminal state writes an owner-scoped notification, which the notification centre
+renders and mirrors to the browser notice BUG-255 built — off the machine only if
+the owner has already permitted it, and only while Raiker is not the window they
+are looking at. Only *background* work notifies; a Chat turn is a task too, and a
+banner behind an answer the owner is reading is noise.
+
+**Still open:** one external channel end to end. That is the half that needs
+`external_channels_enabled`, and it stays behind the fifteen pre-enablement gates
+in `raiker/channels/readiness.py` rather than being turned on to make a row
+green.
 
 #### C11 — Background work is not conversational
 
@@ -749,8 +768,20 @@ to prevent.
 
 #### C15 — Attachments are one-way
 
-The composer uploads; the transcript cannot
-hand a file back (C1), preview one (C4), or let the owner drag one out.
+✅ **Complete — closed by C1 and C4, and recorded here because a row that says
+"Open" about finished work is the same defect as a document claiming unfinished
+work is done.** The transcript hands a file back (**Download** on every artifact
+card, over the session-authorized `attachmentDownload` read) and previews one in
+place (`FileInspector`, which also downloads what it is showing). Dropping a file
+*in* works on every surface that accepts an upload
+([FIXED-350](FIXED_ITEMS.md#fixed-350--dropping-a-file-worked-in-one-place-and-was-ignored-in-four)).
+
+**One part of the original wording is deliberately not built:** dragging a file
+*out* of the transcript onto the desktop. It needs the File System Access API or
+a `DownloadURL` drag payload, neither of which is available in every browser
+Raiker supports, and **Download** already does the thing the owner wanted. A
+control that works in one browser and silently does nothing in another is worse
+than the button beside it.
 
 #### C16 — Governed turn-based voice
 

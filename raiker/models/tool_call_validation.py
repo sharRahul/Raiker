@@ -143,29 +143,31 @@ def risk_for_tool(tool_name: str) -> str:
         raise ToolCallRejected(f"unknown_tool:{tool_name}", tool_name=tool_name) from None
 
 
+def tool_spec(name: str) -> ToolSpec:
+    """One registered tool's schema, exactly as the model is offered it.
+
+    Split out of :func:`default_tool_specs` so `tool_search` can hand back the
+    schema of a deferred tool without rebuilding all forty-nine (backlog #16) —
+    and so both paths are provably the same schema rather than two renderings
+    that could drift.
+    """
+    required = [*_REQUIRED_ARGS.get(name, ()), *_REQUIRED_LIST_ARGS.get(name, ())]
+    schemas = _ARG_SCHEMAS.get(name, {})
+    properties: dict[str, Any] = {
+        arg: schemas.get(arg, {"type": "string"})
+        for arg in (*required, *_OPTIONAL_ARGS.get(name, ()))
+    }
+    return ToolSpec(
+        name=name,
+        description=_TOOL_DESCRIPTIONS.get(name, name),
+        parameters={"type": "object", "properties": properties, "required": required},
+    )
+
+
 def default_tool_specs() -> list[ToolSpec]:
     """Tool schemas advertised to the model. Only registered, brokered tools are offered."""
 
-    specs: list[ToolSpec] = []
-    for name in sorted(_MODEL_EXPOSED_TOOLS):
-        required = [*_REQUIRED_ARGS.get(name, ()), *_REQUIRED_LIST_ARGS.get(name, ())]
-        schemas = _ARG_SCHEMAS.get(name, {})
-        properties: dict[str, Any] = {
-            arg: schemas.get(arg, {"type": "string"})
-            for arg in (*required, *_OPTIONAL_ARGS.get(name, ()))
-        }
-        specs.append(
-            ToolSpec(
-                name=name,
-                description=_TOOL_DESCRIPTIONS.get(name, name),
-                parameters={
-                    "type": "object",
-                    "properties": properties,
-                    "required": required,
-                },
-            )
-        )
-    return specs
+    return [tool_spec(name) for name in sorted(_MODEL_EXPOSED_TOOLS)]
 
 
 def validate_tool_call(proposal: ToolCallProposal) -> ToolAction:

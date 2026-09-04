@@ -63,6 +63,14 @@
             status = "This device could not play the response.";
             coordinator.release(ownerId);
           },
+          // BUG-269 — read aloud stays on this machine or does not happen.
+          // Naming the language matters: the answer is about this one, not
+          // about the feature, and another language may well work.
+          noLocalVoice(spokenLanguage) {
+            speaking = false;
+            status = `No on-device voice for ${spokenLanguage}.`;
+            coordinator.release(ownerId);
+          },
         });
       },
       () => playback.stop(),

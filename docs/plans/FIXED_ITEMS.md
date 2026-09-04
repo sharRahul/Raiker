@@ -384,6 +384,11 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-369](#fixed-369--a-reviewer-could-accept-a-change-or-reject-it-and-nothing-between) | — | Build / Approvals / code review | Fixed 2026-09-03 (GAP-BUILD B14 remainder) |
 | [FIXED-370](#fixed-370--a-valid-key-was-reported-as-a-bare-http-status) | Medium | Models / provider errors | Fixed 2026-09-03 (BUG-272, raised and closed in the same round) |
 | [FIXED-371](#fixed-371--two-controls-with-nothing-in-them-found-by-the-sweep) | Low | Web UI | Fixed 2026-09-03 (found by this round's own UI sweep) |
+| [FIXED-372](#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | Fixed 2026-09-04 (BUG-274, the remainder FIXED-370 left) |
+| [FIXED-373](#fixed-373--read-aloud-was-the-half-of-voice-that-was-still-not-local) | Low | Voice / privacy posture | Fixed 2026-09-04 (BUG-269) |
+| [FIXED-374](#fixed-374--a-routine-ran-all-night-and-told-nobody) | Medium | Tasks / notifications | Fixed 2026-09-04 (GAP-CHAT C10, first half) |
+| [FIXED-375](#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | Fixed 2026-09-04 (BUG-271; closes GAP-BUILD B14) |
+| [FIXED-376](#fixed-376--every-turn-paid-for-forty-nine-tool-schemas-to-call-two) | Medium | Models / context cost | Fixed 2026-09-04 (compatibility backlog item 16) |
 
 ---
 
@@ -15907,3 +15912,365 @@ the mocked desktop audit cover the header.
 **User-interface outcome.** No control on a fresh install renders as an
 unexplained shape, and no page repeats the sentence the topbar is already
 showing.
+
+---
+
+## FIXED-372 — The answer to an identity-linked key was "go and get another one"
+
+**Severity: Medium. Area: models / provider connection. Status: Fixed
+2026-09-04 (BUG-274, the remainder
+[FIXED-370](#fixed-370--a-valid-key-was-reported-as-a-bare-http-status) left).**
+
+**Observed.** FIXED-370 classified the refusal correctly and stopped there. The
+owner was told their key was the wrong *kind* and sent to the provider's console
+for a different one:
+
+> *"Use a standard API key from the provider's console, or one scoped to a single
+> workspace, then connect again."*
+
+For an owner who has only this key that is not a repair, it is a dead end — and
+it was Raiker's dead end, because the provider had already said what it wanted.
+An identity-linked key authenticates perfectly well. It acts inside one
+workspace, and the request has to name which:
+
+```
+"anthropic-workspace-id is required when authenticating with an identity-linked
+ API key; send the id of the workspace this request acts in."
+```
+
+Raiker had no field for it, so a valid credential was unusable and the round's
+three live scenarios ([BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun))
+could not run.
+
+**Fixed.** The connection carries an optional **Workspace ID**, stored in the
+same encrypted vault beside the endpoint and the key, and sent as
+`anthropic-workspace-id` on every request the profile makes. A standard console
+key is never sent an empty one: the header appears only when the owner supplied
+a value, because an empty header is not the same as no header and would be
+refused.
+
+**The shape check is a header rule, not a format guess.** A workspace id the
+owner pastes becomes an HTTP header value, so `validated_workspace_id` refuses
+anything a header could not safely carry — a newline that would start a second
+header, a non-printable, anything over 128 characters. It deliberately does *not*
+check for `wrkspc_`: a rule written to today's prefix would refuse a valid id
+tomorrow, and what the provider makes of the value is the provider's answer to
+give. Refused at save time, where the owner can still see what they typed, and
+again fail-closed at build time so a stored value that no longer passes is never
+sent.
+
+**Adding one does not delete the key beside it.** A save replaces the stored
+payload, so a workspace sent on its own would have removed the credential it is
+meant to accompany — and "add the workspace ID to this connection" has to mean
+exactly that. A request carrying *only* a workspace id, against a connection that
+already exists, merges. Any other combination still replaces, so nothing else
+silently retains a value the owner believed they had cleared.
+
+**A rejected id is not a missing one.** Once Raiker can send a workspace it can
+send a wrong one, and the two have opposite repairs.
+`provider_workspace_invalid` is classified from its own body markers and checked
+*before* the missing-workspace markers, because both bodies name the same header
+and only one names a value the owner already supplied. Nothing from either body
+is kept: the reason codes are fixed strings, so a provider naming an
+organisation in this message cannot carry it into an event, an API response or a
+readiness record.
+
+**Guarded.** `tests/test_provider_workspace_named.py` — the header sent only
+when named, a bad stored value failing closed, both classifications separated,
+the quota case not stolen, nothing from the body reaching the code, and the two
+remediations not sharing a sentence. `tests/test_api_model_selection.py` covers
+the merge rule, that anything else still replaces, that a header-unsafe value is
+refused before storage, and that clearing still clears. `providerErrors.test.ts`
+covers both codes.
+
+**Two things the live run found that the unit tests could not.**
+
+* **Saving does not contact the provider.** The refusal arrives on the *next*
+  read — the readiness check, or the catalogue listing when no model is pinned
+  yet — so the guidance in the dialog was never the surface an owner met it on.
+  The card's own answer now carries an **Add workspace ID** action, which opens
+  the connection dialog with **Advanced** already expanded. A remediation naming
+  a field the owner then has to find under Details → Reconnect → Advanced is a
+  remediation pointing at nothing they can see.
+* And it has to read *both* paths. Reading only the readiness row offered the
+  field on the one case an owner has already got past — a pinned model — and not
+  on a fresh connection, which is where the refusal actually happens. Both
+  sources are governed reason codes rather than message text.
+
+**And a third, on the screen an owner meets first.** `ProviderMatrix` — the
+first-run provider list — reported a refusal the server had *already classified*
+as *"could not be reached. Check this device's network access."* It knew four
+causes by name and let everything else fall through to that sentence, because
+a catalogue refusal arrives as an HTTP **200** whose body says `unavailable`
+rather than as a thrown error, so the guidance table was never consulted on that
+path. That is the FIXED-355 / FIXED-370 defect alive on the one screen where a
+new owner meets a provider for the first time. It now uses the same
+`providerErrorGuidance` table Models does, so a code either surface learns is
+known to both.
+
+**And one defect that had been papered over in the harness.** **Reconnect** is
+reached through **Model details**, and saving left that modal sitting over the
+card it had just changed, so the next click hit an overlay. `hosted-provider.ts`
+had been closing it by hand since FIXED-141 with a comment explaining why, which
+made it look like a test concern rather than the interface defect it is. Saving a
+connection now closes Details.
+
+**User-interface outcome.** The connection dialog carries **Workspace ID
+(identity-linked keys only)** under **Advanced**, because most keys need nothing
+there — and a workspace refusal opens that section itself, from the card the
+owner read it on. First run raises the same field against the row that hit the
+refusal, rather than asking every owner for an id most cannot supply; the same
+screen also stopped printing bare reason codes at them. Details reports
+*"workspace named"* — that one is set, never which one.
+
+**Live evidence**, against a real identity-linked key:
+[`screenshots/working/bug-274-workspace-answer-live.png`](screenshots/working/bug-274-workspace-answer-live.png)
+(the provider's refusal as a repair, on the card) and
+[`screenshots/working/bug-274-workspace-field-live.png`](screenshots/working/bug-274-workspace-field-live.png)
+(the field it opens on). `e2e/identity-linked-key-live.spec.ts` drives both and
+skips itself when no key is supplied.
+
+---
+
+## FIXED-373 — Read aloud was the half of voice that was still not local
+
+**Severity: Low. Area: voice / privacy posture. Status: Fixed 2026-09-04
+(BUG-269).**
+
+**Observed.** [FIXED-363](#fixed-363--dictation-was-the-last-surface-that-was-not-local)
+made dictation run on this machine. Playback was left behind: **Read aloud**
+called the browser's `speechSynthesis` and took whatever voice it was given.
+Chrome ships remote voices for several languages and picks one without saying
+so, and the page could not tell afterwards which kind it got.
+
+The asymmetry was its own defect. An owner who has just pointed the microphone at
+a runtime on their own machine has no reason to expect the other direction to
+behave differently, and nothing told them it did.
+
+**Fixed, in one line and with no setting** — exactly as dictation now needs none.
+`speechSynthesis` exposes `voice.localService`, so the page can tell
+*beforehand* what it could not tell afterwards: **Raiker speaks only with a voice
+it can see is on this device, and says so when there is none.**
+
+* An exact region match wins, then the same language in another region — the
+  thing being chosen here is the boundary, not the accent, so a local `en-US`
+  beats a remote `en-GB`.
+* A voice the platform has not marked local is never a candidate. The flag is
+  the only evidence there is, and treating "unmarked" as local would rest the
+  claim on nothing.
+* The voice list is read *after* waiting for `voiceschanged`, briefly. Several
+  browsers populate it asynchronously, so reading once would have reported "no
+  on-device voice" on the owner's first click and a working voice on their
+  second.
+
+Refusing is the honest half of the promise: speaking with a voice whose locality
+could not be established would make the claim untrue in precisely the case the
+claim matters.
+
+**Guarded.** `voice.test.ts` — local preferred over remote for the same
+language, a local voice in another region preferred over a remote one in this
+region, nothing found when every voice is remote, an unmarked voice never
+treated as local, the chosen voice actually attached to the utterance, and the
+asynchronous list waited for. `ReadAloudButton.test.ts` covers the refusal
+reaching the owner and the button returning to rest.
+
+**User-interface outcome.** Read aloud either uses a voice that stays on this
+machine or says **"No on-device voice for &lt;language&gt;."** — naming the
+language, because that is what is missing rather than the feature — without
+asking the owner to configure anything.
+
+---
+
+## FIXED-374 — A routine ran all night and told nobody
+
+**Severity: Medium. Area: tasks / notifications. Status: Fixed 2026-09-04
+(GAP-CHAT C10, first half).**
+
+**Observed.** `raiker/config/channel-connectors.json` declares ten surfaces and
+`external_channels_enabled` is hardcoded `False`, so there was nowhere for
+Raiker to reach an owner who was not looking at it. The consequence
+[GAP-CHAT C10](GAP_BUILD_CHAT.md#c10--the-assistant-lives-in-one-browser-tab)
+names is the one that matters: **a scheduled routine ran, finished, and left
+nothing but a card the owner had to think to go and look at.** Nothing in the
+codebase called `insert_notification` for a task — only approvals, integrity
+findings, MCP monitoring, containment and injection scans did.
+
+**Fixed, over what already exists rather than by adding a channel.** A task
+reaching a terminal state writes an owner-scoped `task_finished` notification.
+The notification centre already renders those, and already mirrors a new one to
+the browser notice [FIXED-351](#fixed-351--a-decision-raised-while-raiker-was-in-the-background-reached-nobody)
+built — a notice the owner has already permitted, only while Raiker is not the
+visible window, and one that never leaves the machine. The owner's optional
+`RAIKER_OS_NOTIFY_CMD` hook fires exactly as it does for an approval.
+
+**Only work the owner was not watching.** Every Chat turn is a task and every
+Chat turn completes; notifying for those would put a banner behind a message the
+owner has just finished reading. A task qualifies when it carries a schedule —
+C10's own case — or when it was parked `waiting_for_children`, which is work that
+outlived the turn that asked for it. That second condition is read *before* the
+terminal write, because the write is what changes it: a parent settling is
+already `completed` by the time the notice is sent, and asking then would answer
+about the wrong moment.
+
+**Metadata, not content.** The body names the task's title, bounded, and its
+outcome. A run's summary is model output about the owner's material, and an
+operating system may render a notice on a lock screen; the thread is one click
+away and holds the whole of it.
+
+**A notice never fails the task it is about.** The whole path is isolated the
+same way the hook dispatch is: a store that refuses the write, a workspace with
+no owner account yet, a hook that throws — each returns quietly, because the
+task's outcome is already recorded and a courtesy on top of a record must not be
+able to destroy it.
+
+**Guarded.** `tests/test_task_finished_notification.py` — a scheduled run and a
+recurring run notifying, an ordinary Chat turn not, a parent that outlived its
+turn notifying while its watched child does not, a failure reading as one, a
+run's own words staying out of the body, a long title bounded, and a store that
+refuses the write leaving the task completed.
+
+**User-interface outcome.** A finished background task appears in the
+notification centre and, when Raiker is not the window in front of the owner, as
+a browser notice that lands on **Tasks** — where the card carries the run's own
+conversation thread.
+
+---
+
+## FIXED-375 — A reviewer could narrow a change and could not correct one
+
+**Severity: Low. Area: Build / Approvals / code review. Status: Fixed 2026-09-04
+(BUG-271; closes GAP-BUILD B14).**
+
+**Observed.** Per-hunk accept and reject shipped as
+[FIXED-369](#fixed-369--a-reviewer-could-accept-a-change-or-reject-it-and-nothing-between).
+*Edit then accept* — the reviewer changing a line in the proposed diff and
+approving the result — did not, and was not offered rather than being shown as a
+control the server would refuse.
+
+**Why it did not come with the other half**, and why the fix is shaped the way it
+is. A narrowing and an edit are different kinds of thing, and the difference is
+exactly the one the approval boundary is built on:
+
+* a **narrowing** is a subset of what was approved. `select_hunks` copies bytes
+  out of the approved patch and copies nothing else in, so the A1
+  immutable-intent hash still covers the whole approved change and what runs is
+  provably inside it;
+* an **edit** is a *different action*. Its bytes were never approved, so it
+  cannot ride that hash — and the one thing the relay must never do is execute
+  arguments no human read. `ResolveApprovalRequest` sets `extra="forbid"`
+  precisely to stop an edited payload arriving on a resolve.
+
+**Fixed by not amending anything.** `POST /api/approvals/{id}/replace` takes the
+reviewer's own patch and makes it a **new proposal**: its own action row, its own
+preview, its own immutable-intent hash, its own approval. The original resolves
+as **denied**, with the replacement's id on the denial, and a second
+`approval_replaced_by_edit` event says what took its place — so a reader of the
+trail sees a replacement rather than an amendment. Nothing executes: the edited
+patch runs only if the owner then approves it, through the same relay, capability
+gate, policy review and posture check any other proposal passes. The bytes that
+run are always bytes a human approved after seeing them.
+
+**What it refuses, and why each.** An empty diff (not a change). Text that is not
+a unified diff (unreadable, so unappliable). The identical patch (denying and
+re-raising it would only churn the trail). A critical approval (replacing one
+here would route it around the human-only step-up lifecycle). Anything but a
+patch (a control with nothing behind it). And a replacement that reaches a file
+the original never named — not because the new approval could not govern it, but
+because a different change wearing a review's clothes should be proposed as one.
+
+**The model is told the right thing.** "Rejected, try something else" would be
+wrong here: the owner did not decline the work, they corrected it, and their
+version is waiting on their own approval. `approval_outcome` gained a `replaced`
+case that says so and tells the model not to propose an alternative that would
+compete with a change the owner has written.
+
+**Guarded.** `tests/test_edited_change_proposal.py` — the original denied and the
+edit pending, the replacement carrying its own hash over the edited bytes,
+approving it applying the reviewer's own text, the trail carrying both records,
+the event carrying no diff, and each of the seven refusals. It also re-pins that
+`resolve` still rejects an unknown field, which is why the edit needed its own
+route at all. `ApprovalsView.test.ts` covers the editor opening on the proposed
+diff, the request going to `/replace` and never to `/resolve`, a governed refusal
+rendered in words, and no edit control on a preview that is not a patch.
+
+**User-interface outcome.** **Edit…** sits beside Deny and Approve on a proposed
+patch, in Approvals and in Build's own review panel. It opens on the proposed
+diff and says, above the button: *"This denies the change above and proposes yours
+in its place. You will be asked to approve it; nothing runs until you do."* The
+button is **Propose as a new change**. What does not appear anywhere is a control
+that looks like an amendment to the approval in front of the owner.
+
+---
+
+## FIXED-376 — Every turn paid for forty-nine tool schemas to call two
+
+**Severity: Medium. Area: models / context cost. Status: Fixed 2026-09-04
+(compatibility backlog item 16).**
+
+**Observed.** Every model-exposed built-in entered every request at full schema,
+and every tool a connected MCP server advertises was projected on top. Measured
+on the registry as it stood: **~6,400 tokens before a word of the owner's
+prompt**, on every turn of every conversation, most of it describing tools the
+turn would never call. On a long conversation that is paid again on each turn,
+and it is the first thing to crowd a small local model's context window.
+
+**Fixed with the mechanism the reference platforms use, and one property of
+Raiker's own.** A turn carries a *core* set at full schema — reading, editing,
+running, planning, asking the owner, recall, the web, and where a coding turn
+starts — and `tool_search` fetches the rest by name or by what they do
+(*"commit my work"*, *"read my calendar"*). A schema fetched once stays callable
+for the remainder of that turn and costs the next one nothing. Measured on the
+same registry: **6,494 → 3,726 tokens, a 43% reduction**, with the whole catalogue
+still reachable.
+
+**Deferring is not gating**, and the code is written so it cannot become that:
+
+* every deferred tool's name and one-line summary rides on `tool_search`'s own
+  description — the one spec guaranteed to be in every request — so the model is
+  told what exists rather than left to guess. That index costs ~500 tokens
+  against the ~3,300 the full schemas cost, and it is the whole difference
+  between *not carried* and *not available*;
+* `tool_search` grants **nothing**. A schema is a description; the tool it
+  describes still passes its own capability gate, decision mode, policy review
+  and approval when it is actually called. It is `low`, has no capability of its
+  own, and reads the registry Raiker ships — no store, no network;
+* the reveal is read from the **result**, never from the query, so the model
+  cannot widen its own catalogue by naming something the registry does not have;
+* the split is *derived* — one declared core set, checked against the registry at
+  import — so a tool added tomorrow is deferred by default rather than silently
+  absent from both halves. A name in the core set that is not a real tool fails
+  at import rather than projecting nothing.
+
+`tool_search` and `default_tool_specs` return the **same** schema, built by the
+same function, so a tool reached by search cannot be described differently from
+one that was in the request all along.
+
+**Guarded.** `tests/test_tool_schema_projection.py` — the two halves being the
+whole catalogue and disjoint, every deferred tool named in the request, the
+projection materially smaller, `defer=False` returning everything, search by name
+and by intent, an empty query listing the catalogue, nothing-matched saying what
+exists, the identical schema coming back, a revealed tool joining the request and
+leaving the others deferred, the search tool needing no capability, a deferred
+tool keeping its own band and gate, and the reveal ignoring a name the registry
+does not have.
+
+**Found while doing it.** `TERMINAL_COMMAND_STATES` is a frozenset, and a
+`@pytest.mark.parametrize` over it made every `pytest-xdist` worker collect the
+parameters in a different order, aborting the whole run with *"Different tests
+were collected between gw0 and gw1"*. The suite could therefore only be run
+serially — around forty minutes rather than ten. Sorted, and the reason is in the
+comment beside it.
+
+**What is deliberately not built.** A connected MCP server's tools are still
+projected in full. A projected MCP tool is already one generic `arguments`
+object, so the saving would be small, and the set changes between turns with
+what the owner has connected — a deferred index would have to be rebuilt from a
+live discovery read each turn, which is a cost of its own. Backlog item 16 and
+[the known limits](../guide/known-limits.md) both say so rather than letting the
+built-in behaviour imply it.
+
+**User-interface outcome.** The context popover states it in one line —
+*"25 tool schemas sent · 25 fetched on request"* — with the explanation on the
+info marker: nothing is withheld, and a fetched tool passes the same permission,
+policy and approval checks. An owner reading a context figure can see where part
+of it went.

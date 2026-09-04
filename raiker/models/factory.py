@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import httpx
 
 from raiker.contracts.models import ModelProfile
+from raiker.models.connections import validated_workspace_id
 from raiker.models.contracts import ModelCapabilities
 from raiker.models.endpoint_policy import (
     EndpointPolicy,
@@ -213,6 +214,19 @@ class ModelProviderFactory:
         if provider == "anthropic":
             if api_key:
                 headers["x-api-key"] = api_key
+            # BUG-274 — an identity-linked key authenticates only when the
+            # request names the workspace it acts in. Optional: a standard
+            # console key needs no workspace and must not be sent an empty one,
+            # so the header appears only when the owner supplied a value.
+            workspace_id = (self.connection or {}).get("workspace_id", "").strip()
+            if workspace_id:
+                try:
+                    headers["anthropic-workspace-id"] = validated_workspace_id(workspace_id)
+                except ValueError as exc:
+                    # Fail closed rather than send it. A stored value that no
+                    # longer passes the shape check is a misconfiguration, and
+                    # the owner repairs it where they entered it.
+                    raise ProviderConfigurationError(str(exc)) from exc
             return AsyncAnthropicMessagesProvider(
                 profile_id=profile.profile_id,
                 provider=profile.provider,

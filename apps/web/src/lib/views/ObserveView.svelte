@@ -375,6 +375,11 @@
             <p class="entry-meta">
               <time title={notification.created_at}>{relativeTime(notification.created_at)}</time>
               · {notification.read ? "read" : "unread"}
+              <!-- C10 — a notice about background work is only useful if it
+                   leads to the work. The card there carries the run's thread. -->
+              {#if notification.kind === "task_finished"}
+                · <a href="#/tasks">Open Tasks</a>
+              {/if}
             </p>
           </li>
         {/each}

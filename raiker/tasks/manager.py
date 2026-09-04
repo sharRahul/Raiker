@@ -213,6 +213,11 @@ class TaskManager:
         """
         if self._unfinished_children(task_id):
             return self._hold_for_children(task_id, summary)
+        # C10 — read before the write, because the write is what changes it. A
+        # parent settling out of `waiting_for_children` is `completed` by the
+        # time the notice is sent, and asking then would answer about the wrong
+        # moment.
+        was_background = self._was_unwatched(task_id)
         self.store.complete_task(task_id, summary)
         task = self.get_task(task_id)
         if task is not None:
@@ -227,11 +232,13 @@ class TaskManager:
             self._dispatch_task_hook(
                 "TaskCompleted", task, {"outcome": "completed", "summary_length": len(summary or "")}
             )
+            self._notify_owner(task, outcome="completed", was_background=was_background)
             self._settle_parent(task)
         return task
 
     def fail_task(self, task_id: str, reason: str) -> TaskRecord | None:
         stated = _stated(reason, NO_STATED_FAILURE_REASON)
+        was_background = self._was_unwatched(task_id)
         self.store.fail_task(task_id, stated)
         task = self.get_task(task_id)
         if task is not None:
@@ -248,6 +255,7 @@ class TaskManager:
             self._dispatch_task_hook(
                 "TaskCompleted", task, {"outcome": "failed", "summary_length": len(stated)}
             )
+            self._notify_owner(task, outcome="failed", was_background=was_background)
             self._settle_parent(task)
         return task
 
@@ -270,6 +278,34 @@ class TaskManager:
             )
             self.writer.append(event)
         return task
+
+    # ── Telling the owner it ended (GAP-CHAT C10) ───────────────────────────
+
+    def _was_unwatched(self, task_id: str) -> bool:
+        """True when this task was parked for delegated children before it ended.
+
+        The one background condition that is *lost* by the write about to
+        happen. The schedule-carrying case survives it and is read from the
+        record itself, in the notifier.
+        """
+        current = self.get_task(task_id)
+        return current is not None and current.status == "waiting_for_children"
+
+    def _notify_owner(self, task: TaskRecord, *, outcome: str, was_background: bool) -> None:
+        """Tell the owner that work they were not watching has ended.
+
+        Isolated for the same reason the hook dispatch is: a notice is a
+        courtesy on top of a record that already exists, and it must never be
+        able to fail the task it is about.
+        """
+        try:
+            from raiker.notify.task_notifier import notify_task_finished
+
+            notify_task_finished(
+                self.store, task, outcome=outcome, was_background=was_background
+            )
+        except Exception:  # noqa: BLE001 - the task's outcome is already recorded
+            return
 
     # ── Delegation ownership (BUG-220) ──────────────────────────────────────
 

@@ -12,6 +12,7 @@ from raiker.api.auth import AuthMiddleware
 from raiker.api.routes_prompts import _record_generated_file_attachments_for_turn, _sse
 from raiker.api.schemas import (
     AnswerOwnerQuestionRequest,
+    ReplaceApprovalRequest,
     ResolveApprovalRequest,
     serialize_dto,
 )
@@ -389,6 +390,188 @@ async def answer_owner_question(
             approval_id,
             owner_answer_outcome(answers=answers, response=response),
         ),
+    }
+
+
+# BUG-271 — a reviewer could narrow a change and could not correct one.
+#
+# Per-hunk accept and reject ship (B14/FIXED-369). *Edit then accept* — the
+# reviewer changing a line in the proposed diff and approving the result — did
+# not, and the reason is the distinction the approval boundary is built on:
+#
+# * a **narrowing** is a subset of what was approved. `select_hunks` copies
+#   bytes out of the approved patch and copies nothing else in, so the A1
+#   immutable-intent hash still covers the whole approved change and what runs
+#   is provably inside it;
+# * an **edit** is a *different action*. Its bytes were never approved, so it
+#   cannot ride that hash, and the one thing the relay must never do is execute
+#   arguments no human read.
+#
+# So an edit does not amend a decision. It becomes a new proposal with its own
+# preview, its own hash and its own approval, and the original resolves as
+# denied with the replacement named. The owner reads their own text and approves
+# it exactly as they would read the model's — which is the point: the bytes that
+# execute are always bytes a human approved after seeing them.
+
+#: The tools whose proposal is a patch, and so can be replaced by an edited one.
+_PATCH_TOOLS = frozenset({"apply_patch"})
+
+
+@router.post("/api/approvals/{approval_id}/replace")
+async def replace_approval_with_edit(
+    approval_id: str,
+    body: ReplaceApprovalRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Deny a proposed patch and raise the reviewer's own in its place.
+
+    Executes nothing. It records one denial and one fresh proposal, and returns
+    the new approval id; the edited patch runs only if the owner then approves
+    it, through the same relay, gate, policy review and posture check any other
+    proposal passes.
+    """
+    from raiker.contracts.ids import new_id
+    from raiker.contracts.models import ToolAction
+    from raiker.tools.patch_selection import patch_target_paths
+
+    session, _principal = _auth_data
+    store = SQLiteStore(_ws(request))
+    user_id = store.principal_user_id(session.principal_id)
+    approval_row = store.load_approval(approval_id, user_id=user_id)
+    if approval_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"ok": False, "reason_code": "approval_not_found"},
+        )
+    if str(approval_row.get("status", "")) != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": "approval_already_resolved"},
+        )
+    # A critical approval keeps the human-only, step-up lifecycle. Replacing one
+    # here would route it around that floor, so it is refused rather than
+    # quietly downgraded.
+    if approval_row.get("critical"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"ok": False, "reason_code": "critical_approval_requires_lifecycle"},
+        )
+    tool_name = str(approval_row.get("tool_name", ""))
+    original = approval_arguments(approval_row)
+    if tool_name not in _PATCH_TOOLS or not str(original.get("patch", "")).strip():
+        # Only a patch can be edited as text. Offering the control on anything
+        # else would be a control with nothing behind it.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": "action_is_not_a_patch"},
+        )
+
+    edited = body.patch
+    if not edited.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"ok": False, "reason_code": "replacement_patch_empty"},
+        )
+    original_targets = patch_target_paths(str(original.get("patch", "")))
+    edited_targets = patch_target_paths(edited)
+    if not edited_targets:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"ok": False, "reason_code": "replacement_patch_unreadable"},
+        )
+    # A correction changes the same files. This is not the authority boundary —
+    # the new approval is — but a "replacement" that reaches a file the review
+    # never mentioned is a different change wearing a review's clothes, and the
+    # owner should propose that as one rather than through this door.
+    widened = sorted(set(edited_targets) - set(original_targets))
+    if widened:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "ok": False,
+                "reason_code": "replacement_widens_targets",
+                "unexpected_paths": widened,
+            },
+        )
+    if edited == str(original.get("patch", "")):
+        # Nothing was corrected, so there is nothing to replace. Denying and
+        # re-raising an identical proposal would only churn the audit trail.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": "replacement_unchanged"},
+        )
+
+    session_id = str(approval_row.get("session_id", ""))
+    turn_id = str(approval_row.get("turn_id", "")) or None
+    action = ToolAction(
+        action_id=new_id("act_"),
+        tool_name=tool_name,
+        # The reviewer's patch replaces the proposed one entirely. Nothing from
+        # the original is merged in: a half-merged diff would be a third change
+        # neither party wrote.
+        arguments={**original, "patch": edited},
+        risk_level=str(approval_row.get("risk_level", "medium")),
+        requires_approval=True,
+        proposed_by=session.principal_id,
+    )
+    # The replacement is raised *before* the denial, so the denial can name it.
+    # If the denial then loses a race the owner is left with one extra pending
+    # proposal — the one they just wrote, visible and refusable, running
+    # nothing. The other order would leave a denial pointing at an id that does
+    # not exist, which is a record that lies.
+    replacement_id = new_id("appr_")
+    store.insert_tool_action(action, session_id, turn_id, "approval_required")
+    store.insert_approval(replacement_id, action)
+
+    inbox = ApprovalInbox(store, EventLogWriter(store))
+    reason = (body.reason or "").strip() or "Replaced by the reviewer's own edit."
+    try:
+        inbox.resolve(
+            approval_id,
+            approve=False,
+            resolved_by=session.principal_id,
+            reason=f"{reason} (replaced by {replacement_id})",
+            user_id=user_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=_RESOLVE_ERRORS.get(str(exc), status.HTTP_409_CONFLICT),
+            detail={"ok": False, "reason_code": str(exc)},
+        ) from exc
+
+    EventLogWriter(store).append(
+        make_event(
+            session_id=session_id or f"approval_{session.principal_id}",
+            turn_id=turn_id,
+            event_type="approval_replaced_by_edit",
+            actor="approval_api",
+            payload={
+                "approval_id": approval_id,
+                "replacement_approval_id": replacement_id,
+                "action_id": action.action_id,
+                # Positions and counts, never the diff: the patch itself is on
+                # the action row, redacted by the same path every other proposal
+                # takes, and does not belong duplicated in the event log.
+                "paths": len(edited_targets),
+                "executes_action": False,
+            },
+        )
+    )
+    outcome = _record_resume_outcome(
+        request,
+        store,
+        approval_id,
+        approval_outcome(approved=False, executed=False, replaced=True),
+    )
+    return {
+        "ok": True,
+        "approval_id": approval_id,
+        "status": "denied",
+        "replacement_approval_id": replacement_id,
+        "action_id": action.action_id,
+        "executes_action": False,
+        **outcome,
     }
 
 

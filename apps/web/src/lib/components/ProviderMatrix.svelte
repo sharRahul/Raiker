@@ -149,6 +149,12 @@
   let choice = $state<Record<string, string>>({});
   let apiKey = $state<Record<string, string>>({});
   let endpoint = $state<Record<string, string>>({});
+  // BUG-274 — an identity-linked key acts inside one workspace. Neither field
+  // is offered up front: most keys need nothing here, and a box asking for a
+  // "workspace ID" on first run is a question most owners cannot answer. The
+  // provider's own refusal is what raises it, against the row that hit it.
+  let workspaceId = $state<Record<string, string>>({});
+  let wantsWorkspace = $state<Record<string, true>>({});
   let busy = $state<Record<string, "detecting" | "saving" | "pinning" | "deploying">>({});
   let note = $state<Record<string, string>>({});
   let failure = $state<Record<string, string>>({});
@@ -194,6 +200,10 @@
       // half was the redaction layer flattening three distinct ids into one.)
       const list = { ...answer, models: [...new Set(answer.models)] };
       catalogue = set(catalogue, row.profileId, list);
+      // A refusal can arrive as a 200 whose body says `unavailable` — the
+      // provider answered, and what it said was no. The field has to be raised
+      // from there too, not only from a thrown error (BUG-274).
+      noteWorkspaceRefusalCode(row, list.reason_code);
       if (list.status === "available" && list.models.length > 0) {
         // Pre-select the pinned model when the provider still serves it, so the
         // dropdown opens on the owner's own choice rather than on the provider's
@@ -205,12 +215,66 @@
         );
       }
     } catch (error) {
+      // A bare reason code is not an answer (FIXED-01). The same guidance the
+      // key path already used says what happened and what to do about it, and
+      // falls back to the code only when there is nothing better to say.
+      const guidance =
+        error instanceof ApiError ? providerErrorGuidance(error.reasonCode) : null;
+      noteWorkspaceRefusal(row, error);
       failure = set(
         failure,
         row.profileId,
-        error instanceof ApiError && error.reasonCode
-          ? `${row.label} could not be listed (${error.reasonCode}).`
-          : `${row.label} could not be reached from this device.`,
+        guidance
+          ? `${guidance.message} ${guidance.fix}`
+          : error instanceof ApiError && error.reasonCode
+            ? `${row.label} could not be listed (${error.reasonCode}).`
+            : `${row.label} could not be reached from this device.`,
+      );
+    } finally {
+      busy = drop(busy, row.profileId);
+    }
+  }
+
+  /** Raise the workspace field on the row the provider asked it of (BUG-274). */
+  function noteWorkspaceRefusal(row: Row, error: unknown) {
+    noteWorkspaceRefusalCode(
+      row,
+      error instanceof ApiError ? (error.reasonCode ?? null) : null,
+    );
+  }
+
+  function noteWorkspaceRefusalCode(row: Row, reasonCode: string | null) {
+    if ((reasonCode ?? "").startsWith("provider_workspace"))
+      wantsWorkspace = set(wantsWorkspace, row.profileId, true);
+  }
+
+  /**
+   * Add a workspace to a stored connection without re-pasting the key.
+   *
+   * A workspace on its own merges into the saved connection server-side, which
+   * is the one shape that does: anything else replaces. So this sends nothing
+   * but the workspace, and the catalogue read that follows is the proof it
+   * worked.
+   */
+  async function saveWorkspace(row: Row) {
+    const value = (workspaceId[row.profileId] ?? "").trim();
+    if (value === "") return;
+    busy = set(busy, row.profileId, "saving");
+    failure = drop(failure, row.profileId);
+    try {
+      await api.saveModelConnection(row.profileId, "", "", "", value);
+      wantsWorkspace = drop(wantsWorkspace, row.profileId);
+      onchanged?.();
+      await detect(row);
+    } catch (error) {
+      const guidance =
+        error instanceof ApiError ? providerErrorGuidance(error.reasonCode) : null;
+      failure = set(
+        failure,
+        row.profileId,
+        guidance
+          ? `${guidance.message} ${guidance.fix}`
+          : `${row.label} would not accept that workspace ID.`,
       );
     } finally {
       busy = drop(busy, row.profileId);
@@ -269,6 +333,7 @@
       }
     } catch (error) {
       const guidance = error instanceof ApiError ? providerErrorGuidance(error.reasonCode) : null;
+      noteWorkspaceRefusal(row, error);
       failure = set(
         failure,
         row.profileId,
@@ -566,6 +631,15 @@
     if (cause === "provider_timeout") {
       return `${row.label} did not answer in time. Try again.`;
     }
+    // BUG-274 — found on first run while proving the workspace field. A refusal
+    // the *server already classified* arrived here as a 200 whose body says
+    // `unavailable`, not as a thrown error, so the four causes above were the
+    // whole list and everything else fell through to "check your network" — the
+    // FIXED-355/FIXED-370 defect, alive on the one screen where an owner meets
+    // it first. The shared guidance is the same table Models uses, so a code
+    // either surface learns is known to both.
+    const guidance = providerErrorGuidance(reasonCode);
+    if (guidance !== null) return `${row.label}: ${guidance.message} ${guidance.fix}`;
     return `${row.label} could not be reached. Check this device's network access.`;
   }
 
@@ -829,6 +903,40 @@
         {/if}
       </div>
 
+      <!-- BUG-274 — raised by the provider's refusal, not offered up front. -->
+      {#if wantsWorkspace[row.profileId]}
+        <div class="workspace-row">
+          <label class="field key-field">
+            <span class="sr-only">{row.label} workspace ID</span>
+            <input
+              class="input"
+              type="text"
+              spellcheck="false"
+              autocapitalize="off"
+              autocomplete="off"
+              placeholder="Workspace ID"
+              aria-label={`${row.label} workspace ID`}
+              bind:value={workspaceId[row.profileId]}
+              onkeydown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void saveWorkspace(row);
+                }
+              }}
+            />
+          </label>
+          <button
+            class="btn btn-sm btn-primary"
+            type="button"
+            disabled={busy[row.profileId] !== undefined ||
+              !(workspaceId[row.profileId] ?? "").trim()}
+            onclick={() => void saveWorkspace(row)}
+          >
+            {busy[row.profileId] === "saving" ? "Saving…" : "Add workspace"}
+          </button>
+        </div>
+      {/if}
+
       <p class="state">
         {#if row.pinned}<span class="pinned">Selected: {modelName(row.pinned)}</span>{/if}
         {#if failure[row.profileId]}<span class="failed" role="alert">{failure[row.profileId]}</span>
@@ -967,6 +1075,17 @@
   }
   .key-field {
     flex: 1 1 15rem;
+  }
+  /* BUG-274 — the same shape as the key row it follows, so a row that gains
+     this field does not change layout beyond one extra line. It wraps rather
+     than shrinking the input on a narrow window. */
+  .workspace-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    min-width: 0;
   }
   /* Narrower than the picker it filters: the list is the answer, the filter is
      how you reach it. */

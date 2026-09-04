@@ -83,6 +83,10 @@
     ].filter((row): row is [string, string] => typeof row[1] === "string" && row[1] !== ""),
   );
   const providerLabel = $derived(usage?.provider ? `${usage.provider}, all time` : "All time");
+  // Backlog #16 — how much of the tool catalogue a turn carries. Absent on an
+  // older server, which renders nothing rather than "0 deferred".
+  const toolsProjected = $derived(usage?.tools_projected ?? 0);
+  const toolsDeferred = $derived(usage?.tools_deferred ?? 0);
 </script>
 
 <section class="context-popover" aria-label="Context window and cost details">
@@ -116,6 +120,20 @@
     </p>
   {:else}
     <p>Context capacity is not configured for this model.</p>
+  {/if}
+  <!-- Backlog #16 — a turn carries the core tool schemas and fetches the rest
+       on request. Stated because a tool missing from a request is not a tool
+       withheld, and an owner reading a context figure should be able to see
+       where part of it went. One line: the counts are the whole story. -->
+  {#if toolsDeferred > 0}
+    <p class="tool-budget">
+      {toolsProjected} tool schemas sent · {toolsDeferred} fetched on request
+      <span
+        class="info"
+        title="Raiker sends the tools a turn usually needs and lets the model ask for any of the others by name. Nothing is withheld: a fetched tool passes the same permission, policy and approval checks."
+        aria-label="About deferred tool schemas">i</span
+      >
+    </p>
   {/if}
 
   {#if usage?.latest_compaction}
@@ -184,6 +202,7 @@
      this only places it. */
   .meter { margin-top:.75rem; }
   .remaining { display:flex; justify-content:space-between; flex-wrap:wrap; gap:.5rem; margin-top:.7rem; color:var(--text-2); font-size:.76rem; }
+  .tool-budget { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem; margin:.35rem 0 0; color:var(--text-3); font-size:.72rem; }
   .reported { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem; } .capacity-source { color:var(--text-2); } .info { width:1rem; height:1rem; display:inline-grid; place-items:center; border:1px solid var(--border-strong); border-radius:50%; font-size:.65rem; color:var(--text-2); cursor:help; }
   .compaction { display:grid; grid-template-columns:1fr auto; gap:.2rem .9rem; margin-top:1rem; padding:.75rem .85rem; border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:.5rem; background:var(--sunken); }
   .compaction strong { color:var(--text-1); font-size:.8rem; }

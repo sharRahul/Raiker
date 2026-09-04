@@ -97,7 +97,8 @@ names.
 | [BUG-246](FIXED_ITEMS.md#fixed-320--the-authority-matrix-hid-its-own-verdicts-on-a-phone) | Low | Permissions / web UI | **Closed 2026-08-29 (FIXED-320)** — raised and closed in the same run; a narrow window gets the same verdicts as stacked cards |
 | [BUG-247](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite) | Low | Live test harness | **Closed 2026-08-30 (FIXED-328)** — `OWNER_CREDENTIALS` is the only owner credential in the suite |
 | [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — raised 2026-09-03. The round's supplied key is identity-linked ([FIXED-370](FIXED_ITEMS.md#fixed-370--a-valid-key-was-reported-as-a-bare-http-status)), so no provider turn could run; three scenarios are written and are waiting on a key that authenticates |
-| [BUG-271](#bug-271--a-reviewer-can-narrow-a-change-and-cannot-correct-one) | Low | Build / Approvals / code review | Open — raised 2026-09-03 while closing B14's remainder. An edit is a *different action*, not a smaller one, so it needs its own proposal path rather than a field on the decision |
+| [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
+| [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced 2026-08-30 to twenty; seven converted and re-run, three must keep their own |
 | [BUG-249](FIXED_ITEMS.md#fixed-326--a-fixed_items-link-pointed-at-a-heading-that-does-not-exist) | Low | Documentation / CI | **Closed 2026-08-30 (FIXED-326)** — one line, and `test_docs_consistency` is green |
 | [BUG-250](#bug-250--a-shared-live-workspace-carries-state-between-specs) | Low | Live test harness | Open — raised 2026-08-30, the first thing found by actually running a round against one workspace |
@@ -109,7 +110,7 @@ names.
 | [BUG-256](FIXED_ITEMS.md#fixed-363--dictation-was-the-last-surface-that-was-not-local) | Medium | Voice / privacy posture | **Closed 2026-09-03 (FIXED-363)** — a speech runtime on this machine, and a security header that had been denying the microphone to Raiker's own page all along |
 | [BUG-266](FIXED_ITEMS.md#fixed-364--a-live-round-could-start-on-the-previous-rounds-data) | Low | Live test harness / host lifecycle | **Closed 2026-09-03 (FIXED-364)** — the reset waits for the process, not the response, and reads the directory back |
 | [BUG-267](FIXED_ITEMS.md#fixed-362--an-expected-answer-was-written-to-the-console-as-a-failure) | Low | Authentication / web UI | **Closed 2026-09-03 (FIXED-362)** — the boot question gets a route that answers it rather than refusing it |
-| [BUG-269](#bug-269--read-aloud-is-the-half-of-voice-that-is-still-not-local) | Low | Voice / privacy posture | Open — raised 2026-09-03 while closing BUG-256. Dictation can now run on this device; playback cannot |
+| [BUG-269](FIXED_ITEMS.md#fixed-373--read-aloud-was-the-half-of-voice-that-was-still-not-local) | Low | Voice / privacy posture | **Closed 2026-09-04 ([FIXED-373](FIXED_ITEMS.md#fixed-373--read-aloud-was-the-half-of-voice-that-was-still-not-local))** — Raiker speaks only with a voice it can see is on this device, and names the language when there is none |
 | [BUG-270](FIXED_ITEMS.md#fixed-365--a-fresh-install-named-a-model-nobody-had) | Medium | Models / first-run default | **Closed 2026-09-03 (FIXED-365)** — option **B**, detect before claiming: a PATH lookup cached in a row, never a connection. Option A was declined because it removes the runtime's out-of-box fallback |
 | [BUG-268](FIXED_ITEMS.md#fixed-361--the-folder-picker-handed-back-redacted_secret-instead-of-a-path) | High | Web UI / redaction | **Closed 2026-09-03 (FIXED-361)** — found by Linux CI; the picker returned `[REDACTED_SECRET]` for an ordinary folder |
 | [BUG-257](FIXED_ITEMS.md#fixed-355--a-rejected-key-was-reported-as-a-network-failure) | Medium | Models / provider errors | **Closed 2026-09-03 (FIXED-355)** — raised while verifying BUG-251 against live providers |
@@ -118,8 +119,8 @@ names.
 | [BUG-260, BUG-263, BUG-264](FIXED_ITEMS.md#fixed-358--choosing-among-four-hundred-models-was-a-dropdown-with-no-search) | High | Models / web UI | **Closed 2026-09-03 (FIXED-358)** — no dropdown; one picker with a search, on both surfaces |
 | [BUG-261, BUG-262](FIXED_ITEMS.md#fixed-359--first-run-could-detect-a-missing-runtime-and-not-offer-to-install-it) | Medium | Models / first run | **Closed 2026-09-03 (FIXED-359)** — install a runtime and choose a model without leaving first run |
 | [BUG-265](FIXED_ITEMS.md#fixed-360--a-policy-refusal-was-reported-as-a-wrong-password) | Medium | Authentication / web UI | **Closed 2026-09-03 (FIXED-360)** — "Authentication failed." for a one-owner-per-instance refusal |
-| [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (18 complete, 1 partial, 1 open; B10 closed 2026-09-03 as FIXED-366 and B14 as FIXED-369, leaving edit-then-accept as [BUG-271](#bug-271--a-reviewer-can-narrow-a-change-and-cannot-correct-one); B13 closed 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, B16 by BUG-206 slice D) |
-| [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (15 complete, 3 open; C11 closed 2026-09-03 as FIXED-367 and C18 as FIXED-368; C17 recall visibility 2026-08-29 as FIXED-311) |
+| [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (18 complete, 2 partial; B14 closed 2026-09-04 as [FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one), B10 2026-09-03 as FIXED-366, B13 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, B16 by BUG-206 slice D. B15 and B20 remain partial on [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution)) |
+| [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (16 complete, 1 partial, 1 open; C15 closed by C1/C4, C11 2026-09-03 as FIXED-367, C18 as FIXED-368, C17 2026-08-29 as FIXED-311. C10 is partial — the notification half ships as [FIXED-374](FIXED_ITEMS.md#fixed-374--a-routine-ran-all-night-and-told-nobody); C12 stays an architecture decision) |
 
 The memory audit of **2026-08-11** has its own document,
 [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md), written to this
@@ -812,9 +813,9 @@ ways, and clears the stale cookie so the next load does not ask at all.
 
 ## BUG-269 — Read aloud is the half of voice that is still not local
 
-**Severity: Low. Area: voice / privacy posture. Status: Open — raised 2026-09-03
-while closing
-[BUG-256](FIXED_ITEMS.md#fixed-363--dictation-was-the-last-surface-that-was-not-local).**
+**Severity: Low. Area: voice / privacy posture. Status: Closed 2026-09-04 as
+[FIXED-373](FIXED_ITEMS.md#fixed-373--read-aloud-was-the-half-of-voice-that-was-still-not-local).
+The filter turned out to be enough; no local synthesis runtime was needed.**
 
 **Observed.** Dictation can now be made to run entirely on this machine.
 **Read aloud** cannot: it calls the browser's `speechSynthesis`, and nothing in
@@ -846,9 +847,10 @@ configure anything.
 
 ## BUG-271 — A reviewer can narrow a change, and cannot correct one
 
-**Severity: Low. Area: Build / Approvals / code review. Status: Open — raised
-2026-09-03 while closing GAP-BUILD B14's remainder as
-[FIXED-369](FIXED_ITEMS.md#fixed-369--a-reviewer-could-accept-a-change-or-reject-it-and-nothing-between).**
+**Severity: Low. Area: Build / Approvals / code review. Status: Closed 2026-09-04
+as [FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one),
+which is what "What it would take" below describes; GAP-BUILD B14 closes with
+it.**
 
 **Observed.** Per-hunk accept and reject ship. *Edit then accept* — the reviewer
 changing a line in the proposed diff and approving the result — does not, and is
@@ -909,9 +911,13 @@ surfaces themselves were walked live at four widths with no console error. What
 is missing is the end-to-end evidence a FIXED entry is normally held to: a real
 turn, in a real thread, on a real provider.
 
-**The fix is not code.** Set `RAIKER_LIVE_ANTHROPIC_KEY` to a key that
-authenticates — a standard console key, or one scoped to a single workspace —
-and run:
+**Reduced 2026-09-04.** The fix is still not code *in the product* — that half
+is done. [FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one)
+gives the connection a **Workspace ID**, so the identity-linked key supplied for
+that round is now usable by Raiker; what is still missing is the id itself, which
+only the key's owner has. Set `RAIKER_LIVE_ANTHROPIC_KEY` to a key that
+authenticates — a standard console key, or an identity-linked one **with**
+`RAIKER_LIVE_ANTHROPIC_WORKSPACE_ID` set to its workspace — and run:
 
 ```
 npx playwright test --project=live e2e/priority-round-real-turn-live.spec.ts

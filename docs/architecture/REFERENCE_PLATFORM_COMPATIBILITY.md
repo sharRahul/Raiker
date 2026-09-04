@@ -280,7 +280,7 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 | Auto mode reviewed by a classifier model | Claude Code auto mode | Permissions | Different by design | `auto_requires_approval` keys off the action's risk level, and `raiker/runtime/alignment.py` checks the action against the turn's own record — neither is a model call | Raiker's `auto` is deterministic in both halves. Its alignment check is narrower than a classifier and says so: it catches a change to a file the turn never established, not a semantically wrong change to one it did | **Different — see [3.2](#32-a-deterministic-auto-instead-of-a-classifier)** |
 | Critical actions never auto-approved | Claude Code protected paths, Codex | Shared runtime | Implemented | `raiker/runtime/authority/critical.py`; critical risk is human-only with step-up | — | **YES — improvement** |
 | Standing per-tool grants | Claude Code "don't ask again" | Permissions, Git credential | Implemented | Decision modes; `run_command` standing grants; git-credential loan scopes | — | PARITY |
-| Deferring tool schemas to bound context cost | Claude Code `ToolSearch` over deferred tools | Shared runtime | Proposed | — | All 45 model-exposed tools enter every turn's tool list, and every projected MCP tool is added to it. A connected server costs its whole schema on every turn. Same underlying item as MCP tool search in [§2.6](#26-extensibility--plugins-skills-mcp-channels) | **YES — improvement** |
+| Deferring tool schemas to bound context cost | Claude Code `ToolSearch` over deferred tools | Shared runtime | Implemented 2026-09-04 | [FIXED-376](../plans/FIXED_ITEMS.md#fixed-376--every-turn-paid-for-forty-nine-tool-schemas-to-call-two) | A turn carries the core schemas; `tool_search` fetches the rest by name or intent and they stay callable for that turn. 6,494 → 3,726 tokens before a word of the prompt. Deferring is not gating: every deferred name rides on `tool_search`'s own description, and a fetched tool passes the same gate, decision mode, policy review and approval | **YES — improvement** |
 | A structured question to the owner mid-turn | Claude Code `AskUserQuestion`; MCP elicitation (`2026-07-28`); Cowork Dispatch's *Awaiting answer* state | Chat, Build | Proposed | — | Raiker's only mid-turn interruption is an **approval**, which asks *may I do this* and cannot ask *which of these did you mean*. A model that must guess between two readings guesses. The governance question is small — a question grants nothing and executes nothing — which is what makes this cheap | **YES — improvement** |
 
 ### 2.3 Approvals, governance and audit
@@ -825,7 +825,7 @@ had to be true first:
 |---|---|---|---|---|
 | ~~14~~ | ~~Hook lifecycle coverage~~ | **Done 2026-08-28 — [FIXED-304](../plans/FIXED_ITEMS.md#fixed-304--owner-setting-changes-had-no-hookable-governance-boundary) and [FIXED-305](../plans/FIXED_ITEMS.md#fixed-305--the-three-remaining-worth-adding-hook-events-had-no-call-site).** All four Raiker-meaningful events from Claude Code's 31 now dispatch: `ConfigChange` decides, and `Notification`, `PostToolBatch` and `InstructionsLoaded` observe. The other eleven are assessed individually in [`HOOKS_SPEC.md`](HOOKS_SPEC.md#which-of-the-fifteen-are-worth-adding) and none is pending | Authenticated owner-setting changes are interceptable without exposing values; the owner's hook kill switch stays above every rule; the three observation events carry counts and source types rather than content, so a repository-introduced `command` handler cannot read a turn's standing context or a notification's copy out of them | PARITY; the control bundle is a **YES — improvement** |
 | ~~15~~ | ~~The `prompt` hook handler (BUG-226)~~ | **Done 2026-08-28 — FIXED-303.** One bounded call through the owner-selected governed provider, no tools or nested hooks, advisory context only, and content-free audit metadata | A project cannot turn model judgment into authority or select another provider credential | **YES — improvement** over the parity feature |
-| 16 | MCP tool search and deferred tool schemas | Bound the context cost of projected MCP tools, and of the 45 built-ins that enter every turn | A connected server should not cost every turn its whole schema | **YES — improvement** |
+| 16 | Tool search and deferred tool schemas | **Built-in half done 2026-09-04 — [FIXED-376](../plans/FIXED_ITEMS.md#fixed-376--every-turn-paid-for-forty-nine-tool-schemas-to-call-two).** A turn carries the core schemas and `tool_search` fetches the rest by name or intent, revealed for the remainder of that turn: 6,494 → 3,726 tokens before a word of the prompt. **The MCP half is not built**: a projected MCP tool is already one generic `arguments` object, so the saving is small, and the set changes per turn with what the owner has connected — a deferred index would have to be rebuilt from a live discovery read each time. Stated as a known limit rather than implied | Deferring is not gating, and the code is written so it cannot become that: every deferred name rides on `tool_search`'s own description, the reveal is read from the result rather than the query, and a fetched tool passes the same gate, decision mode, policy review and approval | **YES — improvement.** The mechanism is parity; doing it with the tool that fetches a schema granting provably nothing, and the split derived from the registry so a new tool cannot fall out of both halves, is not |
 | ~~17~~ ★ | ~~**A structured question to the owner mid-turn**~~ | **Done 2026-08-29 — [FIXED-308](../plans/FIXED_ITEMS.md#fixed-308--raiker-could-ask-permission-and-could-not-ask-what-you-meant).** `ask_owner_question` asks 1-4 questions with 2-4 options; the turn parks through the approval transport and answers through a route of its own | A question grants nothing, so it is `low` and says so; `/resolve` and `/answer` refuse each other's kind; no composer mode answers one; and only an option the model offered can come back | **YES — improvement.** Parity with `AskUserQuestion`; doing it with no authority attached, in a product where every other interruption carries authority, is not |
 | 18 | OpenTelemetry export | Emit governed events over OTLP behind its own capability gate, metadata-only by default with content capture as an explicit opt-in | [Cowork exports six events this way](https://claude.com/docs/cowork/monitoring) — including `tool_decision`, which carries the decision *and* its source. Raiker already records strictly more per action than that; what it lacks is the wire to carry it anywhere | **YES — improvement** |
 | 19 | Credential masking with sentinel substitution | Generalise the git-credential loan into a sentinel/substitution path for owner-declared credentials | A command that authenticates without ever holding the secret is strictly better than one that holds it briefly | **YES — improvement** |
@@ -878,7 +878,24 @@ carries every round it went through stops describing the product as it is and
 becomes a record of how it got there; both are worth having, and they answer
 different questions. **Where a review and Part 2 disagree, Part 2 is current.**
 
-**The most recent round is 2026-08-30 (second pass)** — what happens to a turn
+**The most recent round is 2026-09-04** — what a product owes an owner whose
+valid credential it cannot use, whether a review surface can take a correction,
+what a turn is charged for its own tool catalogue, and whether background work
+can reach the person who asked for it. Its finding, stated plainly because two
+of the four are not flattering: accepting an identity-linked key and notifying
+on a finished routine are both **parity**, and Raiker was under the bar on
+each — the first with an answer that classified the refusal correctly and then
+handed the owner a dead end, which is worse than the bare status code it
+replaced. What goes beyond the set is what sits around them: an edit to a
+proposed change that becomes a *second proposal* rather than an amended
+approval, so the executed bytes are provably ones a human read; a notice that
+carries the fact and leaves the result in the thread, because an operating
+system may render it on a lock screen; and a deferred tool catalogue where
+deferring is provably not gating — every deferred name is in the request, the
+tool that fetches a schema grants nothing, and the split is derived from the
+registry rather than remembered.
+
+**The round before it is 2026-08-30 (second pass)** — what happens to a turn
 when the person reading it leaves, what a compact layout may take away, and
 whether an observability surface describes the thing it links to. Its finding,
 stated plainly because it is not flattering either: a turn that was destroyed by

@@ -189,6 +189,65 @@ describe("first-run setup", () => {
     expect(await screen.findByText(/Opus 4.5 is selected/)).toBeInTheDocument();
   });
 
+  // BUG-274 — an identity-linked key authenticates and then acts inside one
+  // workspace. First run is where an owner most often meets that refusal, and
+  // it used to answer with a bare reason code and no way forward.
+  it("raises the workspace field on the row the provider asked it of", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/setup": required,
+      "GET /api/models": { profiles: REGISTRY, chat_profiles: [] },
+      "GET /api/model-library": { roots: [], models: [] },
+      "GET /api/models/ollama-local/provider-models": {
+        profile_id: "ollama-local", provider: "ollama", status: "unavailable", reason_code: "x", models: [],
+      },
+      "GET /api/models/lm-studio-local/provider-models": {
+        profile_id: "lm-studio-local", provider: "lm-studio", status: "unavailable", reason_code: "x", models: [],
+      },
+      "PUT /api/models/anthropic-hosted/connection": { ok: true, connection_configured: true },
+      "GET /api/models/anthropic-hosted/provider-models": {
+        profile_id: "anthropic-hosted",
+        provider: "anthropic",
+        status: "unavailable",
+        reason_code: "provider_workspace_required:http_400",
+        models: [],
+      },
+    });
+    render(ModelSetupView);
+
+    const row = await screen.findByRole("group", { name: "Anthropic" });
+    // Not offered up front: a box asking for a "workspace ID" on first run is a
+    // question most owners cannot answer.
+    expect(within(row).queryByLabelText("Anthropic workspace ID")).toBeNull();
+
+    await fireEvent.input(within(row).getByLabelText("Anthropic API key"), {
+      target: { value: "sk-ant-test" },
+    });
+    await fireEvent.click(within(row).getByRole("button", { name: "Save and list models" }));
+
+    // The refusal is a repair, in words, not a reason code.
+    expect(await within(row).findByText(/identity-linked/i)).toBeInTheDocument();
+    const field = await within(row).findByLabelText("Anthropic workspace ID");
+    await fireEvent.input(field, { target: { value: "wrkspc_01" } });
+    await fireEvent.click(within(row).getByRole("button", { name: "Add workspace" }));
+
+    // Sent on its own, so it merges into the connection rather than replacing
+    // the key that was just stored.
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/models/anthropic-hosted/connection",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({
+            endpoint: null,
+            api_key: null,
+            admin_api_key: null,
+            workspace_id: "wrkspc_01",
+          }),
+        }),
+      ),
+    );
+  });
+
   it("signs in to the ChatGPT subscription without asking for an API key", async () => {
     const fetchMock = stubFetch({
       "GET /api/setup": required,

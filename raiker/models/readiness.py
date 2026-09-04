@@ -222,6 +222,18 @@ def _provider_label(provider: str) -> str:
     }.get(provider, provider.replace("-", " ").title())
 
 
+def _is_workspace_invalid(error: Exception | None) -> bool:
+    """True when the refusal names the workspace the owner supplied (BUG-274).
+
+    Reads the exception's own reason code, never a provider message: both
+    conditions raise :class:`ProviderWorkspaceRequiredError`, and the code is the
+    fixed string the classifier chose. A caller that has no exception to hand —
+    the pre-BUG-274 call shape — gets the missing-workspace answer, which is the
+    safe one: it asks for a value rather than doubting one.
+    """
+    return error is not None and str(error).startswith("provider_workspace_invalid")
+
+
 def _effective_endpoint(profile: Any, connection: dict[str, str] | None) -> str:
     if connection and connection.get("endpoint", "").strip():
         return connection["endpoint"].strip()
@@ -293,22 +305,45 @@ class ProviderCatalogueProbe:
         )
 
     def _workspace_required(
-        self, key: ModelReadinessKey, label: str, provider: str
+        self,
+        key: ModelReadinessKey,
+        label: str,
+        provider: str,
+        error: Exception | None = None,
     ) -> ModelReadiness:
-        """BUG-272 — the key is valid and names no workspace.
+        """BUG-272/BUG-274 — the key is valid and the workspace is the problem.
 
         Its own answer for the same reason quota has one: the repair is neither
         a network fix nor a new key. An identity-linked key is the wrong *shape*
         of credential for a request that does not carry a workspace, and telling
         the owner to rotate it would send them round the same loop.
+
+        Two answers, because two things can be wrong and they have opposite
+        repairs. **BUG-274** made the first one actionable: Raiker can now send
+        the workspace, so the remediation names the field instead of telling the
+        owner to go and find another key — which was a dead end for an owner who
+        only has this one. Once a workspace *is* named, a refusal means that id
+        is wrong, and repeating the first message would send them to add
+        something they have already added.
         """
+        if _is_workspace_invalid(error):
+            return self._result(
+                key,
+                ModelReadinessState.AUTHENTICATION_FAILED,
+                f"{label} did not recognise the workspace named with this key.",
+                "provider_workspace_invalid",
+                "Check the workspace ID on this connection against the one in the "
+                f"{label} console, then check again.",
+                provider=provider,
+            )
         return self._result(
             key,
             ModelReadinessState.AUTHENTICATION_FAILED,
             f"{label} needs a workspace named alongside this kind of key.",
             "provider_workspace_required",
-            f"This key is identity-linked. Use a standard {label} API key from the "
-            "provider's console, or one scoped to a single workspace, then check again.",
+            "This key is identity-linked, so it acts inside one workspace. Add that "
+            f"workspace ID to this connection — it is in the {label} console beside the "
+            "key — then check again. The key itself is fine.",
             provider=provider,
         )
 
@@ -381,8 +416,8 @@ class ProviderCatalogueProbe:
                 "Review the provider policy and check again.",
                 provider=profile.provider,
             )
-        except ProviderWorkspaceRequiredError:
-            return self._workspace_required(key, label, profile.provider)
+        except ProviderWorkspaceRequiredError as exc:
+            return self._workspace_required(key, label, profile.provider, exc)
         except ProviderQuotaExhaustedError:
             return self._quota_exhausted(key, label, profile.provider)
         except ProviderConfigurationError:
@@ -478,8 +513,8 @@ class ProviderCatalogueProbe:
                     "Update the provider credential and check again.",
                     provider=profile.provider,
                 )
-            except ProviderWorkspaceRequiredError:
-                return self._workspace_required(key, label, profile.provider)
+            except ProviderWorkspaceRequiredError as exc:
+                return self._workspace_required(key, label, profile.provider, exc)
             except ProviderQuotaExhaustedError:
                 return self._quota_exhausted(key, label, profile.provider)
             except ProviderModelNotFoundError:

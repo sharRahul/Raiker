@@ -43,11 +43,22 @@ const GUIDANCE: Record<string, Omit<ProviderErrorGuidance, "code">> = {
     linkLabel: "Open Permissions",
   },
   // BUG-272 — the credential is valid and there is nothing to rotate. Its
-  // *shape* is the problem: an identity-linked key needs a workspace named on
-  // every request, and Raiker's provider calls do not carry one.
+  // *shape* is the problem: an identity-linked key acts inside one workspace,
+  // and the provider will not accept it until the request names which.
+  //
+  // BUG-274 turned that into something the owner can act on. The old fix sent
+  // them to fetch a different key, which is a dead end for an owner who has
+  // only this one; the connection now carries a Workspace ID field, so the fix
+  // is a value they already have rather than a credential they may not.
   provider_workspace_required: {
-    message: "This key is identity-linked, so the provider wants a workspace named with it.",
-    fix: "Use a standard API key from the provider's console, or one scoped to a single workspace, then connect again. The key you pasted is not broken — it is the wrong kind for this call.",
+    message: "This key is identity-linked, so it acts inside one workspace.",
+    fix: "Add the workspace ID to this connection — it is beside the key in the provider's console — then connect again. The key you pasted is fine.",
+  },
+  // BUG-274 — the other half. A workspace *is* named and the provider refused
+  // it, so repeating the message above would ask for something already given.
+  provider_workspace_invalid: {
+    message: "The provider did not recognise the workspace named with this key.",
+    fix: "Check the workspace ID on this connection against the one in the provider's console, then connect again.",
   },
   connector_vault_key_unset: {
     message: "There is no vault key, so Raiker cannot encrypt the credential you just entered.",

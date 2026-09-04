@@ -55,6 +55,11 @@ from raiker.models.tool_call_validation import (
     default_tool_specs,
     validate_tool_call,
 )
+from raiker.models.tool_projection import (
+    DEFERRABLE_TOOL_NAMES,
+    TOOL_SEARCH,
+    project_specs,
+)
 from raiker.runtime.classifier import SimpleClassifier
 from raiker.runtime.conversation_compaction import (
     ContextBudgetPlanner,
@@ -175,7 +180,13 @@ _SYSTEM_PROMPT = (
     "keep exactly one step in_progress as you go, and mark each one completed when it is truly "
     "done — the user watches that checklist live and it is how you resume after an interruption. "
     "When you need to search widely before you can act, delegate it with `spawn_subagent` so the "
-    "raw output stays out of this conversation and you get the findings back."
+    "raw output stays out of this conversation and you get the findings back. "
+    # Backlog #16 — a mechanism a model does not know about is a mechanism it
+    # does not use. The catalogue itself rides on `tool_search`'s description;
+    # this is the habit, and the reassurance that asking is free.
+    "More tools exist than are listed here: `tool_search` returns any of them by name or by what "
+    "they do, and they stay available for the rest of this turn. Asking for one grants nothing, "
+    "so ask rather than assume a capability is missing."
 )
 
 
@@ -300,6 +311,15 @@ class RuntimeOrchestrator:
         self.verifier = Verifier()
         self.tool_specs = default_tool_specs()
         self._sink: list[StreamEvent] | None = None
+        # Backlog #16 — deferred tools this turn has actually asked for. Grown
+        # by a `tool_search` result and cleared with the turn, so a schema the
+        # model fetched stays available for the rest of the turn and costs the
+        # next one nothing. (An orchestrator is built per request, so "the turn"
+        # is exactly its lifetime. A turn resumed after an approval starts a new
+        # one and searches again if it still wants the tool — one cheap call,
+        # and the fail-safe direction: the catalogue is rebuilt, never inherited
+        # across a boundary the owner just stood at.)
+        self._revealed_tools: set[str] = set()
 
     def _turn_tool_specs(self) -> list[ToolSpec]:
         """The tools this turn may call: the built-ins plus projected MCP tools.
@@ -309,12 +329,33 @@ class RuntimeOrchestrator:
         `mcp_connector_runtime` gate, a server that never completed a handshake,
         and a contained connection all contribute nothing, so the model is never
         offered a tool the runtime would refuse.
+
+        Backlog #16 — and it carries the *core* built-ins rather than all of
+        them. Deferring is not gating: `tool_search` names every deferred tool
+        and returns its exact schema on request, and a tool reached that way
+        passes the identical gate, decision mode, policy review and approval it
+        always did. What changes is only what every request has to pay for.
         """
         store = getattr(self.tool_broker, "store", None)
         return [
-            *self.tool_specs,
+            *project_specs(self.tool_specs, revealed=frozenset(self._revealed_tools)),
             *mcp_tool_specs(self.workspace_root, store, self.tool_broker.principal_id),
         ]
+
+    def _reveal_searched_tools(self, action: ToolAction, result: ToolResult) -> None:
+        """Keep what a `tool_search` returned callable for the rest of the turn.
+
+        Read from the result rather than from the query, so the set can only
+        ever contain tools the search really returned — the model cannot widen
+        its own catalogue by naming something the registry does not have, and
+        nothing here decides whether any of them may run.
+        """
+        if action.tool_name != TOOL_SEARCH or result.status != "success":
+            return
+        for entry in (result.output or {}).get("tools", []) or []:
+            name = str(entry.get("name", "")) if isinstance(entry, dict) else ""
+            if name in DEFERRABLE_TOOL_NAMES:
+                self._revealed_tools.add(name)
 
     # ── C6/C4: the turn's source ledger ──────────────────────────────────────
     #
@@ -2514,6 +2555,7 @@ class RuntimeOrchestrator:
             started_action_ids.add(action.action_id)
             self._emit_plan_event(envelope, action, queued_result)
             self._emit_subagent_event(envelope, action, queued_result)
+            self._reveal_searched_tools(action, queued_result)
             self._verify_and_emit(
                 envelope, action=action, decision=queued_decision,
                 result=queued_result, started_action_ids=started_action_ids,
@@ -2820,6 +2862,7 @@ class RuntimeOrchestrator:
                     started_action_ids.add(done_action.action_id)
                     self._emit_plan_event(envelope, done_action, done_result)
                     self._emit_subagent_event(envelope, done_action, done_result)
+                    self._reveal_searched_tools(done_action, done_result)
                     self._verify_and_emit(
                         envelope, action=done_action, decision=done_decision,
                         result=done_result, started_action_ids=started_action_ids,
@@ -2891,6 +2934,7 @@ class RuntimeOrchestrator:
                 started_action_ids.add(completed_action.action_id)
                 self._emit_plan_event(envelope, completed_action, completed_result)
                 self._emit_subagent_event(envelope, completed_action, completed_result)
+                self._reveal_searched_tools(completed_action, completed_result)
                 self._verify_and_emit(
                     envelope, action=completed_action, decision=completed_decision,
                     result=completed_result, started_action_ids=started_action_ids,

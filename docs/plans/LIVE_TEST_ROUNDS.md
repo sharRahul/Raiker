@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-04 | Targeted + full responsive sweep | `bug-274-`, `pages/` | Anthropic, an **identity-linked** key entered through the interface | A key Raiker previously had no way to use, the field that makes it usable reached from where the refusal is read, and every route measured at four widths in both themes |
 | 2026-09-03 | Targeted + full responsive sweep | `bug-256-`, `pages/` | Anthropic, key entered through the interface | Dictation running with nothing leaving the machine, a locked load that refuses nothing, and every page measured at four widths in both themes |
 | 2026-08-30 | Targeted + measured responsive sweep | `b13-`, `bug-239-`, `bug-245-`, `ui-sweep-` | Anthropic (`claude-haiku-4-5-20251001`), key entered through the interface | The repository on screen in Build, Permissions telling the truth about an untouched gate, a cited exchange that opens — and every route *measured* at three widths rather than photographed |
 | 2026-08-29 | Targeted | `bug-244-`, `bug-246-` | — (no model needed) | An import that says what is already stored before it writes, and the authority matrix readable at a phone width |
@@ -1096,6 +1097,56 @@ through FIXED-170. Screenshots: `round0810-01-first-run-model-setup.png` through
 chunk-size warning: the entry chunk is 237 kB against the previous 690 kB, and
 the largest route chunk is Models at 82 kB.
 ---
+
+## 2026-09-04 — Identity-linked key, and the sweep at four widths
+
+**Tier: targeted + full responsive sweep.** Production web build, a workspace
+reset through `scripts/reset_live_workspace.py` before each attempt, and one
+provider: Anthropic, with an **identity-linked** key entered through the Connect
+dialog. No key appears in this repository.
+
+**What it proved.**
+
+1. A fresh instance, owner registered, Anthropic connected with the supplied key.
+   The save succeeds — saving a credential contacts nothing.
+2. **Test** on that card reaches the provider and the refusal comes back as a
+   repair: *"This key is identity-linked, so it acts inside one workspace. Add
+   the workspace ID to this connection — it is beside the key in the provider's
+   console — then connect again. The key you pasted is fine."* Not a status code,
+   and not an instruction to go and find a different key.
+   *(BUG-274 / [FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one).)*
+3. **Add workspace ID** on that same answer opens the connection dialog with
+   **Advanced** already expanded and the field visible.
+4. A workspace id that could not safely become an HTTP header is refused before
+   anything is stored.
+5. Every route measured at **four** widths — 390, 768, 1024, 1440 — with nothing
+   reaching past the window that is not inside something that scrolls on
+   purpose, and no console error. 768 was added this round: it is where several
+   views hand a two-column grid over to one, and a sweep that stepped 390 → 1024
+   stepped over it.
+6. Every route captured and rendered in explicit light and dark themes, no
+   console error, no page repeating the topbar's own sentence.
+
+**What it found**, both fixed in this change rather than deferred:
+
+* The guidance for a workspace refusal was wired to the *save*, which never
+  contacts the provider. Two paths actually meet it — the readiness check with a
+  model pinned, and the catalogue read without one — and the fresh-connection
+  case, which is where an owner meets it first, was the one not covered.
+* **Reconnect** is reached through **Model details**, and saving left that modal
+  over the card it had just changed. The live harness had been closing it by
+  hand since FIXED-141 with a comment saying so, which had made an interface
+  defect look like a test concern.
+
+**What it could not prove.** A real provider *turn* on this key: authenticating
+still needs the workspace id itself, which only the key's owner has.
+[BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)
+stays open for that reason and is now waiting on a value rather than on a
+product change.
+
+**Screenshots:** `bug-274-workspace-answer-live.png` and
+`bug-274-workspace-field-live.png` in [`screenshots/working/`](screenshots/working);
+the page sweep refreshed [`screenshots/pages/`](screenshots/pages) in full.
 
 ## 2026-08-09 — BUG-69 closure round
 Run against a fresh isolated workspace and the production web build. Provider

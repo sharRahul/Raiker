@@ -1,5 +1,5 @@
 /**
- * Every route, at three widths, with nothing clipped off the edge.
+ * Every route, at four widths, with nothing clipped off the edge.
  *
  * The sweep this replaces was a set of screenshots somebody had to look at.
  * Looking is how three defects survived several rounds of it:
@@ -36,8 +36,12 @@ const ROUTES = [
   "observe?tab=notifications", "settings", "guide",
 ] as const;
 
+// Four, not three. 768 is where the shell's own breakpoints change hands —
+// several views collapse a two-column grid there and a rail becomes a sheet —
+// so a sweep that jumps 390 → 1024 steps over the width most likely to break.
 const WIDTHS = [
   ["phone", 390, 844],
+  ["narrow", 768, 900],
   ["tablet", 1024, 800],
   ["desktop", 1440, 1000],
 ] as const;
@@ -68,7 +72,7 @@ async function clipped(page: import("@playwright/test").Page): Promise<string[]>
   });
 }
 
-test("no route clips its own content at any of the three widths", async ({ page }) => {
+test("no route clips its own content at any of the four widths", async ({ page }) => {
   test.setTimeout(900_000);
   const consoleErrors: string[] = [];
   page.on("console", (message) => {

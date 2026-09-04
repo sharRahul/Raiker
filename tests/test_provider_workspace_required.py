@@ -91,7 +91,10 @@ class TestTheOwnerIsToldWhatToDo:
 
         remedy = dict(_PROVIDER_ERROR_SENTENCES)["provider_workspace_required"]
         # Not "update the key": the key is fine, and its *shape* is the problem.
-        assert "identity-linked" in remedy
+        # BUG-274 replaced the rest of the sentence. It used to send the owner
+        # to fetch a different key, which is a dead end for an owner who has
+        # only this one; the repair is now the field Raiker gained.
+        assert "workspace ID" in remedy
         assert "rotate" not in remedy.lower()
 
     def test_nothing_from_the_body_reaches_the_code(self) -> None:

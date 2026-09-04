@@ -150,6 +150,27 @@ this up front so it is not discovered through a 401.
 
 Anthropic issues API keys only — there is no account sign-in to connect.
 
+### An identity-linked key needs its workspace
+
+Some Anthropic keys are **identity-linked**: they authenticate perfectly well and
+act inside one workspace, so the provider refuses any request that does not name
+which. Raiker says so and offers the field rather than telling you to go and find
+a different key:
+
+> *This key is identity-linked, so it acts inside one workspace. Add the
+> workspace ID to this connection — it is beside the key in the provider's
+> console — then connect again. The key you pasted is fine.*
+
+**Advanced → Workspace ID**, in the same dialog. A refusal opens that section for
+you. Most keys need nothing there, which is why it is not on the front of the
+dialog. You can add one to a connection you already saved without re-pasting the
+key: fill in only the workspace and press **Connect**.
+
+If the provider then says it does not recognise the workspace, that is a
+different message with a different fix — check the id against the one in the
+console. Raiker never repeats the "add a workspace" ask for a value you have
+already given.
+
 ### Using a ChatGPT subscription instead of a key
 
 The **ChatGPT subscription** card is a different path from the OpenAI card, and

@@ -34,6 +34,7 @@ from raiker.models.exceptions import (
     is_quota_exhausted,
     needs_workspace_id,
     stream_failure,
+    workspace_id_rejected,
 )
 from raiker.models.health import ProviderHealth
 from raiker.models.providers.llama_cpp_server import _parse_text_json_tool_calls, _parse_tool_calls
@@ -63,6 +64,11 @@ def _map_status(status: int, *, model: str, body: str = "") -> Exception:
     # BUG-272 — a valid, identity-linked key with no workspace named. Checked
     # beside quota and for the same reason: the status is an ordinary 400 and
     # only the body says which 400 it is. There is no credential to rotate here.
+    if workspace_id_rejected(status, body):
+        # BUG-274 — the workspace the owner named was refused. Kept in step with
+        # the Anthropic mapper so a router that proxies these bodies classifies
+        # them the same way.
+        return ProviderWorkspaceRequiredError(f"provider_workspace_invalid:http_{status}")
     if needs_workspace_id(status, body):
         return ProviderWorkspaceRequiredError(f"provider_workspace_required:http_{status}")
     if is_quota_exhausted(status, body):

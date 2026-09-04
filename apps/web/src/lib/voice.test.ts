@@ -6,12 +6,15 @@ import {
   createVoicePlayback,
   encodeWav,
   inputModeForDraft,
+  pickOnDeviceVoice,
   resample,
   resolveSpeechLanguage,
   speechText,
   toMono,
   TRANSCRIPTION_SAMPLE_RATE,
+  voicesWhenReady,
   type LocalTranscriptionPorts,
+  type SpeechVoice,
 } from "./voice";
 
 type ResultItem = { transcript: string; isFinal: boolean };
@@ -93,17 +96,111 @@ describe("voice recognition adapter", () => {
   );
 });
 
-it("coordinates browser playback and exposes failure callbacks", () => {
-  const synth = { speak: vi.fn(), cancel: vi.fn() };
+const localVoice = (lang: string, name = `local-${lang}`) => ({
+  name,
+  lang,
+  localService: true,
+});
+const remoteVoice = (lang: string, name = `remote-${lang}`) => ({
+  name,
+  lang,
+  localService: false,
+});
+
+it("coordinates browser playback and exposes failure callbacks", async () => {
+  const synth = {
+    speak: vi.fn(),
+    cancel: vi.fn(),
+    getVoices: () => [localVoice("en")],
+  };
   const playback = createVoicePlayback(synth);
   const end = vi.fn();
   const error = vi.fn();
   playback.speak("turn-1", "Answer", "en", { end, error });
+  await vi.waitFor(() => expect(synth.speak).toHaveBeenCalled());
   const utterance = synth.speak.mock.calls[0][0];
   expect(utterance.text).toBe("Answer");
   expect(utterance.lang).toBe("en");
   utterance.onerror?.();
   expect(error).toHaveBeenCalledOnce();
+});
+
+// BUG-269 — dictation was made local by BUG-256 and playback was left behind.
+// Chrome ships remote voices for several languages and picks one without
+// saying so, and the page cannot tell afterwards which kind it got. It can tell
+// beforehand, so it does.
+describe("read aloud stays on this device", () => {
+  it("prefers a local voice over a remote one for the same language", () => {
+    expect(
+      pickOnDeviceVoice([remoteVoice("en-GB"), localVoice("en-GB")], "en-GB")?.name,
+    ).toBe("local-en-GB");
+  });
+
+  it("takes a local voice in another region over a remote one in this region", () => {
+    // The thing being chosen is the boundary, not the accent.
+    expect(
+      pickOnDeviceVoice([remoteVoice("en-GB"), localVoice("en-US")], "en-GB")?.name,
+    ).toBe("local-en-US");
+  });
+
+  it("finds nothing when every voice for the language is remote", () => {
+    expect(pickOnDeviceVoice([remoteVoice("ja-JP"), localVoice("en-US")], "ja")).toBeNull();
+  });
+
+  it("never treats an unmarked voice as local", () => {
+    // The flag is the only evidence there is; absence of it is not evidence.
+    const unmarked = { name: "mystery", lang: "en" } as unknown as SpeechVoice;
+    expect(pickOnDeviceVoice([unmarked], "en")).toBeNull();
+  });
+
+  it("speaks with the local voice it chose", async () => {
+    const synth = {
+      speak: vi.fn(),
+      cancel: vi.fn(),
+      getVoices: () => [remoteVoice("en-GB"), localVoice("en-GB")],
+    };
+    createVoicePlayback(synth).speak("turn-1", "Answer", "en", {
+      end: vi.fn(),
+      error: vi.fn(),
+    });
+    await vi.waitFor(() => expect(synth.speak).toHaveBeenCalled());
+    // `en` matches the region variant it has, and takes the local one of the two.
+    expect(synth.speak.mock.calls[0][0].voice.name).toBe("local-en-GB");
+  });
+
+  it("says so rather than speaking with a remote voice", async () => {
+    const synth = {
+      speak: vi.fn(),
+      cancel: vi.fn(),
+      getVoices: () => [remoteVoice("ja-JP")],
+    };
+    const noLocalVoice = vi.fn();
+    createVoicePlayback(synth).speak("turn-1", "答え", "ja", {
+      end: vi.fn(),
+      error: vi.fn(),
+      noLocalVoice,
+    });
+    await vi.waitFor(() => expect(noLocalVoice).toHaveBeenCalledWith("ja"));
+    expect(synth.speak).not.toHaveBeenCalled();
+  });
+
+  it("waits for a voice list the browser populates asynchronously", async () => {
+    // Reading once would report "no on-device voice" on the first click and a
+    // working voice on the second.
+    let voices: SpeechVoice[] = [];
+    const listeners: (() => void)[] = [];
+    const synth = {
+      speak: vi.fn(),
+      cancel: vi.fn(),
+      getVoices: () => voices,
+      addEventListener: (_type: string, listener: () => void) => listeners.push(listener),
+      removeEventListener: vi.fn(),
+    };
+    const ready = voicesWhenReady(synth);
+    voices = [localVoice("en")];
+    listeners.forEach((listener) => listener());
+    expect(await ready).toHaveLength(1);
+  });
 });
 
 it("resolves Auto to a valid device language with an English fallback", () => {

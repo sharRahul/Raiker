@@ -22,6 +22,21 @@
   // the owner approved would vanish from every filter.
   const FILTERS = ["pending", "approved", "executed", "denied"] as const;
   const RISK_RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+  // BUG-271 — a governed refusal of an edited patch, in the owner's language.
+  // A bare reason code as the whole answer is the defect FIXED-01 removed from
+  // Models; a review surface must not put one back.
+  const EDIT_REFUSALS: Record<string, string> = {
+    replacement_patch_empty: "An empty diff is not a change. Write the version you want, or Deny.",
+    replacement_patch_unreadable:
+      "That is not a unified diff Raiker can read. Each file needs its --- and +++ header.",
+    replacement_unchanged: "That is the change as proposed. Approve it, or edit a line first.",
+    replacement_widens_targets:
+      "That version touches a file this change did not. Ask for it as its own change instead.",
+    action_is_not_a_patch: "Only a proposed patch can be edited as text.",
+    approval_already_resolved: "This change has already been decided.",
+    critical_approval_requires_lifecycle:
+      "A critical action keeps the step-up lifecycle and cannot be replaced here.",
+  };
 
   let filter = $state<(typeof FILTERS)[number]>("pending");
   let sort = $state<"risk" | "newest">("risk");
@@ -41,6 +56,14 @@
    * means the reviewer touched a checkbox, even if they re-selected everything.
    */
   let hunkSelection = $state<string[] | undefined>(undefined);
+  /**
+   * BUG-271 — the reviewer's own version of the proposed patch, while they are
+   * writing it. `null` means the editor is closed, which is its resting state:
+   * correcting a change is the rarer thing to want, and a textarea holding a
+   * diff would otherwise sit under every patch approval.
+   */
+  let editedPatch = $state<string | null>(null);
+  let editError = $state<string | null>(null);
   let busy = $state(false);
   // BUG-62 — an executed action whose result is a row rather than a file carries
   // a receipt, so the notice can point at the thing that now exists.
@@ -101,6 +124,8 @@
     // across to the next approval would apply hunk positions from one diff to a
     // completely different one.
     hunkSelection = undefined;
+    editedPatch = null;
+    editError = null;
     try {
       selected = await api.approval(id);
     } catch (e) {
@@ -189,6 +214,45 @@
         kind: "error",
         text: explained ? `${explained.plain} ${explained.remediation ?? ""}` : "That answer was not accepted.",
       };
+    } finally {
+      busy = false;
+    }
+  }
+
+  /**
+   * BUG-271 — propose the reviewer's own version instead of this one.
+   *
+   * Deliberately not an amendment. The server denies the proposal in front of
+   * the owner and raises theirs as a **new** approval with its own preview and
+   * its own immutable-intent hash; nothing runs until they approve that. The
+   * copy says so, because a control that looked like an edit to the decision in
+   * front of them would be a promise the boundary cannot keep.
+   */
+  async function proposeEdit() {
+    if (selected === null || busy || editedPatch === null) return;
+    busy = true;
+    editError = null;
+    notice = null;
+    try {
+      const result = await api.replaceApproval(selected.approval.approval_id, {
+        patch: editedPatch,
+        reason: decisionReason.trim() || "Replaced by the reviewer's own edit.",
+      });
+      editedPatch = null;
+      await load();
+      // Open the replacement first: `openDetail` clears the notice as part of
+      // arriving on an approval, so setting it before would show the sentence
+      // for as long as one fetch takes and then silently remove it.
+      await openDetail(result.replacement_approval_id);
+      notice = {
+        kind: "ok",
+        text: "The proposed change was denied and yours is waiting for your approval. Nothing has run.",
+      };
+    } catch (e) {
+      editError =
+        e instanceof ApiError
+          ? EDIT_REFUSALS[e.reasonCode ?? ""] ?? `That version was not accepted (${e.status}).`
+          : "That version was not accepted.";
     } finally {
       busy = false;
     }
@@ -655,20 +719,62 @@
         placeholder="Why are you approving or denying this?"
         disabled={busy}
       ></textarea>
-      <div class="decision-actions">
-        <button type="button" class="btn btn-danger" onclick={() => resolve(false)} disabled={busy}>
-          Deny
-        </button>
-        <button type="button" class="btn btn-primary" onclick={() => resolve(true)} disabled={busy}>
-          {busy
-            ? selected.executes_on_approval
-              ? "Executing…"
-              : "Recording…"
-            : selected.executes_on_approval
-              ? "Approve and execute once"
-              : "Approve (record only)"}
-        </button>
-      </div>
+      <!-- BUG-271 — a reviewer could narrow a change and could not correct one.
+           An edit is a different action, not a smaller one, so it is not a
+           third state of this decision: it denies what is here and proposes the
+           reviewer's own, which they then approve like any other change. The
+           copy says that in the panel rather than leaving it to be discovered. -->
+      {#if editedPatch !== null}
+        <div class="edit-block">
+          <label class="field-label" for="edited-patch">Your version of this change</label>
+          <textarea
+            id="edited-patch"
+            class="textarea mono"
+            rows="12"
+            bind:value={editedPatch}
+            disabled={busy}
+            spellcheck="false"
+          ></textarea>
+          <p class="hint">
+            This denies the change above and proposes yours in its place. You will be
+            asked to approve it; nothing runs until you do.
+          </p>
+          {#if editError}<p class="error" role="alert">{editError}</p>{/if}
+          <div class="decision-actions">
+            <button type="button" class="btn" onclick={() => (editedPatch = null)} disabled={busy}>
+              Cancel
+            </button>
+            <button type="button" class="btn btn-primary" onclick={proposeEdit} disabled={busy}>
+              {busy ? "Proposing…" : "Propose as a new change"}
+            </button>
+          </div>
+        </div>
+      {:else}
+        <div class="decision-actions">
+          <button type="button" class="btn btn-danger" onclick={() => resolve(false)} disabled={busy}>
+            Deny
+          </button>
+          {#if selected.preview_kind === "patch" && selected.diff}
+            <button
+              type="button"
+              class="btn btn-ghost"
+              onclick={() => (editedPatch = selected!.diff ?? "")}
+              disabled={busy}
+            >
+              Edit…
+            </button>
+          {/if}
+          <button type="button" class="btn btn-primary" onclick={() => resolve(true)} disabled={busy}>
+            {busy
+              ? selected.executes_on_approval
+                ? "Executing…"
+                : "Recording…"
+              : selected.executes_on_approval
+                ? "Approve and execute once"
+                : "Approve (record only)"}
+          </button>
+        </div>
+      {/if}
     {:else if selected.approval.is_expired}
       <p class="resolved-note">Expired before a decision was recorded.</p>
     {:else}
@@ -894,4 +1000,9 @@
   }
   .step-up h2, .step-up p { margin: 0; }
   .hint { color: var(--text-3); font-size: 0.8rem; }
+  /* BUG-271 — the reviewer's own diff. Monospaced because it is one, and given
+     the same vertical rhythm as the decision note above it so the panel does
+     not change shape when the editor opens. */
+  .edit-block { display: grid; gap: var(--space-2); }
+  .edit-block .textarea { font-family: var(--font-mono, ui-monospace, monospace); }
 </style>

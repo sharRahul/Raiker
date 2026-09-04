@@ -661,7 +661,9 @@
                     <span class="note">{handler.timeout_ms} ms</span>
                     {#if !handler.available}
                       <span class="note hook-warn">
-                        no builtin by this name in this build — it will fail every time it matches
+                        {handler.unavailable_reason === "egress_not_granted"
+                          ? "this host is not in RAIKER_HOOK_EGRESS_ALLOWLIST — it will refuse every time it matches"
+                          : "no builtin by this name in this build — it will fail every time it matches"}
                       </span>
                     {:else if !handler.decision_authority}
                       <span class="note">
@@ -709,11 +711,14 @@
       <section class="card">
         <h2>Handler types</h2>
         <p class="note">
-          <strong>command</strong> runs a bounded workspace-local program. <strong>prompt</strong>
-          uses the owner-selected provider with a per-handler timeout and token budget, exposes no
-          tools, refuses nesting, and contributes advisory context only. <strong>builtin</strong>
-          runs Raiker's reviewed in-process logic. HTTP, MCP tool, and agent handlers remain
-          refused rather than gaining an ungoverned execution path.
+          <strong>command</strong> runs a bounded workspace-local program. <strong>http</strong>
+          posts the bounded, redacted event to a host named in
+          <code>RAIKER_HOOK_EGRESS_ALLOWLIST</code>, which is empty until you set it and revokes
+          every http rule at once when cleared. <strong>prompt</strong> uses the owner-selected
+          provider with a per-handler timeout and token budget, exposes no tools, refuses nesting,
+          and contributes advisory context only. <strong>builtin</strong> runs Raiker's reviewed
+          in-process logic. MCP tool and agent handlers remain refused rather than gaining an
+          ungoverned execution path.
         </p>
       </section>
 

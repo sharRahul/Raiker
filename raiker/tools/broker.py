@@ -74,7 +74,7 @@ from raiker.tools.git import (
 )
 from raiker.tools.graph_tools import knowledge_graph
 from raiker.tools.language_tools import diagnostics, document_symbols, find_definition
-from raiker.tools.mcp_tools import is_mcp_tool, mcp_call
+from raiker.tools.mcp_tools import is_mcp_tool, mcp_call, mcp_tool_specs
 from raiker.tools.memory_tools import (
     memory_get,
     memory_list,
@@ -231,7 +231,13 @@ class ToolBroker:
             # Backlog #16 — the schema of a tool this request did not carry.
             # In-process, store-free and network-free: it reads the registry
             # Raiker ships. It grants nothing, so it needs nothing.
-            "tool_search": lambda args: search_tools(str(args.get("query", ""))),
+            "tool_search": lambda args: search_tools(
+                str(args.get("query", "")),
+                # This turn's projected MCP tools are searchable too, resolved
+                # from the same discovery the projection uses so a search can
+                # never return a tool the turn could not have been offered.
+                mcp_specs=mcp_tool_specs(self.workspace_root, self.store, self.principal_id),
+            ),
             "diff_files": lambda args: diff_files(
                 self.workspace_root,
                 str(args.get("before_path", ".")),

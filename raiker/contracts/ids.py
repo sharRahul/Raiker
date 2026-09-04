@@ -86,6 +86,9 @@ _PREFIXES = {
     "cwi_",
     "cinv_",
     "mcp_",
+    # Compatibility backlog #18 — one owner-configured OpenTelemetry destination
+    # governed events may be exported to.
+    "otlp_",
     # Monitored MCP connections (Phase B): a redacted per-session monitoring row
     # and a redacted security finding.
     "mses_",

@@ -1023,6 +1023,107 @@ class RuntimeControlService:
             return mapped
         return ControlResult(ok=True, data=dict(result.artifacts or {}))
 
+    # ── Telemetry export (compatibility backlog #18) ─────────────────────
+
+    def list_telemetry_destinations(self, acting_principal_id: str | None) -> ControlResult:
+        """The owner's own OTLP destinations. A read, so no governed action —
+        but still owner-scoped: the principal decides whose rows these are."""
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        rows = self._store.list_telemetry_destinations(principal.principal_id)
+        return ControlResult(ok=True, data={"destinations": rows})
+
+    def create_telemetry_destination(
+        self,
+        acting_principal_id: str | None,
+        *,
+        name: str,
+        endpoint_url: str,
+        header_ref: str | None = None,
+        include_content: bool = False,
+    ) -> ControlResult:
+        """Add a collector to export governed events to.
+
+        Human-only, like every other configuration of where the owner's record
+        may go. The credential is a *name*: `header_ref` names an environment
+        variable holding an `Authorization` value, and the value itself is never
+        accepted here, never stored, and never returned.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        clean_name = name.strip()
+        if not clean_name:
+            return ControlResult(ok=False, reason_code="telemetry_name_required")
+        parsed = urlparse(endpoint_url.strip())
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return ControlResult(ok=False, reason_code="telemetry_invalid_endpoint")
+        existing = [
+            row
+            for row in self._store.list_telemetry_destinations(principal.principal_id)
+            if str(row.get("name")) == clean_name
+        ]
+        if existing:
+            return ControlResult(ok=False, reason_code="telemetry_name_taken")
+        destination_id = new_id("otlp_")
+        self._store.create_telemetry_destination(
+            destination_id=destination_id,
+            principal_id=principal.principal_id,
+            name=clean_name,
+            endpoint_url=endpoint_url.strip(),
+            header_ref=(header_ref or "").strip() or None,
+            include_content=include_content,
+        )
+        return ControlResult(ok=True, data={"destination_id": destination_id})
+
+    def delete_telemetry_destination(
+        self, acting_principal_id: str | None, destination_id: str
+    ) -> ControlResult:
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        removed = self._store.delete_telemetry_destination(
+            destination_id, principal.principal_id
+        )
+        if not removed:
+            return ControlResult(ok=False, reason_code="telemetry_destination_not_found")
+        return ControlResult(ok=True, data={"deleted": True})
+
+    def run_telemetry_export(
+        self, acting_principal_id: str | None, destination_id: str
+    ) -> ControlResult:
+        """Deliver every governed event this destination has not had yet.
+
+        Takes the long way round for the same reason :meth:`export_audit_log`
+        does: it builds a governed action and routes it through
+        :class:`RuntimeAuthority`, so the `telemetry_export` gate, the policy
+        review, the approval and the audit event all apply. Risk is MEDIUM
+        because the run leaves the machine.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        action = GovernedAction(
+            action_id=new_id("act_"),
+            principal_id=principal.principal_id,
+            action_type="telemetry_export",
+            tool_or_service_name="telemetry_export",
+            arguments={"destination_id": destination_id},
+            risk_level=RiskLevelValue.MEDIUM,
+        )
+        result = self._authority.route_action(action, principal)
+        mapped = self._mcp_action_result(result)
+        if not mapped.ok:
+            return mapped
+        return ControlResult(ok=True, data=dict(result.artifacts or {}))
+
     def build_memory_embedding_index(
         self, acting_principal_id: str | None, provider: str, model: str
     ) -> ControlResult:

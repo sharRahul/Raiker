@@ -54,6 +54,19 @@ class SetCapabilityDecisionModeRequest:
 
 
 @dataclass
+class CreateTelemetryDestinationRequest:
+    # Backlog #18 — where governed events may be exported to. `header_ref` names
+    # the environment variable an `Authorization` value lives in; the value
+    # itself is never accepted here, so a credential cannot be typed into a form
+    # and stored. `include_content` is the owner's explicit opt-in to the
+    # redacted payload; without it a record carries identifiers and a type.
+    name: str
+    endpoint_url: str
+    header_ref: str = ""
+    include_content: bool = False
+
+
+@dataclass
 class CreateStandingGrantRequest:
     # Scoped standing approval grant (F3). Creation is a critical, human-decided
     # action; the authority enforces the human-only + sub-critical ceiling.

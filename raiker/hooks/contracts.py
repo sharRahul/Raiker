@@ -94,7 +94,7 @@ HOOK_EVENT_SUMMARIES = {
 #: nothing — which the hooks surface has to say rather than imply.
 DECIDING_HOOK_EVENTS = {"PreToolUse", "PreCompact", "ConfigChange"}
 
-HANDLER_TYPES = {"command", "builtin", "prompt"}
+HANDLER_TYPES = {"command", "builtin", "prompt", "http"}
 HOOK_DECISIONS = {"allow", "deny", "ask", "defer", "no_decision", "add_context_only"}
 # Highest authority first. A lower scope can never override a higher-scope deny.
 HOOK_SCOPES = ("managed", "user", "project", "local", "plugin", "skill", "session")
@@ -112,6 +112,12 @@ class HookHandler:
     builtin: str | None = None
     prompt: str | None = None
     model: str | None = None
+    #: BUG-226 — where an ``http`` handler posts its event. The destination is
+    #: declared here and *granted* separately: the host must be covered by
+    #: ``RAIKER_HOOK_EGRESS_ALLOWLIST``, which is empty by default and revokes
+    #: every ``http`` rule at once when cleared. Naming a URL in a hooks file
+    #: therefore cannot, on its own, make a request leave the machine.
+    url: str | None = None
     args: list[str] = field(default_factory=list)
     timeout_ms: int = 5000
     max_tokens: int = 256
@@ -134,6 +140,12 @@ class HookHandler:
             not isinstance(self.prompt, str) or not self.prompt.strip()
         ):
             raise HookConfigError("prompt_handler_requires_prompt")
+        if self.type == "http":
+            if not isinstance(self.url, str) or not self.url.strip():
+                raise HookConfigError("http_handler_requires_url")
+            scheme = self.url.split("://", 1)[0].lower() if "://" in self.url else ""
+            if scheme not in ("http", "https"):
+                raise HookConfigError("http_handler_requires_http_url")
         if self.prompt is not None and len(self.prompt) > 4_000:
             raise HookConfigError("prompt_handler_prompt_too_large")
         if self.timeout_ms <= 0:

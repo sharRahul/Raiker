@@ -64,6 +64,7 @@ from raiker.execution.profiles import (
     probe_execution_profile,
     validate_execution_profile,
 )
+from raiker.hooks.handlers.http import egress_granted
 from raiker.memory.store import get_memory, list_memory
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
 from raiker.models.exceptions import (
@@ -108,6 +109,7 @@ from raiker.tools.git import (
     selected_repository_subpath,
 )
 from raiker.tools.graph_tools import reference_resolution
+from raiker.tools.mcp_schema import unsupported_feature_notes
 
 # Capability states that mean the gate is off / fail-closed.
 _DISABLED_STATES = {"disabled", "planned"}
@@ -252,6 +254,57 @@ class SessionView:
         return asdict(self)
 
 
+def _handler_target(handler: Any) -> str:
+    """What a hook handler points at, in one line for the rule's card.
+
+    An `http` handler's destination is the URL it posts to — the fact an owner
+    needs when the grant does not cover it, because the host in that URL is what
+    they have to add.
+    """
+    if handler.type == "command" and handler.command:
+        return " ".join(handler.command)
+    if handler.type == "builtin":
+        return handler.builtin or ""
+    if handler.type == "http":
+        return handler.url or ""
+    return handler.model or "owner-selected model"
+
+
+def _declaration_summaries(stored: Any) -> tuple[dict[str, Any], ...]:
+    """The owner-facing summary of what a server declared for each of its tools.
+
+    Backlog #16 (MCP half). The card used to show a row of tool-name chips and
+    nothing else, so a server whose tools had no declared arguments looked
+    identical to one whose tools were fully described — and the owner could not
+    tell whether the model was calling them with real arguments or guesses.
+
+    Re-bounded on the way out (`decode_declarations`), so an older row written
+    before those bounds existed is still safe to render, and the *argument
+    names* are carried rather than the whole schema: the card answers "what does
+    this tool take", not "paste me a JSON Schema".
+    """
+    from raiker.tools.mcp_schema import decode_declarations
+
+    summaries: list[dict[str, Any]] = []
+    for declaration in decode_declarations(stored):
+        schema = declaration.input_schema or {}
+        properties = schema.get("properties") if isinstance(schema, dict) else None
+        argument_names = sorted(properties) if isinstance(properties, dict) else []
+        required = schema.get("required") if isinstance(schema, dict) else None
+        summaries.append(
+            {
+                "name": declaration.name,
+                "title": declaration.title,
+                "description": declaration.description,
+                "has_schema": declaration.input_schema is not None,
+                "schema_reason": declaration.schema_reason,
+                "arguments": argument_names,
+                "required": sorted(str(item) for item in required) if isinstance(required, list) else [],
+            }
+        )
+    return tuple(summaries)
+
+
 @dataclass(frozen=True)
 class McpServerView:
     """Owner-scoped view of one local stdio MCP server profile (Control Deck
@@ -271,6 +324,17 @@ class McpServerView:
     # never arguments or output).
     tools: tuple[str, ...] = ()
     tool_count: int = 0
+    # Backlog #16 (MCP half) — what each of those tools said it takes, bounded
+    # by `raiker.tools.mcp_schema` before it was stored. One entry per tool that
+    # declared something: its name, the server's own sentence, and whether the
+    # declared argument schema is carried or why it is not. Still never
+    # arguments a call passed or output it returned.
+    tool_declarations: tuple[dict[str, Any], ...] = ()
+    # BUG-234 — what this server offers that Raiker does not use, one sentence
+    # each: capabilities it declared beyond `tools`, and what the transport was
+    # observed doing. Empty when a server offers only what Raiker uses. The rule
+    # is "supported, or named as unsupported" — never silently degraded.
+    unsupported_features: tuple[dict[str, str], ...] = ()
     # Remote (http) connection details. `endpoint_url` is the owner-added URL;
     # `auth_ref` names where the owner token lives (an env var name) — never the
     # token itself. Both are null for a local stdio connection.
@@ -3663,6 +3727,10 @@ class DashboardService:
                 last_connected_at=row.get("last_connected_at"),
                 tools=tuple(str(t) for t in row.get("tools", [])),
                 tool_count=int(row.get("tool_count", 0) or 0),
+                tool_declarations=_declaration_summaries(row.get("tool_schemas")),
+                unsupported_features=tuple(
+                    unsupported_feature_notes(row.get("server_features"))
+                ),
                 endpoint_url=row.get("endpoint_url"),
                 auth_ref=row.get("auth_ref"),
                 monitor_state=str(row.get("monitor_state") or "active"),
@@ -3913,8 +3981,18 @@ class DashboardService:
             # the rule matches, and nothing happens — so it is the same class of
             # dead rule as an event that is never emitted, and is reported the
             # same way rather than being left to look enforcing.
+            # BUG-226 — the same is true of an `http` handler whose destination
+            # the owner's egress grant does not cover: the rule parses, matches,
+            # and refuses at dispatch. Read live rather than at parse time,
+            # because the grant is revocable *without* editing any hooks file —
+            # that is the whole point of it being one variable rather than a
+            # field per rule.
             def _available(handler: HookHandler) -> bool:
-                return handler.type != "builtin" or (handler.builtin or "") in BUILTIN_HANDLERS
+                if handler.type == "builtin":
+                    return (handler.builtin or "") in BUILTIN_HANDLERS
+                if handler.type == "http":
+                    return egress_granted(handler.url)
+                return True
 
             authoritative = any(
                 (handler.decision_authority or handler.type == "builtin") and _available(handler)
@@ -3939,15 +4017,7 @@ class DashboardService:
                         {
                             "id": handler.id,
                             "type": handler.type,
-                            "target": (
-                                " ".join(handler.command)
-                                if handler.type == "command" and handler.command
-                                else (
-                                    handler.builtin or ""
-                                    if handler.type == "builtin"
-                                    else (handler.model or "owner-selected model")
-                                )
-                            ),
+                            "target": _handler_target(handler),
                             "timeout_ms": handler.timeout_ms,
                             # A builtin is Raiker's own code and always carries
                             # authority; a command carries it only when the owner
@@ -3956,10 +4026,23 @@ class DashboardService:
                                 handler.decision_authority or handler.type == "builtin"
                             )
                             and _available(handler),
-                            # False only for a builtin this build does not ship.
-                            # A command's program is resolved at dispatch time
-                            # inside the workspace, so it is not checked here.
+                            # False for a builtin this build does not ship, and
+                            # for an `http` destination the egress grant does not
+                            # cover. A command's program is resolved at dispatch
+                            # time inside the workspace, so it is not checked here.
                             "available": _available(handler),
+                            # BUG-226 — why an unavailable handler is unavailable,
+                            # so the page can say "add this host to the grant"
+                            # rather than only "this will not run".
+                            "unavailable_reason": (
+                                ""
+                                if _available(handler)
+                                else (
+                                    "egress_not_granted"
+                                    if handler.type == "http"
+                                    else "builtin_not_in_this_build"
+                                )
+                            ),
                         }
                         for handler in rule.handlers
                     ],

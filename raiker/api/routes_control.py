@@ -10,6 +10,7 @@ from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
     ActivateRuntimeModeRequest,
     CreateStandingGrantRequest,
+    CreateTelemetryDestinationRequest,
     DisableCapabilityRequest,
     DisableRuntimeModeRequest,
     RecordThreatModelAckRequest,
@@ -388,6 +389,78 @@ async def list_audit_exports(
         }
         for row in rows
     ]
+
+
+# ── Telemetry export (compatibility backlog #18) ─────────────────────────────
+# Raiker records more per governed action than any compared product exports, and
+# had no wire to carry it anywhere. These four routes are that wire's controls:
+# list the collectors, add one, remove one, and run a delivery.
+#
+# The delivery is a governed action — it passes the `telemetry_export` gate, the
+# policy review and the posture check, and appears in the log it exported.
+# Metadata only unless the owner opted into redacted content, and the credential
+# is an environment-variable *name* rather than a value.
+
+
+@router.get("/api/telemetry/destinations")
+async def list_telemetry_destinations(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    """The acting principal's own OTLP destinations, newest first."""
+    session, _principal = auth_data
+    result = _get_service(request).list_telemetry_destinations(session.principal_id)
+    if not result.ok:
+        _deny(result.reason_code)
+    return list(result.data.get("destinations", []))
+
+
+@router.post("/api/telemetry/destinations")
+async def create_telemetry_destination(
+    request: Request,
+    body: CreateTelemetryDestinationRequest,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    session, _principal = auth_data
+    result = _get_service(request).create_telemetry_destination(
+        session.principal_id,
+        name=body.name,
+        endpoint_url=body.endpoint_url,
+        header_ref=body.header_ref,
+        include_content=body.include_content,
+    )
+    if not result.ok:
+        _deny(result.reason_code)
+    return {"ok": True, **result.data}
+
+
+@router.delete("/api/telemetry/destinations/{destination_id}")
+async def delete_telemetry_destination(
+    destination_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    session, _principal = auth_data
+    result = _get_service(request).delete_telemetry_destination(
+        session.principal_id, destination_id
+    )
+    if not result.ok:
+        _deny(result.reason_code)
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/telemetry/destinations/{destination_id}/export")
+async def run_telemetry_export(
+    destination_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Deliver every governed event this destination has not had yet."""
+    session, _principal = auth_data
+    result = _get_service(request).run_telemetry_export(session.principal_id, destination_id)
+    if not result.ok:
+        _deny(result.reason_code)
+    return {"ok": True, **result.data}
 
 
 @router.get("/api/audit/exports/{export_id}/download")

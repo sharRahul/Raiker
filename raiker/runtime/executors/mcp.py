@@ -34,13 +34,14 @@ from urllib.parse import urlparse
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.runtime.executors.base import ExecutionResult
-from raiker.runtime.executors.sandbox import SandboxError, post_json_rpc
+from raiker.runtime.executors.sandbox import SandboxError, delete_mcp_session, post_json_rpc
 from raiker.security.mcp_monitor import (
     McpSessionMonitor,
     McpSessionTelemetry,
     shape_sensitivity,
 )
 from raiker.storage.internal_paths import internal_io_path
+from raiker.tools.mcp_schema import server_feature_keys
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -330,6 +331,11 @@ class _SessionCtx:
     command: list[str] = field(default_factory=list)
     endpoint_url: str | None = None
     started_at: str = ""
+    # BUG-234 — what the remote transport was observed doing, so the server card
+    # can name what Raiker does not use rather than silently degrading. Set on
+    # the http path only; a stdio session leaves them at their defaults.
+    saw_event_stream: bool = False
+    session_restarts: int = 0
 
 
 def _default_http_fn(
@@ -364,6 +370,7 @@ class McpConnectorExecutor:
         store: SQLiteStore,
         *,
         http_fn: HttpFn | None = None,
+        delete_fn: Callable[..., int] | None = None,
         monitor: McpSessionMonitor | None = None,
         content_sink: Callable[[str], None] | None = None,
     ) -> None:
@@ -371,6 +378,7 @@ class McpConnectorExecutor:
         self._store = store
         # Injectable so the remote path is testable without a live network.
         self._http_fn: HttpFn = http_fn or _default_http_fn
+        self._delete_fn: Callable[..., int] = delete_fn or delete_mcp_session
         # Every governed session hands redacted telemetry to the monitor, which
         # records a session-log row and raises redacted findings on anomalies.
         self._monitor = monitor or McpSessionMonitor(store)
@@ -472,7 +480,7 @@ class McpConnectorExecutor:
             return self._fail(action.action_id, token_error)
         try:
             responses, bytes_in, bytes_out = self._run_http_session(
-                endpoint_url, token, requests, timeout
+                endpoint_url, token, requests, timeout, ctx
             )
         except SandboxError as exc:
             self._observe_failure(action, principal_id, ctx)
@@ -549,9 +557,19 @@ class McpConnectorExecutor:
                 bytes_in=bytes_in, bytes_out=bytes_out, tools=tuple(tool_names),
             )
         )
+        declarations = _extract_declarations(responses)
+        # BUG-234 — what this server offers beyond the tools Raiker uses, and
+        # what its transport was seen doing. Names and observations only; the
+        # card turns them into the sentence that says each is unsupported.
+        features = server_feature_keys(
+            init_result.get("capabilities"),
+            event_stream=ctx.saw_event_stream,
+            session_restarted=ctx.session_restarts > 0,
+        )
         self._record_connection(
             action, principal_id, transport=ctx.transport,
             command=ctx.command, endpoint_url=ctx.endpoint_url, tools=tool_names,
+            tool_schemas=declarations, server_features=features,
             protocol_version=negotiated_protocol_version(init_result),
         )
         label = "remote HTTP" if ctx.transport == "http" else "stdio"
@@ -567,6 +585,12 @@ class McpConnectorExecutor:
                 "transport": ctx.transport,
                 "tool_count": len(tool_names),
                 "tools": tool_names,
+                # Counts only: how many of the listed tools declared arguments
+                # Raiker could carry. The declarations themselves are stored on
+                # the profile, never in an artifact.
+                "tools_with_declared_schema": sum(
+                    1 for entry in declarations if entry.get("input_schema")
+                ),
                 "content_redacted": True,
             },
         )
@@ -689,15 +713,37 @@ class McpConnectorExecutor:
 
     # ── remote HTTP session ──
     def _run_http_session(
-        self, endpoint_url: str, token: str | None, requests: list[dict[str, Any]], timeout: float
+        self,
+        endpoint_url: str,
+        token: str | None,
+        requests: list[dict[str, Any]],
+        timeout: float,
+        ctx: _SessionCtx | None = None,
     ) -> tuple[dict[Any, dict[str, Any]], int, int]:
         """Run a bounded JSON-RPC-over-HTTP session against an owner-added MCP
         endpoint. The owner token (if any) is sent as a bearer header and never
         stored or returned. An ``Mcp-Session-Id`` from the initialize response
-        is carried to later requests. Raises :class:`SandboxError` with a
-        redacted reason on any transport failure. Returns the id-keyed responses
-        plus the wire byte totals (in/out) for monitoring — sizes only, never
-        content."""
+        is carried to later requests, and released with a `DELETE` at the end.
+        Raises :class:`SandboxError` with a redacted reason on any transport
+        failure. Returns the id-keyed responses plus the wire byte totals
+        (in/out) for monitoring — sizes only, never content.
+
+        BUG-234 — three things this did not do, each of which a real server does:
+
+        * **An expired session was a dead session.** A server may drop the
+          session it issued and answer `404`; the specification's client starts a
+          new one. Raiker carried the stale id to the end of the request list and
+          reported whatever error came back. It now re-handshakes **once** — once,
+          because a server answering 404 to every request is broken rather than
+          busy, and a loop would hammer it.
+        * **An authorisation challenge read as a status.** A `401` carrying
+          `WWW-Authenticate` is the remote OAuth flow Raiker does not implement,
+          and it is now said in those words instead of `mcp_remote_unreachable`.
+        * **Nothing recorded that the server was streaming.** A `text/event-stream`
+          answer is read (buffered) rather than streamed, which is honest for a
+          bounded session and has to be *stated* — so it is observed here and
+          named on the card.
+        """
         responses: dict[Any, dict[str, Any]] = {}
         session_id: str | None = None
         # BUG-234 — every revision from 2025-06-18 onward requires the agreed
@@ -707,7 +753,10 @@ class McpConnectorExecutor:
         negotiated: str | None = None
         bytes_in = 0
         bytes_out = 0
-        for req in requests:
+        restarted = False
+        index = 0
+        while index < len(requests):
+            req = requests[index]
             bytes_out += len(json.dumps(req).encode("utf-8"))
             headers: dict[str, str] = {}
             if token:
@@ -721,9 +770,28 @@ class McpConnectorExecutor:
             )
             if result.get("truncated"):
                 raise SandboxError("mcp_response_too_large")
+            status = int(result.get("status", 200) or 200)
+            response_headers = result.get("headers", {}) or {}
+            if status == 401 and response_headers.get("www-authenticate"):
+                # The named remainder of BUG-234, said as itself.
+                raise SandboxError("mcp_remote_oauth_required")
+            if status == 404 and session_id and not restarted:
+                # The server dropped the session it issued. Start a new one from
+                # the handshake rather than carrying a dead id to the end.
+                restarted = True
+                session_id = None
+                negotiated = None
+                responses.clear()
+                index = 0
+                if ctx is not None:
+                    ctx.session_restarts += 1
+                continue
+            content_type = str(response_headers.get("content-type", "")).lower()
+            if ctx is not None and "text/event-stream" in content_type:
+                ctx.saw_event_stream = True
             body_text = str(result.get("body_text", ""))
             bytes_in += len(body_text.encode("utf-8"))
-            sid = result.get("headers", {}).get("mcp-session-id")
+            sid = response_headers.get("mcp-session-id")
             if sid:
                 session_id = str(sid)
             for message in _parse_jsonrpc_body(body_text):
@@ -731,7 +799,31 @@ class McpConnectorExecutor:
                     responses[message["id"]] = message
                     if message["id"] == 1 and isinstance(message.get("result"), dict):
                         negotiated = negotiated_protocol_version(message["result"])
+            index += 1
+        if session_id:
+            self._end_http_session(endpoint_url, token, session_id, negotiated, timeout)
         return responses, bytes_in, bytes_out
+
+    def _end_http_session(
+        self,
+        endpoint_url: str,
+        token: str | None,
+        session_id: str,
+        negotiated: str | None,
+        timeout: float,
+    ) -> None:
+        """Release the server-side session this bounded read opened.
+
+        Best-effort: the read has already succeeded, and a server that refuses
+        to let clients end sessions is behaving as the specification permits.
+        """
+        headers = {"Mcp-Session-Id": session_id}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        if negotiated:
+            headers["MCP-Protocol-Version"] = negotiated
+        with contextlib.suppress(Exception):
+            self._delete_fn(endpoint_url, headers=headers, timeout=timeout)
 
     # ── stdio session ──
     def _run_session(
@@ -793,10 +885,12 @@ class McpConnectorExecutor:
         command: list[str],
         endpoint_url: str | None,
         tools: list[str] | None = None,
+        tool_schemas: list[dict[str, Any]] | None = None,
+        server_features: list[str] | None = None,
         protocol_version: str | None = None,
     ) -> None:
         """Persist/refresh an owner-scoped 'connected' profile, including the tool
-        names the handshake discovered (names only).
+        names the handshake discovered and the bounded declaration behind each.
 
         Best-effort bookkeeping only — a storage hiccup must never turn a
         successful governed read into a failure, so this swallows write errors.
@@ -818,7 +912,8 @@ class McpConnectorExecutor:
                     str(existing["server_id"]), principal_id,
                     # `tools=None` (a tools/call session) leaves the stored list
                     # alone; only an enumerating session rewrites it.
-                    status="connected", tools=tools, last_connected_at=utc_now(),
+                    status="connected", tools=tools, tool_schemas=tool_schemas,
+                    server_features=server_features, last_connected_at=utc_now(),
                     protocol_version=protocol_version,
                 )
                 return
@@ -837,6 +932,8 @@ class McpConnectorExecutor:
                 status="connected",
                 last_connected_at=utc_now(),
                 tools=tools or [],
+                tool_schemas=tool_schemas or [],
+                server_features=server_features or [],
                 endpoint_url=endpoint_url,
                 protocol_version=protocol_version,
             )
@@ -905,6 +1002,24 @@ def _extract_tools(
     tools = tools_resp["result"].get("tools") or []
     names = [str(t.get("name", "")) for t in tools if isinstance(t, dict)]
     return None, names, init["result"]
+
+
+def _extract_declarations(responses: dict[Any, dict[str, Any]]) -> list[dict[str, Any]]:
+    """The bounded tool declarations from a `tools/list` result.
+
+    Backlog #16 (MCP half). The names alone were kept for five revisions, so a
+    projected tool reached the model as an untyped object it had to guess the
+    fields of. What a server declares is still an outside program's text, so it
+    is bounded and attributed by `raiker.tools.mcp_schema` before it is stored —
+    never passed through raw into the one part of a turn that is trusted.
+    """
+    from raiker.tools.mcp_schema import declarations_from_payload
+
+    tools_resp = responses.get(2)
+    if tools_resp is None or "result" not in tools_resp:
+        return []
+    payload = tools_resp["result"].get("tools")
+    return [declaration.as_dict() for declaration in declarations_from_payload(payload)]
 
 
 def _extract_call(responses: dict[Any, dict[str, Any]]) -> tuple[str | None, int, int]:

@@ -135,6 +135,13 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     r["git_push_execution"] = _req(
         "git_push_execution", "2", threat_ack=True, human_confirm=True,
         notes="Owner credential + connector egress allowlist; never forces, never deletes.")
+    # Backlog #18 — the governed record over OTLP. Tier 2 because it leaves the
+    # machine; metadata-only unless the owner opts into redacted content, and the
+    # credential is an environment-variable *name*, never a stored value.
+    r["telemetry_export"] = _req(
+        "telemetry_export", "2", threat_ack=True, human_confirm=True,
+        notes="OTLP export to an owner-named collector; metadata by default, "
+              "redacted content on explicit opt-in.")
 
     # Tier 3
     for cap in ("graph_indexing_runtime", "semantic_memory_runtime", "vector_embedding_runtime"):

@@ -18,6 +18,7 @@
   import PageState from "../components/PageState.svelte";
   import StatTile from "../components/StatTile.svelte";
   import TabStrip from "../components/TabStrip.svelte";
+  import TelemetryExport from "../components/TelemetryExport.svelte";
   import { api, ApiError } from "../api";
   import { digestEvents } from "../auditDigest";
   import { isDeferred, isInherent } from "../capabilityModel";
@@ -334,6 +335,11 @@
           <pre class="bundle" aria-label="Redacted support bundle">{JSON.stringify(bundle, null, 2)}</pre>
         {/if}
       </section>
+
+      <!-- Backlog #18 — the record Raiker keeps is more than any compared
+           product exports, and until now it could not leave the machine on a
+           wire. This is the fifth question the overview answers. -->
+      <TelemetryExport />
     {/if}
   </div>
 {:else if tab === "sessions"}

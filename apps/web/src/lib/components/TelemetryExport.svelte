@@ -1,0 +1,204 @@
+<script lang="ts">
+  /**
+   * Backlog #18 — the governed record, on a wire.
+   *
+   * Raiker keeps more per action than any compared product exports and had
+   * nowhere to send it. This is where an owner names a collector and runs a
+   * delivery. It is deliberately small: a list, a form behind a disclosure, and
+   * one sentence saying what a record carries.
+   *
+   * The credential is a *name*. The form takes the name of an environment
+   * variable holding an `Authorization` value and never the value, so a
+   * credential cannot be typed into a browser field and stored.
+   */
+  import { onMount } from "svelte";
+  import Icon from "./Icon.svelte";
+  import { api, ApiError } from "../api";
+  import { relativeTime } from "../format";
+  import type { TelemetryDestination } from "../apiTypes";
+
+  let destinations = $state<TelemetryDestination[] | null>(null);
+  let error = $state<string | null>(null);
+  let notice = $state<string | null>(null);
+  let busy = $state<string | null>(null);
+  let adding = $state(false);
+
+  let name = $state("");
+  let endpoint = $state("");
+  let headerRef = $state("");
+  let includeContent = $state(false);
+
+  function reason(e: unknown): string {
+    if (e instanceof ApiError) return e.reasonCode ?? `Request failed (${e.status})`;
+    return "Request failed";
+  }
+
+  async function load() {
+    error = null;
+    try {
+      destinations = await api.telemetryDestinations();
+    } catch (e) {
+      destinations = [];
+      error = reason(e);
+    }
+  }
+
+  async function add(event: SubmitEvent) {
+    event.preventDefault();
+    busy = "create";
+    error = null;
+    notice = null;
+    try {
+      await api.createTelemetryDestination({
+        name: name.trim(),
+        endpoint_url: endpoint.trim(),
+        header_ref: headerRef.trim(),
+        include_content: includeContent,
+      });
+      name = "";
+      endpoint = "";
+      headerRef = "";
+      includeContent = false;
+      adding = false;
+      await load();
+    } catch (e) {
+      error = reason(e);
+    } finally {
+      busy = null;
+    }
+  }
+
+  async function run(destination: TelemetryDestination) {
+    busy = destination.destination_id;
+    error = null;
+    notice = null;
+    try {
+      const result = await api.runTelemetryExport(destination.destination_id);
+      notice = `${destination.name}: ${result.exported} event(s) delivered.`;
+      await load();
+    } catch (e) {
+      error = reason(e);
+    } finally {
+      busy = null;
+    }
+  }
+
+  async function remove(destination: TelemetryDestination) {
+    if (!confirm(`Remove “${destination.name}”? Nothing already delivered is affected.`)) return;
+    busy = destination.destination_id;
+    error = null;
+    try {
+      await api.deleteTelemetryDestination(destination.destination_id);
+      await load();
+    } catch (e) {
+      error = reason(e);
+    } finally {
+      busy = null;
+    }
+  }
+
+  onMount(load);
+</script>
+
+<section aria-labelledby="otlp-h" class="otlp">
+  <h2 id="otlp-h" class="section-h">Can I see this outside Raiker?</h2>
+  <p>
+    Governed events go to an OpenTelemetry collector as identifiers and an event type. Content is
+    off unless a destination opts in, and is redacted the same way this screen is.
+  </p>
+
+  {#if error}<p class="error" role="alert">{error}</p>{/if}
+  {#if notice}<p class="notice" role="status">{notice}</p>{/if}
+
+  {#if destinations !== null && destinations.length}
+    <ul class="list">
+      {#each destinations as d (d.destination_id)}
+        <li>
+          <div class="row">
+            <span class="name">{d.name}</span>
+            <code>{d.endpoint_url}</code>
+            <span class="tag">{d.include_content ? "With redacted content" : "Metadata only"}</span>
+          </div>
+          <div class="row muted">
+            <span>{d.exported_count} delivered</span>
+            {#if d.last_attempt_at}
+              <span>{d.last_status === "ok" ? "Last run ok" : d.last_status} · {relativeTime(d.last_attempt_at)}</span>
+            {:else}
+              <span>Never run</span>
+            {/if}
+            {#if d.header_ref}<span>Credential: ${d.header_ref}</span>{/if}
+          </div>
+          <div class="row">
+            <button
+              type="button"
+              class="btn btn-sm"
+              onclick={() => run(d)}
+              disabled={busy !== null}
+            >
+              {busy === d.destination_id ? "Delivering…" : "Deliver now"}
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              onclick={() => remove(d)}
+              disabled={busy !== null}
+            >
+              Remove
+            </button>
+          </div>
+        </li>
+      {/each}
+    </ul>
+  {:else if destinations !== null}
+    <p class="muted">No collector yet.</p>
+  {/if}
+
+  {#if adding}
+    <form onsubmit={add} class="add">
+      <label>
+        Name
+        <input bind:value={name} required placeholder="Local collector" />
+      </label>
+      <label>
+        OTLP endpoint
+        <input bind:value={endpoint} required placeholder="http://127.0.0.1:4318" />
+      </label>
+      <label>
+        Credential variable
+        <input bind:value={headerRef} placeholder="OTEL_AUTH_HEADER (optional)" />
+      </label>
+      <label class="check">
+        <input type="checkbox" bind:checked={includeContent} />
+        Send redacted event payloads too
+      </label>
+      <div class="row">
+        <button type="submit" class="btn btn-sm" disabled={busy === "create"}>
+          {busy === "create" ? "Adding…" : "Add collector"}
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick={() => (adding = false)}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  {:else}
+    <button type="button" class="btn btn-sm" onclick={() => (adding = true)}>
+      <Icon name="globe" size={15} /> Add collector
+    </button>
+  {/if}
+</section>
+
+<style>
+  .otlp p { margin: 0 0 var(--space-3); color: var(--text-2); font-size: 0.85rem; }
+  .list { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-3); }
+  .list li { border: 1px solid var(--border); border-radius: var(--radius-2); padding: var(--space-3); display: grid; gap: 0.35rem; }
+  .row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+  .name { font-weight: 600; }
+  .muted { color: var(--text-3); font-size: 0.78rem; }
+  .tag { font-size: 0.72rem; color: var(--text-3); border: 1px solid var(--border); border-radius: 999px; padding: 0.05rem 0.5rem; }
+  .error { color: var(--danger); }
+  .notice { color: var(--text-2); }
+  .add { display: grid; gap: var(--space-3); max-width: 32rem; }
+  .add label { display: grid; gap: 0.25rem; font-size: 0.8rem; color: var(--text-2); }
+  .add .check { display: flex; align-items: center; gap: 0.5rem; }
+  code { font-size: 0.78rem; color: var(--text-3); word-break: break-all; }
+</style>

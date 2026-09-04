@@ -106,6 +106,21 @@ export interface AgentPlan {
   current_step?: string;
 }
 
+/**
+ * One connected tool as its server described it. `has_schema` false means the
+ * server declared no usable argument schema — the tool is still callable, with
+ * an open object — and `schema_reason` says which of the three reasons it was.
+ */
+export interface McpToolDeclaration {
+  name: string;
+  title: string;
+  description: string;
+  has_schema: boolean;
+  schema_reason: string;
+  arguments: string[];
+  required: string[];
+}
+
 export interface McpServer {
   server_id: string;
   name: string;
@@ -117,6 +132,20 @@ export interface McpServer {
   last_connected_at: string | null;
   tools: string[];
   tool_count: number;
+  /**
+   * Backlog #16 (MCP half) — what each discovered tool said it takes, read from
+   * the server's own `tools/list` declaration and bounded before it was stored.
+   * Empty for a connection that has not been tested since declarations were
+   * recorded; the card says so rather than implying the tools take nothing.
+   */
+  tool_declarations: McpToolDeclaration[];
+  /**
+   * BUG-234 — what this server offers that Raiker does not use: capabilities it
+   * declared beyond `tools`, and what its transport was observed doing. Empty
+   * when a server offers only what Raiker uses. Supported, or named as
+   * unsupported — never silently degraded.
+   */
+  unsupported_features: { feature: string; note: string }[];
   endpoint_url: string | null;
   auth_ref: string | null;
   monitor_state: "active" | "paused" | "killed";
@@ -1861,9 +1890,13 @@ export interface HookHandlerView {
   target: string;
   timeout_ms: number;
   decision_authority: boolean;
-  /** False only for a builtin this build does not ship: the rule matches, the
-   *  handler raises, and nothing is enforced. */
+  /** False for a builtin this build does not ship, and for an `http` destination
+   *  the owner's egress grant does not cover: the rule matches, the handler
+   *  refuses, and nothing is enforced. */
   available: boolean;
+  /** Why an unavailable handler is unavailable — "egress_not_granted" or
+   *  "builtin_not_in_this_build". Empty when the handler is available. */
+  unavailable_reason: string;
 }
 
 export interface HookRuleView {
@@ -2935,4 +2968,30 @@ export interface SpeechRuntimeProbe {
   ok: boolean;
   reason_code: string | null;
   endpoint: string;
+}
+
+
+/**
+ * Backlog #18 — one owner-configured OpenTelemetry destination.
+ *
+ * `header_ref` is the *name* of an environment variable holding an
+ * `Authorization` value; the value itself never reaches the browser or the
+ * database. `include_content` is the owner's explicit opt-in to the redacted
+ * payload — without it a record carries identifiers and an event type and
+ * nothing else. The cursor fields say how far delivery has got, so a failed run
+ * is visible as events still waiting rather than as events quietly lost.
+ */
+export interface TelemetryDestination {
+  destination_id: string;
+  name: string;
+  endpoint_url: string;
+  header_ref: string | null;
+  include_content: boolean;
+  enabled: boolean;
+  cursor_timestamp: string | null;
+  cursor_event_id: string | null;
+  last_status: string | null;
+  last_attempt_at: string | null;
+  exported_count: number;
+  created_at: string;
 }

@@ -18,6 +18,7 @@ acknowledging.
 |---|---|
 | `approval_execution_relay` | [Approval execution relay](approval-execution-relay.md) |
 | `audit_export` | [Audit export](audit-export.md) |
+| `telemetry_export` | [Telemetry export](telemetry-export.md) |
 | Critical approvals (human-only, step-up verified) | [Critical approval lifecycle](critical-approval-lifecycle.md) |
 | `file_write_execution`, `patch_apply_execution` | [Workspace file mutation](workspace-file-mutation.md) |
 | `checkpoint_restore_execution` | [Checkpoint restore and rewind](checkpoint-restore.md) |

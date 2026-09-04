@@ -137,6 +137,7 @@ import type {
   SpeechRuntimeChange,
   SpeechRuntimeProbe,
   SpeechRuntimeView,
+  TelemetryDestination,
 } from "./apiTypes";
 import type { ApprovalMode } from "./approvalMode";
 
@@ -1207,6 +1208,28 @@ export const api = {
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url));
   },
+  // ── Backlog #18: governed events over OTLP ──
+  // The record Raiker keeps, on a wire to somewhere the owner already looks.
+  // A destination holds an endpoint and the *name* of the environment variable
+  // an auth header lives in — never a credential.
+  telemetryDestinations: () =>
+    request<TelemetryDestination[]>("/api/telemetry/destinations"),
+  createTelemetryDestination: (body: {
+    name: string;
+    endpoint_url: string;
+    header_ref?: string;
+    include_content?: boolean;
+  }) => postJson<{ ok: boolean; destination_id: string }>("/api/telemetry/destinations", body),
+  deleteTelemetryDestination: (destinationId: string) =>
+    request<{ ok: boolean }>(
+      `/api/telemetry/destinations/${encodeURIComponent(destinationId)}`,
+      { method: "DELETE" },
+    ),
+  runTelemetryExport: (destinationId: string) =>
+    postJson<{ ok: boolean; exported: number; destination: string }>(
+      `/api/telemetry/destinations/${encodeURIComponent(destinationId)}/export`,
+      {},
+    ),
   // ── BUG-21: the normalised price registry ──
   modelPricing: () => request<ModelPricingView>("/api/models/pricing"),
   refreshModelPricing: () =>

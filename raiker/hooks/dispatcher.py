@@ -11,6 +11,7 @@ from raiker.hooks.contracts import HOOK_SCOPES, HookHandler, HookInput, HookOutc
 from raiker.hooks.decision import HandlerDecision, combine
 from raiker.hooks.handlers.builtin import BuiltinHookError, run_builtin
 from raiker.hooks.handlers.command import CommandHookError, CommandHookTimeout, run_command
+from raiker.hooks.handlers.http import HttpHookError, run_http
 from raiker.hooks.handlers.prompt import PromptHookError
 from raiker.hooks.matchers import guard_matches, matches
 from raiker.hooks.registry import HooksRegistry
@@ -143,6 +144,13 @@ class HookDispatcher:
                         )
                         # Model output is never part of Raiker's authority chain.
                         authority = False
+                    elif handler.type == "http":
+                        output = run_http(handler, hook_input)
+                        # Same terms a command handler is on: authority is the
+                        # owner's opt-in, and `combine` already guarantees a
+                        # handler can only make an action stricter — a remote
+                        # responder can deny or ask and can never permit.
+                        authority = handler.decision_authority
                     else:
                         output = run_command(handler, hook_input, self.workspace_root)
                         authority = handler.decision_authority
@@ -155,7 +163,13 @@ class HookDispatcher:
                         client=client,
                     )
                     continue
-                except (CommandHookError, BuiltinHookError, PromptHookError, ModelProviderError) as exc:
+                except (
+                    CommandHookError,
+                    BuiltinHookError,
+                    PromptHookError,
+                    HttpHookError,
+                    ModelProviderError,
+                ) as exc:
                     self._emit(
                         "hook_failed",
                         {"event": hook_input.event_name, "handler_id": handler.id, "scope": rule.scope, "error": str(exc)},

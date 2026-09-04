@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from raiker.context.redaction import redact_text
 from raiker.hooks.contracts import HookHandler, HookInput, HookOutput
+from raiker.hooks.handlers.http import event_body
 from raiker.models.contracts import ModelMessage, ReasoningOptions, summarize_model_usage
 
 _MAX_HOOK_INPUT_CHARS = 12_000
@@ -16,24 +15,14 @@ class PromptHookError(ValueError):
 
 
 def _event_data(hook_input: HookInput) -> str:
-    """Bound and redact the untrusted event data sent to the advisory model."""
-    public_context = {
-        str(key): value
-        for key, value in hook_input.context.items()
-        if not str(key).startswith("_")
-    }
-    raw = json.dumps(
-        {
-            "event_name": hook_input.event_name,
-            "tool_name": hook_input.tool_name,
-            "tool_input": hook_input.tool_input,
-            "context": public_context,
-        },
-        ensure_ascii=False,
-        sort_keys=True,
-        default=str,
-    )[:_MAX_HOOK_INPUT_CHARS]
-    return redact_text(raw)[0]
+    """Bound and redact the untrusted event data sent to the advisory model.
+
+    BUG-226 — the same function the `http` handler uses to build what *it* sends
+    outward. One definition of "what a hook may reveal", because two copies of
+    that rule is exactly the pair that drifts apart and turns one of them into a
+    leak.
+    """
+    return event_body(hook_input, limit=_MAX_HOOK_INPUT_CHARS)
 
 
 def prompt_runner(

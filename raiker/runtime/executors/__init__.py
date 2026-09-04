@@ -38,6 +38,7 @@ from raiker.runtime.executors.tier1_tasks import (
     TaskManagementExecutor,
 )
 from raiker.runtime.executors.tier2_shell import ProcessExecutor, ShellExecutor
+from raiker.runtime.executors.tier2_telemetry import TelemetryExportExecutor
 from raiker.runtime.executors.tier2_web import WebFetchExecutor
 from raiker.runtime.executors.tier3_core import (
     CodeMapIndexExecutor,
@@ -80,7 +81,7 @@ __all__ = [
     "GitWriteExecutor", "GitPushExecutor",
     "MemoryWriteExecutor", "MemoryForgetExecutor",
     "TaskManagementExecutor", "ProjectAssignmentExecutor",
-    "ShellExecutor", "ProcessExecutor", "WebFetchExecutor",
+    "ShellExecutor", "ProcessExecutor", "WebFetchExecutor", "TelemetryExportExecutor",
     "GraphIndexingExecutor", "CodeMapIndexExecutor", "LanguageIntelligenceExecutor",
     "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
     "SubagentExecutor", "MultiAgentTeamExecutor",
@@ -142,6 +143,10 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # scoped export of the owner's own record, written locally; it reaches no
     # network and grants nothing. Evidence that cannot leave is not evidence.
     "audit_export",
+    # Backlog #18 — the same governed record, over OTLP, to a collector the
+    # owner named. Its own capability rather than a corner of `audit_export`,
+    # because it differs in the one way that matters: it leaves the machine.
+    "telemetry_export",
     # BUG-62 — the two local planning mutations an approval carries out. A task
     # row and a project label are owner-scoped, reversible, and never leave the
     # machine, so approving one performs it rather than recording it.
@@ -278,6 +283,7 @@ def build_default_executor_registry(
     registry.register("shell_execution", ShellExecutor(ws))
     registry.register("process_execution", ProcessExecutor(ws))
     registry.register("web_fetch", WebFetchExecutor(ws, store))
+    registry.register("telemetry_export", TelemetryExportExecutor(ws, store))
     registry.register("graph_indexing_runtime", GraphIndexingExecutor(ws))
     registry.register("code_map_indexing", CodeMapIndexExecutor(ws, store))
     registry.register("language_intelligence", LanguageIntelligenceExecutor(ws, store))

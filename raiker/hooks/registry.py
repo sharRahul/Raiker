@@ -39,6 +39,7 @@ def _parse_handler(data: dict[str, Any]) -> HookHandler:
         builtin=str(data["builtin"]) if data.get("builtin") is not None else None,
         prompt=str(data["prompt"]) if data.get("prompt") is not None else None,
         model=str(data["model"]) if data.get("model") is not None else None,
+        url=str(data["url"]) if data.get("url") is not None else None,
         args=[str(a) for a in data.get("args", [])],
         timeout_ms=int(data.get("timeout_ms", 5000)),
         max_tokens=int(data.get("max_tokens", 256)),

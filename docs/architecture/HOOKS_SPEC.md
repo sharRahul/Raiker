@@ -21,9 +21,11 @@
 
 > **Code status: implemented (core).** `raiker/hooks/` is a working dispatcher wired through the
 > tool broker and gateway. Implemented now:
-> - **Handler types:** `builtin` (in-process, trusted) and `command` (subprocess). `http`,
->   `mcp_tool`, `prompt`, and `agent` handlers remain specified-not-implemented (they need
->   network/model/subagent surfaces that are still gated).
+> - **Handler types:** `builtin` (in-process, trusted), `command` (subprocess), bounded
+>   tool-free `prompt` (FIXED-303), and `http` behind a named, revocable egress grant
+>   (FIXED-380 — `RAIKER_HOOK_EGRESS_ALLOWLIST`, empty by default). `mcp_tool` and `agent`
+>   remain specified-not-implemented: each needs authority the hook path deliberately
+>   does not have.
 > - **Wired events:** `SessionStart`, `UserPromptSubmit` (gateway), and `PreToolUse`,
 >   `PermissionRequest`, `PermissionDenied`, `PostToolUse`, `PostToolUseFailure` (tool broker).
 >   Other events in this spec are not dispatched yet.
@@ -80,9 +82,9 @@
 > `TeammateIdle`, `CwdChanged`,
 > `DirectoryAdded`, `FileChanged`, `WorktreeCreate`, `WorktreeRemove`,
 > `Elicitation` and `ElicitationResult`. Of the 5 handler types Raiker builds
-> `command` and bounded, tool-free `prompt`; `builtin` is Raiker's own in-process
-> code and is not one of the five, and `http`, `mcp_tool` and `agent` remain
-> refused at parse time (BUG-226 remainder).
+> `command`, bounded tool-free `prompt`, and `http` behind an owner egress grant;
+> `builtin` is Raiker's own in-process code and is not one of the five, and
+> `mcp_tool` and `agent` remain refused at parse time (BUG-226 remainder).
 >
 > Two places Raiker is deliberately **not** aligned, and will not be:
 > a Raiker hook can return only `deny` or `ask` from an authoritative handler, so
@@ -110,6 +112,21 @@
 > thirty-one is the ceiling this document said was worth aiming at, and it is now
 > reached; the eleven that remain are refused or not applicable rather than
 > pending.
+>
+> **Updated 2026-09-04.** The `http` handler ships
+> ([FIXED-380](../plans/FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two)),
+> behind exactly the thing BUG-226 said it needed: a **named, revocable egress
+> grant**. `RAIKER_HOOK_EGRESS_ALLOWLIST` is empty by default, so adding an
+> `http` rule to a hooks file — including one an installed plugin contributed —
+> cannot on its own make a request leave the machine; clearing it revokes every
+> `http` rule at once without editing a file; and the Hooks page reads it live, so
+> a revoked rule reads as refused rather than as enforcing. The request carries
+> the same bounded, redacted event body a `prompt` handler already sends, from the
+> same function. Four of the five handler types now ship. `mcp_tool` and `agent`
+> stay refused: `mcp_tool` would let a hook reach a tool the turn's own policy
+> might have refused — the exact inversion the hook model forbids — and `agent`
+> needs a multi-turn model loop with its own budget, capability set, and answer to
+> inherited authority.
 
 ### Which of the fifteen are worth adding
 
@@ -153,7 +170,7 @@ Raiker hooks must support lifecycle automation, policy enforcement, validation a
 | Type | Description | Default trust |
 |---|---|---|
 | `command` | Local command or script | untrusted unless scoped |
-| `http` | HTTP endpoint | denied unless network enabled |
+| `http` | POSTs the bounded, redacted event to an owner-declared URL | denied unless the host is in `RAIKER_HOOK_EGRESS_ALLOWLIST`; authority is the owner's per-handler opt-in and can only make an action stricter |
 | `mcp_tool` | MCP server tool | untrusted, brokered |
 | `prompt` | One bounded call through the owner-selected provider, with no tools or nested hooks | advisory context only; never decision authority |
 | `agent` | Subagent hook | untrusted until policy-reviewed |

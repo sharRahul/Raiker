@@ -389,6 +389,10 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-374](#fixed-374--a-routine-ran-all-night-and-told-nobody) | Medium | Tasks / notifications | Fixed 2026-09-04 (GAP-CHAT C10, first half) |
 | [FIXED-375](#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | Fixed 2026-09-04 (BUG-271; closes GAP-BUILD B14) |
 | [FIXED-376](#fixed-376--every-turn-paid-for-forty-nine-tool-schemas-to-call-two) | Medium | Models / context cost | Fixed 2026-09-04 (compatibility backlog item 16) |
+| [FIXED-377](#fixed-377--a-projected-mcp-tool-had-no-arguments) | Medium | MCP / models / context cost | Fixed 2026-09-04 (compatibility backlog item 16, the MCP half) |
+| [FIXED-378](#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport) | Low | MCP / interoperability | Fixed 2026-09-04 (the transport half of BUG-234) |
+| [FIXED-379](#fixed-379--raiker-recorded-more-than-anyone-exports-and-could-not-export-it) | Medium | Observability / governed events | Fixed 2026-09-04 (compatibility backlog item 18) |
+| [FIXED-380](#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two) | Low | Hooks / handlers | Fixed 2026-09-04 (the `http` slice of BUG-226) |
 
 ---
 
@@ -16261,16 +16265,308 @@ were collected between gw0 and gw1"*. The suite could therefore only be run
 serially — around forty minutes rather than ten. Sorted, and the reason is in the
 comment beside it.
 
-**What is deliberately not built.** A connected MCP server's tools are still
-projected in full. A projected MCP tool is already one generic `arguments`
-object, so the saving would be small, and the set changes between turns with
-what the owner has connected — a deferred index would have to be rebuilt from a
-live discovery read each turn, which is a cost of its own. Backlog item 16 and
-[the known limits](../guide/known-limits.md) both say so rather than letting the
-built-in behaviour imply it.
+**What was deliberately not built here, and was built next.** A connected MCP
+server's tools were still projected in full, on a stated reason: a projected MCP
+tool was one generic `arguments` object, so the saving would be small.
+[FIXED-377](#fixed-377--a-projected-mcp-tool-had-no-arguments) removed that
+reason the same day — the schemas are real now, because they are the server's own
+— and put the MCP catalogue on the same rule under a measured budget rather than
+a declared list.
 
 **User-interface outcome.** The context popover states it in one line —
 *"25 tool schemas sent · 25 fetched on request"* — with the explanation on the
 info marker: nothing is withheld, and a fetched tool passes the same permission,
 policy and approval checks. An owner reading a context figure can see where part
 of it went.
+
+---
+
+## FIXED-377 — A projected MCP tool had no arguments
+
+**Severity: Medium. Area: MCP / models / context cost. Status: Fixed 2026-09-04
+(compatibility backlog item 16, the MCP half).**
+
+**Observed.** Every tool a connected MCP server advertised reached the model as
+`mcp__<server>__<tool>` taking one untyped `arguments` object, described by a
+sentence Raiker wrote itself. The handshake reads `tools/list`, which carries a
+`title`, a `description` and an `inputSchema` per tool — and
+`_extract_tools()` kept the **names** and dropped the rest, so nothing was stored
+and nothing could be projected. The model had to guess field names to call
+anything, and the server's own account of what its tool does never entered the
+turn. Both reference coding agents pass the declared `inputSchema` straight
+through.
+
+The Extensions → MCP card had the matching hole: a row of tool-name chips, so a
+server whose tools declare their arguments looked identical to one whose tools do
+not, and the owner could not tell whether the agent was calling them with real
+arguments or with guesses.
+
+**Root cause.** `_record_connection()` was given `tools: list[str]`. There was
+nowhere for a declaration to be stored, so discovery had nowhere to put one.
+
+**Fixed, and bounded rather than passed through raw.** A tool declaration is
+text an outside program wrote, landing in the model's tool catalogue — the one
+part of a turn that is normally trusted. `raiker/tools/mcp_schema.py` bounds it
+before anything downstream sees it:
+
+* **Attributed.** Raiker's framing sentence comes first and the server's after
+  it, marked as the server's — so a description that reads like an instruction
+  reads as *the server's* instruction rather than as Raiker's.
+* **Bounded.** Depth (6), properties per object (48), list items (64), string
+  length (400) and total encoded size (8 KB) are capped. A declaration that will
+  not fit is dropped **whole** rather than truncated, because half a schema
+  describes arguments the tool does not take.
+* **Closed.** Only JSON-Schema keywords a provider acts on survive; an unknown or
+  vendor keyword is dropped, and a `$ref` may point inside its own document and
+  nowhere else — a `$ref` at a URL is a fetch instruction, and no schema Raiker
+  carries asks a provider to go anywhere.
+* **Re-bounded on read**, so a row written before these bounds existed is still
+  safe to render.
+
+The wire shape is unchanged — a call is still `{"arguments": {…}}` — so
+validation, the broker, the approval record and the audit row see exactly what
+they always did. What changed is that the model is told what belongs inside.
+
+**And the deferral half of backlog item 16, which FIXED-376 left open.** That
+entry recorded the MCP half as *deliberately not built*, with a stated reason: a
+projected MCP tool was one generic `arguments` object, so the saving would be
+small. This fix removes that reason — the schemas are real now — so the catalogue
+joins the same rule the built-ins are on, with a **measured budget** rather than a
+declared list, because a connected server's catalogue is not Raiker's own and
+changes between turns:
+
+| Connected MCP tools | Schemas raw | Carried? | Request cost |
+|---|---|---|---|
+| 5 | 705 tok | yes | 4,431 tok |
+| 10 | 1,410 tok | yes | 5,136 tok |
+| 20 | 2,822 tok | **deferred** | 4,084 tok |
+| 40 | 5,647 tok | **deferred** | 4,444 tok |
+
+All-or-nothing on purpose: carrying half of one server's tools and deferring the
+rest would leave the model with an incoherent picture of that server — some
+typed, some named, no way to tell which. Either way every tool is named in
+`tool_search`'s index and one call from its exact schema, and a tool reached that
+way passes the identical connector gate, decision mode, containment check and
+monitor it always did. **Deferring is still not gating**: the reveal is read from
+the search *result*, so a model cannot widen its own catalogue by naming a
+server tool that does not exist.
+
+**Guarded.** `tests/test_mcp_declared_schemas.py` — a declared argument reaching
+the model, the server's sentence riding with it and marked as the server's,
+Raiker's framing coming first, a tool declaring an empty object being offered as
+taking nothing (not as an open object), a server that declared nothing keeping
+the open object, the wire shape unchanged, control characters and runaway prose
+cut, an internal `$ref` kept and a URL one dropped, an unknown keyword dropped,
+an oversize declaration dropped whole with its reason, deep nesting bounded, a
+stored row re-bounded on the way out, unparseable storage yielding nothing, the
+card distinguishing declared from undeclared, and the budget rule carrying,
+deferring, revealing and searching.
+
+**User-interface outcome.** Extensions → MCP lists one line per tool — its name
+and what it takes: `echo · text · optional: uppercase`. A tool that takes nothing
+says *Takes no arguments*; one whose server declared nothing says *No arguments
+declared*; one whose declaration was too large says so; and a connection made
+before declarations were recorded says *Run Test to read what this takes* rather
+than reading as a tool with no arguments. It replaced the chip row: the chips
+said what was there and could not say what any of it took.
+
+---
+
+## FIXED-378 — Raiker spoke the current MCP revision and did not use its transport
+
+**Severity: Low. Area: MCP / interoperability. Status: Fixed 2026-09-04
+(the transport half of [BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks)).**
+
+**Observed.** FIXED-274 made Raiker offer revision `2026-07-28` and accept three
+older ones. Negotiating a revision is not implementing it, and four things the
+specification requires — or that a real server simply does — were missing:
+
+* **`Accept` listed one framing.** The streamable HTTP transport says a client
+  MUST offer both `application/json` and `text/event-stream` on every POST. Raiker
+  sent `application/json` alone, which a conformant server is entitled to answer
+  with **406 before reading the request at all** — so an owner adding a current
+  server watched it fail with a bare status and nothing saying why.
+* **A session was never released.** The specification says a client SHOULD send
+  `DELETE` with its `Mcp-Session-Id` when finished. Every bounded read Raiker made
+  left a server-side session record behind.
+* **An expired session was a dead session.** A server may drop the session it
+  issued and answer `404`; the specification's client starts a new one. Raiker
+  carried the stale id to the end of its request list and reported whatever came
+  back.
+* **An authorisation challenge read as a network failure.** A `401` carrying
+  `WWW-Authenticate` is the remote OAuth flow Raiker does not implement. It
+  surfaced as `mcp_remote_unreachable`, which is the wrong problem.
+
+**Fixed.** `Accept` carries both framings. A session is released with a
+best-effort `DELETE` (a `405` is a server that does not allow clients to end
+sessions, which the specification permits). A `404` after the handshake
+re-handshakes **once** — once, because a server answering 404 to everything is
+broken rather than busy, and a loop would hammer it. A `401` with a challenge is
+`mcp_remote_oauth_required`, in those words.
+
+**And the rule the whole surface is built on: what is not used is named.** The
+`initialize` result's own capability keys, plus what the transport was observed
+doing, are stored as feature *names* on the connection — never a capability's
+contents — and the card turns each into a sentence. A server offering `resources`
+(which is where an MCP App's `ui://` interface would live), `prompts`, `logging`
+or `completions` says so; a server that answers over an event stream says Raiker
+reads each response whole rather than streaming it, and holds no open connection
+between turns. A capability Raiker has never heard of is still named, by its own
+key, rather than vanishing for not being on a list.
+
+**Guarded.** `tests/test_mcp_streamable_http.py` — both framings on every POST,
+the session released with its id, a dropped session restarted once and the read
+completing, a server that answers 404 to everything failing rather than looping,
+an authorisation challenge named as itself, an event-stream answer read and
+recorded, a server offering more than tools saying so on its card, a server
+offering only tools saying nothing, an unknown key still named, and the declared
+schemas of FIXED-377 surviving the remote path too.
+
+**What is still open** and stays on BUG-234: SSE *streaming* (a bounded session
+reads each response whole), resumability, server-initiated messages, the remote
+OAuth flow itself, MCP Apps ([ADD-24](TO_BE_ADDED.md)), elicitation and
+`server/discover`. Each is now **named on the card of a server that offers it**
+rather than implied by silence, which is the interface outcome the entry asked
+for.
+
+**User-interface outcome.** Extensions → MCP states, under the server's tools,
+one line per thing that server offers and Raiker does not use. A server that
+offers only tools shows nothing, so the list is a signal rather than furniture.
+
+---
+
+## FIXED-379 — Raiker recorded more than anyone exports and could not export it
+
+**Severity: Medium. Area: Observability / governed events. Status: Fixed
+2026-09-04 (compatibility backlog item 18).**
+
+**Observed.** Raiker records strictly more per governed action than any compared
+product exports: the decision, where the decision came from, the gate that
+admitted the action, the approval that carried it, and a hash chain over the lot.
+All of it stayed inside the product.
+[Cowork exports six event types over OpenTelemetry](https://claude.com/docs/cowork/monitoring)
+— including `tool_decision`, which carries a decision *and* its source. Raiker
+exported none. What it lacked was not the record. It was the wire.
+
+An owner running Raiker beside an observability stack they already watch could
+see nothing of it there, and the audit export (FIXED-231) writes a file beside
+the log rather than reaching a collector.
+
+**Fixed as a narrow, governed wire.** `telemetry_export` is its own Tier-2
+capability — Tier 2 for the reason every Tier-2 capability is: it leaves the
+machine — with the threat-model acknowledgement and human confirmation that tier
+requires, and the owner's decision mode governing each run. It is **inert until
+the owner names a collector**: with no destination configured there is nowhere
+for a record to go, and adding one is a human-only act. The run is a governed
+action through `route_action`, so exporting the log is an event in the log.
+
+Four properties it is built on:
+
+* **Metadata by default, and metadata that is checkable.** A record carries the
+  event's identifiers and its type — every one of them a column on `events_index`,
+  because those are metadata by construction. It does **not** carry the event's
+  summary: a summary names the object an action acted on, which is a file path
+  more often than not, and a path is content.
+* **Content is one explicit opt-in, and still redacted.** With `include_content`
+  the record's body is the payload through `redact_event_payload` — the same
+  function the on-screen record and the audit export pass through — so a
+  destination can never be told more than the owner can read in the product.
+* **The credential is a name.** `header_ref` names an environment variable
+  holding an `Authorization` value. The value is read at send time, sent, and
+  never stored, returned, or written to an artifact. A named-but-absent variable
+  fails closed rather than sending unauthenticated to a destination the owner
+  said needs a credential.
+* **The cursor moves on delivery, never on attempt.** A run that could not
+  deliver re-sends next time. The cursor is `(timestamp, rowid)` and deliberately
+  **not** `(timestamp, event_id)`: `utc_now()` truncates to whole seconds, and an
+  event id is a random UUID, so an event appended a moment later inside the same
+  second could sort before the cursor and be silently skipped. An export that
+  quietly loses events is the one failure this surface exists to avoid.
+
+**Guarded.** `tests/test_telemetry_export.py` — its own Tier-2 capability with a
+real executor, inertness with no destination, another account's destination being
+unreachable, metadata-only by default with the summary and a credential both
+absent from the wire, content opting in and still redacted, the body going to the
+`/v1/logs` signal, a full signal URL not being doubled, an unparseable timestamp
+becoming zero rather than a fabricated now, the credential read from the
+environment and absent from the result, a named-but-absent variable failing
+closed with nothing sent, the stored row never holding a credential, a second run
+sending only what is new, a failed delivery re-sending rather than skipping, a
+rejection recorded on the destination with the cursor unmoved, and events written
+inside one second being neither skipped nor repeated.
+
+**User-interface outcome.** Observability → Overview answers a fifth question,
+*"Can I see this outside Raiker?"*: the collectors, what each one gets
+(**Metadata only** or **With redacted content**), how many events it has had, how
+its last run went, and **Deliver now**. Adding one takes a name, an OTLP endpoint
+and — optionally — the *name* of the variable the credential lives in, so a
+credential cannot be typed into a browser field and stored.
+
+---
+
+## FIXED-380 — Three of the five hook handler types did not exist; now two
+
+**Severity: Low. Area: Hooks / handlers. Status: Fixed 2026-09-04 (the `http`
+slice of [BUG-226](TO_BE_FIXED.md#bug-226--three-of-the-five-hook-handler-types-do-not-exist)).**
+
+**Observed.** [The Claude Code hooks reference](https://code.claude.com/docs/en/hooks)
+documents and specifies five handler types. Raiker shipped `command`, `builtin`
+and — since FIXED-303 — `prompt`, and refused `http`, `mcp_tool` and `agent` at
+parse time. The refusals were right rather than lazy: each needed a resource the
+hook path deliberately does not have. `http` needed egress, and BUG-226 said it
+would follow "only once a hook can be given a **named, revocable egress grant** of
+the kind the container work already built".
+
+**Fixed with exactly that grant, in the shape the channel and connector paths
+already use.** `RAIKER_HOOK_EGRESS_ALLOWLIST` holds the host globs a hook may
+reach — `hooks.internal.example.com`, `127.0.0.1:*`:
+
+* **Empty by default.** A workspace that never set it grants nothing, so adding
+  an `http` rule to a hooks file cannot on its own make a request leave the
+  machine. That matters because a rule can be contributed by an installed plugin,
+  and a plugin must not be able to widen egress by writing a file.
+* **Revocable in one place.** Clearing the variable revokes every `http` rule at
+  once, without editing any hooks file — which is what revocable has to mean when
+  rules live in five files across four scopes.
+* **A refusal is stated.** The rule parses, matches, and refuses with the host in
+  the reason, and the Hooks page reads the grant **live** rather than at parse
+  time, so revoking it is visible without a restart.
+
+What the request carries is exactly what a `prompt` handler already sends to a
+model provider: the bounded, redacted event JSON, from the **same function** —
+one definition of "what a hook may reveal", because two copies of that rule is
+the pair that drifts apart and turns one of them into a leak. The runtime's own
+private context (the authorised provider and model for the turn) never leaves,
+and the request carries no identity and no credential.
+
+What comes back is read on the same terms a `command` handler's stdout is: a JSON
+decision object, or nothing. **A remote responder can never permit anything** —
+`combine()` honours only `deny` and `ask`, and only from a handler the owner gave
+authority — so an `http` hook can make an action stricter and can never make one
+allowed. A non-2xx is **not** a deny: the exit-code convention is for a local
+program the owner wrote, and inferring "block the action" from a 500 would let a
+responder's outage become a policy.
+
+**`mcp_tool` and `agent` stay refused**, with the reasons unchanged: `mcp_tool`
+would let a hook reach a tool the turn's own policy might have refused — the exact
+inversion the hook model forbids — and `agent` needs a multi-turn model loop with
+its own budget, capability set and answer to inherited authority. Closing one of
+three did not quietly open the other two, and a test asserts it.
+
+**Guarded.** `tests/test_hook_http_handler.py` — the allowlist empty by default,
+a rule without a grant refusing and naming the host, a granted host reached, a
+glob granting a port range, clearing the variable revoking every rule, a non-HTTP
+scheme never granted, the body identical to the `prompt` handler's, a credential
+in the event redacted, private context never leaving, no identity on the request,
+a decision object read, a non-decision answer deciding nothing, an outage not
+becoming a policy, a remote responder unable to permit anything, advisory without
+the opt-in, the other two types still refused at parse time, a URL-less or
+`file://` handler refused at parse time, and the Hooks page reading the grant live.
+
+**User-interface outcome.** Extensions → Hooks lists an `http` handler with the
+URL it posts to — the host is the fact the owner has to act on — and, when the
+grant does not cover it, says *"this host is not in RAIKER_HOOK_EGRESS_ALLOWLIST
+— it will refuse every time it matches"* rather than the builtin wording it used
+to borrow. The **Handler types** card now describes four of five and states that
+MCP tool and agent handlers remain refused rather than gaining an ungoverned
+execution path.

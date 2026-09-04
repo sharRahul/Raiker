@@ -81,11 +81,11 @@ names.
 | [MEM-08](FIXED_ITEMS.md#fixed-316--every-turn-coordinate-was-a-dead-end) | Medium | Memory reliability | **Closed 2026-08-29 (FIXED-316)** — a turn coordinate opens the exchange. With it, every MEM entry raised by the 2026-08-11 memory audit is closed: MEM-06 as FIXED-241, MEM-07 as FIXED-284, MEM-09 as FIXED-310, MEM-10 as FIXED-283/292/293/294. |
 | [BUG-220](FIXED_ITEMS.md#fixed-286--a-task-reported-done-while-the-work-it-delegated-was-still-open) | Medium | Tasks / delegation | **Closed 2026-08-25 (FIXED-286)** — a parent parks as `waiting_for_children` and settles on the last child. Its routing half is now [backlog #23](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) |
 | [BUG-225](FIXED_ITEMS.md#fixed-298--a-paired-channel-could-still-only-record-a-message) | Medium → Low | Channels / extensibility | **Closed 2026-08-27 (FIXED-298)** — owner-stored routing and exact, single-use approval responses now ship; record-only remains the default |
-| [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open remainder — reduced 2026-08-28; `prompt` closed as FIXED-303, while `http`, `mcp_tool` and `agent` remain refused |
+| [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open remainder — reduced again 2026-09-04; `prompt` closed as FIXED-303 and `http` as [FIXED-380](FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two), while `mcp_tool` and `agent` stay refused with their reasons |
 | [BUG-227](FIXED_ITEMS.md#fixed-366--build-could-read-a-repository-and-not-understand-it) | Low | Plugins / language intelligence | **Closed 2026-09-03 (FIXED-366)** — its first question was a scope decision, and the answer is no: Raiker does not want an LSP client. B10's tool set ships without one and both plugin specs state what that costs |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
 | [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in) | Low | Live test harness | **Closed 2026-08-30 (FIXED-324)** — every live spec with a sign-in function delegates to the shared helper. The per-spec password that stops two specs sharing a workspace is a different defect, [BUG-247](#bug-247--every-live-spec-brings-its-own-owner-password) |
-| [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced 2026-08-23 (FIXED-274). The revision is current; streamable HTTP, remote OAuth, MCP Apps and `server/discover` remain |
+| [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced again 2026-09-04 ([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport)). The transport conforms and the card names what a server offers and Raiker does not use; SSE streaming, remote OAuth, MCP Apps and `server/discover` remain |
 | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths), [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Low | Governance architecture / documentation | Open — not duplicated here. GEP-02 is **an owner decision** and the helper now carries the answer at no cost |
 | [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open remainder — the live half closed 2026-08-30 as [FIXED-322](FIXED_ITEMS.md#fixed-322--permissions-said-off-about-a-capability-that-would-have-run): Permissions now reports what the enforcing path answers. Unifying the three resolutions is still **an owner decision** |
 | [BUG-240](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered) | Medium → Low | Memory / retrieval | **Closed 2026-08-26 (FIXED-292, FIXED-294)** — both the provider half and the managed-file half ship; the row is kept so a reader arriving with the number is not left wondering |
@@ -432,12 +432,14 @@ and evidence moved to the closed-work ledger.
 **Observed.** The hooks reference Raiker maps itself against documents five
 handler types: `command`, `http`, `mcp_tool`, `prompt` and `agent`. Before
 FIXED-303, `HANDLER_TYPES` accepted only `command` and Raiker's own `builtin`.
-It now also accepts a bounded `prompt`; a rule naming `http`, `mcp_tool` or
-`agent` is still refused at parse time, which is the right failure until each
-has a governed resource path.
+It now also accepts a bounded `prompt` and, since
+[FIXED-380](FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two),
+an `http` handler behind a named, revocable egress grant. A rule naming
+`mcp_tool` or `agent` is still refused at parse time, which is the right failure
+until each has a governed resource path.
 
-The title originally undercounted four missing types. After FIXED-303 it is now
-accurate: three remain — `http`, `mcp_tool` and `agent`.
+The title has undercounted twice and is kept as raised. After FIXED-303 three
+remained; after FIXED-380, **two** — `mcp_tool` and `agent`.
 
 **Corrected 2026-08-22.** This entry used to say `command` is the only handler
 type Claude Code's own hooks have, and that the gap was therefore against
@@ -467,10 +469,19 @@ does not have:
 
 **Completed first slice.** FIXED-303 adds `prompt` with a per-handler token
 budget and timeout, the owner-selected governed provider, no tools, no nesting,
-redacted bounded event data and advisory-only output. `http` follows only once a
-hook can be given a named, revocable egress grant of the kind the container work
-already built. `mcp_tool` and `agent` should stay refused until there is a stated
-answer to a hook reaching authority the turn did not have.
+redacted bounded event data and advisory-only output.
+
+**Completed second slice (2026-09-04).**
+[FIXED-380](FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two)
+adds `http` behind exactly the grant this entry named:
+`RAIKER_HOOK_EGRESS_ALLOWLIST`, empty by default, revoking every `http` rule at
+once when cleared, read live by the Hooks page, and refusing with the host in the
+reason. It sends the same bounded, redacted event body the `prompt` handler
+already sends, from the same function; a remote responder can deny or ask and can
+never permit, and a non-2xx is not a deny.
+
+`mcp_tool` and `agent` stay refused until there is a stated answer to a hook
+reaching authority the turn did not have.
 
 **Not a regression, and visible today.** A rule naming an unsupported type is
 refused at parse time rather than accepted and ignored, and the Hooks tab reports
@@ -552,13 +563,23 @@ refuses a revision it does not implement rather than continuing on a framing it
 cannot trust. **Extensions → MCP** states the revision each server negotiated.
 Closed as [FIXED-274](FIXED_ITEMS.md).
 
+**Reduced again 2026-09-04**
+([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport)).
+The transport now conforms where a real server would have refused it: `Accept`
+carries both framings (a conformant server may answer 406 to a POST offering only
+JSON), a session is released with `DELETE`, a dropped session re-handshakes once,
+and a `401` with `WWW-Authenticate` is named as the OAuth requirement it is
+rather than as a network failure. **The interface outcome below is met**: what a
+connected server offers and Raiker does not use is named on its card.
+
 **What is left.** Negotiating a revision is not implementing it. Each of the
 following was previously *blocked* by the version pin and is now ordinary work:
 
-* **Streamable HTTP session semantics.** Raiker's `http` transport is its own
-  bounded JSON-RPC client. It carries `Mcp-Session-Id` and the
-  `MCP-Protocol-Version` header, and it is not the specification's transport: no
-  SSE stream, no resumability, no server-initiated messages.
+* **Streamable HTTP streaming.** Raiker's `http` transport is its own bounded
+  JSON-RPC client. It reads an `text/event-stream` answer whole rather than
+  streaming it, and holds no open connection between turns: no incremental
+  delivery, no resumability, no server-initiated messages. A server that answers
+  this way is **named as such on its card** rather than silently degraded.
 * **Remote OAuth.** The authorisation flow the current revision defines. Raiker's
   remote transport takes an owner token from an env var named by `auth_ref`.
 * **MCP Apps ([SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp)).**
@@ -577,7 +598,10 @@ rather than implied.
 **Interface outcome that has to be true before this closes.** A connected server
 that offers a `ui://` resource, an SSE stream, or an OAuth authorisation
 requirement is either supported or **named on its card as unsupported** — never
-silently degraded.
+silently degraded. **Met 2026-09-04 (FIXED-378):** the server's own `initialize`
+capabilities and what its transport was observed doing are stored as feature
+names and rendered as one sentence each, and a capability Raiker has never heard
+of is still named by its own key rather than dropped for not being on a list.
 
 ---
 

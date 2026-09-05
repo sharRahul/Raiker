@@ -36,38 +36,23 @@
  */
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
+import { DESTINATIONS, hubReachability } from "./destinations";
 import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 
-/** Every routed destination the navigation offers. */
-const ROUTES = [
-  ["workbench", "workbench"],
-  ["chat", "new-chat"],
-  ["build", "build"],
-  ["threads", "search-chat"],
-  ["tasks", "tasks"],
-  ["projects", "projects"],
-  ["memory", "memory"],
-  ["brain", "brain"],
-  ["approvals", "approvals"],
-  ["permissions", "capabilities"],
-  ["models", "models"],
-  ["connectors", "extensions?tab=connectors"],
-  ["mcp", "extensions?tab=mcp"],
-  ["skills", "extensions?tab=skills"],
-  ["hooks", "extensions?tab=hooks"],
-  ["plugins", "extensions?tab=plugins"],
-  ["channels", "extensions?tab=channels"],
-  ["observe-overview", "observe?tab=overview"],
-  ["observe-sessions", "observe?tab=sessions"],
-  ["observe-activity", "observe?tab=activity"],
-  ["observe-checkpoints", "observe?tab=checkpoints"],
-  ["observe-diagnostics", "observe?tab=diagnostics"],
-  ["observe-work", "observe?tab=work"],
-  ["observe-notifications", "observe?tab=notifications"],
-  ["settings", "settings"],
-] as const;
+/** Every routed destination the navigation offers.
+ *
+ * The route list is derived from the app's own nav registry by
+ * `destinations.ts` rather than written here. Five specs each carried their own
+ * copy and all five had drifted the same two ways: two routes that no longer
+ * exist (`extensions?tab=channels` — Channels became the Messaging destination —
+ * and `observe?tab=diagnostics`, an alias onto Overview) and twenty that do
+ * exist and none of them held (Design, Messaging, the Guide, all six Models tabs
+ * and all ten Settings sections). `destinations.ts` says why a copy keeps
+ * drifting and what stops it.
+ */
+const ROUTES = DESTINATIONS.map((d) => [d.name, d.route] as const);
 
 /** Phone, tablet, laptop, wide desktop. */
 const WIDTHS = [
@@ -102,6 +87,7 @@ async function settle(page: import("@playwright/test").Page): Promise<void> {
 test("every page fits, contains itself, and names its controls at four widths", async ({ page }) => {
   test.setTimeout(600_000);
   const findings: Finding[] = [];
+  const hub = hubReachability(page);
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -144,6 +130,26 @@ test("every page fits, contains itself, and names its controls at four widths", 
           // A deliberate scroller and a deliberate truncation are both correct.
           // Only content bleeding out of a `visible` box is a defect.
           if (style.overflowX !== "visible") continue;
+          // …and that holds for an *ancestor's* box too, which this missed. A
+          // `<code>` inside a `<pre overflow-x: auto>` is `visible` itself and
+          // wider than the pre's content box — because the pre is scrolling it,
+          // which is the correct behaviour and the whole reason the pre is a
+          // scroller. Every code block in the guide was reported as a bleed the
+          // first time this sweep reached that page. Walking up for the element
+          // that is actually handling the overflow is what tells a real bleed
+          // from a working scroll container.
+          let handled = false;
+          for (
+            let ancestor = element.parentElement;
+            ancestor !== null && ancestor.id !== "main";
+            ancestor = ancestor.parentElement
+          ) {
+            if (getComputedStyle(ancestor).overflowX !== "visible") {
+              handled = true;
+              break;
+            }
+          }
+          if (handled) continue;
           if (element.scrollWidth > element.clientWidth + 2 && element.clientWidth > 0) {
             out.bleeding.push(`${describe(element)} (${element.scrollWidth} in ${element.clientWidth})`);
           }
@@ -218,5 +224,5 @@ test("every page fits, contains itself, and names its controls at four widths", 
     );
   }
   expect(findings, `UI findings:\n${findings.map((f) => `${f.width}px ${f.route}: ${f.kind} — ${f.detail}`).join("\n")}`).toEqual([]);
-  expect(consoleErrors).toEqual([]);
+  expect(hub.filter(consoleErrors)).toEqual([]);
 });

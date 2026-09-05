@@ -87,11 +87,16 @@ for offers no button rather than one that cannot work.
   symlinks, reads a bounded GGUF header, groups shards, and leaves original
   files in place. **Deploy** starts managed loopback llama.cpp for a complete
   model.
-- **Hugging Face:** search the Hub under **Discover**. Raiker shows immutable
-  revision, files, size, format, licence and gated status; GGUF variants are
-  preferred. Confirming a download writes a collision-safe snapshot beneath an
-  approved library. Gated repositories require your own Hub token and accepted
-  upstream terms.
+- **Hugging Face:** the tab opens on the most-downloaded GGUF repositories, so
+  you have somewhere to start without knowing a repository id; search the Hub
+  for anything else. Raiker shows immutable revision, files, size, format,
+  licence and gated status; GGUF variants are preferred. Confirming a download
+  writes a collision-safe snapshot beneath an approved library. Gated
+  repositories require your own Hub token and accepted upstream terms. On a
+  machine with no route to `huggingface.co` the tab says so where the results
+  would be, with a **Try again** — rather than showing an empty list you would
+  otherwise only understand after a search timed out. Everything already in your
+  local library keeps working.
 - **Conversion:** Safetensors conversion is optional and never automatic. It
   runs in a digest-pinned llama.cpp container with no network, a read-only
   source, a separate writable output, and resource limits. Pick GGUF when one

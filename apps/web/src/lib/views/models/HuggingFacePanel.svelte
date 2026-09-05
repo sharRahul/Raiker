@@ -18,6 +18,14 @@
   // the most-downloaded GGUF repositories.
   let showingTrending = $state(false);
   let loadingTrending = $state(true);
+  // Found live 2026-09-05, on a host with no route to huggingface.co. The
+  // trending read failed, was swallowed, and the panel rendered its
+  // "Search the Hub catalogue" empty state — which is what it says when nothing
+  // has been asked for yet. So the owner saw a panel that looked ready, typed a
+  // search, and learned the Hub was unreachable from a request that timed out.
+  // Naming it here is not an interruption: it is the one fact that decides
+  // whether the box below is worth typing into.
+  let hubUnreachable = $state(false);
   let selectedRepo = $state<string | null>(null);
   let variants = $state<HuggingFaceVariant[]>([]);
   let selected = $state<HuggingFaceVariant | null>(null);
@@ -38,15 +46,19 @@
       : `${(n / 1024 ** 3).toFixed(1)} GB`;
   async function loadTrending() {
     loadingTrending = true;
+    hubUnreachable = false;
     try {
       results = (await api.trendingHuggingFace()).items;
       showingTrending = results.length > 0;
+      // An empty answer is not an unreachable Hub. The Hub answered; it just
+      // had nothing to volunteer, and the search box is still the way forward.
     } catch {
-      // A Hub that cannot be reached is not an error worth interrupting the
-      // panel for before the owner has asked for anything; the empty state
-      // still explains what to do, and a real search reports the failure.
+      // Still not an alarm — nothing is broken in Raiker and nothing was lost.
+      // It is stated where the results would have been, with the way to try
+      // again, because the alternative is an empty panel that reads as ready.
       results = [];
       showingTrending = false;
+      hubUnreachable = true;
     } finally {
       loadingTrending = false;
     }
@@ -260,14 +272,24 @@
           Most downloaded GGUF models — search above for anything else.
         </p>{/if}
       {#if results.length === 0}<div class="empty">
-          <strong
-            >{loadingTrending
-              ? "Loading popular models…"
-              : "Search the Hub catalogue"}</strong
-          ><span
-            >Results stay here; selecting one reveals immutable downloadable
-            variants.</span
-          >
+          {#if loadingTrending}
+            <strong>Loading popular models…</strong>
+          {:else if hubUnreachable}
+            <strong>Hugging Face could not be reached</strong>
+            <span>
+              Search and download need a route to huggingface.co. Everything
+              already in your local library still works.
+            </span>
+            <button type="button" class="btn btn-sm" onclick={() => void loadTrending()}>
+              Try again
+            </button>
+          {:else}
+            <strong>Search the Hub catalogue</strong>
+            <span>
+              Results stay here; selecting one reveals immutable downloadable
+              variants.
+            </span>
+          {/if}
         </div>{/if}
       {#each results as item (item.repo_id)}<button
           type="button"
@@ -540,6 +562,12 @@
   .empty-copy {
     padding: 18px;
     color: var(--text-muted);
+  }
+  /* The retry sits under the sentence rather than beside it, so the empty state
+     stays one centred column at every width. */
+  .empty .btn {
+    justify-self: center;
+    margin-top: 4px;
   }
   .download-drawer,
   .conversion-card {

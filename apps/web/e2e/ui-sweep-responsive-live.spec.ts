@@ -29,39 +29,21 @@
  * dimensions are asserted before they are accepted.
  */
 import { expect, test } from "@playwright/test";
+import { DESTINATIONS, hubReachability } from "./destinations";
 import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = "../../docs/plans/screenshots/pages";
 
-const ROUTES = [
-  ["workbench", "workbench"],
-  ["chat", "new-chat"],
-  ["build", "build"],
-  ["search-chat", "search-chat"],
-  ["tasks", "tasks"],
-  ["projects", "projects"],
-  ["memory", "memory"],
-  ["brain", "brain"],
-  ["approvals", "approvals"],
-  ["permissions", "capabilities"],
-  ["models", "models"],
-  ["extensions-connectors", "extensions?tab=connectors"],
-  ["extensions-mcp", "extensions?tab=mcp"],
-  ["extensions-skills", "extensions?tab=skills"],
-  ["extensions-hooks", "extensions?tab=hooks"],
-  ["extensions-plugins", "extensions?tab=plugins"],
-  ["extensions-channels", "extensions?tab=channels"],
-  ["observe-overview", "observe?tab=overview"],
-  ["observe-sessions", "observe?tab=sessions"],
-  ["observe-activity", "observe?tab=activity"],
-  ["observe-checkpoints", "observe?tab=checkpoints"],
-  ["observe-diagnostics", "observe?tab=diagnostics"],
-  ["observe-work", "observe?tab=work"],
-  ["observe-notifications", "observe?tab=notifications"],
-  ["guide", "guide"],
-  ["settings", "settings"],
-] as const;
+// The route list is derived from the app's own nav registry by
+// `destinations.ts` rather than written here. Five specs each carried their own
+// copy and all five had drifted the same two ways: two routes that no longer
+// exist (`extensions?tab=channels` — Channels became the Messaging destination —
+// and `observe?tab=diagnostics`, an alias onto Overview) and twenty that do
+// exist and none of them held (Design, Messaging, the Guide, all six Models tabs
+// and all ten Settings sections). `destinations.ts` says why a copy keeps
+// drifting and what stops it.
+const ROUTES = DESTINATIONS.map((d) => [d.name, d.route] as const);
 
 const CAPTURES = [
   ["mobile", { width: 390, height: 844 }],
@@ -167,6 +149,7 @@ for (const [label, viewport] of ACTIVE_CAPTURES) {
     const iconless: string[] = [];
     const offscreenTab: string[] = [];
     const undersized: string[] = [];
+    const hub = hubReachability(page);
     const consoleErrors: string[] = [];
     page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
 
@@ -274,7 +257,7 @@ for (const [label, viewport] of ACTIVE_CAPTURES) {
     expect(iconless, `pages rendering an icon with no glyph at ${label}`).toEqual([]);
     expect(offscreenTab, `pages whose selected tab is off screen at ${label}`).toEqual([]);
     expect(undersized, `pages with an undersized checkbox or radio at ${label}`).toEqual([]);
-    expect(consoleErrors, `console errors at ${label}/${theme}`).toEqual([]);
+    expect(hub.filter(consoleErrors), `console errors at ${label}/${theme}`).toEqual([]);
   });
   }
 }

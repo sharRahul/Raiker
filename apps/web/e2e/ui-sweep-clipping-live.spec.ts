@@ -22,19 +22,20 @@
  * canvas — is not a defect and is excluded by walking up for that ancestor.
  */
 import { expect, test } from "@playwright/test";
+import { DESTINATIONS, hubReachability } from "./destinations";
 import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 
-const ROUTES = [
-  "workbench", "new-chat", "build", "search-chat", "tasks", "projects", "memory",
-  "brain", "approvals", "capabilities", "models",
-  "extensions?tab=connectors", "extensions?tab=mcp", "extensions?tab=skills",
-  "extensions?tab=hooks", "extensions?tab=plugins", "extensions?tab=channels",
-  "observe?tab=overview", "observe?tab=sessions", "observe?tab=activity",
-  "observe?tab=checkpoints", "observe?tab=diagnostics", "observe?tab=work",
-  "observe?tab=notifications", "settings", "guide",
-] as const;
+// The route list is derived from the app's own nav registry by
+// `destinations.ts` rather than written here. Five specs each carried their own
+// copy and all five had drifted the same two ways: two routes that no longer
+// exist (`extensions?tab=channels` — Channels became the Messaging destination —
+// and `observe?tab=diagnostics`, an alias onto Overview) and twenty that do
+// exist and none of them held (Design, Messaging, the Guide, all six Models tabs
+// and all ten Settings sections). `destinations.ts` says why a copy keeps
+// drifting and what stops it.
+const ROUTES = DESTINATIONS.map((d) => d.route);
 
 // Four, not three. 768 is where the shell's own breakpoints change hands —
 // several views collapse a two-column grid there and a rail becomes a sheet —
@@ -74,6 +75,7 @@ async function clipped(page: import("@playwright/test").Page): Promise<string[]>
 
 test("no route clips its own content at any of the four widths", async ({ page }) => {
   test.setTimeout(900_000);
+  const hub = hubReachability(page);
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -92,7 +94,9 @@ test("no route clips its own content at any of the four widths", async ({ page }
   }
   expect(found, found.join("\n")).toEqual([]);
   // A sweep that clips nothing and logs an uncaught error has not passed.
-  expect(consoleErrors).toEqual([]);
+  // A host with no route to huggingface.co is not a defect in Raiker, and the
+  // allowance is earned rather than granted — see `hubReachability`.
+  expect(hub.filter(consoleErrors)).toEqual([]);
 });
 
 test("the knowledge map fits itself into a phone rather than starting off screen", async ({

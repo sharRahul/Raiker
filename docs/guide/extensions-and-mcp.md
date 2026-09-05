@@ -1,6 +1,8 @@
 # Extensions and MCP
 
-**Extensions** has six tabs: Connectors, MCP servers, Skills, Hooks, Plugins, Channels.
+**Extensions** has five tabs: Connectors, MCP servers, Skills, Hooks, Plugins.
+Channels used to be a sixth; they are their own destination now — see
+[Messaging](messaging.md).
 
 ## Connectors
 
@@ -66,6 +68,16 @@ The card also names anything that server offers and Raiker does not use —
 resources (including any `ui://` interface), prompt templates, a log stream, or
 an event-stream transport Raiker reads whole rather than streaming. A server
 offering only tools shows nothing there.
+
+It names the other direction of the wire too: anything the server **asked Raiker
+to do**. A connected server may send Raiker a request of its own — a keep-alive
+`ping`, or a request to put a question to you (`elicitation/create`) or to spend
+a model turn on its behalf (`sampling/createMessage`). The ping is answered. The
+other two are refused, and the card says which was asked for and why it was
+refused: a question a connected server composes is not one Raiker's runtime
+raised, and a turn a server composes is not one your policy reviewed. So a
+server whose feature quietly does nothing tells you it is doing nothing, rather
+than looking like it works.
 
 Controls: **Test**, **Stop** / **Resume**, **Rename**, **Delete**. Stop is an
 instant containment switch — it refuses all sessions for that connection and is

@@ -94,7 +94,9 @@ approved may finish. `quit` reports waiting work before stopping the host. The
 
 The dashboard's **STOP** control is different: it requests cancellation of
 queued, running, paused, and approval-waiting tasks at the next safe boundary.
-It is governed and audited; it is not a process force-kill.
+It is governed and audited; it is not a process force-kill. It reads how much
+work it would reach and shows the count, so it is loud only when there is
+something to be loud about — and it is in the same place either way.
 
 ## Update and roll back
 

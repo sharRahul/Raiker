@@ -222,3 +222,45 @@ describe("settings sections and their deep links", () => {
     expect(tabFromHash("#/settings")).toBe("general");
   });
 });
+
+// Found live 2026-09-05, walking every destination at four widths. A hub tab is
+// written `#/extensions?tab=mcp` everywhere in this app, and `#/extensions/mcp`
+// — the form every other product uses, and the one a person guesses or types
+// from memory — was not a route at all, so `routeFromHash` fell through to
+// `DEFAULT_ROUTE` and the Workbench opened. That is precisely the failure
+// `HUB_TAB_ALIASES` exists to prevent one level down: a link that looks like it
+// works and lands somewhere else.
+describe("a hub tab addressed as a path segment", () => {
+  it("opens the hub and its tab rather than the Workbench", () => {
+    for (const [route, tabs] of Object.entries(HUB_TABS)) {
+      for (const tab of tabs) {
+        expect(routeFromHash(`#/${route}/${tab}`)).toBe(route);
+        expect(tabFromHash(`#/${route}/${tab}`)).toBe(tab);
+      }
+    }
+  });
+
+  it("reads the same aliases the query form does", () => {
+    expect(tabFromHash("#/models/providers")).toBe("local");
+    expect(tabFromHash("#/observe/diagnostics")).toBe("overview");
+  });
+
+  it("falls back to the hub's first panel for a segment it does not have", () => {
+    expect(routeFromHash("#/extensions/nonsense")).toBe("extensions");
+    expect(tabFromHash("#/extensions/nonsense")).toBe("connectors");
+  });
+
+  it("lets the query win when a hash somehow carries both", () => {
+    expect(tabFromHash("#/extensions/skills?tab=mcp")).toBe("mcp");
+  });
+
+  it("leaves a route with no tabs alone", () => {
+    expect(routeFromHash("#/tasks/anything")).toBe("tasks");
+    expect(tabFromHash("#/tasks/anything")).toBeNull();
+  });
+
+  it("does not mistake a query-only deep link for a segment", () => {
+    expect(routeFromHash("#/new-chat?session=sess_1")).toBe("new-chat");
+    expect(tabFromHash("#/new-chat?session=sess_1")).toBeNull();
+  });
+});

@@ -13,19 +13,31 @@ evidence those write-ups point at.
 | [`pages/`](pages) | The **current** state of every application page. Unlike the two above this folder is not an archive — it is re-captured in full by [`ui-sweep-responsive-live.spec.ts`](../../../apps/web/e2e/ui-sweep-responsive-live.spec.ts), so a file here is always the latest version and a stale one is a bug in the sweep |
 | [`widths/`](widths) | The **current** state of every route at 390 and 1920, written by [`ui-sweep-widths-live.spec.ts`](../../../apps/web/e2e/ui-sweep-widths-live.spec.ts). That spec's captures are the visible half of a run whose real output is four *assertions* per route per width — no sideways scroll, nothing bleeding out of a `visible` box, every control named, and no control that draws nothing. Like `pages/` it is re-captured rather than archived |
 
-## Current adaptive-shell catalogue — 2026-09-03
+## Current adaptive-shell catalogue — 2026-09-05
 
-The mutable `pages/` catalogue contains 208 viewport-only PNG files:
+The mutable `pages/` catalogue contains 320 viewport-only PNG files:
 
 ```text
-26 route/tab states × 4 display classes × 2 themes = 208
+40 route/tab states × 4 display classes × 2 themes = 320
 ```
 
-Beside them sit 25 unprefixed captures (`01-workbench.png` … `25-settings.png`)
+**It was 26 route/tab states until 2026-09-05, and that was the defect.** Five
+sweeps each carried a hand-copied route list; all five swept two routes that no
+longer exist and missed twenty that do — Design, Messaging, the Guide, all six
+Models tabs and all ten Settings sections. Every route list is derived from the
+app's own nav registry now
+([`e2e/destinations.ts`](../../../apps/web/e2e/destinations.ts)), so a
+destination added to the navigation is swept by all five from the next run. The
+record is
+[FIXED-416](../FIXED_ITEMS.md#fixed-416--both-every-page-sweeps-had-stopped-covering-every-page).
+
+Beside them sit 40 unprefixed captures (`home.png`, `settings-privacy.png`, …)
 written by [`all-pages-live.spec.ts`](../../../apps/web/e2e/all-pages-live.spec.ts),
 which is a different sweep with a different question: one width, every route, and
-whether the console stayed clean. They are named for their own scheme so the two
-sets cannot be mistaken for each other.
+whether the console stayed clean. They are named for their destination, matching
+the prefixed set's own convention — the ordinal names (`01-workbench.png` …
+`25-settings.png`) they replace made adding a destination in the middle rename
+every capture after it.
 
 | Prefix | Viewport | Purpose |
 |---|---:|---|
@@ -35,15 +47,17 @@ sets cannot be mistaken for each other.
 | `8k-{light,dark}-` | 7680 × 4320 | Maximum declared display class without scaled controls or unbounded prose |
 
 Each filename ends with the stable route/tab name, for example
-`4k-dark-observe-diagnostics.png`. The live sweep sets the chosen theme before
+`4k-dark-observe-overview.png`. The live sweep sets the chosen theme before
 application mount, checks the theme control state, waits for the page to settle,
 parks the pointer away from hover targets, rejects console errors and horizontal
 overflow, and reads the PNG header to prove its dimensions equal the viewport.
 Tablet widths, the exact 1024-pixel breakpoint, and 1440-pixel desktop remain
 automated layout assertions rather than additional committed screenshot classes.
 
-**All 208 files were recaptured on 2026-08-28**, against a real host serving the
-current build. Mobile and all three desktop classes were generated in the same
+**All 320 files were recaptured on 2026-09-05**, against a real host serving the
+current build — necessarily, because the STOP switch became quiet while nothing
+is running ([FIXED-413](../FIXED_ITEMS.md#fixed-413--the-stop-switch-shouted-on-every-page-and-could-not-say-what-it-would-reach))
+and the top bar is in every one of them. Mobile and all three desktop classes were generated in the same
 run, from the same build, so every image in `pages/` comes from one instance at
 one moment. The sweep itself reads every PNG header and refuses a capture whose
 dimensions do not exactly match its declared viewport.

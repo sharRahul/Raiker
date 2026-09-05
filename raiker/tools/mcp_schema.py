@@ -301,6 +301,11 @@ SUPPORTED_SERVER_FEATURES = frozenset({"tools"})
 TRANSPORT_EVENT_STREAM = "transport:event_stream"
 TRANSPORT_SESSION_RESTARTED = "transport:session_restarted"
 
+#: Prefix for a method the server asked *Raiker* to perform. Same rule as the
+#: two above — the key is the observation, and the note below is the sentence the
+#: card renders from it.
+ASKED_PREFIX = "asked:"
+
 _FEATURE_NOTES: dict[str, str] = {
     "resources": (
         "Offers resources — including any ui:// app interface. Raiker reads this "
@@ -319,12 +324,47 @@ _FEATURE_NOTES: dict[str, str] = {
     ),
 }
 
+#: What a server asked Raiker to do, and what Raiker answered. A server-initiated
+#: request is the one thing on this surface an owner cannot see coming from the
+#: server's own capability declaration — it is a thing the server *did*, so it is
+#: named the way it happened, with the answer it got.
+_ASKED_NOTES: dict[str, str] = {
+    "ping": "Checked that Raiker was still there. Answered.",
+    "elicitation/create": (
+        "Asked Raiker to put a question of its own to you. Refused — a question "
+        "a connected server composes is not one Raiker's runtime raised, and it "
+        "has no owner-facing route yet."
+    ),
+    "sampling/createMessage": (
+        "Asked Raiker to spend a model turn on its behalf. Refused — a turn this "
+        "server composes is not one your policy reviewed."
+    ),
+    "roots/list": (
+        "Asked which directories Raiker works in. Refused — the workspace "
+        "boundary is not something a connected server is told."
+    ),
+}
+
+
+def asked_note(method: str) -> str:
+    """The sentence for one method a server asked for."""
+    return _ASKED_NOTES.get(
+        method,
+        f"Asked Raiker to perform '{method}'. Refused — Raiker declared no client "
+        "capability for it.",
+    )
+
 
 def server_feature_keys(
-    capabilities: Any, *, event_stream: bool = False, session_restarted: bool = False
+    capabilities: Any,
+    *,
+    event_stream: bool = False,
+    session_restarted: bool = False,
+    server_requests: Any = None,
 ) -> list[str]:
-    """The feature keys to store for one connection: what it declared, plus what
-    the transport saw. Names only — never a capability's contents."""
+    """The feature keys to store for one connection: what it declared, what the
+    transport saw, and what it asked Raiker to do. Names only — never a
+    capability's contents and never a request's params."""
     keys: list[str] = []
     if isinstance(capabilities, dict):
         keys.extend(
@@ -336,6 +376,11 @@ def server_feature_keys(
         keys.append(TRANSPORT_EVENT_STREAM)
     if session_restarted:
         keys.append(TRANSPORT_SESSION_RESTARTED)
+    if isinstance(server_requests, (list, tuple)):
+        for raw in server_requests:
+            method = clean_text(raw, limit=64)
+            if method and f"{ASKED_PREFIX}{method}" not in keys:
+                keys.append(f"{ASKED_PREFIX}{method}")
     return keys
 
 
@@ -353,6 +398,9 @@ def unsupported_feature_notes(features: Any) -> list[dict[str, str]]:
     for raw in features:
         key = clean_text(raw, limit=64)
         if not key or key in SUPPORTED_SERVER_FEATURES:
+            continue
+        if key.startswith(ASKED_PREFIX):
+            notes.append({"feature": key, "note": asked_note(key[len(ASKED_PREFIX):])})
             continue
         notes.append({"feature": key, "note": _FEATURE_NOTES.get(key, "Raiker does not use it.")})
     return notes

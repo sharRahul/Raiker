@@ -267,29 +267,55 @@ Two things to know:
 
 ## What you get
 
-The sidebar groups every destination:
+Destinations are split by how often you go to them. The sidebar carries the
+work; everything you set up once lives behind the gear in the top bar.
 
-| Group | Destinations |
-|---|---|
-| Home | Workbench — the live board: what is running, which agents are standing, what is scheduled, and what needs a decision |
-| Work | Chat, Build, Threads, Tasks, Projects |
-| Knowledge | Memory, Knowledge Map |
-| Control | Approvals, Permissions, Models, Extensions |
-| Observe | Observability — overview, sessions, activity, checkpoints, diagnostics, live work, notifications |
-| Utilities | Guide, Settings |
+| Where | Group | Destinations |
+|---|---|---|
+| Sidebar | Core | Workbench, Chat, Build, Design, Threads, Tasks, Projects, Approvals, Messaging |
+| Sidebar | Knowledge | Memory, Knowledge Map |
+| Gear | Manage | Permissions, Models, Extensions |
+| Gear | Observe | Observability |
+| Gear | Support | Guide, Settings |
+
+**Workbench** is the live board: what is running, which agents are standing,
+what is scheduled, and what needs a decision. **Approvals** sits in the sidebar
+rather than behind the gear because a decision waiting on you is the work,
+arriving many times a day, while Permissions and Models are configured once and
+revisited.
 
 **Sessions is inside Observability**, not a destination of its own: it is the
 complete record of every conversation *and* every task run, which is why the
-sidebar's RECENT CHATS list stays conversations only. **Models** and
-**Extensions** are tabbed the same way — Models by Local / Hosted / Hugging
-Face / Activity / Routing / Pricing, Extensions by Connectors / MCP
-servers / Skills / Plugins / Channels. Old links to the pages these absorbed
-still resolve and open the right tab.
+sidebar's RECENT CHATS list stays conversations only.
 
-The top bar carries the notification bell, the theme toggle
-(system → light → dark), and the **STOP** switch, which requests cancellation of
-every task that is queued, running, paused, or waiting for your approval, at the
-next safe boundary. It is governed and audited — not a force-kill.
+Four destinations are tabbed:
+
+| Destination | Tabs |
+|---|---|
+| Models | Local, Hosted, Hugging Face, Activity, Routing, Pricing |
+| Extensions | Connectors, MCP servers, Skills, Hooks, Plugins |
+| Observability | Overview, Sessions, Activity, Checkpoints, Live work, Notifications |
+| Settings | General, Notifications, Personalisation, Security & sign-in, Privacy, Account, Web access, Git credential, Runtime configuration, Updates |
+
+Old links to the pages these absorbed still resolve and open the right tab, and
+so does the path form — `#/extensions/mcp` opens Extensions on MCP servers,
+exactly as `#/extensions?tab=mcp` does.
+
+The top bar carries the notification bell, the **gear** — Settings and every
+destination that is not on the sidebar — the host control, and the **STOP**
+switch.
+
+**STOP** is quiet while nothing is running: an icon, in the row with the bell
+and the gear. When work is under way it turns red and states how many tasks it
+would reach, and pressing it requests cancellation of every task that is queued,
+running, paused, or waiting for your approval, at the next safe boundary. It is
+governed and audited — not a force-kill. It is in the same place, and one press
+from the same dialog, whether or not anything is running: with an empty queue it
+says so immediately rather than asking you to confirm a stop that would reach
+nothing.
+
+The theme is a preference rather than a shell control, and lives in
+**Settings → Personalisation**.
 
 The layout adapts live: below 1024 px the header menu opens navigation as an
 overlay without changing the workspace width. At 1024 px and wider, the

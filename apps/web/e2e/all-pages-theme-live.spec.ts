@@ -1,20 +1,19 @@
 import { expect, test } from "@playwright/test";
+import { DESTINATIONS, hubReachability } from "./destinations";
 import { signInAsOwner } from "./hosted-provider";
 
-const routes = [
-  "home", "new-chat", "build", "search-chat", "tasks", "projects", "memory", "brain",
-  "approvals", "capabilities", "models", "extensions?tab=connectors", "extensions?tab=mcp",
-  // Skills and Hooks were missing, so two of the six extension surfaces were
-  // never checked in either theme — the Hooks tab in particular carries several
-  // colours of its own (the dead-rule note, the decides/observes tags).
-  "extensions?tab=skills", "extensions?tab=hooks",
-  "extensions?tab=plugins", "extensions?tab=channels", "observe?tab=overview",
-  "observe?tab=sessions", "observe?tab=activity", "observe?tab=checkpoints",
-  "observe?tab=diagnostics", "observe?tab=work", "observe?tab=notifications", "settings",
-] as const;
+// The list is derived from the app's own nav registry rather than copied here.
+// This file's copy had drifted: it swept two routes that no longer exist
+// (Channels moved to Messaging, and `observe?tab=diagnostics` is an alias onto
+// Overview) and missed twenty that do — Design, Messaging, the Guide, all six
+// Models tabs and all ten Settings sections were never checked in either theme.
+// `destinations.ts` says why that keeps happening and what stops it.
+const routes = DESTINATIONS.map((destination) => destination.route);
+
 
 test("every application page renders in explicit light and dark themes", async ({ page }) => {
   test.setTimeout(180_000);
+  const hub = hubReachability(page);
   const errors: string[] = [];
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
   page.on("pageerror", (error) => errors.push(error.message));
@@ -44,5 +43,5 @@ test("every application page renders in explicit light and dark themes", async (
   }
 
   for (const route of routes) expect(observed.get(route)?.light).not.toBe(observed.get(route)?.dark);
-  expect(errors).toEqual([]);
+  expect(hub.filter(errors)).toEqual([]);
 });

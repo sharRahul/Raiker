@@ -423,6 +423,13 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-408](#fixed-408--one-composer-three-surfaces-and-design-where-it-belongs) | Medium | Web UI / work surfaces | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-409](#fixed-409--raiker-could-start-at-sign-in-but-had-no-icon-to-click) | Medium | Desktop integration / uninstall | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-410](#fixed-410--the-design-model-picker-was-empty-on-every-real-install) | **High** | Design / models | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-411](#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own) | **High** | MCP / interoperability | Fixed 2026-09-05 (reduces BUG-234) |
+| [FIXED-412](#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped) | Medium | MCP / interoperability | Fixed 2026-09-05 (reduces BUG-234) |
+| [FIXED-413](#fixed-413--the-stop-switch-shouted-on-every-page-and-could-not-say-what-it-would-reach) | Medium | Web UI / governed interrupt | Fixed 2026-09-05 (found live) |
+| [FIXED-414](#fixed-414--the-hub-could-not-be-reached-and-the-panel-said-search-the-catalogue) | Low | Models / Hugging Face | Fixed 2026-09-05 (found live) |
+| [FIXED-415](#fixed-415--a-hub-tab-addressed-as-a-path-opened-the-workbench) | Low | Web UI / routing | Fixed 2026-09-05 (found live) |
+| [FIXED-416](#fixed-416--both-every-page-sweeps-had-stopped-covering-every-page) | Medium | Live test harness / evidence | Fixed 2026-09-05 (found live) |
+| [FIXED-417](#fixed-417--the-guides-tour-of-the-shell-described-a-shell-that-had-moved) | Medium | Documentation / web UI | Fixed 2026-09-05 (found live) |
 
 ---
 
@@ -18237,3 +18244,467 @@ by screenshot. 17 image tests and 17 model-presentation tests pass, including a
 regression test for the chat-picker leak; the mocked fixture now declares an
 image-capable provider so the route audit exercises a populated control. The
 serialisation guard was confirmed to fail when the builder line is removed.
+
+---
+
+## FIXED-411 — A server-initiated request was filed as the answer to Raiker's own
+
+**Severity: High. Area: MCP / interoperability. Status: Fixed 2026-09-05.
+Reduces [BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks).**
+
+**Observed.** A remote MCP server that answers the handshake correctly and then
+asks Raiker a question — a `ping`, an `elicitation/create`, a
+`sampling/createMessage` — could not be connected at all. **Extensions → MCP**
+reported `mcp_initialize_failed`: a reason that names Raiker's own request and
+blames the server for not answering it, about a server that had answered it
+correctly.
+
+**Reproduced on unmodified `main`** with a scripted server that answers
+`initialize` and, in the same event stream, sends `{"id": 1, "method":
+"elicitation/create"}`:
+
+```
+$ python repro.py          # unmodified main
+-> ok: False | reason: mcp_initialize_failed
+$ python repro.py          # after this change
+-> ok: True  | reason: None
+```
+
+**Root cause: an id was read as a direction.** Both transports sorted every
+message by one test —
+
+```python
+if isinstance(message, dict) and "id" in message:
+    responses[message["id"]] = message
+```
+
+— and JSON-RPC is bidirectional. A request the **server** sends carries an `id`
+from the *server's* numbering space, which starts wherever the server likes and
+commonly at 1. Raiker's `initialize` is id 1 and its `tools/list` is id 2, so a
+server numbering its own first request 1 — the ordinary thing to do — landed on
+top of the answer Raiker was waiting for. Whichever of the two it displaced then
+had no `result`, and `_extract_tools` failed closed on it.
+
+An id says what a message is *about*. Only `method` says which way it is going,
+and `classify_jsonrpc` now reads that instead: request, notification, response,
+or invalid, with the server's own messages kept out of the response map
+entirely.
+
+**The second half: silence is not an answer.** Nothing ever replied, so a
+conformant server sat holding a request until its own timeout expired. It is
+answered now, on the same endpoint the streamable HTTP transport already uses
+for both directions:
+
+* `ping` gets an empty result. It asks only whether the peer is alive, grants
+  nothing and reads nothing, so refusing it would be a lie about a connection
+  that plainly is alive.
+* Everything else gets JSON-RPC `-32601`. Raiker declares no client
+  capabilities in its handshake, so a server must not ask for one — and
+  "the method is not implemented here", in the code the specification reserves
+  for exactly that, is both truthful and *complete*: the server learns not to
+  wait and can carry on without what it asked for.
+
+Those answers are best-effort by design. They are all refusals bar `ping`, so
+one that fails to post leaves the server no worse off than the silence it used
+to get, and failing the owner's read because a courtesy reply did not land would
+be the wrong trade.
+
+**Deliberately not a hook for capability.** Answering `elicitation/create` or
+`sampling/createMessage` *for real* would let a connected server compose a
+question the owner is shown, or spend a model turn the owner's policy never
+reviewed. Both are a different authority object from a tool call the owner
+approved, and each needs its own answer before any code — which is what
+[BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks)
+still records as open. Until then, "not implemented" is the honest reply.
+
+**A stdio session makes the same distinction and cannot answer.** Every request
+is written up front and stdin is closed so the local server drains and exits —
+that is what makes the session bounded and non-interactive, and holding stdin
+open to reply would make it neither. So a local server's request is kept out of
+the response map and named on the card, and the server is told nothing rather
+than told the wrong thing.
+
+**User-interface outcome.** A server that asked for something says so on its own
+card, in the sentence format the unsupported-feature notes already use: *"Asked
+Raiker to put a question of its own to you. Refused — a question a connected
+server composes is not one Raiker's runtime raised, and it has no owner-facing
+route yet."* A method nobody wrote a sentence for is still named by its own key
+rather than dropped for not being on a list. Names only — a request's params are
+the server's text and never enter a record. 22 tests in
+`tests/test_mcp_server_initiated.py`, including the end-to-end reproduction
+above and the stdio half.
+
+---
+
+## FIXED-412 — An event stream was read one line at a time, and the rest was dropped
+
+**Severity: Medium. Area: MCP / interoperability. Status: Fixed 2026-09-05.
+Reduces [BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks).**
+
+**Observed.** `_parse_jsonrpc_body` treated each `data:` line of a
+`text/event-stream` answer as one complete JSON message and ignored every other
+field. Two things a conformant server does were therefore invisible.
+
+**One event's payload may span several `data:` lines.** The format joins them
+with a newline and dispatches at the blank line, so a sender may break wherever
+the payload already has one — which is exactly what a server that pretty-prints
+its JSON-RPC does, and plenty do, because the wire gets read by people. Raiker
+parsed each line on its own; every one was a fragment, every parse failed with a
+suppressed `ValueError`, and the read failed as `mcp_initialize_failed` or
+`mcp_list_tools_failed` about a server that had answered correctly. The same
+shape of wrong reason as [FIXED-411](#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own)
+beside it, from a different cause.
+
+**`id:` is where to resume from.** The stream carries an id per event so a
+client that loses its place can say where it got to. Raiker dropped it, so the
+one re-handshake it performs after a dropped session
+([FIXED-378](#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport))
+restarted from nothing and asked the server to repeat work it had already done.
+
+**Root cause.** There was no event-stream parser — there was a `startswith`
+check and a line filter. `_parse_sse` is one now: event boundaries at the blank
+line, `data:` fields joined with a newline, one optional space after the colon
+consumed as the separator, comment lines ignored, all three line terminators the
+format allows, `id:` captured and a NUL-bearing id discarded as the format
+requires. `Last-Event-ID` rides on the request after a drop, and on no other.
+
+**What this does not claim.** Raiker still reads a bounded response *whole*
+rather than incrementally, and holds no open connection between turns. That is
+still stated on the server's card, unchanged; this is about reading correctly
+what it does read.
+
+**User-interface outcome.** None changes by itself — which is the point: a
+server whose answers span lines connects, lists its tools, and shows them, where
+before it appeared broken. The card's existing sentence about the stream stays
+exactly as it was, because it is still true. 23 tests in
+`tests/test_mcp_event_stream.py`, including a server that pretty-prints every
+payload and drops the session once.
+
+---
+
+## FIXED-413 — The stop switch shouted on every page and could not say what it would reach
+
+**Severity: Medium. Area: Web UI / governed interrupt. Status: Fixed 2026-09-05.
+Found live, walking every destination at four widths.**
+
+**Observed.** The **STOP** switch in the top bar was full-strength red on every
+page, at every width, always — and it could not say whether pressing it would do
+anything. The owner pressed it, read a dialog about cancelling every queued,
+running, paused and waiting-for-approval task at the next safe boundary,
+confirmed, waited on `GET /api/tasks` and then on nothing, and was told **"No
+active tasks to stop."** On a 360px header the pill spent about a third of the
+width getting there.
+
+An emergency control that is red when nothing is wrong is a control nobody
+reads, which is the opposite of what it is for.
+
+**What did not change, and must not.** The stop is reachable from every page at
+every moment. That is the Security Philosophy's *instant stop*, and letting
+Raiker's belief that nothing is running remove a control would turn a stale read
+into a missing control. It is still one press from the same dialog when the
+count is zero; it is simply quiet about it.
+
+**What changed.** The switch reads the same `GET /api/tasks` the workbench reads
+and counts it with the same `isActiveTask`, so the two can never disagree about
+what "active" means — including `waiting_for_children`, which
+[FIXED-286](#fixed-286--a-task-reported-done-while-the-work-it-delegated-was-still-open)
+added to that list and which a second definition here would have missed.
+
+* **Nothing running:** a ghost icon in the row with the bell and the gear. No
+  colour, no word, `aria-label="Stop all work (nothing is running)"`.
+* **Something running:** the red pill it always was, with the count on it,
+  `aria-label="Stop all work (3 active)"`, and a polite `aria-live` region
+  *outside* the button so a screen reader hears work starting without the
+  button's own label being re-announced on every poll.
+* **Under 480px** the word drops and the icon and the count carry it, which is
+  what makes the mobile header legible again.
+
+The dialog opens on a count refreshed at that moment. Zero: **"Nothing is
+running"**, immediately, with **Check again** — no confirmation and no interrupt
+spent to discover it. Above zero: the confirm names the number, so the decision
+is made against a quantity rather than a category. The stop itself still
+re-reads before acting, because the decision is about what is running *now*, not
+what was running when the owner reached for the button.
+
+A failed count keeps the last known value. Turning a network hiccup into
+"nothing is running" is the one thing this control must never do.
+
+**Is this beyond the reference platforms?** Yes, narrowly. Claude Code, Cowork
+and Codex all surface a stop while a turn runs. None of them tells you *how
+much* it would reach before you commit, because none of them has a governed
+queue to count — and Raiker's queue spans tasks, schedules and parked approvals,
+not one turn.
+
+**User-interface outcome.** Verified live at 360, 420 and 1440: idle, a quiet
+icon; with three active tasks, `STOP 3` and a dialog reading *"This stops 3
+tasks — everything queued, running, paused, or waiting for your approval — at
+the next safe boundary."* 11 tests in `StopSwitch.test.ts`, including that the
+button is still present and still opens the dialog when the count is zero, that
+no interrupt is issued to discover an empty queue, and that a failed read does
+not quietly claim quiet.
+
+---
+
+## FIXED-414 — The Hub could not be reached and the panel said "search the catalogue"
+
+**Severity: Low. Area: Models / Hugging Face. Status: Fixed 2026-09-05. Found
+live on a host with no route to `huggingface.co`.**
+
+**Observed.** **Models → Hugging Face** opens by fetching the most-downloaded
+GGUF repositories, so an owner who does not already know a repository id has
+somewhere to start. On this host that read answered `503`. The failure was
+caught and discarded, and the panel rendered its **"Search the Hub catalogue —
+Results stay here; selecting one reveals immutable downloadable variants"**
+empty state, which is the copy for *nothing has been asked for yet*.
+
+So the surface said the same thing whether the Hub had answered with nothing or
+could not be reached at all, and the only trace was a `503` in the browser
+console. The owner typed a search and found out from a request that timed out —
+which is
+[BUG-248](TO_BE_FIXED.md#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body)'s
+`bug-69-huggingface` finding arriving from the other side: there, a
+three-minute timeout on a click was blamed on the click.
+
+**Root cause, and why it was written that way.** The `catch` was deliberate and
+carried its reasoning: *"A Hub that cannot be reached is not an error worth
+interrupting the panel for before the owner has asked for anything."* The first
+half of that is right and is kept — this is not an alarm, nothing in Raiker is
+broken, and nothing was lost. The second half does not follow: not interrupting
+is not the same as not saying, and the empty state it fell back to was written
+to mean something else.
+
+**Fixed.** The panel distinguishes three states rather than two. Loading. The
+Hub answered — with repositories, or with nothing, and either way the search box
+is the way forward. Or the Hub could not be reached, said where the results
+would have been, with what still works (*"Everything already in your local
+library still works"*) and a **Try again**, because a route to the Hub is the
+kind of thing that comes back.
+
+**User-interface outcome.** Verified live at 360 and 1440 on a host with no
+route to `huggingface.co`: **"Hugging Face could not be reached."** 5 tests in
+`HuggingFacePanel.test.ts`, including that an empty answer from a reachable Hub
+still gets the search-first copy — an empty catalogue is not an unreachable one.
+
+---
+
+## FIXED-415 — A hub tab addressed as a path opened the Workbench
+
+**Severity: Low. Area: Web UI / routing. Status: Fixed 2026-09-05. Found live,
+walking every destination at four widths.**
+
+**Observed.** A hub tab is written `#/extensions?tab=mcp` everywhere in this
+app. `#/extensions/mcp` — the form every other product uses, and the one a
+person types from memory — was not a route at all: `routeFromHash` split on
+`?`, matched `extensions/mcp` against nothing, and fell through to
+`DEFAULT_ROUTE`. The Workbench opened, titled Workbench, with no indication that
+a link had been misread.
+
+Found because the sweep addressed all 28 hub tabs that way and every capture
+came back byte-identical to the Workbench.
+
+**Root cause.** The hash was read as one opaque path segment. That is exactly
+the failure `HUB_TAB_ALIASES` exists to prevent one level down — its own comment
+says a tab id that misses the map *"looks like a working link to the wrong
+place"* — and the level above it had no such protection.
+
+**Fixed.** `rawSegments` splits the path, `routeFromHash` reads the first
+segment as it always did, and `tabFromHash` reads the second as a tab when the
+route is a hub. It goes through the same alias map, so `#/models/providers`
+resolves to Local exactly as `?tab=providers` does, and an unknown segment falls
+back to the hub's first panel rather than to the Workbench. `?tab=` wins where a
+hash somehow carries both, because that is the form this app emits.
+
+Purely additive: every hash this app writes uses `?tab=`, `?session=` or
+`?section=`, and a route with no tabs is untouched.
+
+**User-interface outcome.** Verified live: `#/extensions/mcp` opens Extensions
+with the MCP tab selected, at 360 and 1440. Six cases in `nav.test.ts`, one of
+which walks every route in `HUB_TABS` and every tab in each, so a hub gaining a
+tab cannot gain a broken path form with it.
+
+---
+
+## FIXED-416 — Both "every page" sweeps had stopped covering every page
+
+**Severity: Medium. Area: Live test harness / evidence. Status: Fixed
+2026-09-05. Found while running the sweeps that were supposed to find
+everything else.**
+
+**Observed.** **Five** live specs sweep the whole product — `all-pages-live`
+photographs every destination and asserts no console error,
+`all-pages-theme-live` checks each one in explicit light and dark,
+`ui-sweep-responsive-live` captures four display classes in both themes,
+`ui-sweep-widths-live` asserts fit and naming at four widths, and
+`ui-sweep-clipping-live` checks that nothing is cut off. Each carried its own
+hand-copied list of routes, and **all five** had drifted the same two ways:
+
+* **Two routes that no longer exist were being swept.**
+  `extensions?tab=channels` — Channels left Extensions for its own Messaging
+  destination — and `observe?tab=diagnostics`, which is an alias resolving onto
+  Overview. Each was photographed and theme-checked as though it were a page of
+  its own, so the catalogue held two duplicates and the theme run made the same
+  assertion twice.
+* **Twenty destinations that do exist were in none of them.** **Design**,
+  **Messaging** and the **Guide**; all six **Models** tabs; all ten **Settings**
+  sections. A regression on any of them — a bleed, a console error, a section
+  that renders the same palette in both themes — would have gone unseen by every
+  sweep in the suite, and the theme guard in particular had never once looked at
+  Settings → Privacy or at the Hugging Face panel.
+
+**And covering them found three responsive defects on the first run**, all
+shipped, all invisible on a desktop screenshot, and all the *same* mistake — an
+element's declared size not surviving the flexible layout it sits in:
+
+* **Settings → Web access bled 31px past a 768px viewport.** The "Blocked
+  destinations" form was `grid-template-columns: 1fr 1fr auto`, and a `1fr`
+  track will not shrink below its content's own minimum — an `<input>` defaults
+  to about twenty characters wide, so two of them held the row at 478px inside a
+  422px card and pushed the whole Settings layout sideways. It is a wrapping
+  flex row now, which also stops the **Check** button on the probe form beneath
+  it stretching to fill a column it was only borrowing.
+* **Settings → Runtime bled at 390px.** `.environment-form` already used
+  `repeat(2, minmax(0, 1fr))` — the fix everyone reaches for — and it was only
+  half of it: the *track* could shrink, but the `<label>` inside it is a grid
+  item whose automatic minimum is its own content, and the `<select>` it holds
+  is at least as wide as *"Daytona cloud workspace"*. The label held a 183px
+  minimum inside a 152px track. `min-width: 0` on the item is the other half,
+  and the form collapses to one column below 40rem like the definition list
+  beside it already did.
+
+* **Settings → Privacy and Settings → Security had checkboxes at 13px on a
+  phone**, and Security had two different sizes on one page. `app.css` sets
+  every checkbox to 1.5rem below 1024px, and it carries a comment explaining
+  that it exists because boxes had come out *"under WCAG 2.2's 24px minimum
+  target — and at three different sizes"*. Both of these pages put their
+  checkbox in a `display: flex` row beside a long label, and a flex item shrinks
+  by default, so it was squeezed straight back to the user agent's own 13px. The
+  element now carries `flex: none`.
+
+The pattern is worth stating once, because it is the one that keeps producing
+these: **giving an element a size is not the same as letting it keep one.** A
+`1fr` track needs `minmax(0, 1fr)`; a grid item inside it needs `min-width: 0`;
+a flex item that must not be squeezed needs `flex: none`. Each fix is one
+declaration and each was missing in a place no sweep had ever looked.
+
+**One blind spot in the checker itself, found the same way.** Once the width
+sweep reached the Guide, every code block in it was reported as bleeding. It
+was not: a `<code>` inside a `<pre overflow-x: auto>` is `visible` itself and
+wider than the pre's content box, because the pre is scrolling it — which is
+the correct behaviour and the entire reason the pre is a scroller. The sweep
+skipped an element whose *own* box was a scroller and not one whose *ancestor's*
+was. It walks up now. A checker that cries wolf on every code block in the
+product is a checker somebody switches off.
+
+**Root cause, and why it is the third time.** `all-pages-live` already carried
+this comment, written the *last* time its copy drifted:
+
+> The sweep is only a sweep if it covers every tab the nav offers. Skills and
+> Hooks were missing, so two of the six extension surfaces were never
+> photographed and a regression on either would have gone unseen.
+
+A comment cannot hold a list in sync. `nav.test.ts` had already refused the same
+defect one floor down, for the settings rail — *"The rail itself, not a copy of
+it"* — after a hand-copied guard shipped with the same omission as the thing it
+was guarding.
+
+**Fixed by deriving it.** `e2e/destinations.ts` builds the list from
+`NAV_ITEMS` and `HUB_TABS` — the app's own registry, the one `routeFromHash`
+resolves against, so a destination missing from it is not reachable at all — and
+expands each hub into one entry per tab. All five specs import it. A destination
+added to the nav is swept from the next run, by every sweep, with nothing for
+anyone to remember.
+
+**And the check that found this round's defects is now a guard.** A second test
+walks every destination at 360, 768, 1024 and 1440 and asserts that nothing in
+the routed view reaches past the right edge. It measures the property rather
+than comparing a screenshot, which is what makes it re-runnable against a
+workspace that has been worked in: the layout has to hold whatever the content
+is. It ignores an element a scroll container is clipping on purpose — a code
+block, a wide table, a tab strip — because a check that calls every one of those
+a bleed returns noise and gets switched off.
+
+**One console error is allowed, and it has to earn it.** A host with no route to
+`huggingface.co` answers the Hub reads `503`, and the browser writes "Failed to
+load resource" for each. That is the host's network rather than a defect — but
+the same message is what a real breakage looks like, so the allowance is
+conditional: it applies only while the panel is telling the owner the Hub could
+not be reached
+([FIXED-414](#fixed-414--the-hub-could-not-be-reached-and-the-panel-said-search-the-catalogue)).
+A silent panel and a `503` still fails.
+
+**User-interface outcome.** Three, by way of the defects it found: Settings →
+Web access and Settings → Runtime no longer push their page sideways at 768px
+and 390px, and the checkboxes on Settings → Privacy and Settings → Security meet
+the 24px target on a phone that the rest of the product already met. Beyond that it is harness work, and what it protects is every other
+surface: 40 destinations rather than 26, photographed in four display classes
+and both themes, and asserted at four widths by three separate checks.
+[`screenshots/pages/`](screenshots/pages) is named by destination now rather
+than by ordinal (`settings-privacy.png`, not `26-`), so adding a destination in
+the middle no longer renames the evidence after it and the catalogue matches the
+theme sweep's existing convention. The 25 ordinal files are replaced; that
+directory is documented as replaceable current-state evidence in
+[`WEB_UI_ADAPTIVE_SHELL_DESIGN.md`](WEB_UI_ADAPTIVE_SHELL_DESIGN.md), and no
+document cited one by name.
+
+**Green on this host:** all five sweeps pass against the derived list — the page
+sweep, the theme sweep, the width sweep, the clipping sweep and the
+display-class catalogue — with no bleed, no clipping, no unnamed control and no
+unexplained console error at any width on any of the 40 destinations.
+
+---
+
+## FIXED-417 — The guide's tour of the shell described a shell that had moved
+
+**Severity: Medium. Area: Documentation / web UI. Status: Fixed 2026-09-05.
+Found while updating the guide for
+[FIXED-413](#fixed-413--the-stop-switch-shouted-on-every-page-and-could-not-say-what-it-would-reach).**
+
+**Observed.** `docs/guide/getting-started.md` — the page a new owner reads
+first, and the one the in-product Guide renders — described the navigation and
+the top bar as they were before two rearrangements landed:
+
+* **The sidebar table named six groups that do not exist.** *Home / Work /
+  Knowledge / Control / Observe / Utilities*. The shipped registry has **Core**
+  and **Knowledge** on the rail, with **Manage**, **Observe** and **Support**
+  behind the gear. So the guide told an owner to look in the sidebar for
+  Permissions, Models, Extensions, Observability, the Guide and Settings — six
+  destinations that are not there — and omitted **Design**, **Messaging** and
+  **Approvals**, which are.
+* **The top bar was said to carry a theme toggle.** It does not; the toggle
+  moved to **Settings → Personalisation** when a preference stopped being a
+  shell control. An owner following that sentence found a gear where the guide
+  promised a sun.
+* **Extensions was said to have a Channels tab.** Channels became their own
+  destination. `extensions-and-mcp.md` contradicted *itself* on this — its first
+  line said six tabs including Channels, and its own Channels section said they
+  had moved.
+* **Observability was said to have a Diagnostics tab.** It is an alias resolving
+  onto Overview.
+
+**Root cause.** The same one as
+[FIXED-416](#fixed-416--both-every-page-sweeps-had-stopped-covering-every-page)
+directly above, in prose instead of in a spec: a hand-written copy of a list the
+product owns. `NAV_GROUPS`, `HUB_TABS` and `SETTINGS_SECTIONS` moved, and four
+passages describing them did not. It is the shape
+[BUG-282](TO_BE_FIXED.md) named — a guide describing a boundary the product had
+removed — recurring on a different list.
+
+**Fixed.** The tour is rewritten against the shipped registry: which group each
+destination is in *and whether it is on the rail or behind the gear*, which is
+the fact an owner actually needs, plus a table of the four tabbed destinations
+listing every tab of each — including all six Models tabs and all ten Settings
+sections, neither of which the guide had ever enumerated. The theme's real home
+is named. The Extensions contradiction is resolved in favour of the product.
+
+Four more passages were brought in line while the surfaces under them changed:
+the STOP switch in `getting-started`, `tasks-and-projects` and
+`managing-the-host` (it is quiet when nothing is running, and states the count
+when something is); the MCP server card in `extensions-and-mcp` (it names what a
+server *asked Raiker to do* and was refused, not only what it offers); and the
+Hugging Face tab in `connecting-a-model` (it opens on trending, and says so when
+the Hub cannot be reached).
+
+**User-interface outcome.** The in-product Guide renders `docs/guide/` directly,
+so this is a product surface rather than a repository file: **Guide → Getting
+started** now describes the navigation an owner is looking at. `test_docs_consistency`
+is green.

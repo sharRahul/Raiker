@@ -929,6 +929,14 @@ code,
 :where(input[type="checkbox"], input[type="radio"]) {
   inline-size: 1.05rem;
   block-size: 1.05rem;
+  /* …and it has to keep that size. Found 2026-09-05, once the sweeps started
+     covering Settings (FIXED-416): Privacy and Security put their checkbox in a
+     `display: flex` row beside a label, and a flex item shrinks by default. At
+     390px the labels are long, so the boxes were squeezed back to the user
+     agent's own 13px — under the 24px minimum the rule below sets, and at two
+     different widths on one page, which is the exact pair of defects that rule
+     was added to fix. Sizing an element is not the same as keeping it sized. */
+  flex: none;
   accent-color: var(--accent);
   cursor: pointer;
 }

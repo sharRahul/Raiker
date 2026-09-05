@@ -165,8 +165,23 @@ const HUB_TAB_ALIASES: Record<string, Record<string, string>> = {
   },
 };
 
+/**
+ * The path part of a hash, without the leading `#/` and without a `?query`.
+ *
+ * A hub tab may be addressed two ways — `#/extensions?tab=mcp` and
+ * `#/extensions/mcp` — so this returns the segments, and the two readers below
+ * decide what each means.
+ */
+function rawSegments(hash: string): string[] {
+  return hash
+    .replace(/^#\/?/, "")
+    .split("?")[0]
+    .split("/")
+    .filter((part) => part !== "");
+}
+
 function rawRoute(hash: string): string {
-  return hash.replace(/^#\/?/, "").split("?")[0];
+  return rawSegments(hash)[0] ?? "";
 }
 
 export function routeFromHash(hash: string): string {
@@ -194,11 +209,24 @@ export function sectionFromHash(hash: string): string | null {
 }
 
 export function tabFromHash(hash: string): string | null {
-  const raw = rawRoute(hash);
+  const segments = rawSegments(hash);
+  const raw = segments[0] ?? "";
   const route = routeFromHash(hash);
   const tabs = HUB_TABS[route];
   if (tabs === undefined) return null;
-  const requested = new URLSearchParams(hash.split("?", 2)[1] ?? "").get("tab");
+  // `?tab=` is the form this app writes. `#/extensions/mcp` is the form a person
+  // guesses, and every other product they use addresses a tab that way — so it
+  // was a link that looked like it worked and opened the Workbench instead,
+  // which is the exact failure `HUB_TAB_ALIASES` above exists to prevent, one
+  // level up. The query wins where both are present, because that is the one
+  // this app emits.
+  // `?section=` is the guide's parameter and reads naturally for a Settings
+  // section, so a link written by hand — or by a surface that had it wrong for
+  // real, which is how this was found — resolves rather than silently opening
+  // the first panel. Same reasoning as the path form above: three spellings, one
+  // destination, and none of them a link that looks like it works.
+  const query = new URLSearchParams(hash.split("?", 2)[1] ?? "");
+  const requested = query.get("tab") ?? query.get("section") ?? segments[1] ?? null;
   if (requested !== null && tabs.includes(requested)) return requested;
   const supersededBy = requested === null ? undefined : HUB_TAB_ALIASES[route]?.[requested];
   if (supersededBy !== undefined && tabs.includes(supersededBy)) return supersededBy;

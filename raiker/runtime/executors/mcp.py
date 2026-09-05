@@ -336,6 +336,18 @@ class _SessionCtx:
     # the http path only; a stdio session leaves them at their defaults.
     saw_event_stream: bool = False
     session_restarts: int = 0
+    # BUG-234 — the methods a server asked *Raiker* to perform, in the order it
+    # first asked for each. Names only: a request's params are the server's text
+    # and never enter a record. The card turns each into the sentence that says
+    # Raiker refused it, so a server whose feature quietly does nothing says so
+    # rather than appearing to work.
+    server_requests: list[str] = field(default_factory=list)
+
+    def note_server_request(self, method: str) -> None:
+        """Record one method a server asked for, once, bounded."""
+        name = method.strip()[:64]
+        if name and name not in self.server_requests and len(self.server_requests) < 8:
+            self.server_requests.append(name)
 
 
 def _default_http_fn(
@@ -455,7 +467,7 @@ class McpConnectorExecutor:
         if reason is not None:
             return self._fail(action.action_id, reason)
         try:
-            responses, bytes_in, bytes_out = self._run_session(command, requests, timeout)
+            responses, bytes_in, bytes_out = self._run_session(command, requests, timeout, ctx)
         except SandboxError as exc:
             self._observe_failure(action, principal_id, ctx)
             return self._fail(action.action_id, str(exc))
@@ -565,6 +577,7 @@ class McpConnectorExecutor:
             init_result.get("capabilities"),
             event_stream=ctx.saw_event_stream,
             session_restarted=ctx.session_restarts > 0,
+            server_requests=ctx.server_requests,
         )
         self._record_connection(
             action, principal_id, transport=ctx.transport,
@@ -751,20 +764,31 @@ class McpConnectorExecutor:
         # current-revision server keep the session rather than reject it as
         # ambiguous; it is set from what the server answered, never assumed.
         negotiated: str | None = None
+        # BUG-234 — where the event stream got to. Carried as `Last-Event-ID` on
+        # the one re-handshake below, so a server that dropped the session can
+        # resume it rather than replay everything it already sent.
+        last_event_id: str | None = None
         bytes_in = 0
         bytes_out = 0
         restarted = False
         index = 0
+
+        def session_headers(*, resume: bool = False) -> dict[str, str]:
+            out: dict[str, str] = {}
+            if token:
+                out["Authorization"] = f"Bearer {token}"
+            if session_id:
+                out["Mcp-Session-Id"] = session_id
+            if negotiated:
+                out["MCP-Protocol-Version"] = negotiated
+            if resume and last_event_id:
+                out["Last-Event-ID"] = last_event_id
+            return out
+
         while index < len(requests):
             req = requests[index]
             bytes_out += len(json.dumps(req).encode("utf-8"))
-            headers: dict[str, str] = {}
-            if token:
-                headers["Authorization"] = f"Bearer {token}"
-            if session_id:
-                headers["Mcp-Session-Id"] = session_id
-            if negotiated:
-                headers["MCP-Protocol-Version"] = negotiated
+            headers = session_headers(resume=restarted and index == 0)
             result = self._http_fn(
                 endpoint_url, req, headers=headers, timeout=timeout, max_bytes=MCP_MAX_OUTPUT_BYTES,
             )
@@ -794,15 +818,71 @@ class McpConnectorExecutor:
             sid = response_headers.get("mcp-session-id")
             if sid:
                 session_id = str(sid)
-            for message in _parse_jsonrpc_body(body_text):
-                if isinstance(message, dict) and "id" in message:
+            messages, stream_event_id = _parse_jsonrpc_messages(body_text)
+            if stream_event_id is not None:
+                last_event_id = stream_event_id
+            # BUG-234 — sorted by direction before anything is filed. A message
+            # carrying a `method` is the server asking Raiker for something, and
+            # putting it in the response map (which is what happened for five
+            # revisions) loses whichever of Raiker's own answers shares its id.
+            answers: list[dict[str, Any]] = []
+            for message in messages:
+                kind = classify_jsonrpc(message)
+                if kind == "response":
                     responses[message["id"]] = message
                     if message["id"] == 1 and isinstance(message.get("result"), dict):
                         negotiated = negotiated_protocol_version(message["result"])
+                elif kind == "request":
+                    if ctx is not None:
+                        ctx.note_server_request(str(message.get("method", "")))
+                    answers.append(server_request_answer(message))
+                elif kind == "notification" and ctx is not None:
+                    # A notification wants no answer, and naming it is still
+                    # worth doing: a server logging into a stream Raiker does not
+                    # read should not look like a server that said nothing.
+                    ctx.note_server_request(str(message.get("method", "")))
+            bytes_out += self._answer_server_requests(
+                endpoint_url, answers, session_headers(), timeout
+            )
             index += 1
         if session_id:
             self._end_http_session(endpoint_url, token, session_id, negotiated, timeout)
         return responses, bytes_in, bytes_out
+
+    def _answer_server_requests(
+        self,
+        endpoint_url: str,
+        answers: list[dict[str, Any]],
+        headers: dict[str, str],
+        timeout: float,
+    ) -> int:
+        """POST Raiker's answers to the requests this server initiated.
+
+        BUG-234. The streamable HTTP transport carries both directions over the
+        same endpoint: a client answers a server-initiated request by POSTing the
+        JSON-RPC response to the URL it is already talking to. Raiker never
+        answered at all, so a server that asked anything sat waiting for a reply
+        that was never coming and spent its own timeout on it.
+
+        **Best-effort, and deliberately so.** These answers are all refusals bar
+        `ping`, so the governed read Raiker came here to do is unaffected by one
+        failing to land: a server that does not accept them is no worse off than
+        under the silence it used to get. Failing the owner's read because a
+        courtesy reply did not post would be the wrong trade. Returns the bytes
+        sent, for the monitor's wire totals.
+        """
+        sent = 0
+        for answer in answers:
+            sent += len(json.dumps(answer).encode("utf-8"))
+            with contextlib.suppress(Exception):
+                self._http_fn(
+                    endpoint_url,
+                    answer,
+                    headers=headers,
+                    timeout=timeout,
+                    max_bytes=MCP_MAX_OUTPUT_BYTES,
+                )
+        return sent
 
     def _end_http_session(
         self,
@@ -827,7 +907,11 @@ class McpConnectorExecutor:
 
     # ── stdio session ──
     def _run_session(
-        self, command: list[str], requests: list[dict[str, Any]], timeout: float
+        self,
+        command: list[str],
+        requests: list[dict[str, Any]],
+        timeout: float,
+        ctx: _SessionCtx | None = None,
     ) -> tuple[dict[Any, dict[str, Any]], int, int]:
         """Run a bounded, non-interactive JSON-RPC stdio session.
 
@@ -872,8 +956,22 @@ class McpConnectorExecutor:
                 message = json.loads(line)
             except ValueError:
                 continue
-            if isinstance(message, dict) and "id" in message:
+            # BUG-234 — the same direction check the HTTP path makes, for the
+            # same reason: a local server that pings the client during the
+            # handshake used its own id 1, which landed on top of the initialize
+            # answer and failed the read as `mcp_initialize_failed`.
+            #
+            # A stdio session cannot *answer*. Every request is written up front
+            # and stdin is then closed so the server drains and exits, which is
+            # what makes the session bounded and non-interactive; holding stdin
+            # open to reply would make it neither. So the message is kept out of
+            # the response map and named on the card, and the server is told
+            # nothing rather than told the wrong thing.
+            kind = classify_jsonrpc(message)
+            if kind == "response":
                 responses[message["id"]] = message
+            elif kind in ("request", "notification") and ctx is not None:
+                ctx.note_server_request(str(message.get("method", "")))
         return responses, bytes_in, bytes_out
 
     def _record_connection(
@@ -949,6 +1047,84 @@ class McpConnectorExecutor:
             summary="MCP connector runtime failed closed.",
             artifacts={},
         )
+
+
+#: JSON-RPC's own code for "this receiver does not implement that method". It is
+#: the answer the specification requires from a client asked for a capability it
+#: did not declare, and it is a *complete* answer rather than a failure: the
+#: server learns it must not wait, and may carry on without the thing it asked
+#: for. Silence — which is what Raiker sent — leaves the server holding a
+#: request until it times out.
+JSONRPC_METHOD_NOT_FOUND = -32601
+
+#: The one server-initiated request Raiker answers with a result. `ping` asks
+#: only whether the peer is alive, grants nothing, reads nothing, and its result
+#: is defined to be empty — so answering it costs nothing and refusing it would
+#: be a lie about a connection that plainly is alive.
+_ANSWERABLE_SERVER_METHODS: frozenset[str] = frozenset({"ping"})
+
+
+def classify_jsonrpc(message: Any) -> str:
+    """Which of JSON-RPC's four message shapes this is.
+
+    BUG-234, and the defect underneath the missing capability. Both transports
+    filed *every* message carrying an ``id`` into the response map:
+
+    ```python
+    if isinstance(message, dict) and "id" in message:
+        responses[message["id"]] = message
+    ```
+
+    A server-initiated request carries an ``id`` too — from the **server's** own
+    numbering space, which starts wherever the server likes and commonly at 1.
+    Raiker's own initialize is id 1 and its tools/list is id 2, so a conformant
+    server that pings the client, or asks it to elicit, during the handshake
+    overwrote the answer to one of them. The read then failed as
+    ``mcp_initialize_failed`` or ``mcp_list_tools_failed`` — a reason that names
+    Raiker's request and blames the server for not answering it, about a server
+    that had answered correctly.
+
+    The discriminator is ``method``, never the id: an id says who a message is
+    *about*, and only ``method`` says which direction it is going.
+    """
+    if not isinstance(message, dict):
+        return "invalid"
+    has_method = isinstance(message.get("method"), str) and bool(message["method"])
+    has_id = "id" in message and message["id"] is not None
+    if has_method:
+        return "request" if has_id else "notification"
+    if has_id:
+        return "response"
+    return "invalid"
+
+
+def server_request_answer(message: dict[str, Any]) -> dict[str, Any]:
+    """The answer Raiker owes a server-initiated request.
+
+    `ping` gets an empty result. Everything else gets ``-32601``, because Raiker
+    declares no client capabilities in its handshake and a server must not ask
+    for one that was not declared — so the honest answer is that the method is
+    not implemented here, said in the code the specification reserves for it.
+
+    **This is deliberately not a hook for capability.** Answering
+    ``elicitation/create`` or ``sampling/createMessage`` for real would put a
+    connected server in the position of composing a question the owner is shown,
+    or of spending a model turn Raiker's policy never saw — a different
+    authority object from a tool call the owner approved, and one that needs its
+    own answer before any code. Until that answer exists, "not implemented" is
+    the truthful reply and the card names what was asked for.
+    """
+    method = str(message.get("method", ""))
+    if method in _ANSWERABLE_SERVER_METHODS:
+        return {"jsonrpc": "2.0", "id": message["id"], "result": {}}
+    return {
+        "jsonrpc": "2.0",
+        "id": message["id"],
+        "error": {
+            "code": JSONRPC_METHOD_NOT_FOUND,
+            "message": f"Raiker declared no client capability for '{method}'.",
+        },
+    }
 
 
 def _rpc(request_id: int, method: str, params: dict[str, Any]) -> dict[str, Any]:
@@ -1088,34 +1264,100 @@ def _call_result_text(responses: dict[Any, dict[str, Any]]) -> str:
     return text
 
 
+def _parse_sse(body: str) -> tuple[list[dict[str, Any]], str | None]:
+    """Parse a `text/event-stream` body into its messages and its last event id.
+
+    BUG-234. Raiker treated every `data:` line as a complete JSON message and
+    ignored every other field, which is wrong in two ways a conformant server
+    will exercise:
+
+    * **One event's payload may span several `data:` lines.** The format joins
+      them with a newline and dispatches the result at the blank line, so a
+      sender may break wherever the payload already has a newline — which is
+      what a server that pretty-prints its JSON-RPC does, and plenty do, because
+      the wire gets read by people. Raiker parsed each line on its own; every
+      one was a fragment, every parse failed, and each was dropped silently, so
+      the read failed as `mcp_initialize_failed` or `mcp_list_tools_failed`
+      while the server had answered correctly.
+    * **`id:` is the resumption point.** The stream carries an id per event so a
+      client that loses the connection can say where it got to. Raiker dropped
+      it, so the one re-handshake it performs after a dropped session
+      (FIXED-378) restarted from nothing and asked the server to do the work
+      again.
+
+    Returns the parsed JSON messages in stream order and the last event id seen,
+    or ``None`` when the stream carried none.
+    """
+    messages: list[dict[str, Any]] = []
+    last_event_id: str | None = None
+    data_lines: list[str] = []
+
+    def dispatch() -> None:
+        if not data_lines:
+            return
+        payload = "\n".join(data_lines)
+        data_lines.clear()
+        with contextlib.suppress(ValueError):
+            parsed = json.loads(payload)
+            if isinstance(parsed, dict):
+                messages.append(parsed)
+            elif isinstance(parsed, list):
+                messages.extend(m for m in parsed if isinstance(m, dict))
+
+    # The format's line terminators are CRLF, LF or CR, and a blank line ends an
+    # event. `splitlines` handles all three; a trailing event with no blank line
+    # after it is dispatched at the end, because a bounded read may stop there.
+    for raw_line in body.splitlines():
+        line = raw_line.rstrip("\r")
+        if line == "":
+            dispatch()
+            continue
+        if line.startswith(":"):
+            continue  # A comment, which is how a server keeps the stream warm.
+        field, _, value = line.partition(":")
+        if value.startswith(" "):
+            value = value[1:]
+        if field == "data":
+            data_lines.append(value)
+        elif field == "id" and "\x00" not in value:
+            last_event_id = value
+    dispatch()
+    return messages, last_event_id
+
+
 def _parse_jsonrpc_body(body: str) -> list[dict[str, Any]]:
     """Parse a JSON-RPC HTTP response body into messages, tolerating a single
-    object, a JSON array, SSE ``data:`` framing, or newline-delimited JSON."""
+    object, a JSON array, SSE framing, or newline-delimited JSON."""
+    return _parse_jsonrpc_messages(body)[0]
+
+
+def _parse_jsonrpc_messages(body: str) -> tuple[list[dict[str, Any]], str | None]:
+    """As :func:`_parse_jsonrpc_body`, and the stream's last event id beside it.
+
+    The id exists only in the event-stream framing; every other shape answers
+    ``None``, which is what "there is nothing to resume from" means.
+    """
     body = body.strip()
     if not body:
-        return []
+        return [], None
     stripped = body.lstrip()
-    if stripped.startswith(("event:", "data:", ":")):
-        out: list[dict[str, Any]] = []
-        for line in body.splitlines():
-            line = line.strip()
-            if line.startswith("data:"):
-                with contextlib.suppress(ValueError):
-                    out.append(json.loads(line[5:].strip()))
-        return out
+    if stripped.startswith(("event:", "data:", "id:", "retry:", ":")):
+        return _parse_sse(body)
     try:
         parsed = json.loads(body)
     except ValueError:
         parsed = None
     if isinstance(parsed, dict):
-        return [parsed]
+        return [parsed], None
     if isinstance(parsed, list):
-        return [m for m in parsed if isinstance(m, dict)]
-    out = []
+        return [m for m in parsed if isinstance(m, dict)], None
+    out: list[dict[str, Any]] = []
     for line in body.splitlines():
         line = line.strip()
         if not line:
             continue
         with contextlib.suppress(ValueError):
-            out.append(json.loads(line))
-    return out
+            message = json.loads(line)
+            if isinstance(message, dict):
+                out.append(message)
+    return out, None

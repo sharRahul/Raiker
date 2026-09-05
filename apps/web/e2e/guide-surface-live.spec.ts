@@ -15,7 +15,7 @@ import { signInAsOwner } from "./hosted-provider";
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
 
-test("the guide opens from the sidebar and from a deep link", async ({ page }) => {
+test("the guide opens from the gear's window and from a deep link", async ({ page }) => {
   test.setTimeout(300_000);
   const consoleErrors: string[] = [];
   page.on("console", (m) => {
@@ -28,8 +28,21 @@ test("the guide opens from the sidebar and from a deep link", async ({ page }) =
   // then assumed the remaining stages came in a fixed order.
   await signInAsOwner(page, BASE);
 
-  // Reachable the way an owner would reach it: a sidebar destination.
-  await page.getByRole("link", { name: "Guide" }).click();
+  // Reachable the way an owner would reach it — which changed, and this spec did
+  // not. The Guide was a sidebar destination until the sidebar kept only the
+  // work (Core and Knowledge) and everything you set up once moved behind the
+  // gear. `getByRole("link", { name: "Guide" })` then waited out its full
+  // five-minute timeout for a link that is no longer drawn, and blamed the
+  // click. Same shape as the five sweeps whose route lists had gone stale
+  // (FIXED-416): a harness asserting a shell that had moved under it.
+  //
+  // The gear's own window is the route now, so this still tests reachability
+  // rather than a hash somebody typed — which is what the deep link below is
+  // for.
+  await page.getByRole("button", { name: "Settings and pages" }).click();
+  const allPages = page.getByRole("dialog");
+  await expect(allPages).toBeVisible({ timeout: 30_000 });
+  await allPages.getByRole("link", { name: "Guide" }).click();
   await expect(page.getByRole("region", { name: "Guide" })).toBeVisible({ timeout: 60_000 });
 
   const sections = page.locator(".guide-sections button");

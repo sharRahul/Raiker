@@ -85,7 +85,7 @@ names.
 | [BUG-227](FIXED_ITEMS.md#fixed-366--build-could-read-a-repository-and-not-understand-it) | Low | Plugins / language intelligence | **Closed 2026-09-03 (FIXED-366)** — its first question was a scope decision, and the answer is no: Raiker does not want an LSP client. B10's tool set ships without one and both plugin specs state what that costs |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
 | [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in) | Low | Live test harness | **Closed 2026-08-30 (FIXED-324)** — every live spec with a sign-in function delegates to the shared helper. The per-spec password that stops two specs sharing a workspace is a different defect, [BUG-247](#bug-247--every-live-spec-brings-its-own-owner-password) |
-| [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced twice on 2026-09-04 ([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport), [FIXED-387](FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six)). The transport conforms, the card names what a server offers and Raiker does not use, and every content-block shape a result may carry now reaches the model; SSE **streaming**, remote OAuth, MCP Apps and elicitation remain |
+| [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced twice on 2026-09-04 ([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport), [FIXED-387](FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six)) and twice again on 2026-09-05 ([FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own), [FIXED-412](FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped)). The transport conforms, the card names what a server offers and Raiker does not use, every content-block shape reaches the model, a server-initiated request is answered rather than mistaken for a response, and an event stream is read and resumed correctly; **incremental** delivery, remote OAuth, MCP Apps and elicitation's owner-facing half remain |
 | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths), [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Low | Governance architecture / documentation | Open — not duplicated here. GEP-02 is **an owner decision** and the helper now carries the answer at no cost |
 | [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open remainder — the live half closed 2026-08-30 as [FIXED-322](FIXED_ITEMS.md#fixed-322--permissions-said-off-about-a-capability-that-would-have-run): Permissions now reports what the enforcing path answers. Unifying the three resolutions is still **an owner decision** |
 | [BUG-240](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered) | Medium → Low | Memory / retrieval | **Closed 2026-08-26 (FIXED-292, FIXED-294)** — both the provider half and the managed-file half ship; the row is kept so a reader arriving with the number is not left wondering |
@@ -105,7 +105,7 @@ names.
 | [BUG-282](FIXED_ITEMS.md#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier) | Medium | Documentation / memory | **Closed 2026-09-04 ([FIXED-393](FIXED_ITEMS.md#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier))** — the guide told owners semantic recall was half-built, nine days after FIXED-292 finished it |
 | [BUG-283](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others) | Low | Web UI / information architecture | **Closed 2026-09-04 ([FIXED-394](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others))** — 244 words of explanation to the guide, one contract that was stated twice, and two tabs that were copies of other surfaces |
 | [BUG-284](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything) | Medium | Web UI / responsive layout | **Closed 2026-09-04 ([FIXED-395](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything))** — found by running the width sweep against a workspace that had been worked in; reproduced on unmodified `main` |
-| [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — **a third round blocked on the same value, 2026-09-04**. The key supplied for this round is identity-linked too, and re-establishing that found [FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network): Raiker had been answering the provider's actual refusal with "check your network" |
+| [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — **a fourth round blocked on the same value, 2026-09-05**; confirmed in two requests rather than a round. The key supplied for this round is identity-linked too, and re-establishing that found [FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network): Raiker had been answering the provider's actual refusal with "check your network" |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-04 to **twelve**; eight more converted and each re-run against a used workspace, three must keep their own |
@@ -561,8 +561,35 @@ its own owner password, so two specs cannot share one workspace. That is
 ## BUG-234 — The remainder: what Raiker does not use of the MCP revision it now speaks
 
 **Severity: Low (was Medium). Area: MCP / interoperability.
-Status: Open — reduced 2026-08-23, again 2026-09-04 (transport), and again
-2026-09-04 (result shapes).**
+Status: Open — reduced 2026-08-23, twice on 2026-09-04 (transport, result
+shapes), and twice again on 2026-09-05 (server-initiated requests, event-stream
+framing).**
+
+**Reduced again 2026-09-05, and the first of the two was a defect rather than a
+gap.** Reading this entry's *streaming* bullet led to the code that reads a
+stream, and two things there were wrong rather than merely unbuilt:
+
+* **[FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own)
+  — a server that asked Raiker anything could not be connected at all.** Both
+  transports filed every message carrying an `id` into the response map, and a
+  server-initiated request carries an id from the *server's* numbering space.
+  One numbered 1 — the ordinary choice — landed on top of the `initialize`
+  answer, and the connection failed as `mcp_initialize_failed`: Raiker's own
+  request named, and the server blamed for not answering it. Reproduced on
+  unmodified `main`. Direction is read from `method` now, `ping` is answered,
+  and everything else is refused with `-32601` and **named on the card** rather
+  than met with silence.
+* **[FIXED-412](FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped)
+  — an event stream was read one line at a time.** One event's payload may span
+  several `data:` lines, which is what a server that pretty-prints its JSON-RPC
+  produces; each line was parsed alone, failed, and was dropped. `id:` was
+  dropped too, so the single re-handshake after a dropped session restarted from
+  nothing. There is a real event-stream parser now, and `Last-Event-ID` on the
+  one request that resumes.
+
+Neither closes the *streaming* bullet below, and neither pretends to: Raiker
+still reads a bounded response whole and holds no connection between turns, and
+the card still says so.
 
 **What changed.** Raiker negotiated revision `2024-11-05` for five revisions,
 which meant a server implementing only the current one could not be connected at
@@ -588,8 +615,16 @@ following was previously *blocked* by the version pin and is now ordinary work:
 * **Streamable HTTP streaming.** Raiker's `http` transport is its own bounded
   JSON-RPC client. It reads an `text/event-stream` answer whole rather than
   streaming it, and holds no open connection between turns: no incremental
-  delivery, no resumability, no server-initiated messages. A server that answers
-  this way is **named as such on its card** rather than silently degraded.
+  delivery. A server that answers this way is **named as such on its card**
+  rather than silently degraded. **Two of the four things this bullet listed are
+  now done** — the framing is read correctly and resumably
+  ([FIXED-412](FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped))
+  and server-initiated messages are answered rather than mis-filed
+  ([FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own)).
+  Incremental delivery and a connection that outlives the turn are what is left,
+  and both are a different object from a bounded governed read: a stream held
+  open between turns is a standing inbound channel, and it needs its own answer
+  to what may arrive on it while nobody is looking.
 * **Remote OAuth.** The authorisation flow the current revision defines. Raiker's
   remote transport takes an owner token from an env var named by `auth_ref`.
 * **MCP Apps ([SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp)).**
@@ -609,7 +644,14 @@ following was previously *blocked* by the version pin and is now ordinary work:
   — and it is still not built. What it needs is an answer to *whose* question a
   server's elicitation is: `ask_owner_question` carries no authority because
   Raiker's own runtime raised it, and a question a connected server composes is a
-  different object.
+  different object. **The wire half is now in place and deliberately stops
+  short**: since
+  [FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own)
+  an `elicitation/create` reaches Raiker as the request it is, is answered
+  `-32601`, and is named on the server's card — so an owner can see a server
+  asking and see that it was refused. Wiring it to a person is the part that
+  still needs the answer above, and `sampling/createMessage` needs the same one
+  about a turn the owner's policy never reviewed.
 * **`server/discover`.** Not implemented, and not urgent: every server an owner
   can add today is added by the owner naming it.
 
@@ -1017,6 +1059,34 @@ covered by unit and API tests
 surfaces themselves were walked live at four widths with no console error. What
 is missing is the end-to-end evidence a FIXED entry is normally held to: a real
 turn, in a real thread, on a real provider.
+
+**Re-attempted 2026-09-05 (fourth round), and blocked on the same value for the
+fourth time — but the check is now two commands rather than a round.** The key
+supplied for this round is identity-linked as well:
+
+```
+$ curl -s -o /dev/null -w '%{http_code}' https://api.anthropic.com/v1/models \
+    -H "x-api-key: $KEY" -H 'anthropic-version: 2023-06-01'
+400   # "This API key is not scoped to a workspace, so this request must
+      #  include the anthropic-workspace-id header…"
+$ curl -s -o /dev/null -w '%{http_code}' \
+    https://api.anthropic.com/v1/organizations/workspaces -H "x-api-key: $KEY"
+403   # "Missing permissions."
+```
+
+Same shape as the second and third rounds, and the same conclusion: **the id
+cannot be recovered from the credential**, so the workspace id has to come from
+whoever issued the key. Raiker's half is done —
+[FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one)
+gives the connection a **Workspace ID** field and
+[FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network)
+makes the refusal read as itself. What is missing is a value only the key's
+owner has.
+
+This round did not attempt the three scenarios blind. It confirmed the block in
+two requests, said so, and spent the round on work that could be finished — which
+is what the entry's own note that *"the blocked scenario is expensive; the
+attempt is not"* is for.
 
 **Re-attempted 2026-09-04 (third round), and still blocked on the same value —
 but the attempt was not wasted.** The key supplied for this round is

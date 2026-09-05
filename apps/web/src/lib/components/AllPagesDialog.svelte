@@ -78,8 +78,14 @@
     base.push({
       id: "settings-sections" as never,
       label: "Settings",
+      // `?tab=`, not `?section=`. This emitted `?section=` and `tabFromHash`
+      // reads `?tab=`, so every one of these ten rows opened Settings on
+      // **General** — and since Settings left the sidebar, the gear's window is
+      // the only route to it, so the whole destination was reachable only at its
+      // first panel. Exactly the failure `nav.test.ts` names: "a deep link that
+      // lands on the wrong page looks exactly like one that works."
       items: (HUB_TABS.settings ?? []).map((section) => ({
-        href: `#/settings?section=${section}`,
+        href: `#/settings?tab=${section}`,
         id: `settings-${section}`,
         label: SETTINGS_LABELS[section] ?? section,
         hint: "",

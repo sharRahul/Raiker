@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-05 | Targeted + derived four-width sweep + full page sweep | `pages/` | Anthropic, a fourth **identity-linked** key — blocked in two requests rather than a round | A stop switch that shouts on every page, a Hub failure nobody was told about, two kinds of deep link that opened the wrong page, and the nine guards that were supposed to catch them |
 | 2026-09-04 (fourth) | Targeted + measured four-width sweep | `pages/` | — (no model needed) | Two tabs folded out of the nav, 244 words moved to the guide, and three mobile bleeds the width sweep found only because the workspace had been worked in |
 | 2026-09-04 (third) | Targeted + measured four-width sweep + full page sweep | `bug-276-`, `bug-277-`, `bug-278-`, `pages/` | Anthropic, a third **identity-linked** key entered through the interface | A telemetry cadence that runs without a button, and three defects the round found in the product by using it: a valid key answered with "check your network", twenty-six connectors that said they were installed, and a "next run" printed as a full timestamp |
 | 2026-09-04 (second) | Targeted + measured four-width sweep | `widths/`, `anthropic-identity-linked-key` | Anthropic, the same **identity-linked** key entered through the interface | Five priority items landed and measured live, and two interface defects the sweep itself found: a model picker that called a provider unreachable after it had answered, and a control that drew nothing |
@@ -62,6 +63,145 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-09-05 — Six things the product was quietly wrong about, and the guards that should have found them
+
+**Tier: Targeted + a derived four-width sweep + the full page sweep. Build:
+production `npm run build`. Providers: Anthropic, a fourth identity-linked key.
+Owner: the shared `OWNER_CREDENTIALS`. Screenshots:
+[`screenshots/pages/`](screenshots/pages), recaptured in full and renamed by
+destination.**
+
+**The provider leg was two commands, not a round.** The key supplied for this
+round is identity-linked like the previous three: `/v1/models` answers `400`
+*"not scoped to a workspace"* and `/v1/organizations/workspaces` answers `403`,
+so the workspace id is again not recoverable from the credential.
+[BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)
+is blocked for a fourth time on the same missing value, and the round said so and
+moved on rather than attempting the three model-dependent scenarios blind.
+
+**It was still entered through the interface, and that re-proved two fixes on a
+fourth key.** Connected from **Models → Hosted → Anthropic → Connect**; the card
+read *"Connection saved"* and the setup meter moved to *1 of 14 connected*. Then
+**Test**, and the card answered with the provider's actual refusal rather than a
+network story:
+
+> Anthropic: This key is identity-linked, so it acts inside one workspace. Add
+> the workspace ID to this connection — it is beside the key in the provider's
+> console — then connect again. **The key you pasted is fine.**
+
+That is [FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network)
+holding on a key it was not written against, and
+[FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one)'s
+repair sitting on the card where the refusal is read: **Add workspace ID**
+reveals the field in place, and the field is offered by the refusal rather than
+carried on the connect dialog for every owner who will never need it. The
+connection could not be completed, because the value the field wants is the one
+only the key's issuer has.
+
+**What the round did instead: it walked the product.** Every destination, every
+hub tab, at 360, 768, 1024 and 1440. That found four defects, and then a fifth
+underneath them.
+
+* **The STOP switch was red on every page, forever, and could not say what it
+  would reach.** Press, confirm a dialog about cancelling everything at a safe
+  boundary, wait, and be told *"No active tasks to stop."* On a 360px header the
+  pill took a third of the width to do it.
+  [FIXED-413](FIXED_ITEMS.md#fixed-413--the-stop-switch-shouted-on-every-page-and-could-not-say-what-it-would-reach).
+* **The Hugging Face tab answered an unreachable Hub with the copy for an
+  untouched panel.** This host has no route to `huggingface.co`; the trending
+  read answered `503`, the failure was swallowed, and the panel said *"Search
+  the Hub catalogue"* — which is what it says when nothing has been asked for
+  yet. The only trace was a console `503`.
+  [FIXED-414](FIXED_ITEMS.md#fixed-414--the-hub-could-not-be-reached-and-the-panel-said-search-the-catalogue).
+* **`#/extensions/mcp` opened the Workbench.** The sweep addressed all 28 hub
+  tabs by path segment and got 28 byte-identical captures of the Workbench back.
+  [FIXED-415](FIXED_ITEMS.md#fixed-415--a-hub-tab-addressed-as-a-path-opened-the-workbench).
+* **Both "every page" sweeps had stopped covering every page.** Each carried a
+  hand-copied route list; both swept two routes that no longer exist and missed
+  twenty that do — Design, Messaging, the Guide, all six Models tabs and all ten
+  Settings sections. `all-pages-live` even carried a comment, written the last
+  time this happened, saying a sweep is only a sweep if it covers every tab.
+  Both lists are derived from the nav registry now.
+  [FIXED-416](FIXED_ITEMS.md#fixed-416--both-every-page-sweeps-had-stopped-covering-every-page).
+* **And the guide described a shell that had moved.** Found while writing up the
+  first of those: six sidebar groups that do not exist, a theme toggle that is
+  not in the top bar, and an Extensions tab that became its own destination —
+  in the page a new owner reads first.
+  [FIXED-417](FIXED_ITEMS.md#fixed-417--the-guides-tour-of-the-shell-described-a-shell-that-had-moved).
+
+**Then two more, from running the guide specs after editing the guide.** The
+sweeps' route lists were one layer of drift; their *assertions* were the next.
+
+* **The only route to Settings opened its first panel, ten times over.** The
+  gear's window lists Settings as its ten sections, and every row emitted
+  `#/settings?section=` while the router reads `?tab=`. Clicking **Privacy**
+  rendered General. Since Settings left the sidebar that window is the only
+  link to it, so the destination was reachable only at General.
+  [FIXED-418](FIXED_ITEMS.md#fixed-418--every-settings-section-opened-general-on-the-only-route-to-settings).
+  Found by writing a navigation assertion the obvious way and having it fail for
+  a reason that turned out to be a different defect underneath.
+* **Four live guards had gone stale and could not say so.**
+  `guide-surface-live` clicked a sidebar link named "Guide" — which moved behind
+  the gear — and spent its full five-minute timeout on it;
+  `bug-61-guide-accuracy-live` asserted five destinations are on the rail when
+  they are behind the gear, and asked for an MCP notice the product deliberately
+  removed as a duplicate. None had failed *visibly*, and that is the part worth
+  keeping: the file is serial and its first two tests need a provider, so on any
+  host without one the six that need no model never ran at all.
+  [FIXED-419](FIXED_ITEMS.md#fixed-419--four-live-guards-had-gone-stale-and-could-not-say-so).
+  That file now reads **4 passed, 5 skipped with the reason, 0 failed** on this
+  host, where it was 1 failed and 7 never reached.
+
+**And two in the MCP client, reached from a plan entry rather than from the
+screen.** Reading
+[BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks)'s
+*streaming* bullet led to the code that reads a stream, and two things there
+were defects rather than unbuilt capability. Both were **reproduced on
+unmodified `main`**:
+
+* A server that answers the handshake and then asks Raiker anything — a `ping`,
+  an `elicitation/create` — could not be connected at all. Its request carried
+  an id from its own numbering space, landed on top of Raiker's `initialize`
+  answer, and the connection failed as `mcp_initialize_failed`.
+  [FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own).
+* A server that pretty-prints its JSON-RPC was unreadable. One event's payload
+  may span several `data:` lines; each was parsed alone, failed, and was
+  dropped.
+  [FIXED-412](FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped).
+
+**What was measured, and passed.**
+
+* The width sweep found **no horizontal bleed** on any of the 40 destinations at
+  any of the four widths — after the four fixes, and after
+  [FIXED-395](FIXED_ITEMS.md) closed the last three. It is a spec now rather than
+  a thing somebody remembers to do, and it asserts the property rather than
+  comparing a picture, so it is re-runnable against a workspace that has been
+  worked in.
+* The theme sweep passed on all 40 destinations in explicit light and dark —
+  twenty of them for the first time.
+* The page sweep captured all 40 with no unexplained console error. The one
+  console error on this host is the Hub `503`, and it is allowed only while the
+  panel is telling the owner the Hub could not be reached: a silent panel and a
+  `503` still fails.
+* The guide specs: `guide-surface-live` green in 23 seconds (from a five-minute
+  timeout), and `bug-61-guide-accuracy-live` green on everything a host without a
+  provider can run.
+* Live verification of each fix at 360 and 1440, by screenshot and by reading the
+  rendered attributes: the stop switch idle (`Stop all work (nothing is
+  running)`, no `live` class) and with three active tasks (`STOP 3`, and a dialog
+  reading *"This stops 3 tasks"*); `#/extensions/mcp` opening Extensions;
+  *"Hugging Face could not be reached"* on the Models tab; and **Privacy** in the
+  gear's window opening Privacy rather than General.
+
+**A note on one photograph.** The red, counted state of the stop switch was
+captured with the task list served from a fixture. This host has no model that
+can answer — the round's key is workspace-scoped — so a real queued task cannot
+be created, and the count is the only thing that photograph is of. The behaviour
+itself is covered by eleven component tests against the real component and the
+real `isActiveTask`.
 
 ---
 

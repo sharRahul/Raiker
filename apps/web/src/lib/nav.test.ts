@@ -7,6 +7,7 @@ import {
   NAV_ITEMS,
   navItem,
   routeFromHash,
+  sectionFromHash,
   tabFromHash,
 } from "./nav";
 
@@ -220,5 +221,80 @@ describe("settings sections and their deep links", () => {
   it("still falls back to General for a section that does not exist", () => {
     expect(tabFromHash("#/settings?tab=nonsense")).toBe("general");
     expect(tabFromHash("#/settings")).toBe("general");
+  });
+});
+
+// Found live 2026-09-05, walking every destination at four widths. A hub tab is
+// written `#/extensions?tab=mcp` everywhere in this app, and `#/extensions/mcp`
+// — the form every other product uses, and the one a person guesses or types
+// from memory — was not a route at all, so `routeFromHash` fell through to
+// `DEFAULT_ROUTE` and the Workbench opened. That is precisely the failure
+// `HUB_TAB_ALIASES` exists to prevent one level down: a link that looks like it
+// works and lands somewhere else.
+describe("a hub tab addressed as a path segment", () => {
+  it("opens the hub and its tab rather than the Workbench", () => {
+    for (const [route, tabs] of Object.entries(HUB_TABS)) {
+      for (const tab of tabs) {
+        expect(routeFromHash(`#/${route}/${tab}`)).toBe(route);
+        expect(tabFromHash(`#/${route}/${tab}`)).toBe(tab);
+      }
+    }
+  });
+
+  it("reads the same aliases the query form does", () => {
+    expect(tabFromHash("#/models/providers")).toBe("local");
+    expect(tabFromHash("#/observe/diagnostics")).toBe("overview");
+  });
+
+  it("falls back to the hub's first panel for a segment it does not have", () => {
+    expect(routeFromHash("#/extensions/nonsense")).toBe("extensions");
+    expect(tabFromHash("#/extensions/nonsense")).toBe("connectors");
+  });
+
+  it("lets the query win when a hash somehow carries both", () => {
+    expect(tabFromHash("#/extensions/skills?tab=mcp")).toBe("mcp");
+  });
+
+  it("leaves a route with no tabs alone", () => {
+    expect(routeFromHash("#/tasks/anything")).toBe("tasks");
+    expect(tabFromHash("#/tasks/anything")).toBeNull();
+  });
+
+  it("does not mistake a query-only deep link for a segment", () => {
+    expect(routeFromHash("#/new-chat?session=sess_1")).toBe("new-chat");
+    expect(tabFromHash("#/new-chat?session=sess_1")).toBeNull();
+  });
+});
+
+// Found live 2026-09-05, by chasing a wrong assertion of my own in
+// `bug-61-guide-accuracy-live`. The gear's window emitted
+// `#/settings?section=privacy` and `tabFromHash` reads `?tab=`, so all ten
+// Settings rows opened **General** — and since Settings left the sidebar, that
+// window is the *only* route to it, so the destination was reachable only at
+// its first panel. The guard above already says what that looks like: "a deep
+// link that lands on the wrong page looks exactly like one that works."
+//
+// The emitter is fixed. This closes the class rather than the instance: three
+// spellings reach one panel, and no future surface can pick the wrong one.
+describe("a settings section addressed the other way", () => {
+  it("reads ?section= as the tab it names", () => {
+    for (const section of HUB_TABS.settings) {
+      expect(tabFromHash(`#/settings?section=${section}`)).toBe(section);
+    }
+  });
+
+  it("lets ?tab= win when a hash carries both", () => {
+    expect(tabFromHash("#/settings?section=privacy&tab=account")).toBe("account");
+  });
+
+  it("leaves the guide's own ?section= alone", () => {
+    // `sectionFromHash` is what the guide reads, and the guide has no tabs, so
+    // `tabFromHash` answers null for it either way.
+    expect(sectionFromHash("#/guide?section=getting-started")).toBe("getting-started");
+    expect(tabFromHash("#/guide?section=getting-started")).toBeNull();
+  });
+
+  it("still falls back to General for a section that does not exist", () => {
+    expect(tabFromHash("#/settings?section=nonsense")).toBe("general");
   });
 });

@@ -82,7 +82,9 @@ Every run stays governed: it uses the same policy, approval, and audit path as
 Chat, and stops at a safe boundary rather than being killed.
 
 The global **STOP** switch in the top bar requests cancellation of every queued,
-running, or paused task at once — governed and audited, not a force-kill.
+running, or paused task at once — governed and audited, not a force-kill. It
+states how many it would reach before you press it, and with nothing running it
+is a quiet icon rather than a red one.
 
 ## Projects
 

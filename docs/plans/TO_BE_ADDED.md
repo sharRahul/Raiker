@@ -1094,8 +1094,8 @@ the dark surface.
 assertion-only breakpoint coverage at 768/834, 1024, and 1440; left/right rail state
 combinations; independent scrolling; focus trap/restoration; reduced motion;
 keyboard-only reveal; no horizontal overflow; token-value assertions; contrast
-checks; and zero console errors. The current 208-image catalogue is documented
-under [`screenshots/`](screenshots/README.md#current-adaptive-shell-catalogue--2026-09-03).
+checks; and zero console errors. The current 320-image catalogue is documented
+under [`screenshots/`](screenshots/README.md#current-adaptive-shell-catalogue--2026-09-05).
 
 ---
 

@@ -4323,10 +4323,10 @@ class DashboardService:
                     "supports_approvals": bool(profile.raw.get("supports_approvals")),
                     # What this transport needs from the owner's environment,
                     # declared on the profile rather than known only to the
-                    # guide — the idea is Hermes Agent's `plugin.yaml`
-                    # `requires_env`/`optional_env`, which drives its setup
-                    # wizard. `present` is a boolean: Raiker takes variable
-                    # names and never values, and that holds on the way out too.
+                    # guide, so the setup surface can read it instead of the
+                    # owner hunting through prose. `present` is a boolean:
+                    # Raiker takes variable names and never values, and that
+                    # holds on the way out too.
                     "env_requirements": _env_requirements(profile.raw),
                 }
             )

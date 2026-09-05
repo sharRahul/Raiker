@@ -1,20 +1,23 @@
 <script lang="ts">
   /**
-   * Design — generate an image, and see what you have generated.
+   * Design — describe an image, and it answers with one.
    *
-   * The page is deliberately small: a prompt, a provider, a size, and a
-   * gallery. What it does *not* do is hide the governed path underneath it.
-   * Generating an image is a hosted model call, so it can be refused by the
-   * capability gate, by an empty egress allowlist, or by a missing credential —
-   * three different states with three different remedies, and a page that
-   * collapsed them into "couldn't generate" would send the owner hunting.
+   * This was a form over a gallery: a textarea, two selects, a Generate button,
+   * and a grid of results underneath. That shape is wrong for what the page
+   * actually is. Asking a model for an image is the same act as asking it for
+   * prose or for a patch — you say something, it answers, you look at the answer
+   * and say the next thing — so it belongs beside Chat and Build in the
+   * navigation and it uses their composer, not a second kind of input.
    *
-   * A refusal is a *record*, not an absence. The runtime writes one for every
-   * attempt, so the gallery shows what was refused and why beside what worked.
-   * An owner who pressed Generate and got nothing should find the answer here
-   * rather than in the audit log.
+   * The transcript reads oldest to newest, and a refusal is a turn in it rather
+   * than an absence. Generating an image is a hosted model call, so it can be
+   * refused by the capability gate, by an empty egress allowlist, or by a
+   * missing credential — three states with three different remedies. The runtime
+   * records every attempt, so the answer to "I pressed Generate and got nothing"
+   * is in the thread, at the point it happened, and not in the audit log.
    */
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
+  import Composer from "../components/Composer.svelte";
   import Icon from "../components/Icon.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import PageState from "../components/PageState.svelte";
@@ -30,6 +33,7 @@
   let models = $state<ModelsView | null>(null);
   let busy = $state(false);
   let failure = $state<string | null>(null);
+  let threadEl = $state<HTMLDivElement | undefined>();
 
   let prompt = $state("");
   let profileId = $state("");
@@ -51,6 +55,12 @@
   const imageProfiles = $derived(
     (models?.profiles ?? []).filter((profile) => Boolean(profile.image_model)),
   );
+
+  /**
+   * Oldest first, the way every other transcript in the product reads. The API
+   * answers newest-first because it was written for a gallery.
+   */
+  const turns = $derived([...(view?.generations ?? [])].reverse());
 
   const REASONS: Record<string, string> = {
     disabled_by_capability_gate:
@@ -82,6 +92,11 @@
     return code;
   }
 
+  async function toLatest() {
+    await tick();
+    if (threadEl) threadEl.scrollTop = threadEl.scrollHeight;
+  }
+
   async function load() {
     try {
       view = await api.images();
@@ -91,7 +106,7 @@
       view = null;
       loadError = error instanceof ApiError ? error.message : "Generations are unavailable.";
     }
-    // Neither of these may take the page down: the gallery is still readable
+    // Neither of these may take the page down: the thread is still readable
     // without them, and a failed gate read must not be reported as a refusal.
     try {
       gates = await api.capabilityGates();
@@ -104,11 +119,11 @@
     } catch {
       models = null;
     }
+    await toLatest();
   }
 
-  async function generate(event: SubmitEvent) {
-    event.preventDefault();
-    if (!prompt.trim() || !profileId) return;
+  async function generate() {
+    if (!prompt.trim() || !profileId || busy || block.kind !== "none") return;
     busy = true;
     failure = null;
     try {
@@ -119,137 +134,232 @@
         error instanceof ApiError ? readable(error.reasonCode ?? null) : "That request failed.";
     } finally {
       busy = false;
-      // Reloaded either way: a refusal is recorded, so the gallery is where the
+      // Reloaded either way: a refusal is recorded, so the thread is where the
       // owner reads what happened even when this attempt failed.
       await load();
+    }
+  }
+
+  function onKeydown(event: KeyboardEvent) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      void generate();
     }
   }
 
   onMount(load);
 </script>
 
-<p class="page-lead">
-  Generate images with a hosted image model you have connected. The prompt leaves this
-  machine; the image is stored here.
-  <GuideLink route="design" label="How image generation is governed" />
-</p>
-
-{#if block.kind !== "none"}
-  <p class="notice" role="status">
-    {block.reason}
-    {#if block.href}<a href={block.href}>{block.linkLabel}</a>{/if}
-  </p>
-{/if}
-
-<form class="composer card" onsubmit={generate}>
-  <label class="prompt">
-    <span class="sr-only">Prompt</span>
-    <textarea
-      bind:value={prompt}
-      rows="3"
-      placeholder="Describe the image you want"
-      aria-label="Prompt"
-      disabled={busy}
-    ></textarea>
-  </label>
-  <div class="controls">
-    <label>
-      <span>Provider</span>
-      <select bind:value={profileId} disabled={busy || imageProfiles.length === 0}>
-        {#each imageProfiles as profile (profile.profile_id)}
-          <option value={profile.profile_id}>
-            {profile.provider} · {modelName(profile.image_model ?? "")}
-          </option>
-        {/each}
-      </select>
-    </label>
-    <label>
-      <span>Size</span>
-      <select bind:value={size} disabled={busy}>
-        {#each view?.sizes ?? [] as option (option)}
-          <option value={option}>{option}</option>
-        {/each}
-      </select>
-    </label>
-    <button
-      type="submit"
-      class="btn btn-primary"
-      disabled={busy || !prompt.trim() || !profileId || block.kind !== "none"}
-    >
-      {busy ? "Generating…" : "Generate"}
-    </button>
-  </div>
-  {#if imageProfiles.length === 0 && models !== null}
-    <p class="sub">
-      No connected provider offers an image model. Connect OpenAI or Gemini on the Models
-      page.
+<div class="design">
+  <div class="thread" bind:this={threadEl}>
+    <p class="page-lead">
+      Describe an image and a connected image model draws it. The prompt leaves this
+      machine; the image is stored here.
+      <GuideLink route="design" label="How image generation is governed" />
     </p>
-  {/if}
-  {#if failure}<p class="error" role="alert">{failure}</p>{/if}
-</form>
 
-{#if loadError}
-  <PageState state="error" title="Couldn't read your generations" detail={loadError} />
-{:else if view === null}
-  <PageState state="loading" title="Reading your generations…" />
-{:else if view!.generations.length === 0}
-  <PageState
-    state="empty"
-    title="Nothing generated yet"
-    detail="What you generate is stored in this workspace and listed here."
-  />
-{:else}
-  <ul class="gallery">
-    {#each view!.generations as item (item.generation_id)}
-      <li class="card" class:refused={item.status !== "ok"}>
-        {#if item.has_image}
-          <a class="shot" href={api.imageBytesUrl(item.generation_id)} target="_blank" rel="noopener">
-            <img src={api.imageBytesUrl(item.generation_id)} alt={item.prompt} loading="lazy" />
-          </a>
-        {:else}
-          <p class="refusal"><Icon name="warning" size="sm" /> {readable(item.reason_code)}</p>
-        {/if}
-        <p class="prompt-text">{item.prompt}</p>
-        <p class="sub">
-          {item.model} · {item.size} · {relativeTime(item.created_at)}
+    {#if block.kind !== "none"}
+      <p class="notice" role="status">
+        {block.reason}
+        {#if block.href}<a href={block.href}>{block.linkLabel}</a>{/if}
+      </p>
+    {/if}
+
+    {#if loadError}
+      <PageState state="error" title="Couldn't read your generations" detail={loadError} />
+    {:else if view === null}
+      <PageState state="loading" title="Reading your generations…" />
+    {:else if turns.length === 0}
+      <PageState
+        state="empty"
+        title="Nothing generated yet"
+        detail="Describe an image below. What you generate is stored in this workspace."
+      />
+    {:else}
+      <ol class="turns">
+        {#each turns as item (item.generation_id)}
+          <li class="turn">
+            <p class="asked">{item.prompt}</p>
+            <div class="answer" class:refused={item.status !== "ok"}>
+              {#if item.has_image}
+                <a
+                  class="shot"
+                  href={api.imageBytesUrl(item.generation_id)}
+                  target="_blank"
+                  rel="noopener"
+                >
+                  <img src={api.imageBytesUrl(item.generation_id)} alt={item.prompt} loading="lazy" />
+                </a>
+              {:else}
+                <p class="refusal">
+                  <Icon name="warning" size="sm" />
+                  {readable(item.reason_code)}
+                </p>
+              {/if}
+              <p class="sub">{item.model} · {item.size} · {relativeTime(item.created_at)}</p>
+            </div>
+          </li>
+        {/each}
+      </ol>
+    {/if}
+  </div>
+
+  <Composer
+    ariaLabel="Image composer"
+    inputId="design-prompt"
+    inputLabel="Describe the image"
+    bind:value={prompt}
+    inputProps={{
+      placeholder: "Describe the image you want…",
+      title: "Enter to generate, Shift+Enter for a new line",
+      disabled: busy,
+      onkeydown: onKeydown,
+    }}
+    onsubmit={() => void generate()}
+  >
+    {#snippet left()}
+      <!-- Rendered only when there is something to choose. A `disabled` select
+           over an empty list is an empty pill on the bar: a control that looks
+           broken rather than one that is not applicable, and the footer below
+           already says why there is nothing to pick. -->
+      {#if imageProfiles.length > 0}
+        <label class="composer-scope">
+          <span class="sr-only">Provider</span>
+          <Icon name="models" size="sm" />
+          <select class="bar-select" bind:value={profileId} aria-label="Provider" disabled={busy}>
+            {#each imageProfiles as profile (profile.profile_id)}
+              <option value={profile.profile_id}>
+                {profile.provider} · {modelName(profile.image_model ?? "")}
+              </option>
+            {/each}
+          </select>
+        </label>
+      {/if}
+      {#if (view?.sizes ?? []).length > 0}
+        <label class="composer-scope">
+          <span class="sr-only">Size</span>
+          <select class="bar-select" bind:value={size} aria-label="Size" disabled={busy}>
+            {#each view!.sizes as option (option)}
+              <option value={option}>{option}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
+    {/snippet}
+
+    {#snippet right()}
+      <button
+        type="submit"
+        class="btn btn-primary send"
+        disabled={busy || !prompt.trim() || !profileId || block.kind !== "none"}
+        aria-label={busy ? "Generating" : "Generate"}
+      >
+        <Icon name={busy ? "clock" : "send"} size="sm" />
+        <span class="send-label">{busy ? "Generating…" : "Generate"}</span>
+      </button>
+    {/snippet}
+
+    {#snippet footer()}
+      {#if imageProfiles.length === 0 && models !== null}
+        <p class="line-notice" role="status">
+          No connected provider offers an image model.
+          <a href="#/models">Connect one on Models →</a>
         </p>
-      </li>
-    {/each}
-  </ul>
-{/if}
+      {/if}
+      {#if failure}<p class="error" role="alert">{failure}</p>{/if}
+    {/snippet}
+
+    {#snippet hint()}
+      Enter generates · Shift+Enter adds a line
+    {/snippet}
+  </Composer>
+</div>
 
 <style>
-  .composer { display: grid; gap: var(--space-3); margin-bottom: var(--space-4); }
-  .prompt textarea {
-    width: 100%;
-    resize: vertical;
-    padding: var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    background: var(--sunken);
-    color: var(--text-1);
-    font: inherit;
+  /* The same frame Chat uses: the thread takes the room the shell gives it and
+     scrolls, the composer stays on the floor of the page. */
+  .design {
+    display: flex;
+    flex-direction: column;
+    height: var(--content-h);
+    min-height: 0;
   }
-  .controls { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); }
-  .controls label { display: grid; gap: 0.25rem; font-size: var(--text-sm); color: var(--text-2); }
-  .controls select { min-width: 0; }
-  .controls .btn { margin-left: auto; }
-  .gallery {
+  .thread {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .turns {
     list-style: none;
     margin: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
-    gap: var(--space-4);
+    gap: var(--space-5);
   }
-  .gallery li { display: grid; gap: 0.35rem; align-content: start; }
-  .refused { border-color: var(--warn-border); background: var(--warn-soft); }
-  .shot { display: block; border-radius: var(--r-sm); overflow: hidden; }
-  .shot img { display: block; width: 100%; height: auto; }
-  .refusal { margin: 0; display: flex; align-items: center; gap: 0.4rem; color: var(--warn); font-size: var(--text-sm); }
-  .prompt-text { margin: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
-  .sub { margin: 0; color: var(--text-3); font-size: var(--text-xs); }
-  .error { margin: 0; color: var(--danger); font-size: var(--text-sm); }
+  .turn {
+    display: grid;
+    gap: var(--space-2);
+    justify-items: start;
+  }
+  /* The prompt reads as the thing you said, in the same bubble grammar as a
+     Chat message, so the pairing is legible without a label on either half. */
+  .asked {
+    margin: 0;
+    justify-self: end;
+    max-width: min(42rem, 85%);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--r-lg);
+    background: var(--accent-soft);
+    color: var(--text-1);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+  }
+  .answer {
+    display: grid;
+    gap: 0.35rem;
+    max-width: min(32rem, 100%);
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+  }
+  .refused {
+    border-color: var(--warn-border);
+    background: var(--warn-soft);
+  }
+  .shot {
+    display: block;
+    border-radius: var(--r-sm);
+    overflow: hidden;
+  }
+  .shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .refusal {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--warn);
+    font-size: var(--text-sm);
+  }
+  .sub {
+    margin: 0;
+    color: var(--text-3);
+    font-size: var(--text-xs);
+  }
+  .line-notice {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--text-3);
+  }
   .notice { color: var(--text-2); }
   .notice a { margin-left: 0.35rem; }
+
+  @media (max-width: 63.9rem) {
+    .design { height: auto; min-height: var(--content-h); }
+    .thread { overflow-y: visible; }
+  }
 </style>

@@ -12,6 +12,10 @@ export const NAV_GROUPS: NavGroup[] = [
     { id: "home", label: "Workbench", icon: "spark", hint: "Resume governed work and see what needs attention" },
     { id: "new-chat", label: "Chat", icon: "chat", hint: "Start or continue a governed conversation" },
     { id: "build", label: "Build", icon: "code", hint: "Code against a repository with Plan, Edit, and Auto" },
+    // Design sits with Chat and Build because it is the same kind of thing: you
+    // describe what you want and a model answers. It was last in the group, next
+    // to Messaging, which put a making surface among the plumbing.
+    { id: "design", label: "Design", icon: "spark", hint: "Describe an image and generate it" },
     // C18 — this destination stopped being only a search. With an empty box it
     // is the board of everything the owner has going, chats and routine threads
     // alike; with a query it is the search it always was.
@@ -27,7 +31,6 @@ export const NAV_GROUPS: NavGroup[] = [
     // kind of thing from the connectors, servers and hooks the agent *uses* —
     // it was a tab inside Extensions and is its own destination now.
     { id: "messaging", label: "Messaging", icon: "chat", hint: "Channels that reach Raiker from somewhere else" },
-    { id: "design", label: "Design", icon: "spark", hint: "Generate images with a connected image model" },
   ] },
   { id: "knowledge", label: "Knowledge", collapsible: true, items: [
     { id: "memory", label: "Memory", icon: "activity", hint: "Approved memories the agent can recall" },

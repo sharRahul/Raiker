@@ -93,6 +93,7 @@
   import { hasSteps, planFromEvent } from "../agentPlan";
   import { approvalBadge } from "../statusMaps";
   import AttachmentCard from "../components/AttachmentCard.svelte";
+  import Composer from "../components/Composer.svelte";
   import ComposerAttach from "../components/ComposerAttach.svelte";
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
@@ -2063,20 +2064,37 @@
 
     <CommandOutputPane {sessionId} {visible} bind:open={commandPaneOpen} />
 
-    <form
-      class="composer"
-      onsubmit={(event) => {
-        event.preventDefault();
-        void submit();
+    <Composer
+      ariaLabel="Build composer"
+      cardClass="composer-build"
+      inputId="build-prompt"
+      inputLabel="Describe the change"
+      bind:value={promptText}
+      bind:inputEl={promptEl}
+      inputProps={{
+        placeholder: activeRepo === null
+          ? "Describe what you want built…"
+          : `Describe the change in ${activeRepo.label}…`,
+        title: "Enter to send, Shift+Enter for a new line, Shift+Tab to change mode, / for commands, @ to mention a file",
+        disabled: streaming,
+        oninput: onPromptInput,
+        onselect: trackPromptSelection,
+        onclick: trackPromptSelection,
+        onkeyup: trackPromptSelection,
+        onkeydown: onKeydown,
+        onblur: () => (menuKind = "none"),
       }}
+      dropActive={composerDrop.over}
+      dropHandlers={{
+        ondragenter: composerDrop.ondragenter,
+        ondragover: composerDrop.ondragover,
+        ondragleave: composerDrop.ondragleave,
+        ondrop: composerDrop.ondrop,
+      }}
+      onsubmit={() => void submit()}
+      turnActive={streaming}
     >
-      <div class="composer-card" role="group" aria-label="Build composer"
-        class:drop-active={composerDrop.over}
-        ondragenter={composerDrop.ondragenter}
-        ondragover={composerDrop.ondragover}
-        ondragleave={composerDrop.ondragleave}
-        ondrop={composerDrop.ondrop}
-      >
+      {#snippet above()}
         <ComposerChips store={attachStore} disabled={streaming} />
         <ModelReadinessStrip readiness={modelReadiness} draftPreserved={promptText.trim() !== ""} />
         <SkillLinkNotice text={promptText} />
@@ -2093,31 +2111,9 @@
             onchoose={chooseMenuItem}
           />
         {/if}
+      {/snippet}
 
-        {#if composerDrop.over}<p class="drop-note" role="status">Drop to attach</p>{/if}
-        <label for="build-prompt" class="sr-only">Describe the change</label>
-        <div class="composer-upper">
-          <textarea
-            id="build-prompt"
-            bind:this={promptEl}
-            bind:value={promptText}
-            oninput={onPromptInput}
-            onselect={trackPromptSelection}
-            onclick={trackPromptSelection}
-            onkeyup={trackPromptSelection}
-            onkeydown={onKeydown}
-            onblur={() => (menuKind = "none")}
-            rows="2"
-            placeholder={activeRepo === null
-              ? "Describe what you want built…"
-              : `Describe the change in ${activeRepo.label}…`}
-            title="Enter to send, Shift+Enter for a new line, Shift+Tab to change mode, / for commands, @ to mention a file"
-            spellcheck="true"
-            lang="en-US"
-            disabled={streaming}
-          ></textarea>
-        </div>
-
+      {#snippet below()}
         <!-- BUG-70 — the mode picker's own menu carries what each mode does, so
              the composer keeps only the line the picker cannot know: for Auto,
              what the owner's standing permissions actually allow. Auto promises
@@ -2132,17 +2128,13 @@
         {#if attachOpen}
           <ComposerAttachPanel store={attachStore} disabled={streaming} idPrefix="build" />
         {/if}
+      {/snippet}
 
-        {#if streaming}
-          <!-- B17/C13 — while a turn runs, the composer is where it is stopped
-               or corrected rather than where the next question is written. -->
-          <div class="composer-bar">
-            <TurnControl sessionId={sessionId} bind:stopping />
-          </div>
-        {/if}
+      {#snippet turn()}
+        <TurnControl sessionId={sessionId} bind:stopping />
+      {/snippet}
 
-        <div class="composer-bar">
-          <div class="bar-left">
+      {#snippet left()}
             <ComposerAttach bind:this={attachControl} bind:open={attachOpen} disabled={streaming} />
             <VoiceDictationControl
               bind:this={voiceControl}
@@ -2176,9 +2168,9 @@
             </label>
             <ApprovalModeControl />
             <ExecutionEnvironmentBadge />
-          </div>
+      {/snippet}
 
-          <div class="bar-right">
+      {#snippet right()}
             <ModelPicker
               bind:profileId={modelProfile}
               bind:model
@@ -2227,8 +2219,9 @@
               <Icon name={streaming ? "clock" : "send"} size="sm" />
               <span class="send-label">{streaming ? "Working…" : "Send"}</span>
             </button>
-          </div>
-        </div>
+      {/snippet}
+
+      {#snippet footer()}
         <!-- The composer states the boundary, not the lesson: which project a
              turn will run in is what changes between turns, and what a project
              lets Build reach is explained once in the guide. -->
@@ -2239,15 +2232,16 @@
             Working in <strong>{selectedProject?.name}</strong>
           </p>
         {/if}
-        <p class="shortcut-hint">
-          Shift+Tab changes mode · Enter sends · <code>/</code> for commands ·
-          <code>@</code> to mention a file ·
-          <button type="button" class="hint-link" onclick={() => (shortcutsOpen = !shortcutsOpen)}>
-            all shortcuts
-          </button>
-        </p>
-      </div>
-    </form>
+      {/snippet}
+
+      {#snippet hint()}
+        Shift+Tab changes mode · Enter sends · <code>/</code> for commands ·
+        <code>@</code> to mention a file ·
+        <button type="button" class="hint-link" onclick={() => (shortcutsOpen = !shortcutsOpen)}>
+          all shortcuts
+        </button>
+      {/snippet}
+    </Composer>
   </div>
 
   {#if exportOpen && sessionId !== null}
@@ -2304,7 +2298,7 @@
   /* BUG-22 — the print layout, matching Chat's. Save as PDF produces the
      transcript as a document: no chrome, no controls, no split turns. */
   @media print {
-    :global(.sidebar), :global(.topbar), :global(.skip-link), .composer,
+    :global(.sidebar), :global(.topbar), :global(.skip-link), :global(.composer),
     .build-header, .rail-slot, .decisions, .parked,
     :global(.md-copy) { display: none !important; }
     :global(.app-shell), :global(.app-main), :global(.content), :global(.responsive-page),
@@ -2736,59 +2730,6 @@
   }
   .copy-message:hover { color: var(--text-1); border-color: var(--border); }
   .copy-message.copied { color: var(--ok); }
-  .composer {
-    display: grid;
-    gap: 0.3rem;
-  }
-  /* One composer surface, defined identically in Chat and Build so the two
-     conversations are the same instrument in two rooms rather than two
-     instruments that resemble each other. */
-  .composer-card {
-    border: 1px solid var(--border);
-    border-radius: var(--r-lg);
-    background: var(--surface);
-    box-shadow: var(--shadow-1);
-    transition: border-color 120ms ease, box-shadow 120ms ease;
-    padding: 0.75rem 0.85rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  /* Typing is the primary act on both pages, so the card lifts while it has
-     focus instead of only changing a border colour by one shade. */
-  .composer-card:focus-within {
-    border-color: var(--accent-border);
-    box-shadow: var(--shadow-2);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .composer-card { transition: none; }
-  }
-  /* Upper area: textarea on the left, model + effort on the right. Same
-     layout as the Chat composer so both surfaces present model selection
-     identically. */
-  .composer-upper {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-  .composer-upper textarea {
-    flex: 1;
-    min-width: 0;
-  }
-  .composer-card textarea {
-    width: 100%;
-    border: none;
-    outline: none;
-    resize: vertical;
-    background: transparent;
-    color: var(--text-1);
-    font: inherit;
-    font-size: var(--text-md);
-    min-height: 2.6rem;
-  }
-  .composer-card textarea::placeholder {
-    color: var(--text-3);
-  }
   .line-notice {
     margin: 0;
     font-size: var(--text-xs);
@@ -2811,31 +2752,6 @@
     font-size: var(--text-sm);
     color: var(--text-2);
   }
-  .composer-bar {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    border-top: 1px solid var(--border);
-    padding-top: 0.5rem;
-    flex-wrap: wrap;
-    position: relative;
-  }
-  .bar-left {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    flex-wrap: wrap;
-    min-width: 0;
-  }
-  .bar-right {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    min-width: 0;
-  }
   .project-required,
   .project-boundary {
     margin: 0.35rem 0 0;
@@ -2847,34 +2763,6 @@
   .project-required { color: var(--text-2); font-weight: 600; }
   .project-boundary strong { color: var(--text-1); }
 
-  /* Same setting pill as the Chat composer, so the two conversation surfaces
-     present their per-turn controls identically. */
-  .bar-select {
-    border: 1px solid var(--neutral-border);
-    background: var(--surface);
-    color: var(--text-2);
-    font: inherit;
-    font-size: var(--text-xs);
-    font-weight: 600;
-    padding: 0.2rem 0.45rem;
-    border-radius: var(--r-pill);
-    max-width: 11rem;
-    text-overflow: ellipsis;
-    min-width: 0;
-  }
-  .bar-select:hover:not(:disabled) {
-    border-color: var(--accent-border);
-    color: var(--text-1);
-  }
-  .bar-select:disabled {
-    opacity: 0.6;
-  }
-  .bar-select:focus-visible {
-    outline: 2px solid var(--focus-ring);
-  }
-  .send {
-    min-width: 6.5rem;
-  }
   .context-wrap { position: relative; }
   .context-trigger {
     display: inline-flex;
@@ -2891,30 +2779,6 @@
   }
   .context-trigger:hover { border-color: var(--accent-border); color: var(--accent); }
   .context-trigger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-  /* Same hint treatment as Chat: quiet, right-aligned, out of the way. */
-  .shortcut-hint {
-    margin: 0;
-    text-align: right;
-    font-size: var(--text-xs);
-    color: var(--text-3);
-    line-height: 1.35;
-  }
-  .shortcut-hint code {
-    padding: 0 0.22rem;
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    font-family: var(--font-mono);
-    font-size: var(--text-2xs);
-  }
-  .hint-link {
-    border: 0;
-    padding: 0;
-    background: transparent;
-    color: var(--accent);
-    font: inherit;
-    cursor: pointer;
-    text-decoration: underline;
-  }
 
   /* Compact screens preserve the transcript width and float background work as
      an isolated right-side drawer. */
@@ -2952,9 +2816,6 @@
       box-shadow: var(--shadow-2);
       transition: transform var(--motion-shell) var(--ease-shell);
     }
-    .composer-upper {
-      flex-direction: column;
-    }
     .build-header { align-items: center; gap: var(--space-2); }
     .repo-button { max-width: 100%; min-height: 2.75rem; padding-inline: .6rem; }
     .header-actions { width: 100%; flex-wrap: nowrap; justify-content: flex-end; }
@@ -2962,54 +2823,28 @@
     .thread :global(.empty-body) { display: none; }
     .thread :global(.empty) { padding-block: var(--space-5); }
     :global(.command-pane:not(.expanded)) { display: none; }
-    .composer { flex-shrink: 0; }
-    .composer-card {
-      gap: .3rem;
-      padding: .55rem .6rem;
-      border-radius: 1rem;
-      box-shadow: none;
-    }
-    .composer-card textarea { min-height: 2.25rem; resize: none; }
-    /* Wraps rather than drops. The bar used to hide the project picker below
-       this width while still printing "Select a project to start." underneath
-       and keeping Send disabled — an instruction pointing at a control that was
-       not on the screen, with no other route to it in Build. What a narrow
-       window may lose is information (the context ring, the environment badge,
-       the shortcut line); what gates sending stays. */
-    .composer-bar { flex-wrap: wrap; gap: .25rem; padding-top: .4rem; }
-    .bar-left { flex-wrap: wrap; gap: .2rem; }
-    .bar-right { flex-wrap: nowrap; gap: .2rem; margin-left: auto; }
+    /* Build carries six controls on the left where Chat has four, so its left
+       group wraps to a second row rather than compressing off the screen. The
+       bar used to hide the project picker below this width while still printing
+       "Select a project to start." underneath and keeping Send disabled — an
+       instruction pointing at a control that was not on the screen, with no
+       other route to it in Build. What a narrow window may lose is information
+       (the context ring, the environment badge); what gates sending stays. */
+    :global(.composer-build .bar-left) { flex-wrap: wrap; }
     .project-picker { max-width: 10rem; }
-    .project-picker .bar-select { min-width: 0; }
-    .context-wrap, .shortcut-hint, :global(.composer-card .environment-badge) { display: none; }
+    .project-picker :global(.bar-select) { min-width: 0; }
+    .context-wrap, :global(.composer-build .environment-badge) { display: none; }
     .standing-wide { display: none; }
     .standing-compact { display: inline; }
-    .send {
+    /* Build's mode picker has no equivalent in Chat, so its compact form lives
+       here rather than in the shared composer. */
+    :global(.composer-build .mode-trigger) {
       width: 2.75rem;
       height: 2.75rem;
-      min-width: 2.75rem;
       padding: 0;
-      border-radius: 50%;
+      justify-content: center;
     }
-    .send-label { display: none; }
-    :global(.composer-card .model-trigger),
-    :global(.composer-card .approval-trigger),
-    :global(.composer-card .mode-trigger) { width: 2.75rem; height: 2.75rem; padding: 0; justify-content: center; }
-    :global(.composer-card .model-trigger) { min-width: 2.75rem; }
-    /* `> span` hid the provider logo along with the label, because the logo is
-       a span and not an svg — so below 1024px the model control was an empty
-       circle and no window narrower than a laptop said which model would
-       answer. The label and the effort chip go; the logo is the control. */
-    :global(.composer-card .model-trigger > span:not(.provider-logo)),
-    :global(.composer-card .model-trigger > svg:last-child),
-    :global(.composer-card .approval-trigger > span),
-    :global(.composer-card .approval-trigger > svg:last-child),
-    :global(.composer-card .mode-trigger > span),
-    :global(.composer-card .mode-trigger > svg:last-child) { display: none; }
-  }
-  @media (max-width: 30rem) {
-    .composer-upper {
-      flex-direction: column;
-    }
+    :global(.composer-build .mode-trigger > span),
+    :global(.composer-build .mode-trigger > svg:last-child) { display: none; }
   }
 </style>

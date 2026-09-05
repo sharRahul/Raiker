@@ -47,13 +47,16 @@ describe("nav model", () => {
     expect(NAV_GROUPS[0].items.map((i) => i.id)).toEqual([
       "home",
       "new-chat",
+      // Design is a making surface, not plumbing: you describe what you want
+      // and a model answers, exactly as in Chat and Build. It sat last in this
+      // group, next to Messaging, which is where the channels live.
       "build",
+      "design",
       "search-chat",
       "tasks",
       "projects",
       "approvals",
       "messaging",
-      "design",
     ]);
   });
 

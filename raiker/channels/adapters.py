@@ -5,15 +5,13 @@ inside :class:`ExternalChannelExecutor`. That works for two and stops working at
 three, which is the point at which every messaging product has had to answer the
 same question.
 
-**The shape here is borrowed from Hermes Agent** (MIT, © 2025 Nous Research),
-which runs twenty-two platforms off one gateway: a table keyed by platform, each
-entry owning its own wire format, and the gateway owning everything that is not
-wire format. What is *not* borrowed is the size of it — Hermes's
-``BasePlatformAdapter`` is four thousand lines of streaming edits, typing
-bubbles, TTS, media caches and inline keyboards, because Hermes is a chat client
-you talk to. A Raiker channel is a governed relay whose default routing is
-``record_only``. Importing that surface would be importing a different product's
-problem.
+The answer is a table keyed by channel type: each entry owns its own wire format,
+and the executor owns everything that is not wire format. What an adapter
+deliberately does *not* grow is the surface of a chat client — streaming message
+edits, typing indicators, media caches, inline keyboards. A Raiker channel is a
+governed relay whose default routing is ``record_only`` and whose content is
+untrusted by definition; every one of those features would need its own
+governance answer before it could ship, and none of them is what a relay is for.
 
 So an adapter here answers exactly two questions, and nothing else:
 

@@ -33,60 +33,26 @@ python -m pip install -e ".[dev]"
 
 #### If the install downloads the same package over and over
 
-A run like this — one version after another of the same package, each one fully
-downloaded — means the install is on **the wrong Python**, not that anything is
-broken with the network or the package index:
-
 ```text
 Downloading ruff-0.6.3-py3-none-win_amd64.whl (8.8 MB)
 Downloading ruff-0.6.2-py3-none-win_amd64.whl (8.8 MB)
-Downloading ruff-0.6.1-py3-none-win_amd64.whl (8.7 MB)
-INFO: pip is looking at multiple versions of pyyaml to determine which version
-      is compatible with other requirements. This could take a while.
+INFO: pip is looking at multiple versions of pyyaml…
 ```
 
-Raiker requires Python 3.11. pip builds the project's metadata first and resolves
-the dependency tree second, and **older pip does not check the project's
-`Requires-Python` until after that resolution**. On Python 3.10 there is no
-solution to find, so the resolver goes looking for one anyway: it walks every
-dependency down to its floor, downloading each wheel to read the metadata inside
-and discarding it. The tell is in the filenames — `cp310` in a wheel name is
-CPython 3.10.
+You are on the wrong Python. Raiker needs 3.11; `cp310` in a wheel name is
+CPython 3.10. Old pip resolves every dependency before it checks the project's
+required Python, so on 3.10 it searches for a set that cannot exist.
 
-Measured on Python 3.10, same project, same command, only pip differing:
+Fix it by creating the environment with a 3.11+ interpreter — `py -3.11 -m venv
+.venv` on Windows, `python3.11 -m venv .venv` elsewhere — and upgrading pip
+before installing. Current Raiker also stops the install itself, in about a
+second, with a message naming the version it found.
 
-| pip | outcome |
-|---|---|
-| 23.0.1 (what `ensurepip` bundles for 3.10) | **382 MB in four minutes**, still going |
-| 26.2.1 | **1.2 MB**, correct error in about a second |
-
-For scale, a *correct* `.[dev]` install for Windows is **54 wheels, 49 MB in
-total** — `ruff` (10.1 MB) and `mypy` (10.6 MB) are the only two platform
-binaries in it.
-
-Two things prevent it, and the install block above does both:
-
-- **Use a 3.11+ interpreter to create the environment.** On Windows the `py`
-  launcher picks a version deliberately: `py -3.11 -m venv .venv`. Elsewhere name
-  it: `python3.11 -m venv .venv`.
-- **Upgrade pip before installing.** Newer pip checks the project's
-  `Requires-Python` before it resolves anything, and it reads
-  [PEP 658](https://peps.python.org/pep-0658/) metadata served alongside a wheel
-  rather than fetching the wheel to read it.
-
-Since this was found, Raiker also refuses the install itself: `setup.py` checks
-the interpreter version before pip resolves anything at all, so an unsupported
-Python now fails in about a second with a message saying which version was found
-and how to fix it — on any pip.
-
-If you have [uv](https://github.com/astral-sh/uv), skip the question entirely:
+With [uv](https://github.com/astral-sh/uv) the question does not arise:
 
 ```bash
 uv sync --extra dev
 ```
-
-That installs the exact set pinned in `uv.lock`. No resolution runs, so no
-wheel can be downloaded speculatively.
 
 The following platform sections spell out the same source install with the
 correct shell and package manager. Raiker does not currently publish a signed
@@ -240,9 +206,24 @@ raiker-app service status --workspace .
 raiker-app status --workspace .
 ```
 
-Run `raiker-app --help` for pause, resume, quit, service, update, and uninstall
-commands. [Managing the Raiker host](managing-the-host.md) explains what each
-command changes, where instance data lives, and how to keep or export it.
+To open Raiker from your applications menu instead of a terminal:
+
+```bash
+raiker-app desktop install
+```
+
+That adds a launcher — an entry in the applications menu on Linux, the Start
+Menu on Windows, `~/Applications` on macOS — which starts Raiker if it is not
+running and opens the dashboard. Everything is written under your own home
+directory. `raiker-app desktop uninstall` removes it.
+
+Once Raiker is running it also has a system-tray icon: status, Open Raiker,
+Pause or Resume, Restart, Quit.
+
+Run `raiker-app --help` for pause, resume, quit, service, desktop, update, and
+uninstall commands. [Managing the Raiker host](managing-the-host.md) explains
+what each command changes, where instance data lives, and how to keep or export
+it.
 
 For explicit server control without the application lifecycle wrapper, use
 `raiker-web`:

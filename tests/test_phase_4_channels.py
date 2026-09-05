@@ -574,10 +574,9 @@ def test_telegram_inbound_acknowledges_updates_it_cannot_use(
 
 # ── Adapters as a table, and declared environment ────────────────────────────
 #
-# Both ideas are Hermes Agent's (MIT, (c) 2025 Nous Research), which runs
-# twenty-two platforms off one gateway: a registry keyed by platform, and each
-# platform declaring the environment it needs so the setup surface can read it
-# rather than the operator hunting through prose.
+# A registry keyed by channel type, and each channel declaring the environment
+# it needs so the setup surface can read it rather than the owner hunting
+# through prose.
 
 
 def test_a_channel_type_with_no_wire_format_fails_closed(

@@ -65,7 +65,9 @@
   }
   let appMain = $state<HTMLElement>();
   const pageLayout = $derived(
-    current === "new-chat" || current === "build"
+    // Design joins Chat and Build here: all three are a transcript that fills
+    // the room the shell gives it, with a composer on the floor of the page.
+    current === "new-chat" || current === "build" || current === "design"
       ? "work-surface" as const
       : current === "search-chat" || current === "guide"
         ? "reading" as const

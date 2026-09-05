@@ -1435,3 +1435,49 @@ dialog li { font-size: var(--text-sm); line-height: 1.5; }
   color: var(--accent);
   font-size: var(--text-xs);
 }
+
+/* ── Composer bar controls ──
+   `Composer.svelte` owns the card, the input and the bar. These two sit on
+   elements the *view* renders into that bar, so a component's scoped styles
+   cannot reach them and each view kept its own copy — which is how Chat and
+   Build ended up with two `.bar-select` definitions that had already drifted.
+   One definition here, and every composer's controls read as the same control.
+
+   Each setting is a pill so a control reads as a control. Borderless, at body
+   weight, they ran the whole bar together as one line of prose; and a fixed
+   max-width stretched a select so its chevron floated far from its own label. */
+.bar-select {
+  border: 1px solid var(--neutral-border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--r-pill);
+  width: auto;
+  max-width: 11rem;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.bar-select:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  color: var(--text-1);
+}
+.bar-select:disabled {
+  opacity: 0.6;
+}
+.bar-select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+/* Wide enough that "Send" and "Running…" do not resize the bar between them. */
+.send {
+  min-width: 6.5rem;
+}
+/* A label beside an icon in the bar — the project select's folder, say. */
+.composer-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}

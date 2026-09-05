@@ -418,8 +418,10 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-403](#fixed-403--the-design-surface-governed-image-generation-from-nothing) | High | Design / image generation | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-404](#fixed-404--a-nine-step-type-scale-with-sixty-three-sizes-in-front-of-it) | Medium | Web UI / design system | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-405](#fixed-405--the-element-floor-was-a-ceiling-and-it-painted-the-page-out) | High | Web UI / shell | Fixed 2026-09-05 (raised by the owner) |
-| [FIXED-406](#fixed-406--two-ideas-from-hermes-agent-and-the-one-that-was-not-worth-taking) | Medium | Channels / messaging | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-406](#fixed-406--an-if-chain-that-works-for-two-transports-and-stops-at-three) | Medium | Channels / messaging | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-407](#fixed-407--a-gigabyte-of-downloads-because-the-interpreter-was-python-310) | Medium | Install / dependencies | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-408](#fixed-408--one-composer-three-surfaces-and-design-where-it-belongs) | Medium | Web UI / work surfaces | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-409](#fixed-409--raiker-could-start-at-sign-in-but-had-no-icon-to-click) | Medium | Desktop integration / uninstall | Fixed 2026-09-05 (raised by the owner) |
 
 ---
 
@@ -17911,19 +17913,16 @@ transparent, which is right because that panel is not modal.
 onto each layer and asserts the computed colour. Confirmed to fail against the
 old selector, returning `rgb(241, 245, 249)`.
 
-## FIXED-406 — Two ideas from Hermes Agent, and the one that was not worth taking
+## FIXED-406 — An `if` chain that works for two transports and stops at three
 
 **Severity: Medium. Area: Channels / messaging. Status: Fixed 2026-09-05. Raised
-by the owner: see if Hermes Agent's messaging code can build Raiker's channels.**
+by the owner: whether a messaging gateway's structure could build Raiker's
+channels.**
 
-**Observed.** [Hermes Agent](https://github.com/NousResearch/hermes-agent) (MIT,
-© 2025 Nous Research) runs **twenty-two messaging platforms** off one gateway —
-Telegram, Discord, Slack, Matrix, Signal, WhatsApp, IRC, Teams and more — each a
-plugin with a `plugin.yaml` and an `adapter.py`, all inheriting a
-`BasePlatformAdapter`. Raiker had one reference webhook and, as of FIXED-402, a
-Telegram branch written as `if channel_type == "telegram"` inside
+**Observed.** Raiker had one reference webhook and, as of FIXED-402, a Telegram
+branch written as `if channel_type == "telegram"` inside
 `ExternalChannelExecutor`. That works for two transports and stops working at
-three.
+three — which is the point every messaging product reaches and has to answer.
 
 **Taken, and why.**
 
@@ -17940,29 +17939,25 @@ branch and the webhook body-builder both moved into it, and a channel type with
 no adapter now fails closed by name (`channel_transport_unsupported:slack`)
 rather than being attempted hopefully.
 
-*Declared environment.* Hermes's `plugin.yaml` lists `requires_env` and
-`optional_env` with a description, a prompt, a URL and a `password` flag, and its
-setup wizard reads them. Raiker's connector profiles now declare the same thing,
-and the Messaging page renders it on the connector: which variable, what it is
-for, where to get it, and **whether it is set**. Never what it is set to — Raiker
-takes the name of a variable and reads it at use, and that holds on the way out
-too, which a test asserts against a live token value. It answers the question an
-owner actually has in front of a channel that will not send, which the guide
-could only answer if they went looking.
+*Declared environment.* A connector profile now declares which environment
+variables the transport needs — which variable, what it is for, where to get it,
+and **whether it is set** — and the Messaging page renders it on the connector.
+Never what it is set to: Raiker takes the name of a variable and reads it at use,
+and that holds on the way out too, which a test asserts against a live token
+value. It answers the question an owner actually has in front of a channel that
+will not send, which the guide could only answer if they went looking.
 
-**Not taken, and this is the more useful half.** `BasePlatformAdapter` is **4,161
-lines** — streaming message edits, typing indicators, TTS handles, media caches,
-draft streaming, inline keyboards, per-chat message-length functions, platform
-locks, fatal-error handlers. All of it is right for Hermes, because Hermes is a
-chat client you hold a conversation in. A Raiker channel is a governed relay
+**Deliberately not taken.** The surface of a chat client — streaming message
+edits, typing indicators, TTS handles, media caches, draft streaming, inline
+keyboards, per-chat message-length rules, platform locks. All of that is right
+for a product you hold a conversation *in*. A Raiker channel is a governed relay
 whose default routing is `record_only` and whose content is untrusted by
-definition. Adopting that surface would have been adopting a different product's
-problem, and every one of those features would have needed its own governance
+definition, and every one of those features would have needed its own governance
 answer before it could ship.
 
-The plugin-directory model was declined for the same kind of reason: a channel
-arriving as third-party code would have to answer to `plugin_execution` as well,
-which is a much larger question than the one being asked.
+A plugin-directory model — a channel arriving as third-party code — was declined
+for the same kind of reason: it would have to answer to `plugin_execution` as
+well, which is a much larger question than the one being asked.
 
 **User-interface outcome.** The Telegram card lists its three required variables,
 each marked Set or Missing, with a link to BotFather for the token. 24 channel
@@ -18062,3 +18057,121 @@ same package over and over* section that shows the symptom as it actually
 appears, names `cp310` as the tell, gives the `py -3.11 -m venv` and
 `python3.11 -m venv` fixes, and prints the two-row pip measurement. 4 guard tests
 pass; ruff and mypy are clean.
+
+## FIXED-408 — One composer, three surfaces, and Design where it belongs
+
+**Severity: Medium. Area: Web UI / work surfaces. Status: Fixed 2026-09-05.
+Raised by the owner: use one composer for Chat, Build and Design; Design was
+meant to sit under Build in core navigation and behave like Chat.**
+
+**Observed.** Chat and Build each carried their own copy of the composer markup
+and roughly **thirty CSS selectors** for it, and the two copies had already
+drifted: one styled `.prompt-input`, the other `.composer-card textarea`; one let
+`.bar-left` wrap and the other did not; the compact rules that keep the model
+control legible below 1024px existed in Chat and nowhere else. None of that is
+visible in review, and all of it is visible as two pages that are *almost* the
+same shape.
+
+Design was a third shape again — a form with a textarea, two selects and a
+Generate button over a gallery grid — and sat last in the Core group beside
+Messaging, which put a making surface among the plumbing.
+
+**Taken.**
+
+*One frame.* `apps/web/src/lib/components/Composer.svelte` owns the card, the
+input, the two-row bar, the hint line and every breakpoint. A view supplies
+`above`, `left`, `right`, `footer` and `hint`, which is the part that genuinely
+differs: Build has a mode picker and a repository, Design has a size and a
+provider, Chat has neither. `.bar-select`, `.send` and `.composer-scope` moved to
+`app.css` because they sit on elements the *view* renders into the bar, where a
+component's scoped styles cannot reach them — which is exactly how two
+`.bar-select` definitions came to exist.
+
+*A hook rather than a leak.* Build carries six controls on the left where Chat
+has four and needs them to wrap where Chat's must not, so `Composer` takes a
+`cardClass` and Build overrides `:global(.composer-build .bar-left)`. The
+alternative — reaching into `.composer-card` globally — would have made every
+future override everyone's problem.
+
+*Design is a conversation.* It reads oldest to newest: the prompt as a bubble,
+the image or the refusal as the answer beneath it, and a refusal is a turn
+rather than an absence. It takes the same `work-surface` frame as Chat and Build
+and sits directly after Build in Core.
+
+**A guard that got stronger.** Two tests asserted the compact composer grammar
+was present *in both view files* — they guarded the duplication rather than
+removing it. They now assert the grammar exists once, in `Composer.svelte`, and
+that no view redefines `.composer-card`, `.composer-bar`, `.prompt-input`,
+`.bar-left` or `.bar-right`.
+
+**Two things the screenshot caught.** With no image-capable provider connected,
+the bar rendered two empty disabled pills — a control that looks broken rather
+than one that does not apply; each select is now rendered only when there is
+something to choose. And the mocked Playwright fixture had no `/api/images`
+route, so the route audit exercised Design's *error state* and passed, which is
+why the surface was never actually covered. The fixture now serves one
+generation and one refusal.
+
+**User-interface outcome.** 1295 web tests and the mocked Playwright suite pass;
+`svelte-check` reports 0 errors and 0 warnings, having flagged fourteen
+now-orphaned selectors during the move. Verified by screenshot at 1440×950.
+
+## FIXED-409 — Raiker could start at sign-in but had no icon to click
+
+**Severity: Medium. Area: Desktop integration / uninstall. Status: Fixed
+2026-09-05. Raised by the owner: a desktop launcher for the browser after
+installation, a system tray icon, and complete safe uninstalling even from a
+git install.**
+
+**Observed, and what already existed.** The tray icon was already there —
+`raiker/app/tray.py`, started by `raiker-app`, carrying status, Open Raiker,
+Pause/Resume, Restart and Quit. `raiker-app uninstall` already existed too, with
+a per-instance keep / export / erase choice stated before anything happened.
+
+What did not exist was a **launcher**. `raiker/app/service.py` registers the host
+to *start at sign-in*, which is a different thing: after a source install there
+was no entry in the applications menu, none in the Start Menu, none in
+Spotlight. The only way into a product whose entire surface is a browser page
+was a terminal.
+
+**Taken.**
+
+*`raiker/app/desktop_entry.py`*, following `service.py` exactly — the plan is a
+value that can be printed and asserted without touching the disk, everything is
+per-user, and a failed activation is reported rather than raised. A freedesktop
+`.desktop` file on Linux, a minimal `.app` bundle in `~/Applications` on macOS,
+and a Start Menu `.cmd` on Windows with a PowerShell-written `.lnk` beside it for
+the icon and the window style. `raiker-app desktop install|status|uninstall`.
+
+The entry runs bare `raiker-app` with no `--workspace`: an icon someone clicks a
+year from now should open their Raiker, not whichever directory the install
+command happened to run in.
+
+*Uninstall removes the launcher too*, before the data — the same ordering the
+service registration already had, so an interrupted erase cannot leave a menu
+icon pointing at a half-removed workspace. The Windows `.lnk` is created by the
+activation step rather than written as a file, so it is named explicitly in the
+removal or it would survive one.
+
+*A source checkout is named, not deleted.* `pip uninstall raiker` removes a link
+and leaves a directory: on this machine that is 167.7 MB of `node_modules`, a
+5.7 MB `build/`, a 4.9 MB `dist/`, and a 230.6 MB `.venv`. The plan now names
+every one with its size. **They are not removed by default** — they are in the
+owner's repository, and deleting out of a git checkout because Raiker happens to
+be running from it exceeds anything "uninstall Raiker" can be read to mean.
+`--source-artifacts` opts in; the checkout and its virtual environment are never
+removed at all.
+
+**A bug the tests found before it shipped.** Checkout detection was initially
+unconditional, so `plan_uninstall` in any test took *the repository the test
+runner was executing from* as its subject — and `apply_uninstall` would have
+deleted the repo's own `node_modules` during a test run. Detection is now
+injectable (`checkout=`, `detect_source=`), which is what made the safe default
+testable rather than merely intended.
+
+**User-interface outcome.** No web surface. 16 launcher tests pass, each
+per-platform artefact asserted on every platform (the plist is parsed with
+`plistlib`, the `.desktop` Exec line is checked against a path with a space and
+one with a `%`); `raiker-app desktop install|status|uninstall` verified end to
+end on this machine, including the degraded path where `update-desktop-database`
+is absent — reported, not raised, entry still written.

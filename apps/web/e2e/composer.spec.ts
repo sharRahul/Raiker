@@ -92,6 +92,27 @@ test.beforeEach(async ({ page }) => {
       else if (path === "/api/work-threads") body = [];
       else if (path === "/api/approvals") body = [];
       else if (path === "/api/capabilities") body = [];
+      // Design reads this on load. Without it the page rendered its error state
+      // in the route audit — which passed, because an error state is still a
+      // laid-out page, so the surface was never actually exercised. One good
+      // generation and one refusal, which are the two halves of the transcript.
+      else if (path === "/api/images") body = {
+        sizes: ["1024x1024", "1024x1536", "1536x1024"],
+        generations: [
+          {
+            generation_id: "img_2", prompt: "a lighthouse in fog",
+            model: "gpt-image-1", size: "1024x1024", status: "refused",
+            reason_code: "image_refused_by_provider", has_image: false,
+            created_at: new Date(Date.now() - 60_000).toISOString(),
+          },
+          {
+            generation_id: "img_1", prompt: "a paper boat on a still lake",
+            model: "gpt-image-1", size: "1024x1024", status: "ok",
+            reason_code: null, has_image: true,
+            created_at: new Date(Date.now() - 600_000).toISOString(),
+          },
+        ],
+      };
       // One configured rule that enforces, one that never fires, and one file
       // that did not parse: the three states the Hooks panel exists to tell
       // apart, so a redesign that collapses them fails here.
@@ -466,9 +487,10 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     ["extensions?tab=skills", "Extensions", "operational"],
     ["extensions?tab=hooks", "Extensions", "operational"],
     ["extensions?tab=plugins", "Extensions", "operational"],
-    // Channels left Extensions for their own destination; Design is new.
+    // Channels left Extensions for their own destination. Design is a
+    // transcript with a composer, so it takes the same frame as Chat and Build.
     ["messaging", "Messaging", "workspace"],
-    ["design", "Design", "workspace"],
+    ["design", "Design", "work-surface"],
     ["observe?tab=overview", "Observability", "operational"],
     ["observe?tab=sessions", "Observability", "operational"],
     ["observe?tab=activity", "Observability", "operational"],

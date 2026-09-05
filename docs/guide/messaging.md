@@ -114,14 +114,7 @@ per-sender budget, the redaction, the audit event, your stored routing choice â€
 lives outside the adapter and applies identically to every one of them. An
 adapter cannot widen any of it, which is what makes adding one small.
 
-Both that shape and the declared-environment idea above are taken from
-[Hermes Agent](https://github.com/NousResearch/hermes-agent) (MIT, Â© 2025 Nous
-Research), which runs twenty-two platforms off a single gateway: a table keyed by
-platform, and a manifest per platform declaring the environment it needs so the
-setup surface can read it rather than the operator hunting through prose.
-
-What is deliberately *not* taken is the size. Hermes's `BasePlatformAdapter` is
-four thousand lines of streaming edits, typing indicators, TTS, media caches and
-inline keyboards, because Hermes is a chat client you talk to. A Raiker channel
-is a governed relay whose default routing is `record_only`. Importing that
-surface would be importing a different product's problem.
+An adapter stays that small on purpose. Streaming message edits, typing
+indicators, media caches and inline keyboards belong to a chat client; a channel
+is a governed relay carrying untrusted content, and each of those would need its
+own governance answer before it could ship.

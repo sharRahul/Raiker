@@ -62,6 +62,15 @@ class InstanceRemoval:
 
 
 @dataclass(frozen=True)
+class BuildArtefact:
+    """A directory a source install created, and what it costs to keep."""
+
+    label: str
+    path: Path
+    bytes_on_disk: int
+
+
+@dataclass(frozen=True)
 class UninstallPlan:
     """Everything an uninstall would remove and everything it would leave."""
 
@@ -71,6 +80,19 @@ class UninstallPlan:
     service_registered: bool
     export_to: Path | None = None
     not_removed: list[str] = field(default_factory=list)
+    #: The applications-menu entry, when one is installed.
+    launcher_path: Path | None = None
+    launcher_mechanism: str = "none"
+    launcher_installed: bool = False
+    #: Regenerable directories a `pip install -e .` left in the checkout.
+    build_artefacts: list[BuildArtefact] = field(default_factory=list)
+    #: The checkout itself, when Raiker is running from one. Never removed.
+    source_checkout: Path | None = None
+    #: Whether the artefacts above are removed or only reported. Off by default:
+    #: they live in the owner's own repository, and a tool that deletes out of a
+    #: git checkout because it happens to be running from one has exceeded what
+    #: "uninstall Raiker" can be read to mean. `--source-artifacts` opts in.
+    remove_build_artefacts: bool = False
 
     @property
     def removes_data(self) -> bool:
@@ -83,6 +105,16 @@ class UninstallPlan:
             lines.append(f"Removed: the {self.service_mechanism} registration at {self.service_path}")
         else:
             lines.append(f"Nothing to remove: Raiker is not registered with {self.service_mechanism}")
+        if self.launcher_installed and self.launcher_path is not None:
+            lines.append(f"Removed: the {self.launcher_mechanism} at {self.launcher_path}")
+        else:
+            lines.append(f"Nothing to remove: there is no {self.launcher_mechanism} installed")
+        for artefact in self.build_artefacts:
+            verb = "Removed" if self.remove_build_artefacts else "Kept"
+            lines.append(
+                f"{verb}: {artefact.label} ({human_bytes(artefact.bytes_on_disk)}) "
+                f"— {artefact.path}"
+            )
         for instance in self.instances:
             lines.append(("Kept: " if instance.kept else "Removed: ") + instance.describe())
         if self.export_to is not None:
@@ -100,6 +132,9 @@ def plan_uninstall(
     port: int = 8765,
     os_name: str | None = None,
     home: Path | None = None,
+    remove_build_artefacts: bool = False,
+    checkout: Path | None = None,
+    detect_source: bool = True,
 ) -> UninstallPlan:
     """Describe the uninstall without performing any part of it."""
     if disposition not in DISPOSITIONS:
@@ -107,10 +142,16 @@ def plan_uninstall(
     if disposition == "export" and export_to is None:
         raise ValueError("export_requires_a_destination")
 
+    from raiker.app.desktop_entry import status as launcher_status
     from raiker.app.service import registration
 
     root = Path(workspace).resolve()
     service = registration(root, port=port, os_name=os_name, home=home)
+    launcher = launcher_status(os_name=os_name, home=home)
+    # Both injectable, because the alternative is that every test of this
+    # function silently takes the repository the test runner is executing from
+    # as its subject — and `apply_uninstall` would then be pointed at it.
+    found = checkout if checkout is not None else (source_checkout() if detect_source else None)
     instances = [
         InstanceRemoval(
             name=name,
@@ -126,15 +167,83 @@ def plan_uninstall(
         service_mechanism=service.mechanism,
         service_registered=service.registered,
         export_to=Path(export_to).resolve() if export_to is not None else None,
+        launcher_path=Path(launcher.path) if launcher.path else None,
+        launcher_mechanism=launcher.mechanism,
+        launcher_installed=launcher.installed,
+        build_artefacts=build_artefacts(found),
+        source_checkout=found,
+        remove_build_artefacts=remove_build_artefacts,
         # Named explicitly because "uninstall" reads as "everything is gone", and
         # a backup the owner configured to a NAS is not Raiker's to delete.
         not_removed=[
             "any backup you configured to an external drive or provider — Raiker "
             "never deletes a copy it does not hold",
-            "the Python package itself — remove it with your package manager "
-            "(`pip uninstall raiker`)",
+            *_source_notes(found),
         ],
     )
+
+
+#: Directories a source install creates and can recreate. Removing one costs a
+#: rebuild and nothing else; none of them holds anything the owner wrote.
+BUILD_ARTEFACTS: tuple[tuple[str, str], ...] = (
+    ("the built dashboard", "apps/web/dist"),
+    ("the dashboard's downloaded packages", "apps/web/node_modules"),
+    ("the Python build tree", "build"),
+    ("the editable-install metadata", "raiker.egg-info"),
+)
+
+
+def source_checkout() -> Path | None:
+    """The repository Raiker is running from, or ``None`` for a wheel install.
+
+    An editable install leaves the code in the checkout, so `pip uninstall
+    raiker` removes a link and leaves a directory that still contains a
+    `.venv`, a `node_modules` and a `build/`. An owner who followed the source
+    install and then uninstalled was told "the Python package itself" and left
+    to find the rest.
+    """
+    root = Path(__file__).resolve().parents[2]
+    return root if (root / "pyproject.toml").is_file() and (root / ".git").exists() else None
+
+
+def build_artefacts(checkout: Path | None) -> list[BuildArtefact]:
+    """Regenerable directories in *checkout*, largest first."""
+    if checkout is None:
+        return []
+    found = [
+        BuildArtefact(label=label, path=path, bytes_on_disk=directory_bytes(path))
+        for label, relative in BUILD_ARTEFACTS
+        if (path := checkout / relative).is_dir()
+    ]
+    return sorted(found, key=lambda item: item.bytes_on_disk, reverse=True)
+
+
+def _source_notes(checkout: Path | None) -> list[str]:
+    """What a source install keeps, said in the owner's terms.
+
+    The checkout is never removed. It is the owner's directory — it may hold
+    their branches, their notes, their unrelated work — and a tool that deletes
+    a git repository because it happens to live inside it has exceeded what
+    "uninstall Raiker" can possibly have meant.
+    """
+    notes = [
+        "the Python package itself — remove it with your package manager "
+        "(`pip uninstall raiker`)"
+    ]
+    if checkout is None:
+        return notes
+    notes.append(
+        f"your source checkout at {checkout} — it is yours, and it may hold work "
+        "that has nothing to do with Raiker"
+    )
+    venv = checkout / ".venv"
+    if venv.is_dir():
+        notes.append(
+            f"the virtual environment at {venv} "
+            f"({human_bytes(directory_bytes(venv))}) — delete the directory to "
+            "reclaim it"
+        )
+    return notes
 
 
 def apply_uninstall(
@@ -154,6 +263,8 @@ def apply_uninstall(
     removing the parent first would make the child's own removal a no-op that
     still claimed to have happened.
     """
+    from raiker.app.desktop_entry import entry_plan
+    from raiker.app.desktop_entry import uninstall as remove_launcher
     from raiker.app.service import service_plan
     from raiker.app.service import uninstall as remove_service
 
@@ -169,6 +280,15 @@ def apply_uninstall(
             service_plan(workspace, port=port, os_name=os_name, home=home)
         )
         done.append(result.message)
+    # Before the data, for the same reason the service registration goes first:
+    # if a large erase is interrupted, the owner should not be left with a
+    # partial workspace and a menu icon that still opens it.
+    if plan.launcher_installed:
+        done.append(remove_launcher(entry_plan(os_name=os_name, home=home)).message)
+    if plan.remove_build_artefacts:
+        for artefact in plan.build_artefacts:
+            shutil.rmtree(artefact.path, ignore_errors=True)
+            done.append(f"Removed {artefact.label} at {artefact.path}")
 
     for instance in sorted(plan.instances, key=lambda item: len(item.path.parts), reverse=True):
         if instance.kept:

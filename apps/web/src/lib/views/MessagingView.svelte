@@ -258,13 +258,11 @@
           </span>
 
           <!-- What this transport needs from the environment, declared on the
-               connector profile rather than left to the guide. The idea is
-               Hermes Agent's `plugin.yaml` requires_env/optional_env, which
-               drives its setup wizard; here it answers the question an owner
-               actually has in front of a channel that will not send — *which
-               variable, and is it set*. Whether, never what: Raiker takes the
-               name of a variable and never its value, and that holds on this
-               surface too. -->
+               connector profile rather than left to the guide. It answers the
+               question an owner actually has in front of a channel that will
+               not send — *which variable, and is it set*. Whether, never what:
+               Raiker takes the name of a variable and never its value, and that
+               holds on this surface too. -->
           {#if profile.env_requirements?.length}
             <ul class="env">
               {#each profile.env_requirements as need (need.name)}

@@ -103,6 +103,7 @@ describe("DownloadsPanel", () => {
       },
       "GET /api/model-operations/mop_3/partial-files": {
         path: "/models/library/snapshot",
+        paths: ["/models/library/snapshot"],
         exists: true,
         bytes: 2048,
         file_count: 2,
@@ -114,6 +115,95 @@ describe("DownloadsPanel", () => {
     expect(await screen.findByText("/models/library/snapshot", { exact: false })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Delete files" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Keep them" })).toBeTruthy();
+  });
+
+  it("names every file a failed conversion owns, and never its library folder", async () => {
+    // GCR-19 — the confirmation used to name `payload.destination`, which for a
+    // conversion is the model-library output *folder* the owner chose. That
+    // folder holds the models earlier conversions succeeded at, so confirming
+    // it was confirming their deletion. The dialog names the operation's own
+    // artifacts instead, and the folder is not one of them.
+    stubFetch({
+      "GET /api/model-operations": {
+        items: [
+          {
+            operation_id: "mop_convert",
+            owner_principal_id: "owner",
+            kind: "convert",
+            target: "mistral@abc",
+            state: "failed",
+            phase: "failed",
+            progress_bytes: 0,
+            total_bytes: null,
+            progress_percent: null,
+            source_url: null,
+            destination: "<model-library>/converted",
+            error_code: "model_conversion_failed",
+            error_detail: null,
+            created_at: "now",
+            updated_at: "now",
+            retryable: true,
+            partial_files_present: true,
+          },
+        ],
+      },
+      "GET /api/model-operations/mop_convert/partial-files": {
+        path: null,
+        paths: [
+          "/models/converted/mistral-abcdef123456.bf16.gguf",
+          "/models/converted/mistral-abcdef123456.Q4_K_M.gguf",
+        ],
+        exists: true,
+        bytes: 4096,
+        file_count: 2,
+      },
+    });
+    render(DownloadsPanel);
+    await fireEvent.click(
+      await screen.findByRole("button", { name: "Delete partial files" }),
+    );
+    expect(
+      await screen.findByText("/models/converted/mistral-abcdef123456.bf16.gguf"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("/models/converted/mistral-abcdef123456.Q4_K_M.gguf"),
+    ).toBeTruthy();
+    // The shared output folder is never offered as something to delete.
+    expect(screen.queryByText("/models/converted")).toBeNull();
+  });
+
+  it("offers Retry for a cancelled job, not only a failed one", async () => {
+    // GCR-21 — Retry was drawn on `failed` alone while the API accepted it from
+    // any state, so the one job an owner most wants to start again could not be
+    // started from here and a running one could be started twice from anywhere
+    // else. Both halves say the same thing now.
+    stubFetch({
+      "GET /api/model-operations": {
+        items: [
+          {
+            operation_id: "mop_cancelled",
+            owner_principal_id: "owner",
+            kind: "pull",
+            target: "tiny",
+            state: "cancelled",
+            phase: "cancelled",
+            progress_bytes: 0,
+            total_bytes: null,
+            progress_percent: null,
+            source_url: null,
+            destination: null,
+            error_code: null,
+            error_detail: null,
+            created_at: "now",
+            updated_at: "now",
+            retryable: true,
+            partial_files_present: false,
+          },
+        ],
+      },
+    });
+    render(DownloadsPanel);
+    expect(await screen.findByRole("button", { name: "Retry" })).toBeTruthy();
   });
 
   it("refreshes background operation state while the panel is mounted", async () => {

@@ -38,6 +38,7 @@ from raiker.models.contracts import (
     ModelRequest,
     ReasoningOptions,
 )
+from raiker.models.exceptions import ProviderUnsupportedCapabilityError
 from raiker.models.providers.anthropic_messages import (
     AsyncAnthropicMessagesProvider,
     reset_thinking_negotiation,
@@ -237,6 +238,12 @@ def _reasoning_request(model: str = "claude-test") -> ModelRequest:
         model=model,
         messages=[ModelMessage(role="user", content="What is 17 * 23?")],
         reasoning=ReasoningOptions(enabled=True, summary="summarized"),
+        # What the shipped `anthropic-hosted` profile declares, and what the
+        # router therefore puts on every real Anthropic request. The dataclass
+        # default is 1024, which is below the budgeted spelling's own floor plus
+        # the room an answer needs (GCR-31): a number no real turn runs with,
+        # and the wrong one to negotiate a thinking spelling against.
+        max_tokens=16000,
     )
 
 
@@ -541,3 +548,82 @@ def test_a_model_that_will_not_think_says_what_to_do_about_it() -> None:
     assert "readiness check" not in message
     # The machine code stays where support and the audit trail can read it.
     assert "reasoning_unsupported" in message
+
+
+def test_a_thinking_budget_always_leaves_room_for_the_answer() -> None:
+    """GCR-31 — the clamp ended at `max(1024, …)`, which clamps *upward*.
+
+    The comment beside it said the budget has to leave room for the answer and
+    `max_tokens` counts both. With `max_tokens` at 1024 the expression returned
+    a 1024-token thinking budget, leaving the answer nothing: exactly the
+    request the comment describes as one the provider would refuse.
+    """
+    seen: list[dict[str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        seen.append(payload)
+        if payload.get("thinking", {}).get("type") == "adaptive":
+            return httpx.Response(
+                400,
+                json={
+                    "type": "error",
+                    "error": {
+                        "type": "invalid_request_error",
+                        "message": "adaptive thinking is not supported on this model",
+                    },
+                },
+            )
+        return httpx.Response(200, json=_answer(thinking="thought"))
+
+    request = ModelRequest(
+        profile_id="anthropic-profile",
+        provider="anthropic",
+        model="claude-test",
+        messages=[ModelMessage(role="user", content="What is 17 * 23?")],
+        reasoning=ReasoningOptions(enabled=True, summary="summarized"),
+        max_tokens=4096,
+    )
+    run(_provider(handler).chat(request))
+
+    budgeted = seen[1]["thinking"]
+    assert budgeted["type"] == "enabled"
+    assert budgeted["budget_tokens"] < seen[1]["max_tokens"]
+    assert budgeted["budget_tokens"] >= 1024
+
+
+def test_a_max_tokens_too_small_for_thinking_is_said_out_loud() -> None:
+    """Never clamp upward beyond the available budget: say what is wrong instead."""
+    from raiker.models.exceptions import provider_error_sentence
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        if payload.get("thinking", {}).get("type") == "adaptive":
+            return httpx.Response(
+                400,
+                json={
+                    "type": "error",
+                    "error": {
+                        "type": "invalid_request_error",
+                        "message": "adaptive thinking is not supported on this model",
+                    },
+                },
+            )
+        return httpx.Response(200, json=_answer(thinking="thought"))
+
+    request = ModelRequest(
+        profile_id="anthropic-profile",
+        provider="anthropic",
+        model="claude-test",
+        messages=[ModelMessage(role="user", content="What is 17 * 23?")],
+        reasoning=ReasoningOptions(enabled=True, summary="summarized"),
+        max_tokens=1024,
+    )
+
+    with pytest.raises(ProviderUnsupportedCapabilityError) as raised:
+        run(_provider(handler).chat(request))
+
+    assert str(raised.value) == "reasoning_budget_exceeds_output_limit"
+    # And the owner is told which number to change, not a raw code.
+    sentence = provider_error_sentence("reasoning_budget_exceeds_output_limit")
+    assert "maximum output" in sentence

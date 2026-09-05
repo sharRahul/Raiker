@@ -88,16 +88,23 @@ class ModelLibraryService:
 
     @staticmethod
     def _index_root(owner: str, root: Path, files: list[Path]) -> list[LocalModel]:
-        groups: dict[str, list[tuple[Path, int, int]]] = {}
+        # GCR-27 — a shard group is a *directory* and a base name, not a base
+        # name. `model-00001-of-00002.gguf` is the commonest filename a split
+        # GGUF has, so two unrelated models one folder apart used to be indexed
+        # as one: one model's metadata over the other's files, with a shard
+        # count and a size that belonged to neither.
+        groups: dict[tuple[str, str, int], list[tuple[Path, int, int]]] = {}
         for path in files:
             match = _SHARD.match(path.name)
-            key = match.group("base") if match else str(path.relative_to(root))
-            groups.setdefault(key, []).append(
-                (
-                    path,
-                    int(match.group("part")) if match else 1,
-                    int(match.group("total")) if match else 1,
-                )
+            parent = str(path.parent.relative_to(root))
+            base = match.group("base") if match else path.name
+            # The declared total is part of the identity too: a directory
+            # holding `-of-00002` and `-of-00003` under one base name holds two
+            # incomplete sets, and each is reported as incomplete rather than
+            # one set that looks complete because the counts were added up.
+            total = int(match.group("total")) if match else 1
+            groups.setdefault((parent, base, total), []).append(
+                (path, int(match.group("part")) if match else 1, total)
             )
         result: list[LocalModel] = []
         for _key, shards in groups.items():

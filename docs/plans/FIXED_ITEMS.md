@@ -432,6 +432,16 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-417](#fixed-417--the-guides-tour-of-the-shell-described-a-shell-that-had-moved) | Medium | Documentation / web UI | Fixed 2026-09-05 (found live) |
 | [FIXED-418](#fixed-418--every-settings-section-opened-general-on-the-only-route-to-settings) | Medium | Web UI / routing | Fixed 2026-09-05 (found live) |
 | [FIXED-419](#fixed-419--four-live-guards-had-gone-stale-and-could-not-say-so) | Medium | Live test harness / evidence | Fixed 2026-09-05 (found live) |
+| [FIXED-420](#fixed-420--a-failed-conversions-cleanup-could-delete-every-model-beside-it) | **Critical** | Models / destructive cleanup | Fixed 2026-09-05 (third-pass static review) |
+| [FIXED-421](#fixed-421--a-cancellation-could-be-overwritten-by-the-worker-it-cancelled) | High | Models / durable operations | Fixed 2026-09-05 (third-pass static review) |
+| [FIXED-422](#fixed-422--retry-checked-the-kind-and-the-payload-and-never-the-state) | High | Models / durable operations | Fixed 2026-09-05 (third-pass static review) |
+| [FIXED-423](#fixed-423--a-multi-gigabyte-download-ran-inside-the-request-that-asked-for-it) | Medium/High | Models / Hugging Face | Fixed 2026-09-05 (third-pass static review) |
+| [FIXED-424](#fixed-424--two-models-one-folder-apart-were-indexed-as-one) | High | Models / local library | Fixed 2026-09-05 (third-pass static review) |
+| [FIXED-425](#fixed-425--a-method-whose-contract-was-to-return-health-raised-instead) | Medium | Models / provider contract | Fixed 2026-09-05 (third-pass static review) |
+| [FIXED-426](#fixed-426--a-thinking-budget-that-left-the-answer-nothing) | Medium/High | Models / Anthropic provider | Fixed 2026-09-05 (third-pass static review) |
+| [FIXED-427](#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence) | Medium/High | Host lifecycle / observability | Fixed 2026-09-05 (third-pass static review) |
+| [FIXED-428](#fixed-428--every-conversion-in-activity-was-called-snapshotredacted_secret) | Medium | Web UI / API redaction | Fixed 2026-09-05 (found live) |
+| [FIXED-429](#fixed-429--a-shared-live-helper-spent-a-whole-spec-timeout-on-a-button-nobody-needed) | Low | Live test harness | Fixed 2026-09-05 (found live) |
 
 ---
 
@@ -18829,3 +18839,374 @@ gives a spec that needs a fresh workspace (BUG-250). The other four run.
 accuracy guard. **On this host, with no provider that answers: 4 passed, 5
 skipped with a stated reason, 0 failed** — where before it was 1 failed and 7
 never reached.
+
+---
+
+## FIXED-420 — A failed conversion's cleanup could delete every model beside it
+
+**Severity: Critical. Area: Models / model library / destructive cleanup.
+Status: Fixed 2026-09-05. Raised as
+[GCR-19](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-19--conversion-cleanup-can-recursively-delete-unrelated-models),
+the one P0 of the third-pass static review.**
+
+**Observed.** `start_model_conversion()` persisted the approved model-library
+**output directory** as the operation's `destination`, and `destination` is what
+a confirmed *Delete partial files* deletes:
+
+```python
+if target.is_dir():
+    shutil.rmtree(target)
+```
+
+The output directory of a conversion is a directory the owner chose for their
+converted models. It holds the ones that succeeded. So the sequence was:
+
+1. `/models/converted` already holds `gemma-2b.Q4_K_M.gguf` from an earlier run;
+2. a second conversion into the same directory fails or is cancelled;
+3. the row becomes terminal and offers **Delete partial files**;
+4. the confirmation names `/models/converted` — "2 files, 4.1 GB";
+5. the owner confirms, and `rmtree` takes the earlier model with the wreckage.
+
+The only containment check was that the target sat under an approved model-library
+root — which is exactly what a shared library directory does. It never proved
+the directory, or anything in it, had been created by the failed operation. The
+check was also written `target == root or root in target.parents`, so a recorded
+destination *equal to* an approved root passed it: the whole library.
+
+**Root cause.** The cleanup boundary was a *location* rather than a *set of
+artifacts*. A conversion writes three files whose names are fully determined
+before it runs — `<source>-<revision>.bf16.gguf`, the quantised result, and the
+result's `.provenance.json` — and none of that was recorded, so cleanup had
+nothing to work from but the folder they went into.
+
+**Fixed.** An operation may delete only what it can prove it created.
+
+* `conversion_artifacts(preview)` in `raiker/models/conversion.py` is the one
+  place those three paths are derived; `DockerConversionRunner` writes the
+  provenance file through it, so the runner and the cleanup cannot drift apart.
+* `start_model_conversion` persists them as the operation's `artifacts`.
+* `ModelOperation.cleanup_targets()` is the deletion set: recorded artifacts
+  when there are any; otherwise the `destination` **only** for a `download`,
+  whose destination is the collision-safe snapshot directory that operation made
+  for itself. A conversion row written before this change — one that names a
+  shared directory and nothing else — names nothing, and its bytes are left for
+  the owner to remove deliberately. Guessing there is the defect.
+* The delete route re-reads what the operation owns at the moment of deletion,
+  requires every path to be *strictly inside* an approved root — a root is the
+  boundary of the check, never something it permits deleting — and refuses the
+  whole request rather than deleting part of it.
+
+**User-interface outcome.** The confirmation lists **every exact path**, with
+the file count and total size, and says that only what this job created is
+removed. `partial_files_present` is computed from the deletion set, so a job with
+nothing provably its own does not offer the button at all. `Clear record` stays
+metadata-only.
+
+**Proof.** `test_failed_conversion_cleanup_leaves_unrelated_models_intact` runs
+the review's own scenario through the real routes: an output directory holding a
+successful model, a second conversion into it that fails, the confirmed cleanup —
+and asserts the unrelated model is still there byte for byte.
+`test_cleanup_refuses_a_path_that_is_an_approved_root_itself` covers the second
+half. Two web tests assert the dialog names the artifacts and never the folder.
+
+---
+
+## FIXED-421 — A cancellation could be overwritten by the worker it cancelled
+
+**Severity: High. Area: Models / durable operations. Status: Fixed 2026-09-05.
+Raised as
+[GCR-20](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-20--model-operation-state-transitions-can-overwrite-each-other)
+and
+[GCR-23](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-23--initial-hugging-face-download-can-lose-cancellation).**
+
+**Observed.** Every lifecycle write — `running`, `progress`, `complete`, `fail`,
+`cancel`, `cancelled`, `retry` — was load, replace, save. So:
+
+* the worker reads `running` and computes its progress row;
+* the owner presses **Cancel**; the row becomes `cancel_requested`;
+* the worker saves the row it already had, with `state="running"`;
+* the cancellation is gone, and the owner's next press is against a job that
+  looks like it was never asked to stop.
+
+The same race settled a completed download as `complete` over a
+`cancel_requested` it could not see.
+
+**Root cause.** There was no expected-state anywhere in the lifecycle. A
+last-writer-wins store cannot tell a stale write from a current one.
+
+**Fixed.** `SQLiteStore.transition_model_operation()` is the single lifecycle
+write: an `UPDATE … WHERE owner = ? AND operation_id = ? AND state IN (…)` that
+either moves the row or reports that somebody moved it first. Each service
+method names the states it expects — `progress` accepts only `running`, `retry`
+only a terminal state, `complete` only an active one. A refused transition is
+never an error for a worker: it gets the row as it now stands and reads its
+state. `complete()` arriving after a Cancel settles the row as **cancelled**, so
+the owner's decision stands *and* the row still reaches a terminal state rather
+than sitting in `cancel_requested` waiting for a worker that has gone. Every
+background worker now checks its claim — `running(...)` returning something
+other than `running` means the job is not theirs — instead of starting work on a
+job the owner already stopped.
+
+**User-interface outcome.** Cancel is final in **Models → Activity**: once
+pressed, no later write returns the job to *running* or reports it *complete*.
+The guide says so.
+
+---
+
+## FIXED-422 — Retry checked the kind and the payload, and never the state
+
+**Severity: High. Area: Models / durable operations. Status: Fixed 2026-09-05.
+Raised as
+[GCR-21](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-21--retry-can-dispatch-duplicatenon-terminal-work).**
+
+**Observed.** `ModelOperationService.retry()` required only that the kind was
+retryable and a payload existed. The route then dispatched a worker by kind. So
+a retry against a **running** operation re-queued the row and started a second
+worker over the same destination, and a retry against a **completed** one ran
+the whole expensive job again. Two simultaneous presses both dispatched.
+
+**Root cause.** Retry was written as a re-queue, not as a claim.
+
+**Fixed.** Retry is refused unless the operation is `failed` or `cancelled`
+(`operation_not_retryable_from_state`, HTTP 422), and the re-queue *is* the
+claim: the same expected-state transition FIXED-421 introduced, so only one of
+two simultaneous presses can take it and only one worker is dispatched. The
+route dispatches from the row it claimed rather than the row it read.
+
+**User-interface outcome.** **Retry** in Activity is now offered on a
+**cancelled** job as well as a failed one — the one job an owner most wants to
+start again could not be started from the panel at all, while a running one
+could be started twice from anywhere else. Both halves say the same thing now.
+
+---
+
+## FIXED-423 — A multi-gigabyte download ran inside the request that asked for it
+
+**Severity: Medium/High. Area: Models / Hugging Face. Status: Fixed 2026-09-05.
+Raised as
+[GCR-22](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-22--initial-hugging-face-download-blocks-the-request-path).**
+
+**Observed.** `/api/hugging-face/download` performed the whole snapshot download
+synchronously: a request worker was held for the entire pull, the browser waited
+on a request that could take an hour, and the completion written at the end had
+no way to see a Cancel pressed in between. Retry, meanwhile, already ran the
+same download through a background worker that checked cancellation before and
+after. The first attempt and the second attempt were different code with
+different lifecycle semantics.
+
+**Fixed.** One worker. The route validates the selection (so a changed variant
+is still refused immediately, with its own reason, rather than becoming a failed
+background job), starts the durable operation, dispatches
+`_run_hugging_face_download` through the same `_dispatch_operation` a retry uses,
+and returns the operation. The snapshot and conversion-output paths are derived
+from the approved destination and the immutable revision, so they are known
+before a byte moves and travel back with the operation.
+
+**User-interface outcome.** The Hugging Face panel says **Download queued** and
+follows the job: its state, its progress bar, and a **Cancel download** that
+reaches it. Leaving the page does not stop it — **Models → Activity** is the same
+job under a different heading — and the optional conversion step is offered the
+moment the operation reports `complete`.
+
+---
+
+## FIXED-424 — Two models one folder apart were indexed as one
+
+**Severity: High. Area: Models / local library. Status: Fixed 2026-09-05. Raised
+as
+[GCR-27](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-27--gguf-shards-from-different-directories-can-be-merged-into-one-model).**
+
+**Observed.** `ModelLibraryService._index_root()` grouped a sharded GGUF by the
+base name in its filename. `model-00001-of-00002.gguf` is what every tool that
+writes a split GGUF calls the first shard, so:
+
+```
+root/mistral/model-00001-of-00002.gguf
+root/mistral/model-00002-of-00002.gguf
+root/qwen/model-00001-of-00002.gguf
+root/qwen/model-00002-of-00002.gguf
+```
+
+was one group of four: one model's metadata attached to the other's files, a
+shard count and size belonging to neither, and a primary path — the one a deploy
+would launch — chosen from whichever sorted first. The declared total was taken
+from the first shard and never compared with the rest, so a directory holding
+`-of-00002` and `-of-00003` under one base name could add up to something that
+looked complete.
+
+**Fixed.** The group key is `(relative parent directory, base name, declared
+total)`. Two directories are two models; two different declared totals are two
+incomplete sets, each reported as incomplete.
+
+**User-interface outcome.** **Models → Local library** lists the models that are
+on disk, with their own names, sizes and shard counts, and *Deploy* launches the
+file that belongs to the row it is on.
+
+---
+
+## FIXED-425 — A method whose contract was to return health raised instead
+
+**Severity: Medium. Area: Models / provider contract. Status: Fixed 2026-09-05.
+Raised as
+[GCR-30](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-30--provider-health-contract-can-unexpectedly-raise).**
+
+**Observed.** Both `health()` implementations caught a hand-kept list of six
+exception classes and returned a `ProviderHealth` for each. Their shared status
+mapper raises more than six: `ProviderQuotaExhaustedError` (FIXED-355) and both
+`ProviderWorkspaceRequiredError` spellings (FIXED-372, FIXED-388) were added to
+`_map_status` and never to the catch list. So a provider state Raiker had
+already classified *correctly* propagated out of a method whose entire job is to
+answer with a health record, and the caller died on it.
+
+**Root cause.** A list that had to be extended every time the classifier learned
+something new, with nothing to make the two agree.
+
+**Fixed.** The classification is `ModelProviderError` — the base class every
+provider-domain failure derives from, so it cannot fall behind the mapper again.
+Anything that is *not* a provider-domain error is a bug and still escapes.
+
+**User-interface outcome.** A readiness check against an account that is out of
+credit, or a key that needs a workspace named, now reports that state on
+**Models** instead of failing the check. `test_health_answers_every_provider_state_it_can_classify`
+runs every status the mapper classifies through both providers' `health()`.
+
+---
+
+## FIXED-426 — A thinking budget that left the answer nothing
+
+**Severity: Medium/High. Area: Models / Anthropic provider. Status: Fixed
+2026-09-05. Raised as
+[GCR-31](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-31--anthropic-thinking-budget-clamp-can-create-an-impossible-request).**
+
+**Observed.** For the budgeted spelling of extended thinking:
+
+```python
+limit = request.max_tokens or self.max_tokens
+return {"type": "enabled", "budget_tokens": max(1024, min(budget, limit - 512))}
+```
+
+The comment above it said the budget has to leave room for the answer and that
+`max_tokens` counts both. With `max_tokens` at 1024 the expression returns
+**1024** — the outer `max` clamps *upward*, past the limit it had just clamped
+down to. The request the comment describes as one the provider would refuse was
+exactly the request being built.
+
+**Fixed.** The total is validated before the request is constructed. The budget
+is `min(asked, max_tokens - 512)` and is never raised above what is available;
+when what is available is below the API's 1024-token floor, the turn fails with
+`reasoning_budget_exceeds_output_limit` rather than sending a request that
+cannot succeed.
+
+**User-interface outcome.** The owner is told which number to change —
+*"this turn's maximum output is too small to hold both the model's minimum
+thinking budget and an answer. Raise the maximum output tokens for this profile
+on Models, or set Thinking back to default."* — instead of meeting an opaque
+provider 400. The guide's troubleshooting table carries the code. The shipped
+`anthropic-hosted` profile declares 16000, so no real turn is affected; the
+tests had been negotiating the thinking spelling against the 1024 dataclass
+default, which no real turn uses, and now use the profile's number.
+
+---
+
+## FIXED-427 — A background pass could fail every fifteen seconds in silence
+
+**Severity: Medium/High. Area: Host lifecycle / scheduler / observability.
+Status: Fixed 2026-09-05. Raised as
+[GCR-38](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-38--scheduler-failures-are-suppressed-without-worker-health-evidence)
+and
+[GCR-39](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-39--one-scheduled-task-exception-aborts-the-remainder-of-the-batch).**
+
+**Observed, two halves.**
+
+*The tick.* Each of the host's four passes was `with suppress(Exception)`. The
+isolation is right — a telemetry collector that is down must not stop due work
+from starting — and the silence is not. Nothing counted a failure, nothing
+logged it, and no surface could show it, so a systemic scheduler bug could fail
+every fifteen seconds for days behind a Diagnostics page reporting a healthy
+runtime.
+
+*The batch.* `TaskScheduler.run_due()` claimed a set of due tasks and then ran
+them with no per-task containment. One provider, storage or runtime exception
+escaped `run_due` entirely and the tick above swallowed it — so **every task
+claimed after it in the same batch was skipped**: already claimed, therefore no
+longer due, never run, and left with no stated outcome. Nothing retried them.
+
+**Fixed.**
+
+* `contained(pass_name, work)` replaces the four bare suppressions. The
+  exception is still swallowed — the tick must not die — and now leaves a log
+  line and a durable row: last success, last failure, the exception **class**
+  only (never its message, which can carry provider text), the consecutive
+  streak, and the lifetime total.
+* `run_due()` runs each claimed task inside its own `try`. A failure lands on
+  the task it belongs to through the same path a failed turn takes, so a
+  recurring task keeps its slot and its summary says the cycle did not complete,
+  and the rest of the batch runs.
+
+**User-interface outcome.** **Observability → Overview** carries a **Background
+passes** card: one line per pass, worst first, saying `ok` or how many failures
+in a row, the exception class it last raised, and when it last succeeded — or
+`never succeeded`, which is the case a streak alone cannot express. A pass that
+is fine is one line; the failure is what gets the words. The guide describes it.
+
+---
+
+## FIXED-428 — Every conversion in Activity was called `snapshot@[REDACTED_SECRET]`
+
+**Severity: Medium. Area: Web UI / API redaction. Status: Fixed 2026-09-05.
+Found live, on the first screen the FIXED-420 evidence run photographed.**
+
+**Observed.** The **Downloads and model jobs** panel labelled a conversion
+`snapshot@[REDACTED_SECRET]`. The label is built as
+`f"{source.name}@{body.revision}"`, and an immutable Hub revision is forty hex
+characters — so with the snapshot name in front it is forty-nine URL-safe
+characters in one unbroken run, which is exactly what the API redactor's
+high-entropy fallback exists to catch.
+
+**Root cause.** The same shape as
+[FIXED-361](#fixed-361--the-folder-picker-handed-back-redacted_secret-instead-of-a-path),
+where an ordinary folder came back as `[REDACTED_SECRET]`: a value with the
+*statistics* of a credential and none of its meaning. A Hub revision is public —
+it is printed on the repository page — and it is the only thing that tells two
+conversions of the same snapshot apart.
+
+**Fixed.** The row carries the **short** revision, which is what the Hugging
+Face download row beside it had used since it was written:
+`f"{source.name}@{body.revision[:12]}"`. Twelve hex characters do not trip the
+fallback, the label is the short-hash convention every tool in this area uses,
+and the payload still holds the full revision, so a retry converts exactly the
+same immutable snapshot. The redactor is not widened.
+
+**User-interface outcome.** `snapshot@dddddddddddd` — a label an owner can read,
+and can tell from the next one.
+
+---
+
+## FIXED-429 — A shared live helper spent a whole spec timeout on a button nobody needed
+
+**Severity: Low. Area: Live test harness. Status: Fixed 2026-09-05. Found while
+running this round's spec twice.**
+
+**Observed.** `connectHostedProvider` — the helper roughly forty live specs use —
+ends by closing the **Model details** modal that the *Reconnect* route opens. On
+the second run against the same workspace (the route a workspace that already
+holds the connection always takes) it resolved that close button, found it
+visible and stable, and then spent the spec's entire four-minute timeout being
+told `<div class="signin-overlay"> intercepts pointer events`. It was reported as
+a slow click.
+
+**Root cause.** The helper still assumed the product left both modals open. It
+does not: `saveConnection` clears `signInFor` *and* `detailsFor`, which
+[FIXED-374](#fixed-374--a-routine-ran-all-night-and-told-nobody)'s neighbour
+landed with the comment *"the live harness had been closing it by hand, which
+made it look like a test concern rather than the interface defect it is."* The
+product fixed it; the helper kept the workaround, and the workaround is only
+reachable during the moment the sign-in overlay is still unmounting.
+
+**Fixed.** The helper waits for `.signin-overlay` to be gone before it looks at
+Details at all, and closes Details only if the product has not already. It is a
+guard now rather than the fix.
+
+**User-interface outcome.** None; harness-only. A stale guard that cannot fail
+visibly is the shape [FIXED-419](#fixed-419--four-live-guards-had-gone-stale-and-could-not-say-so)
+recorded, and this is the same lesson one layer down.

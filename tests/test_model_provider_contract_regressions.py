@@ -384,3 +384,59 @@ def test_builtin_profiles_separate_embedding_models_and_gemini_schema_support() 
     assert openai.raw["embedding_model"] == "text-embedding-3-small"
     assert gemini.raw["embedding_model"] == "gemini-embedding-2-preview"
     assert gemini.raw["supports_json_schema"] is True
+
+
+def test_health_answers_every_provider_state_it_can_classify() -> None:
+    """GCR-30 — `health()` caught six exception classes and its own status mapper
+    raises more than six.
+
+    Quota exhaustion and both workspace refusals were classified correctly by
+    `_map_status` and then propagated straight out of a method whose entire
+    contract is to *return* a `ProviderHealth`. The readiness check that calls it
+    died on a provider state Raiker had already understood. The classification is
+    the base class now, so every provider-domain failure is a health answer.
+    """
+    bodies = {
+        # (status, body) → the provider state it classifies as.
+        (402, "payment required"): "ProviderQuotaExhaustedError",
+        (
+            400,
+            "This API key is not scoped to a workspace, so this request must "
+            "include the anthropic-workspace-id header.",
+        ): "ProviderWorkspaceRequiredError",
+        (400, "workspace_id must be a valid workspace id"): "ProviderWorkspaceRequiredError",
+        (401, "unauthorized"): "ProviderAuthenticationError",
+        (429, "slow down"): "ProviderRateLimitError",
+        (404, "no such model"): "ProviderModelNotFoundError",
+        (503, "upstream down"): "ProviderConnectionError",
+    }
+    for (status, body), expected in bodies.items():
+        def handler(
+            _request: httpx.Request, status: int = status, body: str = body
+        ) -> httpx.Response:
+            return httpx.Response(status, text=body)
+
+        for provider in (
+            AsyncAnthropicMessagesProvider(
+                profile_id="anthropic-profile",
+                provider="anthropic",
+                model="claude-test",
+                endpoint="https://api.anthropic.test",
+                capabilities=ModelCapabilities(),
+                extra_headers={"x-api-key": "test-key"},
+                client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+            ),
+            AsyncOpenAICompatibleProvider(
+                profile_id="openai-profile",
+                provider="openai",
+                model="gpt-test",
+                endpoint="https://api.openai.test/v1",
+                capabilities=ModelCapabilities(),
+                extra_headers={"Authorization": "Bearer test-key"},
+                client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+            ),
+        ):
+            health = asyncio.run(provider.health())
+            assert health.available is False
+            assert health.enabled_for_runtime is False
+            assert health.detail == expected, (status, body, provider.provider)

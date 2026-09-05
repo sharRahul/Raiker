@@ -399,12 +399,36 @@ export interface ModelOperation {
   partial_files_present: boolean;
 }
 
-/** What a confirmed "Delete partial files" would remove — named exactly. */
+/**
+ * What a confirmed "Delete partial files" would remove — named exactly.
+ *
+ * GCR-19 — `paths` is the deletion set: only the files the operation can prove
+ * it created, never the library directory it wrote them into. `path` is the
+ * single-target convenience (a download's own snapshot directory) and is null
+ * whenever the set has more than one member.
+ */
 export interface PartialFiles {
   path: string | null;
+  paths: string[];
   exists: boolean;
   bytes: number;
   file_count: number;
+}
+
+/**
+ * GCR-38 — one host-tick background pass and how it has been going. Failures
+ * used to be suppressed in silence, so a pass could throw every fifteen seconds
+ * while the host reported itself healthy.
+ */
+export interface BackgroundWorkerHealth {
+  pass_name: string;
+  last_success_at: string | null;
+  last_failure_at: string | null;
+  last_error_class: string | null;
+  consecutive_failures: number;
+  total_failures: number;
+  healthy: boolean;
+  updated_at: string;
 }
 
 /** One monitored subject's containment state (BUG-76, BUG-77). */
@@ -661,6 +685,7 @@ export interface Diagnostics {
   readiness: Record<string, boolean | CheckpointCaptureHealth>;
   missing_config: string[];
   provider_health: ProviderHealth[];
+  background_workers: BackgroundWorkerHealth[];
   scope_note: string;
 }
 

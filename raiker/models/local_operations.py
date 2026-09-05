@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, replace
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass
 from pathlib import Path, PurePath
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -10,10 +11,21 @@ from raiker.contracts.ids import new_id, utc_now
 
 TERMINAL_STATES = frozenset({"cancelled", "failed", "complete"})
 
+# The states a worker may still be advancing from. Every lifecycle write names
+# the states it expects, and the store refuses the write when the row has
+# already moved on (GCR-20), so a late progress row can no longer overwrite a
+# cancellation the owner asked for while the worker was busy.
+_ACTIVE_STATES = ("queued", "running")
+_STOPPABLE_STATES = ("queued", "running", "cancel_requested")
+
 # The operation kinds a retry can really dispatch again (BUG-75). `install` is
 # absent on purpose: it has no background worker to reconstruct, so offering
 # Retry for it would be the record-only control this fix exists to remove.
 RETRYABLE_KINDS = frozenset({"download", "convert", "deploy", "pull"})
+
+# The states a retry may start from. A running job is not retried, it is
+# already running; a completed one is not retried, it succeeded (GCR-21).
+RETRYABLE_STATES = ("failed", "cancelled")
 
 # Payload keys that may be persisted. An allowlist rather than a blocklist, so a
 # caller cannot accidentally durably store a token by adding a field: everything
@@ -22,9 +34,15 @@ _PAYLOAD_KEYS = frozenset(
     {
         "repo_id", "revision", "variant", "destination", "model", "source",
         "output", "quantization", "model_path", "model_id",
-        "framework", "profile_id",
+        "framework", "profile_id", "artifacts",
     }
 )
+
+# The kinds whose recorded `destination` is a directory this operation created
+# for itself, and therefore may delete whole. A conversion's destination is the
+# owner's shared library output directory and is never one of them (GCR-19):
+# a conversion names its exact artifacts instead.
+_OPERATION_OWNED_DESTINATION_KINDS = frozenset({"download"})
 
 
 @dataclass(frozen=True)
@@ -66,6 +84,30 @@ class ModelOperation:
             return {}
         return parsed if isinstance(parsed, dict) else {}
 
+    def cleanup_targets(self) -> tuple[str, ...]:
+        """The exact paths a confirmed cleanup may remove — and no others.
+
+        An operation may delete only what it can prove it created (GCR-19). A
+        job that recorded its artifacts names them; a job whose destination is a
+        directory it made for itself names that directory; anything else — a
+        conversion written into the owner's shared output directory, or a row
+        stored before artifacts were recorded — names nothing, and its bytes are
+        left for the owner to remove deliberately.
+        """
+        payload = self.payload()
+        recorded = payload.get("artifacts")
+        if isinstance(recorded, str) and recorded:
+            try:
+                parsed = json.loads(recorded)
+            except ValueError:
+                parsed = None
+            if isinstance(parsed, list):
+                return tuple(str(item) for item in parsed if str(item))
+        destination = str(payload.get("destination") or "")
+        if destination and self.kind in _OPERATION_OWNED_DESTINATION_KINDS:
+            return (destination,)
+        return ()
+
     def to_row(self) -> dict[str, Any]:
         """Every column, in schema order. Storage only."""
         return asdict(self)
@@ -77,7 +119,7 @@ class ModelOperation:
         data.pop("payload_json", None)
         data["retryable"] = self.kind in RETRYABLE_KINDS and bool(payload)
         data["partial_files_present"] = bool(
-            payload.get("destination") and self.state in {"failed", "cancelled"}
+            self.cleanup_targets() and self.state in set(RETRYABLE_STATES)
         )
         return data
 
@@ -128,15 +170,34 @@ class ModelOperationService:
         )
         return operation
 
+    def _transition(
+        self,
+        owner_principal_id: str,
+        operation_id: str,
+        expected_states: Sequence[str],
+        **updates: Any,
+    ) -> ModelOperation:
+        """Apply one expected-state transition, or report the row unchanged.
+
+        A refused transition is never an error for a worker: it means the owner
+        cancelled, or another worker already landed the outcome. The caller gets
+        the row as it now stands and can read its state to decide what to do,
+        rather than writing over a decision it did not see (GCR-20).
+        """
+        moved = self.store.transition_model_operation(
+            owner_principal_id, operation_id, expected_states=expected_states, **updates
+        )
+        if moved is not None:
+            return moved
+        current: ModelOperation = self.store.require_model_operation(
+            owner_principal_id, operation_id
+        )
+        return current
+
     def running(self, owner_principal_id: str, operation_id: str, *, phase: str) -> ModelOperation:
-        operation = self.store.require_model_operation(owner_principal_id, operation_id)
-        return self.store.save_model_operation(
-            replace(
-                operation,
-                state="running",
-                phase=phase,
-                updated_at=utc_now(),
-            )
+        """Claim an operation for a worker. Refused once it has been cancelled."""
+        return self._transition(
+            owner_principal_id, operation_id, _ACTIVE_STATES, state="running", phase=phase
         )
 
     def progress(
@@ -148,47 +209,50 @@ class ModelOperationService:
         total_bytes: int | None,
         phase: str,
     ) -> ModelOperation:
-        operation = self.store.require_model_operation(owner_principal_id, operation_id)
         completed = max(0, completed_bytes)
         total = max(completed, total_bytes) if total_bytes is not None else None
         percent = min(99, int(completed * 100 / total)) if total else None
-        return self.store.save_model_operation(
-            replace(
-                operation,
-                state="running",
-                phase=phase,
-                progress_bytes=completed,
-                total_bytes=total,
-                progress_percent=percent,
-                updated_at=utc_now(),
-            )
+        # `running` only: a progress row that arrived after the owner pressed
+        # Cancel used to reinstate `running` and lose the request.
+        return self._transition(
+            owner_principal_id,
+            operation_id,
+            ("running",),
+            state="running",
+            phase=phase,
+            progress_bytes=completed,
+            total_bytes=total,
+            progress_percent=percent,
         )
 
     def complete(self, owner_principal_id: str, operation_id: str) -> ModelOperation:
         operation = self.store.require_model_operation(owner_principal_id, operation_id)
         total = operation.total_bytes
-        return self.store.save_model_operation(
-            replace(
-                operation,
-                state="complete",
-                phase="complete",
-                progress_bytes=total or operation.progress_bytes,
-                progress_percent=100,
-                updated_at=utc_now(),
-            )
+        settled = self._transition(
+            owner_principal_id,
+            operation_id,
+            _ACTIVE_STATES,
+            state="complete",
+            phase="complete",
+            progress_bytes=total or operation.progress_bytes,
+            progress_percent=100,
         )
+        if settled.state == "cancel_requested":
+            # The work finished and the owner had already asked it to stop. The
+            # owner's decision is the one that stands, and the row reaches a
+            # terminal state rather than waiting for a worker that has gone.
+            return self.cancelled(owner_principal_id, operation_id)
+        return settled
 
     def fail(self, owner_principal_id: str, operation_id: str, *, code: str) -> ModelOperation:
-        operation = self.store.require_model_operation(owner_principal_id, operation_id)
-        return self.store.save_model_operation(
-            replace(
-                operation,
-                state="failed",
-                phase="failed",
-                error_code=code,
-                error_detail=None,
-                updated_at=utc_now(),
-            )
+        return self._transition(
+            owner_principal_id,
+            operation_id,
+            _STOPPABLE_STATES,
+            state="failed",
+            phase="failed",
+            error_code=code,
+            error_detail=None,
         )
 
     def cancel(self, owner_principal_id: str, operation_id: str) -> ModelOperation:
@@ -198,10 +262,22 @@ class ModelOperationService:
         if operation.state == "queued":
             # Nothing has started, so there is nothing to co-operate with: the
             # request reaches its terminal state immediately rather than sitting
-            # in `cancel_requested` waiting for a worker that never ran.
-            return self.cancelled(owner_principal_id, operation_id)
-        return self.store.save_model_operation(
-            replace(operation, state="cancel_requested", updated_at=utc_now())
+            # in `cancel_requested` waiting for a worker that never ran. If a
+            # worker claimed it in between, this write is refused and the
+            # cooperative path below is taken instead.
+            settled = self.store.transition_model_operation(
+                owner_principal_id,
+                operation_id,
+                expected_states=("queued",),
+                state="cancelled",
+                phase="cancelled",
+                error_code=None,
+                error_detail=None,
+            )
+            if settled is not None:
+                return settled
+        return self._transition(
+            owner_principal_id, operation_id, ("running",), state="cancel_requested"
         )
 
     def cancel_requested(self, owner_principal_id: str, operation_id: str) -> bool:
@@ -219,55 +295,71 @@ class ModelOperationService:
 
     def cancelled(self, owner_principal_id: str, operation_id: str) -> ModelOperation:
         """Move a cancel request to its terminal state."""
-        operation = self.store.require_model_operation(owner_principal_id, operation_id)
-        return self.store.save_model_operation(
-            replace(
-                operation,
-                state="cancelled",
-                phase="cancelled",
-                error_code=None,
-                error_detail=None,
-                updated_at=utc_now(),
-            )
+        return self._transition(
+            owner_principal_id,
+            operation_id,
+            _STOPPABLE_STATES,
+            state="cancelled",
+            phase="cancelled",
+            error_code=None,
+            error_detail=None,
         )
 
     def retry(self, owner_principal_id: str, operation_id: str) -> ModelOperation:
-        """Re-queue a failed operation. The caller dispatches its worker by kind."""
+        """Re-queue a **terminal** operation. The caller dispatches its worker.
+
+        Retry used to check only that the kind was retryable and a payload
+        existed, so pressing it against a running or already-completed job
+        re-queued the row and started a second expensive worker over the same
+        destination (GCR-21). The claim is the transition itself: two
+        simultaneous presses cannot both take it.
+        """
         operation = self.store.require_model_operation(owner_principal_id, operation_id)
         if operation.kind not in RETRYABLE_KINDS or not operation.payload():
             raise ValueError("operation_not_retryable")
-        return self.store.save_model_operation(
-            replace(
-                operation,
-                state="queued",
-                phase="queued",
-                progress_bytes=0,
-                progress_percent=None,
-                error_code=None,
-                error_detail=None,
-                updated_at=utc_now(),
-            )
+        if operation.state not in RETRYABLE_STATES:
+            raise ValueError("operation_not_retryable_from_state")
+        claimed = self.store.transition_model_operation(
+            owner_principal_id,
+            operation_id,
+            expected_states=RETRYABLE_STATES,
+            state="queued",
+            phase="queued",
+            progress_bytes=0,
+            progress_percent=None,
+            error_code=None,
+            error_detail=None,
         )
+        if claimed is None:
+            raise ValueError("operation_not_retryable_from_state")
+        return claimed
 
     def partial_files(self, owner_principal_id: str, operation_id: str) -> dict[str, Any]:
-        """What a confirmed cleanup would delete: the exact path and its bytes.
+        """What a confirmed cleanup would delete: the exact paths and their bytes.
 
         Named exactly, because a destructive confirmation that says "the
-        destination" is not a confirmation. The path is only ever produced for a
-        terminal operation, and the caller still checks it against the owner's
-        approved model-library roots before anything is removed.
+        destination" is not a confirmation — and because the destination of a
+        conversion is the owner's shared output directory, which held other
+        models (GCR-19). Only paths this operation can prove it created are
+        listed; the caller still checks each against the owner's approved
+        model-library roots before anything is removed.
         """
         operation = self.store.require_model_operation(owner_principal_id, operation_id)
-        path = str(operation.payload().get("destination") or "")
-        if not path or operation.state not in TERMINAL_STATES:
-            return {"path": None, "exists": False, "bytes": 0, "file_count": 0}
-        target = Path(path)
-        if not target.exists():
-            return {"path": path, "exists": False, "bytes": 0, "file_count": 0}
-        files = [item for item in target.rglob("*") if item.is_file()] if target.is_dir() else [target]
+        targets = operation.cleanup_targets()
+        if not targets or operation.state not in TERMINAL_STATES:
+            return {"path": None, "paths": [], "exists": False, "bytes": 0, "file_count": 0}
+        present = [path for path in targets if Path(path).exists()]
+        files: list[Path] = []
+        for path in present:
+            target = Path(path)
+            if target.is_dir():
+                files.extend(item for item in target.rglob("*") if item.is_file())
+            else:
+                files.append(target)
         return {
-            "path": path,
-            "exists": True,
+            "path": targets[0] if len(targets) == 1 else None,
+            "paths": present,
+            "exists": bool(present),
             "bytes": sum(item.stat().st_size for item in files),
             "file_count": len(files),
         }
@@ -287,11 +379,20 @@ def _safe_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
     """Keep only the allowlisted, non-secret keys a retry actually needs."""
     if not payload:
         return {}
-    return {
-        key: str(value)
-        for key, value in payload.items()
-        if key in _PAYLOAD_KEYS and value is not None and str(value)
-    }
+    kept: dict[str, Any] = {}
+    for key, value in payload.items():
+        if key not in _PAYLOAD_KEYS or value is None:
+            continue
+        # `artifacts` is the one list-valued key: the exact paths this operation
+        # owns, stored as JSON so the row stays one flat string column.
+        text = (
+            json.dumps([str(item) for item in value if str(item)], sort_keys=True)
+            if key == "artifacts" and isinstance(value, list | tuple)
+            else str(value)
+        )
+        if text and text != "[]":
+            kept[key] = text
+    return kept
 
 
 def _redact_source_url(value: str | None) -> str | None:

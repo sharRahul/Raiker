@@ -22,7 +22,9 @@ owner. Nothing is resumed on the strength of what was true when it parked.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -45,6 +47,8 @@ from raiker.notify.approval_notifier import (
 from raiker.runtime.turn_suspension import TurnSuspensionError
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
+
+_LOG = logging.getLogger(__name__)
 
 # A task in one of these states must never be continued: the owner has stopped
 # it, or it has already reached a terminal state through some other path.
@@ -328,56 +332,83 @@ class TaskScheduler:
             return 0
         tasks = self.store.claim_due_tasks(utc_now())
         for task in tasks:
-            principal_id = task.session_id.removeprefix("sess_inbox_")
-            if principal_id == task.session_id or self.store.get_principal(principal_id) is None:
-                TaskManager(self.store, EventLogWriter(self.store)).fail_task(task.task_id, "Scheduled task has no valid owner.")
-                continue
-            prompt = task.objective or task.title
-            turn_id = new_id("turn_")
-            # C11 — the cycle runs in the task's own conversation, so the
-            # routine accumulates a readable thread and anything the owner
-            # replied there is already in the context this cycle reads.
-            run_session_id = task.run_session_id
-            for attachment in task.attachments:
-                attachment_id = str(attachment.get("attachment_id", ""))
-                if attachment_id and self.store.load_attachment_metadata(
-                    attachment_id, owner_principal_id=principal_id
-                ) is not None:
-                    self.store.save_session_attachment_ref(
-                        session_id=run_session_id,
-                        attachment_id=attachment_id,
-                        owner_principal_id=principal_id,
-                        turn_id=turn_id,
-                    )
-            response = await AgentGateway(self.workspace_root, principal_id=principal_id).submit_prompt_async(
-                PromptEnvelope(
-                    request_id=new_id("req_"), session_id=run_session_id, turn_id=turn_id,
-                    client=ClientMetadata(type="dashboard", name="raiker-scheduler", version="1"),
-                    user=UserMetadata(id=principal_id),
-                    prompt=PromptPayload(
-                        text=prompt,
-                        attachments=task.attachments,
-                        # Backlog #23 — the working method this task was created
-                        # for. Every cycle ran as Chat before this, so a task
-                        # whose job is "read the repository, make the change, run
-                        # the tests" was given the assistant's method for it.
-                        metadata={"surface": task.surface},
-                    ),
-                    options=PromptOptions(
-                        model_profile=task.model_profile or "",
-                        model=task.model or "",
-                    ),
+            try:
+                await self._run_claimed_task(task)
+            except Exception as exc:  # noqa: BLE001 — one task's failure is its own
+                # GCR-39 — this loop had no containment, so a provider, storage
+                # or runtime exception from one claimed task escaped `run_due`
+                # and the host tick suppressed it. Every task *after* it in the
+                # already-claimed batch was then skipped: claimed, never run,
+                # and left with no stated outcome for the owner to see. The
+                # failure lands on the task it belongs to — through the same
+                # path a failed turn takes, so a recurring task keeps its slot —
+                # and the rest of the batch runs.
+                _LOG.warning(
+                    "scheduled task %s stopped unexpectedly: %s",
+                    task.task_id,
+                    type(exc).__name__,
                 )
-            )
-            manager = TaskManager(self.store, EventLogWriter(self.store))
-            # A user may have stopped the task while its governed turn was
-            # reaching a safe boundary; `_land_outcome` re-reads the task and
-            # never overwrites that cancellation. A recurring task keeps its
-            # slot whatever one cycle did, so the summary says which it was —
-            # otherwise a cycle that never ran reads exactly like one that
-            # succeeded.
-            self._land_outcome(manager, task.task_id, response.status, response.message)
+                with suppress(Exception):
+                    self._land_outcome(
+                        TaskManager(self.store, EventLogWriter(self.store)),
+                        task.task_id,
+                        "failed",
+                        "This run stopped unexpectedly "
+                        f"({type(exc).__name__}). You can run it again.",
+                    )
         return len(tasks)
+
+    async def _run_claimed_task(self, task: TaskRecord) -> None:
+        """One claimed task's governed cycle, from its owner to its outcome."""
+        principal_id = task.session_id.removeprefix("sess_inbox_")
+        if principal_id == task.session_id or self.store.get_principal(principal_id) is None:
+            TaskManager(self.store, EventLogWriter(self.store)).fail_task(task.task_id, "Scheduled task has no valid owner.")
+            return
+        prompt = task.objective or task.title
+        turn_id = new_id("turn_")
+        # C11 — the cycle runs in the task's own conversation, so the
+        # routine accumulates a readable thread and anything the owner
+        # replied there is already in the context this cycle reads.
+        run_session_id = task.run_session_id
+        for attachment in task.attachments:
+            attachment_id = str(attachment.get("attachment_id", ""))
+            if attachment_id and self.store.load_attachment_metadata(
+                attachment_id, owner_principal_id=principal_id
+            ) is not None:
+                self.store.save_session_attachment_ref(
+                    session_id=run_session_id,
+                    attachment_id=attachment_id,
+                    owner_principal_id=principal_id,
+                    turn_id=turn_id,
+                )
+        response = await AgentGateway(self.workspace_root, principal_id=principal_id).submit_prompt_async(
+            PromptEnvelope(
+                request_id=new_id("req_"), session_id=run_session_id, turn_id=turn_id,
+                client=ClientMetadata(type="dashboard", name="raiker-scheduler", version="1"),
+                user=UserMetadata(id=principal_id),
+                prompt=PromptPayload(
+                    text=prompt,
+                    attachments=task.attachments,
+                    # Backlog #23 — the working method this task was created
+                    # for. Every cycle ran as Chat before this, so a task
+                    # whose job is "read the repository, make the change, run
+                    # the tests" was given the assistant's method for it.
+                    metadata={"surface": task.surface},
+                ),
+                options=PromptOptions(
+                    model_profile=task.model_profile or "",
+                    model=task.model or "",
+                ),
+            )
+        )
+        manager = TaskManager(self.store, EventLogWriter(self.store))
+        # A user may have stopped the task while its governed turn was
+        # reaching a safe boundary; `_land_outcome` re-reads the task and
+        # never overwrites that cancellation. A recurring task keeps its
+        # slot whatever one cycle did, so the summary says which it was —
+        # otherwise a cycle that never ran reads exactly like one that
+        # succeeded.
+        self._land_outcome(manager, task.task_id, response.status, response.message)
 
 
 # How a governed turn's terminal status lands on the task the scheduler ran, and

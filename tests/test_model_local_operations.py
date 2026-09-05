@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from raiker.models.local_operations import ModelOperationRequest, ModelOperationService
 from raiker.storage.sqlite import SQLiteStore
 
@@ -135,3 +137,178 @@ def test_operation_storage_redacts_url_credentials_and_absolute_destination(tmp_
     assert "token" not in (stored.source_url or "")
     assert "Alice" not in (stored.destination or "")
     assert stored.destination == "<model-library>/model.gguf"
+
+
+def test_a_late_progress_row_cannot_overwrite_a_cancellation(tmp_path: Path) -> None:
+    """GCR-20 — the race that lost a Cancel, run in the order it happened.
+
+    A worker read `running`, the owner pressed Cancel, and the worker then stored
+    the progress row it had already computed — with `state="running"` — over the
+    request. Every lifecycle write is an expected-state transition now, so the
+    write that arrives second is refused rather than applied.
+    """
+    service = ModelOperationService(SQLiteStore(tmp_path))
+    operation = service.start(
+        "owner",
+        ModelOperationRequest(kind="pull", target="tiny", confirmed=True),
+        payload={"model": "tiny"},
+    )
+    service.running("owner", operation.operation_id, phase="pulling")
+
+    assert service.cancel("owner", operation.operation_id).state == "cancel_requested"
+    late = service.progress(
+        "owner", operation.operation_id, completed_bytes=50, total_bytes=100, phase="pulling"
+    )
+
+    assert late.state == "cancel_requested"
+    assert service.cancel_requested("owner", operation.operation_id) is True
+
+
+def test_a_completion_that_arrives_after_a_cancel_settles_as_cancelled(tmp_path: Path) -> None:
+    """GCR-23 — the owner's decision stands, and the row still reaches a terminal state."""
+    service = ModelOperationService(SQLiteStore(tmp_path))
+    operation = service.start(
+        "owner",
+        ModelOperationRequest(kind="download", target="repo/model", confirmed=True),
+        payload={"repo_id": "org/model"},
+    )
+    service.running("owner", operation.operation_id, phase="downloading")
+    service.cancel("owner", operation.operation_id)
+
+    settled = service.complete("owner", operation.operation_id)
+
+    assert settled.state == "cancelled"
+    assert settled.phase == "cancelled"
+
+
+def test_a_worker_cannot_claim_an_operation_the_owner_already_cancelled(tmp_path: Path) -> None:
+    service = ModelOperationService(SQLiteStore(tmp_path))
+    operation = service.start(
+        "owner",
+        ModelOperationRequest(kind="pull", target="tiny", confirmed=True),
+        payload={"model": "tiny"},
+    )
+    # Cancelled while still queued: it goes straight to its terminal state.
+    assert service.cancel("owner", operation.operation_id).state == "cancelled"
+
+    assert service.running("owner", operation.operation_id, phase="pulling").state == "cancelled"
+
+
+def test_retry_is_refused_from_a_running_or_completed_operation(tmp_path: Path) -> None:
+    """GCR-21 — Retry checked the kind and the payload, and never the state.
+
+    So pressing it against a job that was still running re-queued the row and
+    started a second worker over the same destination, and pressing it against a
+    job that had succeeded ran the whole expensive thing again.
+    """
+    service = ModelOperationService(SQLiteStore(tmp_path))
+    operation = service.start(
+        "owner",
+        ModelOperationRequest(kind="download", target="repo/model", confirmed=True),
+        payload={"repo_id": "org/model"},
+    )
+    service.running("owner", operation.operation_id, phase="downloading")
+
+    with pytest.raises(ValueError, match="operation_not_retryable_from_state"):
+        service.retry("owner", operation.operation_id)
+
+    service.complete("owner", operation.operation_id)
+    with pytest.raises(ValueError, match="operation_not_retryable_from_state"):
+        service.retry("owner", operation.operation_id)
+
+
+def test_only_one_of_two_simultaneous_retries_claims_the_operation(tmp_path: Path) -> None:
+    """The re-queue *is* the claim, so two presses cannot both dispatch a worker."""
+    service = ModelOperationService(SQLiteStore(tmp_path))
+    operation = service.start(
+        "owner",
+        ModelOperationRequest(kind="pull", target="tiny", confirmed=True),
+        payload={"model": "tiny"},
+    )
+    service.fail("owner", operation.operation_id, code="ollama_pull_failed")
+
+    assert service.retry("owner", operation.operation_id).state == "queued"
+    with pytest.raises(ValueError, match="operation_not_retryable_from_state"):
+        service.retry("owner", operation.operation_id)
+
+
+def test_a_cancelled_operation_can_be_started_again(tmp_path: Path) -> None:
+    service = ModelOperationService(SQLiteStore(tmp_path))
+    operation = service.start(
+        "owner",
+        ModelOperationRequest(kind="pull", target="tiny", confirmed=True),
+        payload={"model": "tiny"},
+    )
+    service.running("owner", operation.operation_id, phase="pulling")
+    service.cancel("owner", operation.operation_id)
+    service.cancelled("owner", operation.operation_id)
+
+    assert service.retry("owner", operation.operation_id).state == "queued"
+
+
+def test_a_conversion_owns_its_artifacts_and_never_its_output_directory(tmp_path: Path) -> None:
+    """GCR-19 — the cleanup boundary is the operation's files, not a library folder.
+
+    The output directory of a conversion is a directory the owner chose for
+    their converted models. It holds the ones that succeeded. Reporting it as
+    "the files this job left behind" made a confirmed cleanup of one failure a
+    confirmed deletion of all of them.
+    """
+    library = tmp_path / "library"
+    library.mkdir()
+    unrelated = library / "already-converted.Q4_K_M.gguf"
+    unrelated.write_bytes(b"y" * 64)
+    intermediate = library / "mistral-abcdefabcdef.bf16.gguf"
+    intermediate.write_bytes(b"x" * 32)
+    service = ModelOperationService(SQLiteStore(tmp_path))
+    operation = service.start(
+        "owner",
+        ModelOperationRequest(
+            kind="convert", target="mistral@abc", confirmed=True, destination=str(library)
+        ),
+        payload={
+            "source": str(tmp_path / "source"),
+            "output": str(library),
+            "destination": str(library),
+            "artifacts": [str(intermediate), str(library / "mistral-abcdefabcdef.Q4_K_M.gguf")],
+        },
+    )
+    service.fail("owner", operation.operation_id, code="model_conversion_failed")
+
+    summary = service.partial_files("owner", operation.operation_id)
+
+    assert summary["paths"] == [str(intermediate)]
+    assert str(library) not in summary["paths"]
+    assert summary["path"] is None
+    assert summary["bytes"] == 32
+    assert summary["file_count"] == 1
+
+
+def test_a_conversion_recorded_before_artifacts_existed_offers_no_cleanup(tmp_path: Path) -> None:
+    """A row written by an older Raiker names a shared directory and nothing else.
+
+    It is not treated as an operation-owned target: the button is not offered,
+    and `Clear record` still removes the row. Guessing here is what the defect
+    was.
+    """
+    library = tmp_path / "library"
+    library.mkdir()
+    (library / "already-converted.Q4_K_M.gguf").write_bytes(b"y" * 64)
+    service = ModelOperationService(SQLiteStore(tmp_path))
+    operation = service.start(
+        "owner",
+        ModelOperationRequest(
+            kind="convert", target="mistral@abc", confirmed=True, destination=str(library)
+        ),
+        payload={"source": str(tmp_path / "source"), "output": str(library),
+                 "destination": str(library)},
+    )
+    service.fail("owner", operation.operation_id, code="model_conversion_failed")
+
+    summary = service.partial_files("owner", operation.operation_id)
+
+    assert summary["paths"] == []
+    assert summary["exists"] is False
+    assert service.require("owner", operation.operation_id).to_dict()[
+        "partial_files_present"
+    ] is False

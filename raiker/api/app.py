@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from collections.abc import AsyncIterator
+import logging
+from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
@@ -55,8 +56,10 @@ from raiker.runtime.attachments import MAX_ATTACHMENT_BYTES
 from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.skills.package import MAX_BUNDLE_BYTES as MAX_SKILL_BUNDLE_BYTES
 from raiker.storage.internal_paths import display_path, internal_io_path
-from raiker.storage.sqlite import StoreUnavailableError
+from raiker.storage.sqlite import SQLiteStore, StoreUnavailableError
 from raiker.tasks.wakeup import SchedulerWakeup
+
+_LOG = logging.getLogger(__name__)
 
 # Paths whose responses must not be buffered/redacted by RedactionMiddleware:
 # - /api/auth/session returns the owner's bearer token (must reach the client intact);
@@ -277,26 +280,46 @@ def create_app(
             async with resuming:
                 await scheduler.resume_approved()
 
+        async def contained(pass_name: str, work: Awaitable[Any]) -> None:
+            """Run one host-tick pass, isolated from the others and *recorded*.
+
+            GCR-38 — every pass used to be `with suppress(Exception)`. The
+            isolation is right: a telemetry collector that is down must not stop
+            due work from starting. Suppressing in silence was not: a pass could
+            throw every fifteen seconds for days while the product reported a
+            healthy host, because nothing counted it, nothing logged it, and no
+            surface could show it. The exception is still swallowed — the tick
+            must not die — and now it leaves a row and a log line behind.
+            """
+            store = SQLiteStore(app.state.workspace_root)
+            try:
+                await work
+            except Exception as exc:  # noqa: BLE001 — the record below is the report
+                _LOG.warning(
+                    "background pass %s failed: %s", pass_name, type(exc).__name__
+                )
+                with suppress(Exception):
+                    store.record_background_pass(pass_name, error_class=type(exc).__name__)
+                return
+            with suppress(Exception):
+                store.record_background_pass(pass_name)
+
         async def tick() -> None:
             scheduler = TaskScheduler(app.state.workspace_root)
             while not stop.is_set():
-                with suppress(Exception):
-                    await scheduler.run_due()
+                await contained("scheduled_tasks", scheduler.run_due())
                 # Continuing approved work is a separate pass from starting due
-                # work, and it is suppressed separately: a continuation that
+                # work, and it is contained separately: a continuation that
                 # throws must not stop the next tick from starting due runs, and
                 # a failed due run must not stop approved work from finishing
                 # (BUG-25).
-                with suppress(Exception):
-                    await resume_approved(scheduler)
-                with suppress(Exception):
-                    await scheduler.refresh_model_capacities()
+                await contained("approved_continuations", resume_approved(scheduler))
+                await contained("model_capacity_refresh", scheduler.refresh_model_capacities())
                 # BUG-276 — the governed record leaves on the cadence its
                 # destination carries, not only when somebody presses a button.
-                # Suppressed on its own like every pass above it: a collector
+                # Contained on its own like every pass above it: a collector
                 # that is down must not stop due work from starting.
-                with suppress(Exception):
-                    await scheduler.deliver_due_telemetry()
+                await contained("telemetry_delivery", scheduler.deliver_due_telemetry())
                 with suppress(TimeoutError):
                     await asyncio.wait_for(stop.wait(), timeout=15)
 

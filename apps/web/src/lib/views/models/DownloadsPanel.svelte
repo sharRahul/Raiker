@@ -12,6 +12,13 @@
   let deleteError = $state<string | null>(null);
   const terminal = (state: string) =>
     ["complete", "failed", "cancelled"].includes(state);
+  // GCR-21 — the states a retry may really start from. It used to be offered on
+  // `failed` alone while the API accepted it from any state at all, so a job the
+  // owner had cancelled could not be started again from here and a *running*
+  // one could be started twice from anywhere else. Both halves now say the same
+  // thing: a terminal, retryable job, and nothing else.
+  const retryableNow = (item: ModelOperation) =>
+    item.retryable && ["failed", "cancelled"].includes(item.state);
   async function load() {
     try {
       items = (await api.modelOperations()).items;
@@ -99,13 +106,22 @@
   {#if deleting !== null}
     <div class="confirm" role="alertdialog" aria-labelledby="delete-partial-title">
       <h3 id="delete-partial-title">Delete the files this job left behind?</h3>
-      {#if deleting.summary.exists && deleting.summary.path}
+      {#if deleting.summary.exists && deleting.summary.paths.length > 0}
+        <!--
+          GCR-19 — every path, not "the destination". A conversion writes into
+          the model-library folder the owner chose, which holds the models
+          earlier conversions succeeded at; naming the folder here would have
+          been asking them to confirm the deletion of all of it.
+        -->
         <p>
-          <code>{deleting.summary.path}</code> — {deleting.summary.file_count}
+          {deleting.summary.file_count}
           {deleting.summary.file_count === 1 ? "file" : "files"},
-          {formatBytes(deleting.summary.bytes)}. This cannot be undone, and it removes only that
-          path inside your approved model library.
+          {formatBytes(deleting.summary.bytes)}. Only what this job created is removed —
+          nothing else in your model library. This cannot be undone.
         </p>
+        <ul class="paths">
+          {#each deleting.summary.paths as path (path)}<li><code>{path}</code></li>{/each}
+        </ul>
       {:else}
         <p>Nothing is left on disk for this job.</p>
       {/if}
@@ -161,7 +177,7 @@
                   class="btn btn-ghost btn-sm"
                   type="button"
                   onclick={() => void cancel(item.operation_id)}>Cancel</button
-                >{:else if item.state === "failed" && item.retryable}<button
+                >{:else if retryableNow(item)}<button
                   class="btn btn-sm"
                   type="button"
                   onclick={() => void retry(item.operation_id)}>Retry</button
@@ -177,7 +193,7 @@
                   >Clear record</button
                 >{/if}
             </div>
-            {#if item.state === "failed" && !item.retryable}
+            {#if ["failed", "cancelled"].includes(item.state) && !item.retryable}
               <p class="note">
                 This job cannot be started again — it has no recorded parameters to run from.
                 Start it fresh from its own page.
@@ -309,5 +325,13 @@
   }
   .confirm code {
     word-break: break-all;
+  }
+  .paths {
+    margin: 0;
+    padding-left: 20px;
+    display: grid;
+    gap: 4px;
+    max-height: 180px;
+    overflow-y: auto;
   }
 </style>

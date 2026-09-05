@@ -1875,6 +1875,10 @@ class DiagnosticsView:
     readiness: dict[str, Any] = field(default_factory=dict)
     missing_config: tuple[str, ...] = ()
     provider_health: tuple[ProviderHealthView, ...] = ()
+    # GCR-38 — one row per host-tick background pass: when it last succeeded,
+    # when it last threw, the exception *class* it threw, and how many times in
+    # a row. A pass that fails every fifteen seconds used to be invisible.
+    background_workers: tuple[dict[str, Any], ...] = ()
     scope_note: str = "Status reflects the local single-user runtime only."
 
     def to_dict(self) -> dict[str, Any]:
@@ -1887,6 +1891,7 @@ class DiagnosticsView:
             "readiness": dict(self.readiness),
             "missing_config": list(self.missing_config),
             "provider_health": [p.to_dict() for p in self.provider_health],
+            "background_workers": [dict(worker) for worker in self.background_workers],
             "scope_note": self.scope_note,
         }
 
@@ -8053,6 +8058,7 @@ class DashboardService:
             readiness=readiness_summary,
             missing_config=missing_config,
             provider_health=provider_health,
+            background_workers=tuple(self.store.list_background_worker_health()),
         )
 
     @staticmethod

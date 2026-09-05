@@ -358,3 +358,103 @@ def test_owner_retry_continues_a_decided_run(
     assert result["task_status"] == "completed"
     saved = store.load_task(task_id)
     assert saved is not None and saved.status == "completed"
+
+
+def test_one_failing_task_does_not_abort_the_rest_of_the_claimed_batch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """GCR-39 — the loop had no per-task containment.
+
+    A provider, storage or runtime exception from one claimed task escaped
+    `run_due` entirely, the host tick suppressed it, and every task claimed
+    *after* it in the same batch was skipped: already claimed, never run, and
+    left with no stated outcome the owner could see. Nothing retried them,
+    because claiming had already moved them out of the due queue.
+    """
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    store = SQLiteStore(tmp_path)
+    session_id = "sess_inbox_principal_owner"
+    store.create_session(session_id, str(tmp_path))
+    manager = TaskManager(store, EventLogWriter(store))
+    first = manager.create_task(
+        session_id=session_id, title="Breaks", objective="Break",
+        scheduled_at="2020-01-01T09:00:00Z",
+    )
+    second = manager.create_task(
+        session_id=session_id, title="Runs", objective="Run",
+        scheduled_at="2020-01-01T09:00:00Z",
+    )
+    ran: list[str] = []
+
+    async def submit(_gateway, envelope):  # type: ignore[no-untyped-def]
+        ran.append(envelope.prompt.text)
+        if envelope.prompt.text == "Break":
+            raise RuntimeError("the provider fell over")
+        return SimpleNamespace(status="completed", message="Finished safely.")
+
+    monkeypatch.setattr("raiker.tasks.scheduler.AgentGateway.submit_prompt_async", submit)
+
+    assert asyncio.run(TaskScheduler(tmp_path).run_due()) == 2
+
+    assert sorted(ran) == ["Break", "Run"]
+    broke = store.load_task(first.task_id)
+    assert broke is not None and broke.status == "failed"
+    # The failure is stated in the owner's terms and names the class, not a
+    # provider message that could carry a key fragment.
+    assert broke.summary is not None and "RuntimeError" in broke.summary
+    finished = store.load_task(second.task_id)
+    assert finished is not None and finished.status == "completed"
+
+
+def test_a_recurring_task_that_throws_keeps_its_slot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Containment goes through the same path a failed turn takes.
+
+    A recurring task is re-armed after every cycle rather than closed, so an
+    unexpected exception must not be the one outcome that stops the routine.
+    """
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    store = SQLiteStore(tmp_path)
+    session_id = "sess_inbox_principal_owner"
+    store.create_session(session_id, str(tmp_path))
+    task = TaskManager(store, EventLogWriter(store)).create_task(
+        session_id=session_id, title="Watch", objective="Watch",
+        scheduled_at="2020-01-01T09:00:00Z", recurrence="daily",
+    )
+
+    async def explode(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise RuntimeError("the provider fell over")
+
+    monkeypatch.setattr("raiker.tasks.scheduler.AgentGateway.submit_prompt_async", explode)
+    assert asyncio.run(TaskScheduler(tmp_path).run_due()) == 1
+
+    saved = store.load_task(task.task_id)
+    assert saved is not None
+    assert saved.status != "failed"
+    assert saved.scheduled_at is not None and saved.scheduled_at > "2026-07-15T00:00:00Z"
+    assert saved.summary is not None and "did not complete" in saved.summary
+
+
+def test_a_background_pass_records_its_failures_and_its_recovery(tmp_path: Path) -> None:
+    """GCR-38 — a suppressed pass now leaves evidence a surface can read."""
+    store = SQLiteStore(tmp_path)
+
+    store.record_background_pass("telemetry_delivery", error_class="ProviderConnectionError")
+    store.record_background_pass("telemetry_delivery", error_class="ProviderConnectionError")
+    store.record_background_pass("scheduled_tasks")
+
+    rows = {row["pass_name"]: row for row in store.list_background_worker_health()}
+    assert rows["telemetry_delivery"]["consecutive_failures"] == 2
+    assert rows["telemetry_delivery"]["last_error_class"] == "ProviderConnectionError"
+    assert rows["telemetry_delivery"]["last_success_at"] is None
+    assert rows["telemetry_delivery"]["healthy"] is False
+    assert rows["scheduled_tasks"]["healthy"] is True
+
+    store.record_background_pass("telemetry_delivery")
+
+    recovered = {row["pass_name"]: row for row in store.list_background_worker_health()}
+    assert recovered["telemetry_delivery"]["consecutive_failures"] == 0
+    assert recovered["telemetry_delivery"]["healthy"] is True
+    # The history is kept: a pass that recovered is not a pass that never failed.
+    assert recovered["telemetry_delivery"]["total_failures"] == 2

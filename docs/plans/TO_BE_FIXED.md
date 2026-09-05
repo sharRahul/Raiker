@@ -147,6 +147,22 @@ entry**: MEM-09 closed as FIXED-310, MEM-10's remainder as FIXED-301, and MEM-08
 — the last of them — as FIXED-316. It stays as the record of the audit and of
 how each entry closed, not as open work.
 
+The generic static code review of **2026-09-05** has its own pair of documents,
+[`GENERIC_STATIC_CODE_REVIEW_2026-09-05.md`](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md)
+(GCR-01 … GCR-18) and
+[`GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md`](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md)
+(GCR-19 … GCR-47). Its findings are engineering defects rather than product
+defects, so they are not duplicated here; the third-pass document carries its own
+remediation order and states what is closed against it. **Ten are closed as of
+2026-09-05** — GCR-19 (its one P0) as [FIXED-420](FIXED_ITEMS.md#fixed-420--a-failed-conversions-cleanup-could-delete-every-model-beside-it),
+GCR-20/23 as [FIXED-421](FIXED_ITEMS.md#fixed-421--a-cancellation-could-be-overwritten-by-the-worker-it-cancelled),
+GCR-21 as [FIXED-422](FIXED_ITEMS.md#fixed-422--retry-checked-the-kind-and-the-payload-and-never-the-state),
+GCR-22 as [FIXED-423](FIXED_ITEMS.md#fixed-423--a-multi-gigabyte-download-ran-inside-the-request-that-asked-for-it),
+GCR-27 as [FIXED-424](FIXED_ITEMS.md#fixed-424--two-models-one-folder-apart-were-indexed-as-one),
+GCR-30 as [FIXED-425](FIXED_ITEMS.md#fixed-425--a-method-whose-contract-was-to-return-health-raised-instead),
+GCR-31 as [FIXED-426](FIXED_ITEMS.md#fixed-426--a-thinking-budget-that-left-the-answer-nothing),
+and GCR-38/39 as [FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence).
+
 ---
 
 ## BUG-194 — The governed shell has an OS boundary, but no interactive, background or remote execution

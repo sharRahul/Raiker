@@ -8,6 +8,31 @@ It is a companion to `docs/plans/GENERIC_STATIC_CODE_REVIEW_2026-09-05.md`. The 
 
 This remains a static review. It is not a runtime stress test, profiler run, fuzzing campaign, or proof that no additional defects exist. Findings are included only where the reviewed `main` implementation provides concrete evidence.
 
+## Status — 2026-09-05
+
+Ten of the forty-seven are closed, taken in the order this document's own
+remediation table gives — priority first, then effort. Every entry below keeps
+its original analysis; a closed one carries a **Status** line naming the
+[`FIXED_ITEMS.md`](FIXED_ITEMS.md) record that closed it, so the evidence and the
+finding stay together.
+
+| Closed | What it was | Record |
+|---|---|---|
+| GCR-19 | The P0: a failed conversion's cleanup boundary was a shared library directory | [FIXED-420](FIXED_ITEMS.md#fixed-420--a-failed-conversions-cleanup-could-delete-every-model-beside-it) |
+| GCR-20, GCR-23 | Non-CAS lifecycle writes; a cancellation could be overwritten by the worker it cancelled | [FIXED-421](FIXED_ITEMS.md#fixed-421--a-cancellation-could-be-overwritten-by-the-worker-it-cancelled) |
+| GCR-21 | Retry accepted any state and was not a claim | [FIXED-422](FIXED_ITEMS.md#fixed-422--retry-checked-the-kind-and-the-payload-and-never-the-state) |
+| GCR-22 | Initial Hugging Face download ran in the request path | [FIXED-423](FIXED_ITEMS.md#fixed-423--a-multi-gigabyte-download-ran-inside-the-request-that-asked-for-it) |
+| GCR-27 | Same-named GGUF shards in two folders indexed as one model | [FIXED-424](FIXED_ITEMS.md#fixed-424--two-models-one-folder-apart-were-indexed-as-one) |
+| GCR-30 | `health()` could raise instead of returning `ProviderHealth` | [FIXED-425](FIXED_ITEMS.md#fixed-425--a-method-whose-contract-was-to-return-health-raised-instead) |
+| GCR-31 | The thinking-budget clamp clamped upward, past the limit | [FIXED-426](FIXED_ITEMS.md#fixed-426--a-thinking-budget-that-left-the-answer-nothing) |
+| GCR-38, GCR-39 | Host-tick passes suppressed in silence; one task's exception skipped the rest of its batch | [FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence) |
+
+**Still open, and next by the same order:** GCR-01/02/03 (provider launch
+configuration, client leak, reasoning profile resolution — all Low effort),
+GCR-06 (the global command workspace), GCR-24/25 (a cancellable conversion
+subprocess and an app-owned durable job runner), GCR-26, GCR-28, GCR-33, GCR-40,
+and the P2 architecture work below them.
+
 ## Executive judgement
 
 The deeper review changes the generic engineering risk assessment in one important way: there are now **several correctness and data-integrity issues that should be fixed before broad refactoring**.
@@ -24,27 +49,27 @@ The third theme is **durability mismatch**: a number of operations are represent
 
 | ID | Severity | Priority | Finding |
 |---|---|---:|---|
-| GCR-19 | Critical/High | P0 | Conversion partial-file cleanup can recursively delete unrelated models in a shared output directory |
-| GCR-20 | High | P1 | Model-operation transitions are non-CAS and can lose cancellation or overwrite concurrent state |
-| GCR-21 | High | P1 | Model-operation Retry can requeue non-terminal/running/completed work and dispatch a duplicate worker |
-| GCR-22 | Medium/High | P1 | Initial Hugging Face download runs synchronously while retry uses a background worker |
-| GCR-23 | High | P1 | Initial Hugging Face download can overwrite a concurrent cancel with `complete` |
+| GCR-19 | Critical/High | P0 | Conversion partial-file cleanup can recursively delete unrelated models in a shared output directory — **Closed 2026-09-05 ([FIXED-420](FIXED_ITEMS.md#fixed-420--a-failed-conversions-cleanup-could-delete-every-model-beside-it))** |
+| GCR-20 | High | P1 | Model-operation transitions are non-CAS and can lose cancellation or overwrite concurrent state — **Closed 2026-09-05 ([FIXED-421](FIXED_ITEMS.md#fixed-421--a-cancellation-could-be-overwritten-by-the-worker-it-cancelled))** |
+| GCR-21 | High | P1 | Model-operation Retry can requeue non-terminal/running/completed work and dispatch a duplicate worker — **Closed 2026-09-05 ([FIXED-422](FIXED_ITEMS.md#fixed-422--retry-checked-the-kind-and-the-payload-and-never-the-state))** |
+| GCR-22 | Medium/High | P1 | Initial Hugging Face download runs synchronously while retry uses a background worker — **Closed 2026-09-05 ([FIXED-423](FIXED_ITEMS.md#fixed-423--a-multi-gigabyte-download-ran-inside-the-request-that-asked-for-it))** |
+| GCR-23 | High | P1 | Initial Hugging Face download can overwrite a concurrent cancel with `complete` — **Closed 2026-09-05 ([FIXED-421](FIXED_ITEMS.md#fixed-421--a-cancellation-could-be-overwritten-by-the-worker-it-cancelled))** |
 | GCR-24 | Medium/High | P1 | Long model conversion is effectively non-cancellable during a subprocess that may run for hours |
 | GCR-25 | Medium/High | P1 | Durable model-operation rows are executed by in-process background tasks; no startup recovery wiring was identified in the reviewed lifespan |
 | GCR-26 | Medium/High | P1 | Conversion source fingerprint hashes names and sizes, not file contents |
-| GCR-27 | High | P1 | GGUF shard grouping can merge same-named shards from different directories |
+| GCR-27 | High | P1 | GGUF shard grouping can merge same-named shards from different directories — **Closed 2026-09-05 ([FIXED-424](FIXED_ITEMS.md#fixed-424--two-models-one-folder-apart-were-indexed-as-one))** |
 | GCR-28 | High | P1 | Managed llama.cpp/MLX runtime slot allocation and process maps are unsynchronized across concurrent deploys |
 | GCR-29 | Medium | P2 | Managed llama.cpp custom-port launch can report the wrong endpoint |
-| GCR-30 | Medium | P1/P2 | Provider `health()` can raise quota/workspace exceptions instead of returning `ProviderHealth` |
-| GCR-31 | Medium/High | P1 | Anthropic budgeted-thinking clamp can produce an invalid budget equal to or larger than available output capacity |
+| GCR-30 | Medium | P1/P2 | Provider `health()` can raise quota/workspace exceptions instead of returning `ProviderHealth` — **Closed 2026-09-05 ([FIXED-425](FIXED_ITEMS.md#fixed-425--a-method-whose-contract-was-to-return-health-raised-instead))** |
+| GCR-31 | Medium/High | P1 | Anthropic budgeted-thinking clamp can produce an invalid budget equal to or larger than available output capacity — **Closed 2026-09-05 ([FIXED-426](FIXED_ITEMS.md#fixed-426--a-thinking-budget-that-left-the-answer-nothing))** |
 | GCR-32 | Medium | P2 | Anthropic thinking-shape negotiation cache is process-global and keyed only by model name |
 | GCR-33 | Medium/High | P1 | Concurrent OAuth refresh can race when providers rotate refresh tokens |
 | GCR-34 | Medium | P2 | Connector response truncation occurs before JSON parsing and silently changes a large JSON result into a string |
 | GCR-35 | Medium | P2 | Conversation-history budget can discard all history when the newest exchange alone exceeds the budget |
 | GCR-36 | Medium | P2 | Conversation-history read failures silently become an empty conversation context |
 | GCR-37 | Medium | P2 | SQLite connection cache uses recyclable numeric thread IDs as connection ownership identity |
-| GCR-38 | Medium/High | P1 | Scheduler top-level work passes suppress unexpected exceptions without recording worker health |
-| GCR-39 | Medium/High | P1 | One unexpected scheduled-task exception aborts the remainder of the claimed scheduler batch |
+| GCR-38 | Medium/High | P1 | Scheduler top-level work passes suppress unexpected exceptions without recording worker health — **Closed 2026-09-05 ([FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence))** |
+| GCR-39 | Medium/High | P1 | One unexpected scheduled-task exception aborts the remainder of the claimed scheduler batch — **Closed 2026-09-05 ([FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence))** |
 | GCR-40 | High | P1 | Event JSONL append and database index update are not atomic; integrity verification is blind to unindexed orphan lines |
 | GCR-41 | Medium/High | P1/P2 | Release artifact reproducibility is undermined by unpinned dependency resolution and mutable external build-tool downloads |
 | GCR-42 | Medium | P2 | Frontend API types are manually duplicated from backend DTOs instead of generated from the source contract |
@@ -61,6 +86,8 @@ The third theme is **durability mismatch**: a number of operations are represent
 ## GCR-19 — Conversion cleanup can recursively delete unrelated models
 
 **Severity: Critical/High — Priority: P0 — Confidence: High**
+
+**Status: Closed 2026-09-05 — [FIXED-420](FIXED_ITEMS.md#fixed-420--a-failed-conversions-cleanup-could-delete-every-model-beside-it).**
 
 ### Evidence
 
@@ -116,6 +143,8 @@ Create an output directory containing an unrelated successful model, start/fail 
 
 **Severity: High — Priority: P1 — Confidence: High**
 
+**Status: Closed 2026-09-05 — [FIXED-421](FIXED_ITEMS.md#fixed-421--a-cancellation-could-be-overwritten-by-the-worker-it-cancelled).**
+
 ### Evidence
 
 `ModelOperationService.running()`, `progress()`, `complete()`, `fail()`, `cancel()`, `cancelled()` and `retry()` all follow the same broad pattern:
@@ -160,6 +189,8 @@ Run progress, completion, cancellation and retry from racing workers and assert 
 
 **Severity: High — Priority: P1 — Confidence: High**
 
+**Status: Closed 2026-09-05 — [FIXED-422](FIXED_ITEMS.md#fixed-422--retry-checked-the-kind-and-the-payload-and-never-the-state).**
+
 `ModelOperationService.retry()` checks only that the kind is retryable and a payload exists. It does not require the current state to be `failed` or `cancelled`.
 
 The API retry route calls `service.retry(...)` and immediately dispatches the worker by operation kind.
@@ -174,6 +205,8 @@ Consequently a retry against a running or even successfully completed retryable 
 
 **Severity: Medium/High — Priority: P1 — Confidence: High**
 
+**Status: Closed 2026-09-05 — [FIXED-423](FIXED_ITEMS.md#fixed-423--a-multi-gigabyte-download-ran-inside-the-request-that-asked-for-it).**
+
 There is already a background worker `_run_hugging_face_download()` used when a failed operation is retried. However, the initial `/api/hugging-face/download` route performs `HuggingFaceService.download()` synchronously inside the request, rescans the model library and completes the durable operation before returning.
 
 A multi-gigabyte snapshot can therefore occupy a request worker for the entire download and makes initial execution materially different from retry execution.
@@ -185,6 +218,8 @@ A multi-gigabyte snapshot can therefore occupy a request worker for the entire d
 ## GCR-23 — Initial Hugging Face download can lose cancellation
 
 **Severity: High — Priority: P1 — Confidence: High**
+
+**Status: Closed 2026-09-05 — [FIXED-421](FIXED_ITEMS.md#fixed-421--a-cancellation-could-be-overwritten-by-the-worker-it-cancelled).**
 
 The initial download path writes `running`, performs the complete blocking snapshot download, rescans, and then calls `complete()` without checking `cancel_requested()`.
 
@@ -246,6 +281,8 @@ A source file can be modified while keeping the same path and byte length and pr
 
 **Severity: High — Priority: P1 — Confidence: High**
 
+**Status: Closed 2026-09-05 — [FIXED-424](FIXED_ITEMS.md#fixed-424--two-models-one-folder-apart-were-indexed-as-one).**
+
 `ModelLibraryService._index_root()` groups a sharded GGUF by `match.group("base")`. For a shard name such as `model-00001-of-00002.gguf`, the directory path is not included in that group key.
 
 Therefore:
@@ -305,6 +342,8 @@ A runtime launched on a custom port such as 9000 can therefore report the first 
 
 **Severity: Medium — Priority: P1/P2 — Confidence: High**
 
+**Status: Closed 2026-09-05 — [FIXED-425](FIXED_ITEMS.md#fixed-425--a-method-whose-contract-was-to-return-health-raised-instead).**
+
 Both OpenAI-compatible and Anthropic provider `health()` implementations catch a selected list of provider exceptions and return `ProviderHealth`.
 
 Their shared status classification can also raise other expected provider-domain exceptions such as quota exhaustion and workspace-required/invalid-workspace errors. Those classes are not included in the reviewed health catch lists.
@@ -318,6 +357,8 @@ Therefore a method whose interface normally returns `ProviderHealth` can instead
 ## GCR-31 — Anthropic thinking budget clamp can create an impossible request
 
 **Severity: Medium/High — Priority: P1 — Confidence: High**
+
+**Status: Closed 2026-09-05 — [FIXED-426](FIXED_ITEMS.md#fixed-426--a-thinking-budget-that-left-the-answer-nothing).**
 
 For the budgeted reasoning spelling, the code calculates:
 
@@ -433,6 +474,8 @@ Thread identifiers are numeric identities that can be reused after a thread exit
 
 **Severity: Medium/High — Priority: P1 — Confidence: High**
 
+**Status: Closed 2026-09-05 — [FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence).**
+
 The root FastAPI lifespan loops through scheduler work with separate blocks such as:
 
 ```python
@@ -451,6 +494,8 @@ Isolation between passes is good, but the outer suppression records no log entry
 ## GCR-39 — One scheduled-task exception aborts the remainder of the batch
 
 **Severity: Medium/High — Priority: P1 — Confidence: High**
+
+**Status: Closed 2026-09-05 — [FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence).**
 
 `TaskScheduler.run_due()` claims a collection of due tasks, then iterates them without a per-task `try/except` around the full turn execution. A provider/storage/runtime exception from one `AgentGateway.submit_prompt_async()` therefore escapes `run_due()`.
 
@@ -628,24 +673,24 @@ The order below combines the new third-pass findings with the most important fir
 
 | Order | Finding | Priority | Effort | Recommended action |
 |---:|---|---:|---|---|
-| 1 | GCR-19 conversion cleanup data loss | **P0** | Low-Medium | Stop directory-wide deletion; persist exact operation-owned artifacts/staging dir |
-| 2 | GCR-20 operation CAS/state machine | P1 | Medium | Atomic expected-state transitions |
-| 3 | GCR-21 retry state validation | P1 | Low | Retry only failed/cancelled and atomically claim |
-| 4 | GCR-23 HF cancel overwrite | P1 | Low-Medium after GCR-20 | Unify worker + CAS completion |
+| 1 | GCR-19 conversion cleanup data loss | **P0** | Low-Medium | Stop directory-wide deletion; persist exact operation-owned artifacts/staging dir — **Closed** |
+| 2 | GCR-20 operation CAS/state machine | P1 | Medium | Atomic expected-state transitions — **Closed** |
+| 3 | GCR-21 retry state validation | P1 | Low | Retry only failed/cancelled and atomically claim — **Closed** |
+| 4 | GCR-23 HF cancel overwrite | P1 | Low-Medium after GCR-20 | Unify worker + CAS completion — **Closed** |
 | 5 | GCR-01 provider launch configuration | P1 | Low | Route validation through `_factory(profile)` |
 | 6 | GCR-02 provider client leak | P1 | Low | Avoid constructing transport for validation or close it deterministically |
 | 7 | GCR-03 reasoning profile mismatch | P1 | Low | Resolve actual selected/default profile |
-| 8 | GCR-27 GGUF shard grouping | P1 | Low-Medium | Include relative parent + validate shard totals |
-| 9 | GCR-30 provider health exception completeness | P1/P2 | Low | Complete health classification tests |
-| 10 | GCR-31 Anthropic budget clamp | P1 | Low | Validate minimum reasoning/output budget |
+| 8 | GCR-27 GGUF shard grouping | P1 | Low-Medium | Include relative parent + validate shard totals — **Closed** |
+| 9 | GCR-30 provider health exception completeness | P1/P2 | Low | Complete health classification tests — **Closed** |
+| 10 | GCR-31 Anthropic budget clamp | P1 | Low | Validate minimum reasoning/output budget — **Closed** |
 | 11 | GCR-06 global command workspace | P0/P1 | Medium | Pass workspace explicitly; remove mutable global |
 | 12 | GCR-08 transactional instance creation | P1 | Medium | Stage/register then publish/mount atomically |
 | 13 | GCR-28 local runtime concurrency | P1 | Medium | Atomic slot supervisor |
 | 14 | GCR-33 OAuth refresh single-flight | P1 | Medium | Per-credential lease/CAS refresh |
-| 15 | GCR-38 scheduler health visibility | P1 | Low-Medium | Record/log pass failures and degraded health |
-| 16 | GCR-39 per-task scheduler containment | P1 | Low-Medium | Catch/land failures per claimed task |
+| 15 | GCR-38 scheduler health visibility | P1 | Low-Medium | Record/log pass failures and degraded health — **Closed** |
+| 16 | GCR-39 per-task scheduler containment | P1 | Low-Medium | Catch/land failures per claimed task — **Closed** |
 | 17 | GCR-40 event dual-write recovery | P1 | Medium-High | Journal/reconcile or choose one authoritative store |
-| 18 | GCR-22 initial HF background execution | P1 | Medium | Use one durable worker for initial/retry |
+| 18 | GCR-22 initial HF background execution | P1 | Medium | Use one durable worker for initial/retry — **Closed** |
 | 19 | GCR-24 cancellable conversion | P1 | Medium-High | Managed process/container handle + cancellation |
 | 20 | GCR-25 durable operation runner/recovery | P1 | High | App-owned job leases/restart recovery |
 | 21 | GCR-26 content-valid provenance fingerprint | P1 | Medium | Hash source content/trusted file digests |

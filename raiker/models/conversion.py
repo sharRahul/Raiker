@@ -114,7 +114,7 @@ class DockerConversionRunner:
             quantization=preview.quantization,
             output_path=str(result.resolve()),
         )
-        (output / f"{result.name}.provenance.json").write_text(
+        _provenance_path(output, result).write_text(
             json.dumps(provenance.to_dict(), sort_keys=True, indent=2), encoding="utf-8"
         )
         intermediate.unlink(missing_ok=True)
@@ -234,6 +234,23 @@ def _output_paths(preview: ConversionPreview) -> tuple[Path, Path]:
         output / f"{stem}.bf16.gguf",
         output / f"{stem}.{preview.quantization}.gguf",
     )
+
+
+def _provenance_path(output: Path, result: Path) -> Path:
+    return output / f"{result.name}.provenance.json"
+
+
+def conversion_artifacts(preview: ConversionPreview) -> tuple[Path, ...]:
+    """Every path this conversion can create — and nothing else it may delete.
+
+    The output directory is a *library* directory the owner chose: converting a
+    second model into it is the ordinary case, so the directory is never the
+    boundary of a cleanup. These three paths are, and they are derived here
+    rather than at each call site so the runner that writes them and the
+    cleanup that removes them cannot drift apart (GCR-19).
+    """
+    intermediate, result = _output_paths(preview)
+    return (intermediate, result, _provenance_path(Path(preview.output), result))
 
 
 def _source_fingerprint(source: Path, revision: str) -> str:

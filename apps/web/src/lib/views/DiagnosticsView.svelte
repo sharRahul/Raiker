@@ -215,6 +215,49 @@
     </section>
 
     <!--
+      GCR-38 — the host tick's four background passes. Each was wrapped in
+      `with suppress(Exception)`: isolated from the others, which is right, and
+      silent, which is not. A pass could throw every fifteen seconds for days
+      while this page reported a healthy runtime, because nothing counted it and
+      no surface could show it. Failing passes come first, and a pass that is
+      fine is one line — the failure is what needs the words.
+    -->
+    <section class="card" aria-labelledby="diag-workers-h">
+      <h2 id="diag-workers-h">Background passes</h2>
+      <p class="sub">
+        The scheduled work the host runs every fifteen seconds. A pass is isolated from the
+        others, so one failing pass never stops the rest — and is recorded here rather than
+        swallowed.
+      </p>
+      {#if diag.background_workers.length === 0}
+        <p class="sub">No pass has run yet on this host.</p>
+      {:else}
+        <ul class="monitor">
+          {#each diag.background_workers as worker (worker.pass_name)}
+            <li>
+              <Badge
+                variant={worker.healthy ? "implemented" : "approval-required"}
+                label={worker.healthy ? "ok" : `${worker.consecutive_failures} in a row`}
+              />
+              <span class="monitor-code">{humanize(worker.pass_name)}</span>
+              {#if !worker.healthy && worker.last_error_class}
+                <span class="mono">{worker.last_error_class}</span>
+              {/if}
+              <span
+                class="monitor-when"
+                title={worker.last_success_at ?? worker.updated_at}
+              >
+                {worker.last_success_at
+                  ? `succeeded ${relativeTime(worker.last_success_at)}`
+                  : "never succeeded"}
+              </span>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </section>
+
+    <!--
       Only the readiness checks that FAILED, and only because a failure carries a
       remediation the tiles above cannot fit. The passing ones were a tick list
       restating "Runtime: Ready", which the tile at the top of this page already

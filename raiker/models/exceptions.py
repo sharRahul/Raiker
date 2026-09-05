@@ -408,6 +408,15 @@ _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
         "this model would not think before answering, in any form this provider "
         "offers. Set Thinking back to default, or choose a model that supports it.",
     ),
+    # GCR-31 — the model and the provider are both fine; the turn's own output
+    # limit is too small to hold a minimum thinking budget and an answer. The
+    # remediation is the number, so the sentence names it.
+    (
+        "reasoning_budget_exceeds_output_limit",
+        "this turn's maximum output is too small to hold both the model's minimum "
+        "thinking budget and an answer. Raise the maximum output tokens for this "
+        "profile on Models, or set Thinking back to default.",
+    ),
 )
 
 

@@ -251,11 +251,19 @@ export async function connectHostedProvider(
   await page.locator(".signin-connect").click();
   await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
   // The Reconnect path opens **Model details** to reach the control, and saving
-  // a credential does not close it — so a spec run against a workspace that
-  // already had the provider connected left a modal over the card and every
-  // later click hit the overlay instead. Close it here rather than in each
-  // caller: the reconnect route is the one an already-configured workspace
-  // always takes, so this is the common case, not the edge one.
+  // a credential used to leave that modal sitting over the card it had just
+  // changed. `saveConnection` closes both the sign-in dialog and Details itself
+  // now, so this is a *guard*, not the fix: wait for the sign-in overlay to go,
+  // then close Details only if the product has not already.
+  //
+  // Waiting for the overlay first is the whole point. Found 2026-09-05 running
+  // this helper against a workspace that already held the connection: the
+  // Details close button is behind the sign-in overlay while it is still
+  // mounted, so an unconditional click resolved the button, waited for it to be
+  // "stable", and then spent the spec's whole timeout being told the overlay
+  // intercepts pointer events — reported as a slow click on a button nobody
+  // needed to press.
+  await expect(page.locator(".signin-overlay")).toHaveCount(0, { timeout: 60_000 });
   const detailsClose = page.getByRole("button", { name: "Close model details" });
   if (await detailsClose.isVisible().catch(() => false)) {
     await detailsClose.click();

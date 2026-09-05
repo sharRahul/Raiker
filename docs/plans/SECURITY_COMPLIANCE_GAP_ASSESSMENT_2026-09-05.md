@@ -2,549 +2,1124 @@
 
 ## Purpose
 
-This plan records Raiker's current security posture against current application-security, AI/GenAI/agent-security, privacy, data-loss-prevention, supply-chain, and AI-governance expectations. It is a **static architecture/code/documentation assessment and remediation plan**, not a penetration test, legal opinion, certification, production configuration review, or proof of operational compliance.
+This plan records Raiker's current security posture against current application-security, AI/GenAI/agent-security, privacy, data-loss-prevention, supply-chain, software-product-security, and AI-governance expectations.
+
+It is a **static architecture/code/documentation assessment and remediation plan**, not a penetration test, legal opinion, certification, production-configuration review, or proof of operational compliance.
 
 The review uses implementation evidence as the primary source. Documentation-only claims are not treated as implemented controls unless a corresponding enforcement path exists.
 
-## Benchmark set
+This revision includes a **second-pass review** focused on issues that were underrepresented in the first pass: agentic AI risks, AI secure development, model/AI supply chain, RAG/vector security, memory poisoning, MCP trust, multimodal injection, model-output rendering, delegated identity, approval integrity, cryptographic/key lifecycle, backup/restore security, coordinated vulnerability disclosure/PSIRT, cross-agent security, AI release evaluations, fail-safe degradation, UK privacy, and EU Cyber Resilience Act readiness.
 
-Primary benchmarks reviewed for this assessment:
+---
 
-- OWASP Top 10:2025 and OWASP ASVS 5.0.0.
+# 1. Benchmark set
+
+## 1.1 Application and API security
+
+Primary application-security baselines:
+
+- OWASP Top 10:2025.
+- OWASP ASVS 5.0.0.
 - OWASP API Security Top 10:2023.
-- OWASP GenAI LLM Top 10:2026 (released 2026-08-03).
-- OWASP Agent Control Standard (ACS, released 2026-09-01) and relevant OWASP GenAI/agentic security guidance.
-- NIST AI RMF 1.0 and NIST AI 600-1 Generative AI Profile.
-- MITRE ATLAS, including prompt-injection, agent-context/tool poisoning, tool invocation, credential discovery/misuse, AI-service data access/exfiltration, and AI supply-chain attack paths.
-- Google Secure AI Framework (SAIF): input/output validation, least-privilege agent permissions, observability, red teaming, data controls and governance.
-- OpenAI agent-security guidance: least privilege, explicit user confirmation for consequential actions, restricted app/tool access, prompt-injection resilience and monitoring.
-- Microsoft AI security and Purview DLP practices: prompt-injection protection, sensitive-information classification, contextual DLP policy, audit/block/warn actions, endpoint/network controls.
-- AWS security/DLP patterns including continuous sensitive-data discovery, findings, coverage reporting, encryption and retention.
-- GitHub Actions secure-use guidance: least-privilege workflow permissions, immutable SHA pinning, secret protection, code scanning, dependency review and supply-chain controls.
-- EU GDPR, particularly Arts. 5, 6, 12–22, 24–25, 28, 30, 32–36 and international-transfer obligations where applicable.
-- Regulation (EU) 2024/1689 (EU AI Act), including provisions already applicable and the general application date of 2026-08-02; Article 50 transparency obligations now apply. Exact provider/deployer/GPAI/high-risk obligations depend on Raiker's actual placing-on-market and use cases and therefore require a formal role/applicability determination rather than assumptions from source code.
-- EDPB Opinion 28/2024 on personal-data processing in the context of AI models.
+- OWASP SSRF, authentication, session-management, secrets-management, logging and secure-file-processing guidance where relevant.
 
-## Status vocabulary
+## 1.2 AI, GenAI, LLM and agentic security
+
+Primary AI/agent security baselines:
+
+- OWASP GenAI LLM Top 10:2026.
+- OWASP Agent Control Standard (ACS), released 2026-09-01.
+- OWASP Top 10 for Agentic Applications 2026.
+- OWASP GenAI guidance for securely using third-party MCP servers and securely developing MCP servers.
+- NIST AI RMF 1.0.
+- NIST AI 600-1 Generative AI Profile.
+- NIST SP 800-218 SSDF 1.1.
+- NIST SP 800-218A, Secure Software Development Practices for Generative AI and Dual-Use Foundation Models.
+- MITRE ATLAS, including prompt injection, agent-context poisoning, tool poisoning/tool invocation, credential discovery/misuse, AI-service data access/exfiltration, persistence, AI artifact/supply-chain compromise, and response-rendering attack paths.
+- ENISA Multilayer Framework for Good Cybersecurity Practices for AI: cybersecurity foundations, AI-specific cybersecurity, and sector-specific controls.
+
+## 1.3 Leading-provider practices
+
+Provider and platform recommendations considered:
+
+- Google Secure AI Framework (SAIF): input/output validation, contextual least privilege, agent/tool controls, monitoring, red teaming, data governance and supply-chain controls.
+- OpenAI agent-security guidance: least privilege, explicit user confirmation for consequential actions, restricted tool/app access, prompt-injection resilience, monitoring and safe delegation.
+- Microsoft AI security and Purview DLP practices: sensitive-information classification, contextual policy, monitor/warn/block actions, data-boundary controls and auditability.
+- AWS security/DLP patterns: continuous sensitive-data discovery, encryption, findings, coverage reporting, least privilege and retention.
+- GitHub secure-use guidance: least-privilege workflow permissions, immutable action pinning, secret protection, code scanning, dependency review and supply-chain controls.
+
+## 1.4 Privacy, AI regulation and product-security regulation
+
+Regulatory/privacy baselines:
+
+- EU GDPR, particularly Arts. 5, 6, 12–22, 24–25, 28, 30, 32–36 and international-transfer obligations where applicable.
+- EDPB Opinion 28/2024 on personal-data processing in the context of AI models.
+- Regulation (EU) 2024/1689 (EU AI Act), including obligations already applicable by 2026-09-05 and Article 50 transparency requirements.
+- UK GDPR and Data Protection Act 2018 for UK operating/distribution contexts.
+- Regulation (EU) 2024/2847, Cyber Resilience Act (CRA), where Raiker qualifies as a product with digital elements placed on the EU market.
+  - CRA Article 14 reporting obligations apply from **2026-09-11**.
+  - General CRA application is from **2027-12-11**.
+  - Applicable manufacturers must report actively exploited vulnerabilities and severe security incidents, with an early warning within 24 hours and a fuller notification within 72 hours through the CRA reporting mechanism.
+- NIS2/DORA/sectoral rules are **conditional overlays**, not assumed universally applicable to Raiker.
+
+---
+
+# 2. Status vocabulary
 
 - **Aligned** — direct implementation evidence supports the control objective.
-- **Partially aligned** — meaningful control exists but coverage, assurance, configuration or lifecycle completeness is missing.
-- **Gap** — no sufficient implementation or governance evidence was identified for the stated objective.
-- **Applicability TBD** — legal/product applicability depends on deployment, business role, data flows or intended-use facts not provable from the repository.
-- **Operational evidence required** — code support exists but runtime configuration/process evidence is still required.
+- **Partially aligned** — meaningful control exists but coverage, assurance, configuration, lifecycle completeness or evidence is missing.
+- **Gap** — no sufficient implementation/governance evidence was identified.
+- **Applicability TBD** — legal/product applicability depends on deployment, distribution model, business role, data flows or intended use.
+- **Operational evidence required** — implementation support exists, but runtime/process evidence is still required.
 
 Priority:
 
 - **P0** — release/public-exposure blocker or bypass of a core security boundary.
 - **P1** — high-value security/compliance remediation for the next hardening cycle.
-- **P2** — material defense-in-depth / assurance improvement.
+- **P2** — material defense-in-depth/assurance improvement.
 - **P3** — maturity, evidence and operational-quality improvement.
 
 ---
 
-# Executive assessment
+# 3. Executive assessment
 
-Raiker already has an unusually strong **governed-agent architecture** for an open application: explicit runtime authority/capability mapping, approval and critical-confirmation concepts, tool/service capability gates, credential-aware redaction, event/audit concepts, checkpoint/recovery support, sandbox/container execution paths, web egress policy, source provenance and prompt-injection detection. These design choices align well with OWASP ACS, OWASP LLM/agentic guidance, Google SAIF and leading-provider advice that model output must never itself be an authority boundary.
+Raiker already has an unusually strong **governed-agent architecture** for an open AI application: explicit runtime authority/capability mapping, approval and critical-confirmation concepts, tool/service capability gates, credential-aware redaction, event/audit concepts, checkpoint/recovery support, sandbox/container execution paths, web egress policy, source provenance and prompt-injection detection.
 
-The largest remaining risk is **control completeness and demonstrable assurance**, not the absence of a governance layer. A mature release posture now needs to prove that every ingress, model call, retrieved source, tool call, plugin, subagent, connector, network path, file mutation and outbound disclosure crosses enforceable policy boundaries, and that data-protection obligations are handled as lifecycle controls rather than only log redaction.
+The largest remaining risk is **control completeness and demonstrable assurance**, not the absence of a governance layer. A mature Raiker release must prove that every ingress, model call, retrieved chunk, memory write/recall, tool call, plugin, MCP server, subagent, connector, scheduled action, file mutation, credential loan and outbound disclosure crosses enforceable non-model security boundaries.
 
-### Overall judgement
+The second pass adds an important conclusion:
+
+> **Raiker must treat authority, data, identity and provenance as separate security planes. A safe network destination is not automatically an authorised data destination; a model suggestion is not authority; a trusted agent is not a trusted subagent; a retrieved source is not an instruction; and a successful approval is valid only for the exact action that was previewed.**
+
+## 3.1 Overall judgement
 
 | Domain | Status | Summary |
 |---|---|---|
-| Agent authority / least privilege | **Aligned / verify exhaustiveness** | Strong central capability mapping and explicit approval constructs; add an automated no-bypass invariant for every executable capability. |
-| Prompt injection / untrusted content | **Partially aligned** | Detection + provenance exists and does not pretend regex is a complete prevention layer; scanner sampling and adversarial assurance should be strengthened. |
-| Tool / excessive-agency controls | **Aligned / verify exhaustiveness** | Capability gates and human confirmation design are strong; continuously prove new tools cannot execute outside authority routing. |
-| Web / SSRF / egress | **Strongly aligned** | Public-address-only resolution and DNS-rebinding-aware transport are strong. Owner web posture is permissive-by-default for public internet and therefore needs outbound DLP/domain-risk policy above network reachability. |
-| Authentication / session security | **Partially aligned** | Bearer/cookie distinction, revocation/expiry/scopes and CSRF handling are positive; complete ASVS verification remains required. |
-| Browser hardening | **Partial / gap** | Useful response headers and conditional HSTS exist; no Content-Security-Policy was identified in the reviewed security-header middleware. |
-| API abuse / resource consumption | **Partial** | Rate and declared body-size limits exist; actual streamed-byte enforcement and model/tool cost quotas need verification/strengthening. |
-| DLP / sensitive-data protection | **Partial** | Strong secret/credential redaction exists, but DLP needs a broader classify → decide → block/warn/quarantine → audit lifecycle across prompts, RAG, tools and egress. |
-| Secrets / credentials | **Strong partial** | Exact in-use secrets can be registered and redacted; repository/CI secret prevention and provider-secret lifecycle need continuous assurance. |
-| Data-at-rest protection | **Strong partial** | SQLCipher-related CI posture is visible; key lifecycle, backup/export behavior, deletion propagation and recovery evidence must be formally controlled. |
-| Logging / audit / observability | **Strong partial** | Architecture contains event/audit/security-finding mechanisms; define security-event taxonomy, retention, integrity verification and incident playbooks as measurable release criteria. |
-| Supply chain / CI/CD | **Partial** | CI uses full SHA pins for reviewed GitHub actions and runs tests/lint/type checks/native tests; add explicit least-privilege permissions, CodeQL/SAST, dependency review/SBOM/provenance and secret-scanning evidence. |
-| GDPR | **Partial / applicability-dependent** | Privacy-preserving technical controls exist, but repository evidence is not a substitute for ROPA, lawful-basis mapping, notices, rights workflows, processor/transfer records, DPIA criteria and breach procedures. |
-| EU AI Act | **Partial / applicability TBD** | Human-governance, logging and security architecture are favorable; formal role/risk classification and current transparency/compliance artifacts are required now that most provisions and Article 50 apply. |
-| MITRE ATLAS / adversarial assurance | **Partial** | Architecture addresses several ATLAS attack classes; establish a maintained ATLAS threat/control/test matrix and adversarial regression suite. |
+| Agent authority / least privilege | **Aligned / verify exhaustiveness** | Strong central capability mapping and human-confirmation constructs; add machine-enforced no-bypass invariants. |
+| OWASP Agentic Top 10 coverage | **Partial** | Architecture addresses several risks implicitly; explicit risk → control → test mapping is missing. |
+| Prompt injection / untrusted context | **Partial** | Detection/provenance exists; complete chunk/multimodal/tool-result coverage and adversarial tests are needed. |
+| Tool / excessive-agency controls | **Aligned / verify exhaustiveness** | Capability gates are strong; direct-executor escape paths must be continuously disproved. |
+| Delegated identity / subagents | **Partial** | Subagent governance exists conceptually; attenuated identity/capability inheritance and anti-laundering invariants need explicit assurance. |
+| MCP security | **Partial / gap** | MCP is governed as a capability, but server identity, schema/tool drift, tool poisoning, trust and approval-binding require deeper controls. |
+| Web / SSRF | **Strongly aligned** | Public-only address checks and DNS-rebinding-aware logic are strong. |
+| Outbound DLP / destination policy | **Partial** | Network reachability is separated from some governance, but a full data-disclosure policy plane is not yet evidenced. |
+| RAG/vector/embedding security | **Partial / gap** | Privacy/retention concepts exist; retrieval ACL propagation, poisoning controls and vector namespace isolation require explicit controls/tests. |
+| Long-term memory security | **Partial** | Memory is governed, but durable context poisoning, contamination and compaction integrity need dedicated controls. |
+| Multimodal input security | **Gap / not fully evidenced** | Text injection handling does not prove equivalent controls for images, PDFs, metadata, OCR/audio or embedded active content. |
+| Model-output/rendering security | **Partial** | Browser headers help, but model-generated HTML/Markdown/SVG/URLs/files/terminal output need explicit safe-rendering controls. |
+| Browser hardening | **Partial / gap** | Useful security headers exist; CSP was not identified in reviewed middleware. |
+| API abuse / resource consumption | **Partial** | Rate/body-size guardrails exist; streamed-byte, token/cost, recursion, CPU/memory and fan-out budgets need strengthening. |
+| DLP / sensitive data | **Partial** | Strong credential redaction exists; classify/decide/enforce/block/warn/quarantine controls are incomplete. |
+| Secrets lifecycle | **Strong partial** | Runtime redaction is good; vaulting, scope, rotation, child-process inheritance and crash-dump protections need explicit assurance. |
+| Cryptographic/key lifecycle | **Partial** | SQLCipher posture is positive; master-key storage, rotation, backup/recovery and crypto agility need a formal design. |
+| Backup/restore security | **Partial** | Checkpoints exist; restore must not bypass revocation, GDPR deletion or malicious-state quarantine. |
+| Software supply chain | **Partial** | SHA-pinned actions/tests are positive; broaden SAST/SCA/SBOM/provenance/secret scanning. |
+| AI/model supply chain | **Gap / partial** | Model provenance, hashes/signatures, unsafe model formats/config/tokenizers/adapters and model registry trust need explicit controls. |
+| Logging/audit/observability | **Strong partial** | Good event concepts; integrity, taxonomy, retention, correlation and incident evidence requirements need formalisation. |
+| Incident response / PSIRT | **Partial / gap** | Security findings exist; a complete vulnerability intake, coordinated disclosure, emergency revocation and CRA-ready reporting process is needed. |
+| GDPR / UK GDPR | **Partial / applicability-dependent** | Strong technical ingredients; operational accountability artifacts remain required. |
+| EU AI Act | **Partial / applicability TBD** | Governance architecture is favourable; formal role/risk/transparency applicability register is required. |
+| EU CRA | **Applicability TBD / urgent readiness** | Determine manufacturer/product applicability now; Article 14 reporting begins 2026-09-11 where applicable. |
+| MITRE ATLAS / adversarial assurance | **Partial** | Multiple ATLAS techniques are addressed architecturally; maintain a live threat-control-test matrix. |
+| AI release security evaluation | **Gap / partial** | Standard tests exist; adversarial AI-specific release gates and regression thresholds need formalisation. |
 
 ---
 
-# Confirmed strengths
+# 4. Core Raiker security invariants
+
+These should be treated as non-negotiable architectural invariants and eventually machine-tested.
+
+## INV-01 — Authority can originate only from the governed runtime
+
+> No model, agent, subagent, memory, retrieved document, plugin, MCP server, connector, tool result, scheduled task or external message may create, expand, transfer or exercise authority. Authority may only originate from authenticated human policy or an explicitly delegated, bounded, auditable grant issued by the Raiker runtime.
+
+## INV-02 — Untrusted content is data, never authority
+
+Content from the web, documents, email, chat, repositories, MCP/tool outputs, OCR, images, audio, memory or RAG may inform reasoning but may not change permissions, approvals, policy, credential scope or destination policy.
+
+## INV-03 — Approval is bound to exact intent and exact effects
+
+Every approval must be cryptographically/logically bound to the exact actor, target, tool, arguments, expected effects, destination, data classification, credential scope and expiry shown to the user. Any material change invalidates approval.
+
+## INV-04 — Data disclosure requires a separate DLP decision
+
+Passing authentication, tool policy, SSRF checks or an approval does not by itself authorise disclosure. Sensitive-data movement must pass destination-aware DLP/minimisation policy.
+
+## INV-05 — Delegation only reduces privilege
+
+A subagent, plugin, MCP server or child process may receive equal or lower privilege than its parent grant, never greater privilege. Delegation must be time-bound, purpose-bound and revocable.
+
+## INV-06 — Security-service failure fails safely
+
+Failure/unavailability of DLP, policy evaluation, approval verification, credential brokerage, provenance verification or critical audit functions must not silently convert to `allow`.
+
+## INV-07 — Restore cannot resurrect forbidden state
+
+Restore/checkpoint/backup operations must re-apply current policy, credential revocation, deletion requirements, malware/trust checks and compatibility validation before state becomes active.
+
+---
+
+# 5. Confirmed strengths
 
 ## S-01 — Central runtime authority and explicit capability vocabulary
 
 **Status: Aligned**
 
-`raiker/runtime/authority/router.py` maps tools and high-impact services to explicit capability gates, including file/patch writes, memory mutation, git push, shell, remote/cloud execution, web access, plugins, hosted/private model runtimes, connectors, MCP, subagents, external channels and sensitive-domain runtimes. It also defines non-allow decisions and a critical-confirmation object intended to be produced only after human/step-up validation.
+`raiker/runtime/authority/router.py` maps tools and high-impact services to explicit capability gates, including file/patch writes, memory mutation, git push, shell, remote/cloud execution, web access, plugins, hosted/private model runtimes, connectors, MCP, subagents, external channels and sensitive-domain runtimes. It also defines non-allow decisions and critical human-confirmation structures.
 
-**Why this matters:** this is directly consistent with OWASP ACS and SAIF's requirement that agent permissions be bounded outside the model and that runtime actions remain controllable and auditable.
+**Recommendation:** preserve this as the mandatory reference-monitor architecture and make its coverage machine-verifiable.
 
-**Recommendation:** preserve this as a mandatory reference-monitor architecture. Make gate coverage machine-verifiable; never rely on developers remembering to add a capability mapping.
-
-## S-02 — Prompt injection treated as an untrusted-data problem, not only a prompt-filter problem
+## S-02 — Prompt injection treated as an untrusted-data problem
 
 **Status: Aligned design / partial assurance**
 
-`raiker/security/injection_scan.py` detects instruction override, role impersonation, credential solicitation, exfiltration requests, tool coercion, approval bypass, hidden instructions and invisible-character techniques. Findings store redacted metadata/provenance rather than captured payload text. Importantly, the module states that detection is advisory and that structural authority/tool gates are the actual prevention boundary.
-
-That is the correct security model: prompt injection cannot currently be considered “solved” by a classifier or system prompt.
+`raiker/security/injection_scan.py` recognises instruction override, role impersonation, credential solicitation, exfiltration, tool coercion, approval bypass, hidden instructions and invisible-character techniques. Findings retain redacted metadata/provenance, and detection is advisory rather than incorrectly being treated as the security boundary.
 
 ## S-03 — SSRF and DNS-rebinding-aware web policy
 
 **Status: Strongly aligned**
 
-`raiker/runtime/web_policy.py` denies loopback, private, link-local, multicast, reserved and non-global addresses; handles IPv4-mapped IPv6 / alternate IP forms; blocks metadata/local naming patterns; validates all DNS answers and documents pinned transport to avoid validate-then-re-resolve DNS rebinding.
+`raiker/runtime/web_policy.py` denies loopback/private/link-local/multicast/reserved/non-global addresses, handles alternate IP forms, validates all DNS answers and is designed to prevent validate-then-re-resolve DNS rebinding.
 
-This is materially stronger than a simple hostname allow/deny check and maps well to OWASP SSRF/API unsafe-consumption controls.
-
-## S-04 — Credential and sensitive-token redaction
+## S-04 — Credential-aware redaction
 
 **Status: Aligned for redaction objective**
 
-`raiker/context/redaction.py` covers private keys, GitHub/OpenAI/AWS-like token shapes, bearer credentials, password/API-key assignments, email, card/account-style values, selected identifier patterns and a high-entropy fallback. It also supports an in-memory exact-secret registry so known credentials are removed even when their transformed output no longer resembles the original token format.
+`raiker/context/redaction.py` covers private keys, common token shapes, bearer credentials, password/API-key assignments, email, card/account-like values and high-entropy tokens. It also supports exact in-use secret registration so known credentials remain redacted even if transformed.
 
-**Important limitation:** redaction is one DLP control, not a complete DLP programme.
-
-## S-05 — Cookie CSRF handling and session/scoped authorization
+## S-05 — CSRF-aware cookie authentication and scoped sessions
 
 **Status: Partial/positive**
 
-`raiker/api/auth.py` distinguishes explicit bearer authorization from automatically attached browser cookies, applies CSRF validation to the cookie path, checks session revocation and expiry, resolves an active principal and validates required session scope.
+`raiker/api/auth.py` distinguishes explicit bearer headers from browser cookies, applies CSRF controls to the cookie path, checks expiry/revocation/active principals and validates required scopes.
 
 ## S-06 — Baseline HTTP hardening
 
 **Status: Partial/positive**
 
-`raiker/api/security.py` emits `X-Content-Type-Options`, frame denial, strict referrer policy, COOP/CORP and a restrictive Permissions-Policy; HSTS is available when the deployment is configured for it. It also provides API rate limiting and request-size handling.
+`raiker/api/security.py` includes `X-Content-Type-Options`, frame denial, strict referrer policy, COOP/CORP, Permissions-Policy and optional HSTS, plus API rate limiting and request-size handling.
 
-## S-07 — CI action immutability and security-relevant testing
+## S-07 — CI immutability and security-relevant tests
 
 **Status: Partial/positive**
 
-`.github/workflows/ci.yml` pins reviewed actions to full commit SHAs, runs the Python test suite, Ruff, mypy and compile checks, builds/tests the native runner on Linux and Windows, and verifies SQLCipher-related security characteristics.
-
-This aligns with GitHub's immutable-action recommendation. The workflow still needs the broader CI/CD hardening controls listed below.
+`.github/workflows/ci.yml` pins reviewed GitHub Actions to full commit SHAs and runs Python tests, Ruff, mypy, compilation, native Rust tests and SQLCipher security checks.
 
 ---
 
-# Gaps and required improvements
+# 6. First-pass gaps retained
 
-## F-01 — Add an enforceable “no authority bypass” invariant
+## F-01 — Enforce a machine-verifiable no-authority-bypass invariant
 
-**Priority: P0 before claiming universal governance**  
+**Priority: P0**  
 **Status: Partially aligned**
 
-A central router exists, but agent platforms regress when a new connector/tool/executor is added and directly invokes a side effect without the reference monitor.
-
-### Required change
-
-Create a generated registry/invariant test that fails CI when any executable capability can be reached without:
+Create registry/invariant tests that fail CI when a side-effecting capability can execute without:
 
 1. authenticated principal/session context where applicable;
 2. capability-gate evaluation;
 3. risk classification;
 4. policy/decision-mode evaluation;
 5. approval/critical confirmation when required;
-6. scoped credential loan only after authorization;
-7. audit event before/after execution;
+6. scoped credential loan after authorization;
+7. pre/post audit events;
 8. output/redaction/DLP handling;
-9. revocation/cancellation path where technically possible.
+9. cancellation/revocation where technically possible.
 
-Include tools, MCP, plugins, skills, connectors, subagents, scheduled routines, external channels, shell/process, file/git writes, hosted models, network and future tool registries.
+**Acceptance criterion:** introducing a deliberately bypassing tool/executor causes CI to fail.
 
-### Acceptance criterion
-
-A deliberately introduced test tool that attempts a direct side effect outside the broker/router must cause CI to fail.
-
----
-
-## F-02 — Content Security Policy not evidenced
+## F-02 — Add a production Content Security Policy
 
 **Priority: P1**  
-**Status: Gap in reviewed HTTP middleware**
+**Status: Gap in reviewed middleware**
 
-`raiker/api/security.py` provides several good security headers, but no `Content-Security-Policy` was identified in the reviewed response-header set.
+Implement nonce/hash-based CSP where practical. Explicitly constrain `default-src`, `script-src`, `style-src`, `img-src`, `font-src`, `connect-src`, `worker-src`, `frame-ancestors`, `base-uri`, `form-action` and `object-src`. Avoid `unsafe-eval`; minimise `unsafe-inline`.
 
-### Required change
-
-Implement a production CSP appropriate to the Vite/web application, preferably nonce/hash based and without `unsafe-eval`; minimize or remove `unsafe-inline`. Define explicit `default-src`, `script-src`, `style-src`, `img-src`, `font-src`, `connect-src`, `frame-ancestors`, `base-uri`, `form-action`, `object-src` and any worker/media needs. Keep `frame-ancestors 'none'` even though `X-Frame-Options: DENY` remains useful legacy defense.
-
-Start in report-only mode only for migration/telemetry, then make enforcement a release criterion.
-
----
-
-## F-03 — Request-size enforcement must cover actual streamed bytes
+## F-03 — Enforce request limits on actual streamed bytes
 
 **Priority: P1**  
 **Status: Partial**
 
-The reviewed middleware rejects an excessive declared `Content-Length`, but a security boundary cannot assume every request supplies a truthful length. Chunked/streamed bodies and base64 expansion must be bounded by bytes actually consumed.
+Do not rely only on declared `Content-Length`. Bound cumulative receive bytes, decompression ratios, archive nesting, parser memory/time, attachment types and base64 expansion.
 
-### Required change
-
-- enforce cumulative receive-body limits independent of `Content-Length`;
-- define separate caps for JSON, attachments, images/audio and connector payloads;
-- apply decompression limits and expansion ratios;
-- reject archive bombs/nested archives where archives are supported;
-- enforce parser time/memory budgets;
-- test missing, malformed and conflicting length/transfer encodings.
-
----
-
-## F-04 — Prompt-injection scanning coverage can miss middle-of-document attacks
+## F-04 — Make prompt-injection detection chunk-complete for context actually sent to models
 
 **Priority: P1**  
 **Status: Partial**
 
-The scanner intentionally examines a bounded window and for large text uses the head and tail. This can miss an indirect injection located in the middle of a long document.
+Large-document head/tail sampling can miss middle-of-document attacks. Scan each chunk actually entering model context and preserve provenance.
 
-### Required change
-
-Use chunk-aware scanning tied to source provenance/RAG chunking. Every chunk actually offered to a model should be assessed, not necessarily every byte of a huge source. Preserve the current principle that a detector is advisory and never the authority boundary.
-
-Add adversarial regression cases for:
-
-- multilingual/encoded/obfuscated injection;
-- Markdown/HTML comments and CSS-like hidden content;
-- Unicode confusables/invisible characters;
-- indirect injection in PDFs/web pages/code/issues/email;
-- tool-result and MCP-result injection;
-- context poisoning across memory/RAG;
-- instruction splitting across chunks/turns;
-- attempts to extract system instructions, credentials or connected-app data;
-- approval social engineering.
-
----
-
-## F-05 — Build a real DLP decision plane, not only redaction
+## F-05 — Build a real DLP decision plane
 
 **Priority: P1**  
 **Status: Partial**
 
-Raiker has useful sensitive-value redaction, but modern DLP requires classification and policy decisions before disclosure, not only masking data after it reaches a logging/output surface.
+Implement common `DataClassification` + `DlpDecision` contracts across prompts, attachments, RAG, memory, model-provider requests, tools/connectors, network egress, email/chat/calendar, exports, telemetry, plugins/MCP and subagents.
 
-### Required control model
+Minimum policy actions:
 
-Implement a common `DataClassification` + `DlpDecision` layer used by:
+- allow;
+- redact/tokenize;
+- warn + require confirmation;
+- block;
+- quarantine;
+- require narrower destination/scope;
+- explicit time-bound exception.
 
-- user prompt ingress;
-- attachment/document ingestion;
-- knowledge/RAG indexing and retrieval;
-- memory writes and recall;
-- model-provider requests;
-- tool/connector arguments;
-- web/network egress;
-- email/chat/calendar payloads;
-- clipboard/export/download where supported;
-- logs, traces, crash reports and telemetry;
-- plugin/MCP/subagent context sharing.
-
-Minimum classifications should support configurable organization policy rather than hard-code legal conclusions: public, internal, confidential, restricted; credentials/secrets; personal data; special-category/high-sensitivity personal data; financial/payment data; health data; source code/IP; organization-defined exact/custom identifiers.
-
-Minimum actions: allow, redact/tokenize, warn + require confirmation, block, quarantine, require a narrower destination/scope, or require explicit exception with reason and expiry.
-
-### DLP design requirements
-
-- destination-aware policy: local model vs approved private provider vs external SaaS must not be equivalent;
-- purpose/context-aware disclosure minimization;
-- per-field structured inspection rather than only regex over concatenated strings;
-- custom data identifiers and allowlists/exceptions;
-- detection confidence and false-positive handling;
-- audit only metadata/classification, never unnecessarily persist the matched secret;
-- policy simulation/dry-run mode;
-- exception expiry and review;
-- tests proving data cannot travel through a less-obvious alternate channel.
-
----
-
-## F-06 — Outbound internet policy protects networks but not data destinations
+## F-06 — Separate network reachability from disclosure authorization
 
 **Priority: P1**  
 **Status: Partial**
 
-The public-address SSRF boundary is strong, but the owner blocklist posture means any public destination is network-reachable unless specifically blocked. For an agent capable of reading sensitive local/connected data, network reachability and disclosure authorization must be separate decisions.
+Keep the strong SSRF guard, but add a higher-level destination policy considering destination trust, tool purpose, data classification, user-selected versus untrusted-content-selected destinations, redirects, methods, credential scope and volume anomalies.
 
-### Required change
-
-Keep the current SSRF guard, but add a higher-level egress policy that considers:
-
-- destination trust/category;
-- tool purpose;
-- data classification being sent;
-- user-requested destination vs destination originating in untrusted content;
-- redirect chain;
-- request method/content type;
-- credential scope;
-- approved domains for high-sensitivity disclosures;
-- volume/rate anomaly.
-
-A URL found inside untrusted content must never become sufficient authority to transmit user data to that URL.
-
----
-
-## F-07 — Extend resource-consumption controls to model/tool economics and concurrency
+## F-07 — Add model/tool/subagent resource and cost budgets
 
 **Priority: P1**  
 **Status: Partial**
 
-Per-IP fixed-window API limiting is useful but does not address LLM/API cost exhaustion or recursive agent/tool loops.
+Enforce per-turn/session/day ceilings for tokens, spend, retries, web downloads, tool calls, MCP calls, subagent depth/fan-out, scheduled routines, command duration, CPU, memory, storage and output bytes.
 
-Add principal/session/turn limits for:
+## F-08 — Expand CI/CD supply-chain controls
 
-- concurrent runs;
-- model tokens/cost and retries;
-- tool calls;
-- recursive subagent depth/fan-out;
-- MCP/plugin calls;
-- downloads and attachment expansion;
-- web requests and redirects;
-- command CPU/memory/time/disk/process counts;
-- scheduled-run budgets.
+**Priority: P1/P2**  
+**Status: Partial**
 
-On limit failure, fail closed for side effects and return a clear owner-visible reason.
+Add/verify:
+
+- explicit least-privilege workflow `permissions:`;
+- CodeQL/SAST;
+- dependency review/SCA;
+- SBOM generation;
+- build provenance/attestation;
+- release-artifact signing/verifiability;
+- secret scanning and push protection;
+- container/image scanning where applicable;
+- dependency pinning/update policy;
+- protected release workflow and environment approvals.
+
+## F-09 — Maintain MITRE ATLAS + OWASP ACS control/test mappings
+
+**Priority: P1/P2**
+
+For every applicable technique/control, record:
+
+`Threat → Attack path → Raiker boundary → Preventive control → Detective control → Audit event → Automated test → Residual risk`.
+
+## F-10 — Complete GDPR/UK GDPR accountability artifacts
+
+**Priority: P1/P2**  
+**Status: Partial / operational**
+
+Maintain:
+
+- ROPA/data inventory;
+- lawful-basis mapping;
+- special-category conditions where relevant;
+- controller/processor/subprocessor mapping;
+- privacy notices;
+- data-subject-rights workflows;
+- deletion propagation through memory, vector indexes, checkpoints, backups and provider copies;
+- retention schedules;
+- processor/transfer register;
+- breach procedure;
+- DPIA trigger/template;
+- hosted-provider data-minimisation tests.
+
+## F-11 — Formalise EU AI Act applicability
+
+**Priority: P1/P2**  
+**Status: Applicability TBD**
+
+Maintain a role/use-case register determining whether a deployment acts as provider, deployer, importer/distributor or other actor; whether it creates/uses high-risk systems; whether Article 50 transparency applies; and whether any GPAI-provider obligations attach to Raiker itself rather than the upstream model provider.
 
 ---
 
-## F-08 — Formalize supply-chain security beyond SHA-pinned Actions
+# 7. Second-pass findings and required improvements
+
+## SP-01 — Explicitly map OWASP Top 10 for Agentic Applications 2026
 
 **Priority: P1**  
 **Status: Partial**
 
-SHA-pinned actions are good. The repository should additionally make the following release controls explicit and machine-enforced:
+The first pass referenced agentic guidance but did not require an explicit control-by-control crosswalk.
 
-- top-level/job-level minimal `permissions:` for `GITHUB_TOKEN`;
-- CodeQL/SAST including GitHub Actions workflow analysis;
-- dependency review on pull requests;
-- Dependabot or equivalent dependency monitoring/update policy;
-- secret scanning + push protection (repository setting evidence, not source only);
-- Python/Rust/Node vulnerability scanning;
-- SBOM for release artifacts;
-- provenance/attestation and signed releases/artifacts where practical;
-- locked/reproducible dependency inputs and documented update policy;
-- plugin/MCP/skill package integrity, signature/hash/provenance policy;
-- container base-image digest pinning and vulnerability scanning;
-- protections for privileged workflow triggers and untrusted PR artifacts.
+Create `docs/security/OWASP_AGENTIC_TOP10_MAPPING.md` or equivalent mapping each OWASP Agentic risk to:
 
----
+- applicable Raiker surfaces;
+- prevention controls;
+- detection/telemetry;
+- human-control points;
+- abuse cases;
+- automated adversarial tests;
+- residual risk.
 
-## F-09 — Formalize AI/agent red-team and MITRE ATLAS regression coverage
+At minimum cover agent goal hijack, tool misuse, identity/privilege abuse, supply-chain compromise, unexpected code execution and unsafe multi-agent/delegation behaviour.
 
-**Priority: P1**  
-**Status: Gap in assurance artefacts**
-
-Create `docs/threat-models/` and test mappings that explicitly cover relevant MITRE ATLAS and OWASP attack paths, including:
-
-- direct and indirect LLM prompt injection;
-- agent context poisoning;
-- agent tool-data/tool poisoning;
-- malicious MCP/plugin/tool metadata;
-- unauthorized agent tool invocation;
-- system/configuration discovery;
-- credential discovery and alternate-authentication abuse;
-- sensitive-data collection from AI services;
-- exfiltration over web, connector, tool output, Git push and covert/encoded channels;
-- model/provider supply-chain compromise;
-- poisoned RAG/knowledge/memory;
-- unsafe model output passed to shell/code/HTML/SQL/path interpreters;
-- excessive agency / confused-deputy cases;
-- recursive agents/self-replication/persistence;
-- denial of wallet/service/resource exhaustion.
-
-Every high-risk scenario needs a deterministic expected outcome: deny, approval, sanitize, isolate, alert or bounded safe execution.
+**Acceptance criterion:** no applicable Agentic Top 10 item may be marked aligned without both implementation evidence and an executable test or documented operational evidence requirement.
 
 ---
 
-## F-10 — GDPR accountability artifacts are incomplete/not established by code
+## SP-02 — Adopt NIST SP 800-218A as an AI secure-development baseline
 
-**Priority: P1 if Raiker processes EU personal data in an applicable role**  
-**Status: Applicability TBD / governance gap**
+**Priority: P1/P2**  
+**Status: Gap in formal benchmark mapping**
 
-Technical controls such as encryption, redaction, access control and retention support help meet GDPR security/privacy-by-design objectives, but GDPR compliance cannot be inferred from them.
+Extend Raiker's SSDLC so model/AI-specific artifacts are governed like software artifacts.
 
-Create and maintain:
+Required controls:
 
-1. processing inventory / ROPA mapping data categories, purposes, data subjects, recipients, providers, locations and retention;
-2. controller/processor/subprocessor role mapping for each operating model;
-3. lawful-basis and, where relevant, special-category condition mapping;
-4. privacy notice(s) and just-in-time disclosures;
-5. data-subject rights workflow for access, correction, deletion, restriction, portability and objection where applicable;
-6. retention/deletion schedule including derived indexes, memory, vector stores, audit logs, checkpoints, backups and provider copies;
-7. processor contract/subprocessor and international-transfer register;
-8. personal-data breach detection, assessment and notification procedure;
-9. DPIA trigger and template; AI processing likely to create high risk must be assessed before use;
-10. privacy-by-default verification tests, including minimization before sending context to hosted models/connectors.
-
-EDPB Opinion 28/2024 should be considered for any model-development/deployment scenario involving personal data, including anonymity claims, legitimate-interest analysis and consequences of unlawfully processed training/deployment data.
+- provenance of models, datasets/adapters/configuration used in builds/tests;
+- threat modelling before new AI capabilities;
+- secure defaults;
+- protected build/release environments;
+- vulnerability/root-cause analysis;
+- AI-specific security tests before release;
+- documentation of security-relevant model/tool/provider assumptions.
 
 ---
 
-## F-11 — EU AI Act role, risk and transparency classification must be explicit
+## SP-03 — Establish EU Cyber Resilience Act readiness
 
 **Priority: P1 now**  
-**Status: Applicability TBD / governance gap**
+**Status: Applicability TBD / time-sensitive**
 
-The AI Act generally applies from **2026-08-02**, with earlier/later staged provisions. Article 50 transparency obligations also apply from 2026-08-02. Raiker must therefore have a documented applicability decision rather than a generic “AI Act compliant” statement.
+Raiker must determine whether its distribution model qualifies it as a manufacturer/provider of a product with digital elements under the CRA.
 
-### Required artifact
+Important dates:
 
-Create an AI Act applicability register that answers, per distribution/deployment mode:
+- **2026-09-11:** Article 14 vulnerability/severe-incident reporting obligations begin where applicable.
+- **2027-12-11:** general CRA application date.
 
-- Is the project/entity a provider, deployer, importer/distributor, product manufacturer, downstream provider, or more than one role?
-- Does Raiker place a GPAI **model** on the market, or does it consume third-party/local models as an AI **system**? Do not incorrectly inherit GPAI-model-provider duties merely because Raiker can call GPAI models.
-- What intended uses are supported/prohibited?
-- Can configuration produce a high-risk use under Annex III or Art. 6? If so, what product boundary/disclaimer/technical prevention applies?
-- Are any prohibited-practice scenarios technically possible and how are they blocked by product policy?
-- What Art. 50 transparency duties apply (e.g. informing people they are interacting with AI; generated/altered content obligations where applicable)?
-- Which logging, human oversight, technical documentation, quality/risk management, robustness/cybersecurity, incident/post-market obligations apply to each role/use?
-- Who owns AI literacy/training obligations and evidence?
+Required readiness work:
 
-Raiker's visible agent/governance UX should make human control and AI identity clear, but legal applicability must be signed off using actual product/distribution facts.
+- formal CRA applicability decision and evidence;
+- PSIRT/contact ownership;
+- actively exploited vulnerability triage;
+- severe security incident classification;
+- 24-hour early-warning workflow;
+- 72-hour main-notification workflow;
+- final-report workflow;
+- vulnerability remediation/SLA tracking;
+- supported-version/security-update policy;
+- vulnerability disclosure intake;
+- evidence preservation and notification audit trail.
+
+Do not state that Raiker is CRA-compliant until applicability and required operational processes are evidenced.
 
 ---
 
-## F-12 — Complete ASVS/API verification instead of relying on framework defaults
+## SP-04 — Add ENISA's multilayer AI cybersecurity framework
 
 **Priority: P2**  
+**Status: Gap in formal crosswalk**
+
+Map Raiker against ENISA's three-layer structure:
+
+1. cybersecurity foundations;
+2. AI-specific cybersecurity;
+3. sector-specific overlays where Raiker is deployed into regulated/high-risk environments.
+
+This helps prevent AI controls from being treated as a replacement for conventional platform security.
+
+---
+
+## SP-05 — Create an AI/model supply-chain trust boundary
+
+**Priority: P1**  
+**Status: Gap / partial**
+
+Software dependency controls are not sufficient for downloadable or externally hosted models.
+
+Required controls:
+
+- trusted model registries/sources;
+- immutable model/version identifiers where possible;
+- hash/signature verification for downloaded artifacts;
+- quarantine before activation;
+- provenance manifest covering provider/source, licence, model version, hash, format and trust decision;
+- block unsafe deserialization formats by default;
+- restrict executable/custom-code model loaders;
+- inspect/tokenize configuration separately from model weights;
+- protect against malicious tokenizers, templates, config hooks, adapters and LoRAs;
+- model substitution detection;
+- embedding-model provenance;
+- rollback/revocation for compromised models;
+- explicit trust level shown in the UI/control plane.
+
+Hosted providers also require provenance: endpoint, tenant/account, API version, model version/alias semantics and provider data-handling policy must be captured.
+
+---
+
+## SP-06 — Treat RAG/vector/embedding storage as an authorization boundary
+
+**Priority: P1**  
+**Status: Partial / gap**
+
+Required invariants:
+
+> Retrieval must never return content the requesting principal could not have directly read.
+
+Controls:
+
+- source ACLs propagated into chunks/embeddings;
+- project/user/tenant namespace isolation;
+- retrieval-time authorization, not ingestion-time authorization only;
+- source trust/provenance on every chunk;
+- poisoning detection/quarantine;
+- stale/superseded source handling;
+- deletion propagation into vectors/indexes/caches;
+- no cross-project similarity leakage;
+- restricted metadata filters cannot be model-controlled without validation;
+- embedding model/version changes trigger safe re-index/revalidation;
+- exact source links retained for audit/explanation.
+
+Adversarial tests must attempt cross-project retrieval, deleted-document retrieval, metadata filter bypass and poisoned-chunk influence.
+
+---
+
+## SP-07 — Add durable-memory poisoning and contamination controls
+
+**Priority: P1**  
 **Status: Partial**
 
-Run and document an ASVS 5.0-focused verification for the exposed web/API surface. At minimum verify:
+Memory creates persistence and therefore deserves a dedicated threat model.
 
-- authentication/session lifecycle, MFA/step-up, password hashing, recovery/bootstrap;
-- authorization on every object/function, not only route authentication;
-- CSRF/CORS/origin controls;
-- CSP and browser injection defenses;
-- request parsing/content types/schema validation;
-- file upload MIME/signature/size/decompression/path handling and malware policy;
-- command/path/template/HTML injection boundaries;
-- error handling with no secrets/internal stack exposure;
-- cache behavior for sensitive pages/API data;
-- TLS/HSTS public deployment rules;
-- logging and alerting;
-- API inventory/versioning/deprecation;
-- resource consumption and SSRF;
-- unsafe third-party API/connector consumption.
+Controls:
+
+- provenance for every memory;
+- classify source as user assertion, verified fact, model inference, tool result or external content;
+- untrusted external content may not silently become durable instruction/policy;
+- memory writes remain governed actions;
+- confidence/expiry/supersession metadata;
+- project/user isolation;
+- safe compaction/summarisation with provenance preservation;
+- rollback/forget capability;
+- detect repeated self-reinsertion/self-replication;
+- security-sensitive memories require stronger write policy;
+- memory recall cannot increase authority.
+
+Test indirect prompt injection → memory write → later privileged action as a full multi-turn attack chain.
 
 ---
 
-## F-13 — Define operational security evidence and release gates
+## SP-08 — Deepen MCP security beyond capability gating
+
+**Priority: P1**  
+**Status: Partial**
+
+MCP must be treated as an untrusted integration boundary even when the user intentionally connects a server.
+
+Controls:
+
+- strong MCP server identity and origin display;
+- explicit trust state;
+- tool catalogue/schema snapshot at approval/connection time;
+- detect tool-description/schema changes;
+- require reapproval for security-relevant tool drift;
+- protect against tool-name collisions/confusable names;
+- tool descriptions are untrusted data, not policy;
+- narrow OAuth/API scopes and audience-bound tokens;
+- credentials never exposed to tool descriptions/results;
+- per-tool capability mapping rather than blanket server trust;
+- outbound destination/DLP controls still apply to MCP-triggered actions;
+- confused-deputy protections;
+- server revocation/kill switch;
+- audit server identity + tool schema version/hash with each consequential invocation where practical;
+- remote MCP transports must receive the same SSRF/TLS/DLP scrutiny as other external services.
+
+**Approval integrity:** if a tool definition changes after approval, the old approval must not authorize the new semantics.
+
+---
+
+## SP-09 — Extend prompt-injection controls to multimodal and embedded content
+
+**Priority: P1/P2**  
+**Status: Gap / not fully evidenced**
+
+Treat as untrusted instruction-bearing surfaces:
+
+- images;
+- PDFs and hidden text/OCR layers;
+- document metadata/comments;
+- Office files;
+- HTML/SVG;
+- QR codes;
+- audio and transcripts;
+- EXIF/XMP metadata;
+- code comments/issues/commit messages;
+- generated thumbnails/previews.
+
+Controls:
+
+- maintain source/layer provenance;
+- strip or isolate active content before parsing;
+- detect mismatches between visible and hidden text where possible;
+- never execute embedded macros/scripts;
+- separate extraction from interpretation;
+- scan model-bound extracted chunks, not only raw container files.
+
+---
+
+## SP-10 — Secure model-output rendering and generated artifacts
+
+**Priority: P1**  
+**Status: Partial**
+
+Model output is attacker-influenced data and must not be rendered/executed as trusted UI content.
+
+Controls:
+
+- sanitize HTML/Markdown;
+- reject dangerous URL schemes (`javascript:`, unsafe `data:` use, file/custom protocols unless explicitly required); 
+- sanitize SVG and active content;
+- prevent automatic remote-resource fetching from rendered model output unless governed;
+- safe link previews;
+- phishing/external-domain indicators for generated links where useful;
+- filename/path canonicalization;
+- generated downloads treated as untrusted until scanned/validated;
+- terminal/ANSI/control-sequence sanitization;
+- escape logs and diagnostics for terminal/web viewers;
+- diagram/Markdown extensions must not create script execution paths.
+
+This should be mapped to MITRE ATLAS response-rendering/exfiltration techniques.
+
+---
+
+## SP-11 — Formalise agent/subagent/service identity
+
+**Priority: P1**  
+**Status: Partial**
+
+Required identity chain:
+
+`human → session → agent → subagent/plugin/MCP/tool → external service`
+
+Every hop should carry an auditable principal/delegation identity.
+
+Controls:
+
+- no implicit credential inheritance;
+- attenuated capabilities;
+- audience/purpose-bound credential grants;
+- short expiry;
+- explicit delegator identity;
+- maximum delegation depth;
+- revocation propagation;
+- human-only roles can never be assumed by AI principals;
+- downstream agents cannot assert that approval occurred; the runtime must verify it.
+
+---
+
+## SP-12 — Adversarially test human approvals
+
+**Priority: P1**  
+**Status: Partial**
+
+Test and prevent:
+
+- approval fatigue;
+- misleading/truncated summaries;
+- preview/execute argument mismatch;
+- target/path/destination substitution;
+- TOCTOU changes after approval;
+- replay/reuse;
+- expired approvals;
+- cross-session approval theft;
+- nested approvals hiding consequential actions;
+- bulk approvals that exceed intended scope;
+- model-generated social engineering around the approval UI;
+- post-approval tool/schema drift.
+
+**Acceptance criterion:** the execution broker recomputes a canonical action digest/fingerprint and rejects execution when the approved intent no longer matches.
+
+---
+
+## SP-13 — Expand secrets management from redaction to lifecycle controls
+
+**Priority: P1**  
+**Status: Strong partial**
+
+Required controls:
+
+- use OS keychain/secure vault abstractions where practical;
+- no plaintext persistence;
+- provider-specific isolation;
+- least-privilege OAuth scopes;
+- short-lived tokens/workload identity where available;
+- rotation and revocation UX;
+- credential use only after policy approval;
+- child processes receive only explicitly loaned secrets;
+- scrub unnecessary inherited environment variables;
+- prevent secrets from crash reports, telemetry and core dumps where practical;
+- exact-secret redaction remains active for the whole loan lifetime;
+- credential compromise creates immediate revoke-and-disable workflow.
+
+---
+
+## SP-14 — Formalise cryptographic and key-management architecture
+
+**Priority: P1/P2**  
+**Status: Partial**
+
+Document and test:
+
+- master-key generation/entropy;
+- KDF parameters;
+- OS-bound key storage (DPAPI/Keychain/Secret Service/TPM where suitable);
+- separation between data-encryption keys and wrapping keys;
+- key rotation;
+- migration/re-encryption;
+- secure deletion limitations;
+- backup/recovery key process;
+- encryption for attachments, vector data, checkpoints, audit exports and sensitive caches;
+- nonce/IV correctness;
+- crypto library/version policy;
+- crypto agility and algorithm deprecation plan.
+
+No custom cryptography.
+
+---
+
+## SP-15 — Make backup/checkpoint restore a governed security event
+
+**Priority: P1/P2**  
+**Status: Partial**
+
+Restore is potentially more privileged than a normal write because it can resurrect old state.
+
+Before activation of restored state, re-evaluate:
+
+- revoked credentials/tokens;
+- deleted personal data;
+- revoked plugins/MCP servers/models;
+- malware/quarantine state;
+- policy version compatibility;
+- principal/role changes;
+- secrets rotation;
+- schema/data migrations.
+
+Backups must have retention, encryption, integrity and deletion policy. Restores must be fully audited.
+
+---
+
+## SP-16 — Establish PSIRT, coordinated vulnerability disclosure and emergency control paths
+
+**Priority: P1**  
+**Status: Partial / gap**
+
+Maintain:
+
+- `SECURITY.md` with supported versions and reporting method;
+- private vulnerability reporting where available;
+- severity taxonomy;
+- triage/ownership SLAs;
+- patch/release process;
+- emergency kill switches for plugins/MCP/connectors/models/providers;
+- credential-compromise playbooks;
+- dependency/model compromise playbooks;
+- evidence preservation;
+- user notification criteria;
+- CVE/CNA process if/when appropriate;
+- CRA reporting decision tree where applicable.
+
+---
+
+## SP-17 — Threat-model abuse through Raiker, not only attacks against Raiker
+
+**Priority: P1/P2**  
+**Status: Gap / partial**
+
+Because Raiker can act, the security model must include misuse of legitimate capabilities.
+
+Define high-risk capability classes and controls for:
+
+- destructive commands/filesystem actions;
+- credential attacks;
+- bulk external messaging/spam;
+- high-volume crawling/scanning;
+- surveillance/home-security capabilities;
+- financial/medical/high-impact domains;
+- privacy-invasive aggregation;
+- persistence/autorun/service installation;
+- downloading/executing untrusted binaries;
+- large-scale automation.
+
+Apply proportional friction: deny, sandbox, require step-up, narrow scope, explicit confirmation, rate/budget constraints and audit.
+
+---
+
+## SP-18 — Add cross-agent and multi-agent trust controls
+
+**Priority: P1**  
+**Status: Partial**
+
+Prevent:
+
+- delegation loops;
+- privilege amplification;
+- trust laundering (`agent B says user approved`);
+- malicious inter-agent messages;
+- uncontrolled fan-out;
+- self-spawning persistence;
+- duplicated side effects;
+- unbounded spend;
+- collusion between agents/tools to bypass single-control limits.
+
+All agent-to-agent claims about permission must be treated as untrusted assertions and verified against the runtime authority store.
+
+---
+
+## SP-19 — Introduce AI-specific security evaluation gates
+
+**Priority: P1/P2**  
+**Status: Gap / partial**
+
+Create a maintained adversarial evaluation suite covering:
+
+- OWASP LLM Top 10:2026;
+- OWASP Agentic Top 10:2026;
+- OWASP ACS controls;
+- MITRE ATLAS attack chains;
+- DLP exfiltration cases;
+- MCP/tool poisoning;
+- RAG/memory poisoning;
+- multimodal injection;
+- approval manipulation;
+- delegated privilege escalation;
+- unsafe output rendering;
+- resource exhaustion;
+- compromised model/provider/tool simulations.
+
+Each release should produce machine-readable evidence: tests executed, pass/fail, known exceptions, residual risk and versioned baseline.
+
+Do not measure only refusal rate. Measure whether **authority boundaries remain intact even when the model is fully compromised**.
+
+---
+
+## SP-20 — Define fail-safe degradation for every security-critical dependency
+
+**Priority: P1**  
+**Status: Partial / operational evidence required**
+
+Explicitly define behaviour when:
+
+- policy engine unavailable;
+- DLP classifier unavailable;
+- audit store unavailable;
+- model provider unavailable;
+- vector index corrupted;
+- memory store corrupted;
+- MCP server unreachable/drifts;
+- credential vault unavailable;
+- sandbox runner fails;
+- checkpoint capture fails;
+- network/DNS validation fails;
+- security scanner times out.
+
+Security-critical enforcement failures should fail closed. Availability-only features may degrade safely if doing so does not weaken authority or disclosure controls.
+
+---
+
+## SP-21 — Add UK privacy/regulatory overlay
 
 **Priority: P2**  
-**Status: Gap / operational evidence required**
+**Status: Applicability-dependent**
 
-A safe architecture can be deployed unsafely. Add a release/security evidence checklist covering:
+Maintain a UK GDPR/Data Protection Act 2018 mapping alongside EU GDPR for UK operations/users/distribution. Keep EU and UK transfer mechanisms, regulator references and legal bases distinct where necessary.
 
-- public bind/TLS/reverse-proxy posture;
-- HSTS/CSP validation;
-- secret-scanning/push-protection status;
-- dependency/code/container scans;
-- SBOM/provenance/signature verification;
-- database encryption and key permissions;
-- backup encryption + restore test;
-- retention/deletion test;
-- DLP/adversarial test results;
-- event-integrity/audit verification;
-- incident-response contact/process;
-- approved provider/subprocessor list;
-- data residency/transfer configuration;
-- AI Act/GDPR applicability review date/owner.
+NIS2, DORA and sectoral requirements should remain optional deployment overlays unless Raiker or a customer deployment is actually in scope.
 
 ---
 
-# DLP control architecture target
+# 8. DLP target architecture
 
-Raiker should converge on the following invariant:
+Recommended common pipeline:
 
-> **No sensitive datum is disclosed merely because a model generated a tool call or because untrusted content supplied a destination.** Every outbound transfer is authorized from trusted user intent, current capability authority, destination policy and data classification.
+`Source → provenance → normalization → classification → minimization → injection/content signals → policy → model/tool projection → runtime authority → destination DLP → execution → output validation → redaction/audit`
 
-Suggested pipeline:
+## 8.1 DLP principles
 
-`SOURCE → provenance → normalize → classify → minimize → injection/content signals → policy decision → model/tool projection → authority gate → destination/egress DLP → execute → output validation → redact/log metadata`
+1. Detect before disclosure, not only after logging.
+2. Data classification travels with the datum/chunk/artifact.
+3. Model prompts do not strip source ACLs.
+4. Local/private/hosted models have different destination trust levels.
+5. Tool arguments and connector payloads are DLP-inspected independently from natural-language responses.
+6. Credentials are never treated as ordinary sensitive text; use stricter non-disclosure defaults.
+7. High-sensitivity transfers require explicit approved destinations and, where appropriate, confirmation.
+8. Untrusted content cannot select an exfiltration destination and thereby authorize the transfer.
+9. DLP exceptions are time-bound, scoped and auditable.
+10. Security telemetry stores classification metadata rather than unnecessary raw sensitive content.
 
-For retrieved or connected data, preserve provenance and classification through transformations. Derived summaries should inherit the strongest relevant classification unless an approved declassification rule proves otherwise.
+## 8.2 DLP test cases
 
----
+Required regression cases include:
 
-# Security test programme to add
-
-## P1 automated suites
-
-- authority-bypass/meta-registry test;
-- indirect prompt-injection corpus test;
-- RAG/memory context-poisoning test;
-- sensitive-data exfiltration tests across **every** outbound-capable tool;
-- malicious MCP/plugin schema/description/output test;
-- SSRF redirect/DNS-rebinding/address-encoding test;
-- streamed-body/decompression/resource-exhaustion test;
-- shell/path/tool-argument injection test;
-- approval replay/TOCTOU/intent-change test;
-- credential-scope/loan/revocation/logging test;
-- subagent capability-escalation and fan-out test;
-- hosted-model context-minimization/DLP test;
-- audit integrity and security-event test.
-
-## P2 periodic/manual suites
-
-- OWASP ASVS 5.0 verification;
-- OWASP LLM Top 10:2026 + ACS control review;
-- MITRE ATLAS adversarial exercise;
-- provider-specific prompt injection/exfiltration testing;
-- container/native sandbox escape assumptions review;
-- backup/restore and deletion propagation exercise;
-- incident-response tabletop including leaked provider token and prompt-injection-driven connector misuse.
+- secret in user prompt → hosted model;
+- secret in attachment → model context;
+- secret in RAG chunk → tool argument;
+- PII in memory → external connector;
+- source code → unapproved web endpoint;
+- malicious document instructs upload to webhook;
+- model encodes secret in URL/query/base64/JSON/header;
+- agent splits sensitive value across multiple calls;
+- data hidden in filename/path/metadata;
+- data exfiltration through Markdown image/link rendering;
+- subagent attempts disclosure using parent context;
+- MCP tool attempts unexpected network transmission.
 
 ---
 
-# Priority execution order
+# 9. MITRE ATLAS / threat-control-test programme
 
-The project should preserve the existing priority/effort principle: high-priority, low-effort controls first.
+Maintain an executable threat matrix rather than documentation-only mapping.
 
-| Order | Work item | Priority | Effort |
-|---:|---|---|---|
-| 1 | Add explicit CSP and CSP tests | P1 | Low–Medium |
-| 2 | Add streamed/body byte enforcement tests/fix | P1 | Medium |
-| 3 | Add no-authority-bypass registry invariant | P0 | Medium |
-| 4 | Add DLP decision contract and outbound enforcement points | P1 | High |
-| 5 | Expand injection scanning to every model-consumed chunk + adversarial corpus | P1 | Medium |
-| 6 | Add model/tool/subagent resource budgets | P1 | Medium |
-| 7 | CI: explicit permissions, CodeQL/dependency/security scanning, SBOM/provenance | P1 | Medium |
-| 8 | Add MITRE ATLAS/OWASP ACS threat-control-test matrix | P1 | Medium |
-| 9 | Create GDPR processing/DPIA/rights/retention accountability pack | P1 if applicable | Medium |
-| 10 | Create EU AI Act role/risk/transparency applicability register | P1 | Medium |
-| 11 | Complete ASVS 5.0/API verification and evidence | P2 | High |
-| 12 | Formalize release operational-security evidence | P2 | Medium |
+Minimum attack families:
 
----
+- direct/indirect prompt injection;
+- agent-context poisoning;
+- RAG/vector poisoning;
+- memory persistence poisoning;
+- tool/MCP poisoning;
+- model/artifact supply-chain compromise;
+- credential discovery and misuse;
+- AI-service/data-store discovery;
+- data exfiltration via tools/network/rendering;
+- malicious code execution;
+- excessive agency/privilege escalation;
+- model/provider substitution;
+- approval manipulation;
+- unsafe response rendering;
+- multi-agent delegation abuse.
 
-# Release safety criteria
-
-Raiker should not describe itself as “secure”, “GDPR compliant”, “EU AI Act compliant”, or “OWASP compliant” solely from this assessment. A defensible statement is narrower: the architecture implements controls aligned with specified framework objectives, while remaining gaps and applicability items are tracked here.
-
-Before a security-focused release, require at minimum:
-
-- no known path around runtime authority for side effects;
-- all critical/high-impact actions have tested approval/step-up behavior;
-- CSP and actual request-size limits enforced;
-- public web/API exposure passes ASVS-focused checks;
-- outbound-sensitive-data DLP exists at model/tool/connector/network boundaries;
-- prompt-injection adversarial regression suite passes while authority remains fail-closed;
-- CI/release supply-chain security controls pass;
-- no exposed secrets and repository secret protection enabled;
-- threat model current against OWASP LLM Top 10:2026, ACS and MITRE ATLAS;
-- GDPR/EU AI Act role/applicability decisions documented for the intended release/distribution model;
-- security incident and vulnerability disclosure paths tested/documented.
+For each, maintain preventive, detective and recovery tests.
 
 ---
 
-# Review cadence
+# 10. GDPR / privacy target state
 
-Re-run this assessment:
+Technical privacy controls are necessary but do not establish compliance by themselves.
 
-- before each major release;
-- whenever a new tool, connector, provider, plugin/MCP capability, subagent mode or external channel is introduced;
-- when an execution boundary changes;
-- following a material security incident;
-- at least quarterly for OWASP/MITRE/provider guidance drift;
-- on material EU AI Act/GDPR/EDPB guidance or legal changes.
+Required evidence/artifacts:
 
-The control matrix must be evidence-based: a documentation statement is not enough; cite the implementation and its tests, or mark the control as documentation-only/operational evidence required.
+1. ROPA/data-flow inventory.
+2. Purpose and lawful-basis mapping.
+3. Controller/processor/subprocessor roles.
+4. Special-category/high-sensitivity processing conditions where applicable.
+5. Privacy notices and just-in-time disclosures.
+6. Data-subject rights workflow.
+7. Retention/deletion schedule.
+8. Deletion propagation across chat, memory, indexes/vectors, caches, checkpoints, backups and provider copies.
+9. International-transfer register/mechanism.
+10. DPIA triggers and templates.
+11. Personal-data breach workflow.
+12. Hosted-model/provider minimisation tests.
+13. Privacy-by-default configuration tests.
+14. UK GDPR/DPA 2018 overlay for UK contexts.
+
+---
+
+# 11. EU AI Act target state
+
+Maintain an **AI Act applicability register** per product/deployment/use case covering:
+
+- Raiker's legal role(s);
+- intended purpose;
+- prohibited-practice screening;
+- high-risk classification where relevant;
+- transparency duties;
+- human oversight;
+- logging/record keeping;
+- cybersecurity/robustness obligations;
+- provider/deployer operational duties;
+- downstream responsibilities;
+- whether Raiker itself qualifies for any GPAI-provider obligations (do not assume this merely because it integrates GPAI APIs/models).
+
+Do not claim generic "EU AI Act compliant" status from architecture alone.
+
+---
+
+# 12. EU Cyber Resilience Act target state
+
+## 12.1 Immediate action
+
+Before 2026-09-11, determine and record whether Raiker's current/future EU distribution qualifies for Article 14 reporting obligations.
+
+## 12.2 If applicable
+
+Prepare:
+
+- security contact/PSIRT ownership;
+- single-reporting-platform readiness;
+- 24-hour early-warning template;
+- 72-hour notification template/process;
+- final-report process;
+- evidence/log preservation;
+- supported product/version register;
+- actively exploited vulnerability decision criteria;
+- severe-incident decision criteria;
+- coordinated communications/legal review workflow.
+
+## 12.3 Longer-term CRA readiness
+
+Before general application on 2027-12-11, maintain product-security requirements, secure development, vulnerability handling, update/support lifecycle, technical documentation and conformity evidence appropriate to Raiker's actual CRA category and distribution model.
+
+---
+
+# 13. Recommended implementation order
+
+Order by **priority first, then effort/value**.
+
+## Wave 0 — Immediate governance blockers
+
+1. **P0:** no-authority-bypass invariant and CI enforcement.
+2. **P1:** CRA applicability decision + Article 14 incident/vulnerability reporting readiness before 2026-09-11 if applicable.
+
+## Wave 1 — High-priority / relatively bounded engineering
+
+3. CSP.
+4. streamed request-body limits/decompression limits.
+5. canonical approval fingerprint + TOCTOU/replay protection tests.
+6. explicit workflow permissions + CodeQL/dependency review/secret-scanning evidence.
+7. PSIRT/`SECURITY.md`/emergency revocation procedures.
+
+## Wave 2 — Core AI/data security planes
+
+8. common DLP classification/decision layer.
+9. destination-aware outbound DLP.
+10. chunk-complete + multimodal injection scanning for model-bound context.
+11. RAG/vector authorization + deletion/poisoning controls.
+12. memory provenance/poisoning controls.
+13. MCP identity/schema-drift/tool-poisoning controls.
+
+## Wave 3 — Delegation and supply-chain hardening
+
+14. explicit agent/subagent delegated-identity model.
+15. multi-agent anti-amplification/fan-out controls.
+16. AI/model supply-chain provenance/signature/quarantine controls.
+17. secrets lifecycle + OS vault integration.
+18. cryptographic/key-management architecture.
+19. secure restore/checkpoint revalidation.
+
+## Wave 4 — Assurance and governance evidence
+
+20. OWASP Agentic Top 10 mapping.
+21. NIST SP 800-218A SSDLC mapping.
+22. MITRE ATLAS threat-control-test matrix.
+23. ENISA multilayer AI cybersecurity mapping.
+24. GDPR/UK GDPR accountability artifacts.
+25. EU AI Act role/risk/transparency register.
+26. full ASVS 5.0 verification.
+27. adversarial AI security release suite and regression thresholds.
+
+---
+
+# 14. Release security gates
+
+A production/public release should not be labelled "secure", "hardened" or broadly "compliant" unless the following evidence exists.
+
+## Required technical gates
+
+- no-authority-bypass CI invariant passes;
+- security-critical capability registry is complete;
+- CSP enabled for production web builds;
+- actual streamed body limits enforced;
+- DLP policy covers every outbound disclosure path;
+- RAG retrieval authorization tests pass;
+- memory-poisoning regression tests pass;
+- MCP schema/tool-drift tests pass;
+- approval replay/TOCTOU tests pass;
+- subagent privilege attenuation tests pass;
+- secret leakage regression suite passes;
+- SSRF/DNS-rebinding regression suite passes;
+- model-output rendering sanitization tests pass;
+- resource/cost/fan-out limits are enforced;
+- SAST/SCA/secret scanning/SBOM run clean or have approved exceptions;
+- release artifacts have integrity/provenance evidence;
+- backup/restore security tests pass.
+
+## Required governance/operational gates
+
+- supported security versions defined;
+- vulnerability disclosure/PSIRT route active;
+- incident-response playbooks maintained;
+- CRA applicability recorded and time-sensitive duties operational where applicable;
+- GDPR/UK GDPR data inventory + retention/deletion evidence maintained;
+- AI Act role/risk applicability recorded;
+- known security exceptions have owner, rationale and expiry.
+
+---
+
+# 15. Recommended documentation additions
+
+Create/maintain the following under appropriate `docs/` locations (keeping planning documents under `docs/plans/`):
+
+- `docs/security/SECURITY_ARCHITECTURE.md`
+- `docs/security/AUTHORITY_INVARIANTS.md`
+- `docs/security/DLP_ARCHITECTURE.md`
+- `docs/security/OWASP_AGENTIC_TOP10_MAPPING.md`
+- `docs/security/OWASP_LLM_TOP10_2026_MAPPING.md`
+- `docs/security/OWASP_ACS_MAPPING.md`
+- `docs/security/MITRE_ATLAS_MAPPING.md`
+- `docs/security/MCP_SECURITY.md`
+- `docs/security/RAG_MEMORY_SECURITY.md`
+- `docs/security/MODEL_SUPPLY_CHAIN.md`
+- `docs/security/SECRETS_AND_KEY_MANAGEMENT.md`
+- `docs/security/AI_SECURITY_TESTING.md`
+- `docs/compliance/GDPR_UK_GDPR_DATA_GOVERNANCE.md`
+- `docs/compliance/EU_AI_ACT_APPLICABILITY.md`
+- `docs/compliance/EU_CRA_APPLICABILITY.md`
+- repository-root `SECURITY.md`
+
+Architecture implementation plans should remain outside public GitHub if that is the repository documentation policy; public docs should contain the stable security contract and user/developer expectations, while `docs/plans/` contains remediation planning.
+
+---
+
+# 16. Reference sources
+
+Authoritative/current reference set used for the assessment:
+
+- OWASP GenAI Security Project — https://genai.owasp.org/
+- OWASP Top 10 for Agentic Applications 2026 — https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/
+- OWASP Agent Control Standard — https://genai.owasp.org/resource/agent-control-standard-acs/
+- OWASP GenAI data/MCP security resources — https://genai.owasp.org/initiatives/gen-ai-data-security/
+- NIST SP 800-218 — https://csrc.nist.gov/pubs/sp/800/218/final
+- NIST SP 800-218A — https://csrc.nist.gov/pubs/sp/800/218/a/final
+- NIST AI RMF / GenAI Profile — https://www.nist.gov/itl/ai-risk-management-framework
+- MITRE ATLAS — https://atlas.mitre.org/
+- ENISA Multilayer Framework for Good Cybersecurity Practices for AI — https://www.enisa.europa.eu/publications/multilayer-framework-for-good-cybersecurity-practices-for-ai
+- Google SAIF — https://saif.google/
+- EU AI Act (Regulation (EU) 2024/1689) — https://eur-lex.europa.eu/eli/reg/2024/1689/oj
+- EU GDPR — https://eur-lex.europa.eu/eli/reg/2016/679/oj
+- EDPB — https://www.edpb.europa.eu/
+- EU Cyber Resilience Act (Regulation (EU) 2024/2847) — https://eur-lex.europa.eu/eli/reg/2024/2847/oj
+- European Commission CRA reporting guidance — https://digital-strategy.ec.europa.eu/en/policies/cra-reporting
+- UK ICO — https://ico.org.uk/
+- GitHub secure use of Actions — https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions
+
+---
+
+# 17. Final assessment
+
+Raiker's strongest differentiator is already present: it is being built around an externalized authority/governance layer rather than relying on the model to decide what is safe.
+
+The next maturity step is to **prove completeness across every authority, identity, data and provenance boundary** and to make those proofs regression-testable.
+
+The second pass therefore changes the security roadmap from a conventional application/LLM hardening exercise into a broader **Raiker Security & Trust Baseline** covering:
+
+- web/API security;
+- agentic authority;
+- DLP/privacy;
+- RAG/memory security;
+- MCP/plugin trust;
+- delegated identity;
+- model/software supply chain;
+- multimodal/input/output security;
+- cryptography/secrets/backup;
+- incident/vulnerability response;
+- GDPR/UK GDPR;
+- EU AI Act;
+- EU CRA;
+- adversarial AI assurance.
+
+Until the P0/P1 items have implementation evidence, the correct posture is **strong architecture with material assurance gaps**, not a claim of complete security or regulatory compliance.

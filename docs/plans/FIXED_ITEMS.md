@@ -18532,6 +18532,13 @@ tab cannot gain a broken path form with it.
 2026-09-05. Found while running the sweeps that were supposed to find
 everything else.**
 
+**The title says "both" and there are five.** It is kept as raised, the way
+[BUG-226](TO_BE_FIXED.md#bug-226--three-of-the-five-hook-handler-types-do-not-exist)
+keeps a count that turned out to be wrong: the entry was opened on the two
+specs whose *names* say they sweep every page, and reading the rest of the
+directory found three more doing the same thing with the same drift. A title
+corrected after the fact hides how the thing was found.
+
 **Observed.** **Five** live specs sweep the whole product — `all-pages-live`
 photographs every destination and asserts no console error,
 `all-pages-theme-live` checks each one in explicit light and dark,

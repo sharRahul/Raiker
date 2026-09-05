@@ -53,7 +53,7 @@
 {#if notice !== null}
   <div class="composer-menu menu-surface" role="status">
     <p class="menu-notice">
-      <Icon name="info" size={13} />
+      <Icon name="info" size="sm" />
       <span>
         {plain(notice.text)}
         {#if notice.href}<a href={notice.href}>{notice.linkLabel ?? "Open"}</a>{/if}
@@ -95,7 +95,7 @@
     border: 1px solid var(--border);
     border-radius: var(--r-md);
     background: var(--surface);
-    box-shadow: var(--shadow-2, 0 8px 24px rgb(0 0 0 / 12%));
+    box-shadow: var(--shadow-2);
     overflow: hidden;
   }
   .menu-heading {
@@ -103,7 +103,7 @@
     padding: 0.35rem 0.6rem;
     border-bottom: 1px solid var(--border);
     color: var(--text-3);
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
@@ -125,7 +125,7 @@
     background: transparent;
     color: var(--text-1);
     font: inherit;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     text-align: left;
     cursor: pointer;
   }
@@ -134,7 +134,7 @@
   .row-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row-detail {
     color: var(--text-3);
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     font-weight: 400;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -147,7 +147,7 @@
     margin: 0;
     padding: 0.45rem 0.6rem;
     color: var(--text-2);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     line-height: 1.5;
   }
   .menu-notice a { color: var(--accent); margin-left: 0.25rem; }

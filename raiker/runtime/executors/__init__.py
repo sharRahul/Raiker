@@ -37,6 +37,7 @@ from raiker.runtime.executors.tier1_tasks import (
     ProjectAssignmentExecutor,
     TaskManagementExecutor,
 )
+from raiker.runtime.executors.tier2_image import ImageGenerationExecutor
 from raiker.runtime.executors.tier2_shell import ProcessExecutor, ShellExecutor
 from raiker.runtime.executors.tier2_telemetry import TelemetryExportExecutor
 from raiker.runtime.executors.tier2_web import WebFetchExecutor
@@ -82,6 +83,7 @@ __all__ = [
     "MemoryWriteExecutor", "MemoryForgetExecutor",
     "TaskManagementExecutor", "ProjectAssignmentExecutor",
     "ShellExecutor", "ProcessExecutor", "WebFetchExecutor", "TelemetryExportExecutor",
+    "ImageGenerationExecutor",
     "GraphIndexingExecutor", "CodeMapIndexExecutor", "LanguageIntelligenceExecutor",
     "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
     "SubagentExecutor", "MultiAgentTeamExecutor",
@@ -160,6 +162,10 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # owner's connector egress allowlist and the owner's own credential; it never
     # forces and never deletes a ref.
     "git_push_execution",
+    # The Design surface. Egress on the same terms as any other model call: the
+    # model egress allowlist, the owner's saved provider credential, and an
+    # endpoint built from the configured profile rather than from the request.
+    "image_generation",
     # Tier 3 — local code-intelligence runtime
     "graph_indexing_runtime",
     # B9 — the repository code map. A local, read-derived symbol index the owner
@@ -284,6 +290,7 @@ def build_default_executor_registry(
     registry.register("process_execution", ProcessExecutor(ws))
     registry.register("web_fetch", WebFetchExecutor(ws, store))
     registry.register("telemetry_export", TelemetryExportExecutor(ws, store))
+    registry.register("image_generation", ImageGenerationExecutor(ws, store))
     registry.register("graph_indexing_runtime", GraphIndexingExecutor(ws))
     registry.register("code_map_indexing", CodeMapIndexExecutor(ws, store))
     registry.register("language_intelligence", LanguageIntelligenceExecutor(ws, store))

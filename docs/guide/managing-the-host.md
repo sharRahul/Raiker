@@ -56,6 +56,30 @@ The registration points to the current Raiker executable and workspace. If you
 move or delete the source checkout, virtual environment, or workspace later,
 remove the registration first and install it again from the new location.
 
+## Open Raiker from the applications menu
+
+Starting at sign-in and having an icon to click are different things. For the
+icon:
+
+```bash
+raiker-app desktop install
+raiker-app desktop status
+raiker-app desktop uninstall
+```
+
+| Platform | Entry | Where |
+|---|---|---|
+| Linux | `raiker.desktop` | `~/.local/share/applications` |
+| macOS | `Raiker.app` | `~/Applications` |
+| Windows | `Raiker.cmd` and a shortcut | Start Menu → Programs |
+
+Everything is written under your own home directory; nothing system-wide is
+touched and nothing asks for elevation. The entry runs `raiker-app`, which
+starts the host if it is not running and opens the dashboard either way.
+
+While the host is running it also has a system-tray icon carrying its status,
+Open Raiker, Pause or Resume, Restart, and Quit.
+
 ## Pause, resume, and stop
 
 ```bash
@@ -118,10 +142,22 @@ owner account, conversations, configuration, audit records, and credentials are
 no longer needed. `--data export` requires `--export-to`; the preview prints the
 resolved destination before anything changes.
 
-For a source checkout, uninstall removes the per-user startup registration and
-applies the selected data disposition. It does not delete a repository checkout
-or virtual environment it does not own; the preview tells you to run
-`python -m pip uninstall raiker` when package removal is still needed.
+Uninstall removes the per-user startup registration, the applications-menu
+entry, and applies the selected data disposition.
+
+From a source checkout it also names what `pip uninstall raiker` would leave
+behind — `node_modules`, `dist`, `build`, `*.egg-info`, and the size of each.
+Those are **not** removed by default: they are in your repository, and deleting
+out of a git checkout is more than "uninstall Raiker" can be read to mean. Add
+`--source-artifacts` to remove them:
+
+```bash
+raiker-app uninstall --yes --data keep --source-artifacts
+```
+
+The checkout itself and its virtual environment are never removed. The preview
+names both, with the space the environment is using, so you can delete them
+yourself if you want the disk back.
 
 ## Explicit web-server control
 

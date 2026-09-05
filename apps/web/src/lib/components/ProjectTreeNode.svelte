@@ -12,7 +12,7 @@
   <div class="node-row">
     {#if node.children.length > 0}
       <button type="button" class="expand-btn" onclick={() => (expanded = !expanded)} aria-label={expanded ? "Collapse" : "Expand"}>
-        <Icon name={expanded ? "chevron-down" : "chevron-right"} size={12} />
+        <Icon name={expanded ? "chevron-down" : "chevron-right"} size="sm" />
       </button>
     {:else}
       <span class="expand-placeholder"></span>
@@ -58,7 +58,7 @@
     height: 14px;
   }
   .node-label {
-    font-size: 0.88rem;
+    font-size: var(--text-md);
     overflow-wrap: anywhere;
   }
   .children-list {

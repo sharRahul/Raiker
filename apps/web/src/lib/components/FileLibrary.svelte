@@ -222,7 +222,7 @@
         onclick={() => fileInput?.click()}
         disabled={!ready || importing}
       >
-        <Icon name="file" size={15} /> Add files
+        <Icon name="file" size="sm" /> Add files
       </button>
       <button
         type="button"
@@ -230,7 +230,7 @@
         onclick={() => folderInput?.click()}
         disabled={!ready || importing}
       >
-        <Icon name="folder" size={15} /> Add folder
+        <Icon name="folder" size="sm" /> Add folder
       </button>
     </div>
   </header>
@@ -312,7 +312,7 @@
                 aria-label={`Retry indexing ${file.relative_path}`}
                 onclick={() => retry(file)}
                 disabled={busyFileId === file.file_id}
-              ><Icon name="refresh" size={15} /></button>
+              ><Icon name="refresh" size="sm" /></button>
             {/if}
             <button
               type="button"
@@ -320,7 +320,7 @@
               aria-label={`Remove ${file.relative_path}`}
               onclick={() => remove(file)}
               disabled={busyFileId === file.file_id}
-            ><Icon name="x" size={15} /></button>
+            ><Icon name="x" size="sm" /></button>
           </div>
         </li>
       {/each}

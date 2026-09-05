@@ -288,6 +288,9 @@ const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   // is for: an audit export writes a file beside the log, and this one leaves
   // the machine.
   telemetry_export: "Network",
+  // The Design surface. Network for the same reason: the prompt leaves the
+  // machine and the image comes back from somebody else's model.
+  image_generation: "Network",
   // BUG-67 — a push is repository work, but what makes it a separate decision is
   // that it leaves the machine. It sits with the other egress switches so the
   // owner reviewing "what can reach the network" sees it.
@@ -724,6 +727,11 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
     label: "Telemetry export",
     description:
       "Send governed events to an OpenTelemetry collector you name. Identifiers and event types only, unless a destination opts in to redacted content.",
+  },
+  image_generation: {
+    label: "Image generation",
+    description:
+      "Generate images from a prompt with a hosted image model you have connected. The prompt leaves the machine; the image is stored in this workspace.",
   },
   checkpoint_restore_execution: {
     label: "Checkpoint restore",

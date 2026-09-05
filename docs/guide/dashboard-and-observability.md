@@ -17,9 +17,9 @@ tablets, and a full sidebar on wider screens.
 | Knowledge | **Knowledge Map** | Explore indexed sources and the citations connecting them |
 | Control | **Approvals** | Inspect proposed actions and decide whether they may proceed |
 | Control | **Permissions** | Capability gates and per-capability decision modes |
-| Control | **Models** | Providers, model readiness, routing, fallback, pricing, and posture |
+| Control | **Models** | Providers, model readiness, routing, fallback, and pricing |
 | Control | **Extensions** | Connectors, MCP servers, skills, hooks, plugins, and channels |
-| Observe | **Observability** | Sessions, audit activity, checkpoints, diagnostics, live work, and notifications |
+| Observe | **Observability** | Readiness, sessions, audit activity, checkpoints, live work, and notifications |
 | Utilities | **Guide** and **Settings** | This manual, runtime configuration, privacy, web access, and credentials |
 
 ## Understand a turn
@@ -58,10 +58,30 @@ Use **Observability** when you need evidence rather than a summary:
   Each snapshot's **Turn** links back to the exchange it was taken at, and
   *Preview rewind* opens the same preflight **Rewind to before this** opens from
   a message in Chat or Build.
-- **Diagnostics** names configuration gaps, unavailable executors, and reason
-  codes.
 - **Work** shows live background activity.
 - **Notifications** collects events that need attention.
+
+**Overview** answers the whole of "is this instance in a state I can work in".
+Three tiles at the top give the runtime's readiness, how many capability gates
+are closed, and what configuration is missing — each linking to the page where
+you change it. Underneath, **Is the runtime itself healthy?** carries what only
+the runtime knows about itself: the health transitions its own monitors
+recorded, the memory integrity report and the one repair it offers, and any
+readiness check that actually failed, with its reason code and remediation.
+
+There used to be a separate **Diagnostics** tab. It read the same runtime status
+this page reads and restated most of it — a tick list saying "ready" beside a
+tile saying "Ready", the same missing-configuration list twice, an expansion of
+the closed-gate count that Permissions already lists with controls, and a
+provider table thinner than the one on Models. Its unique half is the section
+above; `#/diagnostics` and `#/observe?tab=diagnostics` still open it.
+
+Its *"Disabled / deferred capabilities"* chip list went with it, and unlike the
+rest it was not a duplicate — it was wrong. It listed the shipped registry's
+phase gates, so it named `web_ui` and `dashboard` as disabled to somebody reading
+it in the dashboard. Both facts it was reaching for are now written down where
+they are true: see
+[Capabilities with no enable path](permissions-and-runtime-modes.md#capabilities-with-no-enable-path).
 
 Checkpoint capture is size-bounded. A file over 8 MiB may still be changed, but
 Raiker warns before approval that the particular change cannot be rewound. Git
@@ -112,7 +132,7 @@ default vector representation is a feature-hashed bag of tokens, not a
 meaning-aware embedding model, so paraphrases without shared terms can be missed.
 See [Known limits](known-limits.md).
 
-**Diagnostics → Memory integrity** compares every index and projection memory
+**Overview → Is the runtime itself healthy?** compares every index and projection memory
 depends on — including the conversation index behind Threads — against the
 table that owns the content. It reports `clean` or names the drift, **Rescan**
 runs it again on request, and the one repair it offers appears only beside the

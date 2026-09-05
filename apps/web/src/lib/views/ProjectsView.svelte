@@ -340,7 +340,7 @@
 <div class="head-row">
   <GuideLink route="projects" />
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh projects">
-    <Icon name="refresh" size={15} />
+    <Icon name="refresh" size="sm" />
     Refresh
   </button>
 </div>
@@ -406,7 +406,7 @@
         aria-label="Folder path"
       />
       <button type="button" class="btn btn-sm" onclick={() => (browsing = true)}>
-        <Icon name="folder" size={14} /> Browse
+        <Icon name="folder" size="sm" /> Browse
       </button>
     </div>
     <label class="check-row">
@@ -549,7 +549,7 @@
               {exporting ? "Exporting…" : "Export project"}
             </button>
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => (detail = null)}>
-              <Icon name="x" size={14} />
+              <Icon name="x" size="sm" />
               Close
             </button>
           </div>
@@ -776,7 +776,7 @@
   .drop-hint {
     margin: 0.5rem 0 0;
     color: var(--accent);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
   .project-head {
@@ -786,7 +786,7 @@
     gap: 0.5rem;
   }
   .project-name {
-    font-size: 1rem;
+    font-size: var(--text-base);
     margin: 0;
     overflow-wrap: anywhere;
   }
@@ -835,7 +835,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
   }
   .plain-list li {
     display: flex;
@@ -845,7 +845,7 @@
     padding-bottom: 0.3rem;
   }
   .kicker {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -854,22 +854,19 @@
   }
   .sub {
     color: var(--text-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     margin: 0.3rem 0 0;
     overflow-wrap: anywhere;
   }
-  .error {
-    color: var(--danger);
-  }
   .cross-link {
     display: inline-block;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     margin-bottom: var(--space-2);
   }
   .panel-h {
     margin: var(--space-2) 0 0;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
   }
   .provenance {
     list-style: none;
@@ -887,7 +884,7 @@
     justify-content: space-between;
     gap: 0.5rem;
     margin: 0;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 650;
   }
   .prov-head time {
@@ -898,7 +895,7 @@
   .prov-detail,
   .prov-links {
     margin: 0;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
   }
 </style>

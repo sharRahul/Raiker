@@ -36,13 +36,13 @@
 {/if}
 
 <style>
-  .rechecking { margin: 0; font-size: .72rem; color: var(--text-3); }
+  .rechecking { margin: 0; font-size: var(--text-xs); color: var(--text-3); }
   .readiness-strip { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .65rem; padding: .62rem .72rem; border: 1px solid var(--warn-border, var(--neutral-border)); border-radius: var(--r-md); background: var(--warn-soft, var(--sunken)); color: var(--text-2); }
-  .indicator { width: .52rem; height: .52rem; border-radius: 50%; background: var(--warn, #d58b19); box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--warn, #d58b19) 16%, transparent); }
-  .copy { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .5rem; font-size: .74rem; }
+  .indicator { width: .52rem; height: .52rem; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--warn) 16%, transparent); }
+  .copy { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .5rem; font-size: var(--text-xs); }
   .copy strong { color: var(--text-1); }
   .draft { color: var(--text-3); }
-  button { border: 1px solid var(--accent-border); border-radius: var(--r-pill); padding: .3rem .62rem; background: var(--surface); color: var(--text-1); font: inherit; font-size: .72rem; font-weight: 750; cursor: pointer; }
+  button { border: 1px solid var(--accent-border); border-radius: var(--r-pill); padding: .3rem .62rem; background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--text-xs); font-weight: 750; cursor: pointer; }
   @media (max-width: 63.9rem) {
     /* Revalidation does not block sending, so compact composers omit this
        informational line. A real failure keeps the full actionable strip. */

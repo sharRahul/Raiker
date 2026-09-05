@@ -444,6 +444,17 @@ export interface PluginSignature {
 /** What a plugin actually provides, read from the files the runtime loads
  *  rather than from the manifest that described them (BUG-221). */
 /** One connector profile, and what is actually true of it right now (BUG-225). */
+/** One environment variable a channel transport declares that it needs. */
+export interface ChannelEnvRequirement {
+  name: string;
+  description: string;
+  url: string | null;
+  secret: boolean;
+  required: boolean;
+  /** Whether it is set. Never what it is set to. */
+  present: boolean;
+}
+
 export interface ChannelProfile {
   connector_id: string;
   channel_type: string;
@@ -469,6 +480,7 @@ export interface ChannelProfile {
   supports_side_questions: boolean;
   supports_interrupts: boolean;
   supports_approvals: boolean;
+  env_requirements?: ChannelEnvRequirement[];
 }
 
 export interface ChannelsView {
@@ -690,6 +702,11 @@ export interface ModelProfile {
   profile_id: string;
   provider: string;
   model: string;
+  /** The image model this provider answers with, when it has a governed image
+   *  endpoint. Absent means the Design surface does not offer this profile. */
+  image_model?: string | null;
+  /** Image models this provider declares, default first. Empty for most. */
+  image_models?: string[];
   default_state: string;
   local_only: boolean;
   requires_network: boolean;
@@ -2988,6 +3005,28 @@ export interface SpeechRuntimeProbe {
  * nothing else. The cursor fields say how far delivery has got, so a failed run
  * is visible as events still waiting rather than as events quietly lost.
  */
+/** One governed image generation, as the Design page sees it. */
+export interface ImageGeneration {
+  generation_id: string;
+  profile_id: string;
+  provider: string;
+  model: string;
+  prompt: string;
+  size: string;
+  /** `ok` or `refused`. A refusal is a record, not an absence. */
+  status: string;
+  reason_code: string | null;
+  has_image: boolean;
+  media_type: string | null;
+  byte_size: number;
+  created_at: string;
+}
+
+export interface ImageGenerationsView {
+  sizes: string[];
+  generations: ImageGeneration[];
+}
+
 export interface TelemetryDestination {
   destination_id: string;
   name: string;

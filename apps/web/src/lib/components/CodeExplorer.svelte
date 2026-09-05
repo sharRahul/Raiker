@@ -178,11 +178,11 @@
 <section class="code-explorer" aria-labelledby="code-explorer-heading">
   <header class="head">
     <h2 id="code-explorer-heading">
-      <Icon name="folder" size={14} />
+      <Icon name="folder" size="sm" />
       <span class="repo">{repoLabel}</span>
     </h2>
     <button type="button" class="icon-btn" aria-label="Close files" onclick={onclose}>
-      <Icon name="x" size={15} />
+      <Icon name="x" size="sm" />
     </button>
   </header>
 
@@ -237,7 +237,7 @@
               fileDiagnostics = null;
             }}
           >
-            <Icon name="x" size={14} />
+            <Icon name="x" size="sm" />
           </button>
         </span>
       </header>
@@ -252,7 +252,7 @@
           <ul class="problems" aria-label={`Problems in ${openPath}`}>
             {#each fileDiagnostics.diagnostics as problem (`${problem.line}:${problem.column}:${problem.message}`)}
               <li>
-                <Icon name="warning" size={13} />
+                <Icon name="warning" size="sm" />
                 <span class="where">{problem.line}:{problem.column}</span>
                 <span class="what">{problem.message}</span>
               </li>
@@ -309,7 +309,7 @@
         >
           <Icon
             name={expanded[entry.relative_path] ? "chevron-down" : "chevron-right"}
-            size={13}
+            size="sm"
           />
         </button>
       {:else}
@@ -322,7 +322,7 @@
         onclick={() => (entry.is_directory ? void toggle(entry) : void openFile(entry))}
         aria-label={entry.is_directory ? `Open ${entry.name}` : `Read ${entry.name}`}
       >
-        <Icon name={entry.is_directory ? "folder" : "file"} size={13} />
+        <Icon name={entry.is_directory ? "folder" : "file"} size="sm" />
         <span class="entry-name">{entry.name}</span>
         {#if !entry.is_directory}
           <span class="entry-meta">{formatSize(entry.size_bytes)}</span>
@@ -356,7 +356,7 @@
     min-height: 0;
     min-width: 0;
     height: 100%;
-    background: var(--surface-1);
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
     overflow: hidden;
@@ -374,7 +374,7 @@
     align-items: center;
     gap: 0.4rem;
     margin: 0;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     letter-spacing: 0.02em;
     min-width: 0;
@@ -398,12 +398,12 @@
     cursor: pointer;
   }
   .icon-btn.mention {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
   .icon-btn:hover {
-    background: var(--surface-2);
-    color: var(--text);
+    background: var(--sunken);
+    color: var(--text-1);
   }
   .tree-pane {
     flex: 1 1 auto;
@@ -451,16 +451,16 @@
     background: none;
     color: inherit;
     font: inherit;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     text-align: left;
     cursor: pointer;
   }
   .entry:hover,
   .entry.selected {
-    background: var(--surface-2);
+    background: var(--sunken);
   }
   .entry.selected {
-    color: var(--text);
+    color: var(--text-1);
     font-weight: 600;
   }
   .entry-name {
@@ -471,7 +471,7 @@
   .entry-meta {
     margin-left: auto;
     color: var(--text-muted);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     white-space: nowrap;
   }
   .child-note,
@@ -479,7 +479,7 @@
     margin: 0;
     padding: 0.25rem 0.5rem;
     color: var(--text-muted);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .child-note {
     padding-left: calc(var(--depth, 0) * 0.75rem + 1.1rem);
@@ -494,14 +494,14 @@
     max-height: 7rem;
     overflow: auto;
     border-bottom: 1px solid var(--border);
-    background: var(--warn-soft, var(--surface-2));
+    background: var(--warn-soft, var(--sunken));
   }
   .problems li {
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
-    font-size: 0.76rem;
-    color: var(--warn, var(--text));
+    font-size: var(--text-xs);
+    color: var(--warn, var(--text-1));
     line-height: 1.5;
   }
   .problems .where {
@@ -537,7 +537,7 @@
   }
   .viewer-path {
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -552,7 +552,7 @@
   }
   .lang {
     color: var(--text-muted);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
@@ -563,7 +563,7 @@
     padding: 0.5rem 0.75rem;
     overflow: auto;
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     line-height: 1.55;
     tab-size: 2;
     white-space: pre;

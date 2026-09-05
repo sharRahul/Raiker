@@ -35,6 +35,7 @@
     TurnSourceView,
   } from "../apiTypes";
   import AttachmentCard from "../components/AttachmentCard.svelte";
+  import Composer from "../components/Composer.svelte";
   import ComposerAttach from "../components/ComposerAttach.svelte";
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
@@ -1594,7 +1595,7 @@
         aria-label="Background work"
         title="Background work"
       >
-        <Icon name="panel" size={15} />
+        <Icon name="panel" size="sm" />
       </button>
     </div>
   </header>
@@ -1610,7 +1611,7 @@
        start the same way. The original is reachable and unchanged. -->
   {#if branchOrigin !== null}
     <p class="branch-origin">
-      <Icon name="branch" size={14} />
+      <Icon name="branch" size="sm" />
       <span>
         Branched from
         <a href={`#/new-chat?session=${encodeURIComponent(branchOrigin.source_session_id ?? "")}`}
@@ -1779,7 +1780,7 @@
                 onclick={() => void copyAnswer(turn)}
                 aria-label={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
                 title={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
-              ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size={15} /></button>
+              ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size="sm" /></button>
               </div>
             {/if}
           {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval"}
@@ -1829,7 +1830,7 @@
             <section class="artifact-stack" aria-label="Generated documents">
               {#each generatedFiles as file (file.attachmentId)}
                 <article class="artifact-card" data-status={file.attachmentId ? "ready" : "unavailable"}>
-                  <div class="artifact-icon" aria-hidden="true"><Icon name="file" size={20} /></div>
+                  <div class="artifact-icon" aria-hidden="true"><Icon name="file" size="lg" /></div>
                   <div class="artifact-copy">
                     <div class="artifact-heading">
                       <strong>{file.label}</strong>
@@ -1856,7 +1857,7 @@
                         class="btn btn-ghost btn-sm artifact-download"
                         aria-label={`Download ${file.label}`}
                         onclick={() => void downloadArtifact(file.attachmentId as string, file.label)}
-                      ><Icon name="download" size={14} /> Download</button>
+                      ><Icon name="download" size="sm" /> Download</button>
                     </div>
                   {:else}
                     <span class="artifact-unavailable">Preview unavailable</span>
@@ -1900,12 +1901,12 @@
                 </p>
               {:else if turn.resumeState === "elsewhere"}
                 <p class="approval-title" role="status" aria-live="polite">
-                  <Icon name="approvals" size={15} /> Continued in another tab
+                  <Icon name="approvals" size="sm" /> Continued in another tab
                 </p>
                 <p class="approval-note">{turn.resumeNote}</p>
               {:else}
                 <p class="approval-title">
-                  <Icon name="approvals" size={15} /> Waiting for approval
+                  <Icon name="approvals" size="sm" /> Waiting for approval
                 </p>
                 <p class="approval-body">{turn.response.approval.message}</p>
                 <p class="approval-note">
@@ -1938,20 +1939,33 @@
     {/each}
   </div>
 
-  <form
-    class="composer"
-    onsubmit={(e) => {
-      e.preventDefault();
-      void submit();
+  <Composer
+    ariaLabel="Message composer"
+    inputId="prompt-input"
+    bind:value={promptText}
+    bind:inputEl={promptEl}
+    inputProps={{
+      placeholder: "How can I help you today?",
+      title: "Enter to send, Shift+Enter for a new line, / for commands, @ to mention a file",
+      disabled: streaming,
+      oninput: onPromptInput,
+      onselect: trackPromptSelection,
+      onclick: trackPromptSelection,
+      onkeyup: trackPromptSelection,
+      onkeydown: onKeydown,
+      onblur: () => (menuKind = "none"),
     }}
+    dropActive={composerDrop.over}
+    dropHandlers={{
+      ondragenter: composerDrop.ondragenter,
+      ondragover: composerDrop.ondragover,
+      ondragleave: composerDrop.ondragleave,
+      ondrop: composerDrop.ondrop,
+    }}
+    onsubmit={() => void submit()}
+    turnActive={streaming}
   >
-    <div class="composer-card" role="group" aria-label="Message composer"
-      class:drop-active={composerDrop.over}
-      ondragenter={composerDrop.ondragenter}
-      ondragover={composerDrop.ondragover}
-      ondragleave={composerDrop.ondragleave}
-      ondrop={composerDrop.ondrop}
-    >
+    {#snippet above()}
       <ComposerChips store={attachStore} disabled={streaming} />
       <ModelReadinessStrip readiness={modelReadiness} draftPreserved={promptText.trim() !== ""} />
       <SkillLinkNotice text={promptText} />
@@ -1968,45 +1982,19 @@
           onchoose={chooseMenuItem}
         />
       {/if}
+    {/snippet}
 
-      {#if composerDrop.over}<p class="drop-note" role="status">Drop to attach</p>{/if}
-      <label for="prompt-input" class="sr-only">Prompt</label>
-      <div class="composer-upper">
-        <textarea
-          id="prompt-input"
-          class="prompt-input"
-          bind:this={promptEl}
-          bind:value={promptText}
-          oninput={onPromptInput}
-          onselect={trackPromptSelection}
-          onclick={trackPromptSelection}
-          onkeyup={trackPromptSelection}
-          onkeydown={onKeydown}
-          onblur={() => (menuKind = "none")}
-          rows="2"
-          placeholder="How can I help you today?"
-          title="Enter to send, Shift+Enter for a new line, / for commands, @ to mention a file"
-          spellcheck="true"
-          lang="en-US"
-          disabled={streaming}
-        ></textarea>
-      </div>
-
+    {#snippet below()}
       {#if attachOpen}
         <ComposerAttachPanel store={attachStore} disabled={streaming} idPrefix="chat" />
       {/if}
+    {/snippet}
 
-      {#if streaming}
-        <!-- B17/C13 — while a turn is running the composer's job changes: it is
-             no longer where the next question is written, it is where this turn
-             is stopped or corrected. -->
-        <div class="composer-bar">
-          <TurnControl sessionId={sessionId} bind:stopping />
-        </div>
-      {/if}
+    {#snippet turn()}
+      <TurnControl sessionId={sessionId} bind:stopping />
+    {/snippet}
 
-      <div class="composer-bar">
-        <div class="bar-left">
+    {#snippet left()}
           <ComposerAttach bind:this={attachControl} bind:open={attachOpen} disabled={streaming} />
           <VoiceDictationControl
             bind:this={voiceControl}
@@ -2024,7 +2012,7 @@
           {#if projects && projects.projects.length > 0}
             <label class="composer-scope">
               <span class="sr-only">Project for this chat</span>
-              <Icon name="folder" size={14} />
+              <Icon name="folder" size="sm" />
               <select
                 class="bar-select"
                 value={projectId}
@@ -2039,9 +2027,9 @@
             </label>
           {/if}
           <ApprovalModeControl />
-        </div>
+    {/snippet}
 
-        <div class="bar-right">
+    {#snippet right()}
           <ModelPicker
             bind:profileId={modelProfile}
             bind:model
@@ -2088,20 +2076,19 @@
             disabled={streaming || attachStore.uploading || promptText.trim() === "" || modelBlocked}
             aria-label={streaming ? "Running" : "Send"}
           >
-            <Icon name="send" size={15} />
+            <Icon name="send" size="sm" />
             <span class="send-label">{streaming ? "Running…" : "Send"}</span>
           </button>
-        </div>
-      </div>
-      <p class="shortcut-hint">
-        Enter sends · Shift+Enter adds a line · <code>/</code> for commands ·
-        <code>@</code> to mention a file ·
-        <button type="button" class="hint-link" onclick={() => (shortcutsOpen = !shortcutsOpen)}>
-          all shortcuts
-        </button>
-      </p>
-    </div>
-  </form>
+    {/snippet}
+
+    {#snippet hint()}
+      Enter sends · Shift+Enter adds a line · <code>/</code> for commands ·
+      <code>@</code> to mention a file ·
+      <button type="button" class="hint-link" onclick={() => (shortcutsOpen = !shortcutsOpen)}>
+        all shortcuts
+      </button>
+    {/snippet}
+  </Composer>
   {#if projectNotice}<p class="project-notice" role="status">{projectNotice}</p>{/if}
 </div>
   {#if backgroundWorkOpen}
@@ -2233,18 +2220,8 @@
     .rail-slot {
       max-height: 32rem;
     }
-    .composer-upper {
-      flex-direction: column;
-    }
     .thread :global(.empty-body) { display: none; }
     .thread :global(.empty) { padding-block: var(--space-5); }
-  }
-  /* On narrow screens the model picker wraps under the textarea even when the
-     page layout hasn't hit the split-view breakpoint yet. */
-  @media (max-width: 30rem) {
-    .composer-upper {
-      flex-direction: column;
-    }
   }
   /* Below the split breakpoint the inspector is a sheet over the conversation
      (see FileInspector.svelte), so the grid stays single-column. */
@@ -2265,7 +2242,7 @@
   }
   .export-notice {
     color: var(--text-2);
-    font-size: .78rem;
+    font-size: var(--text-sm);
     order: -1;
     margin-right: auto;
   }
@@ -2318,22 +2295,22 @@
     border-radius: var(--r-md); color: var(--accent); background: var(--surface);
   }
   .artifact-copy { min-width: 0; }
-  .artifact-copy p { margin: 0.15rem 0 0; color: var(--text-2); font-size: 0.8rem; }
+  .artifact-copy p { margin: 0.15rem 0 0; color: var(--text-2); font-size: var(--text-sm); }
   .artifact-heading { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .artifact-heading strong { overflow-wrap: anywhere; }
   .stopped-line {
     margin: 0 0 0.4rem;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .artifact-status {
     border-radius: 999px; padding: 0.1rem 0.45rem; color: var(--ok);
-    background: var(--ok-soft); font-size: 0.7rem; font-weight: 700;
+    background: var(--ok-soft); font-size: var(--text-2xs); font-weight: 700;
   }
-  .artifact-meta { color: var(--text-3) !important; font-size: 0.72rem !important; }
+  .artifact-meta { color: var(--text-3) !important; font-size: var(--text-xs) !important; }
   .artifact-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-  .artifact-error { grid-column: 1 / -1; margin: var(--space-2) 0 0; font-size: 0.78rem; }
-  .artifact-unavailable { color: var(--text-3); font-size: 0.78rem; }
+  .artifact-error { grid-column: 1 / -1; margin: var(--space-2) 0 0; font-size: var(--text-sm); }
+  .artifact-unavailable { color: var(--text-3); font-size: var(--text-sm); }
   @media (max-width: 40rem) {
     .artifact-card { grid-template-columns: auto minmax(0, 1fr); }
     .artifact-actions, .artifact-unavailable { grid-column: 1 / -1; justify-self: stretch; }
@@ -2348,7 +2325,7 @@
      across a page boundary. Code blocks keep their frame but lose the copy
      button, which means nothing on paper. */
   @media print {
-    :global(.sidebar), :global(.topbar), :global(.skip-link), .composer,
+    :global(.sidebar), :global(.topbar), :global(.skip-link), :global(.composer),
     .copy-message, .chat-header, .rail-slot, .approval-actions,
     :global(.md-copy), :global(.file-inspector) { display: none !important; }
     :global(.app-shell), :global(.app-main), :global(.content), :global(.responsive-page),
@@ -2356,7 +2333,7 @@
     .thread { display: block; overflow: visible; }
     .turn { break-inside: avoid; margin-bottom: 1.5rem; }
     .message-group { max-width: none; }
-    .message-bubble { box-shadow: none; border: 1px solid #bbb; }
+    .message-bubble { box-shadow: none; border: 1px solid var(--border); }
     :global(.md-code) { break-inside: avoid; }
     @page { margin: 18mm 15mm; }
   }
@@ -2402,7 +2379,7 @@
     gap: 0.45rem;
     margin: 0 0 0.3rem;
     color: var(--text-3);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-weight: 650;
   }
   .bubble-text {
@@ -2434,7 +2411,7 @@
   }
   .error-line {
     color: var(--danger);
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     margin: 0.35rem 0 0;
   }
   .approval-card {
@@ -2449,16 +2426,16 @@
     align-items: center;
     gap: 0.4rem;
     font-weight: 650;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     margin: 0 0 0.3rem;
     color: var(--warn);
   }
   .approval-body {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     margin: 0 0 0.3rem;
   }
   .approval-note {
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     color: var(--text-2);
     margin: 0 0 0.5rem;
   }
@@ -2503,7 +2480,7 @@
     background: transparent;
     color: var(--text-1);
     font: inherit;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     padding: var(--space-1) var(--space-2);
     border-radius: var(--r-sm);
     text-align: left;
@@ -2511,161 +2488,16 @@
   }
   .conversation-menu .menu button:hover:not(:disabled) { background: var(--accent-soft); }
   .conversation-menu .menu button:disabled { color: var(--text-3); cursor: default; }
-  .composer {
-    padding-top: var(--space-3);
-    background: var(--bg);
-  }
   .project-notice {
     margin: var(--space-2) 0 0;
     color: var(--text-3);
-    font-size: .75rem;
-  }
-  .shortcut-hint {
-    color: var(--text-3);
-    font-size: 0.72rem;
-    line-height: 1.35;
-    margin: 0;
-    text-align: right;
-  }
-  .shortcut-hint code {
-    padding: 0 0.22rem;
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-  }
-  .hint-link {
-    border: 0;
-    padding: 0;
-    background: transparent;
-    color: var(--accent);
-    font: inherit;
-    cursor: pointer;
-    text-decoration: underline;
-  }
-  /* One clean card: prompt on top, "+" and the per-turn controls at the bottom. */
-  /* One composer surface, defined identically in Chat and Build so the two
-     conversations are the same instrument in two rooms rather than two
-     instruments that resemble each other. */
-  .composer-card {
-    border: 1px solid var(--border);
-    border-radius: var(--r-lg);
-    background: var(--surface);
-    box-shadow: var(--shadow-1);
-    transition: border-color 120ms ease, box-shadow 120ms ease;
-    /* Even padding all round: the old tighter bottom made the control bar look
-       cropped against the card edge. */
-    padding: 0.75rem 0.85rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  /* Typing is the primary act on both pages, so the card lifts while it has
-     focus instead of only changing a border colour by one shade. */
-  .composer-card:focus-within {
-    border-color: var(--accent-border);
-    box-shadow: var(--shadow-2);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .composer-card { transition: none; }
-  }
-  /* Upper area: the prompt, and nothing else. The per-turn controls used to sit
-     in a column to the right of it, which cost the prompt a third of the card's
-     width and put the model chip somewhere no other composer keeps it. They are
-     all on the control bar below now, so the prompt gets the whole card. */
-  .composer-upper {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-  .composer-upper .prompt-input {
-    flex: 1;
-    min-width: 0;
-  }
-  .prompt-input {
-    width: 100%;
-    border: none;
-    outline: none;
-    resize: vertical;
-    background: transparent;
-    color: var(--text-1);
-    font: inherit;
-    font-size: 0.95rem;
-    min-height: 2.6rem;
-  }
-  .prompt-input::placeholder {
-    color: var(--text-3);
-  }
-  .composer-bar {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem 0.75rem;
-    border-top: 1px solid var(--border);
-    padding-top: 0.55rem;
-    flex-wrap: wrap;
-  }
-  .bar-left {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    flex-wrap: wrap;
-    min-width: 0;
-  }
-  .composer-scope {
-    display: inline-flex;
-    align-items: center;
-    gap: .25rem;
-    min-width: 0;
-  }
-  /* Per-turn settings sit on the right of the bar, ending in the send action. */
-  .bar-right {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    flex-wrap: wrap;
-    min-width: 0;
-    justify-content: flex-end;
-  }
-  /* Each setting is a pill so a control reads as a control. Previously they
-     were borderless and shared the body weight, which ran the whole bar
-     together as one line of prose; and a fixed max-width stretched the select
-     so its chevron floated far from its own label. */
-  .bar-select {
-    border: 1px solid var(--neutral-border);
-    background: var(--surface);
-    color: var(--text-2);
-    font-size: 0.76rem;
-    font-weight: 600;
-    padding: 0.2rem 0.45rem;
-    border-radius: var(--r-pill);
-    width: auto;
-    max-width: 11rem;
-    text-overflow: ellipsis;
-    min-width: 0;
-  }
-  .bar-select:hover:not(:disabled) {
-    border-color: var(--accent-border);
-    color: var(--text-1);
-  }
-  .bar-select:disabled {
-    opacity: 0.6;
-  }
-  /* The focus ring was previously stranded on the front of the
-     `.turn-attachments` selector, so focusing a bar select silently applied a
-     flex layout and a top margin to it and never drew a ring at all. */
-  .bar-select:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 2px;
+    font-size: var(--text-xs);
   }
   .turn-attachments {
     margin: 0.5rem 0 0;
     display: flex;
     gap: 0.4rem;
     flex-wrap: wrap;
-  }
-  .send {
-    min-width: 6.5rem;
   }
   .context-control { position: relative; }
   .context-trigger {
@@ -2683,67 +2515,9 @@
   }
   .context-trigger:hover { border-color: var(--accent-border); color: var(--accent); }
   .context-trigger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-  /* Kept after the base composer rules so compact declarations win without
-     changing a single desktop selector. */
-  @media (max-width: 63.9rem) {
-    .composer { flex-shrink: 0; padding-top: var(--space-2); }
-    .composer-card {
-      gap: .3rem;
-      padding: .55rem .6rem;
-      border-radius: 1rem;
-      box-shadow: none;
-    }
-    .prompt-input { min-height: 2.25rem; resize: none; }
-    /* Wraps rather than drops, the same grammar as Build: a control that gates
-       or steers a turn moves to a second row instead of leaving the screen. */
-    .composer-bar { flex-wrap: wrap; gap: .25rem; padding-top: .4rem; }
-    .bar-left, .bar-right { flex-wrap: nowrap; gap: .2rem; }
-    .bar-right { margin-left: auto; width: auto; justify-content: flex-end; }
-    .composer-scope, .context-control, .shortcut-hint { display: none; }
-    .send {
-      width: 2.75rem;
-      height: 2.75rem;
-      min-width: 2.75rem;
-      margin-left: 0;
-      padding: 0;
-      border-radius: 50%;
-    }
-    .send-label { display: none; }
-    :global(.composer-card .model-trigger) {
-      min-width: 2.75rem;
-      width: 2.75rem;
-      height: 2.75rem;
-      padding: 0;
-      justify-content: center;
-    }
-    /* `> span` hid the provider logo along with the label, because the logo is
-       a span and not an svg — so below 1024px the model control was an empty
-       circle and no window narrower than a laptop said which model would
-       answer. The label and the effort chip go; the logo is the control. */
-    :global(.composer-card .model-trigger > span:not(.provider-logo)),
-    :global(.composer-card .model-trigger > svg:last-child),
-    :global(.composer-card .approval-trigger > span),
-    :global(.composer-card .approval-trigger > svg:last-child) { display: none; }
-    :global(.composer-card .approval-trigger) {
-      width: 2.75rem;
-      height: 2.75rem;
-      padding: 0;
-      justify-content: center;
-    }
-  }
   @media (max-width: 720px) {
     .message-group {
       max-width: 88%;
-    }
-  }
-  /* Narrow: the settings stop competing with the left actions for one line and
-     take a row of their own, so nothing wraps into a ragged half-row with the
-     send button stranded from its group. */
-  @media (max-width: 34rem) {
-    .bar-right {
-      margin-left: auto;
-      width: auto;
-      justify-content: flex-end;
     }
   }
   /* MEM-08 — the exchange a link landed on. A brief mark, not a state: a

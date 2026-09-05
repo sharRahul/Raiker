@@ -145,7 +145,7 @@
           <ul class="files">
             {#each manifest.files as file (file.filename + file.byte_size)}
               <li>
-                <Icon name="file" size={13} />
+                <Icon name="file" size="sm" />
                 <span class="file-name">{file.filename}</span>
                 <span class="file-meta">{file.media_type} · {file.byte_size} bytes</span>
               </li>
@@ -171,7 +171,7 @@
 
       <footer>
         <button type="button" class="btn btn-ghost btn-sm" onclick={() => onprint?.()}>
-          <Icon name="file" size={14} /> Print / Save as PDF
+          <Icon name="file" size="sm" /> Print / Save as PDF
         </button>
         <span class="spacer"></span>
         <button type="button" class="btn btn-ghost btn-sm" onclick={onclose}>Close</button>
@@ -184,7 +184,7 @@
 
 <style>
   .dialog::backdrop {
-    background: color-mix(in srgb, #0b1417 55%, transparent);
+    background: var(--overlay);
   }
   .dialog {
     color:var(--text-1);
@@ -200,32 +200,32 @@
     box-shadow: var(--shadow-2);
   }
   header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-  header h2 { margin: 0; font-size: 1.05rem; }
+  header h2 { margin: 0; font-size: var(--text-base); }
   .icon-btn {
     border: 0; background: transparent; color: var(--text-3);
-    font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0.1rem 0.35rem;
+    font-size: var(--text-xl); line-height: 1; cursor: pointer; padding: 0.1rem 0.35rem;
   }
   .icon-btn:hover { color: var(--text-1); }
-  h3 { margin: 0 0 0.35rem; font-size: 0.86rem; }
+  h3 { margin: 0 0 0.35rem; font-size: var(--text-sm); }
   .review {
     padding: var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--r-md);
     background: var(--sunken);
   }
-  .facts { display: flex; flex-wrap: wrap; gap: 0.9rem; list-style: none; margin: 0; padding: 0; font-size: 0.82rem; color: var(--text-2); }
+  .facts { display: flex; flex-wrap: wrap; gap: 0.9rem; list-style: none; margin: 0; padding: 0; font-size: var(--text-sm); color: var(--text-2); }
   .title-fact { overflow-wrap: anywhere; }
   .files { list-style: none; margin: 0.6rem 0 0; padding: 0; display: grid; gap: 0.25rem; }
-  .files li { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: var(--text-2); }
+  .files li { display: flex; align-items: center; gap: 0.4rem; font-size: var(--text-sm); color: var(--text-2); }
   .file-name { font-weight: 600; overflow-wrap: anywhere; }
   .file-meta { color: var(--text-2); }
   .policy {
     margin: 0.7rem 0 0; padding-left: 0.6rem;
     border-left: 3px solid var(--accent-border);
-    color: var(--text-2); font-size: 0.76rem; line-height: 1.45;
+    color: var(--text-2); font-size: var(--text-sm); line-height: 1.45;
   }
   .formats { display: grid; gap: 0.4rem; border: 0; padding: 0; margin: 0; }
-  .formats legend { font-size: 0.82rem; font-weight: 650; padding: 0; margin-bottom: 0.3rem; }
+  .formats legend { font-size: var(--text-sm); font-weight: 650; padding: 0; margin-bottom: 0.3rem; }
   .format {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
@@ -238,11 +238,11 @@
   }
   .format.selected { border-color: var(--accent-border); background: var(--accent-soft); }
   .format input { grid-row: 1 / 3; align-self: center; }
-  .format-label { font-weight: 650; font-size: 0.86rem; }
-  .format-detail { grid-column: 2; color: var(--text-2); font-size: 0.76rem; }
+  .format-label { font-weight: 650; font-size: var(--text-sm); }
+  .format-detail { grid-column: 2; color: var(--text-2); font-size: var(--text-sm); }
   footer { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .spacer { flex: 1; }
-  .muted { color: var(--text-2); font-size: 0.84rem; margin: 0; }
-  .error { color: var(--danger); font-size: 0.82rem; margin: 0; }
-  .ok { color: var(--ok); font-size: 0.82rem; margin: 0; font-weight: 600; }
+  .muted { color: var(--text-2); font-size: var(--text-sm); margin: 0; }
+  .error { color: var(--danger); font-size: var(--text-sm); margin: 0; }
+  .ok { color: var(--ok); font-size: var(--text-sm); margin: 0; font-weight: 600; }
 </style>

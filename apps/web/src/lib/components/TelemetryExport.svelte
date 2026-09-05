@@ -138,6 +138,34 @@
     }
   }
 
+  /**
+   * BUG-283 — what the last delivery did, as a sentence.
+   *
+   * The row printed `d.last_status` verbatim, so a failed run read
+   * `telemetry_delivery_failed:fetch_failed:URLError` on the page. That was
+   * survivable while delivery only happened when somebody pressed the button and
+   * watched the result; putting destinations on a cadence (FIXED-386) made an
+   * unattended failure the ordinary case, so the raw code is now what an owner
+   * meets on a page they were not looking at when it happened.
+   *
+   * Same rule as everywhere else in this product: a reason code is the audit
+   * vocabulary, and a surface says what it means. The code is kept in `title` so
+   * it is still one hover away for correlating against the log.
+   */
+  function statusLine(status: string | null): string {
+    if (!status) return "Never run";
+    if (status === "ok") return "Last run ok";
+    if (status === "telemetry_credential_missing")
+      return "Last run refused: the credential variable is unset";
+    if (status === "telemetry_destination_disabled") return "Last run refused: destination off";
+    if (status.startsWith("telemetry_rejected_"))
+      return `Last run refused by the collector (${status.slice("telemetry_rejected_".length)})`;
+    if (status.includes("fetch_failed")) return "Last run could not reach the collector";
+    if (status.includes("http_error"))
+      return `Last run was rejected (${status.slice(status.lastIndexOf("_") + 1)})`;
+    return "Last run did not complete";
+  }
+
   async function remove(destination: TelemetryDestination) {
     if (!confirm(`Remove “${destination.name}”? Nothing already delivered is affected.`)) return;
     busy = destination.destination_id;
@@ -184,7 +212,9 @@
           <div class="row muted">
             <span>{d.exported_count} delivered</span>
             {#if d.last_attempt_at}
-              <span>{d.last_status === "ok" ? "Last run ok" : d.last_status} · {relativeTime(d.last_attempt_at)}</span>
+              <span title={d.last_status ?? ""}
+                >{statusLine(d.last_status)} · {relativeTime(d.last_attempt_at)}</span
+              >
             {:else}
               <span>Never run</span>
             {/if}
@@ -262,7 +292,7 @@
     </form>
   {:else}
     <button type="button" class="btn btn-sm" onclick={() => (adding = true)}>
-      <Icon name="globe" size={15} /> Add collector
+      <Icon name="globe" size="sm" /> Add collector
     </button>
   {/if}
 </section>
@@ -272,20 +302,19 @@
      scoped to that file — so a heading given the same class here inherited
      nothing and rendered a size larger than its siblings. Matched rather than
      hoisted: one component owning one heading is the smaller change. */
-  .otlp .section-h { font-size: 0.95rem; margin: 0 0 var(--space-3); }
+  .otlp .section-h { font-size: var(--text-md); margin: 0 0 var(--space-3); }
   .otlp p { margin: 0 0 var(--space-3); color: var(--text-2); max-width: 68ch; }
   .list { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-3); }
-  .list li { border: 1px solid var(--border); border-radius: var(--radius-2); padding: var(--space-3); display: grid; gap: 0.35rem; }
+  .list li { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--space-3); display: grid; gap: 0.35rem; }
   .row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
   .name { font-weight: 600; }
-  .muted { color: var(--text-3); font-size: 0.78rem; }
-  .tag { font-size: 0.72rem; color: var(--text-3); border: 1px solid var(--border); border-radius: 999px; padding: 0.05rem 0.5rem; }
-  .cadence select { font-size: 0.78rem; padding: 0.2rem 0.4rem; }
-  .error { color: var(--danger); }
+  .muted { color: var(--text-3); font-size: var(--text-sm); }
+  .tag { font-size: var(--text-xs); color: var(--text-3); border: 1px solid var(--border); border-radius: 999px; padding: 0.05rem 0.5rem; }
+  .cadence select { font-size: var(--text-sm); padding: 0.2rem 0.4rem; }
   .notice { color: var(--text-2); }
   .notice a { margin-left: 0.35rem; }
   .add { display: grid; gap: var(--space-3); max-width: 32rem; }
-  .add label { display: grid; gap: 0.25rem; font-size: 0.8rem; color: var(--text-2); }
+  .add label { display: grid; gap: 0.25rem; font-size: var(--text-sm); color: var(--text-2); }
   .add .check { display: flex; align-items: center; gap: 0.5rem; }
-  code { font-size: 0.78rem; color: var(--text-3); word-break: break-all; }
+  code { font-size: var(--text-sm); color: var(--text-3); word-break: break-all; }
 </style>

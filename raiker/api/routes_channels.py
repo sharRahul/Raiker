@@ -21,6 +21,7 @@ from raiker.api.schemas import (
     PairChannelRequest,
 )
 from raiker.api.sessions import ApiSession
+from raiker.channels.adapters import adapter_for
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import (
@@ -262,6 +263,27 @@ async def deliver_channel_test(
     )
 
 
+def _require_channel_secret(presented: str | None) -> None:
+    """The shared inbound secret, checked the same way for every transport.
+
+    Fail closed: no inbound at all until the owner sets one. Telegram presents
+    it in its own header (`X-Telegram-Bot-Api-Secret-Token`, which Telegram
+    echoes verbatim from the value given at `setWebhook`), so the check lives
+    here rather than in either route.
+    """
+    secret = os.environ.get("RAIKER_CHANNEL_INBOUND_SECRET", "").strip()
+    if not secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"ok": False, "reason_code": "channel_inbound_disabled"},
+        )
+    if not presented or not hmac.compare_digest(presented, secret):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"ok": False, "reason_code": "invalid_channel_secret"},
+        )
+
+
 @router.post("/api/channels/{connector_id}/inbound")
 async def receive_inbound(
     connector_id: str,
@@ -269,19 +291,50 @@ async def receive_inbound(
     request: Request,
     x_raiker_channel_secret: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    secret = os.environ.get("RAIKER_CHANNEL_INBOUND_SECRET", "").strip()
-    if not secret:
-        # Fail closed: no inbound until the owner configures a channel secret.
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"ok": False, "reason_code": "channel_inbound_disabled"},
-        )
-    if not x_raiker_channel_secret or not hmac.compare_digest(x_raiker_channel_secret, secret):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"ok": False, "reason_code": "invalid_channel_secret"},
-        )
+    _require_channel_secret(x_raiker_channel_secret)
+    return await _handle_inbound(
+        connector_id, sender_id=body.sender_id, text=body.text, request=request
+    )
 
+
+@router.post("/api/channels/{connector_id}/telegram")
+async def receive_telegram(
+    connector_id: str,
+    update: dict[str, Any],
+    request: Request,
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    """Telegram's own update shape, translated at the edge.
+
+    Everything after the translation is the path every channel already takes —
+    pairing lookup, sender allowlist, per-sender budget, redacted preview,
+    audit event, and the stored owner route. Telegram gets no shortcut: a
+    sender it does not recognise is refused here exactly as one arriving on the
+    generic webhook is, and the text stays structurally untrusted either way.
+
+    A non-message update (an edit is accepted; a poll answer, a reaction, a
+    join) is acknowledged and dropped rather than refused — Telegram retries
+    anything it does not get a 2xx for, and retrying a `chat_member` update
+    forever helps nobody.
+    """
+    _require_channel_secret(x_telegram_bot_api_secret_token)
+    adapter = adapter_for("telegram")
+    parsed = adapter.parse_inbound(update) if adapter is not None else None
+    if parsed is None:
+        return {"ok": True, "ignored": "unsupported_update"}
+    return await _handle_inbound(
+        connector_id, sender_id=parsed.sender_id, text=parsed.text, request=request
+    )
+
+
+
+async def _handle_inbound(
+    connector_id: str,
+    *,
+    sender_id: str,
+    text: str,
+    request: Request,
+) -> dict[str, Any]:
     store = SQLiteStore(_ws(request))
     writer = EventLogWriter(store)
     pairing = _enabled_pairing(store, connector_id)
@@ -298,9 +351,9 @@ async def receive_inbound(
 
     channel_message_id = new_id("chn_")
     channel_type = str(pairing.get("channel_type", "webhooks"))
-    preview, _ = redact_text(body.text[:200])
+    preview, _ = redact_text(text[:200])
 
-    if body.sender_id not in allowlist:
+    if sender_id not in allowlist:
         writer.append(make_event(
             session_id="channels",
             turn_id=None,
@@ -309,7 +362,7 @@ async def receive_inbound(
             payload={
                 "connector_id": connector_id,
                 "channel_type": channel_type,
-                "sender_id": body.sender_id,
+                "sender_id": sender_id,
                 "trust_level": "untrusted",
                 "reason": "sender_not_allowlisted",
             },
@@ -324,7 +377,7 @@ async def receive_inbound(
             },
         )
 
-    if not _within_inbound_budget(connector_id, body.sender_id):
+    if not _within_inbound_budget(connector_id, sender_id):
         writer.append(make_event(
             session_id="channels",
             turn_id=None,
@@ -333,7 +386,7 @@ async def receive_inbound(
             payload={
                 "connector_id": connector_id,
                 "channel_type": channel_type,
-                "sender_id": body.sender_id,
+                "sender_id": sender_id,
                 "trust_level": "untrusted",
                 "reason": "rate_limited",
                 "limit_per_minute": channel_inbound_limit(),
@@ -353,7 +406,7 @@ async def receive_inbound(
     # The stored owner route — never a field in this request — decides whether
     # anything else happens.
     owner_sender_id = str(pairing.get("owner_sender_id") or "")
-    is_owner = bool(owner_sender_id and hmac.compare_digest(body.sender_id, owner_sender_id))
+    is_owner = bool(owner_sender_id and hmac.compare_digest(sender_id, owner_sender_id))
     writer.append(make_event(
         session_id="channels",
         turn_id=None,
@@ -363,7 +416,7 @@ async def receive_inbound(
             "channel_message_id": channel_message_id,
             "connector_id": connector_id,
             "channel_type": channel_type,
-            "sender_id": body.sender_id,
+            "sender_id": sender_id,
             "trust_level": "owner" if is_owner else "untrusted",
             "quarantined": True,
             "instructions_inert": True,
@@ -375,8 +428,8 @@ async def receive_inbound(
         store,
         pairing,
         channel_message_id=channel_message_id,
-        sender_id=body.sender_id,
-        text=body.text,
+        sender_id=sender_id,
+        text=text,
         is_owner=is_owner,
     )
     return {

@@ -318,13 +318,13 @@
         <p class="intro">Your account will have its own Raiker workspace and open in a new tab.</p>
         <form onsubmit={(event) => { event.preventDefault(); void createUserInstance(); }}>
           <label for="instance-name">Instance name</label>
-          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="projects" size={17} /></span><input id="instance-name" bind:value={instanceName} placeholder="for example, alex" pattern={"[a-z0-9][a-z0-9-]{0,62}"} required disabled={busy} /></div>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="projects" size="md" /></span><input id="instance-name" bind:value={instanceName} placeholder="for example, alex" pattern={"[a-z0-9][a-z0-9-]{0,62}"} required disabled={busy} /></div>
           <label for="username">Username</label>
-          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="user" size={17} /></span><input id="username" bind:value={username} autocomplete="username" required disabled={busy} /></div>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="user" size="md" /></span><input id="username" bind:value={username} autocomplete="username" required disabled={busy} /></div>
           <label for="password">Password</label>
-          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="lock" size={17} /></span><input id="password" type="password" bind:value={password} autocomplete="new-password" required disabled={busy} /></div>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="lock" size="md" /></span><input id="password" type="password" bind:value={password} autocomplete="new-password" required disabled={busy} /></div>
           <label for="confirm-password">Confirm password</label>
-          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="lock" size={17} /></span><input id="confirm-password" type="password" bind:value={confirmPassword} autocomplete="new-password" required disabled={busy} /></div>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="lock" size="md" /></span><input id="confirm-password" type="password" bind:value={confirmPassword} autocomplete="new-password" required disabled={busy} /></div>
           {#if error}<p class="error" role="alert">{error}</p>{/if}
           <button type="submit" class="btn btn-primary submit" disabled={busy || !instanceName.trim() || !username || !password || !confirmPassword}>{busy ? "Creating…" : "Create account and open Raiker"}</button>
         </form>
@@ -334,7 +334,7 @@
         <p class="intro">Enter your username to begin local recovery.</p>
         <form onsubmit={beginRecovery}>
           <label for="username">Username</label>
-          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="user" size={17} /></span><input id="username" bind:value={username} autocomplete="username" required disabled={formDisabled} /></div>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="user" size="md" /></span><input id="username" bind:value={username} autocomplete="username" required disabled={formDisabled} /></div>
           {#if error}<p class="error" role="alert">{error}</p>{/if}
           <button type="submit" class="btn btn-primary submit" disabled={formDisabled} aria-busy={busy}>{busy ? "Starting…" : "Begin recovery"}</button>
         </form>
@@ -344,9 +344,9 @@
         <p class="intro">An existing authenticator code or one-time backup recovery code is required. Then choose a new password.</p>
         <form onsubmit={completeRecovery}>
           <label for="recovery-code">Recovery verification code</label>
-          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="lock" size={17} /></span><input id="recovery-code" bind:value={recoveryCode} autocomplete="one-time-code" required disabled={formDisabled} /></div>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="lock" size="md" /></span><input id="recovery-code" bind:value={recoveryCode} autocomplete="one-time-code" required disabled={formDisabled} /></div>
           <label for="password">New password</label>
-          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="lock" size={17} /></span><input id="password" type="password" bind:value={password} autocomplete="new-password" required disabled={formDisabled} /></div>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="lock" size="md" /></span><input id="password" type="password" bind:value={password} autocomplete="new-password" required disabled={formDisabled} /></div>
           {#if error}<p class="error" role="alert">{error}</p>{/if}
           <button type="submit" class="btn btn-primary submit" disabled={formDisabled} aria-busy={busy}>{busy ? "Updating…" : "Reset password"}</button>
         </form>
@@ -362,7 +362,7 @@
         <form onsubmit={submitCredentials} aria-describedby="privacy-note">
           <label for="username">Username</label>
           <div class="field">
-            <span class="field-icon" aria-hidden="true"><Icon name="user" size={17} /></span>
+            <span class="field-icon" aria-hidden="true"><Icon name="user" size="md" /></span>
             <input
               id="username"
               bind:value={username}
@@ -375,7 +375,7 @@
 
           <label for="password">Password</label>
           <div class="field">
-            <span class="field-icon" aria-hidden="true"><Icon name="lock" size={17} /></span>
+            <span class="field-icon" aria-hidden="true"><Icon name="lock" size="md" /></span>
             <input
               id="password"
               type={showPassword ? "text" : "password"}
@@ -393,14 +393,14 @@
               onclick={() => (showPassword = !showPassword)}
               disabled={formDisabled}
             >
-              <Icon name={showPassword ? "eye-off" : "eye"} size={18} />
+              <Icon name={showPassword ? "eye-off" : "eye"} size="md" />
             </button>
           </div>
 
           {#if registerIntent}
             <label for="confirm-password">Confirm password</label>
             <div class="field">
-              <span class="field-icon" aria-hidden="true"><Icon name="lock" size={17} /></span>
+              <span class="field-icon" aria-hidden="true"><Icon name="lock" size="md" /></span>
               <input
                 id="confirm-password"
                 type="password"
@@ -427,7 +427,7 @@
 
           {#if bootstrapAllowed || isRegister}
             <button type="button" class="secondary" onclick={switchMode} disabled={formDisabled}>
-              <Icon name={isRegister ? "user" : "user-plus"} size={18} />
+              <Icon name={isRegister ? "user" : "user-plus"} size="md" />
               {isRegister ? "Return to unlock" : "Create a User Account"}
             </button>
           {/if}
@@ -440,14 +440,14 @@
 
           {#if !bootstrapAllowed && !isRegister}
             <button type="button" class="secondary instance-button" onclick={() => { instanceSetup = true; error = null; }} disabled={formDisabled}>
-              <Icon name="projects" size={18} />
+              <Icon name="projects" size="md" />
               Create a User Account
             </button>
           {/if}
         {/if}
 
         <div id="privacy-note" class="privacy">
-          <span class="privacy-icon" aria-hidden="true"><Icon name="info" size={17} /></span>
+          <span class="privacy-icon" aria-hidden="true"><Icon name="info" size="md" /></span>
           <div>
             <strong>Local runtime</strong>
             <p>Your credentials and session remain on this Raiker instance.</p>
@@ -459,7 +459,7 @@
         <form onsubmit={submitMfa}>
           <label for="mfa-code">Authentication code</label>
           <div class="field">
-            <span class="field-icon" aria-hidden="true"><Icon name="lock" size={17} /></span>
+            <span class="field-icon" aria-hidden="true"><Icon name="lock" size="md" /></span>
             <input
               id="mfa-code"
               bind:value={mfaCode}
@@ -513,7 +513,7 @@
     background:
       radial-gradient(circle at 30% 22%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 30rem),
       linear-gradient(135deg, var(--surface), var(--bg));
-    color: var(--text);
+    color: var(--text-1);
     padding: clamp(1rem, 3vw, 2rem);
   }
   .lock-header {
@@ -709,7 +709,7 @@
     cursor: pointer;
   }
   .eye-toggle:hover {
-    color: var(--text);
+    color: var(--text-1);
   }
   .submit {
     margin-top: var(--space-3);
@@ -722,7 +722,7 @@
     align-items: center;
     gap: var(--space-3);
     color: var(--text-2);
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     margin: var(--space-3) 0;
   }
   .divider::before,
@@ -742,7 +742,7 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
-    color: var(--text);
+    color: var(--text-1);
     font-weight: 600;
     cursor: pointer;
   }
@@ -764,7 +764,7 @@
     border-radius: 0.9rem;
     background: var(--accent-soft);
     border: 1px solid var(--accent-border);
-    font-size: 0.9rem;
+    font-size: var(--text-md);
   }
   .privacy-icon {
     display: inline-flex;
@@ -804,8 +804,8 @@
     }
   }
   .status-bar {
-    background: #0d1420;
-    color: #e7ecf3;
+    background: var(--sunken);
+    color: var(--text-1);
     border-radius: 1rem;
     padding: var(--space-3) var(--space-5);
     max-width: 76rem;
@@ -821,26 +821,26 @@
     width: 0.65rem;
     height: 0.65rem;
     border-radius: 999px;
-    background: #8a94a6;
+    background: var(--text-3);
   }
   .status-dot.ok {
-    background: #34d399;
+    background: var(--success);
   }
   .status-dot.bad {
-    background: #f87171;
+    background: var(--danger);
   }
   .status-text {
     display: flex;
     flex-direction: column;
   }
   .status-label {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: #97a1b3;
+    color: var(--text-3);
   }
   .status-value {
-    font-size: 0.95rem;
+    font-size: var(--text-md);
   }
   @media (max-width: 820px) {
     .lock-layout {
@@ -855,7 +855,7 @@
   @media (max-width: 520px) {
     .brand {
       letter-spacing: 0.28em;
-      font-size: 0.9rem;
+      font-size: var(--text-md);
     }
   }
   @media (prefers-reduced-motion: reduce) {

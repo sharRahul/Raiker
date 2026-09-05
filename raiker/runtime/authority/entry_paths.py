@@ -132,6 +132,10 @@ _ENTRIES: tuple[CapabilityEntry, ...] = (
     _own("approval_execution_relay", ENTRY_CONTROL_PLANE),
     _own("audit_export", ENTRY_CONTROL_PLANE),
     _own("telemetry_export", ENTRY_CONTROL_PLANE),
+    # The Design surface. Reached only from the control plane — the owner
+    # pressing Generate — and never advertised to a model, because spending the
+    # owner's provider credit is not something a turn decides on its own.
+    _own("image_generation", ENTRY_CONTROL_PLANE),
     _own("mcp_builder_runtime", ENTRY_CONTROL_PLANE),
     _own("mcp_connector_runtime", ENTRY_CONTROL_PLANE, ENTRY_LOCAL_ADMISSION),
     _own("external_channel_runtime", ENTRY_CONTROL_PLANE),

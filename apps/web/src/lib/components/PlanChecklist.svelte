@@ -45,7 +45,7 @@
         aria-controls="plan-steps"
         onclick={() => (collapsed = !collapsed)}
       >
-        <Icon name={collapsed ? "chevron-right" : "chevron-down"} size={14} />
+        <Icon name={collapsed ? "chevron-right" : "chevron-down"} size="sm" />
         <span id="plan-heading">Plan</span>
       </button>
       <span class="count">{done} of {steps.length} done</span>
@@ -72,7 +72,7 @@
         {#each steps as step, index (index)}
           <li class={step.status}>
             <span class="marker" aria-hidden="true">
-              <Icon name={MARK[step.status] ?? "circle"} size={13} />
+              <Icon name={MARK[step.status] ?? "circle"} size="sm" />
             </span>
             <span class="body">
               <span class="title">{step.title}</span>
@@ -114,7 +114,7 @@
     background: transparent;
     color: var(--text-1);
     font: inherit;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-weight: 700;
     letter-spacing: 0.03em;
     text-transform: uppercase;
@@ -126,7 +126,7 @@
     outline-offset: 2px;
   }
   .count {
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
   }
   .progress {
@@ -156,7 +156,7 @@
     grid-template-columns: 1.1rem 1fr;
     gap: 0.5rem;
     align-items: start;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .marker {
@@ -178,11 +178,11 @@
     color: var(--text-1);
     font-weight: 650;
   }
-  .note { font-size: 0.75rem; color: var(--text-3); }
+  .note { font-size: var(--text-xs); color: var(--text-3); }
   .collapsed-line,
   .blocked-line {
     margin: 0;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
   }
   .blocked-line { color: var(--warn); }

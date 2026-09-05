@@ -61,11 +61,11 @@
   {:else}
     <span class="glyph" data-kind={attachment.kind} aria-hidden="true">
       {#if attachment.kind === "path"}
-        <Icon name="folder" size={16} />
+        <Icon name="folder" size="md" />
       {:else if isImage}
-        <Icon name="eye" size={16} />
+        <Icon name="eye" size="md" />
       {:else}
-        <Icon name="file" size={16} />
+        <Icon name="file" size="md" />
       {/if}
     </span>
   {/if}
@@ -99,7 +99,7 @@
       aria-label={`Remove attachment ${attachment.label}`}
       {disabled}
     >
-      <Icon name="x" size={12} />
+      <Icon name="x" size="sm" />
     </button>
   {/if}
 </div>
@@ -160,7 +160,7 @@
 
   .text { display: grid; gap: 0.05rem; min-width: 0; }
   .name {
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     line-height: 1.25;
     /* One line, ellipsised: a composer that rewraps as files are added moves
@@ -171,7 +171,7 @@
   }
   .meta {
     color: var(--text-3);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     letter-spacing: 0.02em;
     overflow: hidden;
     text-overflow: ellipsis;

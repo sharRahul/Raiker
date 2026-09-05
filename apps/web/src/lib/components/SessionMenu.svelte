@@ -90,7 +90,7 @@
     background: transparent;
     color: var(--text-1);
     font: inherit;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     padding: var(--space-1) var(--space-2);
     border-radius: var(--r-sm);
     text-align: left;
@@ -102,13 +102,13 @@
   .menu label {
     display: grid;
     gap: 0.2rem;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     color: var(--text-2);
     padding: 0 var(--space-2);
   }
   .menu input {
     font: inherit;
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
     padding: 0.25rem 0.4rem;
     border: 1px solid var(--border-strong);
     border-radius: var(--r-sm);

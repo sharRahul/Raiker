@@ -14,14 +14,14 @@ describe("DiagnosticsView", () => {
     stubFetchPending();
     render(DiagnosticsView);
     const status = await screen.findByRole("status");
-    expect(status).toHaveTextContent(/loading diagnostics/i);
+    expect(status).toHaveTextContent(/reading runtime health/i);
   });
 
   it("shows a route-level error state when diagnostics cannot load", async () => {
     stubFetch({});
     render(DiagnosticsView);
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(/couldn't load diagnostics/i);
+    expect(alert).toHaveTextContent(/couldn't read runtime health/i);
     expect(alert).toHaveTextContent(/unavailable \(404\)/i);
   });
 

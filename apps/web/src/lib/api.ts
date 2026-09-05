@@ -137,6 +137,7 @@ import type {
   SpeechRuntimeChange,
   SpeechRuntimeProbe,
   SpeechRuntimeView,
+  ImageGenerationsView,
   TelemetryDestination,
 } from "./apiTypes";
 import type { ApprovalMode } from "./approvalMode";
@@ -1240,6 +1241,14 @@ export const api = {
         body: JSON.stringify({ cadence }),
       },
     ),
+  // ── The Design surface ──
+  // The list is metadata only; the bytes are a separate, owner-scoped request
+  // that names one generation, so a gallery cannot accidentally ship megabytes.
+  images: () => request<ImageGenerationsView>("/api/images"),
+  generateImage: (body: { profile_id: string; prompt: string; size: string; model?: string }) =>
+    postJson<{ ok: boolean; generation_id: string }>("/api/images", body),
+  imageBytesUrl: (generationId: string) =>
+    `/api/images/${encodeURIComponent(generationId)}/bytes`,
   // ── BUG-21: the normalised price registry ──
   modelPricing: () => request<ModelPricingView>("/api/models/pricing"),
   refreshModelPricing: () =>

@@ -184,11 +184,11 @@
 {#if current !== null && !onApprovals}
   <section class="approval-prompt" aria-label="Approval needed">
     <header>
-      <Icon name="shield" size={15} />
+      <Icon name="shield" size="sm" />
       <strong>Approval needed</strong>
       {#if queue.length > 1}<span class="more">{queue.length - 1} more</span>{/if}
       <button type="button" class="dismiss" aria-label="Decide later" onclick={later}>
-        <Icon name="x" size={14} />
+        <Icon name="x" size="sm" />
       </button>
     </header>
     <p class="what">
@@ -202,7 +202,7 @@
       {#if failure}<p class="note" role="alert">{failure}</p>{/if}
       <div class="actions">
         <button type="button" class="primary" disabled={busy} onclick={() => void decide(true)}>
-          <Icon name="check" size={14} /> Approve
+          <Icon name="check" size="sm" /> Approve
         </button>
         <button type="button" disabled={busy} onclick={() => void decide(false)}>Deny</button>
         <button type="button" class="quiet" onclick={review}>Details</button>
@@ -225,18 +225,18 @@
     border-radius: var(--r-md);
     background: var(--surface);
     color: var(--text-2);
-    box-shadow: 0 10px 30px rgb(0 0 0 / 18%);
+    box-shadow: var(--shadow-2);
   }
   header {
     display: flex;
     align-items: center;
     gap: 0.4rem;
     color: var(--text-1);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .more {
     color: var(--text-3);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
   }
   .dismiss {
     margin-left: auto;
@@ -250,19 +250,19 @@
     margin: 0;
     display: grid;
     gap: 0.1rem;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
   }
   .what strong {
     color: var(--text-1);
   }
   .what span {
     color: var(--text-3);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
   .note {
     margin: 0;
     color: var(--text-3);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
   .actions {
     display: flex;
@@ -278,7 +278,7 @@
     background: var(--surface);
     color: var(--text-1);
     font: inherit;
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     cursor: pointer;
   }

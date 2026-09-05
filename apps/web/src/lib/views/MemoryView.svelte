@@ -348,10 +348,10 @@
   $effect(() => { void load(); });
 </script>
 
-<header class="page-intro"><GuideLink route="memory" /><button class="btn btn-ghost btn-sm" type="button" onclick={load}><Icon name="refresh" size={15} /> Refresh</button></header>
+<header class="page-intro"><GuideLink route="memory" /><button class="btn btn-ghost btn-sm" type="button" onclick={load}><Icon name="refresh" size="sm" /> Refresh</button></header>
 
 <section class="posture-card posture-{posture.kind}" role="note" aria-label="Memory permission posture">
-  <Icon name={posture.kind === "proposes" ? "check" : "info"} size={16} />
+  <Icon name={posture.kind === "proposes" ? "check" : "info"} size="md" />
   <p>{posture.headline}</p>
   {#if posture.action}<a class="posture-action" href="#/capabilities">{posture.action} →</a>{/if}
 </section>
@@ -373,7 +373,7 @@
            as separate children a narrow window broke the model name across two
            columns and stranded the clause beside it. -->
       <p class="posture-line" data-semantic={recall === "semantic"}>
-        <Icon name={recall === "semantic" ? "check" : "info"} size={14} />
+        <Icon name={recall === "semantic" ? "check" : "info"} size="sm" />
         <span>
           {#if recall === "semantic"}
             Searching <b>{retrieval.model}</b> — matches meaning.
@@ -422,7 +422,7 @@
         </div>
         {#if settings.embedding_providers.some((provider) => provider.provider === "llama.cpp")}
           <p class="posture-line">
-            <Icon name="download" size={14} />
+            <Icon name="download" size="sm" />
             <span>
               Need a local embedding model? The curated Apache-2.0 Nomic Embed
               Q4_K_M option is about 81 MiB. <a href="#/models?tab=huggingface">Review and download it in Models</a>;
@@ -430,7 +430,7 @@
             </span>
           </p>
         {/if}
-        {#if indexResult}<p class="posture-line" data-semantic="true"><Icon name="check" size={14} /><span>{indexResult}</span></p>{/if}
+        {#if indexResult}<p class="posture-line" data-semantic="true"><Icon name="check" size="sm" /><span>{indexResult}</span></p>{/if}
       {/if}
     </div>
     <label class="backend-field">
@@ -473,7 +473,7 @@
   </section>
 
   <section class="filters" aria-label="Filter memories">
-    <label class="search"><Icon name="search" size={16} /><input bind:value={query} aria-label="Search memories" placeholder="Search memories…" /></label>
+    <label class="search"><Icon name="search" size="md" /><input bind:value={query} aria-label="Search memories" placeholder="Search memories…" /></label>
     <select bind:value={statusFilter} aria-label="Memory status"><option value="all">All statuses</option><option value="approved">Approved</option><option value="expired">Expired</option></select>
     <select bind:value={scopeFilter} aria-label="Memory scope"><option value="all">All scopes</option>{#each scopes as scope}<option value={scope}>{scope}</option>{/each}</select>
     <select bind:value={sensitivityFilter} aria-label="Memory sensitivity"><option value="all">All sensitivities</option>{#each sensitivities as sensitivity}<option value={sensitivity}>{sensitivity}</option>{/each}</select>
@@ -521,10 +521,10 @@
          none. Repeating its sentence here put the same line on screen twice;
          the empty state keeps the action, which is the half that is not
          already said. -->
-    {#if approved.length === 0}<div class="empty"><Icon name="spark" size={24} /><h4>No approved memories yet</h4><a href={posture.action ? "#/capabilities" : "#/approvals"}>{posture.action ?? "Learn how governed review works"}</a></div>
+    {#if approved.length === 0}<div class="empty"><Icon name="spark" size="xl" /><h4>No approved memories yet</h4><a href={posture.action ? "#/capabilities" : "#/approvals"}>{posture.action ?? "Learn how governed review works"}</a></div>
     {:else if filtered.length === 0}<div class="empty"><h4>No memories match these filters</h4><p>Clear or change the filters to see approved memories.</p></div>
     {:else}<div class="memory-grid">{#each filtered as m (m.memory_id)}<article class="memory-card" class:pinned={m.pinned}>
-      <div class="memory-title">{#if editingId === m.memory_id}<textarea rows="3" bind:value={editDraft} aria-label="Memory text"></textarea>{:else}<h4>{m.text}</h4>{/if}{#if m.pinned}<span class="pin-label"><Icon name="check" size={12} /> Pinned</span>{/if}</div>
+      <div class="memory-title">{#if editingId === m.memory_id}<textarea rows="3" bind:value={editDraft} aria-label="Memory text"></textarea>{:else}<h4>{m.text}</h4>{/if}{#if m.pinned}<span class="pin-label"><Icon name="check" size="sm" /> Pinned</span>{/if}</div>
       <div class="meta"><span>Approved</span><span>{m.scope} scope</span><span>{m.sensitivity} sensitivity</span></div>
       <dl><div><dt>Source</dt><dd>{provenanceLabel(m)}</dd></div><div><dt>Approved</dt><dd>{relativeTime(m.created_at)}</dd></div><div><dt>Review or expiry</dt><dd>{m.expires_at ? relativeTime(m.expires_at) : "No date set"}</dd></div></dl>
       <div class="card-actions">{#if editingId === m.memory_id}<button class="btn btn-primary btn-sm" aria-label="Save memory" onclick={() => void saveEdit(m)}>Save</button><button class="btn btn-ghost btn-sm" onclick={() => editingId = null}>Cancel</button>{:else}<button class="btn btn-ghost btn-sm" aria-label={`View the source of “${m.text.slice(0, 40)}”`} onclick={() => void viewSource(m)}>View source</button><button class="btn btn-ghost btn-sm" aria-label="Edit memory" onclick={() => { editingId = m.memory_id; editDraft = m.text; }}>Edit</button><button class="btn btn-ghost btn-sm" onclick={() => void changeScope(m)}>Edit scope</button><button class="btn btn-ghost btn-sm" onclick={() => void reviewExpiry(m)}>Review expiry</button><button class="btn btn-ghost btn-sm" aria-label={m.pinned ? "Unpin memory" : "Pin memory"} onclick={() => void togglePin(m)}>{m.pinned ? "Unpin" : "Pin"}</button><button class="btn btn-ghost btn-sm" onclick={() => void viewHistory(m)}>View history</button><button class="btn btn-ghost btn-sm danger" aria-label="Forget memory" onclick={() => void forget(m)}>Forget</button>{/if}</div>
@@ -547,15 +547,15 @@
     </div>
     {#if dueForExpiry.length}
       <div class="due-row" role="note">
-        <Icon name="info" size={14} />
+        <Icon name="info" size="sm" />
         <span>{dueForExpiry.length} past their retention class.</span>
         <button class="btn btn-sm" type="button" disabled={busy} onclick={() => void sweepExpired()}>Remove</button>
       </div>
     {:else if sweepResult}
-      <div class="due-row" role="status"><Icon name="check" size={14} /><span>{sweepResult}</span></div>
+      <div class="due-row" role="status"><Icon name="check" size="sm" /><span>{sweepResult}</span></div>
     {/if}
     {#if observations === null}
-      <div class="empty"><Icon name="info" size={24} /><h4>Observation capture is not reporting</h4><p>The runtime could not be asked what it captured. This is not the same as having captured nothing.</p></div>
+      <div class="empty"><Icon name="info" size="xl" /><h4>Observation capture is not reporting</h4><p>The runtime could not be asked what it captured. This is not the same as having captured nothing.</p></div>
     {:else}
       {#if observations.observations.length}
         <div class="filters">
@@ -568,14 +568,14 @@
         </div>
       {/if}
       {#if observations.observations.length === 0}
-        <div class="empty"><Icon name="spark" size={24} /><h4>No observations yet</h4><p>Raiker records one observation each time a governed tool returns material. Run a turn that reads a file or searches the workspace and it will appear here.</p></div>
+        <div class="empty"><Icon name="spark" size="xl" /><h4>No observations yet</h4><p>Raiker records one observation each time a governed tool returns material. Run a turn that reads a file or searches the workspace and it will appear here.</p></div>
       {:else if observationRows.length === 0}
         <div class="empty"><h4>No observations match this filter</h4><p>Choose a different kind to see what was captured.</p></div>
       {:else}
         <div class="memory-grid">
           {#each observationRows as o (o.observation_id)}
             <article class="memory-card observation" class:refused={o.capture_status === "skipped"}>
-              <div class="memory-title"><h4>{o.summary}</h4>{#if o.capture_status === "skipped"}<span class="refused-label"><Icon name="info" size={12} /> Not captured</span>{/if}</div>
+              <div class="memory-title"><h4>{o.summary}</h4>{#if o.capture_status === "skipped"}<span class="refused-label"><Icon name="info" size="sm" /> Not captured</span>{/if}</div>
               <div class="meta">
                 <span>{o.source_type.replaceAll("_", " ")}</span>
                 <span>{retentionLabel(o.retention)}</span>
@@ -591,7 +591,7 @@
                 <div><dt>Checksum</dt><dd>{o.content_sha256 ? `${o.content_sha256.slice(0, 12)}… · ${o.content_bytes} bytes` : "None kept"}</dd></div>
               </dl>
               {#if o.gist_status === "pending_review"}
-                <p class="gist-note"><Icon name="spark" size={14} /> Gist proposed and pending review: “{o.gist_summary}”. It becomes durable memory only through the same approval every other memory needs.</p>
+                <p class="gist-note"><Icon name="spark" size="sm" /> Gist proposed and pending review: “{o.gist_summary}”. It becomes durable memory only through the same approval every other memory needs.</p>
               {/if}
               <div class="card-actions">
                 {#if o.gist_id}<button class="btn btn-ghost btn-sm" onclick={() => void discardGist(o.gist_id)}>Discard gist</button>{/if}
@@ -604,7 +604,7 @@
     {/if}
   </section>
 
-  <details class="advanced"><summary><span><strong>Advanced memory management</strong><small>Import or export governed memory records.</small></span><Icon name="chevron-down" size={16} /></summary><div class="advanced-body"><button class="btn btn-ghost" onclick={() => void exportMemories()}>Export memories</button><label class="btn btn-ghost file-button">Review import<input type="file" accept="application/json,.json" onchange={(e) => void reviewImport(e)} /></label>{#if importPreview}
+  <details class="advanced"><summary><span><strong>Advanced memory management</strong><small>Import or export governed memory records.</small></span><Icon name="chevron-down" size="md" /></summary><div class="advanced-body"><button class="btn btn-ghost" onclick={() => void exportMemories()}>Export memories</button><label class="btn btn-ghost file-button">Review import<input type="file" accept="application/json,.json" onchange={(e) => void reviewImport(e)} /></label>{#if importPreview}
       <!-- BUG-244 — what this would change, before it changes anything. An
            import used to report the number of records in the file and write
            every one of them, so re-importing the same file made a second copy
@@ -653,21 +653,29 @@
   /* MEM-03 — the sentence that says which embedding is in force. It is a
      statement of fact rather than an alert, so it uses the same tone treatment
      as the posture strip above rather than a second, louder one. */
-  .posture-line { display:flex; align-items:baseline; gap:.4rem; margin-top:var(--space-2) !important; font-size:.82rem; }
+  .posture-line { display:flex; align-items:baseline; gap:.4rem; margin-top:var(--space-2) !important; font-size:var(--text-sm); }
   .posture-line :global(svg) { flex:none; align-self:center; color:var(--warn,var(--text-3)); }
   .posture-line[data-semantic="true"] :global(svg) { color:var(--ok,var(--text-3)); }
   .backend-field { flex:none; min-width:14rem; }
   /* A secondary clause under the lead, not a second lead. */
-  .due-row { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); font-size:.82rem; color:var(--text-2); }
+  .due-row { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); font-size:var(--text-sm); color:var(--text-2); }
   .due-row :global(svg) { flex:none; color:var(--warn,var(--text-3)); }
   .due-row[role="status"] :global(svg) { color:var(--ok,var(--text-3)); }
   .index-row { display:flex; gap:var(--space-2); align-items:center; margin-top:var(--space-2); flex-wrap:wrap; }
+  /* BUG-284 — two mobile bleeds this page had as soon as it held anything.
+     `min-width:0` lets the label shrink; the select inside it still claims the
+     width of its longest option unless it is told otherwise. And an approved
+     memory offers seven controls in a row that could not wrap, so at 390px the
+     card bled 145px past its own edge and over the one beside it. Neither was
+     visible on an empty workspace, which is why the width sweep went green on a
+     fresh instance and red on a used one. */
   .index-field { flex:1 1 14rem; min-width:0; }
+  .index-field select { width:100%; min-width:0; }
   /* BUG-71 — the posture strip states what this page can actually promise. It
      sits above everything else because it changes the meaning of the counts
      below it: "0 Pending review" reads very differently when nothing is able
      to propose. */
-  .posture-card { display:flex; align-items:flex-start; gap:var(--space-2); padding:var(--space-3) var(--space-4); margin-bottom:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface-2); }
+  .posture-card { display:flex; align-items:flex-start; gap:var(--space-2); padding:var(--space-3) var(--space-4); margin-bottom:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--sunken); }
   .posture-card p { margin:0; color:var(--text-2); flex:1; }
   .posture-card :global(svg) { flex:none; margin-top:.1rem; color:var(--text-3); }
   .posture-proposes { border-color:var(--ok-border,var(--border)); }
@@ -675,8 +683,8 @@
   .posture-denied :global(svg),.posture-unknown :global(svg) { color:var(--warn,var(--text-3)); }
   .posture-action { flex:none; white-space:nowrap; font-weight:600; }
   .switch { min-width:76px; min-height:44px; display:flex; align-items:center; gap:.45rem; border:1px solid var(--border-strong); border-radius:var(--r-pill); padding:.25rem .55rem .25rem .3rem; background:var(--sunken); color:var(--text-2); cursor:pointer; } .switch span { width:1.65rem; height:1.65rem; border-radius:50%; background:var(--text-3); } .switch.on { background:var(--accent-soft); color:var(--accent); border-color:var(--accent-border); } .switch.on span { background:var(--accent); }
-  .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:var(--space-4) 0; overflow:hidden; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--border); } .summary div { display:grid; gap:.15rem; padding:var(--space-3); background:var(--surface); } .summary strong { font-size:1.2rem; } .summary span { color:var(--text-3); font-size:.75rem; }
-  .filters { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; margin-bottom:var(--space-5); } .search { min-height:var(--control-min-h); border:1px solid var(--border-strong); border-radius:var(--r-sm); background:var(--surface); color:var(--text-1); } .search { display:flex; align-items:center; gap:.45rem; padding:0 .7rem; flex:1; min-width:15rem; } .search input { width:100%; border:0; outline:0; background:transparent; color:inherit; } .pinned-filter { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:.82rem; }
+  .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:var(--space-4) 0; overflow:hidden; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--border); } .summary div { display:grid; gap:.15rem; padding:var(--space-3); background:var(--surface); } .summary strong { font-size:var(--text-xl); } .summary span { color:var(--text-3); font-size:var(--text-xs); }
+  .filters { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; margin-bottom:var(--space-5); } .search { min-height:var(--control-min-h); border:1px solid var(--border-strong); border-radius:var(--r-sm); background:var(--surface); color:var(--text-1); } .search { display:flex; align-items:center; gap:.45rem; padding:0 .7rem; flex:1; min-width:15rem; } .search input { width:100%; border:0; outline:0; background:transparent; color:inherit; } .pinned-filter { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:var(--text-sm); }
   /* The library is a card like the posture controls above it, not a bare run of
      text. Without the enclosure its empty state ("No files yet.") sat directly
      on top of the memory filter row and read as a caption for the filters. */
@@ -694,19 +702,19 @@
      wrapped into a three-line column beside its heading, and so did the
      observations count. A short count still sits inline. */
   .section-head > :last-child:not(:first-child) { flex:none; max-width:100%; } .memory-grid { display:grid; gap:var(--space-3); }
-  .memory-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .memory-card.pinned { border-color:var(--accent-border); } .memory-card.pending { margin-bottom:var(--space-3); background:var(--warning-soft); } .memory-card h4 { font-size:1rem; } .memory-title textarea { width:100%; }
-  .pin-label { display:flex; align-items:center; gap:.25rem; color:var(--accent); font-size:.72rem; } .meta { display:flex; flex-wrap:wrap; gap:.35rem; margin:.6rem 0; } .meta span { padding:.22rem .48rem; border-radius:var(--r-pill); background:var(--sunken); color:var(--text-2); font-size:.72rem; } dl { display:grid; grid-template-columns:2fr 1fr 1fr; gap:var(--space-3); padding-block:var(--space-3); border-block:1px solid var(--border); } dl div { min-width:0; } dt { color:var(--text-3); font-size:.7rem; } dd { margin:.15rem 0 0; overflow-wrap:anywhere; font-size:.82rem; } .card-actions { justify-content:flex-start; margin-top:var(--space-3); } .danger { color:var(--danger); } details { margin-top:var(--space-3); color:var(--text-2); font-size:.78rem; } details summary { cursor:pointer; color:var(--text-1); }
+  .memory-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .memory-card.pinned { border-color:var(--accent-border); } .memory-card.pending { margin-bottom:var(--space-3); background:var(--warn-soft); } .memory-card h4 { font-size:var(--text-base); } .memory-title textarea { width:100%; }
+  .pin-label { display:flex; align-items:center; gap:.25rem; color:var(--accent); font-size:var(--text-xs); } .meta { display:flex; flex-wrap:wrap; gap:.35rem; margin:.6rem 0; } .meta span { padding:.22rem .48rem; border-radius:var(--r-pill); background:var(--sunken); color:var(--text-2); font-size:var(--text-xs); } dl { display:grid; grid-template-columns:2fr 1fr 1fr; gap:var(--space-3); padding-block:var(--space-3); border-block:1px solid var(--border); } dl div { min-width:0; } dt { color:var(--text-3); font-size:var(--text-2xs); } dd { margin:.15rem 0 0; overflow-wrap:anywhere; font-size:var(--text-sm); } .card-actions { justify-content:flex-start; flex-wrap:wrap; margin-top:var(--space-3); } .danger { color:var(--danger); } details { margin-top:var(--space-3); color:var(--text-2); font-size:var(--text-sm); } details summary { cursor:pointer; color:var(--text-1); }
   /* MEM-04 — an observation reads as a memory card with one difference: a
      refused one is drawn in the warning tone the pending proposals already use,
      because both are "here is something Raiker did not act on by itself". */
-  .section-head p.section-note { margin:.2rem 0 0; color:var(--text-3); font-size:.8rem; max-width:52rem; }
-  .memory-card.observation.refused { background:var(--warning-soft); border-color:var(--warn-border,var(--border-strong)); }
-  .refused-label { display:flex; align-items:center; gap:.25rem; flex:none; color:var(--warn,var(--text-3)); font-size:.72rem; }
-  .refused-note,.gist-note { margin:.5rem 0 0; color:var(--text-2); font-size:.8rem; }
+  .section-head p.section-note { margin:.2rem 0 0; color:var(--text-3); font-size:var(--text-sm); max-width:52rem; }
+  .memory-card.observation.refused { background:var(--warn-soft); border-color:var(--warn-border,var(--border-strong)); }
+  .refused-label { display:flex; align-items:center; gap:.25rem; flex:none; color:var(--warn,var(--text-3)); font-size:var(--text-xs); }
+  .refused-note,.gist-note { margin:.5rem 0 0; color:var(--text-2); font-size:var(--text-sm); }
   .gist-note { display:flex; align-items:baseline; gap:.4rem; }
   .gist-note :global(svg) { flex:none; align-self:center; color:var(--accent); }
-  .empty { padding:var(--space-7); text-align:center; border:1px dashed var(--border-strong); border-radius:var(--r-lg); color:var(--text-2); } .empty h4 { color:var(--text-1); margin-top:var(--space-2); }
-  .advanced { margin-top:var(--space-6); padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .advanced summary { margin:0; list-style:none; } .advanced summary span { display:grid; gap:.2rem; } .advanced small { color:var(--text-2); font-weight:400; } .advanced-body { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); padding-top:var(--space-4); } .file-button input { position:absolute; width:1px; height:1px; opacity:0; } .import-review { width:100%; display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding:var(--space-3); background:var(--sunken); border-radius:var(--r-md); } .import-notice { width:100%; margin:var(--space-2) 0 0; color:var(--text-2); font-size:.84rem; }
+  .empty { padding:var(--space-6); text-align:center; border:1px dashed var(--border-strong); border-radius:var(--r-lg); color:var(--text-2); } .empty h4 { color:var(--text-1); margin-top:var(--space-2); }
+  .advanced { margin-top:var(--space-6); padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .advanced summary { margin:0; list-style:none; } .advanced summary span { display:grid; gap:.2rem; } .advanced small { color:var(--text-2); font-weight:400; } .advanced-body { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); padding-top:var(--space-4); } .file-button input { position:absolute; width:1px; height:1px; opacity:0; } .import-review { width:100%; display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding:var(--space-3); background:var(--sunken); border-radius:var(--r-md); } .import-notice { width:100%; margin:var(--space-2) 0 0; color:var(--text-2); font-size:var(--text-sm); }
   @media (max-width:45rem) {
     .summary { grid-template-columns:repeat(2,1fr); }
     dl { grid-template-columns:1fr; }

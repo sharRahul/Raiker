@@ -42,7 +42,7 @@
     title="Attach a workspace file, an image, or a document"
     {disabled}
   >
-    <Icon name="file" size={15} />
+    <Icon name="file" size="sm" />
   </button>
 </div>
 

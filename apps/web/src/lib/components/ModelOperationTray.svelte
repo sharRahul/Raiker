@@ -61,10 +61,10 @@
     bottom: 18px;
     z-index: 45;
     width: min(390px, calc(100vw - 32px));
-    border: 1px solid color-mix(in srgb, #2563eb 35%, var(--border));
+    border: 1px solid var(--accent-border);
     border-radius: 12px;
     background: var(--surface);
-    box-shadow: 0 14px 38px rgb(0 0 0/0.16);
+    box-shadow: var(--shadow-2);
     overflow: hidden;
   }
   .tray-toggle {
@@ -81,14 +81,14 @@
   }
   .tray-toggle > span:last-child {
     color: var(--text-muted);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .pulse {
     width: 9px;
     height: 9px;
     border-radius: 50%;
-    background: #2563eb;
-    box-shadow: 0 0 0 5px rgb(37 99 235/0.13);
+    background: var(--accent);
+    box-shadow: 0 0 0 5px var(--accent-soft);
   }
   .tray-body {
     border-top: 1px solid var(--border);
@@ -104,11 +104,11 @@
     text-decoration: none;
   }
   .tray-body a:hover {
-    background: var(--surface-raised, #f5f6f8);
+    background: var(--surface-raised);
   }
   .tray-body strong {
     text-transform: uppercase;
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     letter-spacing: 0.08em;
   }
   .tray-body small {

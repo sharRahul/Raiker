@@ -263,7 +263,7 @@
     </dl>
     <div class="actions">
       <a href="#/activity">View change history</a>
-      <a class="btn btn-ghost btn-sm" href="#/capabilities"><Icon name="capabilities" size={15} /> Review permissions</a>
+      <a class="btn btn-ghost btn-sm" href="#/capabilities"><Icon name="capabilities" size="sm" /> Review permissions</a>
     </div>
   {/if}
 </section>
@@ -363,7 +363,7 @@
                  would imply it is a setting away. -->
             {#if capabilityRows(environment.features).length}
               <ul class="capabilities">
-                {#each capabilityRows(environment.features) as capability (capability)}<li><Icon name="check" size={13} /> {capability}</li>{/each}
+                {#each capabilityRows(environment.features) as capability (capability)}<li><Icon name="check" size="sm" /> {capability}</li>{/each}
               </ul>
             {/if}
             {#if environment.features?.persistent_environment}
@@ -441,14 +441,14 @@
   .settings-card label > small { color: var(--text-2); }
   .settings-card label > input { min-height: 40px; padding: 0 .65rem; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--sunken); color: var(--text-1); font: inherit; }
   .settings-card, .danger-zone { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--card-pad-y) var(--card-pad-x); }
-  .environment-settings { margin-top:var(--space-5); } .environment-grid { display:grid; gap:var(--space-2); margin:var(--space-4) 0; } .environment-grid article { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-grid article.selected { border-color:var(--accent-border); background:var(--accent-soft); } .environment-grid article div { display:grid; gap:.2rem; } .environment-grid article span { color:var(--text-3); font-size:.75rem; text-transform:capitalize; } .environment-grid article .container-runtime { color:var(--text-2); font-family:var(--font-mono); text-transform:none; } .environment-grid article .boundary { width:fit-content; padding:.18rem .45rem; border-left:2px solid var(--accent); background:var(--sunken); color:var(--text-2); text-transform:none; } .environment-grid article small { color:var(--text-2); font-size:.72rem; text-transform:capitalize; } .environment-grid article .remediation { color:var(--warn); text-transform:none; }
+  .environment-settings { margin-top:var(--space-5); } .environment-grid { display:grid; gap:var(--space-2); margin:var(--space-4) 0; } .environment-grid article { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-grid article.selected { border-color:var(--accent-border); background:var(--accent-soft); } .environment-grid article div { display:grid; gap:.2rem; } .environment-grid article span { color:var(--text-3); font-size:var(--text-xs); text-transform:capitalize; } .environment-grid article .container-runtime { color:var(--text-2); font-family:var(--font-mono); text-transform:none; } .environment-grid article .boundary { width:fit-content; padding:.18rem .45rem; border-left:2px solid var(--accent); background:var(--sunken); color:var(--text-2); text-transform:none; } .environment-grid article small { color:var(--text-2); font-size:var(--text-xs); text-transform:capitalize; } .environment-grid article .remediation { color:var(--warn); text-transform:none; }
   .observations { display:grid; gap:.15rem; margin:.35rem 0 0; padding:0; list-style:none; }
-  .observations li { display:flex; align-items:baseline; justify-content:space-between; gap:.75rem; font-size:.72rem; }
+  .observations li { display:flex; align-items:baseline; justify-content:space-between; gap:.75rem; font-size:var(--text-xs); }
   /* The card capitalises its short labels. These are sentences —
      "Cannot read Raiker's own state" — so they opt out of that. */
   .observations li span, .observations li strong, .environment-grid article small.plain { text-transform:none; }
   .observations li span { color:var(--text-2); }
-  .observations li strong { font-size:.68rem; font-weight:650; white-space:nowrap; }
+  .observations li strong { font-size:var(--text-2xs); font-weight:650; white-space:nowrap; }
   .observations li.enforced strong { color:var(--ok); }
   .observations li.unenforced strong { color:var(--danger); }
   .observations li.indeterminate strong { color:var(--warn); }
@@ -459,18 +459,18 @@
      measured observations above them, because they are the same kind of claim:
      a statement of what was built, not of what was configured. */
   .capabilities { display:grid; gap:.15rem; margin:.35rem 0 0; padding:0; list-style:none; }
-  .capabilities li { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:.72rem; text-transform:none; }
+  .capabilities li { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:var(--text-xs); text-transform:none; }
   .capabilities li :global(svg) { flex:none; color:var(--ok); }
   .egress-status { display:grid; gap:.2rem; margin-top:.45rem; padding:.65rem .75rem; border-left:3px solid var(--warn); background:var(--sunken); }
-  .egress-status strong { color:var(--warn); font-size:.75rem; }
-  .egress-status span { color:var(--text-1); font-family:var(--font-mono); font-size:.72rem; text-transform:none; overflow-wrap:anywhere; }
+  .egress-status strong { color:var(--warn); font-size:var(--text-xs); }
+  .egress-status span { color:var(--text-1); font-family:var(--font-mono); font-size:var(--text-xs); text-transform:none; overflow-wrap:anywhere; }
   .egress-status small { color:var(--text-2); text-transform:none; }
   .reset-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:.45rem; }
   .reset-actions .danger { color:var(--danger); }
-  details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; color:var(--text-2); font-size:.78rem; } .environment-form input,.environment-form select { background:var(--sunken); } .environment-form small,.environment-form button,.environment-form fieldset,.boundary-preview { grid-column:1/-1; } .environment-form fieldset { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:0; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-form fieldset legend { padding:0 .35rem; color:var(--text-2); font-size:.78rem; } .environment-form .tool-choice { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:.35rem; color:var(--text-1); font-family:var(--font-mono); } .environment-form .tool-choice input { min-height:0; } .boundary-preview { display:grid; grid-template-columns:auto auto 1fr auto auto; align-items:center; gap:.55rem; padding:.7rem .8rem; border-left:3px solid var(--accent); background:var(--sunken); color:var(--text-3); font-size:.75rem; } .boundary-preview strong { color:var(--text-1); } .boundary-preview i { text-align:center; color:var(--accent); font-style:normal; }
-  .status { color: var(--ok); font-size: .85rem; } .status.stopped { color: var(--warn); }
-  .eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; font-weight: 700; }
-  dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); padding: var(--space-4) 0; border-block: 1px solid var(--border); } dl div { display: grid; gap: .2rem; } dt { color: var(--text-3); font-size: .75rem; } dd { margin: 0; }
+  details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; color:var(--text-2); font-size:var(--text-sm); } .environment-form input,.environment-form select { background:var(--sunken); } .environment-form small,.environment-form button,.environment-form fieldset,.boundary-preview { grid-column:1/-1; } .environment-form fieldset { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:0; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-form fieldset legend { padding:0 .35rem; color:var(--text-2); font-size:var(--text-sm); } .environment-form .tool-choice { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:.35rem; color:var(--text-1); font-family:var(--font-mono); } .environment-form .tool-choice input { min-height:0; } .boundary-preview { display:grid; grid-template-columns:auto auto 1fr auto auto; align-items:center; gap:.55rem; padding:.7rem .8rem; border-left:3px solid var(--accent); background:var(--sunken); color:var(--text-3); font-size:var(--text-xs); } .boundary-preview strong { color:var(--text-1); } .boundary-preview i { text-align:center; color:var(--accent); font-style:normal; }
+  .status { color: var(--ok); font-size: var(--text-sm); } .status.stopped { color: var(--warn); }
+  .eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: .08em; font-size: var(--text-xs); font-weight: 700; }
+  dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); padding: var(--space-4) 0; border-block: 1px solid var(--border); } dl div { display: grid; gap: .2rem; } dt { color: var(--text-3); font-size: var(--text-xs); } dd { margin: 0; }
   .actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-5); }
   .danger-zone { margin-top: var(--space-5); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); } .danger-zone h4 { margin-top: var(--space-4); } .error { color: var(--danger); }
   @media (max-width: 40rem) { dl { grid-template-columns: 1fr; } .actions { align-items: stretch; flex-direction: column; } }

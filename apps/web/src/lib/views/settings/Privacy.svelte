@@ -80,7 +80,7 @@
     max-width: 40rem;
     margin: var(--space-4) 0 0;
     color: var(--text-3);
-    font-size: .82rem;
+    font-size: var(--text-sm);
     line-height: 1.55;
   }
 </style>

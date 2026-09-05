@@ -13,13 +13,16 @@
   // belongs. A global selector that silently retargeted every surface was the
   // thing worth removing: nothing about a page told you which project it meant.
   let { title, hint, connecting = false,
-    navigationOpen = true, compactNavigation = false, onNavigationToggle = () => {} }: {
+    navigationOpen = true, compactNavigation = false, onNavigationToggle = () => {},
+    onOpenAllPages = () => {} }: {
     title: string;
     hint: string;
     connecting?: boolean;
     navigationOpen?: boolean;
     compactNavigation?: boolean;
     onNavigationToggle?: (trigger: HTMLElement) => void;
+    /** Opens the window holding Settings and every page not on the rail. */
+    onOpenAllPages?: (trigger: HTMLElement) => void;
   } = $props();
 
   // Owner-scoped notifications, reachable from every route. Reads are
@@ -77,15 +80,17 @@
 </script>
 
 <header class="topbar">
+  <!-- On desktop this collapses to a rail rather than hiding: the icons stay,
+       so "Hide"/"Show" described a behaviour the control no longer has. -->
   <div class="navigation-reveal-zone" data-navigation-open={navigationOpen}>
     <button
       type="button"
       class="btn btn-ghost navigation-toggle"
-      aria-label={compactNavigation ? (navigationOpen ? "Close navigation" : "Open navigation") : (navigationOpen ? "Hide navigation" : "Show navigation")}
+      aria-label={compactNavigation ? (navigationOpen ? "Close navigation" : "Open navigation") : (navigationOpen ? "Collapse navigation" : "Expand navigation")}
       aria-controls="all-navigation"
       aria-expanded={navigationOpen}
       onclick={(event) => onNavigationToggle(event.currentTarget)}
-    ><Icon name="panel" size={18} /></button>
+    ><Icon name="panel" size="md" /></button>
   </div>
   <div class="page-id"><h1 class="page-title">{title}</h1><p class="page-hint">{hint}</p></div>
   <div class="status" role="status" aria-live="polite">
@@ -101,7 +106,7 @@
         onclick={togglePanel}
         bind:this={notificationTrigger}
       >
-        <Icon name="bell" size={17} />
+        <Icon name="bell" size="md" />
         {#if unread.length > 0}<span class="unread-count">{unread.length}</span>{/if}
       </button>
       {#if panelOpen}
@@ -137,26 +142,36 @@
         </section>
       {/if}
     </div>
+    <!-- Settings, and with it every destination that left the sidebar. The gear
+         is the last thing before the host controls because it is the one an
+         owner reaches for least often and knows where to find. -->
+    <button
+      type="button"
+      class="btn btn-ghost"
+      aria-label="Settings and pages"
+      aria-haspopup="dialog"
+      onclick={(event) => onOpenAllPages(event.currentTarget)}
+    ><Icon name="settings" size="md" /></button>
     <HostControl />
     <StopSwitch />
   </div>
 </header>
 
 <style>
-  .topbar{height:var(--topbar-h);display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-5);border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}.navigation-reveal-zone{width:48px;height:48px;margin-left:-.75rem;display:grid;place-items:center}.navigation-toggle{transition:opacity var(--motion-shell) var(--ease-shell),background var(--motion-fast) var(--ease)}.navigation-reveal-zone[data-navigation-open="false"] .navigation-toggle{opacity:.28}.navigation-reveal-zone:hover .navigation-toggle,.navigation-toggle:focus-visible{opacity:1!important}.page-id{min-width:0}.page-title{font-size:1rem;margin:0;line-height:1.2}.page-hint{font-size:.72rem;color:var(--text-3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto}.pill{font-size:.74rem;font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
+  .topbar{height:var(--topbar-h);display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-5);border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}.navigation-reveal-zone{width:48px;height:48px;margin-left:-.75rem;display:grid;place-items:center}.navigation-toggle{transition:opacity var(--motion-shell) var(--ease-shell),background var(--motion-fast) var(--ease)}.navigation-reveal-zone[data-navigation-open="false"] .navigation-toggle{opacity:.28}.navigation-reveal-zone:hover .navigation-toggle,.navigation-toggle:focus-visible{opacity:1!important}.page-id{min-width:0}.page-title{font-size:var(--text-base);margin:0;line-height:1.2}.page-hint{font-size:var(--text-xs);color:var(--text-3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto}.pill{font-size:var(--text-xs);font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
   .bell-wrap{position:relative}
   .bell{position:relative;padding:.35rem .5rem}
-  .unread-count{position:absolute;top:-2px;right:-2px;min-width:1rem;height:1rem;display:grid;place-items:center;font-size:.62rem;font-weight:700;border-radius:var(--r-pill);background:var(--danger);color:#fff;padding:0 .2rem}
+  .unread-count{position:absolute;top:-2px;right:-2px;min-width:1rem;height:1rem;display:grid;place-items:center;font-size:var(--text-2xs);font-weight:700;border-radius:var(--r-pill);background:var(--danger);color:var(--text-inverse);padding:0 .2rem}
   .panel-backdrop{position:fixed;inset:0;z-index:55;border:0;background:transparent;cursor:default}
   .panel{position:absolute;right:0;top:calc(100% + 6px);z-index:60;width:min(21rem,86vw);border:1px solid var(--border);border-radius:var(--r-md);background:var(--raised);box-shadow:var(--shadow-2);padding:var(--space-3)}
   @media(max-width:720px){.panel{position:fixed;left:var(--space-3);right:var(--space-3);top:calc(var(--topbar-h) + 6px);width:auto}}
   .panel-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);margin-bottom:var(--space-2)}
-  .panel-empty{color:var(--text-3);font-size:.84rem;margin:0}
+  .panel-empty{color:var(--text-3);font-size:var(--text-sm);margin:0}
   .panel ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem;max-height:19rem;overflow:auto}
-  .panel li{display:grid;gap:.1rem;font-size:.82rem;border-left:2px solid transparent;padding-left:.5rem}
+  .panel li{display:grid;gap:.1rem;font-size:var(--text-sm);border-left:2px solid transparent;padding-left:.5rem}
   .panel li.unread{border-left-color:var(--accent)}
   .panel li span{color:var(--text-2)}
-  .panel li time{color:var(--text-3);font-size:.72rem}
-  @media(max-width:900px){.page-hint{display:none}}@media(max-width:720px){.topbar{gap:var(--space-2);padding:0 var(--space-3)}.page-title{font-size:.9rem}.status{display:none}}
+  .panel li time{color:var(--text-3);font-size:var(--text-xs)}
+  @media(max-width:900px){.page-hint{display:none}}@media(max-width:720px){.topbar{gap:var(--space-2);padding:0 var(--space-3)}.page-title{font-size:var(--text-md)}.status{display:none}}
   @media(max-width:720px){.navigation-reveal-zone{margin-left:-.5rem}}
 </style>

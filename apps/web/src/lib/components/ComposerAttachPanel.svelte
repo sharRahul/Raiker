@@ -164,7 +164,7 @@
     background: var(--surface);
     color: var(--text-1);
     font: inherit;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
   }
-  .attach-limit { color: var(--text-3); font-size: 0.74rem; }
+  .attach-limit { color: var(--text-3); font-size: var(--text-xs); }
 </style>

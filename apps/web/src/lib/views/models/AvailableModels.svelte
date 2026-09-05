@@ -161,7 +161,7 @@
   legend {
     padding: 0;
     color: var(--text-3);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 750;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -174,7 +174,7 @@
     background: var(--surface);
     color: var(--text-1);
     font: inherit;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .list {
     display: grid;
@@ -182,7 +182,7 @@
     max-height: 11rem;
     overflow-y: auto;
   }
-  .empty, .count { margin: 0; color: var(--text-3); font-size: 0.68rem; }
+  .empty, .count { margin: 0; color: var(--text-3); font-size: var(--text-2xs); }
   .row-wrap { display: flex; align-items: center; gap: 0.4rem; }
   .row-wrap .row { flex: 1; min-width: 0; }
   .row-wrap .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -196,7 +196,7 @@
     background: var(--surface);
     color: var(--text-2);
     font: inherit;
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     cursor: pointer;
   }
   .use:hover { border-color: var(--accent-border); color: var(--accent); }
@@ -204,7 +204,7 @@
     flex: none;
     padding: 0.1rem 0.5rem;
     color: var(--accent);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
   }
   .row {
@@ -213,7 +213,7 @@
     align-items: center;
     gap: 0.45rem;
     padding: 0.16rem 0.1rem;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
   /* Transparent rather than absent: the real control keeps the size of the
@@ -273,7 +273,7 @@
   }
   .failure {
     margin: 0;
-    color: var(--danger-text, var(--text-2));
-    font-size: 0.72rem;
+    color: var(--danger);
+    font-size: var(--text-xs);
   }
 </style>

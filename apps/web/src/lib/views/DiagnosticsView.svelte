@@ -10,7 +10,6 @@
     MemoryIntegrity,
     SecurityHealth,
   } from "../apiTypes";
-  import { capabilityLabel } from "../capabilityModel";
   import { humanize, relativeTime } from "../format";
 
   let diag = $state<Diagnostics | null>(null);
@@ -97,39 +96,25 @@
     return "idle";
   }
 
-  const readinessChecks = $derived.by(() => {
-    if (diag === null) return [];
-    return Object.entries(diag.readiness)
-      .filter(([, v]) => typeof v === "boolean")
-      .map(([key, ok]) => ({ key, ok: Boolean(ok) }));
-  });
-
-  const readinessDetails = $derived.by(() => {
+  /**
+   * Only the readiness checks that failed.
+   *
+   * The tick list of passing checks, the runtime counts, the configuration gaps
+   * and the capability chips all left this view: Observability -> Overview reads
+   * the *same* `diagnostics` object and already states each of them as a tile,
+   * with a link to where the owner acts. What Overview cannot fit is a failed
+   * check's reason code and remediation, so that is what stays here.
+   */
+  const failedReadiness = $derived.by(() => {
     if (diag === null) return [];
     return Object.entries(diag.readiness)
       .filter((entry): entry is [string, CheckpointCaptureHealth] =>
         typeof entry[1] === "object" && entry[1] !== null && "reason_code" in entry[1],
       )
-      .map(([key, detail]) => ({ key, detail }));
+      .map(([key, detail]) => ({ key, detail }))
+      .filter((check) => !check.detail.ok);
   });
 
-  // Plain-English labels for backend identifiers.
-  function runtimeModeLabel(mode: string): string {
-    switch (mode) {
-      case "raiker_runtime": return "Raiker runtime";
-      case "production_ready_local_single_user_runtime": return "Raiker runtime (production-ready)";
-      default: return humanize(mode);
-    }
-  }
-  function endpointLabel(kind: string): string {
-    switch (kind) {
-      case "local_process":
-      case "local": return "Local";
-      case "private_network": return "Home-lab";
-      case "remote_hosted": return "Hosted";
-      default: return humanize(kind);
-    }
-  }
   // Humanize readiness-check keys into readable labels.
   function readinessLabel(key: string): string {
     const map: Record<string, string> = {
@@ -147,19 +132,18 @@
 
 <div class="head-row">
   <p class="page-lead">
-    An honest report of the local runtime, derived from stored state only — nothing here probes the
-    network or fabricates health.
+    Derived from stored state only — nothing here probes the network or fabricates health.
   </p>
-  <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh diagnostics">
-    <Icon name="refresh" size={15} />
+  <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh runtime health">
+    <Icon name="refresh" size="sm" />
     Refresh
   </button>
 </div>
 
 {#if loadError}
-  <PageState state="error" title="Couldn't load diagnostics" detail={loadError} />
+  <PageState state="error" title="Couldn't read runtime health" detail={loadError} />
 {:else if diag === null}
-  <PageState state="loading" title="Loading diagnostics…" />
+  <PageState state="loading" title="Reading runtime health…" />
 {:else}
   <div class="grid">
     <section class="card" aria-labelledby="diag-monitor-h">
@@ -182,23 +166,6 @@
           {/each}
         </ul>
       {/if}
-    </section>
-
-    <section class="card" aria-labelledby="diag-status-h">
-      <h2 id="diag-status-h">Runtime</h2>
-      <p class="big-status">
-        <Badge
-          variant={diag.production_ready_local_single_user_runtime ? "implemented" : "approval-required"}
-          label={diag.production_ready_local_single_user_runtime ? "production-ready (local)" : "not ready"}
-        />
-      </p>
-      <dl class="kv">
-        <div><dt>Mode</dt><dd>{runtimeModeLabel(diag.runtime_mode)}</dd></div>
-        {#each Object.entries(diag.counts) as [key, value] (key)}
-          <div><dt>{humanize(key)}</dt><dd>{value}</dd></div>
-        {/each}
-      </dl>
-      <p class="sub">{diag.scope_note}</p>
     </section>
 
     <section class="card" aria-labelledby="diag-memory-h">
@@ -247,76 +214,23 @@
       {/if}
     </section>
 
-    <section class="card" aria-labelledby="diag-config-h">
-      <h2 id="diag-config-h">Configuration gaps</h2>
-      {#if diag.missing_config.length === 0}
-        <p class="ok-line"><Icon name="check" size={15} /> No configuration gaps detected.</p>
-      {:else}
-        <ul class="gaps">
-          {#each diag.missing_config as gap (gap)}
-            <li><Icon name="warning" size={14} /> {gap}</li>
-          {/each}
-        </ul>
-      {/if}
-    </section>
-
-    <section class="card" aria-labelledby="diag-readiness-h">
-      <h2 id="diag-readiness-h">Readiness checks</h2>
-      <ul class="checks">
-        {#each readinessChecks as check (check.key)}
-          <li class:ok={check.ok}>
-            <Icon name={check.ok ? "check" : "x"} size={14} />
-            <span>{readinessLabel(check.key)}</span>
-          </li>
-        {/each}
-      </ul>
-      {#each readinessDetails as check (check.key)}
-        <article class:readiness-failed={!check.detail.ok} class="readiness-detail">
-          <div class="readiness-title">
-            <Icon name={check.detail.ok ? "check" : "warning"} size={14} />
-            <strong>{readinessLabel(check.key)}</strong>
-          </div>
-          <p>{check.detail.ok ? "Reversible writes are available." : "Change capture failed — writes may not be reversible."}</p>
-          <p class="mono">{humanize(check.detail.reason_code)}</p>
-          {#if check.detail.remediation}<p>{check.detail.remediation}</p>{/if}
-          <p class="sub">Checked {relativeTime(check.detail.checked_at)}</p>
-        </article>
-      {/each}
-    </section>
-
-    <section class="card" aria-labelledby="diag-providers-h">
-      <h2 id="diag-providers-h">Provider status</h2>
-      <p class="sub">Configuration-derived; reachability is never probed by this page.</p>
-      <table class="table">
-        <thead>
-          <tr><th>Profile</th><th>Kind</th><th>Status</th></tr>
-        </thead>
-        <tbody>
-          {#each diag.provider_health as p (p.profile_id)}
-            <tr>
-              <td class="mono">{p.profile_id}</td>
-              <td>{endpointLabel(p.endpoint_kind)}</td>
-              <td>
-                <Badge variant={p.selected ? "active" : "idle"} label={p.status} />
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </section>
-
-    <section class="card wide" aria-labelledby="diag-disabled-h">
-      <h2 id="diag-disabled-h">Disabled / deferred capabilities ({diag.disabled_capabilities.length})</h2>
-      <p class="sub">
-        These stay fail-closed until a real, governed executor exists. That is by design — the
-        documentation never runs ahead of the code.
-      </p>
-      <div class="cap-chips">
-        {#each diag.disabled_capabilities as cap (cap)}
-          <span class="chip" title={cap}>{capabilityLabel(cap)}</span>
-        {/each}
-      </div>
-    </section>
+    <!--
+      Only the readiness checks that FAILED, and only because a failure carries a
+      remediation the tiles above cannot fit. The passing ones were a tick list
+      restating "Runtime: Ready", which the tile at the top of this page already
+      says; a check that is fine needs no words at all.
+    -->
+    {#each failedReadiness as check (check.key)}
+      <section class="card readiness-failed" aria-labelledby={`diag-readiness-${check.key}`}>
+        <h2 id={`diag-readiness-${check.key}`}>
+          <Icon name="warning" size="sm" /> {readinessLabel(check.key)}
+        </h2>
+        <p>Change capture failed — writes may not be reversible.</p>
+        <p class="mono">{humanize(check.detail.reason_code)}</p>
+        {#if check.detail.remediation}<p>{check.detail.remediation}</p>{/if}
+        <p class="sub">Checked {relativeTime(check.detail.checked_at)}</p>
+      </section>
+    {/each}
   </div>
 {/if}
 
@@ -338,30 +252,12 @@
     gap: var(--space-4);
     align-items: start;
   }
-  .wide {
-    grid-column: 1 / -1;
-  }
   .big-status {
     margin: 0 0 var(--space-3);
-  }
-  .readiness-detail {
-    margin-top: var(--space-3);
-    padding: var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
   }
   .readiness-failed {
     border-color: var(--danger-border, var(--border));
     background: var(--danger-soft, transparent);
-  }
-  .readiness-title {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
-  .readiness-detail p {
-    margin: var(--space-2) 0 0;
-    overflow-wrap: anywhere;
   }
   .kv {
     display: grid;
@@ -370,7 +266,7 @@
     margin: 0 0 var(--space-3);
   }
   .kv dt {
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     font-weight: 650;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -378,60 +274,11 @@
   }
   .kv dd {
     margin: 0.05rem 0 0;
-    font-size: 0.88rem;
-  }
-  .checks,
-  .gaps {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    font-size: 0.85rem;
-  }
-  .checks li {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    color: var(--danger);
-  }
-  .checks li.ok {
-    color: var(--ok);
-  }
-  .checks li span {
-    color: var(--text-1);
-  }
-  .gaps li {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.45rem;
-    color: var(--warn);
-  }
-  .ok-line {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    color: var(--ok);
-    margin: 0;
-  }
-  .cap-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-  }
-  .chip {
-    font-size: 0.74rem;
-    font-weight: 600;
-    border-radius: var(--r-pill);
-    border: 1px solid var(--neutral-border);
-    background: var(--neutral-soft);
-    color: var(--text-2);
-    padding: 0.1rem 0.6rem;
+    font-size: var(--text-md);
   }
   .sub {
     color: var(--text-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
   .monitor {
     list-style: none;
@@ -440,7 +287,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
   }
   .monitor li {
     display: flex;
@@ -453,11 +300,8 @@
   }
   .monitor-when {
     color: var(--text-3);
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     white-space: nowrap;
-  }
-  .error {
-    color: var(--danger);
   }
   .card-actions {
     display: flex;

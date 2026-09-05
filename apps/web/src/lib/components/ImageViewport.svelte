@@ -141,17 +141,17 @@
 <div class="image-viewport">
   <div class="controls" role="toolbar" aria-label="Image view">
     <button type="button" class="tool" onclick={zoomOut} disabled={zoom <= MIN_ZOOM} aria-label="Zoom out (minus key)" title="Zoom out (−)">
-      <Icon name="zoom-out" size={15} />
+      <Icon name="zoom-out" size="sm" />
     </button>
     <span class="zoom-readout" aria-live="polite">{zoomPercent}%</span>
     <button type="button" class="tool" onclick={zoomIn} disabled={zoom >= MAX_ZOOM} aria-label="Zoom in (plus key)" title="Zoom in (+)">
-      <Icon name="zoom-in" size={15} />
+      <Icon name="zoom-in" size="sm" />
     </button>
     <button type="button" class="tool" onclick={fit} aria-label="Fit to pane (F key)" title="Fit to pane (F)">
-      <Icon name="fit" size={15} />
+      <Icon name="fit" size="sm" />
     </button>
     <button type="button" class="tool" onclick={rotate} aria-label={`Rotate right (R key), currently ${rotation} degrees`} title="Rotate right (R)">
-      <Icon name="rotate" size={15} />
+      <Icon name="rotate" size="sm" />
     </button>
     <button type="button" class="tool" onclick={reset} disabled={untouched} aria-label="Reset the view (zero key)" title="Reset (0)">
       Reset
@@ -209,7 +209,7 @@
     background: var(--surface);
     color: var(--text-2);
     font: inherit;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     cursor: pointer;
   }
@@ -220,7 +220,7 @@
     min-width: 3.4rem;
     text-align: center;
     color: var(--text-2);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-variant-numeric: tabular-nums;
   }
   .frame {
@@ -248,7 +248,7 @@
     user-select: none;
     -webkit-user-drag: none;
   }
-  .hint { margin: 0; color: var(--text-3); font-size: 0.72rem; }
+  .hint { margin: 0; color: var(--text-3); font-size: var(--text-xs); }
   @media (prefers-reduced-motion: reduce) {
     img { transition: none; }
   }

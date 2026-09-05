@@ -56,9 +56,9 @@
           {#if row.state === "running"}
             <span class="tool-pulse"></span>
           {:else if row.state === "waiting"}
-            <Icon name="hand" size={14} />
+            <Icon name="hand" size="sm" />
           {:else}
-            <Icon name={familyIcon(row.family)} size={14} />
+            <Icon name={familyIcon(row.family)} size="sm" />
           {/if}
         </span>
         <span class="tool-label">{row.label}</span>
@@ -115,7 +115,7 @@
     grid-template-columns: 1.05rem auto minmax(0, 1fr);
     align-items: baseline;
     gap: 0.45rem;
-    font-size: 0.79rem;
+    font-size: var(--text-sm);
     color: var(--text-3);
     line-height: 1.5;
   }
@@ -160,7 +160,7 @@
   .tool-remedy {
     grid-column: 2 / -1;
     justify-self: start;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
   }
   /* A call still running: the same quiet pulse the composer uses, in the
      glyph's place, so the row does not change width when it settles. */

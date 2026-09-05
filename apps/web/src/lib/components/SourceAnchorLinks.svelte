@@ -48,7 +48,7 @@
               anchor.turn_id,
             )}
           >
-            <Icon name="chat" size={12} />
+            <Icon name="chat" size="sm" />
             <span>{label(anchor)}</span>
           </a>
         </li>

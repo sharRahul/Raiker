@@ -456,7 +456,7 @@ def test_a_delivery_is_signed_when_the_owner_configured_a_secret(
     monkeypatch.setenv("RAIKER_CHANNEL_OUTBOUND_SECRET", "shared-with-the-receiver")
     body = _json.dumps({"text": "hi"}, sort_keys=True).encode("utf-8")
 
-    signature, signed = channel_executors._sign_delivery(body)
+    signature, signed = channel_executors.sign_delivery(body)
 
     assert signed is True
     expected = hmac.new(b"shared-with-the-receiver", body, hashlib.sha256).hexdigest()
@@ -472,7 +472,7 @@ def test_no_secret_means_unsigned_rather_than_refused(
 
     monkeypatch.delenv("RAIKER_CHANNEL_OUTBOUND_SECRET", raising=False)
 
-    signature, signed = channel_executors._sign_delivery(b"{}")
+    signature, signed = channel_executors.sign_delivery(b"{}")
 
     # Deliberate: the owner controls both ends of a webhook they configured, and
     # hard-blocking their own destination is prevention-by-restriction. The state

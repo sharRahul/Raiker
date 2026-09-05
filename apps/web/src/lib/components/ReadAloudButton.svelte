@@ -100,7 +100,7 @@
     title={speaking ? "Stop speaking" : "Read this response aloud"}
     onclick={toggle}
   >
-    <Icon name={speaking ? "stop" : "volume"} size={14} />
+    <Icon name={speaking ? "stop" : "volume"} size="sm" />
   </button>
   {#if status}<span class="playback-status" role="status">{status}</span>{/if}
 </span>
@@ -114,6 +114,6 @@
   }
   button:hover, button.active { background: var(--accent-soft); color: var(--accent); }
   button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-  .playback-status { color: var(--text-3); font-size: 0.68rem; line-height: 1.3; }
+  .playback-status { color: var(--text-3); font-size: var(--text-2xs); line-height: 1.3; }
   @media print { .read-aloud { display: none; } }
 </style>

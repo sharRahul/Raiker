@@ -29,6 +29,16 @@ const model = {
   context_window_tokens: 200000,
 };
 
+// A connected provider that draws. Design reads `image_models` from here, and
+// the chat picker must not offer what it lists.
+const imageModel = {
+  ...model,
+  profile_id: "openai-hosted", provider: "openai", model: "gpt-4o",
+  image_model: "gpt-image-1", image_models: ["gpt-image-1"],
+  selected: false, supports_reasoning: false, supports_reasoning_effort: false,
+  reasoning_effort_values: [] as string[],
+};
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     class FakeRecognition {
@@ -70,7 +80,7 @@ test.beforeEach(async ({ page }) => {
         }
         body = { settings, status: { vault: "configured", mfa_enrolled: false, username: "owner" } };
       }
-      else if (path === "/api/models") body = { profiles: [model], current_profile_id: model.profile_id, current_model: model.model, fallback_sequence: [] };
+      else if (path === "/api/models") body = { profiles: [model, imageModel], current_profile_id: model.profile_id, current_model: model.model, fallback_sequence: [] };
       else if (path.endsWith("/provider-models")) body = { profile_id: model.profile_id, provider: model.provider, status: "available", reason_code: null, models: ["claude-sonnet-4-5", "claude-opus-4-1"] };
       else if (path === "/api/settings/composer-approval-mode") body = { approval_mode: "manual" };
       // BUG-256 — the composers read which speech runtime the owner's choice
@@ -92,6 +102,27 @@ test.beforeEach(async ({ page }) => {
       else if (path === "/api/work-threads") body = [];
       else if (path === "/api/approvals") body = [];
       else if (path === "/api/capabilities") body = [];
+      // Design reads this on load. Without it the page rendered its error state
+      // in the route audit — which passed, because an error state is still a
+      // laid-out page, so the surface was never actually exercised. One good
+      // generation and one refusal, which are the two halves of the transcript.
+      else if (path === "/api/images") body = {
+        sizes: ["1024x1024", "1024x1536", "1536x1024"],
+        generations: [
+          {
+            generation_id: "img_2", prompt: "a lighthouse in fog",
+            model: "gpt-image-1", size: "1024x1024", status: "refused",
+            reason_code: "image_refused_by_provider", has_image: false,
+            created_at: new Date(Date.now() - 60_000).toISOString(),
+          },
+          {
+            generation_id: "img_1", prompt: "a paper boat on a still lake",
+            model: "gpt-image-1", size: "1024x1024", status: "ok",
+            reason_code: null, has_image: true,
+            created_at: new Date(Date.now() - 600_000).toISOString(),
+          },
+        ],
+      };
       // One configured rule that enforces, one that never fires, and one file
       // that did not parse: the three states the Hooks panel exists to tell
       // apart, so a redesign that collapses them fails here.
@@ -338,6 +369,32 @@ test("the Hooks tab tells an enforcing rule from a dead one and a broken file", 
   await capture(page, join(shots, "hooks-tab.png"));
 });
 
+test("a dismiss scrim stays a scrim when the pointer is on it", async ({ page }) => {
+  // Both of the app's dismiss layers are a `<button>` stretched over the
+  // viewport. The element floor in `app.css` used to write its hover fill as
+  // `:where(button):hover:not(:disabled)`, which leaves the pseudo-classes
+  // outside `:where()` and so is (0,2,0), not the zero the rule promises. It
+  // tied every component's own two-class rule and won on order, so the moment
+  // the pointer was anywhere on screen the whole page went behind a flat opaque
+  // sheet — and it looked enough like a deliberate modal that a full responsive
+  // sweep never questioned it.
+  await page.goto("http://raiker.test/#/home");
+  await page.getByRole("button", { name: "Settings and pages" }).click();
+  await expect(page.getByRole("dialog", { name: /settings & pages/i })).toBeVisible();
+  await page.mouse.move(400, 500);
+  const scrim = page.locator(".scrim");
+  await expect(scrim).toHaveCSS("background-color", "rgba(15, 23, 42, 0.48)");
+
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: /Notifications/ }).first().click();
+  await page.mouse.move(400, 500);
+  // The notification panel is not modal, so its catcher stays fully invisible.
+  await expect(page.locator(".panel-backdrop")).toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+});
+
 test("Settings presents one section rail rather than a wall of fields", async ({ page }) => {
   await page.goto("http://raiker.test/#/settings");
   // Scoped to the content region: the top bar carries the same page name, and an
@@ -440,18 +497,20 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     ["extensions?tab=skills", "Extensions", "operational"],
     ["extensions?tab=hooks", "Extensions", "operational"],
     ["extensions?tab=plugins", "Extensions", "operational"],
-    ["extensions?tab=channels", "Extensions", "operational"],
+    // Channels left Extensions for their own destination. Design is a
+    // transcript with a composer, so it takes the same frame as Chat and Build.
+    ["messaging", "Messaging", "workspace"],
+    ["design", "Design", "work-surface"],
     ["observe?tab=overview", "Observability", "operational"],
     ["observe?tab=sessions", "Observability", "operational"],
     ["observe?tab=activity", "Observability", "operational"],
     ["observe?tab=checkpoints", "Observability", "operational"],
-    ["observe?tab=diagnostics", "Observability", "operational"],
     ["observe?tab=work", "Observability", "operational"],
     ["observe?tab=notifications", "Observability", "operational"],
     ["guide", "Guide", "reading"],
     ["settings?tab=general", "Settings", "workspace"],
   ] as const;
-  const modelTabs = ["hosted", "huggingface", "activity", "routing", "pricing", "posture"] as const;
+  const modelTabs = ["hosted", "huggingface", "activity", "routing", "pricing"] as const;
   const settingsSections = [
     "notification", "personalisation", "security", "privacy", "account",
     "web-access", "git-credential", "runtime",

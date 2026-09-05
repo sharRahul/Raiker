@@ -28,7 +28,9 @@ If this is your first time using Raiker, read these pages in order:
 | Understand capture, approval, recall, retention, correction, forget, and purge | [How Raiker memory works](memory.md) |
 | Plan and change code, run commands, commit, and push | [Working in Build](working-in-build.md) |
 | Run work now, later, repeatedly, or in the background | [Tasks and projects](tasks-and-projects.md) |
-| Add connectors, MCP servers, skills, hooks, plugins, or channels | [Extensions and MCP](extensions-and-mcp.md) |
+| Add connectors, MCP servers, skills, hooks, or plugins | [Extensions and MCP](extensions-and-mcp.md) |
+| Reach Raiker from Telegram or another channel | [Messaging](messaging.md) |
+| Generate images with a connected image model | [Design](design.md) |
 | Start Raiker at sign-in, pause it, update it, or remove it | [Managing the Raiker host](managing-the-host.md) |
 | Understand accounts, credentials, audit records, and privacy choices | [Security and privacy](security-and-privacy.md) |
 | Check what is unavailable or deliberately restricted | [Known limits](known-limits.md) |

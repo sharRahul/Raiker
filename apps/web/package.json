@@ -9,12 +9,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "check": "node scripts/check-design-tokens.mjs && svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint .",
     "test": "node scripts/run-tests.mjs",
     "test:e2e": "playwright test",
     "test:e2e:mocked": "playwright test --project=mocked",
-    "test:e2e:live": "playwright test --project=live"
+    "test:e2e:live": "playwright test --project=live",
+    "check:tokens": "node scripts/check-design-tokens.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

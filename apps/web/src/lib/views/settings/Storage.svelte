@@ -46,7 +46,4 @@
   .sub {
     color: var(--text-2);
   }
-  .error {
-    color: var(--danger);
-  }
 </style>

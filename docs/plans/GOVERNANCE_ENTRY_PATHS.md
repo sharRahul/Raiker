@@ -212,9 +212,10 @@ row, and it is recorded rather than removed for the reason this section exists.
 
 ### 3.6 Every capability with a real executor, and the path that reaches it
 
-All forty-six, so the enumeration is complete rather than illustrative.
-`telemetry_export` is the forty-sixth, added 2026-09-04 with backlog item 18; the
-invariant below is what required it to appear here at all. The
+All forty-seven, so the enumeration is complete rather than illustrative.
+`telemetry_export` was the forty-sixth, added 2026-09-04 with backlog item 18;
+`image_generation` is the forty-seventh, added 2026-09-05 with the Design
+surface. The invariant below is what required each to appear here at all. The
 first column is computed (`CAPABILITY_GATE_MAP` over `TOOL_DEFINITIONS`,
 `EXECUTABLE_ON_APPROVAL`); the rest is read from the code and marked where it was
 not fully traced.
@@ -265,6 +266,7 @@ propose a restore, so an agent can never rewind the workspace on its own say-so.
 | `approval_execution_relay` | `ApprovalExecutionBridge`, `raiker/approvals/execution.py:197` |
 | `audit_export` | `control/service.py::export_audit_log` (path 23) |
 | `telemetry_export` | `control/service.py::run_telemetry_export` (path 24) |
+| `image_generation` | `control/service.py::generate_image` (path 25) |
 | `mcp_builder_runtime` | `control/service.py::_route_mcp` (`:492`) |
 | `external_channel_runtime` | `control/service.py:838` |
 

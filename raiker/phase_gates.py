@@ -103,6 +103,11 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     # because the two differ in the one way that matters: an export writes a file
     # beside the log, and this one reaches the network.
     "telemetry_export",
+    # The Design surface: one prompt to a hosted image model, the bytes stored
+    # in the workspace. Its own capability rather than a corner of
+    # `hosted_model_runtime` because an owner who wants a chat model has not
+    # thereby asked to generate images, and the two are refused separately.
+    "image_generation",
     # B9 — the repository code map: a local, derived symbol index over the
     # repository Build points at.
     #
@@ -204,7 +209,13 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
                             "git_push_execution",
                             # Backlog #18 — Tier 2 for the reason the rest are:
                             # it leaves the machine.
-                            "telemetry_export")
+                            "telemetry_export",
+                            # The Design surface. An image model is a hosted
+                            # model, so it answers to the model egress
+                            # allowlist and the owner's saved credential like
+                            # every other provider call, and it is Tier 2 for
+                            # the same reason they are.
+                            "image_generation")
     for name in _TIER2_EXECUTED_CAPS:
         gates[name] = CapabilityGate(
             name, 2, CapabilityState.DISABLED,

@@ -47,7 +47,7 @@
 
 <style>
   .provider-logo { width: var(--logo-size); height: var(--logo-size); flex: 0 0 var(--logo-size); display: inline-grid; place-items: center; border-radius: 5px; background: var(--surface); color: var(--text-1); overflow: hidden; }
-  .provider-logo[data-provider="gemini"], .provider-logo[data-provider="openrouter"], .provider-logo[data-provider="huggingface"] { background: #fff; }
+  .provider-logo[data-provider="gemini"], .provider-logo[data-provider="openrouter"], .provider-logo[data-provider="huggingface"] { background: var(--brand-white); }
   img { width: 82%; height: 82%; object-fit: contain; }
   svg { width: 78%; height: 78%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 </style>

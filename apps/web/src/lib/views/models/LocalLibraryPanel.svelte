@@ -135,7 +135,7 @@
         /></label
       >
       <button type="button" class="btn" onclick={() => (browsing = true)}>
-        <Icon name="folder" size={14} /> Browse
+        <Icon name="folder" size="sm" /> Browse
       </button>
       <button class="btn" type="submit" disabled={busy || !root.trim()}
         >Add and scan</button
@@ -215,11 +215,17 @@
   .library-layout {
     --text-muted: var(--text-2);
     display: grid;
+    /* BUG-284 — an implicit grid column is `auto`, which sizes to the widest
+       item's max-content and refuses to shrink below its min-content. One long
+       row inside therefore made this 450px wide in a 366px phone and the whole
+       panel drew over the page. `minmax(0, 1fr)` is the same single column that
+       is allowed to be narrower than its contents want. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 18px;
   }
   .slot-note {
     color: var(--text-3);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .library-intro {
     display: flex;
@@ -227,7 +233,7 @@
     justify-content: space-between;
     gap: 24px;
     padding: 24px;
-    border-left: 4px solid var(--accent, #2563eb);
+    border-left: 4px solid var(--accent);
   }
   .library-intro h2,
   .section-title h3 {
@@ -249,7 +255,7 @@
   }
   .section-title > span {
     font:
-      700 1.35rem/1 ui-monospace,
+      700 var(--text-xl)/1 ui-monospace,
       monospace;
     color: var(--text-muted);
   }
@@ -262,7 +268,7 @@
   .root-form label {
     display: grid;
     gap: 6px;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     font-weight: 650;
   }
   .root-form input {
@@ -290,7 +296,11 @@
   }
   .model-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    /* BUG-284 — `minmax(300px, 1fr)` has a hard floor: on a 390px phone the
+       track stays 300px inside a ~290px column and the grid bleeds out of the
+       panel. `min(300px, 100%)` keeps the 300px preference where there is room
+       and lets the track shrink where there is not. */
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
     gap: 12px;
   }
   .model-card {
@@ -316,11 +326,11 @@
     place-items: center;
     width: 40px;
     height: 40px;
-    background: #171717;
-    color: #fff;
+    background: var(--brand-black);
+    color: var(--brand-white);
     border-radius: 8px;
     font:
-      750 0.78rem ui-monospace,
+      750 var(--text-sm) ui-monospace,
       monospace;
   }
   .incomplete {
@@ -339,7 +349,7 @@
     color: var(--text-muted);
   }
   .notice {
-    color: var(--success, #15803d);
+    color: var(--success);
   }
   @media (max-width: 700px) {
     .library-intro {

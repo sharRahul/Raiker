@@ -521,6 +521,40 @@ describe("ModelsView state grammar", () => {
     ).not.toBeInTheDocument();
   });
 
+  // A card's model line is a fact about the owner's provider or it is nothing.
+  //
+  // Every hosted card with no model named printed "no model pinned" and every
+  // local row "model chosen at selection" — on a fresh workspace that was eight
+  // identical lines, the largest block of text on the page, and none of it about
+  // the providers it sat on. "Not connected" and "Select models…" already say
+  // that nothing has been chosen; the placeholder only taught Raiker's own
+  // pinning vocabulary to somebody who had not asked to learn it.
+  it("names a card's model when there is one, and says nothing when there is not", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [hostedProfile(), profile({
+          profile_id: "openai-hosted",
+          provider: "openai",
+          model: "<model>",
+          local_only: false,
+          requires_network: true,
+          off_machine: true,
+          endpoint_kind: "hosted",
+        })],
+        chat_profiles: [hostedProfile()],
+      }),
+    });
+    render(ModelsView, { tab: "hosted" });
+
+    expect(await screen.findByText("Your hosted providers")).toBeInTheDocument();
+    expect(screen.queryByText(/no model pinned/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/model chosen at selection/i)).not.toBeInTheDocument();
+    // The fact itself stays: a connected provider still says which model answers.
+    expect(screen.getByText("Haiku 4.5")).toBeInTheDocument();
+    // …and only the card that has one carries the line at all.
+    expect(document.querySelectorAll(".pc-model")).toHaveLength(1);
+  });
+
   // Readiness and the global default describe the whole page, not one panel.
   // Reaching them used to mean navigating back to Providers first.
   it("shows readiness and the global default from every tab", async () => {
@@ -1350,7 +1384,6 @@ describe("ModelsView action-category tabs", () => {
       "Activity",
       "Routing",
       "Pricing",
-      "Posture",
     ]);
   });
 
@@ -1383,14 +1416,30 @@ describe("ModelsView action-category tabs", () => {
     expect(screen.queryByText("Your hosted providers")).toBeNull();
   });
 
-  it("puts the read-only posture on its own tab", async () => {
+  // Posture was a top-level tab holding four read-only facts and a paragraph.
+  // The facts belong above the cards whose refusals they explain, and the
+  // paragraph belongs in the guide; a whole destination for seven words of state
+  // put the answer one click away from the question.
+  it("reads the off-machine posture above the hosted cards it explains", async () => {
     stubFetch({ "GET /api/models": models({}) });
-    render(ModelsView, { props: { tab: "posture" } });
-    expect(
-      await screen.findByText("Off-machine provider posture"),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("On this device")).toBeNull();
-    expect(screen.queryByText("Your hosted providers")).toBeNull();
+    render(ModelsView, { props: { tab: "hosted" } });
+    const posture = await screen.findByLabelText("Off-machine provider posture");
+    expect(within(posture).getByText("Hosted model gate")).toBeInTheDocument();
+    expect(within(posture).getByText("Private-network gate")).toBeInTheDocument();
+    expect(within(posture).getByText("Egress allowlist")).toBeInTheDocument();
+    expect(within(posture).getByText("Off-machine profiles")).toBeInTheDocument();
+    // On the tab it is about, not on one of its own.
+    expect(screen.getByRole("tab", { name: "Hosted" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("does not read the posture on the local tab, which is not about it", async () => {
+    stubFetch({ "GET /api/models": models({}) });
+    render(ModelsView, { props: { tab: "local" } });
+    await screen.findByText("On this device");
+    expect(screen.queryByLabelText("Off-machine provider posture")).toBeNull();
   });
 
   it("marks the selected tab and links each panel back to it", async () => {

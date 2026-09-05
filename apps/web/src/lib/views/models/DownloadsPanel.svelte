@@ -238,14 +238,14 @@
     width: 13px;
     height: 13px;
     border-radius: 50%;
-    background: #d97706;
+    background: var(--warn);
     border: 3px solid var(--surface);
   }
   .rail.done:before {
-    background: #15803d;
+    background: var(--success);
   }
   .rail.failed:before {
-    background: #b91c1c;
+    background: var(--danger);
   }
   .job {
     padding: 0 0 24px;
@@ -265,11 +265,11 @@
   .kind {
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     font-weight: 750;
   }
   .bad {
-    color: #b91c1c;
+    color: var(--danger);
   }
   .progress {
     height: 5px;
@@ -281,7 +281,7 @@
   .progress span {
     display: block;
     height: 100%;
-    background: #2563eb;
+    background: var(--accent);
   }
   .actions {
     display: flex;
@@ -291,7 +291,7 @@
   .note {
     margin: 8px 0 0;
     color: var(--text-muted);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .confirm {
     display: grid;

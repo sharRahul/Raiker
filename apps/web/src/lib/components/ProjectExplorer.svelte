@@ -199,7 +199,7 @@
           onclick={() => void indexNow()}
           disabled={indexing || missing}
         >
-          <Icon name="refresh" size={15} />
+          <Icon name="refresh" size="sm" />
           {indexing ? "Indexing…" : "Index this folder"}
         </button>
       </div>
@@ -270,7 +270,7 @@
           onclick={() => void toggle(entry)}
           aria-label={`${expanded[entry.relative_path] ? "Collapse" : "Expand"} ${entry.name}`}
         >
-          <Icon name={expanded[entry.relative_path] ? "chevron-down" : "chevron-right"} size={14} />
+          <Icon name={expanded[entry.relative_path] ? "chevron-down" : "chevron-right"} size="sm" />
         </button>
       {:else}
         <span class="twisty spacer"></span>
@@ -282,7 +282,7 @@
         onclick={() => (entry.is_directory ? void toggle(entry) : select(entry))}
         aria-label={entry.is_directory ? `Open ${entry.name}` : `Inspect ${entry.name}`}
       >
-        <Icon name={entry.is_directory ? "folder" : "file"} size={14} />
+        <Icon name={entry.is_directory ? "folder" : "file"} size="sm" />
         <span class="entry-name">{entry.name}</span>
         {#if !entry.is_directory}
           <span class="entry-meta">{formatSize(entry.size_bytes)}</span>
@@ -337,7 +337,7 @@
   .explorer-error {
     margin: 0;
     color: var(--text-muted);
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
   }
   .explorer-error {
     color: var(--danger, var(--text-muted));
@@ -386,7 +386,7 @@
   }
   .entry:hover,
   .entry.selected {
-    background: var(--surface-2, rgba(127, 127, 127, 0.12));
+    background: var(--sunken);
   }
   .entry-name {
     overflow: hidden;
@@ -396,12 +396,12 @@
   .entry-meta,
   .entry-state {
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     white-space: nowrap;
   }
   .child-note {
     padding-left: calc(var(--depth, 0) * 1rem + 1.25rem);
     color: var(--text-muted);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
 </style>

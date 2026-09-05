@@ -30,7 +30,7 @@
 
 <article class="tile" data-tone={tone}>
   <p class="label">
-    {#if icon}<Icon name={icon} size={14} />{/if}
+    {#if icon}<Icon name={icon} size="sm" />{/if}
     {label}
   </p>
   <strong class="value">{value}</strong>
@@ -59,14 +59,14 @@
     align-items: center;
     gap: 0.35rem;
     margin: 0;
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
     color: var(--text-3);
   }
   .value {
-    font-size: 1.75rem;
+    font-size: var(--text-display);
     line-height: 1.15;
     font-variant-numeric: tabular-nums;
   }
@@ -76,11 +76,11 @@
   .detail {
     margin: 0.15rem 0 0;
     color: var(--text-2);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
   .evidence {
     margin-top: 0.35rem;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
 </style>

@@ -32,6 +32,8 @@ export type LazyRouteId =
   | "capabilities"
   | "models"
   | "extensions"
+  | "messaging"
+  | "design"
   | "observe"
   | "settings"
   | "guide"
@@ -56,6 +58,8 @@ const LOADERS: Record<LazyRouteId, Loader> = {
   capabilities: () => import("./views/CapabilitiesView.svelte"),
   models: () => import("./views/ModelsView.svelte"),
   extensions: () => import("./views/ExtensionsView.svelte"),
+  messaging: () => import("./views/MessagingView.svelte"),
+  design: () => import("./views/DesignView.svelte"),
   observe: () => import("./views/ObserveView.svelte"),
   settings: () => import("./views/SettingsView.svelte"),
   "model-setup": () => import("./views/ModelSetupView.svelte"),

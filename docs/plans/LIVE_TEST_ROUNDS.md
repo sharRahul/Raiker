@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-04 (fourth) | Targeted + measured four-width sweep | `pages/` | — (no model needed) | Two tabs folded out of the nav, 244 words moved to the guide, and three mobile bleeds the width sweep found only because the workspace had been worked in |
 | 2026-09-04 (third) | Targeted + measured four-width sweep + full page sweep | `bug-276-`, `bug-277-`, `bug-278-`, `pages/` | Anthropic, a third **identity-linked** key entered through the interface | A telemetry cadence that runs without a button, and three defects the round found in the product by using it: a valid key answered with "check your network", twenty-six connectors that said they were installed, and a "next run" printed as a full timestamp |
 | 2026-09-04 (second) | Targeted + measured four-width sweep | `widths/`, `anthropic-identity-linked-key` | Anthropic, the same **identity-linked** key entered through the interface | Five priority items landed and measured live, and two interface defects the sweep itself found: a model picker that called a provider unreachable after it had answered, and a control that drew nothing |
 | 2026-09-04 | Targeted + full responsive sweep | `bug-274-`, `pages/` | Anthropic, an **identity-linked** key entered through the interface | A key Raiker previously had no way to use, the field that makes it usable reached from where the refusal is read, and every route measured at four widths in both themes |
@@ -1098,6 +1099,132 @@ through FIXED-170. Screenshots: `round0810-01-first-run-model-setup.png` through
 [`screenshots/working/`](screenshots/working). The production build reports no
 chunk-size warning: the entry chunk is 237 kB against the previous 690 kB, and
 the largest route chunk is Models at 82 kB.
+---
+
+## 2026-09-04 (sixth) — A stated rule, and the 183 colours that had accumulated behind it
+
+**Tier: full theme + responsive sweep.** Production web build, the same workspace
+the previous three rounds used. Prompted by the owner pointing at Hermes Agent
+and OpenClaw and saying they look clean; both repositories were read before
+anything changed.
+
+**What it proved.**
+
+1. **Every page renders in both themes at every width.** Fourteen live specs:
+   `all-pages-theme-live`, `ui-sweep-clipping-live`, `ui-sweep-responsive-live`
+   (390 / 768 / 1080p / 4K / 8K, light and dark), `ui-sweep-widths-live` and
+   `all-pages-live`. All pass.
+2. **183 raw colours to zero** across every component style block, with the
+   Knowledge Map — 58 of them — now following the theme through the same
+   mechanism as everything else, including for a viewer who never chose one.
+3. **The rule is enforced, not stated.** `npm run check` fails on a raw colour in
+   a component style block or a `var()` naming an undefined token. Verified
+   against an injected violation before being trusted.
+
+**What it found, and it is the more useful half.** Three defects nobody could
+have seen without listing the colours side by side. Two were contrast: the unread
+notification badge painted **white on the dark theme's `--danger`, which is a
+pale peach** — unreadable in the flagship theme; and the gold Connect buttons on
+Models sat at about 1.9:1. The third was quieter and larger — **ten `var()`
+references to tokens that do not exist**, in fifteen components. CSS fails
+silently there, so `border-radius: var(--radius-2)` resolved to 0 and gave the
+collector cards square corners beside every other card's 12px, and a failure
+message rendered in body grey instead of red. None of that is visible in review;
+all of it is visible as "this doesn't look quite right".
+
+Closed as [FIXED-398](FIXED_ITEMS.md#fixed-398--the-design-system-was-stated-in-a-comment-and-enforced-by-nothing),
+[FIXED-399](FIXED_ITEMS.md#fixed-399--the-knowledge-map-carried-four-palettes-and-two-of-them-were-the-same-one)
+and [FIXED-400](FIXED_ITEMS.md#fixed-400--ten-var-references-to-tokens-that-do-not-exist).
+
+**Screenshots:** `round0904-knowledge-map-light.png` and
+`round0904-knowledge-map-dark.png` in [`screenshots/working/`](screenshots/working).
+
+---
+
+## 2026-09-04 (fifth) — Two lines the owner asked to lose, and what one of them was actually saying
+
+**Tier: targeted + measured four-width sweep.** Production web build, the same
+workspace the third and fourth rounds used, signed in as the existing owner. Both
+items came from the owner in one sentence each.
+
+**What it proved.**
+
+1. **Models → Hosted carries no pinning placeholder.** Eight cards, none of them
+   reading *"no model pinned"*, and the local rows no longer read *"model chosen
+   at selection"*. Each card still states its connection, its readiness chip, and
+   **Select models…**; a card with a chosen model still names it. Guarded from
+   both directions in `ModelsView.test.ts` — neither placeholder anywhere on the
+   tab, **Haiku 4.5** still on the connected card, and exactly one `.pc-model`
+   element for two profiles. Closed as
+   [FIXED-396](FIXED_ITEMS.md#fixed-396--eight-provider-cards-printed-the-same-placeholder-about-pinning).
+2. **Nothing in Observability claims a capability is disabled.** The overview
+   reads *Ready*, *49 closed capability gates* with "18 more have no executor and
+   stay closed", and one missing-configuration item — each linking to where the
+   owner acts. Closed as
+   [FIXED-397](FIXED_ITEMS.md#fixed-397--a-chip-list-of-disabled-capabilities-that-named-the-page-it-was-drawn-on).
+3. **Every route still fits at 390, 768, 1280 and 1920** after the card layout
+   lost a row — `ui-sweep-widths-live.spec.ts` green in 1.1 minutes.
+
+**What it found, and it is the more useful half.** The Observability card was
+asked to be removed for information-architecture reasons; reading what it
+rendered made it a truthfulness defect. It printed
+`phase_gates.list_disabled_capabilities()` — the *shipped registry's* build-out
+flags, fourteen entries including `dashboard` and `web_ui`. It was telling an
+owner, in the dashboard, in a browser, that the dashboard and the web UI were
+disabled. It was never showing the deferred domains its heading implied, which
+are a different set arrived at a different way. Both facts now live in
+[Capabilities with no enable path](../guide/permissions-and-runtime-modes.md#capabilities-with-no-enable-path),
+which names the deferred domains, enumerates the fourteen phase gates by phase,
+says what a phase gate is *not*, and points at `/capabilities` for the live set.
+Four guide pages that pointed at the removed card were corrected in the same
+edit.
+
+**Screenshots:** `round0904-models-hosted-no-pinning-placeholder.png` and
+`round0904-observe-overview-no-disabled-chips.png` in
+[`screenshots/working/`](screenshots/working). No dialog was open in either and
+neither contains a credential value.
+
+---
+
+## 2026-09-04 (fourth) — Two tabs that were copies, and three bleeds an empty page hid
+
+**Tier: targeted + measured four-width sweep.** Production web build, the same
+workspace the third round used — which is the whole reason this round found
+anything.
+
+**What it proved.**
+
+1. **Every route still fits at 390, 768, 1280 and 1920**, and every page renders,
+   after two hub tabs were folded away. `#/models?tab=posture` opens Hosted,
+   `#/diagnostics` and `#/observe?tab=diagnostics` open Overview; `nav.test.ts`
+   asserts each, so a bookmark that named either lands on the panel that owns its
+   content rather than on the hub's first tab.
+2. **Four read-only facts read above the cards they explain.** The off-machine
+   posture is a strip at the top of Models → Hosted, where it answers *why did
+   this provider refuse*, instead of a tab of its own one click away.
+3. **Observability lost a tab and kept everything it said.** *Is the runtime
+   itself healthy?* carries the health transitions, the memory integrity report
+   and its Rescan; the four cards that restated Overview's own tiles are gone.
+
+**What it found, and it is the more useful half.** The width sweep had passed
+that morning and failed that afternoon at 390px. Stashing every source change and
+rebuilding reproduced it identically on unmodified `main` — so it was never the
+day's work. Three genuine mobile bleeds, each needing *content* to exist:
+
+* seven controls on an approved memory in a flex row that could not wrap
+  (511px in a 366px card);
+* a `<select>` claiming the width of its longest option inside a label that was
+  allowed to shrink;
+* a `display:grid` whose implicit `auto` column sized to max-content and refused
+  to shrink below it, plus a `minmax(300px, 1fr)` with a hard floor.
+
+The morning run had none of them because the workspace had no memory and no
+indexed model. **A responsive check against an empty page is a check of the empty
+state.** That is the layer under [BUG-250](TO_BE_FIXED.md#bug-250--a-shared-live-workspace-carries-state-between-specs):
+not that a spec can re-run against a used workspace, but that running against one
+finds what an empty one hides. Closed as
+[FIXED-395](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything).
+
 ---
 
 ## 2026-09-04 (third) — A wire with a clock, and three defects found by using the product

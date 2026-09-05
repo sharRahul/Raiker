@@ -149,21 +149,21 @@
 {/if}
 
 <style>
-  dialog { width: min(31rem, calc(100vw - 2rem)); padding: 0; border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); box-shadow: var(--shadow-3); }
+  dialog { width: min(31rem, calc(100vw - 2rem)); padding: 0; border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); box-shadow: var(--shadow-2); }
   dialog::backdrop { background: var(--overlay); backdrop-filter: blur(3px); }
   .dialog-card { padding: 1.2rem; }
-  .eyebrow { color: var(--accent); font-size: .68rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
-  h2 { margin: .3rem 0 .6rem; color: var(--text-1); font-size: 1.2rem; }
-  p { margin: .35rem 0; font-size: .82rem; line-height: 1.5; }
+  .eyebrow { color: var(--accent); font-size: var(--text-2xs); font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+  h2 { margin: .3rem 0 .6rem; color: var(--text-1); font-size: var(--text-xl); }
+  p { margin: .35rem 0; font-size: var(--text-sm); line-height: 1.5; }
   .summary { color: var(--text-1); font-weight: 700; }
   .preserved { color: var(--text-3); }
-  details { margin-top: .85rem; border-top: 1px solid var(--border); padding-top: .65rem; font-size: .74rem; }
+  details { margin-top: .85rem; border-top: 1px solid var(--border); padding-top: .65rem; font-size: var(--text-sm); }
   summary { width: max-content; color: var(--text-2); cursor: pointer; }
   dl { display: grid; grid-template-columns: auto 1fr; gap: .35rem .65rem; }
   dt { color: var(--text-3); } dd { margin: 0; overflow-wrap: anywhere; }
   .retry-status { color: var(--text-3); }
   .actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .45rem; margin-top: 1rem; }
-  button { border-radius: var(--r-pill); padding: .42rem .72rem; font: inherit; font-size: .76rem; font-weight: 750; cursor: pointer; }
+  button { border-radius: var(--r-pill); padding: .42rem .72rem; font: inherit; font-size: var(--text-sm); font-weight: 750; cursor: pointer; }
   button:disabled { opacity: .62; cursor: wait; }
   .secondary { border: 1px solid var(--neutral-border); background: var(--surface); color: var(--text-1); }
   .primary { border: 1px solid var(--accent-border); background: var(--accent); color: var(--accent-contrast, white); }

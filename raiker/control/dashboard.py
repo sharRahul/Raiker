@@ -86,6 +86,7 @@ from raiker.models.tool_projection import ALWAYS_PROJECTED, DEFERRABLE_TOOL_NAME
 from raiker.runtime.authority.models import PrincipalType
 from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
 from raiker.runtime.executors.containers import container_image_allowlist
+from raiker.runtime.executors.tier2_image import declared_image_models
 from raiker.runtime.model_facts_store import ModelFactsStore
 from raiker.security.credentials import CredentialLifecycle, CredentialLifecycleView
 from raiker.security.monitoring import SecurityMonitor
@@ -1573,6 +1574,13 @@ class ModelProfileView:
     # which is why the thinking the product asked for was never asked for.
     reasoning_modes: tuple[str, ...] = ()
     supports_reasoning_summary: bool = False
+    # The image models this provider declares, default first, empty for a
+    # provider that generates no images. This was read by the Design page and
+    # never sent by this view, so the surface asked every profile whether it had
+    # an image model and every profile answered `undefined` — the picker was
+    # empty on every real install, and only looked correct in a fixture that had
+    # no image provider either.
+    image_models: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -1987,6 +1995,30 @@ class AuthError:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def _env_requirements(raw: dict[str, Any]) -> list[dict[str, Any]]:
+    """The environment variables a channel transport declares, and whether each
+    is set — never what it is set to."""
+    import os as _os
+
+    out: list[dict[str, Any]] = []
+    for key, required in (("requires_env", True), ("optional_env", False)):
+        for entry in raw.get(key) or []:
+            if not isinstance(entry, dict) or not entry.get("name"):
+                continue
+            name = str(entry["name"])
+            out.append(
+                {
+                    "name": name,
+                    "description": str(entry.get("description") or ""),
+                    "url": entry.get("url"),
+                    "secret": bool(entry.get("secret")),
+                    "required": required,
+                    "present": bool(_os.environ.get(name, "").strip()),
+                }
+            )
+    return out
 
 
 class DashboardService:
@@ -4297,6 +4329,13 @@ class DashboardService:
                     "supports_side_questions": bool(profile.raw.get("supports_side_questions")),
                     "supports_interrupts": bool(profile.raw.get("supports_interrupts")),
                     "supports_approvals": bool(profile.raw.get("supports_approvals")),
+                    # What this transport needs from the owner's environment,
+                    # declared on the profile rather than known only to the
+                    # guide, so the setup surface can read it instead of the
+                    # owner hunting through prose. `present` is a boolean:
+                    # Raiker takes variable names and never values, and that
+                    # holds on the way out too.
+                    "env_requirements": _env_requirements(profile.raw),
                 }
             )
         return {
@@ -6692,6 +6731,7 @@ class DashboardService:
                 supports_reasoning_summary=bool(
                     profile.raw.get("supports_reasoning_summary", False)
                 ),
+                image_models=declared_image_models(profile.raw),
                 **_usage_fields(profile),
             )
 

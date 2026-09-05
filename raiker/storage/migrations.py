@@ -3786,3 +3786,40 @@ TELEMETRY_CADENCE_SQL = """
 ALTER TABLE telemetry_destinations ADD COLUMN delivery_cadence TEXT NOT NULL DEFAULT 'off';
 ALTER TABLE telemetry_destinations ADD COLUMN next_delivery_at TEXT;
 """
+
+
+# ── Generated images (the Design surface) ────────────────────────────────────
+#
+# The bytes live in `attachments`, which already stores owner-scoped, sha256'd
+# binary and is the one place in this product that does. This table is the
+# *record* of a generation: what was asked for, which model answered, and how it
+# went — including when it went badly, because a refusal an owner cannot see is
+# the failure mode every other surface here is written against.
+#
+# `prompt` is stored deliberately. It is the owner's own text on their own
+# machine, it is what makes a gallery navigable, and the redaction that applies
+# to model traffic applies to it on the way out through telemetry like anything
+# else.
+IMAGE_GENERATIONS_MIGRATION_ID = "RAIKER-2060-image-generations"
+
+IMAGE_GENERATIONS_SQL = """
+CREATE TABLE IF NOT EXISTS image_generations (
+  generation_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT,
+  profile_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  size TEXT NOT NULL,
+  status TEXT NOT NULL,
+  reason_code TEXT,
+  attachment_id TEXT,
+  media_type TEXT,
+  byte_size INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_image_generations_created
+  ON image_generations (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_image_generations_owner
+  ON image_generations (owner_principal_id, created_at DESC);
+"""

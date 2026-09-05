@@ -174,7 +174,7 @@
            record behind it, is in the guide. -->
       <p class="page-lead">Every card links to the record it is derived from.</p>
       <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
-        <Icon name="refresh" size={15} /> Refresh
+        <Icon name="refresh" size="sm" /> Refresh
       </button>
     </div>
 
@@ -197,8 +197,6 @@
               ? `Running in ${humanize(diagnostics.runtime_mode)} mode with its readiness checks met.`
               : `Running in ${humanize(diagnostics.runtime_mode)} mode with unmet readiness checks.`}
             tone={ready ? "ok" : "warn"}
-            href="#/observe?tab=diagnostics"
-            linkLabel="Open diagnostics"
           />
           <StatTile
             label="Closed capability gates"
@@ -337,6 +335,21 @@
         {/if}
       </section>
 
+      <!--
+        Diagnostics was a seventh tab on this hub reading the *same* `diagnostics`
+        object this page already reads. Four of its six cards restated the three
+        tiles at the top: the readiness tick list said "Runtime: Ready", the
+        configuration-gaps card rendered the identical `missing_config`, the
+        capability chips expanded the closed-gates count, and the provider table
+        was a thinner copy of Models. What only it had is here — the runtime's
+        own health transitions, the memory integrity report and its repair, and
+        any readiness check that actually failed.
+      -->
+      <section aria-labelledby="health-h">
+        <h2 id="health-h" class="section-h">Is the runtime itself healthy?</h2>
+        <DiagnosticsView />
+      </section>
+
       <!-- Backlog #18 — the record Raiker keeps is more than any compared
            product exports, and until now it could not leave the machine on a
            wire. This is the fifth question the overview answers. -->
@@ -354,10 +367,6 @@
 {:else if tab === "checkpoints"}
   <div id="panel-checkpoints" role="tabpanel" aria-labelledby="tab-checkpoints">
     <CheckpointsView {projectId} {sessionId} />
-  </div>
-{:else if tab === "diagnostics"}
-  <div id="panel-diagnostics" role="tabpanel" aria-labelledby="tab-diagnostics">
-    <DiagnosticsView />
   </div>
 {:else if tab === "work"}
   <div id="panel-work" role="tabpanel" aria-labelledby="tab-work">
@@ -413,7 +422,7 @@
   }
   .head .page-lead { margin: 0; }
   .section-h {
-    font-size: 0.95rem;
+    font-size: var(--text-md);
     margin: 0 0 var(--space-3);
   }
   .tiles {
@@ -450,17 +459,16 @@
   .dot[data-risk="medium"] { background: var(--warn); }
   .dot[data-risk="low"] { background: var(--ok); }
   .entry { display: grid; gap: 0.1rem; min-width: 0; }
-  .entry-title { margin: 0; font-weight: 650; font-size: 0.88rem; }
-  .entry-detail { margin: 0; color: var(--text-2); font-size: 0.84rem; overflow-wrap: anywhere; }
-  .entry-meta { margin: 0; color: var(--text-3); font-size: 0.75rem; }
-  .more { font-size: 0.82rem; font-weight: 600; }
+  .entry-title { margin: 0; font-weight: 650; font-size: var(--text-md); }
+  .entry-detail { margin: 0; color: var(--text-2); font-size: var(--text-sm); overflow-wrap: anywhere; }
+  .entry-meta { margin: 0; color: var(--text-3); font-size: var(--text-xs); }
+  .more { font-size: var(--text-sm); font-weight: 600; }
   .more-row { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: var(--space-2) 0 0; }
   .quiet { color: var(--text-3); }
   .support p { color: var(--text-2); max-width: 68ch; }
   .support-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-  .copy-note { color: var(--ok); font-size: 0.8rem; font-weight: 600; }
+  .copy-note { color: var(--ok); font-size: var(--text-sm); font-weight: 600; }
   .copy-note.warn { color: var(--warn); }
-  .error { color: var(--danger); }
   .bundle {
     margin: var(--space-3) 0 0;
     padding: var(--space-3);
@@ -470,7 +478,7 @@
     border: 1px solid var(--border);
     border-radius: var(--r-md);
     font-family: var(--font-mono);
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }

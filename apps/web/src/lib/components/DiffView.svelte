@@ -78,7 +78,7 @@
       aria-expanded={expanded}
       onclick={() => (opened = !expanded)}
     >
-      <Icon name={expanded ? "chevron-down" : "chevron-right"} size={13} />
+      <Icon name={expanded ? "chevron-down" : "chevron-right"} size="sm" />
       <span class="diff-title mono">{path ?? files[0].path ?? "Proposed change"}</span>
       <span class="diff-stat">
         <span class="stat-add">+{stat.added}</span>

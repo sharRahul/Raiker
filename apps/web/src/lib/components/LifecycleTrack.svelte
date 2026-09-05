@@ -48,7 +48,7 @@
     grid-template-columns: 1.1rem 1fr;
     gap: 0.5rem;
     align-items: start;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
   }
   .marker {
     color: var(--text-3);
@@ -59,10 +59,10 @@
   .text { display: grid; gap: 0.05rem; }
   .name { color: var(--text-2); font-weight: 600; }
   li.met .name { color: var(--text-1); }
-  .note { color: var(--text-3); font-size: 0.76rem; }
+  .note { color: var(--text-3); font-size: var(--text-xs); }
   .summary {
     margin: var(--space-2) 0 0;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     color: var(--ok);
   }

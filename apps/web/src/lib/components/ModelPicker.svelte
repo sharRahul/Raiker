@@ -184,10 +184,10 @@
          the same defect the rule's own comment records fixing once, alive again
          in the one state a fresh install is always in. The fallback is never
          `svg:last-child`, so it survives that rule by construction. -->
-    {#if active}<ProviderLogo provider={active.provider} />{:else}<Icon name="models" size={15} />{/if}
+    {#if active}<ProviderLogo provider={active.provider} />{:else}<Icon name="models" size="sm" />{/if}
     <span>{label}</span>
     {#if effortLabel !== ""}<span class="model-effort">{effortLabel}</span>{/if}
-    <Icon name="chevron-down" size={14} />
+    <Icon name="chevron-down" size="sm" />
   </button>
 
   {#if open}
@@ -222,7 +222,7 @@
               <span>{modelName(profile.model)}</span>
               {#if active?.profile_id === profile.profile_id && active?.model === profile.model}<Icon
                   name="check"
-                  size={15}
+                  size="sm"
                   label="Selected model"
                 />{/if}
             </button>
@@ -257,7 +257,7 @@
           >
             <span>Effort</span>
             <span class="effort-value">{effort === "" ? "None" : effortLabel}</span>
-            <Icon name={effortOpen ? "chevron-down" : "chevron-right"} size={14} />
+            <Icon name={effortOpen ? "chevron-down" : "chevron-right"} size="sm" />
           </button>
           {#if effortOpen}
             <p class="effort-note">
@@ -274,7 +274,7 @@
                 onclick={() => chooseEffort(level)}
               >
                 <span>{level.charAt(0).toUpperCase() + level.slice(1)}</span>
-                {#if effort === level}<Icon name="check" size={15} label="Selected effort" />{/if}
+                {#if effort === level}<Icon name="check" size="sm" label="Selected effort" />{/if}
               </button>
             {/each}
             <button
@@ -324,7 +324,7 @@
     padding: 0.22rem 0.46rem;
     background: var(--surface);
     color: var(--text-2);
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     cursor: pointer;
   }
@@ -370,7 +370,7 @@
     gap: 0.5rem;
     padding: 0.3rem 0.48rem 0.24rem;
     color: var(--text-1);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 800;
     letter-spacing: 0.03em;
   }
@@ -426,7 +426,7 @@
     background: var(--surface);
     color: var(--text-1);
     font: inherit;
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 750;
     cursor: pointer;
   }
@@ -478,7 +478,7 @@
   .effort-note {
     margin: 0.1rem 0.48rem 0.35rem;
     color: var(--text-3);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     line-height: 1.35;
   }
   .effort-choice {
@@ -505,7 +505,7 @@
   .effort-toggle small {
     display: block;
     color: var(--text-3);
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
   }
   .switch {
     width: 1.85rem;

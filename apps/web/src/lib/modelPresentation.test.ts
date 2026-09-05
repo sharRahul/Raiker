@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chatCandidates, modelName } from "./modelPresentation";
+import { chatCandidates, imageCandidates, modelName } from "./modelPresentation";
 
 describe("modelName", () => {
   it("turns provider model identifiers into concise product names", () => {
@@ -53,5 +53,37 @@ describe("what a provider's catalogue can actually answer with (BUG-258)", () =>
     // not understand; offering too much beats offering nothing.
     const models = ["text-embedding-3-large", "text-embedding-3-small"];
     expect(chatCandidates(models)).toEqual(models);
+  });
+});
+
+describe("models that draw rather than talk", () => {
+  it("offers exactly the image models a catalogue contains", () => {
+    expect(
+      imageCandidates([
+        "gpt-4o",
+        "gpt-image-1",
+        "dall-e-3",
+        "gemini-2.5-flash-image",
+        "imagen-3.0-generate-002",
+        "claude-sonnet-4-5",
+      ]),
+    ).toEqual(["gpt-image-1", "dall-e-3", "gemini-2.5-flash-image", "imagen-3.0-generate-002"]);
+  });
+
+  it("returns nothing for a provider that draws nothing", () => {
+    // Deliberately unlike `chatCandidates`, which falls back to the unfiltered
+    // list. A chat picker offering too much is recoverable; a Generate button
+    // pointed at a model that cannot draw is not.
+    expect(imageCandidates(["claude-sonnet-4-5", "gpt-4o"])).toEqual([]);
+  });
+
+  it("keeps image models out of the chat picker", () => {
+    // The regression this list exists for: the chat exclusions knew `dall-e`
+    // and nothing else, so `gpt-image-1` and `gemini-2.5-flash-image` — the two
+    // models Raiker itself declares for images — were both offered as chat
+    // models that could never answer a turn.
+    expect(chatCandidates(["gpt-4o", "gpt-image-1", "gemini-2.5-flash-image"])).toEqual([
+      "gpt-4o",
+    ]);
   });
 });

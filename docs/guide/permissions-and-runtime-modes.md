@@ -123,7 +123,8 @@ the machine actor separately from you, the owner.
 
 Raiker's registry contains 66 capability gates. **Permissions** displays the
 owner-operable subset, grouped as follows; deliberately unavailable domains are
-kept out of the interactive list and reported in Diagnostics instead.
+kept out of the interactive list altogether, and named in
+[Capabilities with no enable path](#capabilities-with-no-enable-path) below.
 
 | Group | Examples |
 |---|---|
@@ -216,8 +217,25 @@ answers to Observability → Audit log → Export. **Telemetry export** is its
 sibling and sits in **Network** rather than beside it: they carry the same
 record, and an audit export writes a file beside the log while a telemetry
 export leaves the machine.
-Observability → Diagnostics lists them under *"Disabled / deferred
-capabilities"*.
+
+Observability used to carry a *"Disabled / deferred capabilities"* chip list, and
+it is gone. It did not show the domains above. It showed the **phase gates** —
+the build-out flags each capability carries in the shipped registry — which is a
+different list, and one that reads as a lie on a page: it named `web_ui` and
+`dashboard` as disabled to an owner reading it in the dashboard, in a browser.
+Two facts, both recorded here rather than displayed:
+
+* **Which capabilities you cannot turn on** is the set above, and every
+  capability's own state is on its **Permissions** card, where the switch is.
+* **The phase gates**, for anyone tracing a refusal to its origin, are:
+  `dashboard`, `desktop_ui`, `graph_codemap_indexing`, `graph_codemap_planning`,
+  `plugin_execution`, `semantic_memory_review_queue`, `semantic_memory_writes`
+  and `web_ui` (phase 3); `container_execution`, `external_channels` and
+  `remote_execution` (phase 4); `admin_mutation`, `policy_mutation` and
+  `role_mutation` (phase 5). A phase gate is not an account decision and never
+  refuses a turn on its own — per-account resolution is what the Permissions page
+  reads and writes. `/capabilities` in the terminal client prints the current set
+  from the registry if you would rather ask the build than the guide.
 
 ### Code map
 

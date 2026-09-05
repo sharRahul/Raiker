@@ -406,6 +406,23 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-391](#fixed-391--one-tab-in-the-observability-hub-answered-an-empty-list-with-a-grey-line) | Low | Web UI / consistency | Fixed 2026-09-04 (BUG-280, raised by this round's page sweep) |
 | [FIXED-392](#fixed-392--the-source-said-a-gate-ships-enabled-the-product-said-it-was-off) | Low | Documentation / capability defaults | Fixed 2026-09-04 (BUG-281, raised while verifying FIXED-386 live) |
 | [FIXED-393](#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier) | Medium | Documentation / memory | Fixed 2026-09-04 (BUG-282, raised by this round's page sweep) |
+| [FIXED-394](#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others) | Low | Web UI / information architecture | Fixed 2026-09-04 (BUG-283, raised by the owner) |
+| [FIXED-395](#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything) | Medium | Web UI / responsive layout | Fixed 2026-09-04 (BUG-284, found by the width sweep on a *used* workspace) |
+| [FIXED-396](#fixed-396--eight-provider-cards-printed-the-same-placeholder-about-pinning) | Low | Models / information architecture | Fixed 2026-09-04 (raised by the owner) |
+| [FIXED-397](#fixed-397--a-chip-list-of-disabled-capabilities-that-named-the-page-it-was-drawn-on) | Medium | Observability / documentation truthfulness | Fixed 2026-09-04 (raised by the owner) |
+| [FIXED-398](#fixed-398--the-design-system-was-stated-in-a-comment-and-enforced-by-nothing) | High | Web UI / design system | Fixed 2026-09-04 (raised by the owner, from Hermes Agent and OpenClaw) |
+| [FIXED-399](#fixed-399--the-knowledge-map-carried-four-palettes-and-two-of-them-were-the-same-one) | High | Web UI / theming | Fixed 2026-09-04 (found by FIXED-398's audit) |
+| [FIXED-400](#fixed-400--ten-var-references-to-tokens-that-do-not-exist) | Medium | Web UI / design system | Fixed 2026-09-04 (found by FIXED-398's audit) |
+| [FIXED-401](#fixed-401--a-scale-that-existed-and-a-sidebar-that-vanished-instead-of-collapsing) | Medium | Web UI / shell | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-402](#fixed-402--messaging-is-its-own-destination-and-telegram-is-a-real-transport) | High | Channels / messaging | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-403](#fixed-403--the-design-surface-governed-image-generation-from-nothing) | High | Design / image generation | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-404](#fixed-404--a-nine-step-type-scale-with-sixty-three-sizes-in-front-of-it) | Medium | Web UI / design system | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-405](#fixed-405--the-element-floor-was-a-ceiling-and-it-painted-the-page-out) | High | Web UI / shell | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-406](#fixed-406--an-if-chain-that-works-for-two-transports-and-stops-at-three) | Medium | Channels / messaging | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-407](#fixed-407--a-gigabyte-of-downloads-because-the-interpreter-was-python-310) | Medium | Install / dependencies | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-408](#fixed-408--one-composer-three-surfaces-and-design-where-it-belongs) | Medium | Web UI / work surfaces | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-409](#fixed-409--raiker-could-start-at-sign-in-but-had-no-icon-to-click) | Medium | Desktop integration / uninstall | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-410](#fixed-410--the-design-model-picker-was-empty-on-every-real-install) | **High** | Design / models | Fixed 2026-09-05 (raised by the owner) |
 
 ---
 
@@ -17284,3 +17301,939 @@ absent entirely when the runtime is not on that strategy.
 
 **User-interface outcome.** The Memory page is three lines shorter and says the
 same thing. The guide says what the product does.
+
+---
+
+## FIXED-394 — Thirty destinations, and two of them were copies of the others
+
+**Severity: Low. Area: Web UI / information architecture. Status: Fixed
+2026-09-04. Raised as BUG-283 from an owner observation: *"a lot of pages and
+information can be moved to settings and guide docs."***
+
+**Measured before anything was moved**, because "too much text" is a feeling and
+this document only takes evidence:
+
+| | Before | After |
+|---|---|---|
+| Static prose words on screen | 4,457 | 4,213 |
+| …of it explaining how Raiker works in general | 610 | 453 |
+| Hub tab destinations | 30 | 28 |
+
+**What the survey actually found**, and it is not what the observation assumed.
+Most on-screen prose is **not** teaching: it is state (*"No hooks are
+configured"*) or a consequence stated at the point of a decision (*"deleting the
+project later will not delete the folder"*). Those must stay, and the owner
+confirmed that rule when asked. The teaching prose was concentrated, and one page
+held a quarter of it.
+
+**Extensions, 151 words.** The Plugins tab opened with a design-rationale essay —
+*"which is why hooks came first, and why a kind with no such surface yet is
+marked unavailable rather than quietly listed"* — whose first sentence is already
+the guide's Plugins section, verbatim. The MCP side panel explained the governed
+control plane. The Hooks tab explained why the off switch is an owner setting
+rather than a fourth config file, which the guide's *Turning them off* already
+says. Each is now a `GuideLink`, the component built for exactly this and whose
+own header states the rule: *"what it must never become is a second place to
+write prose."*
+
+**And the same contract, twice on one page.** Channels carried a standalone
+**Routing contract** card restating, in different words, a note already inside
+the routing form. One of the two is at the decision; the other was at the foot of
+the tab where nobody reads it before choosing. The card is gone, the note gained
+the one fact only the card had, and the guide carries the full contract.
+
+**Models → Posture was a tab holding four read-only facts and a paragraph.** The
+facts now read as a strip at the top of **Hosted** — above the provider cards
+whose refusals they explain, rather than one click away from them — and the
+paragraph is the guide's *Off-machine provider posture*.
+
+**Observability → Diagnostics was a seventh tab reading the same object as the
+first one.** `ObserveView` and `DiagnosticsView` both call `GET /api/diagnostics`,
+and four of Diagnostics' six cards restated what Overview's three tiles already
+say from that payload: a tick list reading "ready" beside a tile reading
+**Ready**, the identical `missing_config` list, an expansion of the closed-gate
+count that Permissions lists *with controls*, and a provider table thinner than
+the one on Models. What only it had — the runtime's own health transitions, the
+memory integrity report and its repair, and a **failed** readiness check's reason
+code and remediation — is a section of Overview: *Is the runtime itself healthy?*
+`DiagnosticsView.svelte` went 467 → 314 lines and the tick list of passing checks
+is gone, because a check that is fine needs no words at all.
+
+**No link was broken.** `#/models?tab=posture` resolves to Hosted and
+`#/diagnostics` and `#/observe?tab=diagnostics` to Overview, through the
+`HUB_TAB_ALIASES` map that exists for this, and `nav.test.ts` asserts each.
+
+**One thing was put back after being cut.** *"No plugin code runs in this
+browser"* is a claim about the product's boundary that appears nowhere else — not
+on another surface and not in the guide — and a test guarded it. Eight words that
+are the most reassuring fact on the Plugins tab is not prose to move; trimming it
+was the wrong call and it was restored before it shipped.
+
+**User-interface outcome.** Two fewer destinations, 244 fewer words to read past,
+and nothing an owner acts on moved further from the action. Every consequence
+still sits beside the control that causes it.
+
+---
+
+## FIXED-395 — Three mobile bleeds that only existed once the workspace held anything
+
+**Severity: Medium. Area: Web UI / responsive layout. Status: Fixed 2026-09-04.
+Raised as BUG-284 by the width sweep, on the second run of the day.**
+
+**Observed.** `ui-sweep-widths-live.spec.ts` passed at 390/768/1280/1920 in the
+morning and failed at 390 in the afternoon, on a build whose only changes were
+elsewhere. Stashing every source change and rebuilding reproduced the failure
+identically on unmodified `main`, which is what proved it was not the day's work:
+
+* **`.card-actions` on an approved memory** — seven controls in a `display:flex`
+  row with no `flex-wrap`. 511px of buttons in a 366px card, drawn over the card
+  beside it.
+* **`.index-field` on Memory** — `min-width:0` lets the *label* shrink; the
+  `<select>` inside it still claims the width of its longest option. 292 in 248.
+* **`.library-layout` on Models → Local** — a `display:grid` with no
+  `grid-template-columns`, so its single implicit column is `auto`: it sizes to
+  the widest item's max-content and **refuses to shrink below min-content**. 450
+  in 366. `minmax(0, 1fr)` is the same one column, allowed to be narrower than
+  its contents want.
+* **`.model-grid`** — `repeat(auto-fill, minmax(300px, 1fr))` has a hard 300px
+  floor inside a ~290px column. Fixed as `minmax(min(300px, 100%), 1fr)`.
+
+**Why it went green and then red, and this is the part worth keeping.** Every one
+of these needs *content* to appear: an approved memory, an indexed local model.
+The morning's sweep ran on a workspace that had neither. **A responsive check
+against an empty page is a check of the empty state**, and this suite has spent
+three rounds ([BUG-229](TO_BE_FIXED.md#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace),
+[BUG-247](TO_BE_FIXED.md#bug-247--every-live-spec-brings-its-own-owner-password),
+[BUG-250](TO_BE_FIXED.md#bug-250--a-shared-live-workspace-carries-state-between-specs))
+peeling away that same assumption one layer at a time. This is the layer under
+BUG-250: not that a spec cannot re-run against a used workspace, but that running
+against a used one **finds defects an empty one hides**.
+
+**User-interface outcome.** Nothing draws over its neighbour at 390px on any
+route, with a workspace that has been worked in.
+
+## FIXED-396 — Eight provider cards printed the same placeholder about pinning
+
+**Severity: Low. Area: Models / information architecture. Status: Fixed
+2026-09-04. Raised by the owner: "There is no need for pinned models on Models
+page."**
+
+**Observed.** On a workspace with no provider connected, Models → Hosted drew
+eight cards and every one of them carried the line **no model pinned**. The
+local rows carried the same placeholder in different words, **model chosen at
+selection**. Counted against the page, it was the single largest block of
+repeated text on it, and none of it was a fact about the owner's providers.
+
+**Root cause, and why it is not a wording fix.** The line was rendered
+unconditionally: `{#if !namesAModel(p)}<span class="model-unpinned">no model
+pinned</span>{:else}<code>{modelName(p.model)}</code>{/if}`. The `{:else}` branch
+states something — *this provider answers with this model* — and the `{#if}`
+branch states the absence of it, in Raiker's own vocabulary, to somebody who had
+not asked to learn what pinning is. The card already answers it twice over: the
+status line reads **Not connected**, the readiness chip reads **Not checked**,
+and **Select models…** sits directly underneath as the offer. Three surfaces
+saying "you have not chosen a model" is not emphasis, it is noise, and the one of
+them written in the internal vocabulary is the one to lose.
+
+**Fix.** The model line renders only when there is a model to name, on both the
+hosted cards and the local rows; `.model-unpinned` went with it. A card with a
+chosen model is unchanged — the fact survives, the placeholder does not.
+
+**User-interface outcome.** A hosted card names its model or says nothing on
+that line. `ModelsView.test.ts` holds the rule from both directions: neither
+placeholder appears anywhere on the Hosted tab, the connected card still names
+**Haiku 4.5**, and exactly one `.pc-model` element exists for two profiles.
+
+## FIXED-397 — A chip list of disabled capabilities that named the page it was drawn on
+
+**Severity: Medium. Area: Observability / documentation truthfulness. Status:
+Fixed 2026-09-04. Raised by the owner: "I don't think we need disabled and
+deferred capability in Observability page. It can be recorded in docs."**
+
+**Observed.** Observability → Diagnostics carried a card headed **Disabled /
+deferred capabilities** with a chip per entry. Removing it was asked for as an
+information-architecture change; reading what it actually rendered turned it into
+a truthfulness one.
+
+**Root cause.** The card read `diagnostics.disabled_capabilities`, which is
+`phase_gates.list_disabled_capabilities()` — capabilities whose **phase gate** in
+the shipped registry has `runtime_enabled = False`. That set is fourteen entries
+and it includes `dashboard` and `web_ui`. So the card told an owner, in the
+dashboard, in a browser, that the dashboard and the web UI were disabled. It was
+not showing the deferred domains its heading implied (finance, medical, CCTV,
+home security, pregnancy/baby, hardware), which are a different set arrived at a
+different way, and which are absent from Permissions rather than switched off in
+it. A phase gate is a build-out flag; it is not an account decision and refuses
+nothing on its own, because per-account resolution is what
+`admission.unset_resolution_for` reads and what the Permissions page writes.
+
+**Fix.** The card is gone — it left with the Diagnostics tab in the same pass —
+and both facts it was reaching for are written down where each is true.
+[Capabilities with no enable path](../guide/permissions-and-runtime-modes.md#capabilities-with-no-enable-path)
+now names the deferred domains *and* enumerates the fourteen phase gates by
+phase, says what a phase gate is not, and points at `/capabilities` in the
+terminal client for the current set straight from the registry. Four guide pages
+that pointed at the removed card were corrected in the same edit:
+`security-and-privacy.md`, `troubleshooting.md` (twice),
+`permissions-and-runtime-modes.md` itself, and `memory.md`, whose Memory
+integrity path moved to **Observability → Overview**.
+
+**Why it is recorded rather than re-sited.** A number an owner cannot act on, on
+a page they visit when something is wrong, is worse than no number: this one
+invited the reading "the web UI is disabled, that is why my page is broken".
+Every capability's own state is on its Permissions card, beside the switch that
+changes it. That is the surface; the registry's phase table is reference
+material, and reference material belongs in the guide.
+
+**User-interface outcome.** Nothing in Observability claims a capability is
+disabled. `grep -rn "disabled_capabilities" apps/web/src/` returns type
+declarations and test fixtures only — no rendering code.
+
+## FIXED-398 — The design system was stated in a comment and enforced by nothing
+
+**Severity: High. Area: Web UI / design system. Status: Fixed 2026-09-04. Raised
+by the owner, who pointed at [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+and [OpenClaw](https://github.com/openclaw/openclaw) and said they look clean.**
+
+**Observed.** Both were read before anything was changed, and they turn out to be
+clean by opposite routes. Hermes has 255 lines of global CSS and **no
+per-component CSS at all**: a theme is three colours — `--foreground`,
+`--midground`, `--background` — and every surface is a `color-mix` off them
+(cards `midground 4%` over background, borders `15%`, muted `8%`). Nothing can
+clash because no page can invent a colour. OpenClaw is the opposite: **56,451
+lines of CSS** and 215 tokens, a vocabulary almost identical to Raiker's own
+(`--bg`, `--bg-elevated`, `--text`, `--text-strong`, `--border`,
+`--border-strong`) — but its CSS lives in thirty *named feature stylesheets*, so
+shared patterns are actually shared.
+
+Measured against them, Raiker is not missing a design system. `app.css` opens by
+stating one, including the rule: *"Components use tokens only — never raw colours
+— so both themes stay in lockstep."* Nothing checked it.
+
+| | Raiker (before) | Hermes | OpenClaw |
+|---|---|---|---|
+| Global CSS | 1,329 | 255 | 1,183 |
+| Per-component CSS | 10,666 lines / 115 components | 0 | 30 feature sheets |
+| Raw colours in component styles | **183 distinct, 20 components** | 0 | 0 |
+
+**Root cause.** A stated rule with no check is a preference. The 183 were not one
+bad page; they were a slow accumulation of near-misses, which is the thing you
+notice as *almost* uniform without being able to point at it. The audit split
+them into four kinds, and only the first was what anybody would have guessed:
+
+* **Genuinely new colours** — a `#2563eb` blue in the model-operation tray that
+  exists nowhere in the palette, present twice more in `rgb(37 99 235/…)` form.
+* **Dead fallbacks** — `var(--danger, #b42318)` in one component and
+  `var(--danger, #b3292f)` in another. The token always exists, so neither
+  literal can ever render; they exist only to disagree with each other.
+* **Reimplemented tokens** — `--overlay` hand-rolled four times at four different
+  alphas, `--shadow-2` hand-rolled four times, the elevation ramp re-derived as
+  `0 14px 40px color-mix(…)`.
+* **Content, not chrome** — a CSS illustration of a person at a desk, and
+  `mask-image` gradients where `#000` is an alpha channel. These are the only
+  legitimate cases and they are now the only exemptions.
+
+**Two contrast defects fell out of it.** Both were invisible until the colours
+were listed side by side:
+
+* The notification badge set `background: var(--danger); color: #fff`. In the
+  dark theme `--danger` is `#FFEDD5` — a pale peach. **White on near-white**: the
+  unread count was unreadable in the flagship theme. Now `var(--text-inverse)`,
+  which is near-black on the dark theme's pale danger and white on the light
+  theme's deep red.
+* The gold **Connect** buttons on Models set `color: #fff` on `--brand`
+  (`#ecd06f` in *both* themes) — about 1.9:1. Now `--brand-black`, about 11.9:1.
+
+**Fix.** 183 raw colours to **zero** across every component style block.
+Everything mapped onto the existing palette; three genuinely theme-independent
+groups were named rather than scattered — `--brand-huggingface` for a vendor
+mark, and a six-token `--term-*` group for the command output pane, which is dark
+in both themes because it renders a real program's output and inverting it would
+misrepresent what the program drew.
+
+`apps/web/scripts/check-design-tokens.mjs` now runs as the first half of
+`npm run check`, which CI already invokes, so the rule holds. Exemptions live in
+the script with a reason each — never inline — so adding one is a visible
+decision. Verified failing on an injected violation before being trusted.
+
+**User-interface outcome.** Every page renders in both themes at 390 / 768 /
+1280 / 1920 / 4K / 8K: `all-pages-theme-live`, `ui-sweep-clipping-live`,
+`ui-sweep-responsive-live`, `ui-sweep-widths-live` and `all-pages-live` — 14
+specs — all pass. `.muted` and `.sub` were also collapsed onto `--text-sm`, from
+the four sizes (0.78 / 0.8 / 0.82 / 0.84rem) they had drifted into.
+
+## FIXED-399 — The Knowledge Map carried four palettes, and two of them were the same one
+
+**Severity: High. Area: Web UI / theming. Status: Fixed 2026-09-04. Found by
+FIXED-398's audit.**
+
+**Observed.** `BrainView.svelte` held 58 of the 183 raw colours — including
+**eight near-identical greys** (`#607689`, `#7f899e`, `#8892a5`, `#a9b0bf`,
+`#687286`, `#718697`, `#6e8292`, `#526b7e`) where the palette offers `--text-1`,
+`--text-2` and `--text-3`, and **five near-identical borders** where it offers
+two.
+
+**Root cause, which is the interesting part.** The file contained four palettes
+stacked on top of each other:
+
+1. a complete hard-coded **dark** palette in the base rules;
+2. a complete hard-coded **light** palette immediately below it, overriding the
+   first for every property it set — so palette 1 was largely dead CSS;
+3. a **tokenised** dark override keyed on `[data-theme="dark"]`, patching the
+   theme back on top of the hard-coded light one;
+4. **that same override again, verbatim**, inside a `prefers-color-scheme: dark`
+   query for the viewer who never chose a theme — thirteen rules duplicated, with
+   `:global(…)` repeated on every selector.
+
+The comment above the duplicate named the symptom precisely — *"Without this the
+Knowledge Map stayed light inside an otherwise dark app on every machine set to
+follow the OS"* — without naming the cause. The cause is that the base rules were
+painted in literals, so every theme had to be patched back over them, and each
+patch needed its own copy for each way a theme can be selected.
+
+**Fix.** The base rules are painted in tokens, so they are already correct in
+both themes, and **all four override blocks are gone**. `BrainView.svelte` is
+850 → 704 lines; its style block went from about 120 lines to 48.
+
+**One thing the fix exposed.** The graph's categorical node key is deliberately
+fixed across themes — it is a legend, not chrome. Every entry is a saturated
+mid-tone that reads on either ground except `user: "#f3f5fa"`, near-white,
+chosen to be the brightest thing on a canvas that used to be hard-coded dark.
+Once the canvas followed the theme, the "you" node vanished into the light one.
+It is now rose (`#fb7185`) — the same brightness, distinct from the purple,
+orange and yellow already in the key, and visible on both.
+
+**User-interface outcome.** The Knowledge Map follows the theme through the same
+mechanism as every other page, including for a viewer who never chose one.
+Screenshots: `round0904-knowledge-map-light.png` and
+`round0904-knowledge-map-dark.png`.
+
+## FIXED-400 — Ten `var()` references to tokens that do not exist
+
+**Severity: Medium. Area: Web UI / design system. Status: Fixed 2026-09-04.
+Found by FIXED-398's audit.**
+
+**Observed.** Ten custom properties were referenced with no definition anywhere
+and no fallback: `--bg-2`, `--radius-2`, `--shadow-3`, `--shadow-sm`, `--space-7`,
+`--surface-1`, `--surface-2`, `--surface-3`, `--text` and `--warning-soft`,
+across fifteen components. Four more hid behind a fallback that therefore always
+won: `--shadow-lg`, `--danger-text`, and two more uses of `--surface-2`.
+
+**Why nobody saw it.** CSS fails silently. An undefined custom property with no
+fallback makes the *whole declaration* invalid, so it is dropped:
+
+* `border-radius: var(--radius-2)` → **0**. The collector cards on Observability
+  had square corners while every other card in the product had 12px.
+* `color: var(--danger-text, var(--text-2))` → a **failure message rendered in
+  body grey** instead of red, on the model picker.
+* `background: var(--surface-2)` → transparent, in five components.
+
+None of this appears in review, and none of it is wrong enough to report as a
+bug. It is exactly the residue that reads as "this doesn't look quite right".
+
+**Fix.** Each was repointed at the vocabulary that exists — `--radius-2` →
+`--r-md`, `--surface-2` → `--sunken`, `--text` → `--text-1`, `--shadow-sm` →
+`--shadow-0`, and so on. The five properties that are legitimately set from
+markup (`--sz`, `--depth`, `--logo-size`, `--link-width`, `--content-h`,
+`--explorer-w`) are declared as such in the checker rather than being confused
+for dangling ones.
+
+**User-interface outcome.** No `var()` in any component names a token nothing
+defines, and the checker fails the build if one appears.
+
+## FIXED-401 — A scale that existed, and a sidebar that vanished instead of collapsing
+
+**Severity: Medium. Area: Web UI / shell. Status: Fixed 2026-09-05. Raised by the
+owner, from Hermes Agent and Claude.**
+
+**Observed.** Seven separate complaints that turned out to share two causes.
+
+**Icons were sixteen different sizes** — 12 through 44 — with 212 of them in the
+13–18 band, which is one inline icon written six ways. The scale to fix this
+already existed: **BUG-37** created `ICON_SIZE` (`sm` 14, `md` 16, `lg` 20, `xl`
+24) and its comment names this exact complaint — *"call sites passed 14, 15, 16,
+17, 18, 20 and 22 more or less interchangeably, which is why an icon in a button
+and an icon in a nav row were different sizes that both looked almost right."*
+The scale was built and the call sites never moved onto it. All 212 have now,
+and `Icon`'s own default went from a numeric `18` to `md`.
+
+**Sliders had no styling at all**, so every range input was the browser's default
+pill — the one fully rounded control in a surface language whose radii are
+8/12/16/20 and whose buttons and fields are rectangles. Squared once, globally.
+
+**Dialogs read smaller than the page that summoned them**, setting their own body
+text between 0.68 and 0.86rem against a 1rem page. A floor in `app.css` plus the
+per-dialog rules that sat under it; a kicker that is meant to be small still asks
+for that deliberately.
+
+**The sidebar did not collapse — it disappeared.** `desktop-hidden` was width 0
+plus `translateX(-100%)`, `inert`, and `aria-hidden`, so the only way to see
+where you were was to bring all 256px back. It is a rail now: icons stay, the
+active row stays marked, `inert` and `aria-hidden` came off because a rail is on
+screen and clickable, and the toggle says **Collapse**/**Expand** rather than
+Hide/Show.
+
+**Everything you configure once moved behind the gear.** The rail carries what an
+owner opens many times an hour; Permissions, Models, Extensions, Observability,
+Guide and Settings are now a window in the top right with a filter over every
+page and every settings section. Routing is untouched and no deep link broke —
+`nav.ts` still holds every destination in `NAV_GROUPS` because `routeFromHash`
+resolves against `NAV_ITEMS`; `SIDEBAR_GROUPS` and `HUB_GROUPS` decide only where
+a link is *drawn*. **Approvals moved the other way**, out of Manage into Core: a
+decision waiting on you is the work, not setup, and it was only grouped with
+Models because both were called "management".
+
+**The Knowledge Map lost two controls and gained an answer.** Fullscreen is gone
+— the graph already fills the content area, and the browser's own fullscreen took
+the sidebar and topbar away without replacing them. Global/Local is gone, and the
+answer to whether it was needed is in `centreNode()`: focusing a node *already*
+switches to local, so the segmented control's only unique job was getting back
+out, and it spent the rest of its life half disabled. That is a **Show all**
+beside the depth slider now — the other control that exists only in local mode.
+The filter sits at the right end of a toolbar that is a flex row rather than a
+fixed six-slot grid. A second search input in the graph settings panel, bound to
+the *same* `search` state as the toolbar's, went with it.
+
+**Capabilities groups fold.** 66 gates across a dozen domains all rendered
+expanded. A search overrides a fold, because answering a query with a hidden
+group is the page arguing with it.
+
+**User-interface outcome.** Every page renders at 390/768/1280/1920 and through
+the 26-route capture; 1,294 unit tests and 9 mocked e2e green.
+
+## FIXED-402 — Messaging is its own destination, and Telegram is a real transport
+
+**Severity: High. Area: Channels / messaging. Status: Fixed 2026-09-05. Raised by
+the owner, who asked for a messaging page like Hermes Agent's.**
+
+**Observed.** Raiker's channels were a **tab inside Extensions**, beside
+connectors, MCP servers, skills, hooks and plugins. Those are all things the agent
+*uses*; a channel is the opposite direction — a place a person writes to Raiker
+from — and it is the one surface where content Raiker did not ask for enters a
+turn. It also had exactly one real transport: a signed HTTP webhook.
+
+**What was already there, which changed the shape of the work.** The governed
+pipeline was complete and good: `executors/channels.py` with an egress allowlist,
+HMAC signing and a metadata-only approval relay; `routes_channels.py` with a
+shared inbound secret, pairing lookup, sender allowlist, per-sender budget,
+redacted preview, audit events and quarantine. What was missing was not a
+transport — it was **a transport that is somebody else's shape**.
+
+**Fix, in two halves.**
+
+*The page.* `MessagingView.svelte` is the channels panel moved out of Extensions
+rather than copied: Extensions is 1,486 → 1,084 lines, its `channels` tab is
+gone, and `#/channels` aliases to the new route so no link breaks. Its seven
+tests moved with it into `MessagingView.test.ts`.
+
+*The adapter.* `channel.telegram` is a real profile with a real delivery path,
+and being a name you recognise buys it nothing:
+
+* **Outbound** branches on the pairing's `channel_type` and builds Telegram's own
+  `sendMessage` body. The URL is constructed in the executor, never taken from
+  the action — a model-proposed URL is untrusted, and the one thing this
+  transport must never do is POST an owner's bot token at a host the owner did
+  not name.
+* **The token is a variable name, not a value**, read from
+  `RAIKER_TELEGRAM_BOT_TOKEN` at delivery: never stored in the workspace, never
+  logged, never returned.
+* **A bot token is not authorisation to reach the network.**
+  `api.telegram.org` must be on the egress allowlist separately, and the refusal
+  names the host.
+* **Inbound** translates Telegram's update shape at the edge and then takes the
+  same path every channel takes. A non-message update is acknowledged and dropped
+  rather than refused, because Telegram retries anything that is not a `2xx` and
+  retrying a join forever helps nobody.
+
+**One hardening the adapter forced, which applies to every caller.** Telegram
+carries its credential in the URL *path* (`/bot<token>/sendMessage`), and
+`post_url`'s `invalid_url` branch echoed the **whole URL** into a `SandboxError`
+— a reason code, which reaches the audit log. That is a live-token write to the
+record. All three call sites now report scheme and host only; the other two
+failure paths already said just the host or the exception type. Two tests hold
+it: a delivery that fails at transport, and one that fails at egress, with the
+token asserted absent from the result *and* from every event payload.
+
+**User-interface outcome.** Messaging is a sidebar destination. Telegram appears
+in its connector list, off, with the four fail-closed facts stated separately.
+21 channel tests pass, including eight new ones covering the token, the chat id,
+the egress boundary, the inbound translation, an unallowlisted sender, a bad
+secret, and an update that cannot be used.
+
+## FIXED-403 — The Design surface: governed image generation, from nothing
+
+**Severity: High. Area: Design / image generation. Status: Fixed 2026-09-05.
+Raised by the owner: a new page where they can generate and render images using
+models that can generate images.**
+
+**Observed.** Nothing existed. No capability, no executor, no provider adapter,
+no storage, no route, no page — `grep -ril "image_generation\|dall-e\|gpt-image"`
+over `raiker/` returned zero files. This is the first capability added to Raiker
+since `telemetry_export`, and unlike a UI change it had to satisfy every
+invariant this repository holds about what a capability *is*.
+
+**Fix, as a vertical.**
+
+*Capability.* `image_generation`, Tier 2, for the reason every Tier-2 capability
+is Tier 2: it leaves the machine. Deliberately **not** a corner of
+`hosted_model_runtime` — an owner who connected OpenAI to answer questions has
+not thereby asked Raiker to spend their credit generating pictures, so the two
+are gated and refused separately.
+
+*Executor.* `runtime/executors/tier2_image.py` validates the prompt and the size
+against a fixed list, resolves the profile the owner configured, requires a
+non-empty `RAIKER_MODEL_EGRESS_ALLOWLIST`, resolves the credential from the saved
+connection or the owner's environment, and **builds the provider endpoint
+itself**. That last one is the load-bearing decision: an action argument is a
+thing a model can propose, and a proposed URL plus an owner's API key is a
+credential-exfiltration primitive. A prompt cannot reach the URL.
+
+*Transport.* `sandbox.post_json` is new, and exists so this did not become a
+second implementation of "reach a model provider". `post_url` enforces the
+allowlist but returns only size metadata; `post_json_rpc` returns the body but
+deliberately enforces *no* allowlist, because an owner-added MCP endpoint is
+authorised by the owner adding it. A hosted image model is neither: it must
+answer to the model egress allowlist and its reply is the image.
+
+*Storage.* The bytes go into `attachments`, already the one owner-scoped,
+sha256-addressed binary store in the product. `image_generations` records the
+attempt beside them — **including the refused ones**, because an owner who
+pressed Generate and got nothing should find out why from the page rather than
+the audit log.
+
+*API.* Three routes, one rule between them: the list is metadata only and the
+bytes are a separate owner-scoped request naming one generation, served
+`no-store`.
+
+*Page.* `DesignView.svelte` — a prompt, a provider, a size, a gallery. Its three
+refusal states have three different remedies (Permissions, the egress variable,
+the Models page) and are never collapsed into "couldn't generate".
+
+**What the repository's own invariants forced, and this is the part worth
+keeping.** Adding the capability failed *seven* guardrails before it was
+finished, each of which is a thing that would otherwise have shipped missing:
+
+1. `activation_blocked:no_requirement_entry` — no entry in the activation
+   registry, the same gap FIXED-106 recorded for checkpoint restore.
+2. `denied_by_policy` — absent from `policy/config.py`, so it was hard-denied on
+   the way to its own executor.
+3. `unsupported_id_prefix:img_` — ids are a closed set.
+4. No threat model (`docs/threat-models/image-generation.md` now exists).
+5. Not in the threat-model index.
+6. No `CAPABILITY_COPY` entry, so Permissions would have rendered the raw
+   identifier and no description.
+7. Not classified in `entry_paths.py`, and not named in §3.6 of
+   `GOVERNANCE_ENTRY_PATHS.md` — it is the forty-seventh.
+
+A new capability cannot be quietly added to this product, which is the point.
+
+**User-interface outcome.** Design is a sidebar destination. On a workspace with
+the capability off and no image provider connected it says both, separately, each
+linking to where the owner fixes it. 13 backend tests cover the gate, the egress
+boundary, the missing credential, an unsupported provider, an unsupported size,
+the stored bytes, the recorded refusal, a provider policy refusal, an oversized
+response, and that the credential appears in neither the result nor the record.
+
+## FIXED-404 — A nine-step type scale, with sixty-three sizes in front of it
+
+**Severity: Medium. Area: Web UI / design system. Status: Fixed 2026-09-05.
+Raised by the owner: keep the font size the same everywhere.**
+
+**Observed.** `app.css` defines a modular scale at 1.22 — `--text-2xs` 0.68
+through `--text-display` 1.82, nine steps — and the components in front of it
+used **63 distinct raw values across 554 declarations**. 0.72 beside 0.73 beside
+0.74 for the same line of secondary text; 0.78 alone appeared 76 times, 0.8
+fifty-four times, 0.82 fifty times, all meaning the same thing.
+
+It is the same defect as FIXED-401's icon sizes, three times larger: a scale was
+built, and nothing moved onto it. The result is a product that is not wrong
+anywhere and not uniform anywhere either, which is exactly the impression the
+owner reported.
+
+**Fix.** Every declaration mapped to its nearest step — 602 `font-size`
+declarations across 91 components, plus 9 `font:` shorthands that had a size
+baked into them. The migration was measured before it was applied: **533 of the
+554 move less than a pixel** at the 15px root, and the 21 that move more are
+headings being pulled onto the scale (the largest single change is 1.65rem →
+1.49rem).
+
+Four `clamp()` hero headings are left alone and are exempt in the checker. A
+fluid heading is a *range*, and a range cannot become a fixed step without
+losing the thing it exists for.
+
+`scripts/check-design-tokens.mjs` now fails on a hard-coded type size in a
+component style block, beside the raw-colour and dangling-token rules it already
+enforced. Verified both ways: it catches `font-size: 0.77rem` and passes a
+`clamp()`.
+
+**User-interface outcome.** Every page renders at 390 / 768 / 1280 / 1920, no
+route clips its own content, and every page renders in both explicit themes.
+
+## FIXED-405 — The element floor was a ceiling, and it painted the page out
+
+**Severity: High. Area: Web UI / shell. Status: Fixed 2026-09-05. Raised by the
+owner: why is the background opaque when the settings page is open, and the
+same with notifications.**
+
+**Observed.** Opening the settings window or the notification panel did not dim
+the page behind it — it **replaced** it. The sidebar, the top bar and the
+content were all still in the DOM, `display: flex`, `visibility: visible`,
+`opacity: 1`, at full viewport size, painted over by a flat opaque sheet.
+
+**Root cause, and it is not in either of those components.** Both dismiss layers
+are a `<button>` stretched over the viewport. `app.css` defines the element
+floor as `:where(button)`, and the comment above it promises exactly what
+`:where()` is for — *"`:where()` keeps this at zero specificity, so it is
+genuinely a floor: every `.btn-*` variant, every `.chip`, and every
+component-scoped `.menu button` still wins without anything being unpicked."*
+
+The three **state** rules did not honour that. They were written
+
+```css
+:where(button):hover:not(:disabled) { background: var(--sunken); }
+```
+
+with the pseudo-classes *outside* the `:where()`, which is (0,2,0) — not zero.
+That ties any component's own two-class rule and wins on source order. So the
+moment the pointer was anywhere on screen, the catch-all painted the full-screen
+catcher `--sunken` and the page disappeared. The scrim's own
+`background: var(--overlay)` was being overridden; `--overlay` resolved
+correctly on the element the whole time.
+
+**Why it survived everything.** It only appears on `:hover`, and it looks like a
+deliberate modal treatment rather than a defect. A four-width sweep, a
+both-themes sweep and a 26-route capture all walked past it.
+
+**Fix.** Each whole selector goes inside `:where()` —
+`:where(button:hover:not(:disabled))`, and the same for `:disabled` and
+`:focus-visible` — which restores the contract the comment already claimed. The
+settings scrim is the house 48% dim again; the notification catcher is genuinely
+transparent, which is right because that panel is not modal.
+
+**User-interface outcome.** Guarded by a mocked e2e test that moves the pointer
+onto each layer and asserts the computed colour. Confirmed to fail against the
+old selector, returning `rgb(241, 245, 249)`.
+
+## FIXED-406 — An `if` chain that works for two transports and stops at three
+
+**Severity: Medium. Area: Channels / messaging. Status: Fixed 2026-09-05. Raised
+by the owner: whether a messaging gateway's structure could build Raiker's
+channels.**
+
+**Observed.** Raiker had one reference webhook and, as of FIXED-402, a Telegram
+branch written as `if channel_type == "telegram"` inside
+`ExternalChannelExecutor`. That works for two transports and stops working at
+three — which is the point every messaging product reaches and has to answer.
+
+**Taken, and why.**
+
+*An adapter table keyed by channel type.* `raiker/channels/adapters.py` holds one
+adapter per channel type, each answering exactly two questions: what URL and body
+does a message become, and what did an inbound payload actually say. Everything
+that decides whether a message is *allowed* — the capability gate, the egress
+allowlist, the pairing, the sender allowlist, the per-sender budget, the
+redaction, the audit event, the owner's stored routing choice — sits outside and
+applies identically whichever adapter answers. **An adapter cannot widen any
+boundary**, which is what makes adding one a small reviewable change; a test
+asserts its public surface is those two methods and nothing else. The Telegram
+branch and the webhook body-builder both moved into it, and a channel type with
+no adapter now fails closed by name (`channel_transport_unsupported:slack`)
+rather than being attempted hopefully.
+
+*Declared environment.* A connector profile now declares which environment
+variables the transport needs — which variable, what it is for, where to get it,
+and **whether it is set** — and the Messaging page renders it on the connector.
+Never what it is set to: Raiker takes the name of a variable and reads it at use,
+and that holds on the way out too, which a test asserts against a live token
+value. It answers the question an owner actually has in front of a channel that
+will not send, which the guide could only answer if they went looking.
+
+**Deliberately not taken.** The surface of a chat client — streaming message
+edits, typing indicators, TTS handles, media caches, draft streaming, inline
+keyboards, per-chat message-length rules, platform locks. All of that is right
+for a product you hold a conversation *in*. A Raiker channel is a governed relay
+whose default routing is `record_only` and whose content is untrusted by
+definition, and every one of those features would have needed its own governance
+answer before it could ship.
+
+A plugin-directory model — a channel arriving as third-party code — was declined
+for the same kind of reason: it would have to answer to `plugin_execution` as
+well, which is a much larger question than the one being asked.
+
+**User-interface outcome.** The Telegram card lists its three required variables,
+each marked Set or Missing, with a link to BotFather for the token. 24 channel
+tests pass, including the unsupported-transport refusal, the adapter's public
+surface, and that a set token never appears in the channels read.
+
+## FIXED-407 — A gigabyte of downloads because the interpreter was Python 3.10
+
+**Severity: Medium. Area: Install / dependencies. Status: Fixed 2026-09-05.
+Raised by the owner: "it is downloading multiple binaries while setup", and then
+"it should not download multiple versions of same binary it doesn't make
+sense."**
+
+**Observed.** `python -m pip install -e ".[dev]"` on Windows printed a descending
+run of ruff wheels — `0.15.3`, `0.15.2`, `0.15.1`, `0.15.0`, `0.14.8` in the
+first report, and by the second report it had walked all the way to `0.6.3`,
+`0.6.2`, `0.6.1`, `0.6.0` — each ~9-11 MB, each fully downloaded and discarded.
+Then it started on PyYAML, then pytest, with `INFO: pip is looking at multiple
+versions of … to determine which version is compatible with other requirements`
+between them.
+
+**Root cause.** The second screenshot carried the answer the first one did not:
+`PyYAML-6.0.2-cp310-cp310-win_amd64.whl`. **`cp310` is CPython 3.10**, and
+Raiker declares `requires-python = ">=3.11"`.
+
+pip builds the project's metadata first and resolves the dependency tree second,
+and older pip does not check the root package's `Requires-Python` until after
+that resolution. On 3.10 there is no solution to find, so the resolver goes
+looking for one anyway — walking every dependency down to its floor, downloading
+each wheel to read the metadata inside, discarding it, and trying the version
+below. It ends in `ResolutionImpossible`, having spent a great deal of bandwidth
+to reach a conclusion that was available from `python --version`.
+
+**Reproduced, and measured.** Same project, same command, same Python 3.10; only
+pip differs:
+
+| pip | outcome |
+|---|---|
+| 23.0.1 (what `ensurepip` bundles for 3.10) | **382 MB in four minutes**, still going — ruff descending release by release, then watchfiles, uvicorn, types-pyyaml, sqlcipher3-wheels |
+| 26.2.1 | **1.2 MB**, `ERROR: Package 'raiker' requires a different Python: 3.10.20 not in '>=3.11'`, in about a second |
+
+For scale: a *correct* `.[dev]` resolution for `win_amd64` / cp311 is **54
+wheels, 49.1 MB in total**, of which `ruff` (10.1 MB) and `mypy` (10.6 MB) are
+the only two platform binaries.
+
+**A correction to the first attempt at this entry.** The first pass could not
+reproduce the backtracking and said so, and narrowed `ruff>=0.6` to `ruff>=0.15`
+on the reasoning that a floor admitting 110 releases of a 10 MB binary is the
+width of the worst case. That reasoning is still sound and the floor stays, but
+**it was not the fix and should not have been presented as most of one**: the
+resolver walks *every* package, so narrowing one leg moves the cost to the next.
+In the 200-second run above it got through 20 ruff wheels under the new floor and
+went straight on to watchfiles and uvicorn. The reason the first attempt could
+not reproduce the fault is that it only ever tested Python 3.11, where the
+resolution succeeds and there is nothing to reproduce.
+
+**Taken.**
+
+*The check runs before pip resolves anything.* `setup.py` — which did not exist —
+now compares `sys.version_info` against a `MINIMUM` and exits with a message
+naming the version found and the command that fixes it, per platform. The build
+backend runs before dependency resolution, so this is the earliest moment the
+answer can be given, and it costs no network at all. Measured against the real
+project on 3.10 with pip 23.0.1: **1.1 MB, zero ruff wheels, immediate**. It is
+also pip-version-independent, which the `--upgrade pip` step is not — that step
+only helps someone who runs it before hitting the problem.
+
+*`setup()` still takes no arguments.* Every piece of metadata continues to come
+from `pyproject.toml`. Wheels built with and without the file were compared:
+identical file lists (447 entries), identical `METADATA`, identical
+`entry_points.txt`. The guard adds a refusal and changes nothing about what is
+built.
+
+*The imports are ordered deliberately.* `setuptools` is imported **after** the
+check, not before, so that a future setuptools dropping this interpreter cannot
+put its own import error in front of the message. A test asserts that ordering
+in the file, because it is the kind of thing an autoformatter or a tidying pass
+would silently undo.
+
+*The declaration and the guard cannot drift.* `tests/test_python_version_guard.py`
+reads `requires-python` from `pyproject.toml` and `MINIMUM` from `setup.py` — by
+AST, without executing the module, since executing it would run a build rather
+than an assertion — and asserts they agree. Raising `requires-python` without
+updating the guard would otherwise restore the download storm for the newly
+unsupported version, silently. Verified to fail when `MINIMUM` is mutated.
+
+**Not taken.** Lowering `requires-python` to 3.10 to accommodate the interpreter
+that was actually in use. CI tests 3.11, the codebase uses 3.11 syntax, and
+`target-version = "py311"`; supporting 3.10 is a real piece of work and not what
+either report was asking for.
+
+**User-interface outcome.** No UI surface — the install path is the surface.
+[`README.md`](../../README.md) states the version requirement and how to check
+it; [`docs/guide/getting-started.md`](../guide/getting-started.md) checks
+`python --version` in Requirements and carries an *If the install downloads the
+same package over and over* section that shows the symptom as it actually
+appears, names `cp310` as the tell, gives the `py -3.11 -m venv` and
+`python3.11 -m venv` fixes, and prints the two-row pip measurement. 4 guard tests
+pass; ruff and mypy are clean.
+
+## FIXED-408 — One composer, three surfaces, and Design where it belongs
+
+**Severity: Medium. Area: Web UI / work surfaces. Status: Fixed 2026-09-05.
+Raised by the owner: use one composer for Chat, Build and Design; Design was
+meant to sit under Build in core navigation and behave like Chat.**
+
+**Observed.** Chat and Build each carried their own copy of the composer markup
+and roughly **thirty CSS selectors** for it, and the two copies had already
+drifted: one styled `.prompt-input`, the other `.composer-card textarea`; one let
+`.bar-left` wrap and the other did not; the compact rules that keep the model
+control legible below 1024px existed in Chat and nowhere else. None of that is
+visible in review, and all of it is visible as two pages that are *almost* the
+same shape.
+
+Design was a third shape again — a form with a textarea, two selects and a
+Generate button over a gallery grid — and sat last in the Core group beside
+Messaging, which put a making surface among the plumbing.
+
+**Taken.**
+
+*One frame.* `apps/web/src/lib/components/Composer.svelte` owns the card, the
+input, the two-row bar, the hint line and every breakpoint. A view supplies
+`above`, `left`, `right`, `footer` and `hint`, which is the part that genuinely
+differs: Build has a mode picker and a repository, Design has a size and a
+provider, Chat has neither. `.bar-select`, `.send` and `.composer-scope` moved to
+`app.css` because they sit on elements the *view* renders into the bar, where a
+component's scoped styles cannot reach them — which is exactly how two
+`.bar-select` definitions came to exist.
+
+*A hook rather than a leak.* Build carries six controls on the left where Chat
+has four and needs them to wrap where Chat's must not, so `Composer` takes a
+`cardClass` and Build overrides `:global(.composer-build .bar-left)`. The
+alternative — reaching into `.composer-card` globally — would have made every
+future override everyone's problem.
+
+*Design is a conversation.* It reads oldest to newest: the prompt as a bubble,
+the image or the refusal as the answer beneath it, and a refusal is a turn
+rather than an absence. It takes the same `work-surface` frame as Chat and Build
+and sits directly after Build in Core.
+
+**A guard that got stronger.** Two tests asserted the compact composer grammar
+was present *in both view files* — they guarded the duplication rather than
+removing it. They now assert the grammar exists once, in `Composer.svelte`, and
+that no view redefines `.composer-card`, `.composer-bar`, `.prompt-input`,
+`.bar-left` or `.bar-right`.
+
+**Two things the screenshot caught.** With no image-capable provider connected,
+the bar rendered two empty disabled pills — a control that looks broken rather
+than one that does not apply; each select is now rendered only when there is
+something to choose. And the mocked Playwright fixture had no `/api/images`
+route, so the route audit exercised Design's *error state* and passed, which is
+why the surface was never actually covered. The fixture now serves one
+generation and one refusal.
+
+**User-interface outcome.** 1295 web tests and the mocked Playwright suite pass;
+`svelte-check` reports 0 errors and 0 warnings, having flagged fourteen
+now-orphaned selectors during the move. Verified by screenshot at 1440×950.
+
+## FIXED-409 — Raiker could start at sign-in but had no icon to click
+
+**Severity: Medium. Area: Desktop integration / uninstall. Status: Fixed
+2026-09-05. Raised by the owner: a desktop launcher for the browser after
+installation, a system tray icon, and complete safe uninstalling even from a
+git install.**
+
+**Observed, and what already existed.** The tray icon was already there —
+`raiker/app/tray.py`, started by `raiker-app`, carrying status, Open Raiker,
+Pause/Resume, Restart and Quit. `raiker-app uninstall` already existed too, with
+a per-instance keep / export / erase choice stated before anything happened.
+
+What did not exist was a **launcher**. `raiker/app/service.py` registers the host
+to *start at sign-in*, which is a different thing: after a source install there
+was no entry in the applications menu, none in the Start Menu, none in
+Spotlight. The only way into a product whose entire surface is a browser page
+was a terminal.
+
+**Taken.**
+
+*`raiker/app/desktop_entry.py`*, following `service.py` exactly — the plan is a
+value that can be printed and asserted without touching the disk, everything is
+per-user, and a failed activation is reported rather than raised. A freedesktop
+`.desktop` file on Linux, a minimal `.app` bundle in `~/Applications` on macOS,
+and a Start Menu `.cmd` on Windows with a PowerShell-written `.lnk` beside it for
+the icon and the window style. `raiker-app desktop install|status|uninstall`.
+
+The entry runs bare `raiker-app` with no `--workspace`: an icon someone clicks a
+year from now should open their Raiker, not whichever directory the install
+command happened to run in.
+
+*Uninstall removes the launcher too*, before the data — the same ordering the
+service registration already had, so an interrupted erase cannot leave a menu
+icon pointing at a half-removed workspace. The Windows `.lnk` is created by the
+activation step rather than written as a file, so it is named explicitly in the
+removal or it would survive one.
+
+*A source checkout is named, not deleted.* `pip uninstall raiker` removes a link
+and leaves a directory: on this machine that is 167.7 MB of `node_modules`, a
+5.7 MB `build/`, a 4.9 MB `dist/`, and a 230.6 MB `.venv`. The plan now names
+every one with its size. **They are not removed by default** — they are in the
+owner's repository, and deleting out of a git checkout because Raiker happens to
+be running from it exceeds anything "uninstall Raiker" can be read to mean.
+`--source-artifacts` opts in; the checkout and its virtual environment are never
+removed at all.
+
+**A bug the tests found before it shipped.** Checkout detection was initially
+unconditional, so `plan_uninstall` in any test took *the repository the test
+runner was executing from* as its subject — and `apply_uninstall` would have
+deleted the repo's own `node_modules` during a test run. Detection is now
+injectable (`checkout=`, `detect_source=`), which is what made the safe default
+testable rather than merely intended.
+
+**User-interface outcome.** No web surface. 16 launcher tests pass, each
+per-platform artefact asserted on every platform (the plist is parsed with
+`plistlib`, the `.desktop` Exec line is checked against a path with a space and
+one with a `%`); `raiker-app desktop install|status|uninstall` verified end to
+end on this machine, including the degraded path where `update-desktop-database`
+is absent — reported, not raised, entry still written.
+
+## FIXED-410 — The Design model picker was empty on every real install
+
+**Severity: High. Area: Design / models. Status: Fixed 2026-09-05. Raised by the
+owner: why does the Design composer not have the model selector, and the
+dropdown should identify and only show models that can generate images.**
+
+**Observed.** The Design composer had no model control. FIXED-408 had made that
+worse by hiding the select when it was empty — but the select was empty for a
+reason no amount of hiding would fix.
+
+**Root cause: the field was never sent.** `image_model` is declared on two
+profiles in `model-profiles.json`, and `DesignView` read `profile.image_model`
+off every profile in `/api/models`. `ModelProfileView` — the dataclass that *is*
+that response — had no such field. Every profile answered `undefined`, so the
+list of image-capable providers was empty on **every real install**, and had
+been since the surface shipped. The one fixture that might have caught it
+declared no image provider either, so the mocked route audit rendered an empty
+control and passed.
+
+`grep image_model raiker/**/*.py` returns exactly two hits, both inside the
+executor. Nothing in between ever carried it.
+
+**Three defects, one shape.**
+
+*It was a provider picker wearing a model picker's clothes.* `image_model` is a
+single string, so a provider offering two image models could expose one of them
+and the control could only ever say "OpenAI". Profiles now declare
+`image_models` — a list, default first — and the composer lists one entry per
+*model*, labelled `provider · model`.
+
+*Image models were offered as chat models.* `modelPresentation.ts` already had a
+`NOT_A_CHAT_MODEL` list to keep non-chat endpoint families out of the pickers. It
+knew `dall-e` and nothing else, so `gpt-image-1` and `gemini-2.5-flash-image` —
+the two models Raiker itself declares for images — were both offered in Chat and
+Build, where they cannot answer a turn. One `IS_AN_IMAGE_MODEL` list is now read
+in both directions: Design offers exactly these, the chat pickers exclude them,
+and the two rules cannot drift because they are the same list.
+
+`imageCandidates` deliberately has no empty-list fallback where `chatCandidates`
+does. There, offering too much beats offering nothing; here a Generate button
+pointed at a model that cannot draw is worse than an honest empty state.
+
+*A chosen model was unbounded.* The executor already read
+`action.arguments["model"]`, with nothing above it ever setting it — so wiring
+the picker would have made it a free-text string posted to a provider, which is
+the exact objection that bounds `SUPPORTED_SIZES` and builds the URL from the
+profile. It is now refused unless the profile declares it
+(`image_model_not_declared:<model>`), and a test asserts the provider is never
+reached.
+
+**The empty state.** The control is always rendered. With nothing connected it
+reads "No image model — connect one" and links to Models, because hiding it made
+*"no image model is connected"* indistinguishable from *"this page has no model
+control"* — and the second reading is the one the owner actually reached.
+
+**User-interface outcome.** The composer shows "OpenAI · GPT Image 1", verified
+by screenshot. 17 image tests and 17 model-presentation tests pass, including a
+regression test for the chat-picker leak; the mocked fixture now declares an
+image-capable provider so the route audit exercises a populated control. The
+serialisation guard was confirmed to fail when the builder line is removed.

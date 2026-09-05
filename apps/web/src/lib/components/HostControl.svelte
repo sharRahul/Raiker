@@ -246,7 +246,7 @@
             disabled={checking}
             onclick={() => checkForUpdates()}
           >
-            <Icon name="refresh" size={14} /> {checking ? "Checking…" : "Check for updates"}
+            <Icon name="refresh" size="sm" /> {checking ? "Checking…" : "Check for updates"}
           </button>
         {/if}
       </div>
@@ -262,11 +262,11 @@
       <div class="actions">
         {#if host?.paused}
           <button type="button" class="btn btn-soft btn-sm" disabled={busy} onclick={() => act("resume")}>
-            <Icon name="play" size={14} /> Resume
+            <Icon name="play" size="sm" /> Resume
           </button>
         {:else}
           <button type="button" class="btn btn-sm" disabled={busy} onclick={() => act("pause")}>
-            <Icon name="hand" size={14} /> Pause
+            <Icon name="hand" size="sm" /> Pause
           </button>
         {/if}
         <button
@@ -276,10 +276,10 @@
           title={host?.restartable ? undefined : "Raiker is not registered to start in the background, so nothing would start it again."}
           onclick={() => act("restart", confirming === "restart")}
         >
-          <Icon name="refresh" size={14} /> Restart
+          <Icon name="refresh" size="sm" /> Restart
         </button>
         <button type="button" class="btn btn-danger btn-sm" disabled={busy} onclick={() => act("quit", confirming === "quit")}>
-          <Icon name="stop" size={14} /> Quit
+          <Icon name="stop" size="sm" /> Quit
         </button>
       </div>
       <p class="foot">Pause stops new scheduled work. A run you have already approved still finishes.</p>
@@ -289,7 +289,7 @@
 
 <style>
   .host-wrap { position: relative; }
-  .host-btn { padding: 0.35rem 0.55rem; gap: 0.35rem; font-size: 0.76rem; }
+  .host-btn { padding: 0.35rem 0.55rem; gap: 0.35rem; font-size: var(--text-xs); }
   .host-state { text-transform: capitalize; }
   .dot { width: 0.5rem; height: 0.5rem; border-radius: var(--r-pill); background: var(--text-3); }
   .dot.tone-ok { background: var(--ok); }
@@ -305,30 +305,30 @@
   }
   .panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
   .state-pill {
-    font-size: 0.7rem; font-weight: 700; text-transform: capitalize;
+    font-size: var(--text-2xs); font-weight: 700; text-transform: capitalize;
     padding: 0.1rem 0.5rem; border-radius: var(--r-pill);
     background: var(--neutral-soft); border: 1px solid var(--neutral-border); color: var(--text-2);
   }
   .state-pill.tone-ok { background: var(--ok-soft); border-color: var(--ok-border); color: var(--ok); }
   .state-pill.tone-warn { background: var(--warn-soft); border-color: var(--warn-border); color: var(--warn); }
   .state-pill.tone-danger { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger); }
-  .detail, .quiet, .foot { margin: 0; color: var(--text-2); font-size: 0.8rem; }
-  .foot { color: var(--text-3); font-size: 0.72rem; }
-  .work h4, .build h4 { margin: 0 0 0.35rem; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); }
+  .detail, .quiet, .foot { margin: 0; color: var(--text-2); font-size: var(--text-sm); }
+  .foot { color: var(--text-3); font-size: var(--text-xs); }
+  .work h4, .build h4 { margin: 0 0 0.35rem; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); }
   .build { display: grid; gap: 0.4rem; border-top: 1px solid var(--border); padding-top: var(--space-3); }
   .build dd { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
-  .build-version { font-size: 0.74rem; color: var(--text-2); }
-  .build-message { font-size: 0.76rem; }
+  .build-version { font-size: var(--text-xs); color: var(--text-2); }
+  .build-message { font-size: var(--text-xs); }
   .build a { color: inherit; }
   .check-updates { justify-self: start; }
   .work ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
-  .work li { display: grid; gap: 0.1rem; font-size: 0.8rem; }
-  .work li span { color: var(--text-2); font-size: 0.74rem; }
+  .work li { display: grid; gap: 0.1rem; font-size: var(--text-sm); }
+  .work li span { color: var(--text-2); font-size: var(--text-xs); }
   .confirm {
-    margin: 0; font-size: 0.78rem; padding: 0.45rem 0.6rem; border-radius: var(--r-sm);
+    margin: 0; font-size: var(--text-sm); padding: 0.45rem 0.6rem; border-radius: var(--r-sm);
     background: var(--warn-soft); border: 1px solid var(--warn-border); color: var(--text-1);
   }
-  .notice { margin: 0; font-size: 0.78rem; color: var(--text-2); }
+  .notice { margin: 0; font-size: var(--text-sm); color: var(--text-2); }
   .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
   @media (max-width: 720px) {
     .host-state { display: none; }

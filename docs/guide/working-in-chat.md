@@ -607,8 +607,8 @@ the expensive direction.
 
 Every rate lives in an effective-dated registry, so what a turn cost on the day
 it ran stays reproducible after a provider changes its prices. The **Models**
-page is split by what you came to do — **Providers**, **Routing**, **Pricing**,
-**Posture** — and its **Pricing** tab shows the whole registry: the exact model id each rate belongs to, its
+page is split by what you came to do — **Local**, **Hosted**, **Routing**,
+**Pricing** — and its **Pricing** tab shows the whole registry: the exact model id each rate belongs to, its
 source, when it took effect, its full change history, and — per provider — when
 prices were last synchronised, when the next refresh is due, and whether the
 current reading is stale. Recording an override needs the runtime gate-manager

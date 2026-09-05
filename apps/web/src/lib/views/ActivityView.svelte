@@ -127,11 +127,11 @@
       aria-expanded={exportPanelOpen}
       aria-controls="audit-export-panel"
     >
-      <Icon name="download" size={15} />
+      <Icon name="download" size="sm" />
       Export
     </button>
     <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh events">
-      <Icon name="refresh" size={15} />
+      <Icon name="refresh" size="sm" />
       Refresh
     </button>
   </div>
@@ -297,7 +297,7 @@
   }
   .export-card h2 {
     margin: 0;
-    font-size: 0.95rem;
+    font-size: var(--text-md);
   }
   .export-list {
     list-style: none;
@@ -312,14 +312,14 @@
     align-items: center;
     gap: var(--space-3);
     flex-wrap: wrap;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
   .export-list .hash {
     color: var(--text-3);
   }
   .quiet {
     color: var(--text-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     margin: 0;
   }
   .head-row {
@@ -352,12 +352,12 @@
   }
   .actor,
   .ids {
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
     white-space: nowrap;
   }
   .risk {
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     border-radius: var(--r-pill);
     padding: 0.05rem 0.5rem;

@@ -76,7 +76,7 @@
   }
   .mode-btn {
     font: inherit;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     color: var(--text-2);
     background: transparent;

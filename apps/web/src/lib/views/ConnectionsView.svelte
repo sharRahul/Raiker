@@ -189,18 +189,18 @@
 <div class="header">
   <GuideLink route="connections" />
   <button class="btn" onclick={() => (showManifest = true)}
-    ><Icon name="file" size={15} /> Import manifest</button
+    ><Icon name="file" size="sm" /> Import manifest</button
   >
 </div>
 <div class="controls">
   <label class="search"
-    ><Icon name="search" size={17} /><span class="sr-only"
+    ><Icon name="search" size="md" /><span class="sr-only"
       >Search connectors</span
     ><input bind:value={query} placeholder="Search connectors" /></label
   ><label
     ><input type="checkbox" bind:checked={installedOnly} /> Installed</label
   ><button class="icon" aria-label="Refresh connectors" onclick={load}
-    ><Icon name="refresh" size={17} /></button
+    ><Icon name="refresh" size="md" /></button
   >
 </div>
 <div
@@ -218,7 +218,7 @@
 
 {#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
 {#if view && !view.vault_configured}<div class="notice notice-warn">
-    <Icon name="lock" size={16} /> Configure
+    <Icon name="lock" size="md" /> Configure
     <code>RAIKER_CONNECTOR_VAULT_KEY</code> before linking accounts. Credentials fail
     closed without it.
   </div>{/if}
@@ -274,7 +274,7 @@
       tabindex="-1"
     >
       <button class="close" aria-label="Close" onclick={() => (selected = null)}
-        ><Icon name="x" size={18} /></button
+        ><Icon name="x" size="md" /></button
       >
       <div class="detail-head">
         <span class="logo">{selected.display_name[0]}</span>
@@ -322,7 +322,7 @@
               onclick={() => authenticate(selected!)}
               disabled={busy || !secret}>Connect</button
             >{:else}<div class="notice notice-ok">
-              <Icon name="check" size={15} /> Account connected
+              <Icon name="check" size="sm" /> Account connected
             </div>{/if}
         </section>
         <section>
@@ -388,7 +388,7 @@
         class="close"
         aria-label="Close"
         onclick={() => (mcpConnector = null)}
-        ><Icon name="x" size={18} /></button
+        ><Icon name="x" size="md" /></button
       >
       <h2 id="mcp-title">Connect {mcpConnector.display_name} via MCP</h2>
       <p>
@@ -462,7 +462,7 @@
         class="close"
         aria-label="Close"
         onclick={() => (showManifest = false)}
-        ><Icon name="x" size={18} /></button
+        ><Icon name="x" size="md" /></button
       >
       <h2 id="manifest-title">Register connector manifest</h2>
       <p>
@@ -540,7 +540,7 @@
     font: inherit;
   }
   .controls > label {
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .icon,
@@ -591,7 +591,7 @@
     border-radius: 8px;
     color: var(--accent);
     background: var(--accent-soft);
-    font-size: 1.05rem;
+    font-size: var(--text-base);
     font-weight: 800;
   }
   .title {
@@ -600,14 +600,14 @@
   }
   .title small {
     color: var(--text-3);
-    font-size: 0.65rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
   }
   .description {
     display: block;
     margin-top: 0.35rem;
     color: var(--text-2);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
   footer {
     padding: 0.65rem var(--space-4);
@@ -618,7 +618,7 @@
     align-items: center;
     gap: 0.4rem;
     color: var(--text-3);
-    font-size: 0.73rem;
+    font-size: var(--text-xs);
     font-weight: 600;
   }
   .status i {
@@ -671,7 +671,7 @@
     padding: 0.75rem;
     background: var(--sunken);
     border-radius: var(--r-sm);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
   .state span {
     color: var(--text-2);
@@ -692,14 +692,14 @@
   }
   .operations { list-style: none; margin: .75rem 0 0; padding: 0; display: grid; gap: .45rem; }
   .operations li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .65rem; padding: .65rem; border: 1px solid var(--border); border-radius: var(--r-sm); }
-  .method { min-width: 3rem; color: var(--ok); font: 700 .68rem var(--font-mono); }
+  .method { min-width: 3rem; color: var(--ok); font: 700 var(--text-2xs) var(--font-mono); }
   .method.write { color: var(--warn); }
   .operation-copy strong, .operation-copy small { display: block; }
-  .operation-copy small { margin-top: .15rem; color: var(--text-3); font: .68rem var(--font-mono); }
+  .operation-copy small { margin-top: .15rem; color: var(--text-3); font: var(--text-2xs) var(--font-mono); }
   .manifest {
     min-height: 220px;
     font-family: var(--font-mono);
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
   }
   .actions {
     justify-content: flex-end;

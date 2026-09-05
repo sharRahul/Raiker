@@ -60,7 +60,7 @@
 {#if loading || source !== null}
   <section class="source-panel" aria-label="Cited source">
     <header>
-      <span class="eyebrow"><Icon name="quote" size={13} /> Source</span>
+      <span class="eyebrow"><Icon name="quote" size="sm" /> Source</span>
       {#if source !== null}
         <strong>{source.title}</strong>
         <!-- The locator repeats the title for a file source; saying the same
@@ -70,7 +70,7 @@
         {/if}
       {/if}
       <button type="button" class="btn btn-ghost btn-sm" onclick={onclose} aria-label="Close source">
-        <Icon name="x" size={14} />
+        <Icon name="x" size="sm" />
       </button>
     </header>
     {#if loading}

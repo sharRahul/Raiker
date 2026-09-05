@@ -307,12 +307,12 @@
      this page opens with its own state. -->
 <div class="header">
   <GuideLink section="extensions-and-mcp" label="How MCP servers work" />
-  <button class="icon" aria-label="Refresh servers" onclick={load}><Icon name="refresh" size={17} /></button>
+  <button class="icon" aria-label="Refresh servers" onclick={load}><Icon name="refresh" size="md" /></button>
 </div>
 
 {#each blocks as block (block.reason)}
   <div class="notice notice-warn" role="status">
-    <Icon name="warning" size={16} />
+    <Icon name="warning" size="md" />
     <span>
       {block.reason}
       {#if block.action}{block.action}{/if}
@@ -323,7 +323,7 @@
 
 {#if accessBlock}
   <div class="notice notice-warn" role="status">
-    <Icon name="warning" size={16} />
+    <Icon name="warning" size="md" />
     <span>
       {accessBlock.text}
       {accessBlock.action}
@@ -334,7 +334,7 @@
   </div>
 {:else if agentAccess?.callable && agentAccess.projected_tools > 0}
   <div class="notice notice-ok" role="status">
-    <Icon name="check" size={15} />
+    <Icon name="check" size="sm" />
     <span>
       {agentAccess.projected_tools}
       {agentAccess.projected_tools === 1 ? "tool is" : "tools are"} available to Raiker in Chat and Build
@@ -344,7 +344,7 @@
 {/if}
 
 {#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
-{#if notice}<div class="notice notice-ok"><Icon name="check" size={15} /> {notice}</div>{/if}
+{#if notice}<div class="notice notice-ok"><Icon name="check" size="sm" /> {notice}</div>{/if}
 <NotificationCenter {notifications} />
 
 <form class="create" onsubmit={create}>
@@ -533,41 +533,41 @@
   .notice a { color: var(--accent); font-weight: 600; }
   .create { display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); margin-bottom: var(--space-4); }
   .field { display: flex; flex-direction: column; gap: 0.35rem; }
-  .field-label { font-size: 0.75rem; font-weight: 600; color: var(--text-2); }
+  .field-label { font-size: var(--text-xs); font-weight: 600; color: var(--text-2); }
   .input { min-width: 16rem; }
   .rename { min-width: 12rem; }
   .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
   .card { border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); padding: var(--space-4); }
   .top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
   .name-block { display: flex; align-items: center; gap: 0.7rem; }
-  .name { font-weight: 700; font-size: 1rem; }
-  .status { display: flex; align-items: center; gap: 0.4rem; color: var(--text-3); font-size: 0.73rem; font-weight: 600; }
+  .name { font-weight: 700; font-size: var(--text-base); }
+  .status { display: flex; align-items: center; gap: 0.4rem; color: var(--text-3); font-size: var(--text-xs); font-weight: 600; }
   .status i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .status.connected { color: var(--ok); }
   .status.danger { color: var(--danger); }
   .actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }
   .meta { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: var(--space-3) 0 0; }
   .meta div { display: flex; flex-direction: column; gap: 0.15rem; }
-  .meta dt { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); }
-  .meta dd { margin: 0; font-size: 0.82rem; color: var(--text-2); }
-  .meta code { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-1); background: var(--sunken); padding: 0.1rem 0.4rem; border-radius: 4px; }
+  .meta dt { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); }
+  .meta dd { margin: 0; font-size: var(--text-sm); color: var(--text-2); }
+  .meta code { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-1); background: var(--sunken); padding: 0.1rem 0.4rem; border-radius: 4px; }
   .tools { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
   .monitor { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
   .monitor-banner { margin: var(--space-3) 0 0; }
-  .finding { font-size: .75rem; font-weight: 600; padding: .2rem .6rem; border-radius: 999px; background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-border); }
+  .finding { font-size: var(--text-xs); font-weight: 600; padding: .2rem .6rem; border-radius: 999px; background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-border); }
   .unsupported { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: grid; gap: 0.2rem; }
-  .unsupported li { font-size: 0.76rem; color: var(--text-3); }
+  .unsupported li { font-size: var(--text-xs); color: var(--text-3); }
   .unsupported .feature { font-family: var(--font-mono, monospace); color: var(--text-2); }
   .declared { margin: var(--space-2) 0 0; display: grid; gap: 0.25rem; }
-  .declared div { display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: 0.78rem; }
+  .declared div { display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: var(--text-sm); }
   .declared dt { font-family: var(--font-mono, monospace); color: var(--text-2); }
   .declared dd { margin: 0; color: var(--text-3); }
-  .tools-label { font-size: 0.72rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
-  .chip { font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border); }
-  .muted { color: var(--text-3); font-size: 0.8rem; }
-  .reach { font-size: .72rem; font-weight: 600; padding: .2rem .6rem; border-radius: 999px; background: var(--warn-soft, var(--sunken)); color: var(--warn); border: 1px solid var(--border); }
+  .tools-label { font-size: var(--text-xs); font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+  .chip { font-size: var(--text-xs); font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border); }
+  .muted { color: var(--text-3); font-size: var(--text-sm); }
+  .reach { font-size: var(--text-xs); font-weight: 600; padding: .2rem .6rem; border-radius: 999px; background: var(--warn-soft, var(--sunken)); color: var(--warn); border: 1px solid var(--border); }
   .reach.ok { background: var(--ok-soft, var(--sunken)); color: var(--ok); }
-  .notice code { font-family: var(--font-mono); font-size: 0.78rem; background: var(--sunken); padding: 0.05rem 0.35rem; border-radius: 4px; }
+  .notice code { font-family: var(--font-mono); font-size: var(--text-sm); background: var(--sunken); padding: 0.05rem 0.35rem; border-radius: 4px; }
   .loading, .empty { padding: 2.5rem; text-align: center; color: var(--text-3); }
   .empty { border: 1px dashed var(--border); border-radius: var(--r-sm); }
   @media (max-width: 640px) {
@@ -586,8 +586,8 @@
     border-radius: var(--r-md);
     background: var(--sunken);
   }
-  .offers h3 { margin: 0 0 0.2rem; font-size: 0.95rem; }
-  .offers-lead { margin: 0; color: var(--text-2); font-size: 0.84rem; max-width: 60ch; }
+  .offers h3 { margin: 0 0 0.2rem; font-size: var(--text-md); }
+  .offers-lead { margin: 0; color: var(--text-2); font-size: var(--text-sm); max-width: 60ch; }
   .offer-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: var(--space-2); }
   .offer-list > li {
     display: flex;
@@ -601,8 +601,8 @@
     background: var(--surface);
   }
   .offer-copy { display: grid; gap: 0.15rem; min-width: 0; }
-  .offer-meta { color: var(--text-2); font-size: 0.8rem; overflow-wrap: anywhere; }
-  .offer-added { color: var(--text-3); font-size: 0.8rem; font-weight: 650; align-self: center; }
+  .offer-meta { color: var(--text-2); font-size: var(--text-sm); overflow-wrap: anywhere; }
+  .offer-added { color: var(--text-3); font-size: var(--text-sm); font-weight: 650; align-self: center; }
   @media (max-width: 40rem) {
     .offer-list > li { flex-direction: column; align-items: stretch; }
   }

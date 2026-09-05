@@ -398,7 +398,7 @@
     padding: 18px 4px;
   }
   .search-hero h2 {
-    font-size: 1.65rem;
+    font-size: var(--text-2xl);
     margin: 2px 0 6px;
   }
   .search-hero p {
@@ -412,8 +412,8 @@
     width: 52px;
     height: 52px;
     border-radius: 13px;
-    background: #ffd21e;
-    color: #171717;
+    background: var(--brand-huggingface);
+    color: var(--brand-black);
     font-weight: 850;
   }
   .token-card {
@@ -431,7 +431,7 @@
     grid-column: 1/-1;
     margin: 0;
     color: var(--text-muted);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
   }
   .search-box {
     display: grid;
@@ -445,7 +445,7 @@
   .search-box input {
     border: 0;
     background: transparent;
-    font-size: 1rem;
+    font-size: var(--text-base);
   }
   .catalogue {
     display: grid;
@@ -473,11 +473,11 @@
   }
   .results > button:hover,
   .results > button.selected {
-    background: var(--surface-raised, #f5f6f8);
+    background: var(--surface-raised);
   }
   .repo {
     font:
-      650 0.9rem ui-monospace,
+      650 var(--text-md) ui-monospace,
       monospace;
   }
   .results small,
@@ -485,8 +485,8 @@
     color: var(--text-muted);
   }
   .results em {
-    color: #a16207;
-    font-size: 0.75rem;
+    color: var(--warn);
+    font-size: var(--text-xs);
   }
   .variants > header {
     padding: 18px;
@@ -509,8 +509,8 @@
     color: inherit;
   }
   .variant-list button.selected {
-    box-shadow: inset 3px 0 #2563eb;
-    background: var(--surface-raised, #f5f6f8);
+    box-shadow: inset 3px 0 var(--accent);
+    background: var(--surface-raised);
   }
   .variant-list button span {
     display: grid;
@@ -524,7 +524,7 @@
   }
   .results-lead {
     color: var(--text-3);
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     margin: 0 0 8px;
   }
   .empty {
@@ -548,10 +548,10 @@
     gap: 18px;
     align-items: end;
     padding: 20px;
-    border-top: 3px solid #2563eb;
+    border-top: 3px solid var(--accent);
   }
   .conversion-card {
-    border-top-color: #7c3aed;
+    border-top-color: var(--brand);
   }
   .download-drawer h3,
   .conversion-card h3 {
@@ -574,7 +574,7 @@
     color: var(--text-muted);
   }
   .notice {
-    color: var(--success, #15803d);
+    color: var(--success);
   }
   .curated-embedding {
     display: flex;
@@ -582,7 +582,7 @@
     justify-content: space-between;
     gap: 18px;
     padding: 16px 18px;
-    border-left: 3px solid var(--accent, #2563eb);
+    border-left: 3px solid var(--accent);
   }
   .curated-embedding p {
     margin: 3px 0 0;

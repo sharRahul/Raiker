@@ -37,6 +37,29 @@
   let loadError = $state<string | null>(null);
   let search = $state("");
   let expanded = $state<string | null>(null);
+
+  /**
+   * Domain groups the owner has folded away.
+   *
+   * The registry holds 66 gates across a dozen domains and every one of them
+   * rendered expanded, so finding the capability you came for meant scrolling
+   * past every capability you did not. Collapsed by name rather than by index,
+   * so filtering the list does not fold a different group than the one that was
+   * closed.
+   *
+   * A search overrides it: typing is asking to see matches, and answering that
+   * with a folded group would be the page arguing with the query.
+   */
+  let collapsedDomains = $state<string[]>([]);
+  const searching = $derived(search.trim() !== "");
+  function isCollapsed(domain: string): boolean {
+    return !searching && collapsedDomains.includes(domain);
+  }
+  function toggleDomain(domain: string) {
+    collapsedDomains = collapsedDomains.includes(domain)
+      ? collapsedDomains.filter((d) => d !== domain)
+      : [...collapsedDomains, domain];
+  }
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
 
   // The per-capability decision mode is the primary control here. It arrives inline
@@ -310,7 +333,7 @@
 
 {#if integratedButOff > 0}
   <div class="runtime-note" role="note">
-    <Icon name="info" size={16} />
+    <Icon name="info" size="md" />
     <!-- Five lines teaching the fail-closed model, on a page that already links
          to the guide section that teaches it. What is left is the one fact this
          page must state about its own rows, and the one route it is not. -->
@@ -334,7 +357,7 @@
 
 <div class="toolbar">
   <div class="search">
-    <Icon name="search" size={15} />
+    <Icon name="search" size="sm" />
     <label class="sr-only" for="cap-search">Search capabilities</label>
     <input
       id="cap-search"
@@ -345,7 +368,7 @@
     />
   </div>
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh capabilities">
-    <Icon name="refresh" size={15} />
+    <Icon name="refresh" size="sm" />
     Refresh
   </button>
 </div>
@@ -367,8 +390,21 @@
           />
           {group.domain}
         </label>
+        <button
+          type="button"
+          class="phase-fold"
+          aria-expanded={!isCollapsed(group.domain)}
+          onclick={() => toggleDomain(group.domain)}
+        >
+          <span class="phase-count">{group.gates.length}</span>
+          <Icon name={isCollapsed(group.domain) ? "chevron-right" : "chevron-down"} size="sm" />
+          <span class="sr-only">
+            {isCollapsed(group.domain) ? "Show" : "Hide"}
+            {group.domain} capabilities
+          </span>
+        </button>
       </div>
-      {#each group.gates as gate (gate.capability)}
+      {#each isCollapsed(group.domain) ? [] : group.gates as gate (gate.capability)}
         {@const isOpen = expanded === gate.capability}
         {@const mode = modeFor(gate)}
         <div class="cap card" class:open={isOpen}>
@@ -387,7 +423,7 @@
               onclick={() => toggleExpand(gate.capability)}
             >
               <span class="chev" aria-hidden="true">
-                <Icon name={isOpen ? "chevron-down" : "chevron-right"} size={15} />
+                <Icon name={isOpen ? "chevron-down" : "chevron-right"} size="sm" />
               </span>
               <span class="cap-name">
                 <span class="cap-label">{capabilityLabel(gate.capability)}</span>
@@ -519,7 +555,7 @@
   }
   .search-input {
     font: inherit;
-    font-size: 0.88rem;
+    font-size: var(--text-md);
     border: none;
     background: transparent;
     color: var(--text-1);
@@ -534,13 +570,16 @@
     gap: var(--space-2);
     margin-bottom: var(--space-2);
   }
-  .phase-head { padding: 0 0.9rem 0.3rem; }
-  .phase-select-all { display:flex; align-items:center; gap:0.4rem; font-size:0.72rem; font-weight:650; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); cursor:pointer; }
+  .phase-head { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding: 0 0.9rem 0.3rem; }
+  .phase-fold { display:flex; align-items:center; gap:0.35rem; border:0; padding:0.15rem 0.2rem; background:transparent; color:var(--text-3); cursor:pointer; }
+  .phase-fold:hover { color: var(--text-1); }
+  .phase-count { font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
+  .phase-select-all { display:flex; align-items:center; gap:0.4rem; font-size:var(--text-xs); font-weight:650; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); cursor:pointer; }
   .phase-select-all input { accent-color: var(--accent); }
   .cap-check { accent-color: var(--accent); flex:0 0 auto; }
   .bulk-bar { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; padding:0.55rem 0.9rem; border:1px solid var(--accent-border); border-radius:var(--r-md); background:var(--accent-soft); margin-bottom:var(--space-4); }
-  .bulk-count { font-weight:700; color:var(--accent); font-size:0.86rem; }
-  .bulk-label { color:var(--text-3); font-size:0.78rem; margin-left:0.3rem; }
+  .bulk-count { font-weight:700; color:var(--accent); font-size:var(--text-sm); }
+  .bulk-label { color:var(--text-3); font-size:var(--text-sm); margin-left:0.3rem; }
   .cap {
     padding: 0;
     overflow: hidden;
@@ -590,7 +629,7 @@
   /* GEP-04 — a switch that does not govern its own capability says so in the
      row, before the owner opens the card. Text, not colour alone. */
   .cap-reality {
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
@@ -608,7 +647,7 @@
     border-color: var(--accent-border, var(--accent));
   }
   .cap-reality-note {
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
     margin: 0 0 0.5rem;
     padding: 0.5rem 0.6rem;
@@ -625,12 +664,12 @@
     background: var(--sunken);
   }
   .cap-desc {
-    font-size: 0.88rem;
+    font-size: var(--text-md);
     color: var(--text-2);
     margin: 0 0 0.4rem;
   }
   .mode-hint {
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--text-3);
     margin: 0 0 var(--space-3);
   }
@@ -642,7 +681,7 @@
   }
   .muted {
     color: var(--text-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
   .runtime-note {
     display: flex;
@@ -654,7 +693,7 @@
     border-radius: var(--r-md);
     background: var(--accent-soft);
     color: var(--text-2);
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
   }
   .runtime-note a {
     color: var(--accent);

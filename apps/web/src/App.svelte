@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
   import Topbar from "./lib/components/Topbar.svelte";
+  import AllPagesDialog from "./lib/components/AllPagesDialog.svelte";
   import ResponsivePage from "./lib/components/ResponsivePage.svelte";
   import {
     DEFAULT_ROUTE,
@@ -53,9 +54,20 @@
   let desktopNavigationOpen = $state(true);
   let navigationDrawerOpen = $state(false);
   let navigationTrigger = $state<HTMLElement | null>(null);
+  // The gear's window. Manage, Observe and Support left the sidebar for it, so
+  // this is the only place several destinations are linked from — `nav.ts`
+  // still holds them all, because routing resolves against that list.
+  let allPagesOpen = $state(false);
+  let allPagesTrigger = $state<HTMLElement | null>(null);
+  function openAllPages(trigger: HTMLElement) {
+    allPagesTrigger = trigger;
+    allPagesOpen = !allPagesOpen;
+  }
   let appMain = $state<HTMLElement>();
   const pageLayout = $derived(
-    current === "new-chat" || current === "build"
+    // Design joins Chat and Build here: all three are a transcript that fills
+    // the room the shell gives it, with a composer on the floor of the page.
+    current === "new-chat" || current === "build" || current === "design"
       ? "work-surface" as const
       : current === "search-chat" || current === "guide"
         ? "reading" as const
@@ -230,6 +242,13 @@
         navigationOpen={compactNavigation ? navigationDrawerOpen : desktopNavigationOpen}
         {compactNavigation}
         onNavigationToggle={toggleNavigation}
+        onOpenAllPages={openAllPages}
+      />
+      <AllPagesDialog
+        open={allPagesOpen}
+        {current}
+        returnFocusTo={allPagesTrigger}
+        onClose={() => (allPagesOpen = false)}
       />
       <main id="main" class="content" tabindex="-1">
         <!-- The topbar already shows the route title + hint; the page itself
@@ -299,6 +318,10 @@
               route="extensions"
               props={{ tab: currentTab ?? "connectors" }}
             />
+          {:else if current === "messaging"}
+            <LazyRoute route="messaging" />
+          {:else if current === "design"}
+            <LazyRoute route="design" />
           {:else if current === "guide"}
             <LazyRoute route="guide" props={{ section: currentSection }} />
           {:else if current === "observe"}

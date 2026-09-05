@@ -22,6 +22,14 @@ import { describe, expect, it } from "vitest";
 
 const STACKED = /@media \(max-width: 63\.9rem\)\s*\{([\s\S]*?)\n {2}\}/;
 
+/** The one composer frame every conversation surface renders. */
+function composerSource(): string {
+  return readFileSync(
+    resolve(process.cwd(), "src", "lib", "components", "Composer.svelte"),
+    "utf8",
+  );
+}
+
 function stackedBlock(view: string): string {
   const source = readFileSync(resolve(process.cwd(), "src", "lib", "views", view), "utf8");
   const match = STACKED.exec(source);
@@ -45,18 +53,31 @@ describe("stacked conversation layout", () => {
     expect(block).toMatch(/\.rail-slot\.drawer \{[\s\S]*?inset: 0 0 0 auto;/);
   });
 
-  it("uses the same compact composer grammar in Chat and Build", () => {
-    for (const view of ["ChatView.svelte", "BuildView.svelte"]) {
+  it("defines the compact composer grammar once, in the shared composer", () => {
+    const source = composerSource();
+    expect(source).toMatch(/\.composer-card \{[\s\S]*?padding: \.55rem \.6rem;/);
+    // Wrap, not nowrap. `nowrap` plus a `display: none` per control is how
+    // Build came to print "Select a project to start." under a bar with no
+    // project picker in it, and how the model control became an empty circle
+    // in both composers below 1024px.
+    expect(source).toMatch(/\.composer-bar \{ flex-wrap: wrap;/);
+    expect(source).toMatch(/:global\(\.composer-card \.send\) \{[\s\S]*?width: 2\.75rem;/);
+    expect(source).toMatch(/:global\(\.composer-card \.send-label\) \{ display: none; \}/);
+    expect(source).toMatch(/\.shortcut-hint/);
+  });
+
+  it("leaves no view with its own copy of the composer frame", () => {
+    // The grammar above was previously asserted in each view, which guarded the
+    // duplication rather than removing it — and the two copies had already
+    // drifted (`.prompt-input` in one, `.composer-card textarea` in the other;
+    // the compact model-control rules in Chat and nowhere else). One definition
+    // is the stronger property, so this asserts the copies are gone.
+    for (const view of ["ChatView.svelte", "BuildView.svelte", "DesignView.svelte"]) {
       const source = readFileSync(resolve(process.cwd(), "src", "lib", "views", view), "utf8");
-      expect(source).toMatch(/\.composer-card \{[\s\S]*?padding: \.55rem \.6rem;/);
-      // Wrap, not nowrap. `nowrap` plus a `display: none` per control is how
-      // Build came to print "Select a project to start." under a bar with no
-      // project picker in it, and how the model control became an empty circle
-      // in both composers below 1024px.
-      expect(source).toMatch(/\.composer-bar \{ flex-wrap: wrap;/);
-      expect(source).toMatch(/\.send \{[\s\S]*?width: 2\.75rem;/);
-      expect(source).toMatch(/\.send-label \{ display: none; \}/);
-      expect(source).toMatch(/\.shortcut-hint/);
+      const styles = source.slice(source.indexOf("<style>"));
+      for (const owned of [".composer-card {", ".composer-bar {", ".prompt-input {", ".bar-left {", ".bar-right {"]) {
+        expect(styles, `${view} redefines ${owned}`).not.toContain(`\n  ${owned}`);
+      }
     }
   });
 
@@ -69,13 +90,14 @@ describe("stacked conversation layout", () => {
     expect(source).not.toMatch(/\.project-picker,[^\n]*display: none/);
   });
 
-  it("keeps the provider logo on the compact model control in both composers", () => {
-    for (const view of ["ChatView.svelte", "BuildView.svelte"]) {
-      const source = readFileSync(resolve(process.cwd(), "src", "lib", "views", view), "utf8");
-      expect(source).toMatch(
-        /:global\(\.composer-card \.model-trigger > span:not\(\.provider-logo\)\)/,
-      );
-      expect(source).not.toMatch(/:global\(\.composer-card \.model-trigger > span\),/);
-    }
+  it("keeps the provider logo on the compact model control", () => {
+    // `> span` hid the logo along with the label, because the logo is a span
+    // and not an svg — so below 1024px the model control was an empty circle
+    // and no narrow window said which model would answer.
+    const source = composerSource();
+    expect(source).toMatch(
+      /:global\(\.composer-card \.model-trigger > span:not\(\.provider-logo\)\)/,
+    );
+    expect(source).not.toMatch(/:global\(\.composer-card \.model-trigger > span\),/);
   });
 });

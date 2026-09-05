@@ -12,19 +12,31 @@ export const NAV_GROUPS: NavGroup[] = [
     { id: "home", label: "Workbench", icon: "spark", hint: "Resume governed work and see what needs attention" },
     { id: "new-chat", label: "Chat", icon: "chat", hint: "Start or continue a governed conversation" },
     { id: "build", label: "Build", icon: "code", hint: "Code against a repository with Plan, Edit, and Auto" },
+    // Design sits with Chat and Build because it is the same kind of thing: you
+    // describe what you want and a model answers. It was last in the group, next
+    // to Messaging, which put a making surface among the plumbing.
+    { id: "design", label: "Design", icon: "spark", hint: "Describe an image and generate it" },
     // C18 — this destination stopped being only a search. With an empty box it
     // is the board of everything the owner has going, chats and routine threads
     // alike; with a query it is the search it always was.
     { id: "search-chat", label: "Threads", icon: "search", hint: "Everything you have going, and a search across it" },
     { id: "tasks", label: "Tasks", icon: "tasks", hint: "Agent tasks and progress" },
     { id: "projects", label: "Projects", icon: "projects", hint: "Named scopes for ongoing work" },
+    // Approvals sat under Manage with the setup pages, and it is not one: a
+    // decision waiting on you is the work, arriving many times a day, while
+    // Permissions and Models are configured once and revisited. It moved here
+    // when Manage left the sidebar for the gear.
+    { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
+    // A channel is a place a person reaches Raiker from, which is a different
+    // kind of thing from the connectors, servers and hooks the agent *uses* —
+    // it was a tab inside Extensions and is its own destination now.
+    { id: "messaging", label: "Messaging", icon: "chat", hint: "Channels that reach Raiker from somewhere else" },
   ] },
   { id: "knowledge", label: "Knowledge", collapsible: true, items: [
     { id: "memory", label: "Memory", icon: "activity", hint: "Approved memories the agent can recall" },
     { id: "brain", label: "Knowledge Map", icon: "spark", hint: "Governed workspace relationships and sources" },
   ] },
   { id: "manage", label: "Manage", collapsible: true, items: [
-    { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
     { id: "capabilities", label: "Permissions", icon: "capabilities", hint: "What the agent may do, and how it must ask" },
     { id: "models", label: "Models", icon: "models", hint: "Model profiles and provider gates" },
     { id: "extensions", label: "Extensions", icon: "connections", hint: "Connectors, MCP servers, skills, hooks and plugins" },
@@ -39,6 +51,29 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
 export const DEFAULT_ROUTE = "home";
+
+/**
+ * Which groups the sidebar carries, and which live behind the gear.
+ *
+ * `NAV_GROUPS` stays the complete route registry — `routeFromHash` resolves
+ * against `NAV_ITEMS`, so a destination dropped from that list stops being
+ * reachable at all rather than merely moving. These two arrays only decide
+ * *where a link to it is drawn*.
+ *
+ * The split is by how often you go there. Core and Knowledge are the work: you
+ * open them many times an hour and they earn a permanent rail. Manage, Observe
+ * and Support are the things you set up once and revisit when something needs
+ * changing — a standing sidebar row for each was eight rows of furniture for
+ * work that happens on a handful of days.
+ */
+export const SIDEBAR_GROUP_IDS: NavGroupId[] = ["core", "knowledge"];
+export const SIDEBAR_GROUPS: NavGroup[] = NAV_GROUPS.filter((g) =>
+  SIDEBAR_GROUP_IDS.includes(g.id),
+);
+/** Everything the gear's window lists, in the order it lists them. */
+export const HUB_GROUPS: NavGroup[] = NAV_GROUPS.filter(
+  (g) => !SIDEBAR_GROUP_IDS.includes(g.id),
+);
 
 /**
  * Tabs inside a consolidated destination. The hub owns the tab list so a deep
@@ -57,10 +92,9 @@ export const HUB_TABS: Record<string, string[]> = {
     "activity",
     "routing",
     "pricing",
-    "posture",
   ],
-  extensions: ["connectors", "mcp", "skills", "hooks", "plugins", "channels"],
-  observe: ["overview", "sessions", "activity", "checkpoints", "diagnostics", "work", "notifications"],
+  extensions: ["connectors", "mcp", "skills", "hooks", "plugins"],
+  observe: ["overview", "sessions", "activity", "checkpoints", "work", "notifications"],
   // Every section the settings rail renders, in rail order. The two lists have
   // to agree: a section the rail shows but this list omits is a deep link that
   // silently opens General instead, which reads as a working link to the wrong
@@ -92,10 +126,12 @@ const ROUTE_ALIASES: Record<string, { route: string; tab: string }> = {
   mcp: { route: "extensions", tab: "mcp" },
   activity: { route: "observe", tab: "activity" },
   checkpoints: { route: "observe", tab: "checkpoints" },
-  diagnostics: { route: "observe", tab: "diagnostics" },
+  diagnostics: { route: "observe", tab: "overview" },
   work: { route: "observe", tab: "work" },
   notifications: { route: "observe", tab: "notifications" },
   sessions: { route: "observe", tab: "sessions" },
+  // Channels left Extensions for their own page.
+  channels: { route: "messaging", tab: "" },
 };
 
 /**
@@ -114,6 +150,18 @@ const HUB_TAB_ALIASES: Record<string, Record<string, string>> = {
     library: "local",
     discover: "huggingface",
     downloads: "activity",
+    // "Posture" was a tab holding four read-only facts and a paragraph. The
+    // facts moved onto Hosted, where they explain the cards under them; the
+    // paragraph moved to the guide. The alias keeps every link that named the
+    // tab working, which is what this map is for.
+    posture: "hosted",
+  },
+  // "Diagnostics" read the same `diagnostics` object Overview reads and restated
+  // four of its six cards from it. What was unique — runtime health transitions,
+  // memory integrity and its repair, and a failed readiness check's remediation —
+  // is a section of Overview now.
+  observe: {
+    diagnostics: "overview",
   },
 };
 

@@ -102,7 +102,7 @@
       disabled={!ready || busy || steerText.trim() === ""}
       title="Queue this for the running turn"
     >
-      <Icon name="send" size={14} />
+      <Icon name="send" size="sm" />
       Steer
     </button>
   </form>
@@ -114,7 +114,7 @@
     disabled={!ready || busy || stopping}
     aria-label={stopping ? "Stopping at the next safe boundary" : "Stop this turn"}
   >
-    <Icon name="stop" size={14} />
+    <Icon name="stop" size="sm" />
     {stopping ? "Stopping…" : "Stop"}
   </button>
 </div>
@@ -152,7 +152,7 @@
     flex: 1 1 auto;
     min-width: 0;
     font: inherit;
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     color: var(--text-1);
     background: var(--surface);
     border: 1px solid var(--border);
@@ -171,7 +171,7 @@
   }
   .control-note {
     margin: 0.35rem 0 0;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .control-note.error {

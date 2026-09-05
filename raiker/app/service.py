@@ -326,7 +326,7 @@ def install(plan: ServicePlan, *, activate: bool = True) -> ServiceActionResult:
         return ServiceActionResult(False, None, [], [], plan.note)
     plan.path.parent.mkdir(parents=True, exist_ok=True)
     plan.path.write_text(plan.contents, encoding="utf-8")
-    ran, failed = ([], []) if not activate else _run_all(plan.activate)
+    ran, failed = ([], []) if not activate else run_all(plan.activate)
     message = (
         f"Registered with {plan.mechanism}."
         if not failed
@@ -342,7 +342,7 @@ def uninstall(plan: ServicePlan) -> ServiceActionResult:
     """Unload the definition and delete it. Idempotent by construction."""
     if not plan.supported or plan.path is None:
         return ServiceActionResult(False, None, [], [], plan.note)
-    ran, failed = _run_all(plan.deactivate)
+    ran, failed = run_all(plan.deactivate)
     existed = plan.path.is_file()
     plan.path.unlink(missing_ok=True)
     message = (
@@ -353,8 +353,13 @@ def uninstall(plan: ServicePlan) -> ServiceActionResult:
     return ServiceActionResult(True, str(plan.path) if existed else None, ran, failed, message)
 
 
-def _run_all(commands: list[list[str]]) -> tuple[list[str], list[str]]:
-    """Run each command, collecting what worked and what did not. Never raises."""
+def run_all(commands: list[list[str]]) -> tuple[list[str], list[str]]:
+    """Run each command, collecting what worked and what did not. Never raises.
+
+    Public because `raiker.app.desktop_entry` needs exactly this behaviour for
+    its own activation step, and a second copy of "run these, report what
+    failed, raise nothing" is how the two would drift.
+    """
     ran: list[str] = []
     failed: list[str] = []
     for command in commands:

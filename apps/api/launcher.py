@@ -300,6 +300,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write the definition without asking the service manager to load it now.",
     )
 
+    # A launcher is not a service. `service` registers the host to start at
+    # sign-in; this puts an icon in the applications menu for someone who wants
+    # to open Raiker now. Installing from a checkout gave neither, so the only
+    # way in was a terminal.
+    desktop = sub.add_parser(
+        "desktop", help="Add or remove Raiker's entry in this platform's applications menu."
+    )
+    _add_common(desktop, preserve_parent=True)
+    desktop.add_argument("action", choices=("install", "status", "uninstall"))
+    desktop.add_argument(
+        "--no-activate",
+        action="store_true",
+        help="Write the entry without asking the desktop to index it now.",
+    )
+
     # BUG-44 — updating from outside the running host. Applying an update
     # replaces the tree the host is executing from, which is not something a
     # request that host is serving should do, so this lives here and the web
@@ -333,6 +348,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="What to do with each local instance (default: keep).",
     )
     remove.add_argument("--export-to", default=None, help="Where to copy instances before removal.")
+    remove.add_argument(
+        "--source-artifacts",
+        action="store_true",
+        help=(
+            "Also delete the regenerable build directories in a source checkout "
+            "(node_modules, dist, build, *.egg-info). Off by default: they are in "
+            "your repository, not Raiker's."
+        ),
+    )
     remove.add_argument(
         "--yes", action="store_true", help="Carry out the plan instead of only printing it."
     )
@@ -454,6 +478,8 @@ def _run_command(args: argparse.Namespace) -> int:
         return _command_quit(workspace, force=args.force)
     if args.command == "service":
         return _command_service(workspace, args.port, args.action, activate=not args.no_activate)
+    if args.command == "desktop":
+        return _command_desktop(workspace, args.action, activate=not args.no_activate)
     if args.command == "update":
         return _command_update(workspace, args)
     return _command_uninstall(workspace, args)
@@ -497,6 +523,32 @@ def _command_quit(workspace: Path, *, force: bool) -> int:
         return 2
     print(f"[raiker] Asked process {status.pid} to stop at its next safe boundary.")
     return 0
+
+
+def _command_desktop(workspace: Path, action: str, *, activate: bool) -> int:
+    from raiker.app.desktop_entry import entry_plan, install, status, uninstall
+
+    # No workspace on the entry: an icon someone clicks a year from now should
+    # open their Raiker, not whichever directory this command happened to run in.
+    plan = entry_plan()
+    if not plan.supported:
+        print(f"[raiker] {plan.note}", file=sys.stderr)
+        return 2
+    if action == "status":
+        current = status()
+        print(f"[raiker] {plan.mechanism}: {'installed' if current.installed else 'not installed'}")
+        print(f"[raiker] entry: {plan.path}")
+        print(f"[raiker] {plan.note}")
+        return 0
+    result = install(plan, activate=activate) if action == "install" else uninstall(plan)
+    print(f"[raiker] {result.message}")
+    for command in result.ran:
+        print(f"[raiker]   ran: {command}")
+    for failure in result.failed:
+        print(f"[raiker]   could not: {failure}", file=sys.stderr)
+    if action == "install":
+        print(f"[raiker] {plan.note}")
+    return 0 if result.ok else 2
 
 
 def _command_service(workspace: Path, port: int, action: str, *, activate: bool) -> int:
@@ -628,6 +680,7 @@ def _command_uninstall(workspace: Path, args: argparse.Namespace) -> int:
             disposition=args.data,
             export_to=args.export_to,
             port=args.port,
+            remove_build_artefacts=args.source_artifacts,
         )
     except ValueError as error:
         message = {

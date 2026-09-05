@@ -23,7 +23,7 @@
     border: 1px solid var(--badge-border);
     background: var(--badge-bg);
     color: var(--badge-fg);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     line-height: 1.5;
     white-space: nowrap;

@@ -142,6 +142,13 @@ def _build_registry() -> dict[str, ActivationRequirement]:
         "telemetry_export", "2", threat_ack=True, human_confirm=True,
         notes="OTLP export to an owner-named collector; metadata by default, "
               "redacted content on explicit opt-in.")
+    # The Design surface. Tier 2 because it leaves the machine, and gated
+    # separately from `hosted_model_runtime` because an owner who wanted a chat
+    # model has not thereby asked to spend credit generating images.
+    r["image_generation"] = _req(
+        "image_generation", "2", threat_ack=True, human_confirm=True,
+        notes="Hosted image model; model egress allowlist + owner credential; "
+              "endpoint built from the configured profile, never from the request.")
 
     # Tier 3
     for cap in ("graph_indexing_runtime", "semantic_memory_runtime", "vector_embedding_runtime"):

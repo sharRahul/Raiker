@@ -6,6 +6,15 @@
 - Node 20 or newer (to build the dashboard)
 - Git
 
+**Check the Python version before anything else**, and check it *inside* the
+virtual environment rather than before creating it — `python` is whatever name
+resolution last decided it is, and on Windows that is often not the version you
+installed most recently:
+
+```bash
+python --version
+```
+
 Raiker currently runs from a source checkout; no signed desktop release has
 been published. The dashboard and terminal client support local single-user
 operation. Hosted multi-user, dedicated mobile, and IDE clients are not part of
@@ -18,7 +27,31 @@ git clone https://github.com/sharRahul/Raiker.git
 cd Raiker
 python -m venv .venv
 . .venv/bin/activate          # Windows: .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
+```
+
+#### If the install downloads the same package over and over
+
+```text
+Downloading ruff-0.6.3-py3-none-win_amd64.whl (8.8 MB)
+Downloading ruff-0.6.2-py3-none-win_amd64.whl (8.8 MB)
+INFO: pip is looking at multiple versions of pyyaml…
+```
+
+You are on the wrong Python. Raiker needs 3.11; `cp310` in a wheel name is
+CPython 3.10. Old pip resolves every dependency before it checks the project's
+required Python, so on 3.10 it searches for a set that cannot exist.
+
+Fix it by creating the environment with a 3.11+ interpreter — `py -3.11 -m venv
+.venv` on Windows, `python3.11 -m venv .venv` elsewhere — and upgrading pip
+before installing. Current Raiker also stops the install itself, in about a
+second, with a message naming the version it found.
+
+With [uv](https://github.com/astral-sh/uv) the question does not arise:
+
+```bash
+uv sync --extra dev
 ```
 
 The following platform sections spell out the same source install with the
@@ -120,6 +153,7 @@ Raiker repository, reinstall it and try again:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
+python.exe -m pip install --upgrade pip
 python.exe -m pip install -e ".[dev]"
 Get-Command raiker-app
 raiker-app
@@ -172,9 +206,24 @@ raiker-app service status --workspace .
 raiker-app status --workspace .
 ```
 
-Run `raiker-app --help` for pause, resume, quit, service, update, and uninstall
-commands. [Managing the Raiker host](managing-the-host.md) explains what each
-command changes, where instance data lives, and how to keep or export it.
+To open Raiker from your applications menu instead of a terminal:
+
+```bash
+raiker-app desktop install
+```
+
+That adds a launcher — an entry in the applications menu on Linux, the Start
+Menu on Windows, `~/Applications` on macOS — which starts Raiker if it is not
+running and opens the dashboard. Everything is written under your own home
+directory. `raiker-app desktop uninstall` removes it.
+
+Once Raiker is running it also has a system-tray icon: status, Open Raiker,
+Pause or Resume, Restart, Quit.
+
+Run `raiker-app --help` for pause, resume, quit, service, desktop, update, and
+uninstall commands. [Managing the Raiker host](managing-the-host.md) explains
+what each command changes, where instance data lives, and how to keep or export
+it.
 
 For explicit server control without the application lifecycle wrapper, use
 `raiker-web`:
@@ -233,7 +282,7 @@ The sidebar groups every destination:
 complete record of every conversation *and* every task run, which is why the
 sidebar's RECENT CHATS list stays conversations only. **Models** and
 **Extensions** are tabbed the same way — Models by Local / Hosted / Hugging
-Face / Activity / Routing / Pricing / Posture, Extensions by Connectors / MCP
+Face / Activity / Routing / Pricing, Extensions by Connectors / MCP
 servers / Skills / Plugins / Channels. Old links to the pages these absorbed
 still resolve and open the right tab.
 

@@ -51,7 +51,7 @@
 
 {#if text.trim() === "" && notKeptChars > 0}
   <p class="reasoning-absent">
-    <Icon name="shield" size={12} />
+    <Icon name="shield" size="sm" />
     <span>
       Raiker showed its working while this turn ran. It was not kept — retained
       working is off. <a href="#/settings">Turn it on in Settings → Privacy.</a>
@@ -66,7 +66,7 @@
       aria-controls="reasoning-body"
       onclick={() => (opened = !expanded)}
     >
-      <Icon name={expanded ? "chevron-down" : "chevron-right"} size={13} />
+      <Icon name={expanded ? "chevron-down" : "chevron-right"} size="sm" />
       <span>Thinking</span>
       {#if streaming}<span class="reasoning-live" aria-hidden="true"></span>{/if}
     </button>
@@ -91,7 +91,7 @@
     background: transparent;
     color: var(--text-3);
     font: inherit;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     letter-spacing: 0.02em;
     cursor: pointer;
@@ -128,7 +128,7 @@
     gap: 0.35rem;
     margin: 0 0 0.4rem;
     color: var(--text-3);
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     line-height: 1.5;
   }
   .reasoning-absent a { color: var(--accent); }
@@ -139,7 +139,7 @@
     background: var(--sunken);
     border-radius: var(--r-sm);
     color: var(--text-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     line-height: 1.55;
     white-space: pre-wrap;
     overflow-wrap: anywhere;

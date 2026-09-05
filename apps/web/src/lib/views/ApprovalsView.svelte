@@ -423,7 +423,7 @@
 <div class="head-row">
   <GuideLink route="approvals" />
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh approvals">
-    <Icon name="refresh" size={15} />
+    <Icon name="refresh" size="sm" />
     Refresh
   </button>
 </div>
@@ -550,7 +550,7 @@
         {isQuestion ? "Answer a question" : `Review ${humanize(selected.approval.tool_name)}`}
       </h2>
       <button type="button" class="btn btn-ghost btn-sm" onclick={() => (selected = null)}>
-        <Icon name="x" size={14} />
+        <Icon name="x" size="sm" />
         Close
       </button>
     </div>
@@ -817,7 +817,7 @@
     margin: 0.5rem 0;
   }
   .question legend {
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     opacity: 0.7;
@@ -882,7 +882,7 @@
   }
   .filter-btn {
     font: inherit;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-transform: capitalize;
     color: var(--text-2);
@@ -936,7 +936,7 @@
     min-width: 0;
   }
   .meta dt {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -944,13 +944,13 @@
   }
   .meta dd {
     margin: 0;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     min-width: 0;
     overflow-wrap: anywhere;
   }
   .diff-path {
     color: var(--text-2);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     margin: 0 0 0.35rem;
   }
   .diff {
@@ -959,7 +959,7 @@
     border-radius: var(--r-sm);
     padding: 0.7rem 0.9rem;
     font-family: var(--font-mono);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     overflow-x: auto;
     white-space: pre;
     max-height: 24rem;
@@ -976,9 +976,6 @@
     gap: 0.5rem;
     color: var(--text-2);
     margin: var(--space-3) 0 0;
-  }
-  .error {
-    color: var(--danger);
   }
   .overlay {
     position: fixed;
@@ -999,7 +996,7 @@
     box-shadow: var(--shadow-2);
   }
   .step-up h2, .step-up p { margin: 0; }
-  .hint { color: var(--text-3); font-size: 0.8rem; }
+  .hint { color: var(--text-3); font-size: var(--text-sm); }
   /* BUG-271 — the reviewer's own diff. Monospaced because it is one, and given
      the same vertical rhythm as the decision note above it so the panel does
      not change shape when the editor opens. */

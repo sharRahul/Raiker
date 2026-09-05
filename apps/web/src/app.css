@@ -95,6 +95,10 @@
   --space-6: 2rem;
 
   --sidebar-w: 256px;
+  /* Collapsed the sidebar keeps its icons. 56px is a 20px icon in a 2.35rem row
+     with the row's own padding either side — wide enough that the target is the
+     same one you hit at full width, narrow enough to be worth collapsing for. */
+  --sidebar-rail-w: 56px;
   --topbar-h: 56px;
   --ease-shell: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-shell: 240ms;
@@ -193,6 +197,24 @@
   --brand-grey: #9c9c9c;
   --brand-black: #000000;
   --brand-white: #ffffff;
+
+  /* A vendor's colour is theirs in both themes, and a logo plate has to stay
+     the plate or the mark disappears into the surface behind it. These are the
+     only colours in the product that are deliberately theme-independent, and
+     naming them here is what lets the rule below — components use tokens, never
+     raw colours — hold without an exception per provider. */
+  --brand-huggingface: #ffd21e;
+
+  /* The command output pane renders a real program's output, so it is dark in
+     both themes: inverting it in light mode would misrepresent what the program
+     drew. Six literals used to live in the component; they live here now, which
+     is also what lets a future terminal theme be one edit. */
+  --term-bg: #171a1c;
+  --term-fg: #e8e8e2;
+  --term-dim: #a9aaa4;
+  --term-bright: #d6d7d1;
+  --term-border: #30363b;
+  --term-rule: #ffffff1a;
 }
 
 /* ── Light theme tokens ("paper") ── */
@@ -867,14 +889,29 @@ code,
     background var(--motion-fast) var(--ease),
     border-color var(--motion-fast) var(--ease);
 }
-:where(button):hover:not(:disabled) {
+/* The three state rules had the pseudo-classes *outside* `:where()`, which put
+   them at (0,2,0) rather than the zero the comment above promises — so the
+   floor's hover fill tied every component's own two-class rule and won on
+   order. That is not a floor, it is a ceiling that only shows up on hover.
+
+   It was visible as a full-screen opaque panel: both of the app's dismiss
+   scrims are a `<button>` stretched over the viewport, so as soon as the
+   pointer was anywhere on screen the catch-all painted them `--sunken` and the
+   page vanished behind a flat grey sheet. The settings window and the
+   notification panel had it, and it looked like a deliberate modal treatment
+   rather than a bug, which is why it survived a whole responsive sweep.
+
+   Wrapping each whole selector restores the stated contract: a component that
+   says anything about its own hover, disabled or focus state wins, and one that
+   says nothing still gets the floor. */
+:where(button:hover:not(:disabled)) {
   background: var(--sunken);
 }
-:where(button):disabled {
+:where(button:disabled) {
   opacity: 0.5;
   cursor: not-allowed;
 }
-:where(button):focus-visible {
+:where(button:focus-visible) {
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
@@ -1102,6 +1139,77 @@ code,
    and card hover treatments. Each one is a token composition, never a new
    colour, so both themes stay in lockstep and a view cannot drift. */
 
+/* ── The error line ──
+   Twenty components defined `.error`, and twelve of them defined exactly this.
+   The other eight added a margin or a font size, and those eight disagreed with
+   each other about the size — 0.78, 0.8, 0.82 and 0.85rem for the same
+   sentence. Only the unanimous half is hoisted: a component that genuinely
+   needs the line offset from what is above it still says so, and the sizes that
+   had drifted are on the scale now. */
+.error { color: var(--danger); }
+
+/* ── Range inputs ──
+   Nothing styled these, so every slider was the browser's default pill — the
+   one control in the product with fully rounded geometry, against a surface
+   language whose radii are 8 / 12 / 16 / 20px and whose buttons and fields are
+   all rectangles. Squared here, once, rather than per view: the graph's force
+   controls and the recall-depth slider are the same control and should not have
+   to agree by hand.
+
+   Both vendor pseudo-elements are needed and neither can be grouped with the
+   other — a selector list containing an unrecognised pseudo-element is dropped
+   whole by both engines, so the WebKit and Firefox rules are written out
+   separately even though their bodies match. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1.25rem;
+  background: transparent;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+input[type="range"]:disabled { cursor: not-allowed; opacity: 0.5; }
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 0;
+  background: var(--border-strong);
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 0;
+  background: var(--border-strong);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.7rem;
+  height: 1rem;
+  margin-top: -6px;
+  border: 1px solid var(--accent-strong);
+  border-radius: 0;
+  background: var(--accent);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 0.7rem;
+  height: 1rem;
+  border: 1px solid var(--accent-strong);
+  border-radius: 0;
+  background: var(--accent);
+}
+input[type="range"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* ── Dialog type ──
+   A dialog opens on top of the page that summoned it, so text inside it that is
+   smaller than the text behind it reads as a demotion — and every dialog in the
+   product was setting its own body size somewhere between 0.68 and 0.86rem
+   against a 1rem page. The floor is set here so a dialog inherits the page's
+   voice; a dialog that genuinely needs small print still reaches for
+   `--text-xs` deliberately rather than arriving there by default. */
+dialog { font-size: var(--text-base); }
+dialog p,
+dialog label,
+dialog li { font-size: var(--text-sm); line-height: 1.5; }
+
 /* A card the user can act on. The lift is small and motion-gated: it signals
    "this responds", it does not animate for its own sake. */
 .card-interactive {
@@ -1326,4 +1434,50 @@ code,
 .drop-note {
   color: var(--accent);
   font-size: var(--text-xs);
+}
+
+/* ── Composer bar controls ──
+   `Composer.svelte` owns the card, the input and the bar. These two sit on
+   elements the *view* renders into that bar, so a component's scoped styles
+   cannot reach them and each view kept its own copy — which is how Chat and
+   Build ended up with two `.bar-select` definitions that had already drifted.
+   One definition here, and every composer's controls read as the same control.
+
+   Each setting is a pill so a control reads as a control. Borderless, at body
+   weight, they ran the whole bar together as one line of prose; and a fixed
+   max-width stretched a select so its chevron floated far from its own label. */
+.bar-select {
+  border: 1px solid var(--neutral-border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--r-pill);
+  width: auto;
+  max-width: 11rem;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.bar-select:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  color: var(--text-1);
+}
+.bar-select:disabled {
+  opacity: 0.6;
+}
+.bar-select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+/* Wide enough that "Send" and "Running…" do not resize the bar between them. */
+.send {
+  min-width: 6.5rem;
+}
+/* A label beside an icon in the bar — the project select's folder, say. */
+.composer-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
 }

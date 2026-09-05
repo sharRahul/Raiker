@@ -65,7 +65,6 @@
     { id: "activity", label: "Activity" },
     { id: "routing", label: "Routing" },
     { id: "pricing", label: "Pricing" },
-    { id: "posture", label: "Posture" },
   ];
 
   // Which provider sections each tab owns. The three groups already existed as
@@ -1104,14 +1103,14 @@
     disabled={catalogueRefreshing}
     aria-label="Refresh connected providers"
   >
-    <Icon name="refresh" size={15} />
+    <Icon name="refresh" size="sm" />
     {catalogueRefreshing ? "Refreshing…" : "Refresh connected providers"}
   </button>
 </div>
 {#if catalogueNotice}<p class="catalogue-notice" role="status">{catalogueNotice}</p>{/if}
 
 <!-- Readiness and the global default describe the page, not one panel, so
-     they sit above the strip: an owner on Pricing or Posture can still see
+     they sit above the strip: an owner on Pricing or Routing can still see
      whether anything can run and change what runs by default. -->
 {#if models !== null && models.profiles.length > 0}
   <section
@@ -1228,6 +1227,33 @@
           in the terminal client (<code>/model use …</code>).
         {/if}
       </p>
+      <!--
+        The four off-machine facts, on the tab they are about. They were their
+        own top-level tab — seven words of state and a paragraph, one click away
+        from the cards they explain. Read here, they answer the question the
+        Hosted tab actually raises: why did this provider refuse. The paragraph
+        that sat under them is the guide's *Off-machine provider posture*.
+      -->
+      {#if tab === "hosted"}
+        <dl class="gates" aria-label="Off-machine provider posture">
+          <div>
+            <dt>Hosted model gate</dt>
+            <dd>{gateStateLabel(models.hosted_model_gate_state)}</dd>
+          </div>
+          <div>
+            <dt>Private-network gate</dt>
+            <dd>{gateStateLabel(models.private_network_model_gate_state)}</dd>
+          </div>
+          <div>
+            <dt>Egress allowlist</dt>
+            <dd><code>{models.model_egress_allowlist_configured ? "configured" : "not configured"}</code></dd>
+          </div>
+          <div>
+            <dt>Off-machine profiles</dt>
+            <dd><code>{models.remote_profile_count}</code></dd>
+          </div>
+        </dl>
+      {/if}
       {#if tab === "local"}<ProvidersPanel onCatalogueChanged={refreshProviderCatalogues} />{/if}
       {#if models.profiles.length === 0}
         <div class="card">
@@ -1285,12 +1311,16 @@
                         <div class="row-title">
                           <h3>{providerName(p.provider)}</h3>
                         </div>
-                        <p class="row-model">
-                          {#if !namesAModel(p)}<span
-                              class="model-unpinned"
-                              >model chosen at selection</span
-                            >{:else}<code>{modelName(p.model)}</code>{/if}
-                        </p>
+                        <!-- The model line states a fact when there is one and
+                             says nothing when there is not. It used to print
+                             "model chosen at selection" on every row that had
+                             not named one — a placeholder that told an owner
+                             about Raiker's pinning vocabulary rather than about
+                             their provider, on a page where "Select models…"
+                             already offers the choice. -->
+                        {#if namesAModel(p)}
+                          <p class="row-model"><code>{modelName(p.model)}</code></p>
+                        {/if}
                         <p class="row-help">{providerHelp(p)}</p>
                         <!-- BUG-270 — "On this device" is a section whose whole
                              claim is about this device, so the one fact it can
@@ -1301,7 +1331,7 @@
                              then. -->
                         {#if p.provider_detected === false}
                           <p class="posture-line runtime-missing">
-                            <Icon name="warning" size={14} />
+                            <Icon name="warning" size="sm" />
                             Not installed on this machine
                             {#if installerRuntimeFor(p.provider)}
                               <!-- The offer, not just the finding. Raiker opens
@@ -1458,11 +1488,15 @@
                           <h3>{providerName(p.provider)}</h3>
                         </div>
                       </div>
-                      <p class="pc-model">
-                        {#if !namesAModel(p)}<span class="model-unpinned"
-                            >no model pinned</span
-                          >{:else}<code>{modelName(p.model)}</code>{/if}
-                      </p>
+                      <!-- Same rule as the local rows: name the model when one
+                           is named, and print nothing when none is. Eight cards
+                           reading "no model pinned" was the largest single block
+                           of text on this page and the least of it about the
+                           owner's providers — "Not connected" below and
+                           "Select models…" beneath that already carry it. -->
+                      {#if namesAModel(p)}
+                        <p class="pc-model"><code>{modelName(p.model)}</code></p>
+                      {/if}
                       <p class="pc-status">
                         <!-- BUG-198 — this line reports whether a connection is
                              *saved*, which is not whether the provider answers:
@@ -1510,7 +1544,7 @@
                            output then. -->
                       {#if p.provider_detected === false}
                         <p class="posture-line runtime-missing">
-                          <Icon name="warning" size={14} />
+                          <Icon name="warning" size="sm" />
                           Not installed on this machine
                           {#if installerRuntimeFor(p.provider)}
                             <button
@@ -1803,14 +1837,10 @@
       <section class="card advisor" aria-labelledby="advisor-h">
         <h2 id="advisor-h">Advisor model</h2>
         <p class="sub">
-          When you run a local model, it can consult one advisor — typically a
-          hosted model — through the governed <code>consult_advisor</code> tool.
-          Picking an advisor grants nothing on its own: the consult is gated by
-          the <code>advisor_model_runtime</code> capability, its decision mode
-          (default <strong>ask</strong>, which withholds the consult), and the
-          provider's own policy (hosted gate, egress allowlist, API key) at call
-          time. The advisor's answer is always treated as untrusted data, and
-          the question/answer never enter the audit log — only lengths do.
+          A local model can consult one advisor through the governed
+          <code>consult_advisor</code> tool. Picking one grants nothing: every
+          consult is still gated at call time.
+          <GuideLink section="connecting-a-model" label="How an advisor is governed" />
         </p>
         <div class="advisor-row">
           <select bind:value={advisorChoice} aria-label="Advisor model profile">
@@ -1885,50 +1915,6 @@
     </div>
   {/if}
 
-  {#if tab === "posture"}
-    <div
-      class="panel"
-      role="tabpanel"
-      id="panel-posture"
-      aria-labelledby="tab-posture"
-    >
-      <section class="card gate-status" aria-labelledby="model-gates-h">
-        <h2 id="model-gates-h">Off-machine provider posture</h2>
-        <dl class="gates">
-          <div>
-            <dt>Hosted model gate</dt>
-            <dd>{gateStateLabel(models.hosted_model_gate_state)}</dd>
-          </div>
-          <div>
-            <dt>Private-network gate</dt>
-            <dd>{gateStateLabel(models.private_network_model_gate_state)}</dd>
-          </div>
-          <div>
-            <dt>Egress allowlist</dt>
-            <dd>
-              <code
-                >{models.model_egress_allowlist_configured
-                  ? "configured"
-                  : "not configured"}</code
-              >
-            </dd>
-          </div>
-          <div>
-            <dt>Off-machine profiles</dt>
-            <dd><code>{models.remote_profile_count}</code></dd>
-          </div>
-        </dl>
-        <p class="sub">
-          Read-only status. Allowlist values and API keys are never displayed.
-          Hosted providers fail closed unless the runtime gate, threat-model
-          acknowledgement, confirmation token, egress allowlist, and provider
-          key are all present{models.no_silent_hosted_fallback
-            ? " — and there is no silent fallback to hosted models"
-            : ""}.
-        </p>
-      </section>
-    </div>
-  {/if}
 {/if}
 
 
@@ -2293,7 +2279,7 @@
   .tab-lead {
     margin: 0;
     color: var(--text-2);
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     line-height: 1.5;
     max-width: 72ch;
   }
@@ -2348,17 +2334,17 @@
   .section-heading h2,
   .setup-overview h2 {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: var(--text-base);
   }
   .section-heading > p {
     max-width: 28rem;
     color: var(--text-3);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     margin: 0;
   }
   .eyebrow {
     color: var(--accent);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     font-weight: 750;
     letter-spacing: 0.08em;
     margin: 0 0 0.25rem;
@@ -2370,21 +2356,21 @@
   }
   .setup-meter strong {
     display: block;
-    font-size: 1.35rem;
+    font-size: var(--text-xl);
   }
   .setup-meter span {
     color: var(--text-3);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
   }
   .setup-meter .total-spend {
     color: var(--text-2);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     margin: 0.35rem 0 0;
   }
   .posture-line {
     margin: 0.1rem 0 0;
     color: var(--text-3);
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
   }
   /* BUG-270 — the one line on a provider card that is about this machine
      rather than about a provider. It carries the warning tone because it is
@@ -2427,7 +2413,7 @@
     align-items: baseline;
     color: var(--text-2);
     display: flex;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     gap: 0.75rem;
     justify-content: space-between;
   }
@@ -2436,12 +2422,12 @@
   }
   .usage-note {
     color: var(--text-3);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     margin: 0.35rem 0 0;
   }
   .row-usage {
     color: var(--text-3);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     grid-column: 1 / -1;
   }
   /* Geometry lives in the shared `.bar` primitive; this only places it. */
@@ -2492,17 +2478,17 @@
   }
   .row-title h3 {
     margin: 0;
-    font-size: 0.98rem;
+    font-size: var(--text-base);
   }
   .row-model {
     margin: 0.15rem 0 0.4rem;
     color: var(--text-2);
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
     overflow-wrap: anywhere;
   }
   .row-help {
     color: var(--text-3);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     line-height: 1.35;
     margin: 0 0 0.5rem;
   }
@@ -2558,12 +2544,12 @@
   }
   .pc-title h3 {
     margin: 0;
-    font-size: 1rem;
+    font-size: var(--text-base);
   }
   .pc-model {
     margin: 0;
     color: var(--text-2);
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
     overflow-wrap: anywhere;
   }
   .pc-status {
@@ -2571,7 +2557,7 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .status-dot {
@@ -2593,11 +2579,11 @@
   .pc-connect {
     background: var(--brand);
     border-color: var(--brand);
-    color: #fff;
+    color: var(--brand-black);
   }
   .pc-connect:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--brand) 88%, #000);
-    border-color: color-mix(in srgb, var(--brand) 88%, #000);
+    background: color-mix(in srgb, var(--brand) 88%, var(--brand-black));
+    border-color: color-mix(in srgb, var(--brand) 88%, var(--brand-black));
   }
 
   .chips {
@@ -2606,7 +2592,7 @@
     gap: 0.35rem;
   }
   .chip {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     border-radius: var(--r-pill);
     border: 1px solid var(--neutral-border);
@@ -2623,10 +2609,6 @@
     border-color: var(--warn-border);
     background: var(--warn-soft);
     color: var(--warn);
-  }
-  .model-unpinned {
-    color: var(--text-3);
-    font-style: italic;
   }
 
   .picker-dialog {
@@ -2645,10 +2627,10 @@
     color: var(--text-1);
     max-width: 100%;
     font: inherit;
-    font-size: 0.88rem;
+    font-size: var(--text-md);
   }
   .picker-note {
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
     margin: 0;
   }
@@ -2657,12 +2639,12 @@
     gap: 0.4rem;
   }
   .picker-error {
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     margin: 0;
   }
   .test-result {
     color: var(--text-2);
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     margin: 0.3rem 0 0;
   }
   /* The local rows are a wrapping flex row; a result needs the full width to
@@ -2674,7 +2656,7 @@
   /* ── Sign-in modal ── */
   .signin-overlay {
     align-items: center;
-    background: color-mix(in srgb, #000 55%, transparent);
+    background: var(--overlay);
     display: flex;
     inset: 0;
     justify-content: center;
@@ -2703,7 +2685,7 @@
     border: 0;
     color: var(--text-2);
     cursor: pointer;
-    font-size: 1.6rem;
+    font-size: var(--text-2xl);
     line-height: 1;
   }
   .signin-logo {
@@ -2716,12 +2698,12 @@
   .signin-dialog h2 {
     margin: 0;
     text-align: center;
-    font-size: 1.15rem;
+    font-size: var(--text-xl);
   }
   .signin-hint {
     margin: 0;
     color: var(--text-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     line-height: 1.4;
     text-align: center;
   }
@@ -2733,9 +2715,9 @@
     padding: 0.55rem 1rem;
     border-radius: var(--r-sm);
     background: var(--brand);
-    color: #fff;
+    color: var(--brand-black);
     font-weight: 600;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     text-decoration: none;
     border: 1px solid var(--brand);
     transition: opacity 120ms var(--ease);
@@ -2760,7 +2742,7 @@
   }
   .signin-divider span {
     color: var(--text-3);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
   .field {
     display: flex;
@@ -2768,7 +2750,7 @@
     gap: 0.25rem;
   }
   .field-label {
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     color: var(--text-2);
   }
@@ -2778,7 +2760,7 @@
   }
   .admin-usage-field > small {
     color: var(--text-3);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     line-height: 1.35;
   }
   .sso-toggle {
@@ -2787,7 +2769,7 @@
     border: 0;
     color: var(--accent);
     cursor: pointer;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     padding: 0.1rem 0;
   }
   .signin-actions {
@@ -2799,17 +2781,17 @@
     flex: 1;
     background: var(--brand);
     border-color: var(--brand);
-    color: #fff;
+    color: var(--brand-black);
   }
   .signin-connect:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--brand) 88%, #000);
-    border-color: color-mix(in srgb, var(--brand) 88%, #000);
+    background: color-mix(in srgb, var(--brand) 88%, var(--brand-black));
+    border-color: color-mix(in srgb, var(--brand) 88%, var(--brand-black));
   }
   .signin-foot {
     margin: 0.4rem 0 0;
     text-align: center;
     color: var(--text-3);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
   }
   .signin-guidance {
     background: var(--warn-soft);
@@ -2821,7 +2803,7 @@
   }
   .signin-guidance p {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     line-height: 1.45;
     overflow-wrap: anywhere;
   }
@@ -2837,18 +2819,18 @@
   }
   .sg-link {
     color: var(--accent);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
   .sg-code {
     color: var(--text-3);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
 
   /* ── Details modal ── */
   .details-overlay {
     align-items: center;
-    background: color-mix(in srgb, #000 45%, transparent);
+    background: var(--overlay);
     display: flex;
     inset: 0;
     justify-content: center;
@@ -2875,7 +2857,7 @@
     border: 0;
     color: var(--text-2);
     cursor: pointer;
-    font-size: 1.6rem;
+    font-size: var(--text-2xl);
     line-height: 1;
     position: absolute;
     right: 0.75rem;
@@ -2892,7 +2874,7 @@
   }
   .details-grid dt {
     color: var(--text-3);
-    font-size: 0.73rem;
+    font-size: var(--text-xs);
     font-weight: 700;
     text-transform: uppercase;
   }
@@ -2908,7 +2890,7 @@
   }
   .fallback-empty {
     color: var(--text-3);
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
     margin: 0.5rem 0;
   }
   .fallback-list {
@@ -2957,11 +2939,11 @@
   }
   .fallback-add select {
     max-width: 22rem;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
   }
   .ok-note {
     color: var(--ok);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
   }
   .advisor {
     margin-top: var(--space-4);
@@ -2987,24 +2969,26 @@
   }
   .advisor-model-name {
     font-family: var(--font-mono, monospace);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .advisor-row select {
     max-width: 22rem;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
   }
-  .gate-status {
-    margin-top: var(--space-4);
-  }
+  /* The four off-machine facts, read as a strip above the Hosted cards rather
+     than as a card of their own on a tab of their own. */
   .gates {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
     gap: 0.5rem 1rem;
-    margin: 0 0 var(--space-3);
+    margin: 0 0 var(--space-4);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
   }
   .gates dt {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -3015,11 +2999,8 @@
   }
   .sub {
     color: var(--text-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     margin: 0;
-  }
-  .error {
-    color: var(--danger);
   }
   @media (max-width: 44rem) {
     .head-row,

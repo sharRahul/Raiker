@@ -204,7 +204,7 @@
         <li class:blocked={thread.waiting_on}>
           <a href={`#/new-chat?session=${encodeURIComponent(thread.session_id)}`}>
             <span class="title">
-              {#if thread.kind === "routine"}<Icon name="tasks" size={14} />{/if}
+              {#if thread.kind === "routine"}<Icon name="tasks" size="sm" />{/if}
               {thread.title}
             </span>
             <span class="meta">

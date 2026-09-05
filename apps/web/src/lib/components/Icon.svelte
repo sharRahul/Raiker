@@ -16,7 +16,7 @@
 
   let {
     name,
-    size = 18,
+    size = "md",
     label = null,
     filled = false,
   }: {

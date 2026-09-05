@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from raiker.channels.adapters import AdapterRefusal, adapter_for
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ApprovalRelayRecord
 from raiker.runtime.executors.base import ExecutionResult
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 # transport for Phase 4 slice 4; other transports remain gated/fail-closed.
 
 
-def _sign_delivery(body: bytes) -> tuple[str, bool]:
+def sign_delivery(body: bytes) -> tuple[str, bool]:
     """``(signature, signed)`` for one outbound body.
 
     The webhook connector profile declares transport ``signed_http_callback`` and
@@ -68,9 +68,8 @@ class ExternalChannelExecutor:
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         connector_id = str(action.arguments.get("connector_id", "")).strip()
-        url = str(action.arguments.get("url", "")).strip()
         text = str(action.arguments.get("text", ""))
-        if not connector_id or not url:
+        if not connector_id:
             return ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,
                 reason_code="missing_argument:connector_id_or_url",
@@ -83,21 +82,36 @@ class ExternalChannelExecutor:
                 reason_code="channel_not_paired_or_disabled",
                 summary="Channel delivery denied: connector is not paired/enabled.",
             )
+
+        channel_type = str(pairing.get("channel_type") or "webhooks")
         delivered_at = utc_now()
-        body = json.dumps(
-            {
-                "text": text,
-                "connector_id": connector_id,
-                "delivered_at": delivered_at,
-            },
-            sort_keys=True,
-        ).encode("utf-8")
-        signature, signed = _sign_delivery(body)
-        headers = (
-            {"X-Raiker-Signature": signature, "X-Raiker-Delivered-At": delivered_at}
-            if signed
-            else {"X-Raiker-Delivered-At": delivered_at}
+
+        # One adapter per channel type, resolved from a table rather than an
+        # `if` chain here. What an adapter owns is the wire format and nothing
+        # else: the gate, the egress allowlist, the pairing, the sender
+        # allowlist and the audit event are all above this line and apply
+        # identically whichever one answers.
+        adapter = adapter_for(channel_type)
+        if adapter is None:
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=f"channel_transport_unsupported:{channel_type}",
+                summary=f"Channel delivery denied: no wire format for '{channel_type}'.",
+            )
+        built = adapter.outbound(
+            connector_id=connector_id,
+            pairing=pairing,
+            arguments=action.arguments,
+            text=text,
+            delivered_at=delivered_at,
         )
+        if isinstance(built, AdapterRefusal):
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=built.reason_code, summary=built.summary,
+            )
+        url, body, headers, signed = built.url, built.body, built.headers, built.signed
+
         try:
             result = post_url(
                 url, body, egress_allowlist=channel_egress_allowlist(), headers=headers
@@ -112,12 +126,16 @@ class ExternalChannelExecutor:
             ok=True, capability=self.capability, action_id=action.action_id,
             summary=(
                 f"Delivered to '{connector_id}' ({result['sent_bytes']}b)"
-                + (", signed." if signed else ", UNSIGNED — set RAIKER_CHANNEL_OUTBOUND_SECRET.")
+                # The adapter already said whether Raiker signs this transport;
+                # asking it beats naming a platform here.
+                + (", signed." if signed else ".")
             ),
             # Metadata only — never the message text, the target URL, or the
-            # signature itself.
+            # signature itself. For Telegram the URL matters twice over: it
+            # carries the bot token.
             artifacts={
                 "connector_id": connector_id,
+                "channel_type": channel_type,
                 "sent_bytes": result["sent_bytes"],
                 "status": result["status"],
                 "signed": signed,

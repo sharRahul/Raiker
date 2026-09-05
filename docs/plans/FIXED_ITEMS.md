@@ -422,6 +422,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-407](#fixed-407--a-gigabyte-of-downloads-because-the-interpreter-was-python-310) | Medium | Install / dependencies | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-408](#fixed-408--one-composer-three-surfaces-and-design-where-it-belongs) | Medium | Web UI / work surfaces | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-409](#fixed-409--raiker-could-start-at-sign-in-but-had-no-icon-to-click) | Medium | Desktop integration / uninstall | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-410](#fixed-410--the-design-model-picker-was-empty-on-every-real-install) | **High** | Design / models | Fixed 2026-09-05 (raised by the owner) |
 
 ---
 
@@ -18175,3 +18176,64 @@ per-platform artefact asserted on every platform (the plist is parsed with
 one with a `%`); `raiker-app desktop install|status|uninstall` verified end to
 end on this machine, including the degraded path where `update-desktop-database`
 is absent — reported, not raised, entry still written.
+
+## FIXED-410 — The Design model picker was empty on every real install
+
+**Severity: High. Area: Design / models. Status: Fixed 2026-09-05. Raised by the
+owner: why does the Design composer not have the model selector, and the
+dropdown should identify and only show models that can generate images.**
+
+**Observed.** The Design composer had no model control. FIXED-408 had made that
+worse by hiding the select when it was empty — but the select was empty for a
+reason no amount of hiding would fix.
+
+**Root cause: the field was never sent.** `image_model` is declared on two
+profiles in `model-profiles.json`, and `DesignView` read `profile.image_model`
+off every profile in `/api/models`. `ModelProfileView` — the dataclass that *is*
+that response — had no such field. Every profile answered `undefined`, so the
+list of image-capable providers was empty on **every real install**, and had
+been since the surface shipped. The one fixture that might have caught it
+declared no image provider either, so the mocked route audit rendered an empty
+control and passed.
+
+`grep image_model raiker/**/*.py` returns exactly two hits, both inside the
+executor. Nothing in between ever carried it.
+
+**Three defects, one shape.**
+
+*It was a provider picker wearing a model picker's clothes.* `image_model` is a
+single string, so a provider offering two image models could expose one of them
+and the control could only ever say "OpenAI". Profiles now declare
+`image_models` — a list, default first — and the composer lists one entry per
+*model*, labelled `provider · model`.
+
+*Image models were offered as chat models.* `modelPresentation.ts` already had a
+`NOT_A_CHAT_MODEL` list to keep non-chat endpoint families out of the pickers. It
+knew `dall-e` and nothing else, so `gpt-image-1` and `gemini-2.5-flash-image` —
+the two models Raiker itself declares for images — were both offered in Chat and
+Build, where they cannot answer a turn. One `IS_AN_IMAGE_MODEL` list is now read
+in both directions: Design offers exactly these, the chat pickers exclude them,
+and the two rules cannot drift because they are the same list.
+
+`imageCandidates` deliberately has no empty-list fallback where `chatCandidates`
+does. There, offering too much beats offering nothing; here a Generate button
+pointed at a model that cannot draw is worse than an honest empty state.
+
+*A chosen model was unbounded.* The executor already read
+`action.arguments["model"]`, with nothing above it ever setting it — so wiring
+the picker would have made it a free-text string posted to a provider, which is
+the exact objection that bounds `SUPPORTED_SIZES` and builds the URL from the
+profile. It is now refused unless the profile declares it
+(`image_model_not_declared:<model>`), and a test asserts the provider is never
+reached.
+
+**The empty state.** The control is always rendered. With nothing connected it
+reads "No image model — connect one" and links to Models, because hiding it made
+*"no image model is connected"* indistinguishable from *"this page has no model
+control"* — and the second reading is the one the owner actually reached.
+
+**User-interface outcome.** The composer shows "OpenAI · GPT Image 1", verified
+by screenshot. 17 image tests and 17 model-presentation tests pass, including a
+regression test for the chat-picker leak; the mocked fixture now declares an
+image-capable provider so the route audit exercises a populated control. The
+serialisation guard was confirmed to fail when the builder line is removed.

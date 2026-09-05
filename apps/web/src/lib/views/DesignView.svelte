@@ -22,9 +22,9 @@
   import GuideLink from "../components/GuideLink.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
-  import { relativeTime } from "../format";
+  import { providerName, relativeTime } from "../format";
   import { runtimeBlock } from "../capabilityModel";
-  import { modelName } from "../modelPresentation";
+  import { imageCandidates, modelName } from "../modelPresentation";
   import type { CapabilityGate, ImageGeneration, ModelsView } from "../apiTypes";
 
   let view = $state<{ sizes: string[]; generations: ImageGeneration[] } | null>(null);
@@ -36,7 +36,6 @@
   let threadEl = $state<HTMLDivElement | undefined>();
 
   let prompt = $state("");
-  let profileId = $state("");
   let size = $state("1024x1024");
 
   /** Said before the press, through the helper every other gated surface uses. */
@@ -48,12 +47,30 @@
   );
 
   /**
-   * Providers that can actually answer. A profile without an `image_model` has
-   * no image endpoint in this build, and offering it would be an invitation to
-   * a refusal.
+   * Every image model any connected provider declares — one entry per model,
+   * not per provider.
+   *
+   * This is a *model* picker, which is what the surface always needed and did
+   * not have: the previous control listed providers, so a provider offering two
+   * image models could only ever expose one of them. Which providers are
+   * configured for chat has no bearing on it — a profile appears here if and
+   * only if it declares a model that draws.
    */
-  const imageProfiles = $derived(
-    (models?.profiles ?? []).filter((profile) => Boolean(profile.image_model)),
+  const imageChoices = $derived(
+    (models?.profiles ?? []).flatMap((profile) =>
+      imageCandidates(profile.image_models ?? []).map((model) => ({
+        key: `${profile.profile_id}::${model}`,
+        profileId: profile.profile_id,
+        provider: profile.provider,
+        model,
+      })),
+    ),
+  );
+
+  /** The pick, as `profile_id::model`. */
+  let choiceKey = $state("");
+  const choice = $derived(
+    imageChoices.find((item) => item.key === choiceKey) ?? imageChoices[0] ?? null,
   );
 
   /**
@@ -115,7 +132,7 @@
     }
     try {
       models = await api.models();
-      if (!profileId && imageProfiles.length) profileId = imageProfiles[0].profile_id;
+      if (!choiceKey && imageChoices.length) choiceKey = imageChoices[0].key;
     } catch {
       models = null;
     }
@@ -123,11 +140,16 @@
   }
 
   async function generate() {
-    if (!prompt.trim() || !profileId || busy || block.kind !== "none") return;
+    if (!prompt.trim() || choice === null || busy || block.kind !== "none") return;
     busy = true;
     failure = null;
     try {
-      await api.generateImage({ profile_id: profileId, prompt: prompt.trim(), size });
+      await api.generateImage({
+        profile_id: choice.profileId,
+        prompt: prompt.trim(),
+        size,
+        model: choice.model,
+      });
       prompt = "";
     } catch (error) {
       failure =
@@ -218,23 +240,26 @@
     onsubmit={() => void generate()}
   >
     {#snippet left()}
-      <!-- Rendered only when there is something to choose. A `disabled` select
-           over an empty list is an empty pill on the bar: a control that looks
-           broken rather than one that is not applicable, and the footer below
-           already says why there is nothing to pick. -->
-      {#if imageProfiles.length > 0}
-        <label class="composer-scope">
-          <span class="sr-only">Provider</span>
-          <Icon name="models" size="sm" />
-          <select class="bar-select" bind:value={profileId} aria-label="Provider" disabled={busy}>
-            {#each imageProfiles as profile (profile.profile_id)}
-              <option value={profile.profile_id}>
-                {profile.provider} · {modelName(profile.image_model ?? "")}
+      <!-- Always here, whatever is configured. Hiding it made "no image model is
+           connected" indistinguishable from "this page has no model control",
+           and the second reading is the one an owner actually reached. When
+           there is nothing to choose it says so in the control itself rather
+           than leaving a gap where a control belongs. -->
+      <label class="composer-scope">
+        <span class="sr-only">Image model</span>
+        <Icon name="models" size="sm" />
+        {#if imageChoices.length > 0}
+          <select class="bar-select" bind:value={choiceKey} aria-label="Image model" disabled={busy}>
+            {#each imageChoices as item (item.key)}
+              <option value={item.key}>
+                {providerName(item.provider)} · {modelName(item.model)}
               </option>
             {/each}
           </select>
-        </label>
-      {/if}
+        {:else}
+          <a class="bar-select bar-empty" href="#/models">No image model — connect one</a>
+        {/if}
+      </label>
       {#if (view?.sizes ?? []).length > 0}
         <label class="composer-scope">
           <span class="sr-only">Size</span>
@@ -251,7 +276,7 @@
       <button
         type="submit"
         class="btn btn-primary send"
-        disabled={busy || !prompt.trim() || !profileId || block.kind !== "none"}
+        disabled={busy || !prompt.trim() || choice === null || block.kind !== "none"}
         aria-label={busy ? "Generating" : "Generate"}
       >
         <Icon name={busy ? "clock" : "send"} size="sm" />
@@ -260,12 +285,6 @@
     {/snippet}
 
     {#snippet footer()}
-      {#if imageProfiles.length === 0 && models !== null}
-        <p class="line-notice" role="status">
-          No connected provider offers an image model.
-          <a href="#/models">Connect one on Models →</a>
-        </p>
-      {/if}
       {#if failure}<p class="error" role="alert">{failure}</p>{/if}
     {/snippet}
 
@@ -350,10 +369,18 @@
     color: var(--text-3);
     font-size: var(--text-xs);
   }
-  .line-notice {
-    margin: 0;
-    font-size: var(--text-xs);
+  /* The empty state of the model control: shaped like the select it replaces so
+     the bar keeps its rhythm, and a link because the fix is on another page. */
+  .bar-empty {
+    display: inline-flex;
+    align-items: center;
     color: var(--text-3);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .bar-empty:hover {
+    color: var(--accent);
+    border-color: var(--accent-border);
   }
   .notice { color: var(--text-2); }
   .notice a { margin-left: 0.35rem; }

@@ -705,6 +705,8 @@ export interface ModelProfile {
   /** The image model this provider answers with, when it has a governed image
    *  endpoint. Absent means the Design surface does not offer this profile. */
   image_model?: string | null;
+  /** Image models this provider declares, default first. Empty for most. */
+  image_models?: string[];
   default_state: string;
   local_only: boolean;
   requires_network: boolean;

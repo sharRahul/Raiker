@@ -317,3 +317,94 @@ def test_the_list_route_never_returns_bytes_and_the_bytes_route_is_owner_scoped(
     # Unauthenticated: both reads are refused.
     assert client.get("/api/images").status_code in (401, 403)
     assert client.get(f"/api/images/{generation_id}/bytes").status_code in (401, 403)
+
+
+# ── choosing a model ─────────────────────────────────────────────────────
+#
+# The Design surface had no model control at all, because `image_model` was read
+# by the page and never sent by the models view — every profile answered
+# `undefined`, so the picker was empty on every real install. Sending it opened a
+# second question: a chosen model is a string this runtime posts to a provider,
+# and an action argument is a thing a model can propose.
+
+
+def test_a_profile_declares_its_image_models_default_first() -> None:
+    from raiker.runtime.executors.tier2_image import declared_image_models
+
+    assert declared_image_models(
+        {"image_model": "gpt-image-1", "image_models": ["gpt-image-1", "dall-e-3"]}
+    ) == ("gpt-image-1", "dall-e-3")
+    # A default missing from the list is still choosable, and still first.
+    assert declared_image_models({"image_model": "a", "image_models": ["b"]}) == ("a", "b")
+    assert declared_image_models({}) == ()
+
+
+def test_the_shipped_profiles_declare_the_models_the_page_offers() -> None:
+    """The config is the source; a page that offered more would be guessing."""
+    from raiker.models.registry import ModelProfileRegistry
+    from raiker.runtime.executors.tier2_image import (
+        SUPPORTED_PROVIDERS,
+        declared_image_models,
+    )
+
+    declaring = {
+        profile.provider: declared_image_models(profile.raw)
+        for profile in ModelProfileRegistry.load().profiles
+        if declared_image_models(profile.raw)
+    }
+    assert declaring, "no shipped profile declares an image model"
+    # Declaring one is pointless without a governed endpoint to send it to.
+    for provider in declaring:
+        assert provider in SUPPORTED_PROVIDERS
+
+
+def test_the_models_view_actually_sends_the_declared_image_models() -> None:
+    """The defect itself: the field existed in config and never reached the web.
+
+    The Design page read `image_model` off each profile and every profile
+    answered `undefined`, because this view never carried it. The picker was
+    therefore empty on every real install, and the one fixture that could have
+    caught it had no image provider either.
+    """
+    import inspect
+
+    from raiker.control import dashboard
+    from raiker.control.dashboard import ModelProfileView
+
+    field = ModelProfileView.__dataclass_fields__.get("image_models")
+    assert field is not None, "the models view does not carry image models"
+    assert field.default == ()
+    # And the builder populates it, rather than leaving every profile at the
+    # default — which would reproduce the defect with the field in place.
+    source = inspect.getsource(dashboard)
+    assert "image_models=declared_image_models(" in source
+
+
+def test_a_model_the_profile_does_not_declare_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A chosen model is bounded by the profile, exactly as `size` is."""
+    ws = _ws(tmp_path)
+    _enable(ws)
+    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    called = False
+
+    def fake_post(*args: object, **kwargs: object) -> dict:
+        nonlocal called
+        called = True
+        return {}
+
+    monkeypatch.setattr(tier2_image, "post_json", fake_post)
+    result = _generate(
+        ws,
+        profile_id="openai-hosted",
+        prompt="a cat",
+        size="1024x1024",
+        model="some-model-nobody-declared",
+    )
+    assert result.decision == "allow"
+    assert result.error is not None
+    assert "image_model_not_declared" in str(result.error)
+    assert not called, "an undeclared model must not reach the provider"

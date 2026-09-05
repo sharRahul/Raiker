@@ -29,6 +29,16 @@ const model = {
   context_window_tokens: 200000,
 };
 
+// A connected provider that draws. Design reads `image_models` from here, and
+// the chat picker must not offer what it lists.
+const imageModel = {
+  ...model,
+  profile_id: "openai-hosted", provider: "openai", model: "gpt-4o",
+  image_model: "gpt-image-1", image_models: ["gpt-image-1"],
+  selected: false, supports_reasoning: false, supports_reasoning_effort: false,
+  reasoning_effort_values: [] as string[],
+};
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     class FakeRecognition {
@@ -70,7 +80,7 @@ test.beforeEach(async ({ page }) => {
         }
         body = { settings, status: { vault: "configured", mfa_enrolled: false, username: "owner" } };
       }
-      else if (path === "/api/models") body = { profiles: [model], current_profile_id: model.profile_id, current_model: model.model, fallback_sequence: [] };
+      else if (path === "/api/models") body = { profiles: [model, imageModel], current_profile_id: model.profile_id, current_model: model.model, fallback_sequence: [] };
       else if (path.endsWith("/provider-models")) body = { profile_id: model.profile_id, provider: model.provider, status: "available", reason_code: null, models: ["claude-sonnet-4-5", "claude-opus-4-1"] };
       else if (path === "/api/settings/composer-approval-mode") body = { approval_mode: "manual" };
       // BUG-256 — the composers read which speech runtime the owner's choice

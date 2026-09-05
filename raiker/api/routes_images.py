@@ -80,6 +80,7 @@ async def generate_image(body: GenerateImageRequest, request: Request) -> dict[s
         profile_id=body.profile_id.strip(),
         prompt=body.prompt.strip(),
         size=body.size.strip(),
+        model=body.model.strip(),
     )
     if not result.ok:
         # The refusal is already recorded against the owner by the executor, so

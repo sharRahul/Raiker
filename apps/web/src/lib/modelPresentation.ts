@@ -81,15 +81,35 @@ function word(value: string): string {
  * and a provider whose entire catalogue looks like this is a provider this rule
  * does not understand.
  */
+/**
+ * Models that draw rather than talk.
+ *
+ * One list, read in both directions: Design offers exactly these, and the chat
+ * pickers exclude them. Kept together because the two rules are the same fact,
+ * and the version where they were separate had `dall-e` in the chat exclusions
+ * and nothing else — so `gpt-image-1` and `gemini-2.5-flash-image`, the two
+ * models Raiker itself declares for images, were both offered as chat models
+ * that could never answer a turn.
+ *
+ * Like the list below it, this is provider naming rather than a capability
+ * guess: an image endpoint is a different endpoint, and every family here is
+ * named by its provider for that endpoint.
+ */
+const IS_AN_IMAGE_MODEL = [
+  /(^|[/\-_])dall-e/i,
+  /(^|[/\-_])imagen([-_.]|$)/i,
+  /[-_]image([-_.]|$)/i,
+];
+
 const NOT_A_CHAT_MODEL = [
   /(^|[/\-_])text-embedding/i,
   /(^|[/\-_])embed(ding)?([-_.]|$)/i,
   /(^|[/\-_])whisper/i,
   /(^|[/\-_])tts([-_.]|$)/i,
-  /(^|[/\-_])dall-e/i,
   /(^|[/\-_])moderation/i,
   /(^|[/\-_])rerank/i,
   /(^|[/\-_])sora/i,
+  ...IS_AN_IMAGE_MODEL,
 ];
 
 export function chatCandidates(models: string[]): string[] {
@@ -97,4 +117,17 @@ export function chatCandidates(models: string[]): string[] {
     (model) => !NOT_A_CHAT_MODEL.some((pattern) => pattern.test(model)),
   );
   return kept.length > 0 ? kept : models;
+}
+
+/**
+ * The models in a provider's catalogue that generate images.
+ *
+ * No empty-list fallback, unlike `chatCandidates`. There, offering too much
+ * beats offering nothing, because a provider whose whole catalogue looks
+ * unfamiliar is one the rule does not understand. Here the opposite holds: a
+ * provider with no image model must offer none, and falling back to its chat
+ * models would put a model that cannot draw in front of a Generate button.
+ */
+export function imageCandidates(models: string[]): string[] {
+  return models.filter((model) => IS_AN_IMAGE_MODEL.some((pattern) => pattern.test(model)));
 }

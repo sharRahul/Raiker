@@ -53,6 +53,22 @@ SUPPORTED_PROVIDERS = ("openai", "gemini")
 #: forwards to a provider without understanding it.
 SUPPORTED_SIZES = ("1024x1024", "1536x1024", "1024x1536")
 
+def declared_image_models(profile: dict[str, Any]) -> tuple[str, ...]:
+    """Every image model this profile offers, default first.
+
+    `image_model` is the one a generation uses when the owner does not choose;
+    `image_models` is the set they may choose from. Kept as two keys because the
+    default is a decision (which model an unattended call gets) and the list is
+    an inventory, and collapsing them would make "first in the list" load-bearing.
+    """
+    listed = profile.get("image_models")
+    models = [str(name) for name in listed] if isinstance(listed, list) else []
+    default = str(profile.get("image_model") or "")
+    if default and default not in models:
+        models.insert(0, default)
+    return tuple(models)
+
+
 MAX_PROMPT_CHARS = 4_000
 #: Above this an image is refused rather than stored. The bytes go in the same
 #: table as user attachments and a generation is not a licence to fill it.
@@ -150,7 +166,22 @@ class ImageGenerationExecutor:
                 profile_id=profile_id, prompt=prompt, size=size,
             )
         provider = str(profile.get("provider", ""))
-        model = str(action.arguments.get("model") or profile.get("image_model") or "")
+        declared = declared_image_models(profile)
+        requested = str(action.arguments.get("model") or "")
+        model = requested or str(profile.get("image_model") or "")
+        # An action argument is a thing a model can propose, and this one names
+        # what gets posted to the provider. The URL is built from the profile so
+        # a prompt cannot redirect the request, but an undeclared model would
+        # still be a free-text string this runtime forwards without
+        # understanding it — the same objection that bounds `SUPPORTED_SIZES`.
+        if requested and requested not in declared:
+            return self._fail(
+                action, principal, f"image_model_not_declared:{requested}",
+                "Image generation denied: that model is not one this provider "
+                "declares for images.",
+                profile_id=profile_id, provider=provider, model=requested,
+                prompt=prompt, size=size,
+            )
         if provider not in SUPPORTED_PROVIDERS:
             return self._fail(
                 action, principal, f"image_provider_unsupported:{provider or 'unknown'}",

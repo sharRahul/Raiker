@@ -24,11 +24,19 @@ decisions on purpose, and image generation is refused separately from chat for
 the same reason: connecting a provider to answer questions is not asking Raiker
 to spend your credit generating pictures.
 
-## Which providers can answer
+## Choosing a model
 
-The page offers only profiles that name an image model. Today that is OpenAI
-(`gpt-image-1`) and Gemini (`gemini-2.5-flash-image`). A provider without one is
-not offered, rather than offered and then refused.
+The composer's model control lists every image model your connected providers
+declare — one entry per model, not per provider. Today that is OpenAI
+(`gpt-image-1`) and Gemini (`gemini-2.5-flash-image`). Which provider you use for
+chat makes no difference: a model appears here if and only if it can draw.
+
+A model that cannot draw is never offered, and one Raiker's profiles do not
+declare is refused rather than sent — a chosen model is a string this machine
+posts to a provider, so it is bounded like the size is.
+
+With nothing connected the control says so and links to Models, rather than
+disappearing.
 
 ## What is stored, and where
 

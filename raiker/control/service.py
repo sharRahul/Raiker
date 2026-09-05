@@ -1170,6 +1170,7 @@ class RuntimeControlService:
         profile_id: str,
         prompt: str,
         size: str,
+        model: str = "",
     ) -> ControlResult:
         """One governed image generation, for the Design surface.
 
@@ -1193,7 +1194,15 @@ class RuntimeControlService:
             principal_id=principal.principal_id,
             action_type="image_generation",
             tool_or_service_name="image_generation",
-            arguments={"profile_id": profile_id, "prompt": prompt, "size": size},
+            arguments={
+                "profile_id": profile_id,
+                "prompt": prompt,
+                "size": size,
+                # Omitted rather than sent empty: the executor reads "no model
+                # named" as "use the profile default", and an empty string in
+                # the audited arguments would read as a choice that was made.
+                **({"model": model} if model else {}),
+            },
             risk_level=RiskLevelValue.MEDIUM,
         )
         result = self._authority.route_action(action, principal)

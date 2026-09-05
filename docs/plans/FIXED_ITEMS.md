@@ -430,6 +430,8 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-415](#fixed-415--a-hub-tab-addressed-as-a-path-opened-the-workbench) | Low | Web UI / routing | Fixed 2026-09-05 (found live) |
 | [FIXED-416](#fixed-416--both-every-page-sweeps-had-stopped-covering-every-page) | Medium | Live test harness / evidence | Fixed 2026-09-05 (found live) |
 | [FIXED-417](#fixed-417--the-guides-tour-of-the-shell-described-a-shell-that-had-moved) | Medium | Documentation / web UI | Fixed 2026-09-05 (found live) |
+| [FIXED-418](#fixed-418--every-settings-section-opened-general-on-the-only-route-to-settings) | Medium | Web UI / routing | Fixed 2026-09-05 (found live) |
+| [FIXED-419](#fixed-419--four-live-guards-had-gone-stale-and-could-not-say-so) | Medium | Live test harness / evidence | Fixed 2026-09-05 (found live) |
 
 ---
 
@@ -18708,3 +18710,115 @@ the Hub cannot be reached).
 so this is a product surface rather than a repository file: **Guide → Getting
 started** now describes the navigation an owner is looking at. `test_docs_consistency`
 is green.
+
+---
+
+## FIXED-418 — Every Settings section opened General, on the only route to Settings
+
+**Severity: Medium. Area: Web UI / routing. Status: Fixed 2026-09-05. Found by
+chasing a wrong assertion of my own, which is the useful kind.**
+
+**Observed.** Settings left the sidebar when the rail kept only the work, so the
+gear's window — **Settings and pages** — is the only place a link to it is
+drawn. That window lists Settings as its ten sections rather than as one bare
+row, deliberately: a bare "Settings" link would open General while sitting above
+a row that says General.
+
+All ten of those rows emitted `#/settings?section=<id>`. `tabFromHash` reads
+`?tab=`. So every one of them opened Settings on **General**, and the whole
+destination was reachable only at its first panel — Privacy, Security, Web
+access, Runtime, Updates and the rest could be reached only by clicking through
+the rail once you were there.
+
+Verified live before the fix: clicking **Privacy** left the hash at
+`#/settings?section=privacy` and rendered General; *"Retained working"* — the one
+control Privacy holds — was not on the page.
+
+**Root cause.** Two spellings of the same idea, in two files, that never met.
+`sectionFromHash` exists and reads `?section=`, and it is the **guide's**
+parameter: guide pages are not hub tabs, so they cannot be validated against a
+constant and the view resolves them itself. `AllPagesDialog` reached for the
+spelling that reads naturally for a *settings section* and got the guide's one.
+
+`nav.test.ts` already names this failure exactly — *"the settings rail renders
+sections `HUB_TABS.settings` does not list, so `#/settings?tab=web-access`
+silently opened General. A deep link that lands on the wrong page looks exactly
+like one that works."* It guards the `?tab=` spelling, which was never the
+broken one.
+
+**Fixed, in both directions.** The dialog emits `?tab=`, the form the rest of
+the app uses. And `tabFromHash` accepts `?section=` as a synonym, so a link
+written by hand — or by a surface that had it wrong for real, which is how this
+was found — resolves instead of silently opening the first panel. Same reasoning
+as [FIXED-415](#fixed-415--a-hub-tab-addressed-as-a-path-opened-the-workbench)
+one entry up: three spellings, one destination, and none of them a link that
+looks like it works. `?tab=` wins where a hash carries both, and the guide's own
+`?section=` is untouched because the guide has no tabs.
+
+**How it was found, and why that matters.** Writing the navigation assertion in
+`bug-61-guide-accuracy-live` the obvious way — expect a "Settings" link in the
+gear's window — failed, because there deliberately isn't one. Reading the dialog
+to find out why is what surfaced the `href` beneath it. A wrong assertion that
+sends you to read the source is worth more than a right one that does not.
+
+**User-interface outcome.** Clicking **Privacy** in the gear's window opens
+Privacy. Verified live, and the live spec now clicks that row and asserts the
+panel rather than only the row's existence, so the two halves cannot come apart
+again. Four cases in `nav.test.ts` walk every settings section in the other
+spelling.
+
+---
+
+## FIXED-419 — Four live guards had gone stale, and could not say so
+
+**Severity: Medium. Area: Live test harness / evidence. Status: Fixed
+2026-09-05. Found while re-running the guide specs after editing the guide.**
+
+**Observed.** [FIXED-416](#fixed-416--both-every-page-sweeps-had-stopped-covering-every-page)
+found five sweeps whose route lists had drifted. Running the *guide* specs after
+[FIXED-417](#fixed-417--the-guides-tour-of-the-shell-described-a-shell-that-had-moved)
+found the same thing one layer in — assertions, not lists:
+
+* **`guide-surface-live` clicked a sidebar link named "Guide".** The Guide moved
+  behind the gear with the rest of Support. The spec spent its full five-minute
+  timeout waiting for a link that is no longer drawn, and reported it as a slow
+  click. Its comment even said *"Reachable the way an owner would reach it: a
+  sidebar destination."* It goes through the gear's window now — still
+  reachability, rather than a hash somebody typed, which is what the deep link
+  beside it already tests. **23 seconds, from a five-minute timeout.**
+* **`bug-61-guide-accuracy-live` asserted Permissions, Models, Extensions,
+  Observability and Settings are links in the navigation rail.** They are not,
+  for the same reason. It asserts the *split* now — what is on the rail, and
+  what is behind the gear — which is the fact an owner needs and the one
+  `getting-started.md` now states. Writing that assertion is what found
+  [FIXED-418](#fixed-418--every-settings-section-opened-general-on-the-only-route-to-settings).
+* **The same file asserted an MCP notice the product deliberately removed.** It
+  wanted *"Raiker cannot call any MCP tool: the MCP connector capability is not
+  enabled at runtime level."* `McpView` suppresses that sentence when the gate's
+  own block already says it, because a closed connector used to draw two amber
+  notices one under the other saying the same fact in different words and naming
+  the same page by two different names. The improvement landed, its unit test
+  asserts it, and this spec kept asking for the duplicate. It now asserts the
+  claim rather than the wording: the page names the capability that is off and
+  offers the control that changes it. A reword passes; silence does not.
+
+**Root cause, and the structural half that matters more.** Not one of the three
+had failed *visibly*, and the reason is worth more than the fixes. The file is
+`mode: "serial"` — every test shares one signed-in page, which it needs — and
+its first two tests require a provider that answers. On any host without one,
+those two fail and take the six below them with them. So the six that need no
+model at all had not run in months, and three had quietly gone wrong underneath.
+
+A guard that cannot run is not a guard. **`requiresModel()` marks the five tests
+in that file that genuinely need a turn** — the two that ask one, the export test
+(there is nothing to export until a turn has produced a conversation), and the
+two task tests (creating a task with instructions goes through the readiness
+check). Each now *skips with the reason*, naming
+[BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)
+and what to set, instead of failing — the same shape `requireFirstRunWorkspace`
+gives a spec that needs a fresh workspace (BUG-250). The other four run.
+
+**User-interface outcome.** None; harness-only, and it protects the guide's own
+accuracy guard. **On this host, with no provider that answers: 4 passed, 5
+skipped with a stated reason, 0 failed** — where before it was 1 failed and 7
+never reached.

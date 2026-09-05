@@ -30,7 +30,23 @@ const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "scre
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const MODEL = "claude-haiku-4-5-20251001";
 
+// Serial because every test shares one signed-in page. That is what this file
+// needs and also what hid the defect above: a failure in one test stops the file,
+// so the two tests that need a model to answer took the six that do not down with
+// them on every host without one. `requiresModel` marks those two, so a round
+// without a provider skips them *with the reason* and still runs the rest —
+// the same shape `requireFirstRunWorkspace` uses for a spec that needs a fresh
+// workspace (BUG-250).
 test.describe.configure({ mode: "serial" });
+
+/** Skip, with the reason, when no key was supplied for this round. */
+function requiresModel(): void {
+  test.skip(
+    ANTHROPIC_KEY === "",
+    "Needs a provider that answers. Set RAIKER_LIVE_ANTHROPIC_KEY — and, for an " +
+      "identity-linked key, its workspace id — to run this one (BUG-273).",
+  );
+}
 
 let context: BrowserContext;
 let page: Page;
@@ -79,8 +95,8 @@ test.beforeAll(async ({ browser }: { browser: Browser }) => {
 test.afterAll(async () => await context?.close());
 
 test("a provider key is added through the UI and a real turn answers", async () => {
+  requiresModel();
   test.setTimeout(240_000);
-  expect(ANTHROPIC_KEY, "set RAIKER_LIVE_ANTHROPIC_KEY").not.toBe("");
 
   const card = await useHostedModel(page, BASE, {
     provider: "Anthropic",
@@ -94,6 +110,7 @@ test("a provider key is added through the UI and a real turn answers", async () 
 });
 
 test("working-in-chat — a reply is rendered Markdown, not raw text", async () => {
+  requiresModel();
   test.setTimeout(300_000);
   await newChat();
   // The guide used to say "Markdown is not rendered (BUG-03) — headings, tables,
@@ -114,6 +131,9 @@ test("working-in-chat — a reply is rendered Markdown, not raw text", async () 
 });
 
 test("working-in-chat — the transcript offers export, in three formats", async () => {
+  // Not because export needs a model, but because there is nothing to export
+  // until a turn has produced a conversation.
+  requiresModel();
   test.setTimeout(120_000);
   // "No export (BUG-08) — no download, PDF or print control" was the guide's
   // second stale line. FIXED-12, superseded by FIXED-19 and FIXED-54, shipped it.
@@ -146,37 +166,65 @@ test("permissions — one runtime, not a five-mode picker", async () => {
   await capture(page, join(SHOTS, "bug-61-single-runtime.png"));
 });
 
-test("getting-started — the sidebar groups are the ones the guide lists", async () => {
+test("getting-started — every destination is where the guide says it is", async () => {
   test.setTimeout(120_000);
   // The guide's "What you get" table had Sessions under Work and "Brain" under
   // Knowledge. Sessions is a tab inside Observability now, and Brain is the
   // Knowledge Map.
+  //
+  // **This test had itself gone stale, and could not say so.** It asserted that
+  // Permissions, Models, Extensions, Observability and Settings are links in the
+  // navigation rail. They left it when the sidebar kept only the work and
+  // everything you set up once moved behind the gear — so the assertion had been
+  // false since that change, and nobody saw it, because two model-dependent
+  // tests sit above it in a `mode: "serial"` file and this host has no model
+  // that can answer. A guard that cannot run is not a guard, which is the other
+  // half of what FIXED-416 found in the sweeps.
+  //
+  // So it asserts the split rather than one flat list: what is on the rail, and
+  // what is behind the gear. That is the fact an owner needs and the one
+  // `getting-started.md` now states (FIXED-417).
   await page.goto(`${BASE}/#/workbench`);
-  const nav = page.getByRole("navigation").first();
+  const nav = page.getByRole("navigation", { name: "All navigation" });
   await expect(nav).toBeVisible({ timeout: 30_000 });
+
+  // The rail: the work. "Threads" since C18 made this the board as well as the
+  // search; the guide once called it "Search Chat".
   for (const label of [
-    "Workbench",
-    "Chat",
-    "Build",
-    // The rail says "Threads" since C18 made this the board as well as the
-    // search; the guide once called it "Search Chat".
-    "Threads",
-    "Tasks",
-    "Projects",
-    "Memory",
-    "Knowledge Map",
-    "Approvals",
-    "Permissions",
-    "Models",
-    "Extensions",
-    "Observability",
-    "Settings",
+    "Workbench", "Chat", "Build", "Design", "Threads", "Tasks", "Projects",
+    "Approvals", "Messaging", "Memory", "Knowledge Map",
   ]) {
     await expect(nav.getByRole("link", { name: label, exact: true })).toHaveCount(1);
   }
   await expect(nav.getByRole("link", { name: "Sessions", exact: true })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Brain", exact: true })).toHaveCount(0);
   await capture(page, join(SHOTS, "bug-61-navigation.png"));
+
+  // The gear: what you set up once. Reachable, and reachable from here — a
+  // destination that left the rail and landed nowhere would pass the loop above.
+  //
+  // "Settings" itself is deliberately not a row: its ten sections are the rows,
+  // because a bare link would open General while sitting above a row that says
+  // General. Writing this assertion the obvious way — expecting a "Settings"
+  // link — is what found the defect underneath: those ten rows emitted
+  // `?section=` while the router read `?tab=`, so every one of them opened
+  // General anyway (FIXED-418).
+  await page.getByRole("button", { name: "Settings and pages" }).click();
+  const allPages = page.getByRole("dialog");
+  await expect(allPages).toBeVisible({ timeout: 30_000 });
+  for (const label of ["Permissions", "Models", "Extensions", "Observability", "Guide"]) {
+    await expect(allPages.getByRole("link", { name: label, exact: true })).toHaveCount(1);
+  }
+  await expect(allPages.getByRole("link", { name: "Settings", exact: true })).toHaveCount(0);
+  await capture(page, join(SHOTS, "bug-61-all-pages.png"));
+
+  // And a section row opens *that section*, not the one above it.
+  await allPages.getByRole("link", { name: "Privacy", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Privacy", exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByText("Retained working")).toBeVisible({ timeout: 30_000 });
+  await capture(page, join(SHOTS, "bug-61-settings-section-deep-link.png"));
 });
 
 test("extensions-and-mcp — the page states whether the agent can call a server", async () => {
@@ -184,21 +232,35 @@ test("extensions-and-mcp — the page states whether the agent can call a server
   // "Current limit (BUG-12): a connected server's tools are not offered to the
   // model in Chat" was the guide's claim. FIXED-17 made them callable and
   // FIXED-96 made the page say so — including, as here with the gate still off,
-  // the exact reason it cannot and the control that changes it.
+  // the reason it cannot and the control that changes it.
+  //
+  // **This assertion had gone stale too, and could not say so** — it wanted the
+  // sentence *"Raiker cannot call any MCP tool: the MCP connector capability is
+  // not enabled at runtime level."* `McpView` deliberately suppresses that one
+  // when the gate's own block already says it, because a closed connector used
+  // to draw two amber notices one under the other saying the same fact in
+  // different words and naming the same page by two different names. The
+  // improvement landed, its unit test asserts it, and this spec kept asking for
+  // the duplicate — unseen, because two model-dependent tests above it stop the
+  // file on a host with no provider.
+  //
+  // So it asserts the claim rather than the wording: the page names the
+  // capability that is off, and offers the control that changes it. A reword
+  // still passes; the page going silent does not.
   await page.goto(`${BASE}/#/extensions?tab=mcp`);
   const access = page
     .locator(".notice")
-    .filter({ hasText: /Raiker cannot call any MCP tool/i })
+    .filter({ hasText: /MCP connector/i })
     .first();
   await expect(access).toBeVisible({ timeout: 30_000 });
-  await expect(access).toContainText(
-    /the MCP connector capability is not enabled at runtime level/i,
-  );
-  await expect(access.getByRole("link")).toBeVisible();
+  await expect(access).toContainText(/turned off|not enabled|cannot call/i);
+  await expect(access.getByRole("link", { name: /Permissions/i })).toBeVisible();
   await capture(page, join(SHOTS, "bug-61-mcp-agent-access.png"));
 });
 
 test("tasks-and-projects — a task run does not appear in RECENT CHATS", async () => {
+  // Creating a task with instructions goes through the model-readiness check.
+  requiresModel();
   test.setTimeout(300_000);
   // "Task runs create sessions that appear in the sidebar's RECENT CHATS
   // alongside real conversations (BUG-10)" — closed by FIXED-15.
@@ -219,6 +281,7 @@ test("tasks-and-projects — a task run does not appear in RECENT CHATS", async 
 });
 
 test("tasks-and-projects — asking for a task in Chat raises a real decision", async () => {
+  requiresModel();
   test.setTimeout(300_000);
   // The one line the guide carried on trust: "Creating a task by asking for one
   // in Chat is specified but not shipped — the governed create_task tool exists,

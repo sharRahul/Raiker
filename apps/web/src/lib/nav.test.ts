@@ -7,6 +7,7 @@ import {
   NAV_ITEMS,
   navItem,
   routeFromHash,
+  sectionFromHash,
   tabFromHash,
 } from "./nav";
 
@@ -262,5 +263,38 @@ describe("a hub tab addressed as a path segment", () => {
   it("does not mistake a query-only deep link for a segment", () => {
     expect(routeFromHash("#/new-chat?session=sess_1")).toBe("new-chat");
     expect(tabFromHash("#/new-chat?session=sess_1")).toBeNull();
+  });
+});
+
+// Found live 2026-09-05, by chasing a wrong assertion of my own in
+// `bug-61-guide-accuracy-live`. The gear's window emitted
+// `#/settings?section=privacy` and `tabFromHash` reads `?tab=`, so all ten
+// Settings rows opened **General** — and since Settings left the sidebar, that
+// window is the *only* route to it, so the destination was reachable only at
+// its first panel. The guard above already says what that looks like: "a deep
+// link that lands on the wrong page looks exactly like one that works."
+//
+// The emitter is fixed. This closes the class rather than the instance: three
+// spellings reach one panel, and no future surface can pick the wrong one.
+describe("a settings section addressed the other way", () => {
+  it("reads ?section= as the tab it names", () => {
+    for (const section of HUB_TABS.settings) {
+      expect(tabFromHash(`#/settings?section=${section}`)).toBe(section);
+    }
+  });
+
+  it("lets ?tab= win when a hash carries both", () => {
+    expect(tabFromHash("#/settings?section=privacy&tab=account")).toBe("account");
+  });
+
+  it("leaves the guide's own ?section= alone", () => {
+    // `sectionFromHash` is what the guide reads, and the guide has no tabs, so
+    // `tabFromHash` answers null for it either way.
+    expect(sectionFromHash("#/guide?section=getting-started")).toBe("getting-started");
+    expect(tabFromHash("#/guide?section=getting-started")).toBeNull();
+  });
+
+  it("still falls back to General for a section that does not exist", () => {
+    expect(tabFromHash("#/settings?section=nonsense")).toBe("general");
   });
 });

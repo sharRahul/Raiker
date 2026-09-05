@@ -33,7 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
-| 2026-09-05 | Targeted + derived four-width sweep + full page sweep | `pages/` | Anthropic, a fourth **identity-linked** key — blocked in two requests rather than a round | A stop switch that shouts on every page, a Hub failure nobody was told about, a deep link that opened the Workbench, and the two sweeps that were supposed to catch all three |
+| 2026-09-05 | Targeted + derived four-width sweep + full page sweep | `pages/` | Anthropic, a fourth **identity-linked** key — blocked in two requests rather than a round | A stop switch that shouts on every page, a Hub failure nobody was told about, two kinds of deep link that opened the wrong page, and the nine guards that were supposed to catch them |
 | 2026-09-04 (fourth) | Targeted + measured four-width sweep | `pages/` | — (no model needed) | Two tabs folded out of the nav, 244 words moved to the guide, and three mobile bleeds the width sweep found only because the workspace had been worked in |
 | 2026-09-04 (third) | Targeted + measured four-width sweep + full page sweep | `bug-276-`, `bug-277-`, `bug-278-`, `pages/` | Anthropic, a third **identity-linked** key entered through the interface | A telemetry cadence that runs without a button, and three defects the round found in the product by using it: a valid key answered with "check your network", twenty-six connectors that said they were installed, and a "next run" printed as a full timestamp |
 | 2026-09-04 (second) | Targeted + measured four-width sweep | `widths/`, `anthropic-identity-linked-key` | Anthropic, the same **identity-linked** key entered through the interface | Five priority items landed and measured live, and two interface defects the sweep itself found: a model picker that called a provider unreachable after it had answered, and a control that drew nothing |
@@ -66,7 +66,7 @@ carries a tier that says which one a round ran.
 
 ---
 
-## 2026-09-05 — Four things the product was quietly wrong about, and the two sweeps that should have found them
+## 2026-09-05 — Six things the product was quietly wrong about, and the guards that should have found them
 
 **Tier: Targeted + a derived four-width sweep + the full page sweep. Build:
 production `npm run build`. Providers: Anthropic, a fourth identity-linked key.
@@ -132,6 +132,29 @@ underneath them.
   in the page a new owner reads first.
   [FIXED-417](FIXED_ITEMS.md#fixed-417--the-guides-tour-of-the-shell-described-a-shell-that-had-moved).
 
+**Then two more, from running the guide specs after editing the guide.** The
+sweeps' route lists were one layer of drift; their *assertions* were the next.
+
+* **The only route to Settings opened its first panel, ten times over.** The
+  gear's window lists Settings as its ten sections, and every row emitted
+  `#/settings?section=` while the router reads `?tab=`. Clicking **Privacy**
+  rendered General. Since Settings left the sidebar that window is the only
+  link to it, so the destination was reachable only at General.
+  [FIXED-418](FIXED_ITEMS.md#fixed-418--every-settings-section-opened-general-on-the-only-route-to-settings).
+  Found by writing a navigation assertion the obvious way and having it fail for
+  a reason that turned out to be a different defect underneath.
+* **Four live guards had gone stale and could not say so.**
+  `guide-surface-live` clicked a sidebar link named "Guide" — which moved behind
+  the gear — and spent its full five-minute timeout on it;
+  `bug-61-guide-accuracy-live` asserted five destinations are on the rail when
+  they are behind the gear, and asked for an MCP notice the product deliberately
+  removed as a duplicate. None had failed *visibly*, and that is the part worth
+  keeping: the file is serial and its first two tests need a provider, so on any
+  host without one the six that need no model never ran at all.
+  [FIXED-419](FIXED_ITEMS.md#fixed-419--four-live-guards-had-gone-stale-and-could-not-say-so).
+  That file now reads **4 passed, 5 skipped with the reason, 0 failed** on this
+  host, where it was 1 failed and 7 never reached.
+
 **And two in the MCP client, reached from a plan entry rather than from the
 screen.** Reading
 [BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks)'s
@@ -163,11 +186,15 @@ unmodified `main`**:
   console error on this host is the Hub `503`, and it is allowed only while the
   panel is telling the owner the Hub could not be reached: a silent panel and a
   `503` still fails.
+* The guide specs: `guide-surface-live` green in 23 seconds (from a five-minute
+  timeout), and `bug-61-guide-accuracy-live` green on everything a host without a
+  provider can run.
 * Live verification of each fix at 360 and 1440, by screenshot and by reading the
   rendered attributes: the stop switch idle (`Stop all work (nothing is
   running)`, no `live` class) and with three active tasks (`STOP 3`, and a dialog
   reading *"This stops 3 tasks"*); `#/extensions/mcp` opening Extensions;
-  *"Hugging Face could not be reached"* on the Models tab.
+  *"Hugging Face could not be reached"* on the Models tab; and **Privacy** in the
+  gear's window opening Privacy rather than General.
 
 **A note on one photograph.** The red, counted state of the stop switch was
 captured with the task list served from a fixture. This host has no model that

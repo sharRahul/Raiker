@@ -220,8 +220,13 @@ export function tabFromHash(hash: string): string | null {
   // which is the exact failure `HUB_TAB_ALIASES` above exists to prevent, one
   // level up. The query wins where both are present, because that is the one
   // this app emits.
-  const requested =
-    new URLSearchParams(hash.split("?", 2)[1] ?? "").get("tab") ?? segments[1] ?? null;
+  // `?section=` is the guide's parameter and reads naturally for a Settings
+  // section, so a link written by hand — or by a surface that had it wrong for
+  // real, which is how this was found — resolves rather than silently opening
+  // the first panel. Same reasoning as the path form above: three spellings, one
+  // destination, and none of them a link that looks like it works.
+  const query = new URLSearchParams(hash.split("?", 2)[1] ?? "");
+  const requested = query.get("tab") ?? query.get("section") ?? segments[1] ?? null;
   if (requested !== null && tabs.includes(requested)) return requested;
   const supersededBy = requested === null ? undefined : HUB_TAB_ALIASES[route]?.[requested];
   if (supersededBy !== undefined && tabs.includes(supersededBy)) return supersededBy;

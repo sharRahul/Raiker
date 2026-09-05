@@ -415,6 +415,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-400](#fixed-400--ten-var-references-to-tokens-that-do-not-exist) | Medium | Web UI / design system | Fixed 2026-09-04 (found by FIXED-398's audit) |
 | [FIXED-401](#fixed-401--a-scale-that-existed-and-a-sidebar-that-vanished-instead-of-collapsing) | Medium | Web UI / shell | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-402](#fixed-402--messaging-is-its-own-destination-and-telegram-is-a-real-transport) | High | Channels / messaging | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-403](#fixed-403--the-design-surface-governed-image-generation-from-nothing) | High | Design / image generation | Fixed 2026-09-05 (raised by the owner) |
 
 ---
 
@@ -17751,3 +17752,77 @@ in its connector list, off, with the four fail-closed facts stated separately.
 21 channel tests pass, including eight new ones covering the token, the chat id,
 the egress boundary, the inbound translation, an unallowlisted sender, a bad
 secret, and an update that cannot be used.
+
+## FIXED-403 — The Design surface: governed image generation, from nothing
+
+**Severity: High. Area: Design / image generation. Status: Fixed 2026-09-05.
+Raised by the owner: a new page where they can generate and render images using
+models that can generate images.**
+
+**Observed.** Nothing existed. No capability, no executor, no provider adapter,
+no storage, no route, no page — `grep -ril "image_generation\|dall-e\|gpt-image"`
+over `raiker/` returned zero files. This is the first capability added to Raiker
+since `telemetry_export`, and unlike a UI change it had to satisfy every
+invariant this repository holds about what a capability *is*.
+
+**Fix, as a vertical.**
+
+*Capability.* `image_generation`, Tier 2, for the reason every Tier-2 capability
+is Tier 2: it leaves the machine. Deliberately **not** a corner of
+`hosted_model_runtime` — an owner who connected OpenAI to answer questions has
+not thereby asked Raiker to spend their credit generating pictures, so the two
+are gated and refused separately.
+
+*Executor.* `runtime/executors/tier2_image.py` validates the prompt and the size
+against a fixed list, resolves the profile the owner configured, requires a
+non-empty `RAIKER_MODEL_EGRESS_ALLOWLIST`, resolves the credential from the saved
+connection or the owner's environment, and **builds the provider endpoint
+itself**. That last one is the load-bearing decision: an action argument is a
+thing a model can propose, and a proposed URL plus an owner's API key is a
+credential-exfiltration primitive. A prompt cannot reach the URL.
+
+*Transport.* `sandbox.post_json` is new, and exists so this did not become a
+second implementation of "reach a model provider". `post_url` enforces the
+allowlist but returns only size metadata; `post_json_rpc` returns the body but
+deliberately enforces *no* allowlist, because an owner-added MCP endpoint is
+authorised by the owner adding it. A hosted image model is neither: it must
+answer to the model egress allowlist and its reply is the image.
+
+*Storage.* The bytes go into `attachments`, already the one owner-scoped,
+sha256-addressed binary store in the product. `image_generations` records the
+attempt beside them — **including the refused ones**, because an owner who
+pressed Generate and got nothing should find out why from the page rather than
+the audit log.
+
+*API.* Three routes, one rule between them: the list is metadata only and the
+bytes are a separate owner-scoped request naming one generation, served
+`no-store`.
+
+*Page.* `DesignView.svelte` — a prompt, a provider, a size, a gallery. Its three
+refusal states have three different remedies (Permissions, the egress variable,
+the Models page) and are never collapsed into "couldn't generate".
+
+**What the repository's own invariants forced, and this is the part worth
+keeping.** Adding the capability failed *seven* guardrails before it was
+finished, each of which is a thing that would otherwise have shipped missing:
+
+1. `activation_blocked:no_requirement_entry` — no entry in the activation
+   registry, the same gap FIXED-106 recorded for checkpoint restore.
+2. `denied_by_policy` — absent from `policy/config.py`, so it was hard-denied on
+   the way to its own executor.
+3. `unsupported_id_prefix:img_` — ids are a closed set.
+4. No threat model (`docs/threat-models/image-generation.md` now exists).
+5. Not in the threat-model index.
+6. No `CAPABILITY_COPY` entry, so Permissions would have rendered the raw
+   identifier and no description.
+7. Not classified in `entry_paths.py`, and not named in §3.6 of
+   `GOVERNANCE_ENTRY_PATHS.md` — it is the forty-seventh.
+
+A new capability cannot be quietly added to this product, which is the point.
+
+**User-interface outcome.** Design is a sidebar destination. On a workspace with
+the capability off and no image provider connected it says both, separately, each
+linking to where the owner fixes it. 13 backend tests cover the gate, the egress
+boundary, the missing credential, an unsupported provider, an unsupported size,
+the stored bytes, the recorded refusal, a provider policy refusal, an oversized
+response, and that the credential appears in neither the result nor the record.

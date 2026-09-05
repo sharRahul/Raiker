@@ -53,6 +53,7 @@ describe("nav model", () => {
       "projects",
       "approvals",
       "messaging",
+      "design",
     ]);
   });
 

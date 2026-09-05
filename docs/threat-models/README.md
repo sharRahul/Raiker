@@ -19,6 +19,7 @@ acknowledging.
 | `approval_execution_relay` | [Approval execution relay](approval-execution-relay.md) |
 | `audit_export` | [Audit export](audit-export.md) |
 | `telemetry_export` | [Telemetry export](telemetry-export.md) |
+| `image_generation` | [Image generation](image-generation.md) |
 | Critical approvals (human-only, step-up verified) | [Critical approval lifecycle](critical-approval-lifecycle.md) |
 | `file_write_execution`, `patch_apply_execution` | [Workspace file mutation](workspace-file-mutation.md) |
 | `checkpoint_restore_execution` | [Checkpoint restore and rewind](checkpoint-restore.md) |
@@ -118,7 +119,8 @@ nothing to model until one is proposed. See
 
 Re-derived **2026-08-23** by comparing `REAL_EXECUTOR_CAPABILITIES`
 (`raiker/runtime/executors/__init__.py`) against the index above, and again
-**2026-09-04** when `telemetry_export` made it forty-six.
+**2026-09-04** when `telemetry_export` made it forty-six, and **2026-09-05**
+when `image_generation` made it forty-seven.
 **All forty-six are covered**, and every one is reachable from a table on this
 page rather than only by knowing a filename. The count is not maintained by
 care: `test_every_real_executor_capability_has_a_threat_model` fails the suite

@@ -129,7 +129,9 @@
     {
       "profile_id": "raiker-local-mlx",
       "provider": "mlx",
-      "requires_platform": ["darwin"],
+      "requires_platform": [
+        "darwin"
+      ],
       "backend": "openai_compatible",
       "model": "<model>",
       "endpoint": "http://127.0.0.1:8090",
@@ -157,7 +159,9 @@
     {
       "profile_id": "raiker-local-mlx-2",
       "provider": "mlx",
-      "requires_platform": ["darwin"],
+      "requires_platform": [
+        "darwin"
+      ],
       "backend": "openai_compatible",
       "model": "<model>",
       "endpoint": "http://127.0.0.1:8091",
@@ -185,7 +189,9 @@
     {
       "profile_id": "raiker-local-mlx-3",
       "provider": "mlx",
-      "requires_platform": ["darwin"],
+      "requires_platform": [
+        "darwin"
+      ],
       "backend": "openai_compatible",
       "model": "<model>",
       "endpoint": "http://127.0.0.1:8092",
@@ -213,7 +219,9 @@
     {
       "profile_id": "raiker-local-mlx-4",
       "provider": "mlx",
-      "requires_platform": ["darwin"],
+      "requires_platform": [
+        "darwin"
+      ],
       "backend": "openai_compatible",
       "model": "<model>",
       "endpoint": "http://127.0.0.1:8093",
@@ -513,7 +521,8 @@
             "output": 0.6
           }
         }
-      }
+      },
+      "image_model": "gpt-image-1"
     },
     {
       "profile_id": "chatgpt-codex-subscription",
@@ -534,7 +543,11 @@
       "supports_json_schema": false,
       "supports_reasoning": true,
       "supports_reasoning_effort": true,
-      "reasoning_effort_values": ["low", "medium", "high"],
+      "reasoning_effort_values": [
+        "low",
+        "medium",
+        "high"
+      ],
       "reasoning_trace_visible": false,
       "tool_call_mode": "text_json"
     },
@@ -565,7 +578,8 @@
         "api_key_env",
         "extra_headers.Authorization"
       ],
-      "supports_vision": true
+      "supports_vision": true,
+      "image_model": "gemini-2.5-flash-image"
     }
   ]
 }

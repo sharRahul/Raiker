@@ -250,6 +250,68 @@ def post_url(
     return {"status": status_code, "sent_bytes": len(payload), "response_bytes": len(data[:max_bytes])}
 
 
+def post_json(
+    url: str,
+    payload: dict[str, object],
+    *,
+    egress_allowlist: frozenset[str] | None = None,
+    headers: dict[str, str] | None = None,
+    max_bytes: int = 12_000_000,
+    timeout: float = 60.0,
+) -> dict:
+    """POST JSON to an allowlisted host and return the bounded response body.
+
+    The POST analogue of :func:`get_url`, and it exists so image generation does
+    not become a second implementation of "reach a model provider".
+    :func:`post_url` enforces the allowlist but returns only size metadata, and
+    :func:`post_json_rpc` returns the body but deliberately enforces *no*
+    allowlist because an owner-added MCP endpoint is authorised by the owner
+    adding it. A hosted image model is neither of those: it must answer to
+    ``RAIKER_MODEL_EGRESS_ALLOWLIST`` like every other model call, and its reply
+    is the image.
+
+    ``max_bytes`` is generous because the response carries base64 image data;
+    the caller still bounds what it will store. Request headers (an API key
+    among them) are sent verbatim and are never returned or logged here.
+    """
+    import json as _json
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise SandboxError(f"invalid_url:{parsed.scheme or 'none'}://{parsed.netloc or 'none'}")
+    if not egress_allowlist:
+        raise SandboxError("egress_denied:no_allowlist")
+    if not any(fnmatch.fnmatch(parsed.netloc, pattern) for pattern in egress_allowlist):
+        raise SandboxError(f"egress_denied:{parsed.netloc}")
+    import urllib.error
+    import urllib.request
+
+    body = _json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(  # noqa: S310 - scheme checked above
+        url,
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json", **(headers or {})},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
+            data = resp.read(max_bytes + 1)
+    except urllib.error.HTTPError as exc:
+        raise SandboxError(f"http_error:{exc.code}") from None
+    except Exception as exc:
+        raise SandboxError(f"fetch_failed:{type(exc).__name__}") from None
+    if len(data) > max_bytes:
+        raise SandboxError("response_too_large")
+    try:
+        parsed_body = _json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        raise SandboxError("response_not_json") from None
+    if not isinstance(parsed_body, dict):
+        raise SandboxError("response_not_json_object")
+    return parsed_body
+
+
 def post_json_rpc(
     url: str,
     payload: dict[str, object],

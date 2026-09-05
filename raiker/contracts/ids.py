@@ -82,6 +82,10 @@ _PREFIXES = {
     "rm_",
     "rtn_",
     "att_",
+    # One governed image generation on the Design surface. Its own prefix rather
+    # than `att_`, because the attempt and the bytes are different records: a
+    # refused generation has an id and no attachment at all.
+    "img_",
     "proj_",
     "cwi_",
     "cinv_",

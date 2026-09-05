@@ -67,6 +67,17 @@ class CreateTelemetryDestinationRequest:
 
 
 @dataclass
+class GenerateImageRequest:
+    # The three things an owner chooses. Everything else — the endpoint, the
+    # image model, the credential — comes from the profile they already
+    # configured, because a request is a thing a model can propose and none of
+    # those may be proposed.
+    profile_id: str
+    prompt: str
+    size: str = "1024x1024"
+
+
+@dataclass
 class TelemetryCadenceRequest:
     # BUG-276 — how often this destination is delivered to. `off` is the shipped
     # default and means what the card said before this field existed: on demand

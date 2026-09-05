@@ -318,6 +318,8 @@
             />
           {:else if current === "messaging"}
             <LazyRoute route="messaging" />
+          {:else if current === "design"}
+            <LazyRoute route="design" />
           {:else if current === "guide"}
             <LazyRoute route="guide" props={{ section: currentSection }} />
           {:else if current === "observe"}

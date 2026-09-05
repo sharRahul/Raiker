@@ -1163,6 +1163,45 @@ class RuntimeControlService:
             return mapped
         return ControlResult(ok=True, data=dict(result.artifacts or {}))
 
+    def generate_image(
+        self,
+        acting_principal_id: str | None,
+        *,
+        profile_id: str,
+        prompt: str,
+        size: str,
+    ) -> ControlResult:
+        """One governed image generation, for the Design surface.
+
+        Takes the long way round like :meth:`run_telemetry_export`: the action
+        goes through :class:`RuntimeAuthority`, so the ``image_generation``
+        gate, the policy review, the decision mode, the approval and the audit
+        event all apply. A route that called the executor directly would produce
+        the same image while proving nothing about the path it came down.
+
+        Human-only. Generating an image spends the owner's provider credit and
+        leaves the machine, so it is not something an agent turn does on its own
+        behalf through this entry point.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        action = GovernedAction(
+            action_id=new_id("act_"),
+            principal_id=principal.principal_id,
+            action_type="image_generation",
+            tool_or_service_name="image_generation",
+            arguments={"profile_id": profile_id, "prompt": prompt, "size": size},
+            risk_level=RiskLevelValue.MEDIUM,
+        )
+        result = self._authority.route_action(action, principal)
+        mapped = self._mcp_action_result(result)
+        if not mapped.ok:
+            return mapped
+        return ControlResult(ok=True, data=dict(result.artifacts or {}))
+
     def build_memory_embedding_index(
         self, acting_principal_id: str | None, provider: str, model: str
     ) -> ControlResult:

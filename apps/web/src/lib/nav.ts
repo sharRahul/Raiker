@@ -27,6 +27,7 @@ export const NAV_GROUPS: NavGroup[] = [
     // kind of thing from the connectors, servers and hooks the agent *uses* —
     // it was a tab inside Extensions and is its own destination now.
     { id: "messaging", label: "Messaging", icon: "chat", hint: "Channels that reach Raiker from somewhere else" },
+    { id: "design", label: "Design", icon: "spark", hint: "Generate images with a connected image model" },
   ] },
   { id: "knowledge", label: "Knowledge", collapsible: true, items: [
     { id: "memory", label: "Memory", icon: "activity", hint: "Approved memories the agent can recall" },

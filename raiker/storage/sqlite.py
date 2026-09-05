@@ -126,6 +126,8 @@ from raiker.storage.migrations import (
     GIST_MEMORY_SQL,
     GIT_CREDENTIAL_GRANT_MIGRATION_ID,
     GIT_CREDENTIAL_GRANT_SQL,
+    IMAGE_GENERATIONS_MIGRATION_ID,
+    IMAGE_GENERATIONS_SQL,
     LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
     LOCAL_RUNTIME_PRESENCE_MIGRATION_ID,
     LOCAL_RUNTIME_PRESENCE_SQL,
@@ -1579,6 +1581,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 TELEMETRY_CADENCE_MIGRATION_ID,
                 TELEMETRY_CADENCE_SQL,
+                connection,
+            )
+            self._apply_migration(
+                IMAGE_GENERATIONS_MIGRATION_ID,
+                IMAGE_GENERATIONS_SQL,
                 connection,
             )
             self._apply_migration(TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection)
@@ -11513,6 +11520,83 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """
                 + (" AND owner_principal_id = ?" if scoped else ""),
                 (attachment_id, *([owner_principal_id] if scoped else [])),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    # ── Generated images (the Design surface) ──
+
+    def record_image_generation(
+        self,
+        *,
+        generation_id: str,
+        owner_principal_id: str | None,
+        profile_id: str,
+        provider: str,
+        model: str,
+        prompt: str,
+        size: str,
+        status: str,
+        reason_code: str | None = None,
+        attachment_id: str | None = None,
+        media_type: str | None = None,
+        byte_size: int = 0,
+    ) -> None:
+        """Record one attempt, whether or not it produced an image.
+
+        A refused generation is written with the same care as a successful one:
+        the owner asked for something and the runtime said no, and a refusal
+        nobody can see afterwards is the failure this product is written
+        against.
+        """
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO image_generations
+                (generation_id, owner_principal_id, profile_id, provider, model, prompt,
+                 size, status, reason_code, attachment_id, media_type, byte_size, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    generation_id,
+                    owner_principal_id,
+                    profile_id,
+                    provider,
+                    model,
+                    prompt,
+                    size,
+                    status,
+                    reason_code,
+                    attachment_id,
+                    media_type,
+                    byte_size,
+                    utc_now(),
+                ),
+            )
+
+    def list_image_generations(
+        self, *, owner_principal_id: str | None = None, limit: int = 60
+    ) -> list[dict[str, Any]]:
+        """Newest first. ``None`` disables owner scoping; an empty string fails
+        closed rather than dropping the predicate (see ``load_attachment``)."""
+        scoped = owner_principal_id is not None
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM image_generations"
+                + (" WHERE owner_principal_id = ?" if scoped else "")
+                + " ORDER BY created_at DESC, generation_id DESC LIMIT ?",
+                (*([owner_principal_id] if scoped else []), int(limit)),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_image_generation(
+        self, generation_id: str, *, owner_principal_id: str | None = None
+    ) -> dict[str, Any] | None:
+        scoped = owner_principal_id is not None
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM image_generations WHERE generation_id = ?"
+                + (" AND owner_principal_id = ?" if scoped else ""),
+                (generation_id, *([owner_principal_id] if scoped else [])),
             ).fetchone()
         return dict(row) if row is not None else None
 

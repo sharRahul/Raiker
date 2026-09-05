@@ -257,6 +257,31 @@
               : " · local only"}
           </span>
 
+          <!-- What this transport needs from the environment, declared on the
+               connector profile rather than left to the guide. The idea is
+               Hermes Agent's `plugin.yaml` requires_env/optional_env, which
+               drives its setup wizard; here it answers the question an owner
+               actually has in front of a channel that will not send — *which
+               variable, and is it set*. Whether, never what: Raiker takes the
+               name of a variable and never its value, and that holds on this
+               surface too. -->
+          {#if profile.env_requirements?.length}
+            <ul class="env">
+              {#each profile.env_requirements as need (need.name)}
+                <li class:env-missing={need.required && !need.present}>
+                  <code>{need.name}</code>
+                  <span class="hook-tag" class:hook-tag-dead={!need.present}>
+                    {need.present ? "Set" : need.required ? "Missing" : "Not set"}
+                  </span>
+                  <span class="note">
+                    {need.description}
+                    {#if need.url}<a href={need.url} target="_blank" rel="noopener noreferrer">Where to get it</a>{/if}
+                  </span>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+
           {#if profile.linked}
             <div class="channel-actions">
               <button
@@ -432,4 +457,8 @@
   .notice-danger { border-color: var(--danger-border); background: var(--danger-soft); color: var(--danger); }
   .notice-ok { border-color: var(--ok-border); background: var(--ok-soft); color: var(--ok); }
   .card + .card { margin-top: var(--space-4); }
+  .env { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: var(--space-2); }
+  .env li { display: grid; gap: 0.2rem; padding: var(--space-2); border-left: 2px solid var(--border); }
+  .env li.env-missing { border-left-color: var(--warn); }
+  .env code { font-size: var(--text-xs); }
 </style>

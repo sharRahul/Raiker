@@ -57,6 +57,14 @@ owner and one exact pending relay/action pair, once. Critical and connector-writ
 approvals remain local-only.
 Full contract: [`docs/architecture/CHANNELS_SPEC.md`](../architecture/CHANNELS_SPEC.md).
 
+## What a channel needs from your environment
+
+Each connector declares the environment variables it needs, and the page shows
+them on the connector itself: the variable's name, what it is for, where to get
+it, and **whether it is set** — never what it is set to. Raiker takes the name
+of a variable and reads it at the moment it is used; that holds on this surface
+too, so a card can tell you a token is missing without ever having seen one.
+
 ## Telegram
 
 Telegram is the first adapter for a transport that is not Raiker's own shape,
@@ -94,3 +102,26 @@ the request URL rather than an HMAC over the body. It is also why the token
 never appears in a reason code: the token sits in the URL *path*, so `post_url`
 reports only scheme and host when a URL is rejected, and the delivery record
 carries byte counts and a status rather than the target.
+
+
+## Adding another platform
+
+A channel type is one entry in `raiker/channels/adapters.py`, and it answers two
+questions: what URL and body does a message become, and what did an inbound
+payload actually say. Everything that decides whether a message is *allowed* —
+the capability gate, the egress allowlist, the pairing, the sender allowlist, the
+per-sender budget, the redaction, the audit event, your stored routing choice —
+lives outside the adapter and applies identically to every one of them. An
+adapter cannot widen any of it, which is what makes adding one small.
+
+Both that shape and the declared-environment idea above are taken from
+[Hermes Agent](https://github.com/NousResearch/hermes-agent) (MIT, © 2025 Nous
+Research), which runs twenty-two platforms off a single gateway: a table keyed by
+platform, and a manifest per platform declaring the environment it needs so the
+setup surface can read it rather than the operator hunting through prose.
+
+What is deliberately *not* taken is the size. Hermes's `BasePlatformAdapter` is
+four thousand lines of streaming edits, typing indicators, TTS, media caches and
+inline keyboards, because Hermes is a chat client you talk to. A Raiker channel
+is a governed relay whose default routing is `record_only`. Importing that
+surface would be importing a different product's problem.

@@ -444,6 +444,17 @@ export interface PluginSignature {
 /** What a plugin actually provides, read from the files the runtime loads
  *  rather than from the manifest that described them (BUG-221). */
 /** One connector profile, and what is actually true of it right now (BUG-225). */
+/** One environment variable a channel transport declares that it needs. */
+export interface ChannelEnvRequirement {
+  name: string;
+  description: string;
+  url: string | null;
+  secret: boolean;
+  required: boolean;
+  /** Whether it is set. Never what it is set to. */
+  present: boolean;
+}
+
 export interface ChannelProfile {
   connector_id: string;
   channel_type: string;
@@ -469,6 +480,7 @@ export interface ChannelProfile {
   supports_side_questions: boolean;
   supports_interrupts: boolean;
   supports_approvals: boolean;
+  env_requirements?: ChannelEnvRequirement[];
 }
 
 export interface ChannelsView {

@@ -21,6 +21,7 @@ from raiker.api.schemas import (
     PairChannelRequest,
 )
 from raiker.api.sessions import ApiSession
+from raiker.channels.adapters import adapter_for
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import (
@@ -317,17 +318,14 @@ async def receive_telegram(
     forever helps nobody.
     """
     _require_channel_secret(x_telegram_bot_api_secret_token)
-    message = update.get("message") or update.get("edited_message") or {}
-    if not isinstance(message, dict):
-        return {"ok": True, "ignored": "unsupported_update"}
-    sender = message.get("from")
-    sender_id = str(sender.get("id")) if isinstance(sender, dict) and sender.get("id") is not None else ""
-    text = message.get("text")
-    if not sender_id or not isinstance(text, str) or not text.strip():
+    adapter = adapter_for("telegram")
+    parsed = adapter.parse_inbound(update) if adapter is not None else None
+    if parsed is None:
         return {"ok": True, "ignored": "unsupported_update"}
     return await _handle_inbound(
-        connector_id, sender_id=sender_id, text=text, request=request
+        connector_id, sender_id=parsed.sender_id, text=parsed.text, request=request
     )
+
 
 
 async def _handle_inbound(

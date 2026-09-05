@@ -570,3 +570,77 @@ def test_telegram_inbound_acknowledges_updates_it_cannot_use(
     )
     assert response.status_code == 200
     assert response.json() == {"ok": True, "ignored": "unsupported_update"}
+
+
+# ── Adapters as a table, and declared environment ────────────────────────────
+#
+# Both ideas are Hermes Agent's (MIT, (c) 2025 Nous Research), which runs
+# twenty-two platforms off one gateway: a registry keyed by platform, and each
+# platform declaring the environment it needs so the setup surface can read it
+# rather than the operator hunting through prose.
+
+
+def test_a_channel_type_with_no_wire_format_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The table refuses by name; it does not attempt a delivery hopefully."""
+    ws = _ws(tmp_path)
+    _enable(ws, "external_channel_runtime")
+    SQLiteStore(ws).insert_channel_pairing(ChannelPairing(
+        pairing_id=new_id("chn_"),
+        connector_id="channel.slack",
+        channel_type="slack",
+        display_name="Slack",
+        paired_at=utc_now(),
+        paired_by="principal_owner",
+        enabled=True,
+        sender_allowlist_json=json.dumps(["u1"]),
+    ))
+    monkeypatch.setenv("RAIKER_CHANNEL_EGRESS_ALLOWLIST", "*")
+    authority, principal = _authority(ws)
+    result = authority.route_action(
+        _action("external_channel_runtime", principal.principal_id,
+                connector_id="channel.slack", text="hi"),
+        principal,
+    )
+    assert result.error == "channel_transport_unsupported:slack"
+
+
+def test_the_adapter_table_owns_the_wire_format_and_nothing_else() -> None:
+    from raiker.channels.adapters import adapter_channel_types, adapter_for
+
+    assert set(adapter_channel_types()) == {"telegram", "webhooks"}
+    # An adapter answers two questions and has no way to widen a boundary: no
+    # gate, no allowlist, no pairing, no audit surface on it.
+    adapter = adapter_for("telegram")
+    assert adapter is not None
+    assert {"outbound", "parse_inbound", "channel_type"} <= set(dir(adapter))
+    assert not [
+        name
+        for name in dir(adapter)
+        if not name.startswith("_")
+        and name not in {"outbound", "parse_inbound", "channel_type"}
+    ]
+
+
+def test_a_connector_declares_the_environment_it_needs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Which variable, and whether it is set — never what it is set to."""
+    from raiker.control.dashboard import DashboardService
+
+    ws = _ws(tmp_path)
+    _enable(ws, "external_channel_runtime")
+    monkeypatch.setenv("RAIKER_TELEGRAM_BOT_TOKEN", "123:supersecret")
+    monkeypatch.delenv("RAIKER_CHANNEL_INBOUND_SECRET", raising=False)
+
+    view = DashboardService(ws).list_channels("principal_owner")
+    telegram = next(p for p in view["profiles"] if p["connector_id"] == "channel.telegram")
+    needs = {n["name"]: n for n in telegram["env_requirements"]}
+
+    assert needs["RAIKER_TELEGRAM_BOT_TOKEN"]["present"] is True
+    assert needs["RAIKER_TELEGRAM_BOT_TOKEN"]["secret"] is True
+    assert needs["RAIKER_TELEGRAM_BOT_TOKEN"]["url"] == "https://t.me/BotFather"
+    assert needs["RAIKER_CHANNEL_INBOUND_SECRET"]["present"] is False
+    # The value never rides this path, set or unset.
+    assert "supersecret" not in json.dumps(view)

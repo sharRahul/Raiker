@@ -1989,6 +1989,30 @@ class AuthError:
         return asdict(self)
 
 
+def _env_requirements(raw: dict[str, Any]) -> list[dict[str, Any]]:
+    """The environment variables a channel transport declares, and whether each
+    is set — never what it is set to."""
+    import os as _os
+
+    out: list[dict[str, Any]] = []
+    for key, required in (("requires_env", True), ("optional_env", False)):
+        for entry in raw.get(key) or []:
+            if not isinstance(entry, dict) or not entry.get("name"):
+                continue
+            name = str(entry["name"])
+            out.append(
+                {
+                    "name": name,
+                    "description": str(entry.get("description") or ""),
+                    "url": entry.get("url"),
+                    "secret": bool(entry.get("secret")),
+                    "required": required,
+                    "present": bool(_os.environ.get(name, "").strip()),
+                }
+            )
+    return out
+
+
 class DashboardService:
     """Read-only governed views for the web UI. Reuses storage and control services; never mutates."""
 
@@ -4297,6 +4321,13 @@ class DashboardService:
                     "supports_side_questions": bool(profile.raw.get("supports_side_questions")),
                     "supports_interrupts": bool(profile.raw.get("supports_interrupts")),
                     "supports_approvals": bool(profile.raw.get("supports_approvals")),
+                    # What this transport needs from the owner's environment,
+                    # declared on the profile rather than known only to the
+                    # guide — the idea is Hermes Agent's `plugin.yaml`
+                    # `requires_env`/`optional_env`, which drives its setup
+                    # wizard. `present` is a boolean: Raiker takes variable
+                    # names and never values, and that holds on the way out too.
+                    "env_requirements": _env_requirements(profile.raw),
                 }
             )
         return {

@@ -210,7 +210,26 @@
       "requires_sender_allowlist": true,
       "requires_network": true,
       "setup_ui": "channel_link_wizard",
-      "capability_policy_template": "channel.webhooks.default.json"
+      "capability_policy_template": "channel.webhooks.default.json",
+      "requires_env": [
+        {
+          "name": "RAIKER_CHANNEL_EGRESS_ALLOWLIST",
+          "description": "The hosts a delivery may reach. Empty denies every one.",
+          "secret": false
+        }
+      ],
+      "optional_env": [
+        {
+          "name": "RAIKER_CHANNEL_OUTBOUND_SECRET",
+          "description": "HMAC key for signing deliveries. Unset means unsigned, not refused.",
+          "secret": true
+        },
+        {
+          "name": "RAIKER_CHANNEL_INBOUND_SECRET",
+          "description": "Required before any inbound message is accepted at all.",
+          "secret": true
+        }
+      ]
     },
     {
       "connector_id": "channel.telegram",
@@ -231,7 +250,26 @@
       "requires_sender_allowlist": true,
       "requires_network": true,
       "setup_ui": "channel_link_wizard",
-      "capability_policy_template": "channel.telegram.default.json"
+      "capability_policy_template": "channel.telegram.default.json",
+      "requires_env": [
+        {
+          "name": "RAIKER_TELEGRAM_BOT_TOKEN",
+          "description": "Your bot's token from BotFather. Read at delivery, never stored.",
+          "url": "https://t.me/BotFather",
+          "secret": true
+        },
+        {
+          "name": "RAIKER_CHANNEL_INBOUND_SECRET",
+          "description": "The secret you give Telegram at setWebhook; it is echoed back on every update.",
+          "secret": true
+        },
+        {
+          "name": "RAIKER_CHANNEL_EGRESS_ALLOWLIST",
+          "description": "Must contain api.telegram.org, or nothing leaves this machine.",
+          "secret": false
+        }
+      ],
+      "optional_env": []
     },
     {
       "connector_id": "channel.email",

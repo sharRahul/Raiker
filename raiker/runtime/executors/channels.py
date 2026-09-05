@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from raiker.channels.adapters import AdapterRefusal, adapter_for
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ApprovalRelayRecord
 from raiker.runtime.executors.base import ExecutionResult
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 # transport for Phase 4 slice 4; other transports remain gated/fail-closed.
 
 
-def _sign_delivery(body: bytes) -> tuple[str, bool]:
+def sign_delivery(body: bytes) -> tuple[str, bool]:
     """``(signature, signed)`` for one outbound body.
 
     The webhook connector profile declares transport ``signed_http_callback`` and
@@ -50,32 +50,6 @@ def _sign_delivery(body: bytes) -> tuple[str, bool]:
     return f"sha256={digest}", True
 
 
-TELEGRAM_HOST = "api.telegram.org"
-
-
-def _telegram_token() -> str:
-    """The bot token, from the owner's environment, read at delivery only.
-
-    Same posture as ``RAIKER_CHANNEL_OUTBOUND_SECRET`` and the telemetry
-    credential: Raiker takes the *name* of a variable it will read, never the
-    value, so a token cannot be typed into a browser field, cannot be stored in
-    the workspace database, and does not survive the process.
-    """
-    return os.environ.get("RAIKER_TELEGRAM_BOT_TOKEN", "").strip()
-
-
-def _telegram_delivery(chat_id: str, text: str) -> tuple[str, bytes]:
-    """``(url, body)`` for one Telegram ``sendMessage``.
-
-    The token lives in the *path*, which is why `post_url` was hardened to
-    report only scheme and host on a bad URL: a reason code reaches the audit
-    log, and the whole URL would have written a live token into it.
-    """
-    url = f"https://{TELEGRAM_HOST}/bot{_telegram_token()}/sendMessage"
-    body = json.dumps({"chat_id": chat_id, "text": text}, sort_keys=True).encode("utf-8")
-    return url, body
-
-
 def _enabled_pairing(store: SQLiteStore, connector_id: str) -> dict | None:
     for pairing in store.list_channel_pairings(enabled_only=True):
         if pairing.get("connector_id") == connector_id:
@@ -94,7 +68,6 @@ class ExternalChannelExecutor:
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         connector_id = str(action.arguments.get("connector_id", "")).strip()
-        url = str(action.arguments.get("url", "")).strip()
         text = str(action.arguments.get("text", ""))
         if not connector_id:
             return ExecutionResult(
@@ -112,62 +85,33 @@ class ExternalChannelExecutor:
 
         channel_type = str(pairing.get("channel_type") or "webhooks")
         delivered_at = utc_now()
-        signed = False
 
-        if channel_type == "telegram":
-            # A provider transport, so the shape is the provider's: Raiker does
-            # not get to invent Telegram's body, and there is no Raiker
-            # signature on it because the receiver is Telegram, which
-            # authenticates the *token in the URL* rather than a body HMAC.
-            #
-            # The URL is built here rather than taken from the action. That is
-            # the point: a model-proposed URL is untrusted, and the one thing
-            # this transport must never do is POST an owner's bot token at a
-            # host the owner did not name.
-            if not _telegram_token():
-                return ExecutionResult(
-                    ok=False, capability=self.capability, action_id=action.action_id,
-                    reason_code="telegram_bot_token_missing",
-                    summary=(
-                        "Telegram delivery refused: RAIKER_TELEGRAM_BOT_TOKEN is unset "
-                        "in the host environment."
-                    ),
-                )
-            chat_id = str(
-                action.arguments.get("chat_id") or pairing.get("owner_sender_id") or ""
-            ).strip()
-            if not chat_id:
-                return ExecutionResult(
-                    ok=False, capability=self.capability, action_id=action.action_id,
-                    reason_code="telegram_chat_id_missing",
-                    summary=(
-                        "Telegram delivery refused: no chat_id given and the pairing "
-                        "has no bound owner sender."
-                    ),
-                )
-            url, body = _telegram_delivery(chat_id, text)
-            headers = {"X-Raiker-Delivered-At": delivered_at}
-        else:
-            if not url:
-                return ExecutionResult(
-                    ok=False, capability=self.capability, action_id=action.action_id,
-                    reason_code="missing_argument:connector_id_or_url",
-                    summary="Channel delivery denied: connector_id and url required.",
-                )
-            body = json.dumps(
-                {
-                    "text": text,
-                    "connector_id": connector_id,
-                    "delivered_at": delivered_at,
-                },
-                sort_keys=True,
-            ).encode("utf-8")
-            signature, signed = _sign_delivery(body)
-            headers = (
-                {"X-Raiker-Signature": signature, "X-Raiker-Delivered-At": delivered_at}
-                if signed
-                else {"X-Raiker-Delivered-At": delivered_at}
+        # One adapter per channel type, resolved from a table rather than an
+        # `if` chain here. What an adapter owns is the wire format and nothing
+        # else: the gate, the egress allowlist, the pairing, the sender
+        # allowlist and the audit event are all above this line and apply
+        # identically whichever one answers.
+        adapter = adapter_for(channel_type)
+        if adapter is None:
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=f"channel_transport_unsupported:{channel_type}",
+                summary=f"Channel delivery denied: no wire format for '{channel_type}'.",
             )
+        built = adapter.outbound(
+            connector_id=connector_id,
+            pairing=pairing,
+            arguments=action.arguments,
+            text=text,
+            delivered_at=delivered_at,
+        )
+        if isinstance(built, AdapterRefusal):
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=built.reason_code, summary=built.summary,
+            )
+        url, body, headers, signed = built.url, built.body, built.headers, built.signed
+
         try:
             result = post_url(
                 url, body, egress_allowlist=channel_egress_allowlist(), headers=headers
@@ -182,13 +126,9 @@ class ExternalChannelExecutor:
             ok=True, capability=self.capability, action_id=action.action_id,
             summary=(
                 f"Delivered to '{connector_id}' ({result['sent_bytes']}b)"
-                + (
-                    "."
-                    if channel_type == "telegram"
-                    else ", signed."
-                    if signed
-                    else ", UNSIGNED — set RAIKER_CHANNEL_OUTBOUND_SECRET."
-                )
+                # The adapter already said whether Raiker signs this transport;
+                # asking it beats naming a platform here.
+                + (", signed." if signed else ".")
             ),
             # Metadata only — never the message text, the target URL, or the
             # signature itself. For Telegram the URL matters twice over: it

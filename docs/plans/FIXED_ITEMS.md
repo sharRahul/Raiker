@@ -418,6 +418,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-403](#fixed-403--the-design-surface-governed-image-generation-from-nothing) | High | Design / image generation | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-404](#fixed-404--a-nine-step-type-scale-with-sixty-three-sizes-in-front-of-it) | Medium | Web UI / design system | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-405](#fixed-405--the-element-floor-was-a-ceiling-and-it-painted-the-page-out) | High | Web UI / shell | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-406](#fixed-406--two-ideas-from-hermes-agent-and-the-one-that-was-not-worth-taking) | Medium | Channels / messaging | Fixed 2026-09-05 (raised by the owner) |
 
 ---
 
@@ -17908,3 +17909,61 @@ transparent, which is right because that panel is not modal.
 **User-interface outcome.** Guarded by a mocked e2e test that moves the pointer
 onto each layer and asserts the computed colour. Confirmed to fail against the
 old selector, returning `rgb(241, 245, 249)`.
+
+## FIXED-406 — Two ideas from Hermes Agent, and the one that was not worth taking
+
+**Severity: Medium. Area: Channels / messaging. Status: Fixed 2026-09-05. Raised
+by the owner: see if Hermes Agent's messaging code can build Raiker's channels.**
+
+**Observed.** [Hermes Agent](https://github.com/NousResearch/hermes-agent) (MIT,
+© 2025 Nous Research) runs **twenty-two messaging platforms** off one gateway —
+Telegram, Discord, Slack, Matrix, Signal, WhatsApp, IRC, Teams and more — each a
+plugin with a `plugin.yaml` and an `adapter.py`, all inheriting a
+`BasePlatformAdapter`. Raiker had one reference webhook and, as of FIXED-402, a
+Telegram branch written as `if channel_type == "telegram"` inside
+`ExternalChannelExecutor`. That works for two transports and stops working at
+three.
+
+**Taken, and why.**
+
+*An adapter table keyed by channel type.* `raiker/channels/adapters.py` holds one
+adapter per channel type, each answering exactly two questions: what URL and body
+does a message become, and what did an inbound payload actually say. Everything
+that decides whether a message is *allowed* — the capability gate, the egress
+allowlist, the pairing, the sender allowlist, the per-sender budget, the
+redaction, the audit event, the owner's stored routing choice — sits outside and
+applies identically whichever adapter answers. **An adapter cannot widen any
+boundary**, which is what makes adding one a small reviewable change; a test
+asserts its public surface is those two methods and nothing else. The Telegram
+branch and the webhook body-builder both moved into it, and a channel type with
+no adapter now fails closed by name (`channel_transport_unsupported:slack`)
+rather than being attempted hopefully.
+
+*Declared environment.* Hermes's `plugin.yaml` lists `requires_env` and
+`optional_env` with a description, a prompt, a URL and a `password` flag, and its
+setup wizard reads them. Raiker's connector profiles now declare the same thing,
+and the Messaging page renders it on the connector: which variable, what it is
+for, where to get it, and **whether it is set**. Never what it is set to — Raiker
+takes the name of a variable and reads it at use, and that holds on the way out
+too, which a test asserts against a live token value. It answers the question an
+owner actually has in front of a channel that will not send, which the guide
+could only answer if they went looking.
+
+**Not taken, and this is the more useful half.** `BasePlatformAdapter` is **4,161
+lines** — streaming message edits, typing indicators, TTS handles, media caches,
+draft streaming, inline keyboards, per-chat message-length functions, platform
+locks, fatal-error handlers. All of it is right for Hermes, because Hermes is a
+chat client you hold a conversation in. A Raiker channel is a governed relay
+whose default routing is `record_only` and whose content is untrusted by
+definition. Adopting that surface would have been adopting a different product's
+problem, and every one of those features would have needed its own governance
+answer before it could ship.
+
+The plugin-directory model was declined for the same kind of reason: a channel
+arriving as third-party code would have to answer to `plugin_execution` as well,
+which is a much larger question than the one being asked.
+
+**User-interface outcome.** The Telegram card lists its three required variables,
+each marked Set or Missing, with a link to BotFather for the token. 24 channel
+tests pass, including the unsupported-transport refusal, the adapter's public
+surface, and that a set token never appears in the channels read.

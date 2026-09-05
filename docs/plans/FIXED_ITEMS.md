@@ -419,7 +419,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-404](#fixed-404--a-nine-step-type-scale-with-sixty-three-sizes-in-front-of-it) | Medium | Web UI / design system | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-405](#fixed-405--the-element-floor-was-a-ceiling-and-it-painted-the-page-out) | High | Web UI / shell | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-406](#fixed-406--two-ideas-from-hermes-agent-and-the-one-that-was-not-worth-taking) | Medium | Channels / messaging | Fixed 2026-09-05 (raised by the owner) |
-| [FIXED-407](#fixed-407--the-install-downloaded-a-run-of-10-mb-binaries-to-read-their-metadata) | Medium | Install / dependencies | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-407](#fixed-407--a-gigabyte-of-downloads-because-the-interpreter-was-python-310) | Medium | Install / dependencies | Fixed 2026-09-05 (raised by the owner) |
 
 ---
 
@@ -17969,75 +17969,96 @@ each marked Set or Missing, with a link to BotFather for the token. 24 channel
 tests pass, including the unsupported-transport refusal, the adapter's public
 surface, and that a set token never appears in the channels read.
 
-## FIXED-407 — The install downloaded a run of 10 MB binaries to read their metadata
+## FIXED-407 — A gigabyte of downloads because the interpreter was Python 3.10
 
 **Severity: Medium. Area: Install / dependencies. Status: Fixed 2026-09-05.
-Raised by the owner: "it is downloading multiple binaries while setup."**
+Raised by the owner: "it is downloading multiple binaries while setup", and then
+"it should not download multiple versions of same binary it doesn't make
+sense."**
 
 **Observed.** `python -m pip install -e ".[dev]"` on Windows printed a descending
-run of ruff wheels — `ruff-0.15.3-…win_amd64.whl (11.4 MB)`, then `0.15.2`, then
-`0.15.1`, then `0.15.0`, then `0.14.8` — each fully downloaded, each discarded.
-Nothing failed; the install simply spent a great deal of bandwidth on a question
-about a few kilobytes of metadata.
+run of ruff wheels — `0.15.3`, `0.15.2`, `0.15.1`, `0.15.0`, `0.14.8` in the
+first report, and by the second report it had walked all the way to `0.6.3`,
+`0.6.2`, `0.6.1`, `0.6.0` — each ~9-11 MB, each fully downloaded and discarded.
+Then it started on PyYAML, then pytest, with `INFO: pip is looking at multiple
+versions of … to determine which version is compatible with other requirements`
+between them.
 
-**Root cause, and the honest limit of it.** That descending run is pip
-*backtracking*: when it cannot settle a version from index metadata alone it
-fetches the whole wheel to read the metadata inside, throws it away, and tries
-the version below. Ruff ships as a platform binary, so the cost of the search is
-measured in the size of the artefacts rather than the size of the answer.
+**Root cause.** The second screenshot carried the answer the first one did not:
+`PyYAML-6.0.2-cp310-cp310-win_amd64.whl`. **`cp310` is CPython 3.10**, and
+Raiker declares `requires-python = ">=3.11"`.
 
-**Measured, so the number is checkable.** A correct `.[dev]` resolution for
-`win_amd64` / cp311 is **54 wheels, 49.1 MB in total** — `ruff` at 10.1 MB and
-`mypy` at 10.6 MB are the two platform binaries in it. The five discarded ruff
-wheels in the screenshot are ~57 MB on their own: **more than the whole correct
-install**, spent on one package.
+pip builds the project's metadata first and resolves the dependency tree second,
+and older pip does not check the root package's `Requires-Python` until after
+that resolution. On 3.10 there is no solution to find, so the resolver goes
+looking for one anyway — walking every dependency down to its floor, downloading
+each wheel to read the metadata inside, discarding it, and trying the version
+below. It ends in `ResolutionImpossible`, having spent a great deal of bandwidth
+to reach a conclusion that was available from `python --version`.
 
-**What was not established.** The trigger was not reproduced here. pip 24.0 (what
-`ensurepip` bundles for Python 3.11) and pip 26.2.1 were both run against this
-`pyproject.toml`, on Linux and cross-resolving for `--platform win_amd64
---python-version 3.11 --abi cp311`; all four resolved cleanly, downloading
-exactly **one** ruff wheel. No conflicting ruff pin exists anywhere in the
-repository. So what follows reduces the blast radius of a backtrack rather than
-proving the cause of one, and this entry says so rather than claiming a fix it
-cannot demonstrate.
+**Reproduced, and measured.** Same project, same command, same Python 3.10; only
+pip differs:
+
+| pip | outcome |
+|---|---|
+| 23.0.1 (what `ensurepip` bundles for 3.10) | **382 MB in four minutes**, still going — ruff descending release by release, then watchfiles, uvicorn, types-pyyaml, sqlcipher3-wheels |
+| 26.2.1 | **1.2 MB**, `ERROR: Package 'raiker' requires a different Python: 3.10.20 not in '>=3.11'`, in about a second |
+
+For scale: a *correct* `.[dev]` resolution for `win_amd64` / cp311 is **54
+wheels, 49.1 MB in total**, of which `ruff` (10.1 MB) and `mypy` (10.6 MB) are
+the only two platform binaries.
+
+**A correction to the first attempt at this entry.** The first pass could not
+reproduce the backtracking and said so, and narrowed `ruff>=0.6` to `ruff>=0.15`
+on the reasoning that a floor admitting 110 releases of a 10 MB binary is the
+width of the worst case. That reasoning is still sound and the floor stays, but
+**it was not the fix and should not have been presented as most of one**: the
+resolver walks *every* package, so narrowing one leg moves the cost to the next.
+In the 200-second run above it got through 20 ruff wheels under the new floor and
+went straight on to watchfiles and uvicorn. The reason the first attempt could
+not reproduce the fault is that it only ever tested Python 3.11, where the
+resolution succeeds and there is nothing to reproduce.
 
 **Taken.**
 
-*The floor was as wide as the worst case.* `ruff>=0.6` admitted **110** of ruff's
-422 published releases. Nothing in `[tool.ruff]` uses a rule or setting the older
-releases lacked, so that width bought nothing and priced the failure mode: 110
-admissible releases × ~10 MB is the ceiling on what a backtrack can walk. The
-floor is now `ruff>=0.15`, which admits **30**.
+*The check runs before pip resolves anything.* `setup.py` — which did not exist —
+now compares `sys.version_info` against a `MINIMUM` and exits with a message
+naming the version found and the command that fixes it, per platform. The build
+backend runs before dependency resolution, so this is the earliest moment the
+answer can be given, and it costs no network at all. Measured against the real
+project on 3.10 with pip 23.0.1: **1.1 MB, zero ruff wheels, immediate**. It is
+also pip-version-independent, which the `--upgrade pip` step is not — that step
+only helps someone who runs it before hitting the problem.
 
-*The install upgrades pip before it installs.* A `venv` created by Python 3.11
-bundles pip 24. Newer pip reads [PEP 658](https://peps.python.org/pep-0658/)
-metadata served beside the wheel, so in the common case it never fetches the
-binary it is only asking a question about. The step was already in the Linux and
-macOS sections of the guide and missing from the quickstart and the Windows
-reinstall block — the two paths the owner was actually on.
+*`setup()` still takes no arguments.* Every piece of metadata continues to come
+from `pyproject.toml`. Wheels built with and without the file were compared:
+identical file lists (447 entries), identical `METADATA`, identical
+`entry_points.txt`. The guard adds a refusal and changes nothing about what is
+built.
 
-*The lock was an orphan, and stale.* `uv.lock` was referenced by nothing — not
-CI, not the docs, not `pyproject.toml` — and had drifted to `starlette 1.3.1`
-while the project resolves and tests against **1.6.0**. That matters more than it
-looks: starlette 1.6's `TestClient` requires `httpx2`, which is why the dev extra
-carries it, so `uv sync` against the stale lock would have produced an
-environment the test suite does not pass in. The lock is refreshed to the set the
-project actually resolves today, which makes `uv sync --extra dev` a real
-install path — and one where no resolution runs at all, so nothing can be
-downloaded speculatively.
+*The imports are ordered deliberately.* `setuptools` is imported **after** the
+check, not before, so that a future setuptools dropping this interpreter cannot
+put its own import error in front of the message. A test asserts that ordering
+in the file, because it is the kind of thing an autoformatter or a tidying pass
+would silently undo.
 
-**A wrong turn, recorded because it was nearly shipped.** `httpx2>=2.9` in the dev
-extra reads exactly like a typo for `httpx`, which is already a runtime
-dependency, and it was removed on that reading. mypy caught it: `Incompatible
-return value type (got "httpx2._models.Response", expected
-"httpx._models.Response")`. Starlette 1.6's test client does `import httpx2 as
-httpx` first and warns that using `httpx` with it is deprecated. The two are
-different packages that share a name; both belong here, and `pyproject.toml` now
-says so at the line rather than leaving the next reader to make the same edit.
+*The declaration and the guard cannot drift.* `tests/test_python_version_guard.py`
+reads `requires-python` from `pyproject.toml` and `MINIMUM` from `setup.py` — by
+AST, without executing the module, since executing it would run a build rather
+than an assertion — and asserts they agree. Raising `requires-python` without
+updating the guard would otherwise restore the download storm for the newly
+unsupported version, silently. Verified to fail when `MINIMUM` is mutated.
 
-**User-interface outcome.** No UI surface. The install path is the surface: the
-quickstart in [`README.md`](../../README.md) and every first-install block in
-[`docs/guide/getting-started.md`](../guide/getting-started.md) upgrade pip before
-installing, and the guide's *Why the pip upgrade comes first* section names the
-symptom — the descending run of wheels — so a reader who sees it recognises it
-instead of assuming a broken install.
+**Not taken.** Lowering `requires-python` to 3.10 to accommodate the interpreter
+that was actually in use. CI tests 3.11, the codebase uses 3.11 syntax, and
+`target-version = "py311"`; supporting 3.10 is a real piece of work and not what
+either report was asking for.
+
+**User-interface outcome.** No UI surface — the install path is the surface.
+[`README.md`](../../README.md) states the version requirement and how to check
+it; [`docs/guide/getting-started.md`](../guide/getting-started.md) checks
+`python --version` in Requirements and carries an *If the install downloads the
+same package over and over* section that shows the symptom as it actually
+appears, names `cp310` as the tell, gives the `py -3.11 -m venv` and
+`python3.11 -m venv` fixes, and prints the two-row pip measurement. 4 guard tests
+pass; ruff and mypy are clean.

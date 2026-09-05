@@ -6,6 +6,15 @@
 - Node 20 or newer (to build the dashboard)
 - Git
 
+**Check the Python version before anything else**, and check it *inside* the
+virtual environment rather than before creating it — `python` is whatever name
+resolution last decided it is, and on Windows that is often not the version you
+installed most recently:
+
+```bash
+python --version
+```
+
 Raiker currently runs from a source checkout; no signed desktop release has
 been published. The dashboard and terminal client support local single-user
 operation. Hosted multi-user, dedicated mobile, and IDE clients are not part of
@@ -22,29 +31,53 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-#### Why the pip upgrade comes first
+#### If the install downloads the same package over and over
 
-If the install prints a long run of `Downloading ruff-0.15.3-…whl (11.4 MB)`,
-`Downloading ruff-0.15.2-…whl (11.4 MB)`, one version after another, nothing is
-broken: pip is *backtracking*. When it cannot decide a version from metadata
-alone, it downloads the whole wheel to read the metadata inside, discards it,
-and tries the version below.
+A run like this — one version after another of the same package, each one fully
+downloaded — means the install is on **the wrong Python**, not that anything is
+broken with the network or the package index:
 
-Some downloading is normal, and it is worth knowing the size of it: a correct
-`.[dev]` install on Windows is **54 wheels, 49 MB in total**, of which `ruff`
-(10.1 MB) and `mypy` (10.6 MB) are the two platform binaries. So five discarded
-ruff wheels cost more than the entire install ought to.
+```text
+Downloading ruff-0.6.3-py3-none-win_amd64.whl (8.8 MB)
+Downloading ruff-0.6.2-py3-none-win_amd64.whl (8.8 MB)
+Downloading ruff-0.6.1-py3-none-win_amd64.whl (8.7 MB)
+INFO: pip is looking at multiple versions of pyyaml to determine which version
+      is compatible with other requirements. This could take a while.
+```
 
-Two things make that far less likely, and the install block does both:
+Raiker requires Python 3.11. pip builds the project's metadata first and resolves
+the dependency tree second, and **older pip does not check the project's
+`Requires-Python` until after that resolution**. On Python 3.10 there is no
+solution to find, so the resolver goes looking for one anyway: it walks every
+dependency down to its floor, downloading each wheel to read the metadata inside
+and discarding it. The tell is in the filenames — `cp310` in a wheel name is
+CPython 3.10.
 
-- **Upgrade pip before installing.** A `venv` created by Python 3.11 bundles
-  pip 24. Newer pip reads [PEP 658](https://peps.python.org/pep-0658/) metadata
-  served alongside the wheel, so in the common case it never fetches the binary
-  it is only asking about.
-- **Keep the floors current.** Raiker's dev extra requires `ruff>=0.15`. The
-  previous floor, `ruff>=0.6`, admitted 110 published releases; the current one
-  admits 30. Nothing in `[tool.ruff]` uses a rule the older releases lacked, so
-  the wide floor bought nothing and paid for the worst case.
+Measured on Python 3.10, same project, same command, only pip differing:
+
+| pip | outcome |
+|---|---|
+| 23.0.1 (what `ensurepip` bundles for 3.10) | **382 MB in four minutes**, still going |
+| 26.2.1 | **1.2 MB**, correct error in about a second |
+
+For scale, a *correct* `.[dev]` install for Windows is **54 wheels, 49 MB in
+total** — `ruff` (10.1 MB) and `mypy` (10.6 MB) are the only two platform
+binaries in it.
+
+Two things prevent it, and the install block above does both:
+
+- **Use a 3.11+ interpreter to create the environment.** On Windows the `py`
+  launcher picks a version deliberately: `py -3.11 -m venv .venv`. Elsewhere name
+  it: `python3.11 -m venv .venv`.
+- **Upgrade pip before installing.** Newer pip checks the project's
+  `Requires-Python` before it resolves anything, and it reads
+  [PEP 658](https://peps.python.org/pep-0658/) metadata served alongside a wheel
+  rather than fetching the wheel to read it.
+
+Since this was found, Raiker also refuses the install itself: `setup.py` checks
+the interpreter version before pip resolves anything at all, so an unsupported
+Python now fails in about a second with a message saying which version was found
+and how to fix it — on any pip.
 
 If you have [uv](https://github.com/astral-sh/uv), skip the question entirely:
 

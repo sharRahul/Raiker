@@ -33,10 +33,12 @@ npm --prefix apps/web run build
 raiker-app
 ```
 
-Upgrade pip first — an old resolver downloads whole 10 MB wheels just to read
-their metadata. With [uv](https://github.com/astral-sh/uv), `uv sync --extra dev`
-installs the exact set in `uv.lock` and resolves nothing at all. See
-[Getting started](docs/guide/getting-started.md#why-the-pip-upgrade-comes-first).
+Python **3.11 or newer** is required; check with `python --version` once the
+environment is active. If the install instead starts downloading version after
+version of the same package, it is on an older Python — see
+[Getting started](docs/guide/getting-started.md#if-the-install-downloads-the-same-package-over-and-over).
+With [uv](https://github.com/astral-sh/uv), `uv sync --extra dev` installs the
+exact set in `uv.lock` and resolves nothing at all.
 
 `raiker-app` starts Raiker on a loopback address and opens the dashboard in
 your browser. On first run, create the local owner account and connect a model.

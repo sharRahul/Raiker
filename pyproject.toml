@@ -69,10 +69,13 @@ dependencies = [
 #
 # The floors are not decorative. `ruff>=0.6` admitted **110 published
 # releases** of a ~10 MB binary wheel, and a pip that backtracks downloads the
-# whole wheel to read metadata it then throws away — so the width of the floor
-# is the width of the worst case, in megabytes. `>=0.15` admits 30. Nothing in
-# `[tool.ruff]` below uses a rule or setting older releases lacked, so the wide
-# floor bought nothing and paid for that worst case.
+# whole wheel to read metadata it then throws away — so the width of a floor is
+# the width of one leg of the worst case, in megabytes. `>=0.15` admits 30, and
+# nothing in `[tool.ruff]` below uses a rule or setting older releases lacked.
+#
+# This is hygiene, not a fix: the resolver walks *every* package, so narrowing
+# one leg moves the cost to the next. What actually stops the download storm is
+# the interpreter check in `setup.py` — see FIXED-407.
 dev = ["pytest>=8", "ruff>=0.15", "mypy>=1.10", "PyYAML>=6.0", "types-PyYAML>=6.0.12", "httpx2>=2.9", "pyinstaller>=6.10"]
 
 [project.scripts]

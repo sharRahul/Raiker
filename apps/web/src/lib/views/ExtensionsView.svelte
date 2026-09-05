@@ -818,7 +818,7 @@
     align-items: center;
     gap: var(--space-2);
     margin-top: var(--space-3);
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     font-weight: 650;
     color: var(--text-1);
     cursor: pointer;
@@ -851,7 +851,7 @@
     gap: var(--space-2);
   }
   .hook-scope {
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 750;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -863,7 +863,7 @@
      because uppercasing someone's plugin id renames it on screen. Written with
      both classes so it outranks `.hook-scope` regardless of source order. */
   .hook-scope.hook-scope-plugin {
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     font-style: italic;
     letter-spacing: 0;
     text-transform: none;
@@ -874,7 +874,7 @@
     border-radius: var(--r-pill);
     background: var(--sunken);
     color: var(--text-3);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 650;
     white-space: nowrap;
   }
@@ -888,10 +888,10 @@
   }
   .matcher,
   .events summary { cursor: pointer; display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
-  .events-h { font-size: 0.95rem; font-weight: 600; margin: 0; display: inline; }
+  .events-h { font-size: var(--text-md); font-weight: 600; margin: 0; display: inline; }
   .handler-type {
     font-family: var(--font-mono);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
   .handler-list {
     list-style: none;
@@ -952,7 +952,7 @@
     color: var(--warn);
   }
   .sig {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 750;
     padding: 0.16rem 0.55rem;
     border-radius: var(--r-pill);
@@ -1023,13 +1023,13 @@
   }
   .row-main { display: grid; gap: 0.1rem; min-width: 0; }
   .name { font-weight: 650; }
-  .category { color: var(--text-3); font-size: 0.75rem; }
+  .category { color: var(--text-3); font-size: var(--text-xs); }
   .facts { display: flex; gap: 0.3rem; flex-wrap: wrap; }
   .fact {
     border: 1px solid var(--border);
     border-radius: var(--r-pill);
     color: var(--text-3);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 650;
     padding: 0.1rem 0.5rem;
     text-transform: lowercase;
@@ -1048,9 +1048,9 @@
     border: 1px solid var(--accent-border);
     background: var(--accent-soft);
     border-radius: var(--r-sm);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
-  .note { color: var(--text-3); font-size: 0.78rem; margin: 0; }
+  .note { color: var(--text-3); font-size: var(--text-sm); margin: 0; }
   hr { border: 0; border-top: 1px solid var(--border); margin: var(--space-5) 0; }
 
   /* A connector row: identity and state on one line, the controls under it, and

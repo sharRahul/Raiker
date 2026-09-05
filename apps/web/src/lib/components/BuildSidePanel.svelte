@@ -391,7 +391,7 @@
     background: transparent;
     color: var(--text-2);
     font: inherit;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-weight: 650;
     padding: 0.25rem 0.7rem;
     border-radius: var(--r-pill);
@@ -410,7 +410,7 @@
     outline-offset: 1px;
   }
   .count {
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     background: var(--accent-soft);
     color: var(--accent);
     border-radius: var(--r-pill);
@@ -429,12 +429,12 @@
   .rail-lead {
     margin: 0;
     color: var(--text-2);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     line-height: 1.5;
   }
   .notice {
     margin: 0;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     color: var(--accent);
   }
   .load-error {
@@ -445,7 +445,7 @@
     border-radius: var(--r-md);
     background: var(--danger-soft);
     color: var(--text-2);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .load-error strong { color: var(--danger); }
   .task-list,
@@ -470,14 +470,14 @@
     gap: var(--space-2);
   }
   .task-title {
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
     font-weight: 650;
     color: var(--text-1);
     overflow-wrap: anywhere;
   }
   .step {
     margin: 0.3rem 0 0;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     color: var(--accent);
   }
   .progress {
@@ -498,12 +498,12 @@
     gap: var(--space-2);
     margin-top: 0.5rem;
     color: var(--text-3);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
   .recent h3,
   .examples h3 {
     margin: 0 0 0.4rem;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     color: var(--text-3);
     text-transform: uppercase;
@@ -514,7 +514,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .agent-form {
     display: grid;
@@ -523,12 +523,12 @@
   .agent-form label {
     display: grid;
     gap: 0.3rem;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .cadence-detail {
     margin: -0.4rem 0 0;
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
     line-height: 1.5;
   }
@@ -555,11 +555,11 @@
     outline-offset: 1px;
   }
   .example strong {
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     color: var(--text-1);
   }
   .example span {
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
   }
 </style>

@@ -92,19 +92,19 @@
 <style>
   .authority-matrix { margin:var(--space-4) 0; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); overflow:hidden; }
   .matrix-intro { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); padding:var(--space-4); border-bottom:1px solid var(--border); background:linear-gradient(100deg, var(--surface), var(--accent-soft)); }
-  .eyebrow { margin:0 0 .18rem; color:var(--accent); font-size:.66rem; font-weight:750; letter-spacing:.12em; text-transform:uppercase; }
-  h2 { margin:0; font-size:.95rem; font-weight:650; }
-  .delegation-rail { display:flex; align-items:center; gap:.42rem; color:var(--text-2); font-size:.66rem; white-space:nowrap; }
+  .eyebrow { margin:0 0 .18rem; color:var(--accent); font-size:var(--text-2xs); font-weight:750; letter-spacing:.12em; text-transform:uppercase; }
+  h2 { margin:0; font-size:var(--text-md); font-weight:650; }
+  .delegation-rail { display:flex; align-items:center; gap:.42rem; color:var(--text-2); font-size:var(--text-2xs); white-space:nowrap; }
   .delegation-rail i { width:2.4rem; height:1px; background:var(--accent); position:relative; }
   .delegation-rail i::after { content:""; position:absolute; right:-1px; top:-3px; border-left:5px solid var(--accent); border-top:3px solid transparent; border-bottom:3px solid transparent; }
   .matrix-scroll { overflow-x:auto; }
-  .matrix-note { margin:0 var(--space-4) var(--space-3); color:var(--text-3); font-size:.78rem; }
-  table { width:100%; border-collapse:collapse; font-size:.76rem; }
+  .matrix-note { margin:0 var(--space-4) var(--space-3); color:var(--text-3); font-size:var(--text-sm); }
+  table { width:100%; border-collapse:collapse; font-size:var(--text-xs); }
   th, td { padding:.58rem var(--space-4); text-align:left; border-bottom:1px solid var(--border); }
   tbody tr:last-child th, tbody tr:last-child td { border-bottom:0; }
-  thead th { color:var(--text-2); font-size:.65rem; letter-spacing:.06em; text-transform:uppercase; }
+  thead th { color:var(--text-2); font-size:var(--text-2xs); letter-spacing:.06em; text-transform:uppercase; }
   tbody th { font-weight:600; }
-  code { color:var(--text-2); font-family:var(--font-mono); font-size:.7rem; }
+  code { color:var(--text-2); font-family:var(--font-mono); font-size:var(--text-2xs); }
   .authority-state { font-weight:700; color:var(--ok); }
   .authority-state.ask { color:var(--warn); }
   .authority-state.blocked { color:var(--text-2); }
@@ -120,7 +120,7 @@
     .matrix-cards li:last-child { border-bottom:0; }
     .matrix-cards dl { display:grid; grid-template-columns:auto minmax(0,1fr); gap:.15rem var(--space-3); margin:0; }
     .matrix-cards dl > div { display:contents; }
-    .matrix-cards dt { color:var(--text-2); font-size:.65rem; letter-spacing:.06em; text-transform:uppercase; align-self:baseline; }
-    .matrix-cards dd { margin:0; font-size:.78rem; }
+    .matrix-cards dt { color:var(--text-2); font-size:var(--text-2xs); letter-spacing:.06em; text-transform:uppercase; align-self:baseline; }
+    .matrix-cards dd { margin:0; font-size:var(--text-sm); }
   }
 </style>

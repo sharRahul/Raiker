@@ -228,7 +228,7 @@
     background: transparent;
     color: var(--text-3);
     font: inherit;
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     cursor: pointer;
   }
   .msg-action:hover:not(:disabled) { background: var(--sunken); color: var(--text-1); }
@@ -276,14 +276,14 @@
   .more-menu button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
   .more-menu strong {
     display: block;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-weight: 650;
   }
   .more-menu em {
     display: block;
     font-style: normal;
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     color: var(--text-3);
   }
-  .copy-error { margin: 0.15rem 0 0; color: var(--danger); font-size: 0.7rem; }
+  .copy-error { margin: 0.15rem 0 0; color: var(--danger); font-size: var(--text-2xs); }
 </style>

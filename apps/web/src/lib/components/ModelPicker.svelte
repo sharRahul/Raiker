@@ -324,7 +324,7 @@
     padding: 0.22rem 0.46rem;
     background: var(--surface);
     color: var(--text-2);
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     cursor: pointer;
   }
@@ -370,7 +370,7 @@
     gap: 0.5rem;
     padding: 0.3rem 0.48rem 0.24rem;
     color: var(--text-1);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 800;
     letter-spacing: 0.03em;
   }
@@ -426,7 +426,7 @@
     background: var(--surface);
     color: var(--text-1);
     font: inherit;
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 750;
     cursor: pointer;
   }
@@ -478,7 +478,7 @@
   .effort-note {
     margin: 0.1rem 0.48rem 0.35rem;
     color: var(--text-3);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     line-height: 1.35;
   }
   .effort-choice {
@@ -505,7 +505,7 @@
   .effort-toggle small {
     display: block;
     color: var(--text-3);
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
   }
   .switch {
     width: 1.85rem;

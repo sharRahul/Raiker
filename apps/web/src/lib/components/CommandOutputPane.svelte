@@ -250,36 +250,36 @@
   .command-pane.expanded { border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); }
   .pane-toggle { width: 100%; min-height: 48px; display: flex; align-items: center; gap: .7rem; padding: .55rem .8rem; border: 0; background: transparent; color: var(--text-1); text-align: left; cursor: pointer; }
   .pane-toggle:hover { background: var(--sunken); }
-  .terminal-mark { display: grid; place-items: center; width: 30px; height: 28px; border-radius: var(--r-sm); background: var(--text-1); color: var(--surface); font: 700 .72rem/1 var(--font-mono); }
+  .terminal-mark { display: grid; place-items: center; width: 30px; height: 28px; border-radius: var(--r-sm); background: var(--text-1); color: var(--surface); font: 700 var(--text-xs)/1 var(--font-mono); }
   .pane-heading { display: grid; gap: .08rem; flex: 1; }
-  .pane-heading strong { font-size: .8rem; letter-spacing: .01em; }
-  .pane-heading small { color: var(--text-3); font-size: .68rem; }
-  .chevron { color: var(--text-3); font-size: 1.1rem; }
+  .pane-heading strong { font-size: var(--text-sm); letter-spacing: .01em; }
+  .pane-heading small { color: var(--text-3); font-size: var(--text-2xs); }
+  .chevron { color: var(--text-3); font-size: var(--text-base); }
   .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); }
   .pane-body { padding: .15rem .8rem .8rem; border-top: 1px solid var(--border); }
-  .receipt-rail { display: grid; grid-template-columns: auto 1fr auto 1fr auto 1fr auto; align-items: center; gap: .35rem; padding: .72rem 0; color: var(--text-3); font-size: .64rem; text-transform: uppercase; letter-spacing: .07em; }
+  .receipt-rail { display: grid; grid-template-columns: auto 1fr auto 1fr auto 1fr auto; align-items: center; gap: .35rem; padding: .72rem 0; color: var(--text-3); font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: .07em; }
   .receipt-rail span { display: flex; align-items: center; gap: .32rem; white-space: nowrap; }
   .receipt-rail i { width: 7px; height: 7px; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface); }
   .receipt-rail span.ready { color: var(--text-2); }
   .receipt-rail span.ready i { border-color: var(--ok); background: var(--ok); }
   .receipt-rail b { height: 1px; background: var(--border); }
   .command-row { display: flex; align-items: center; gap: .45rem; padding: .42rem .5rem; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--sunken); }
-  .command-notice { color: var(--text-2); font-size: .72rem; }
-  .posture { display: flex; justify-content: space-between; gap: .8rem; padding: .48rem .1rem; color: var(--text-3); font-size: .66rem; }
+  .command-notice { color: var(--text-2); font-size: var(--text-xs); }
+  .posture { display: flex; justify-content: space-between; gap: .8rem; padding: .48rem .1rem; color: var(--text-3); font-size: var(--text-2xs); }
   .posture span { display: inline-flex; align-items: center; gap: .28rem; }
   .output-shell { min-height: 112px; overflow: hidden; border: 1px solid var(--term-border); border-radius: var(--r-md); background: var(--term-bg); color: var(--term-fg); color-scheme: dark; }
-  .output-head { display: flex; justify-content: space-between; gap: .8rem; padding: .42rem .58rem; border-bottom: 1px solid var(--term-rule); color: var(--term-dim); font: .62rem var(--font-mono); }
+  .output-head { display: flex; justify-content: space-between; gap: .8rem; padding: .42rem .58rem; border-bottom: 1px solid var(--term-rule); color: var(--term-dim); font: var(--text-2xs) var(--font-mono); }
   .run-backend { color: var(--term-bright); font-weight: 600; }
-  pre { margin: 0; min-height: 72px; max-height: 240px; overflow: auto; padding: .62rem; white-space: pre-wrap; word-break: break-word; font: .72rem/1.55 var(--font-mono); }
-  .receipt-card { margin-top: .55rem; padding: .42rem .55rem; border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text-2); font-size: .7rem; }
+  pre { margin: 0; min-height: 72px; max-height: 240px; overflow: auto; padding: .62rem; white-space: pre-wrap; word-break: break-word; font: var(--text-xs)/1.55 var(--font-mono); }
+  .receipt-card { margin-top: .55rem; padding: .42rem .55rem; border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text-2); font-size: var(--text-2xs); }
   .receipt-card summary { cursor: pointer; }
   .receipt-card code { color: var(--text-3); }
   dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem; margin: .55rem 0 0; }
-  dl div { min-width: 0; } dt { color: var(--text-3); font-size: .62rem; text-transform: uppercase; } dd { margin: .12rem 0 0; overflow: hidden; text-overflow: ellipsis; }
-  .pane-error { margin: .55rem 0 0; color: var(--danger); font-size: .7rem; }
-  .run-picker { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 .35rem; color: var(--text-3); font-size: .68rem; }
-  .run-picker select { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: .7rem; }
-  .failure-nav { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin: .55rem 0 0; padding: .42rem .5rem; border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border)); border-radius: var(--r-md); background: color-mix(in srgb, var(--danger) 6%, transparent); color: var(--text-2); font-size: .7rem; }
+  dl div { min-width: 0; } dt { color: var(--text-3); font-size: var(--text-2xs); text-transform: uppercase; } dd { margin: .12rem 0 0; overflow: hidden; text-overflow: ellipsis; }
+  .pane-error { margin: .55rem 0 0; color: var(--danger); font-size: var(--text-2xs); }
+  .run-picker { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 .35rem; color: var(--text-3); font-size: var(--text-2xs); }
+  .run-picker select { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: var(--text-2xs); }
+  .failure-nav { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin: .55rem 0 0; padding: .42rem .5rem; border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border)); border-radius: var(--r-md); background: color-mix(in srgb, var(--danger) 6%, transparent); color: var(--text-2); font-size: var(--text-2xs); }
   .failure-nav a { margin-left: auto; color: var(--accent); }
   @media (max-width: 720px) { .command-pane { margin-inline: .75rem; } .receipt-rail { grid-template-columns: repeat(4, 1fr); } .receipt-rail b { display: none; } .receipt-rail span { justify-content: center; } .posture { display: grid; } dl { grid-template-columns: repeat(2, 1fr); } }
   @media (prefers-reduced-motion: reduce) { .live-dot { box-shadow: none; } }

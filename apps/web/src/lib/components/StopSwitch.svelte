@@ -151,7 +151,7 @@
     align-items: center;
     gap: 0.4rem;
     font: inherit;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 700;
     letter-spacing: 0.04em;
     color: var(--danger);
@@ -188,7 +188,7 @@
     margin-top: var(--space-4);
   }
   .events {
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
     padding-left: 1.1rem;
     margin: 0.4rem 0 0;

@@ -638,7 +638,7 @@
 
 <style>
   .standard-tag {
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
@@ -660,7 +660,7 @@
   }
   .conformance h4 {
     margin: 0 0 0.3rem;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     display: flex;
     align-items: baseline;
     gap: 0.5rem;
@@ -668,12 +668,12 @@
   }
   .conformance-summary {
     margin: 0 0 0.5rem;
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .conformance-fields {
     margin: 0 0 0.5rem;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--text-3);
     display: flex;
     gap: 0.9rem;
@@ -692,13 +692,13 @@
     grid-template-columns: auto auto 1fr;
     gap: 0.5rem;
     align-items: baseline;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
   }
   .finding-field {
     font-weight: 600;
   }
   .finding-severity {
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
@@ -717,7 +717,7 @@
   }
   .conformance-refused {
     margin: 0.5rem 0 0;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--text-3);
   }
   @media (max-width: 40rem) {
@@ -747,8 +747,8 @@
     background: var(--surface);
     padding: var(--space-3) var(--space-4);
   }
-  .add-block h3 { margin: 0 0 0.2rem; font-size: 0.9rem; }
-  .add-block p { color: var(--text-3); font-size: 0.78rem; margin: 0 0 var(--space-3); }
+  .add-block h3 { margin: 0 0 0.2rem; font-size: var(--text-md); }
+  .add-block p { color: var(--text-3); font-size: var(--text-sm); margin: 0 0 var(--space-3); }
   .row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
   .row .input { flex: 1 1 12rem; min-width: 0; }
   .builder {
@@ -780,12 +780,12 @@
   }
   .name-block { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .name { font-weight: 650; }
-  .version { color: var(--text-3); font-size: 0.75rem; }
+  .version { color: var(--text-3); font-size: var(--text-xs); }
   /* Provenance, not status: a plugin's skill is neither better nor worse than an
      uploaded one, so this is a quiet chip rather than a coloured badge — the
      active/inactive badge beside it is the one carrying state. */
   .provenance {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     letter-spacing: 0.01em;
     color: var(--text-2);
@@ -811,7 +811,7 @@
     flex-wrap: wrap;
   }
   .command-row .input { flex: 1 1 12rem; min-width: 0; }
-  .command-note { margin: 0.35rem 0 0; font-size: 0.75rem; }
+  .command-note { margin: 0.35rem 0 0; font-size: var(--text-xs); }
   .description {
     margin: 0.35rem 0 0.4rem;
     color: var(--text-2);
@@ -826,7 +826,7 @@
     gap: 0.75rem;
     flex-wrap: wrap;
     color: var(--text-3);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     align-items: center;
   }
   .link {

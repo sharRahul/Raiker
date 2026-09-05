@@ -555,7 +555,7 @@
   }
   .search-input {
     font: inherit;
-    font-size: 0.88rem;
+    font-size: var(--text-md);
     border: none;
     background: transparent;
     color: var(--text-1);
@@ -574,12 +574,12 @@
   .phase-fold { display:flex; align-items:center; gap:0.35rem; border:0; padding:0.15rem 0.2rem; background:transparent; color:var(--text-3); cursor:pointer; }
   .phase-fold:hover { color: var(--text-1); }
   .phase-count { font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
-  .phase-select-all { display:flex; align-items:center; gap:0.4rem; font-size:0.72rem; font-weight:650; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); cursor:pointer; }
+  .phase-select-all { display:flex; align-items:center; gap:0.4rem; font-size:var(--text-xs); font-weight:650; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); cursor:pointer; }
   .phase-select-all input { accent-color: var(--accent); }
   .cap-check { accent-color: var(--accent); flex:0 0 auto; }
   .bulk-bar { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; padding:0.55rem 0.9rem; border:1px solid var(--accent-border); border-radius:var(--r-md); background:var(--accent-soft); margin-bottom:var(--space-4); }
-  .bulk-count { font-weight:700; color:var(--accent); font-size:0.86rem; }
-  .bulk-label { color:var(--text-3); font-size:0.78rem; margin-left:0.3rem; }
+  .bulk-count { font-weight:700; color:var(--accent); font-size:var(--text-sm); }
+  .bulk-label { color:var(--text-3); font-size:var(--text-sm); margin-left:0.3rem; }
   .cap {
     padding: 0;
     overflow: hidden;
@@ -629,7 +629,7 @@
   /* GEP-04 — a switch that does not govern its own capability says so in the
      row, before the owner opens the card. Text, not colour alone. */
   .cap-reality {
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
@@ -647,7 +647,7 @@
     border-color: var(--accent-border, var(--accent));
   }
   .cap-reality-note {
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
     margin: 0 0 0.5rem;
     padding: 0.5rem 0.6rem;
@@ -664,12 +664,12 @@
     background: var(--sunken);
   }
   .cap-desc {
-    font-size: 0.88rem;
+    font-size: var(--text-md);
     color: var(--text-2);
     margin: 0 0 0.4rem;
   }
   .mode-hint {
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--text-3);
     margin: 0 0 var(--space-3);
   }
@@ -693,7 +693,7 @@
     border-radius: var(--r-md);
     background: var(--accent-soft);
     color: var(--text-2);
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
   }
   .runtime-note a {
     color: var(--accent);

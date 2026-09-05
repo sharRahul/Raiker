@@ -2279,7 +2279,7 @@
   .tab-lead {
     margin: 0;
     color: var(--text-2);
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     line-height: 1.5;
     max-width: 72ch;
   }
@@ -2334,17 +2334,17 @@
   .section-heading h2,
   .setup-overview h2 {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: var(--text-base);
   }
   .section-heading > p {
     max-width: 28rem;
     color: var(--text-3);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     margin: 0;
   }
   .eyebrow {
     color: var(--accent);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     font-weight: 750;
     letter-spacing: 0.08em;
     margin: 0 0 0.25rem;
@@ -2356,21 +2356,21 @@
   }
   .setup-meter strong {
     display: block;
-    font-size: 1.35rem;
+    font-size: var(--text-xl);
   }
   .setup-meter span {
     color: var(--text-3);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
   }
   .setup-meter .total-spend {
     color: var(--text-2);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     margin: 0.35rem 0 0;
   }
   .posture-line {
     margin: 0.1rem 0 0;
     color: var(--text-3);
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
   }
   /* BUG-270 — the one line on a provider card that is about this machine
      rather than about a provider. It carries the warning tone because it is
@@ -2413,7 +2413,7 @@
     align-items: baseline;
     color: var(--text-2);
     display: flex;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     gap: 0.75rem;
     justify-content: space-between;
   }
@@ -2422,12 +2422,12 @@
   }
   .usage-note {
     color: var(--text-3);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     margin: 0.35rem 0 0;
   }
   .row-usage {
     color: var(--text-3);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     grid-column: 1 / -1;
   }
   /* Geometry lives in the shared `.bar` primitive; this only places it. */
@@ -2478,17 +2478,17 @@
   }
   .row-title h3 {
     margin: 0;
-    font-size: 0.98rem;
+    font-size: var(--text-base);
   }
   .row-model {
     margin: 0.15rem 0 0.4rem;
     color: var(--text-2);
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
     overflow-wrap: anywhere;
   }
   .row-help {
     color: var(--text-3);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     line-height: 1.35;
     margin: 0 0 0.5rem;
   }
@@ -2544,12 +2544,12 @@
   }
   .pc-title h3 {
     margin: 0;
-    font-size: 1rem;
+    font-size: var(--text-base);
   }
   .pc-model {
     margin: 0;
     color: var(--text-2);
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
     overflow-wrap: anywhere;
   }
   .pc-status {
@@ -2557,7 +2557,7 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .status-dot {
@@ -2592,7 +2592,7 @@
     gap: 0.35rem;
   }
   .chip {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     border-radius: var(--r-pill);
     border: 1px solid var(--neutral-border);
@@ -2627,10 +2627,10 @@
     color: var(--text-1);
     max-width: 100%;
     font: inherit;
-    font-size: 0.88rem;
+    font-size: var(--text-md);
   }
   .picker-note {
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
     margin: 0;
   }
@@ -2639,12 +2639,12 @@
     gap: 0.4rem;
   }
   .picker-error {
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     margin: 0;
   }
   .test-result {
     color: var(--text-2);
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     margin: 0.3rem 0 0;
   }
   /* The local rows are a wrapping flex row; a result needs the full width to
@@ -2685,7 +2685,7 @@
     border: 0;
     color: var(--text-2);
     cursor: pointer;
-    font-size: 1.6rem;
+    font-size: var(--text-2xl);
     line-height: 1;
   }
   .signin-logo {
@@ -2698,12 +2698,12 @@
   .signin-dialog h2 {
     margin: 0;
     text-align: center;
-    font-size: 1.15rem;
+    font-size: var(--text-xl);
   }
   .signin-hint {
     margin: 0;
     color: var(--text-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     line-height: 1.4;
     text-align: center;
   }
@@ -2717,7 +2717,7 @@
     background: var(--brand);
     color: var(--brand-black);
     font-weight: 600;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     text-decoration: none;
     border: 1px solid var(--brand);
     transition: opacity 120ms var(--ease);
@@ -2742,7 +2742,7 @@
   }
   .signin-divider span {
     color: var(--text-3);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
   .field {
     display: flex;
@@ -2750,7 +2750,7 @@
     gap: 0.25rem;
   }
   .field-label {
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     color: var(--text-2);
   }
@@ -2760,7 +2760,7 @@
   }
   .admin-usage-field > small {
     color: var(--text-3);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     line-height: 1.35;
   }
   .sso-toggle {
@@ -2769,7 +2769,7 @@
     border: 0;
     color: var(--accent);
     cursor: pointer;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     padding: 0.1rem 0;
   }
   .signin-actions {
@@ -2791,7 +2791,7 @@
     margin: 0.4rem 0 0;
     text-align: center;
     color: var(--text-3);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
   }
   .signin-guidance {
     background: var(--warn-soft);
@@ -2803,7 +2803,7 @@
   }
   .signin-guidance p {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     line-height: 1.45;
     overflow-wrap: anywhere;
   }
@@ -2819,12 +2819,12 @@
   }
   .sg-link {
     color: var(--accent);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
   .sg-code {
     color: var(--text-3);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
 
   /* ── Details modal ── */
@@ -2857,7 +2857,7 @@
     border: 0;
     color: var(--text-2);
     cursor: pointer;
-    font-size: 1.6rem;
+    font-size: var(--text-2xl);
     line-height: 1;
     position: absolute;
     right: 0.75rem;
@@ -2874,7 +2874,7 @@
   }
   .details-grid dt {
     color: var(--text-3);
-    font-size: 0.73rem;
+    font-size: var(--text-xs);
     font-weight: 700;
     text-transform: uppercase;
   }
@@ -2890,7 +2890,7 @@
   }
   .fallback-empty {
     color: var(--text-3);
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
     margin: 0.5rem 0;
   }
   .fallback-list {
@@ -2939,11 +2939,11 @@
   }
   .fallback-add select {
     max-width: 22rem;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
   }
   .ok-note {
     color: var(--ok);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
   }
   .advisor {
     margin-top: var(--space-4);
@@ -2969,12 +2969,12 @@
   }
   .advisor-model-name {
     font-family: var(--font-mono, monospace);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .advisor-row select {
     max-width: 22rem;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
   }
   /* The four off-machine facts, read as a strip above the Hosted cards rather
      than as a card of their own on a tab of their own. */
@@ -2988,7 +2988,7 @@
     border-radius: var(--r-md);
   }
   .gates dt {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     text-transform: uppercase;
     letter-spacing: 0.05em;

@@ -122,7 +122,7 @@
     padding: 0.2rem 0.45rem;
     background: var(--surface);
     color: var(--text-2);
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     cursor: pointer;
   }
@@ -158,7 +158,7 @@
   .mode-menu-title {
     margin: 0.2rem 0.48rem 0.3rem;
     color: var(--text-3);
-    font-size: 0.65rem;
+    font-size: var(--text-2xs);
     font-weight: 750;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -185,25 +185,25 @@
   .mode-choice strong {
     display: block;
     color: var(--text-1);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
   }
   .mode-choice small {
     display: block;
     color: var(--text-3);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     line-height: 1.3;
   }
   kbd {
     color: var(--text-3);
     font-family: var(--font-mono);
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
   }
   .mode-menu-note {
     margin: 0.3rem 0.48rem 0.15rem;
     padding-top: 0.35rem;
     border-top: 1px solid var(--border);
     color: var(--text-3);
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
     line-height: 1.35;
   }
 </style>

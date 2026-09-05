@@ -81,7 +81,7 @@
   }
   .tray-toggle > span:last-child {
     color: var(--text-muted);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .pulse {
     width: 9px;
@@ -108,7 +108,7 @@
   }
   .tray-body strong {
     text-transform: uppercase;
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     letter-spacing: 0.08em;
   }
   .tray-body small {

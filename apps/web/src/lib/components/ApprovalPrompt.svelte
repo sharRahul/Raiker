@@ -232,11 +232,11 @@
     align-items: center;
     gap: 0.4rem;
     color: var(--text-1);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .more {
     color: var(--text-3);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
   }
   .dismiss {
     margin-left: auto;
@@ -250,19 +250,19 @@
     margin: 0;
     display: grid;
     gap: 0.1rem;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
   }
   .what strong {
     color: var(--text-1);
   }
   .what span {
     color: var(--text-3);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
   .note {
     margin: 0;
     color: var(--text-3);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
   .actions {
     display: flex;
@@ -278,7 +278,7 @@
     background: var(--surface);
     color: var(--text-1);
     font: inherit;
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     cursor: pointer;
   }

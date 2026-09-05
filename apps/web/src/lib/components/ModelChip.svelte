@@ -64,7 +64,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     padding: 0.18rem 0.6rem;
     border-radius: var(--r-pill);
@@ -97,7 +97,7 @@
     color: var(--text-3);
   }
   .glyph {
-    font-size: 0.6rem;
+    font-size: var(--text-2xs);
     line-height: 1;
   }
   .egress {

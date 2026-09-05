@@ -997,11 +997,11 @@
     box-shadow: var(--shadow-2);
   }
   .picker-dialog header { display: flex; align-items: center; gap: var(--space-2); }
-  .picker-dialog h2 { margin: 0; font-size: 1rem; }
+  .picker-dialog h2 { margin: 0; font-size: var(--text-base); }
   .picker-dialog .close {
     margin-left: auto;
     border: 0; background: transparent; color: var(--text-3);
-    font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0.1rem 0.35rem;
+    font-size: var(--text-xl); line-height: 1; cursor: pointer; padding: 0.1rem 0.35rem;
   }
   .picker-dialog footer { display: flex; justify-content: flex-end; }
 

@@ -336,7 +336,7 @@
   .voice-button.active { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent); }
   .voice-button:disabled { opacity: 0.5; cursor: not-allowed; }
   .voice-button:focus-visible, summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-  .listening { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--accent); font-size: 0.72rem; font-weight: 700; }
+  .listening { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--accent); font-size: var(--text-xs); font-weight: 700; }
   .live-dot { width: 0.42rem; height: 0.42rem; border-radius: 50%; background: currentColor; animation: voice-pulse 1.2s ease-in-out infinite; }
   .voice-info { position: relative; }
   summary { display: inline-flex; color: var(--text-3); cursor: pointer; list-style: none; }
@@ -344,10 +344,10 @@
   .voice-info p {
     position: absolute; z-index: 6; left: 0; bottom: calc(100% + 0.45rem); width: min(19rem, calc(100vw - 2rem));
     margin: 0; padding: 0.55rem 0.65rem; border: 1px solid var(--neutral-border); border-radius: var(--r-sm);
-    background: var(--surface); box-shadow: var(--shadow-2); color: var(--text-2); font-size: 0.68rem; line-height: 1.4;
+    background: var(--surface); box-shadow: var(--shadow-2); color: var(--text-2); font-size: var(--text-2xs); line-height: 1.4;
   }
   .voice-info p + p { bottom: calc(100% + 4.8rem); }
-  .voice-error { margin: 0.25rem 0 0; color: var(--danger); font-size: 0.7rem; line-height: 1.35; }
+  .voice-error { margin: 0.25rem 0 0; color: var(--danger); font-size: var(--text-2xs); line-height: 1.35; }
   @keyframes voice-pulse { 50% { opacity: 0.35; transform: scale(0.82); } }
   @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
   @media print { .voice-control, .voice-error { display: none; } }

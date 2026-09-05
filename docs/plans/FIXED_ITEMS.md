@@ -416,6 +416,8 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-401](#fixed-401--a-scale-that-existed-and-a-sidebar-that-vanished-instead-of-collapsing) | Medium | Web UI / shell | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-402](#fixed-402--messaging-is-its-own-destination-and-telegram-is-a-real-transport) | High | Channels / messaging | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-403](#fixed-403--the-design-surface-governed-image-generation-from-nothing) | High | Design / image generation | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-404](#fixed-404--a-nine-step-type-scale-with-sixty-three-sizes-in-front-of-it) | Medium | Web UI / design system | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-405](#fixed-405--the-element-floor-was-a-ceiling-and-it-painted-the-page-out) | High | Web UI / shell | Fixed 2026-09-05 (raised by the owner) |
 
 ---
 
@@ -17826,3 +17828,83 @@ linking to where the owner fixes it. 13 backend tests cover the gate, the egress
 boundary, the missing credential, an unsupported provider, an unsupported size,
 the stored bytes, the recorded refusal, a provider policy refusal, an oversized
 response, and that the credential appears in neither the result nor the record.
+
+## FIXED-404 — A nine-step type scale, with sixty-three sizes in front of it
+
+**Severity: Medium. Area: Web UI / design system. Status: Fixed 2026-09-05.
+Raised by the owner: keep the font size the same everywhere.**
+
+**Observed.** `app.css` defines a modular scale at 1.22 — `--text-2xs` 0.68
+through `--text-display` 1.82, nine steps — and the components in front of it
+used **63 distinct raw values across 554 declarations**. 0.72 beside 0.73 beside
+0.74 for the same line of secondary text; 0.78 alone appeared 76 times, 0.8
+fifty-four times, 0.82 fifty times, all meaning the same thing.
+
+It is the same defect as FIXED-401's icon sizes, three times larger: a scale was
+built, and nothing moved onto it. The result is a product that is not wrong
+anywhere and not uniform anywhere either, which is exactly the impression the
+owner reported.
+
+**Fix.** Every declaration mapped to its nearest step — 602 `font-size`
+declarations across 91 components, plus 9 `font:` shorthands that had a size
+baked into them. The migration was measured before it was applied: **533 of the
+554 move less than a pixel** at the 15px root, and the 21 that move more are
+headings being pulled onto the scale (the largest single change is 1.65rem →
+1.49rem).
+
+Four `clamp()` hero headings are left alone and are exempt in the checker. A
+fluid heading is a *range*, and a range cannot become a fixed step without
+losing the thing it exists for.
+
+`scripts/check-design-tokens.mjs` now fails on a hard-coded type size in a
+component style block, beside the raw-colour and dangling-token rules it already
+enforced. Verified both ways: it catches `font-size: 0.77rem` and passes a
+`clamp()`.
+
+**User-interface outcome.** Every page renders at 390 / 768 / 1280 / 1920, no
+route clips its own content, and every page renders in both explicit themes.
+
+## FIXED-405 — The element floor was a ceiling, and it painted the page out
+
+**Severity: High. Area: Web UI / shell. Status: Fixed 2026-09-05. Raised by the
+owner: why is the background opaque when the settings page is open, and the
+same with notifications.**
+
+**Observed.** Opening the settings window or the notification panel did not dim
+the page behind it — it **replaced** it. The sidebar, the top bar and the
+content were all still in the DOM, `display: flex`, `visibility: visible`,
+`opacity: 1`, at full viewport size, painted over by a flat opaque sheet.
+
+**Root cause, and it is not in either of those components.** Both dismiss layers
+are a `<button>` stretched over the viewport. `app.css` defines the element
+floor as `:where(button)`, and the comment above it promises exactly what
+`:where()` is for — *"`:where()` keeps this at zero specificity, so it is
+genuinely a floor: every `.btn-*` variant, every `.chip`, and every
+component-scoped `.menu button` still wins without anything being unpicked."*
+
+The three **state** rules did not honour that. They were written
+
+```css
+:where(button):hover:not(:disabled) { background: var(--sunken); }
+```
+
+with the pseudo-classes *outside* the `:where()`, which is (0,2,0) — not zero.
+That ties any component's own two-class rule and wins on source order. So the
+moment the pointer was anywhere on screen, the catch-all painted the full-screen
+catcher `--sunken` and the page disappeared. The scrim's own
+`background: var(--overlay)` was being overridden; `--overlay` resolved
+correctly on the element the whole time.
+
+**Why it survived everything.** It only appears on `:hover`, and it looks like a
+deliberate modal treatment rather than a defect. A four-width sweep, a
+both-themes sweep and a 26-route capture all walked past it.
+
+**Fix.** Each whole selector goes inside `:where()` —
+`:where(button:hover:not(:disabled))`, and the same for `:disabled` and
+`:focus-visible` — which restores the contract the comment already claimed. The
+settings scrim is the house 48% dim again; the notification catcher is genuinely
+transparent, which is right because that panel is not modal.
+
+**User-interface outcome.** Guarded by a mocked e2e test that moves the pointer
+onto each layer and asserts the computed colour. Confirmed to fail against the
+old selector, returning `rgb(241, 245, 249)`.

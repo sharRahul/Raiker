@@ -46,7 +46,7 @@
     align-items: center;
     gap: 0.35rem;
     color: var(--text-3);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     text-decoration: none;
     border-radius: var(--r-pill);
   }

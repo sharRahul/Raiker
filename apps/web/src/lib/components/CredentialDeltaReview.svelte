@@ -48,13 +48,13 @@
 {#if message}<p class="delta-message" role="status">{message}</p>{/if}
 
 <style>
-  .delta-review { display:grid; gap:.45rem; margin-top:.55rem; padding:.65rem; border:1px solid color-mix(in srgb,var(--warn) 45%,var(--border)); border-radius:var(--r-md); background:color-mix(in srgb,var(--warn) 5%,transparent); font-size:.7rem; }
+  .delta-review { display:grid; gap:.45rem; margin-top:.55rem; padding:.65rem; border:1px solid color-mix(in srgb,var(--warn) 45%,var(--border)); border-radius:var(--r-md); background:color-mix(in srgb,var(--warn) 5%,transparent); font-size:var(--text-2xs); }
   .delta-review p { margin:0; color:var(--text-2); }
   .delta-review dl { display:flex; flex-wrap:wrap; gap:.8rem; margin:0; }
-  .delta-review dt { color:var(--text-3); font-size:.62rem; text-transform:uppercase; }
+  .delta-review dt { color:var(--text-3); font-size:var(--text-2xs); text-transform:uppercase; }
   .delta-review dd { margin:0; }
   .delta-review ul { max-height:7rem; overflow:auto; margin:0; padding-left:1.1rem; }
   .delta-review .warning { color:var(--warn); }
   .delta-review button { justify-self:start; }
-  .delta-message { margin:.55rem 0 0; color:var(--text-2); font-size:.7rem; }
+  .delta-message { margin:.55rem 0 0; color:var(--text-2); font-size:var(--text-2xs); }
 </style>

@@ -168,7 +168,7 @@
     background: transparent;
     color: var(--text-2);
     font: inherit;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     padding: 0.38rem 0.85rem;
     cursor: pointer;
@@ -189,7 +189,7 @@
     border-radius: var(--r-pill);
     background: var(--accent-soft);
     color: var(--accent);
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
   }
   @media (max-width: 1023px) {

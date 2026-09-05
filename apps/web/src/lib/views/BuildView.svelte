@@ -2443,7 +2443,7 @@
     background: var(--surface);
     color: var(--text-1);
     font: inherit;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     font-weight: 650;
     padding: 0.3rem 0.7rem;
     cursor: pointer;
@@ -2461,7 +2461,7 @@
     white-space: nowrap;
   }
   .repo-warning {
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     color: var(--warn);
   }
   .header-actions {
@@ -2492,7 +2492,7 @@
     background: transparent;
     color: var(--text-1);
     font: inherit;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     padding: var(--space-1) var(--space-2);
     border-radius: var(--r-sm);
     text-align: left;
@@ -2517,7 +2517,7 @@
     align-items: center;
     gap: 0.4rem;
     margin: 0;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     font-weight: 650;
     color: var(--warn);
   }
@@ -2569,7 +2569,7 @@
   }
   .mode-tag {
     display: inline-block;
-    font-size: 0.66rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -2603,7 +2603,7 @@
     gap: 0.45rem;
     margin: 0;
     color: var(--text-3);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-weight: 650;
   }
   .pulse {
@@ -2631,7 +2631,7 @@
     align-items: center;
     gap: 0.4rem;
     cursor: pointer;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     color: var(--text-3);
     list-style: none;
@@ -2647,14 +2647,14 @@
     gap: 0.35rem;
   }
   .phase {
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     color: var(--accent);
   }
   .governance ol ul {
     margin: 0.1rem 0 0;
     padding-left: 1rem;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
 
@@ -2668,12 +2668,12 @@
   }
   .decisions h2 {
     margin: 0;
-    font-size: 0.9rem;
+    font-size: var(--text-md);
     color: var(--warn);
   }
   .decisions-lead {
     margin: 0;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
     line-height: 1.5;
   }
@@ -2690,12 +2690,12 @@
     gap: var(--space-2);
   }
   .decision-title {
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     font-weight: 650;
   }
   .decision-meta {
     margin: 0.2rem 0 0.5rem;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
   }
   .decision-actions {
@@ -2713,7 +2713,7 @@
   .decision-edit .textarea {
     width: 100%;
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     white-space: pre;
     overflow-x: auto;
   }
@@ -2783,7 +2783,7 @@
     background: transparent;
     color: var(--text-1);
     font: inherit;
-    font-size: 0.95rem;
+    font-size: var(--text-md);
     min-height: 2.6rem;
   }
   .composer-card textarea::placeholder {
@@ -2791,13 +2791,13 @@
   }
   .line-notice {
     margin: 0;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
     line-height: 1.5;
   }
   .error-line {
     color: var(--danger);
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     margin: 0.35rem 0 0;
   }
   .standing-compact { display: none; }
@@ -2808,7 +2808,7 @@
   }
   .stopped-line {
     margin: 0 0 0.4rem;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .composer-bar {
@@ -2854,7 +2854,7 @@
     background: var(--surface);
     color: var(--text-2);
     font: inherit;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     padding: 0.2rem 0.45rem;
     border-radius: var(--r-pill);
@@ -2895,7 +2895,7 @@
   .shortcut-hint {
     margin: 0;
     text-align: right;
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
     line-height: 1.35;
   }
@@ -2904,7 +2904,7 @@
     border: 1px solid var(--border);
     border-radius: var(--r-sm);
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
   }
   .hint-link {
     border: 0;

@@ -194,7 +194,7 @@
     display: flex;
     align-items: baseline;
     gap: 0.5rem;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
     margin: 0 0 var(--space-3);
   }
@@ -202,7 +202,7 @@
     color: var(--text-1);
   }
   .count {
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 500;
     color: var(--text-3);
   }
@@ -237,7 +237,7 @@
     flex-wrap: wrap;
   }
   .badge-metadata {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     color: var(--info);
     background: var(--info-soft);
@@ -248,14 +248,14 @@
   }
   .when {
     margin-left: auto;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
     white-space: nowrap;
   }
   .summary {
     margin: 0.4rem 0 0;
     color: var(--text-2);
-    font-size: 0.88rem;
+    font-size: var(--text-md);
   }
   .context {
     display: flex;
@@ -269,7 +269,7 @@
     gap: 0.35rem;
   }
   .context dt {
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -277,7 +277,7 @@
   }
   .context dd {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .preflight-btn {

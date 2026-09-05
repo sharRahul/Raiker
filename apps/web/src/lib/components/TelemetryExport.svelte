@@ -302,19 +302,19 @@
      scoped to that file — so a heading given the same class here inherited
      nothing and rendered a size larger than its siblings. Matched rather than
      hoisted: one component owning one heading is the smaller change. */
-  .otlp .section-h { font-size: 0.95rem; margin: 0 0 var(--space-3); }
+  .otlp .section-h { font-size: var(--text-md); margin: 0 0 var(--space-3); }
   .otlp p { margin: 0 0 var(--space-3); color: var(--text-2); max-width: 68ch; }
   .list { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-3); }
   .list li { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--space-3); display: grid; gap: 0.35rem; }
   .row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
   .name { font-weight: 600; }
   .muted { color: var(--text-3); font-size: var(--text-sm); }
-  .tag { font-size: 0.72rem; color: var(--text-3); border: 1px solid var(--border); border-radius: 999px; padding: 0.05rem 0.5rem; }
-  .cadence select { font-size: 0.78rem; padding: 0.2rem 0.4rem; }
+  .tag { font-size: var(--text-xs); color: var(--text-3); border: 1px solid var(--border); border-radius: 999px; padding: 0.05rem 0.5rem; }
+  .cadence select { font-size: var(--text-sm); padding: 0.2rem 0.4rem; }
   .notice { color: var(--text-2); }
   .notice a { margin-left: 0.35rem; }
   .add { display: grid; gap: var(--space-3); max-width: 32rem; }
-  .add label { display: grid; gap: 0.25rem; font-size: 0.8rem; color: var(--text-2); }
+  .add label { display: grid; gap: 0.25rem; font-size: var(--text-sm); color: var(--text-2); }
   .add .check { display: flex; align-items: center; gap: 0.5rem; }
-  code { font-size: 0.78rem; color: var(--text-3); word-break: break-all; }
+  code { font-size: var(--text-sm); color: var(--text-3); word-break: break-all; }
 </style>

@@ -374,55 +374,55 @@
   .pricing { display: grid; gap: var(--space-3); }
   .pricing-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
   .pricing-head h2 { margin: 0 0 .25rem; }
-  .sub { color: var(--text-2); font-size: .84rem; margin: 0; max-width: 68ch; line-height: 1.5; }
-  .ok-note { color: var(--ok); font-size: .82rem; margin: 0; font-weight: 600; }
+  .sub { color: var(--text-2); font-size: var(--text-sm); margin: 0; max-width: 68ch; line-height: 1.5; }
+  .ok-note { color: var(--ok); font-size: var(--text-sm); margin: 0; font-weight: 600; }
   .error { color: var(--danger); font-size: var(--text-sm); margin: 0; }
 
   .sync { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; }
   .sync li {
     display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
     padding: .45rem .7rem; border: 1px solid var(--border);
-    border-radius: var(--r-md); background: var(--sunken); font-size: .78rem;
+    border-radius: var(--r-md); background: var(--sunken); font-size: var(--text-sm);
   }
   .sync li.stale { border-color: var(--warn-border); background: var(--warn-soft); }
   .sync-provider { font-weight: 700; }
   .sync-fact { color: var(--text-3); }
   .sync-error { color: var(--warn); width: 100%; }
-  .badge { border-radius: 999px; padding: .05rem .45rem; font-size: .68rem; font-weight: 700; }
+  .badge { border-radius: 999px; padding: .05rem .45rem; font-size: var(--text-2xs); font-weight: 700; }
   .badge-ok { background: var(--ok-soft); color: var(--ok); }
   .badge-warn { background: var(--warn-soft); color: var(--warn); }
 
   /* A wide table is allowed to scroll inside itself rather than widening the
      page — the rate components matter more than fitting on one screen. */
   .table-wrap { overflow-x: auto; }
-  table { border-collapse: collapse; width: 100%; font-size: .8rem; }
+  table { border-collapse: collapse; width: 100%; font-size: var(--text-sm); }
   th, td { border-bottom: 1px solid var(--border); padding: .45rem .6rem; text-align: left; vertical-align: top; }
-  thead th { color: var(--text-3); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
+  thead th { color: var(--text-3); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .04em; }
   tbody th { font-weight: 600; }
   tbody th code { display: block; overflow-wrap: anywhere; }
-  .provider { color: var(--text-3); font-size: .72rem; }
+  .provider { color: var(--text-3); font-size: var(--text-xs); }
   .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .source { color: var(--text-2); }
   .source.owner { color: var(--accent); font-weight: 650; }
-  .review-fact, .review-state { display:block; margin-top:.18rem; color:var(--text-3); font-size:.7rem; white-space:nowrap; }
+  .review-fact, .review-state { display:block; margin-top:.18rem; color:var(--text-3); font-size:var(--text-2xs); white-space:nowrap; }
   .review-state { color:var(--ok); font-weight:650; }
   .review-state.overdue { color:var(--warn); }
   .actions { display: flex; gap: .25rem; flex-wrap: wrap; }
 
   .expansion td { background: var(--sunken); }
-  .expansion h3 { margin: 0 0 .35rem; font-size: .84rem; }
+  .expansion h3 { margin: 0 0 .35rem; font-size: var(--text-sm); }
   .history { list-style: none; margin: .4rem 0 0; padding: 0; display: grid; gap: .35rem; }
-  .history li { display: flex; gap: .6rem; flex-wrap: wrap; font-size: .76rem; }
+  .history li { display: flex; gap: .6rem; flex-wrap: wrap; font-size: var(--text-xs); }
   .history-date { font-variant-numeric: tabular-nums; font-weight: 650; }
   .history-source { color: var(--accent); }
   .history-rates { color: var(--text-2); }
   .history-reason, .history-by { color: var(--text-3); }
 
   .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .6rem; margin: .6rem 0; }
-  .fields label { display: grid; gap: .15rem; font-size: .76rem; color: var(--text-2); }
+  .fields label { display: grid; gap: .15rem; font-size: var(--text-xs); color: var(--text-2); }
   .fields .wide { grid-column: 1 / -1; }
   .fields input {
-    font: inherit; font-size: .82rem; padding: .3rem .45rem;
+    font: inherit; font-size: var(--text-sm); padding: .3rem .45rem;
     border: 1px solid var(--border-strong); border-radius: var(--r-sm);
     background: var(--surface); color: var(--text-1);
   }

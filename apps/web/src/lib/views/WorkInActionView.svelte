@@ -184,12 +184,12 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
 <style>
   .head-row { display:flex; justify-content:space-between; align-items:flex-start; gap:var(--space-4); margin-bottom:var(--space-4); }
   .page-lead { margin:0; max-width:760px; color:var(--text-2); }
-  .truth-note { display:flex; align-items:center; gap:6px; margin:var(--space-2) 0 0; color:var(--text-2); font-size:0.85rem; }
+  .truth-note { display:flex; align-items:center; gap:6px; margin:var(--space-2) 0 0; color:var(--text-2); font-size:var(--text-sm); }
 
   /* ── Workstations: cartoon agents at desks ── */
   .floor { margin-bottom:var(--space-4); }
-  .floor-head h2 { margin:0; font-size:1rem; }
-  .floor-head p { margin:4px 0 0; color:var(--text-2); font-size:0.85rem; }
+  .floor-head h2 { margin:0; font-size:var(--text-base); }
+  .floor-head p { margin:4px 0 0; color:var(--text-2); font-size:var(--text-sm); }
   .desks { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:var(--space-4); margin-top:var(--space-4); }
   .desk { display:grid; gap:10px; justify-items:center; }
   .scene { position:relative; width:160px; height:120px; border:1px solid var(--border); border-radius:var(--r-md); background:linear-gradient(180deg, var(--sunken), var(--surface)); overflow:hidden; }
@@ -217,8 +217,8 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
   .desk[data-mood="working"] .arm.right { animation:arm-type 0.5s ease-in-out infinite; transform-origin:top center; }
   .desk[data-mood="queued"] .arm.right { animation:arm-tap 1.4s ease-in-out infinite; transform-origin:top center; }
 
-  .zzz { position:absolute; top:-6px; left:18px; color:var(--text-3); font-size:0.7rem; font-weight:700; opacity:0; animation:zzz 3.6s ease-in-out infinite; }
-  .z2 { left:26px; animation-delay:1.2s; } .z3 { left:34px; font-size:0.9rem; animation-delay:2.4s; }
+  .zzz { position:absolute; top:-6px; left:18px; color:var(--text-3); font-size:var(--text-2xs); font-weight:700; opacity:0; animation:zzz 3.6s ease-in-out infinite; }
+  .z2 { left:26px; animation-delay:1.2s; } .z3 { left:34px; font-size:var(--text-md); animation-delay:2.4s; }
   .sweat { position:absolute; top:2px; right:4px; width:5px; height:7px; background:#9ed1ff; border-radius:50% 50% 50% 50% / 60% 60% 40% 40%; animation:sweat 1.8s ease-in infinite; opacity:0; }
   .motion-lines { position:absolute; top:14px; right:-4px; display:flex; flex-direction:column; gap:3px; }
   .motion-lines i { display:block; width:6px; height:1.5px; background:var(--accent); opacity:0; animation:motion 0.6s ease-out infinite; }
@@ -228,9 +228,9 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
   .wait-clock::after { content:""; position:absolute; top:50%; left:50%; width:1.5px; height:3px; background:var(--text-3); transform-origin:bottom center; transform:translate(-50%,-100%) rotate(90deg); }
 
   .desk-label { text-align:center; }
-  .desk-label h3 { margin:0; font-size:0.86rem; }
-  .desk-label p { margin:3px 0 0; color:var(--text-2); font-size:0.78rem; }
-  .mood-tag { display:inline-block; margin-top:5px; font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; padding:2px 7px; border-radius:var(--r-pill); border:1px solid var(--border); color:var(--text-2); }
+  .desk-label h3 { margin:0; font-size:var(--text-sm); }
+  .desk-label p { margin:3px 0 0; color:var(--text-2); font-size:var(--text-sm); }
+  .mood-tag { display:inline-block; margin-top:5px; font-size:var(--text-2xs); font-weight:700; text-transform:uppercase; letter-spacing:0.06em; padding:2px 7px; border-radius:var(--r-pill); border:1px solid var(--border); color:var(--text-2); }
   .mood-tag[data-mood="working"] { color:var(--accent); border-color:var(--accent-border); background:var(--accent-soft); }
   .mood-tag[data-mood="idle"] { color:var(--text-3); }
   .mood-tag[data-mood="queued"] { color:var(--warn); border-color:var(--warn-border); background:var(--warn-soft); }
@@ -238,23 +238,23 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
 
   /* ── Tasks (conveyor) + schedules (waitlist) ── */
   .work-layout { display:grid; grid-template-columns:1.4fr 1fr; gap:var(--space-4); align-items:start; }
-  .work-layout h2 { margin:0 0 var(--space-3); font-size:1rem; }
+  .work-layout h2 { margin:0 0 var(--space-3); font-size:var(--text-base); }
   .conveyor { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
   .crate { position:relative; display:grid; grid-template-columns:1fr; gap:8px; padding:12px 14px; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); box-shadow:var(--shadow-1); animation:crate-glide 0.6s var(--ease) both; }
-  .crate-body h3 { margin:0; font-size:0.88rem; } .crate-body p { margin:3px 0 0; color:var(--text-2); font-size:0.8rem; }
+  .crate-body h3 { margin:0; font-size:var(--text-md); } .crate-body p { margin:3px 0 0; color:var(--text-2); font-size:var(--text-sm); }
   .progress { height:6px; overflow:hidden; border-radius:4px; background:var(--sunken); } .progress div { height:100%; background:var(--accent); transition:width 400ms var(--ease); }
-  .finished-head { margin:var(--space-4) 0 8px; font-size:0.86rem; color:var(--text-2); }
+  .finished-head { margin:var(--space-4) 0 8px; font-size:var(--text-sm); color:var(--text-2); }
   .finished { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
   .finished li { padding:8px 0; border-bottom:1px solid var(--border); }
   .finished li:last-child { border:0; }
-  .finished h4 { margin:0; font-size:0.84rem; } .finished p { margin:2px 0 0; color:var(--text-2); font-size:0.78rem; }
+  .finished h4 { margin:0; font-size:var(--text-sm); } .finished p { margin:2px 0 0; color:var(--text-2); font-size:var(--text-sm); }
 
   .waitlist { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
   .waitlist li { display:flex; gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); }
   .waitlist li:last-child { border:0; }
-  .waitlist h3 { margin:0; font-size:0.84rem; } .waitlist p { margin:2px 0 0; color:var(--text-2); font-size:0.78rem; }
+  .waitlist h3 { margin:0; font-size:var(--text-sm); } .waitlist p { margin:2px 0 0; color:var(--text-2); font-size:var(--text-sm); }
   .wait-mark { width:14px; height:14px; flex:0 0 auto; border-radius:50%; background:#c89528; animation:wait-pulse 2.2s ease-in-out infinite; }
-  .empty { color:var(--text-2); font-size:0.85rem; }
+  .empty { color:var(--text-2); font-size:var(--text-sm); }
 
   @keyframes char-bob { 50% { transform:translateY(-2px); } }
   @keyframes char-work { 0%,100% { transform:translateY(0) rotate(-1deg); } 50% { transform:translateY(-4px) rotate(1deg); } }

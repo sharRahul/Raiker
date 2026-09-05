@@ -653,12 +653,12 @@
   /* MEM-03 — the sentence that says which embedding is in force. It is a
      statement of fact rather than an alert, so it uses the same tone treatment
      as the posture strip above rather than a second, louder one. */
-  .posture-line { display:flex; align-items:baseline; gap:.4rem; margin-top:var(--space-2) !important; font-size:.82rem; }
+  .posture-line { display:flex; align-items:baseline; gap:.4rem; margin-top:var(--space-2) !important; font-size:var(--text-sm); }
   .posture-line :global(svg) { flex:none; align-self:center; color:var(--warn,var(--text-3)); }
   .posture-line[data-semantic="true"] :global(svg) { color:var(--ok,var(--text-3)); }
   .backend-field { flex:none; min-width:14rem; }
   /* A secondary clause under the lead, not a second lead. */
-  .due-row { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); font-size:.82rem; color:var(--text-2); }
+  .due-row { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); font-size:var(--text-sm); color:var(--text-2); }
   .due-row :global(svg) { flex:none; color:var(--warn,var(--text-3)); }
   .due-row[role="status"] :global(svg) { color:var(--ok,var(--text-3)); }
   .index-row { display:flex; gap:var(--space-2); align-items:center; margin-top:var(--space-2); flex-wrap:wrap; }
@@ -683,8 +683,8 @@
   .posture-denied :global(svg),.posture-unknown :global(svg) { color:var(--warn,var(--text-3)); }
   .posture-action { flex:none; white-space:nowrap; font-weight:600; }
   .switch { min-width:76px; min-height:44px; display:flex; align-items:center; gap:.45rem; border:1px solid var(--border-strong); border-radius:var(--r-pill); padding:.25rem .55rem .25rem .3rem; background:var(--sunken); color:var(--text-2); cursor:pointer; } .switch span { width:1.65rem; height:1.65rem; border-radius:50%; background:var(--text-3); } .switch.on { background:var(--accent-soft); color:var(--accent); border-color:var(--accent-border); } .switch.on span { background:var(--accent); }
-  .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:var(--space-4) 0; overflow:hidden; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--border); } .summary div { display:grid; gap:.15rem; padding:var(--space-3); background:var(--surface); } .summary strong { font-size:1.2rem; } .summary span { color:var(--text-3); font-size:.75rem; }
-  .filters { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; margin-bottom:var(--space-5); } .search { min-height:var(--control-min-h); border:1px solid var(--border-strong); border-radius:var(--r-sm); background:var(--surface); color:var(--text-1); } .search { display:flex; align-items:center; gap:.45rem; padding:0 .7rem; flex:1; min-width:15rem; } .search input { width:100%; border:0; outline:0; background:transparent; color:inherit; } .pinned-filter { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:.82rem; }
+  .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:var(--space-4) 0; overflow:hidden; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--border); } .summary div { display:grid; gap:.15rem; padding:var(--space-3); background:var(--surface); } .summary strong { font-size:var(--text-xl); } .summary span { color:var(--text-3); font-size:var(--text-xs); }
+  .filters { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; margin-bottom:var(--space-5); } .search { min-height:var(--control-min-h); border:1px solid var(--border-strong); border-radius:var(--r-sm); background:var(--surface); color:var(--text-1); } .search { display:flex; align-items:center; gap:.45rem; padding:0 .7rem; flex:1; min-width:15rem; } .search input { width:100%; border:0; outline:0; background:transparent; color:inherit; } .pinned-filter { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:var(--text-sm); }
   /* The library is a card like the posture controls above it, not a bare run of
      text. Without the enclosure its empty state ("No files yet.") sat directly
      on top of the memory filter row and read as a caption for the filters. */
@@ -702,19 +702,19 @@
      wrapped into a three-line column beside its heading, and so did the
      observations count. A short count still sits inline. */
   .section-head > :last-child:not(:first-child) { flex:none; max-width:100%; } .memory-grid { display:grid; gap:var(--space-3); }
-  .memory-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .memory-card.pinned { border-color:var(--accent-border); } .memory-card.pending { margin-bottom:var(--space-3); background:var(--warn-soft); } .memory-card h4 { font-size:1rem; } .memory-title textarea { width:100%; }
-  .pin-label { display:flex; align-items:center; gap:.25rem; color:var(--accent); font-size:.72rem; } .meta { display:flex; flex-wrap:wrap; gap:.35rem; margin:.6rem 0; } .meta span { padding:.22rem .48rem; border-radius:var(--r-pill); background:var(--sunken); color:var(--text-2); font-size:.72rem; } dl { display:grid; grid-template-columns:2fr 1fr 1fr; gap:var(--space-3); padding-block:var(--space-3); border-block:1px solid var(--border); } dl div { min-width:0; } dt { color:var(--text-3); font-size:.7rem; } dd { margin:.15rem 0 0; overflow-wrap:anywhere; font-size:.82rem; } .card-actions { justify-content:flex-start; flex-wrap:wrap; margin-top:var(--space-3); } .danger { color:var(--danger); } details { margin-top:var(--space-3); color:var(--text-2); font-size:.78rem; } details summary { cursor:pointer; color:var(--text-1); }
+  .memory-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .memory-card.pinned { border-color:var(--accent-border); } .memory-card.pending { margin-bottom:var(--space-3); background:var(--warn-soft); } .memory-card h4 { font-size:var(--text-base); } .memory-title textarea { width:100%; }
+  .pin-label { display:flex; align-items:center; gap:.25rem; color:var(--accent); font-size:var(--text-xs); } .meta { display:flex; flex-wrap:wrap; gap:.35rem; margin:.6rem 0; } .meta span { padding:.22rem .48rem; border-radius:var(--r-pill); background:var(--sunken); color:var(--text-2); font-size:var(--text-xs); } dl { display:grid; grid-template-columns:2fr 1fr 1fr; gap:var(--space-3); padding-block:var(--space-3); border-block:1px solid var(--border); } dl div { min-width:0; } dt { color:var(--text-3); font-size:var(--text-2xs); } dd { margin:.15rem 0 0; overflow-wrap:anywhere; font-size:var(--text-sm); } .card-actions { justify-content:flex-start; flex-wrap:wrap; margin-top:var(--space-3); } .danger { color:var(--danger); } details { margin-top:var(--space-3); color:var(--text-2); font-size:var(--text-sm); } details summary { cursor:pointer; color:var(--text-1); }
   /* MEM-04 — an observation reads as a memory card with one difference: a
      refused one is drawn in the warning tone the pending proposals already use,
      because both are "here is something Raiker did not act on by itself". */
-  .section-head p.section-note { margin:.2rem 0 0; color:var(--text-3); font-size:.8rem; max-width:52rem; }
+  .section-head p.section-note { margin:.2rem 0 0; color:var(--text-3); font-size:var(--text-sm); max-width:52rem; }
   .memory-card.observation.refused { background:var(--warn-soft); border-color:var(--warn-border,var(--border-strong)); }
-  .refused-label { display:flex; align-items:center; gap:.25rem; flex:none; color:var(--warn,var(--text-3)); font-size:.72rem; }
-  .refused-note,.gist-note { margin:.5rem 0 0; color:var(--text-2); font-size:.8rem; }
+  .refused-label { display:flex; align-items:center; gap:.25rem; flex:none; color:var(--warn,var(--text-3)); font-size:var(--text-xs); }
+  .refused-note,.gist-note { margin:.5rem 0 0; color:var(--text-2); font-size:var(--text-sm); }
   .gist-note { display:flex; align-items:baseline; gap:.4rem; }
   .gist-note :global(svg) { flex:none; align-self:center; color:var(--accent); }
   .empty { padding:var(--space-6); text-align:center; border:1px dashed var(--border-strong); border-radius:var(--r-lg); color:var(--text-2); } .empty h4 { color:var(--text-1); margin-top:var(--space-2); }
-  .advanced { margin-top:var(--space-6); padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .advanced summary { margin:0; list-style:none; } .advanced summary span { display:grid; gap:.2rem; } .advanced small { color:var(--text-2); font-weight:400; } .advanced-body { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); padding-top:var(--space-4); } .file-button input { position:absolute; width:1px; height:1px; opacity:0; } .import-review { width:100%; display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding:var(--space-3); background:var(--sunken); border-radius:var(--r-md); } .import-notice { width:100%; margin:var(--space-2) 0 0; color:var(--text-2); font-size:.84rem; }
+  .advanced { margin-top:var(--space-6); padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .advanced summary { margin:0; list-style:none; } .advanced summary span { display:grid; gap:.2rem; } .advanced small { color:var(--text-2); font-weight:400; } .advanced-body { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); padding-top:var(--space-4); } .file-button input { position:absolute; width:1px; height:1px; opacity:0; } .import-review { width:100%; display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding:var(--space-3); background:var(--sunken); border-radius:var(--r-md); } .import-notice { width:100%; margin:var(--space-2) 0 0; color:var(--text-2); font-size:var(--text-sm); }
   @media (max-width:45rem) {
     .summary { grid-template-columns:repeat(2,1fr); }
     dl { grid-template-columns:1fr; }

@@ -215,10 +215,10 @@
     box-shadow: var(--shadow-2);
   }
   header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-  header h2 { margin: 0; font-size: 1.05rem; }
+  header h2 { margin: 0; font-size: var(--text-base); }
   .icon-btn {
     border: 0; background: transparent; color: var(--text-3);
-    font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0.1rem 0.35rem;
+    font-size: var(--text-xl); line-height: 1; cursor: pointer; padding: 0.1rem 0.35rem;
   }
   .icon-btn:hover { color: var(--text-1); }
   .crumb { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }

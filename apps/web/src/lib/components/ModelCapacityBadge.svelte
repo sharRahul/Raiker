@@ -8,5 +8,5 @@
 <a class:unknown={!tokens} href="#/models?tab=local" aria-label="Model context capacity">{label}</a>
 
 <style>
-  a { display:inline-flex; min-height:28px; align-items:center; padding:.25rem .55rem; border:1px solid var(--border); border-radius:var(--r-pill); background:var(--surface); color:var(--text-2); font-size:.72rem; text-decoration:none; white-space:nowrap; } a.unknown { color:var(--warn); }
+  a { display:inline-flex; min-height:28px; align-items:center; padding:.25rem .55rem; border:1px solid var(--border); border-radius:var(--r-pill); background:var(--surface); color:var(--text-2); font-size:var(--text-xs); text-decoration:none; white-space:nowrap; } a.unknown { color:var(--warn); }
 </style>

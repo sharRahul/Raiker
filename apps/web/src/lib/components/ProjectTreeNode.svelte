@@ -58,7 +58,7 @@
     height: 14px;
   }
   .node-label {
-    font-size: 0.88rem;
+    font-size: var(--text-md);
     overflow-wrap: anywhere;
   }
   .children-list {

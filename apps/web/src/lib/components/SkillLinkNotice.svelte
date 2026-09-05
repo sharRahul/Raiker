@@ -142,7 +142,7 @@
     border-radius: var(--r-sm);
     padding: 0.45rem 0.6rem;
     margin-bottom: 0.4rem;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
   .body { flex: 1 1 auto; min-width: 0; }
   .body p { margin: 0; }

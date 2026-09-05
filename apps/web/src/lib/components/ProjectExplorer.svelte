@@ -337,7 +337,7 @@
   .explorer-error {
     margin: 0;
     color: var(--text-muted);
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
   }
   .explorer-error {
     color: var(--danger, var(--text-muted));
@@ -396,12 +396,12 @@
   .entry-meta,
   .entry-state {
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     white-space: nowrap;
   }
   .child-note {
     padding-left: calc(var(--depth, 0) * 1rem + 1.25rem);
     color: var(--text-muted);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
 </style>

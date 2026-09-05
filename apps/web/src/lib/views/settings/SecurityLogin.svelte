@@ -611,7 +611,7 @@
   .posture-label {
     color: var(--text-2);
     font-family: var(--font-mono, monospace);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
@@ -666,12 +666,12 @@
   }
   .grant-scope {
     color: var(--text-2);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
   }
   .pill {
     padding: 2px 10px;
     border-radius: 999px;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     background: var(--sunken);
     color: var(--text-2);
   }
@@ -710,13 +710,13 @@
     color: var(--text-2);
   }
   .hint {
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     margin: var(--space-2) 0 0;
     max-width: 34rem;
   }
   .hint code {
     font-family: var(--font-mono, monospace);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     background: var(--sunken);
     padding: 0.05rem 0.3rem;
     border-radius: 4px;

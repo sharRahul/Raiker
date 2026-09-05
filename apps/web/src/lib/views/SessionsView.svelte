@@ -546,7 +546,7 @@
   }
   .tag-filter input {
     font: inherit;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     padding: 0.3rem 0.55rem;
     border: 1px solid var(--border);
     border-radius: var(--r-sm);
@@ -578,7 +578,7 @@
   }
   .bulk-count {
     font-weight: 650;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     margin-right: auto;
   }
   .layout {
@@ -614,7 +614,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
     cursor: pointer;
     white-space: nowrap;
@@ -628,7 +628,7 @@
     gap: 0.5rem;
   }
   .open-link {
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 600;
   }
   .tags-col {
@@ -649,7 +649,7 @@
     color: var(--text-1);
     border-radius: 999px;
     padding: 0.05rem 0.45rem;
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     line-height: 1.4;
   }
   .tag-x {
@@ -657,7 +657,7 @@
     background: none;
     color: var(--text-3);
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: var(--text-md);
     line-height: 1;
     padding: 0 0.1rem;
     border-radius: 999px;
@@ -672,7 +672,7 @@
   }
   .tag-input {
     font: inherit;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     padding: 0.15rem 0.4rem;
     border: 1px solid var(--border);
     border-radius: var(--r-sm);
@@ -691,7 +691,7 @@
     background: var(--neutral-soft);
     color: var(--text-2);
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: var(--text-md);
     line-height: 1;
     padding: 0.1rem 0.4rem;
     border-radius: var(--r-sm);
@@ -729,7 +729,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.45rem 0.8rem;
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
   }
   .turns {
     list-style: none;
@@ -747,7 +747,7 @@
     width: 100%;
     text-align: left;
     font: inherit;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     color: var(--text-1);
     background: var(--sunken);
     border: 1px solid var(--border);
@@ -773,7 +773,7 @@
     border: 1px solid var(--accent-border);
     border-radius: var(--r-sm);
     padding: 0.5rem 0.7rem;
-    font-size: 0.88rem;
+    font-size: var(--text-md);
   }
   .events {
     list-style: none;
@@ -782,7 +782,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
   }
   .events li {
     display: flex;
@@ -802,7 +802,7 @@
   }
   .ev-time {
     color: var(--text-3);
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     white-space: nowrap;
   }
 </style>

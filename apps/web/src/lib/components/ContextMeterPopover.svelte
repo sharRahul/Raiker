@@ -195,30 +195,30 @@
 
 <style>
   .context-popover { position: absolute; right: 0; bottom: calc(100% + .55rem); width: min(35rem, calc(100vw - 2rem)); padding: 1.35rem 1.5rem; border: 1px solid var(--neutral-border); border-radius: .75rem; background: var(--surface); box-shadow: var(--shadow-2); z-index: 5; }
-  .context-heading { display:flex; justify-content:space-between; gap:1rem; color:var(--text-1); } .context-heading span { color:var(--text-2); font-size:.82rem; font-weight:650; }
-  .usage-figure { display:grid; gap:.15rem; margin-top:1rem; } .usage-figure strong { font-size:1.2rem; color:var(--text-1); } .usage-figure span { color:var(--text-3); font-size:.82rem; }
-  p { color:var(--text-3); margin:.75rem 0 0; font-size:.8rem; }
+  .context-heading { display:flex; justify-content:space-between; gap:1rem; color:var(--text-1); } .context-heading span { color:var(--text-2); font-size:var(--text-sm); font-weight:650; }
+  .usage-figure { display:grid; gap:.15rem; margin-top:1rem; } .usage-figure strong { font-size:var(--text-xl); color:var(--text-1); } .usage-figure span { color:var(--text-3); font-size:var(--text-sm); }
+  p { color:var(--text-3); margin:.75rem 0 0; font-size:var(--text-sm); }
   /* Geometry and tone now come from the shared `.meter` primitive in app.css;
      this only places it. */
   .meter { margin-top:.75rem; }
-  .remaining { display:flex; justify-content:space-between; flex-wrap:wrap; gap:.5rem; margin-top:.7rem; color:var(--text-2); font-size:.76rem; }
-  .tool-budget { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem; margin:.35rem 0 0; color:var(--text-3); font-size:.72rem; }
-  .reported { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem; } .capacity-source { color:var(--text-2); } .info { width:1rem; height:1rem; display:inline-grid; place-items:center; border:1px solid var(--border-strong); border-radius:50%; font-size:.65rem; color:var(--text-2); cursor:help; }
+  .remaining { display:flex; justify-content:space-between; flex-wrap:wrap; gap:.5rem; margin-top:.7rem; color:var(--text-2); font-size:var(--text-xs); }
+  .tool-budget { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem; margin:.35rem 0 0; color:var(--text-3); font-size:var(--text-xs); }
+  .reported { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem; } .capacity-source { color:var(--text-2); } .info { width:1rem; height:1rem; display:inline-grid; place-items:center; border:1px solid var(--border-strong); border-radius:50%; font-size:var(--text-2xs); color:var(--text-2); cursor:help; }
   .compaction { display:grid; grid-template-columns:1fr auto; gap:.2rem .9rem; margin-top:1rem; padding:.75rem .85rem; border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:.5rem; background:var(--sunken); }
-  .compaction strong { color:var(--text-1); font-size:.8rem; }
-  .compaction > span { color:var(--text-2); font-size:.74rem; font-variant-numeric:tabular-nums; }
-  .compaction p { grid-column:1 / -1; margin:.05rem 0 0; font-size:.72rem; }
+  .compaction strong { color:var(--text-1); font-size:var(--text-sm); }
+  .compaction > span { color:var(--text-2); font-size:var(--text-xs); font-variant-numeric:tabular-nums; }
+  .compaction p { grid-column:1 / -1; margin:.05rem 0 0; font-size:var(--text-xs); }
   .compaction.failed { border-left-color:var(--warning); }
   .compaction.failed > span { grid-column:1 / -1; }
   .cost { margin:1.2rem -1.5rem -1.35rem; padding:.9rem 1.5rem; border-top:1px solid var(--border); border-radius:0 0 .75rem .75rem; background:var(--sunken); }
-  .cost-row { display:flex; justify-content:space-between; gap:1rem; font-size:.84rem; color:var(--text-1); }
+  .cost-row { display:flex; justify-content:space-between; gap:1rem; font-size:var(--text-sm); color:var(--text-1); }
   .cost-row + .cost-row { margin-top:.25rem; }
   .cost-row.dim, .dim { color:var(--text-3); }
-  .price-note { margin:.4rem 0 0; font-size:.74rem; color:var(--text-3); }
+  .price-note { margin:.4rem 0 0; font-size:var(--text-xs); color:var(--text-3); }
   /* Each rate component on its own row: input, output, and the cache rates a
      provider bills separately. Absent ones are simply not listed. */
   .rates { display:grid; gap:.15rem; margin:.5rem 0 0; }
-  .rates div { display:flex; justify-content:space-between; gap:1rem; font-size:.74rem; }
+  .rates div { display:flex; justify-content:space-between; gap:1rem; font-size:var(--text-xs); }
   .rates dt { color:var(--text-3); margin:0; }
   .rates dd { color:var(--text-2); margin:0; font-variant-numeric:tabular-nums; }
   .price-note a,.configure { color:var(--accent); font-weight:650; }

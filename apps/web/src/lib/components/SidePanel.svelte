@@ -110,18 +110,18 @@
   }
   .titles h2 {
     margin: 0;
-    font-size: 1rem;
+    font-size: var(--text-base);
     overflow-wrap: anywhere;
   }
   .titles p {
     margin: 0.15rem 0 0;
     color: var(--text-3);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .body {
     display: grid;
     gap: var(--space-3);
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
   }
   footer {
     display: flex;

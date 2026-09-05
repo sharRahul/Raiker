@@ -43,7 +43,7 @@
     gap: 0.5rem;
     padding: 0.4rem 0.6rem;
     border-bottom: 1px solid var(--border);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .sheet-close {
     border: 0;
@@ -63,7 +63,7 @@
   }
   dl div { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
   dt { margin: 0; }
-  dd { margin: 0; color: var(--text-2); font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; }
+  dd { margin: 0; color: var(--text-2); font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; }
   kbd {
     display: inline-block;
     padding: 0.1rem 0.35rem;
@@ -72,7 +72,7 @@
     border-radius: var(--r-sm);
     background: var(--sunken);
     color: var(--text-2);
-    font: 600 0.7rem var(--font-mono);
+    font: 600 var(--text-2xs) var(--font-mono);
     white-space: nowrap;
   }
 </style>

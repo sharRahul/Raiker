@@ -265,7 +265,7 @@
   .kind {
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     font-weight: 750;
   }
   .bad {
@@ -291,7 +291,7 @@
   .note {
     margin: 8px 0 0;
     color: var(--text-muted);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .confirm {
     display: grid;

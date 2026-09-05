@@ -402,13 +402,13 @@
   }
   h2 {
     margin: 0;
-    font-size: 0.95rem;
+    font-size: var(--text-md);
   }
   header p {
     margin: 0.25rem 0 0;
     max-width: 60ch;
     color: var(--text-2);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     line-height: 1.5;
   }
   .repo-list {
@@ -442,13 +442,13 @@
     flex: 1;
   }
   .repo-label {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     font-weight: 650;
     color: var(--text-1);
     overflow-wrap: anywhere;
   }
   .repo-detail {
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
     overflow-wrap: anywhere;
   }
@@ -461,7 +461,7 @@
     gap: 0.25rem;
   }
   .active-chip {
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.03em;
     text-transform: uppercase;
@@ -486,12 +486,12 @@
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     font-weight: 650;
     color: var(--text-1);
   }
   .code-map-detail {
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
     overflow-wrap: anywhere;
   }
@@ -506,7 +506,7 @@
   .field {
     display: grid;
     gap: 0.3rem;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
     width: 100%;
   }
@@ -521,7 +521,7 @@
   .optional {
     color: var(--text-3);
     font-weight: 400;
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
   .github-fields {
     display: grid;
@@ -531,7 +531,7 @@
   }
   .hint {
     margin: 0;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
     line-height: 1.5;
     max-width: 72ch;

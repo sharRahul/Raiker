@@ -105,9 +105,9 @@
   .row-logo { display: inline-flex; flex: 0 0 auto; color: var(--text-3); }
   .row-main { flex: 1; min-width: 0; }
   .row-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
-  h3 { margin: 0; font-size: 0.98rem; }
-  .row-heading p { color: var(--text-3); font-size: 0.78rem; margin: 0.2rem 0 0; }
-  .state { color: var(--text-3); font-size: 0.75rem; white-space: nowrap; }
+  h3 { margin: 0; font-size: var(--text-base); }
+  .row-heading p { color: var(--text-3); font-size: var(--text-sm); margin: 0.2rem 0 0; }
+  .state { color: var(--text-3); font-size: var(--text-xs); white-space: nowrap; }
   .state[data-state="set"] { color: var(--accent); }
   .row-controls { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.7rem; }
   label { flex: 1; min-width: 0; }
@@ -115,7 +115,7 @@
     width: 100%; min-width: 0; padding: 0.45rem 0.5rem; border: 1px solid var(--border);
     border-radius: var(--r-sm); background: var(--surface-raised); color: var(--text-1);
   }
-  .error, .notice { margin: 0.55rem 0 0; font-size: 0.78rem; }
+  .error, .notice { margin: 0.55rem 0 0; font-size: var(--text-sm); }
   .notice { color: var(--text-2); }
   @media (max-width: 560px) {
     .row-heading { display: block; }

@@ -2265,7 +2265,7 @@
   }
   .export-notice {
     color: var(--text-2);
-    font-size: .78rem;
+    font-size: var(--text-sm);
     order: -1;
     margin-right: auto;
   }
@@ -2318,22 +2318,22 @@
     border-radius: var(--r-md); color: var(--accent); background: var(--surface);
   }
   .artifact-copy { min-width: 0; }
-  .artifact-copy p { margin: 0.15rem 0 0; color: var(--text-2); font-size: 0.8rem; }
+  .artifact-copy p { margin: 0.15rem 0 0; color: var(--text-2); font-size: var(--text-sm); }
   .artifact-heading { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .artifact-heading strong { overflow-wrap: anywhere; }
   .stopped-line {
     margin: 0 0 0.4rem;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .artifact-status {
     border-radius: 999px; padding: 0.1rem 0.45rem; color: var(--ok);
-    background: var(--ok-soft); font-size: 0.7rem; font-weight: 700;
+    background: var(--ok-soft); font-size: var(--text-2xs); font-weight: 700;
   }
-  .artifact-meta { color: var(--text-3) !important; font-size: 0.72rem !important; }
+  .artifact-meta { color: var(--text-3) !important; font-size: var(--text-xs) !important; }
   .artifact-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-  .artifact-error { grid-column: 1 / -1; margin: var(--space-2) 0 0; font-size: 0.78rem; }
-  .artifact-unavailable { color: var(--text-3); font-size: 0.78rem; }
+  .artifact-error { grid-column: 1 / -1; margin: var(--space-2) 0 0; font-size: var(--text-sm); }
+  .artifact-unavailable { color: var(--text-3); font-size: var(--text-sm); }
   @media (max-width: 40rem) {
     .artifact-card { grid-template-columns: auto minmax(0, 1fr); }
     .artifact-actions, .artifact-unavailable { grid-column: 1 / -1; justify-self: stretch; }
@@ -2402,7 +2402,7 @@
     gap: 0.45rem;
     margin: 0 0 0.3rem;
     color: var(--text-3);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-weight: 650;
   }
   .bubble-text {
@@ -2434,7 +2434,7 @@
   }
   .error-line {
     color: var(--danger);
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     margin: 0.35rem 0 0;
   }
   .approval-card {
@@ -2449,16 +2449,16 @@
     align-items: center;
     gap: 0.4rem;
     font-weight: 650;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     margin: 0 0 0.3rem;
     color: var(--warn);
   }
   .approval-body {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     margin: 0 0 0.3rem;
   }
   .approval-note {
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     color: var(--text-2);
     margin: 0 0 0.5rem;
   }
@@ -2503,7 +2503,7 @@
     background: transparent;
     color: var(--text-1);
     font: inherit;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
     padding: var(--space-1) var(--space-2);
     border-radius: var(--r-sm);
     text-align: left;
@@ -2518,11 +2518,11 @@
   .project-notice {
     margin: var(--space-2) 0 0;
     color: var(--text-3);
-    font-size: .75rem;
+    font-size: var(--text-xs);
   }
   .shortcut-hint {
     color: var(--text-3);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     line-height: 1.35;
     margin: 0;
     text-align: right;
@@ -2532,7 +2532,7 @@
     border: 1px solid var(--border);
     border-radius: var(--r-sm);
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
   }
   .hint-link {
     border: 0;
@@ -2590,7 +2590,7 @@
     background: transparent;
     color: var(--text-1);
     font: inherit;
-    font-size: 0.95rem;
+    font-size: var(--text-md);
     min-height: 2.6rem;
   }
   .prompt-input::placeholder {
@@ -2635,7 +2635,7 @@
     border: 1px solid var(--neutral-border);
     background: var(--surface);
     color: var(--text-2);
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     padding: 0.2rem 0.45rem;
     border-radius: var(--r-pill);

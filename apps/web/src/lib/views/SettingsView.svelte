@@ -234,7 +234,7 @@
   .section-body {
     min-width: 0;
   }
-  .rail-group { margin: var(--space-2) var(--space-3); color: var(--text-3); font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; }
+  .rail-group { margin: var(--space-2) var(--space-3); color: var(--text-3); font-size: var(--text-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: .09em; }
   .dirty-dot { width: .45rem; height: .45rem; border-radius: 50%; background: var(--warning); }
   .save-bar { position: sticky; bottom: var(--space-3); z-index: 5; width: 100%; margin-top: var(--space-5); padding: var(--space-3) var(--space-4); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); border: 1px solid var(--accent-border); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-2); }
   .save-bar div { display: flex; gap: var(--space-2); }

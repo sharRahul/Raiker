@@ -218,11 +218,11 @@
   .pull-row label {
     display: grid;
     gap: 5px;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     font-weight: 650;
   }
   .runtime-grid a {
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--accent);
     text-decoration: none;
   }

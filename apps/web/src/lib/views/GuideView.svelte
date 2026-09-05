@@ -142,11 +142,11 @@
   }
   .guide-sections strong {
     color: var(--text-1);
-    font-size: 0.9rem;
+    font-size: var(--text-md);
   }
   .guide-sections span {
     color: var(--text-3);
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     line-height: 1.35;
     overflow: hidden;
     display: -webkit-box;

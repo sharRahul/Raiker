@@ -32,5 +32,5 @@
     gap: 0.75rem 0.5rem;
     padding-top: 0.35rem;
   }
-  .attach-error { margin: 0; color: var(--danger); font-size: 0.78rem; }
+  .attach-error { margin: 0; color: var(--danger); font-size: var(--text-sm); }
 </style>

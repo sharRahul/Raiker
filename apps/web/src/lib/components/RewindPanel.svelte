@@ -239,11 +239,11 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .impact strong {
-    font-size: 1.05rem;
+    font-size: var(--text-base);
     font-variant-numeric: tabular-nums;
   }
   .affected {
@@ -266,26 +266,26 @@
   }
   .path {
     overflow-wrap: anywhere;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .op {
     color: var(--text-3);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
   }
   .escalation {
     color: var(--danger);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 650;
   }
   .undo-facts h3 {
     margin: 0 0 0.3rem;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
   }
   .undo-facts ul {
     margin: 0;
     padding-left: 1.1rem;
     color: var(--text-2);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     display: grid;
     gap: 0.2rem;
   }
@@ -293,20 +293,20 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
   .handoff {
     margin: 0;
     color: var(--text-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
   .handoff.ready {
     color: var(--text-1);
   }
   .quiet {
     color: var(--text-3);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     margin: 0;
   }
 </style>

@@ -398,7 +398,7 @@
     padding: 18px 4px;
   }
   .search-hero h2 {
-    font-size: 1.65rem;
+    font-size: var(--text-2xl);
     margin: 2px 0 6px;
   }
   .search-hero p {
@@ -431,7 +431,7 @@
     grid-column: 1/-1;
     margin: 0;
     color: var(--text-muted);
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
   }
   .search-box {
     display: grid;
@@ -445,7 +445,7 @@
   .search-box input {
     border: 0;
     background: transparent;
-    font-size: 1rem;
+    font-size: var(--text-base);
   }
   .catalogue {
     display: grid;
@@ -477,7 +477,7 @@
   }
   .repo {
     font:
-      650 0.9rem ui-monospace,
+      650 var(--text-md) ui-monospace,
       monospace;
   }
   .results small,
@@ -486,7 +486,7 @@
   }
   .results em {
     color: var(--warn);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
   }
   .variants > header {
     padding: 18px;
@@ -524,7 +524,7 @@
   }
   .results-lead {
     color: var(--text-3);
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     margin: 0 0 8px;
   }
   .empty {

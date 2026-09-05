@@ -66,6 +66,20 @@ const SET_FROM_MARKUP = new Set([
 
 const COLOUR = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/;
 
+/**
+ * A hard-coded type size.
+ *
+ * There is a nine-step scale in `app.css` and there were **63 distinct raw
+ * values** in front of it — 554 declarations clustered around the steps rather
+ * than on them, 0.72 beside 0.73 beside 0.74 for the same line. That is what a
+ * product looks like when every component picks its own size: not wrong
+ * anywhere, not uniform anywhere either.
+ *
+ * `clamp()` is exempt on purpose: a fluid hero heading is a *range*, and a
+ * range cannot be a step on a fixed scale without losing what it is for.
+ */
+const RAW_TYPE = /font(?:-size)?:\s*(?![^;]*clamp\()[^;]*?[0-9]*\.?[0-9]+rem/;
+
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
     if (entry === "node_modules") continue;
@@ -113,6 +127,13 @@ for (const file of files) {
         `${rel}:${line}  raw colour \`${found}\` in a style block.\n` +
           `    Use a token from app.css. If this genuinely is not chrome, add the file to\n` +
           `    RAW_COLOUR_ALLOWED in scripts/check-design-tokens.mjs with a reason.`,
+      );
+    }
+    if (RAW_TYPE.test(content)) {
+      failures.push(
+        `${rel}:${line}  hard-coded type size in a style block.\n` +
+          `    Use a step from the scale in app.css (--text-2xs … --text-display).\n` +
+          `    A fluid \`clamp()\` heading is exempt and needs no change.`,
       );
     }
     for (const m of content.matchAll(/var\(\s*(--[a-z0-9-]+)/gi)) {

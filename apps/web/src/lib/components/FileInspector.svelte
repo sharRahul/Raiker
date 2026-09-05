@@ -312,40 +312,40 @@
   .header-actions { display: flex; align-items: center; gap: var(--space-1, 0.35rem); flex-shrink: 0; }
   .titles h2 {
     margin: 0;
-    font-size: 0.95rem;
+    font-size: var(--text-md);
     overflow-wrap: anywhere;
   }
   .titles p {
     margin: 0.15rem 0 0;
     color: var(--text-3);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     overflow-wrap: anywhere;
   }
   .body {
     flex: 1;
     min-height: 0;
     overflow: auto;
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
   }
   .muted {
     color: var(--text-3);
   }
   .truncation {
     margin-top: var(--space-3);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
   }
   .reason-code {
     margin: 0.35rem 0 0;
     color: var(--text-3);
     font-family: var(--font-mono, monospace);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
   }
   .text-preview {
     margin: 0;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     font-family: var(--font-mono, monospace);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     line-height: 1.5;
   }
   /* BUG-27 — the passage, in its own surrounding text. The mark is a slice of
@@ -374,14 +374,14 @@
     align-items: center;
     gap: 0.3rem;
     color: var(--accent);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
-  .resolution-badge { color:var(--text-3); font-size:.7rem; font-weight:650; }
+  .resolution-badge { color:var(--text-3); font-size:var(--text-2xs); font-weight:650; }
   .resolution-badge.verified { color:var(--ok); }
-  .source-note { margin: 0; font-size: 0.78rem; }
+  .source-note { margin: 0; font-size: var(--text-sm); }
   .source-excerpt {
     margin: 0;
     padding: 0.55rem 0.75rem;
@@ -406,7 +406,7 @@
   }
   table {
     border-collapse: collapse;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   td {
     border: 1px solid var(--border);

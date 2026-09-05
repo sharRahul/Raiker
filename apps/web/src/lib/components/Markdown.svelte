@@ -153,18 +153,18 @@
     line-height: 1.25;
   }
   .markdown :global(h1) {
-    font-size: 1.28rem;
+    font-size: var(--text-xl);
   }
   .markdown :global(h2) {
-    font-size: 1.14rem;
+    font-size: var(--text-xl);
   }
   .markdown :global(h3) {
-    font-size: 1.02rem;
+    font-size: var(--text-base);
   }
   .markdown :global(h4),
   .markdown :global(h5),
   .markdown :global(h6) {
-    font-size: 0.94rem;
+    font-size: var(--text-md);
   }
   .markdown :global(ul),
   .markdown :global(ol) {
@@ -226,7 +226,7 @@
   .markdown :global(.md-code-lang) {
     color: var(--text-3);
     font-family: var(--font-mono);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
@@ -297,7 +297,7 @@
     padding: 0;
     border: 0;
     background: none;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     line-height: 1.5;
     white-space: pre;
   }
@@ -309,7 +309,7 @@
   }
   .markdown :global(table) {
     border-collapse: collapse;
-    font-size: 0.86rem;
+    font-size: var(--text-sm);
   }
   .markdown :global(th),
   .markdown :global(td) {

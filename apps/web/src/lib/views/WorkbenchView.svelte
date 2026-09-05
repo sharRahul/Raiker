@@ -438,7 +438,7 @@
   .columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 19rem); gap: var(--space-4); align-items: start; }
   .main-column { display: grid; gap: var(--space-4); min-width: 0; }
   .side-column { display: grid; gap: var(--space-3); }
-  .attention-title { margin: 0 0 var(--space-2); font-size: 0.95rem; }
+  .attention-title { margin: 0 0 var(--space-2); font-size: var(--text-md); }
   .board { border-radius: var(--r-lg); }
   .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
   .card-head h3 { margin: 0; }

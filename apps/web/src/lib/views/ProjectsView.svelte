@@ -776,7 +776,7 @@
   .drop-hint {
     margin: 0.5rem 0 0;
     color: var(--accent);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
   .project-head {
@@ -786,7 +786,7 @@
     gap: 0.5rem;
   }
   .project-name {
-    font-size: 1rem;
+    font-size: var(--text-base);
     margin: 0;
     overflow-wrap: anywhere;
   }
@@ -835,7 +835,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
   }
   .plain-list li {
     display: flex;
@@ -845,7 +845,7 @@
     padding-bottom: 0.3rem;
   }
   .kicker {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     font-weight: 650;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -860,13 +860,13 @@
   }
   .cross-link {
     display: inline-block;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     margin-bottom: var(--space-2);
   }
   .panel-h {
     margin: var(--space-2) 0 0;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
   }
   .provenance {
     list-style: none;
@@ -884,7 +884,7 @@
     justify-content: space-between;
     gap: 0.5rem;
     margin: 0;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 650;
   }
   .prov-head time {
@@ -895,7 +895,7 @@
   .prov-detail,
   .prov-links {
     margin: 0;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
   }
 </style>

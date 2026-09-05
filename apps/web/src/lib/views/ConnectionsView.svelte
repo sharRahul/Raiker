@@ -540,7 +540,7 @@
     font: inherit;
   }
   .controls > label {
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .icon,
@@ -591,7 +591,7 @@
     border-radius: 8px;
     color: var(--accent);
     background: var(--accent-soft);
-    font-size: 1.05rem;
+    font-size: var(--text-base);
     font-weight: 800;
   }
   .title {
@@ -600,14 +600,14 @@
   }
   .title small {
     color: var(--text-3);
-    font-size: 0.65rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
   }
   .description {
     display: block;
     margin-top: 0.35rem;
     color: var(--text-2);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
   footer {
     padding: 0.65rem var(--space-4);
@@ -618,7 +618,7 @@
     align-items: center;
     gap: 0.4rem;
     color: var(--text-3);
-    font-size: 0.73rem;
+    font-size: var(--text-xs);
     font-weight: 600;
   }
   .status i {
@@ -671,7 +671,7 @@
     padding: 0.75rem;
     background: var(--sunken);
     border-radius: var(--r-sm);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
   .state span {
     color: var(--text-2);
@@ -692,14 +692,14 @@
   }
   .operations { list-style: none; margin: .75rem 0 0; padding: 0; display: grid; gap: .45rem; }
   .operations li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .65rem; padding: .65rem; border: 1px solid var(--border); border-radius: var(--r-sm); }
-  .method { min-width: 3rem; color: var(--ok); font: 700 .68rem var(--font-mono); }
+  .method { min-width: 3rem; color: var(--ok); font: 700 var(--text-2xs) var(--font-mono); }
   .method.write { color: var(--warn); }
   .operation-copy strong, .operation-copy small { display: block; }
-  .operation-copy small { margin-top: .15rem; color: var(--text-3); font: .68rem var(--font-mono); }
+  .operation-copy small { margin-top: .15rem; color: var(--text-3); font: var(--text-2xs) var(--font-mono); }
   .manifest {
     min-height: 220px;
     font-family: var(--font-mono);
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
   }
   .actions {
     justify-content: flex-end;

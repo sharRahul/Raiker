@@ -140,7 +140,7 @@
     width: calc(100% - 2rem);
   }
   .principal {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     color: var(--text-2);
   }
   .token-label {
@@ -153,12 +153,12 @@
     display: flex;
     align-items: flex-start;
     gap: 0.45rem;
-    font-size: 0.84rem;
+    font-size: var(--text-sm);
     color: var(--text-1);
     margin-top: 0.8rem;
   }
   .hint {
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     color: var(--text-3);
     margin: 0.25rem 0 0;
   }

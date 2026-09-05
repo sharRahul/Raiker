@@ -374,7 +374,7 @@
     align-items: center;
     gap: 0.4rem;
     margin: 0;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     letter-spacing: 0.02em;
     min-width: 0;
@@ -398,7 +398,7 @@
     cursor: pointer;
   }
   .icon-btn.mention {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
   .icon-btn:hover {
@@ -451,7 +451,7 @@
     background: none;
     color: inherit;
     font: inherit;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     text-align: left;
     cursor: pointer;
   }
@@ -471,7 +471,7 @@
   .entry-meta {
     margin-left: auto;
     color: var(--text-muted);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     white-space: nowrap;
   }
   .child-note,
@@ -479,7 +479,7 @@
     margin: 0;
     padding: 0.25rem 0.5rem;
     color: var(--text-muted);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .child-note {
     padding-left: calc(var(--depth, 0) * 0.75rem + 1.1rem);
@@ -500,7 +500,7 @@
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
-    font-size: 0.76rem;
+    font-size: var(--text-xs);
     color: var(--warn, var(--text-1));
     line-height: 1.5;
   }
@@ -537,7 +537,7 @@
   }
   .viewer-path {
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -552,7 +552,7 @@
   }
   .lang {
     color: var(--text-muted);
-    font-size: 0.68rem;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
@@ -563,7 +563,7 @@
     padding: 0.5rem 0.75rem;
     overflow: auto;
     font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     line-height: 1.55;
     tab-size: 2;
     white-space: pre;

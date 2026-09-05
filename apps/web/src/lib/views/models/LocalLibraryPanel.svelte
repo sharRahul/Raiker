@@ -225,7 +225,7 @@
   }
   .slot-note {
     color: var(--text-3);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .library-intro {
     display: flex;
@@ -255,7 +255,7 @@
   }
   .section-title > span {
     font:
-      700 1.35rem/1 ui-monospace,
+      700 var(--text-xl)/1 ui-monospace,
       monospace;
     color: var(--text-muted);
   }
@@ -268,7 +268,7 @@
   .root-form label {
     display: grid;
     gap: 6px;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
     font-weight: 650;
   }
   .root-form input {
@@ -330,7 +330,7 @@
     color: var(--brand-white);
     border-radius: 8px;
     font:
-      750 0.78rem ui-monospace,
+      750 var(--text-sm) ui-monospace,
       monospace;
   }
   .incomplete {

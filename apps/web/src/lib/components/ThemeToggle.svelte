@@ -35,6 +35,6 @@
     text-transform: capitalize;
   }
   .choice-label {
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
 </style>

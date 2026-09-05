@@ -266,7 +266,7 @@
     margin: 0 0 var(--space-3);
   }
   .kv dt {
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     font-weight: 650;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -274,7 +274,7 @@
   }
   .kv dd {
     margin: 0.05rem 0 0;
-    font-size: 0.88rem;
+    font-size: var(--text-md);
   }
   .sub {
     color: var(--text-3);
@@ -287,7 +287,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
   }
   .monitor li {
     display: flex;
@@ -300,7 +300,7 @@
   }
   .monitor-when {
     color: var(--text-3);
-    font-size: 0.74rem;
+    font-size: var(--text-xs);
     white-space: nowrap;
   }
   .card-actions {

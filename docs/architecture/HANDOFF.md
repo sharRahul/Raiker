@@ -343,9 +343,10 @@ npm run build     # exit 0
 ```
 
 `npm run check` runs `scripts/check-design-tokens.mjs` before `svelte-check`. It
-enforces the rule `app.css` has always stated in its header — *components use
-tokens only, never raw colours* — and a second one the audit that added it found
-underneath: a `var()` naming a token nothing defines. CSS fails silently on the
+enforces three rules. Two are the ones `app.css` has always stated in its
+header — *components use tokens only, never raw colours*, and use the type scale
+rather than inventing a size — and the third is one the audit that added the
+checker found underneath: a `var()` naming a token nothing defines. CSS fails silently on the
 second, so an undefined custom property with no fallback drops the whole
 declaration; ten of those were live, giving cards square corners beside rounded
 ones and rendering an error message in body grey. Files that legitimately carry

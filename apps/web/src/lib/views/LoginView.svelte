@@ -722,7 +722,7 @@
     align-items: center;
     gap: var(--space-3);
     color: var(--text-2);
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     margin: var(--space-3) 0;
   }
   .divider::before,
@@ -764,7 +764,7 @@
     border-radius: 0.9rem;
     background: var(--accent-soft);
     border: 1px solid var(--accent-border);
-    font-size: 0.9rem;
+    font-size: var(--text-md);
   }
   .privacy-icon {
     display: inline-flex;
@@ -834,13 +834,13 @@
     flex-direction: column;
   }
   .status-label {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--text-3);
   }
   .status-value {
-    font-size: 0.95rem;
+    font-size: var(--text-md);
   }
   @media (max-width: 820px) {
     .lock-layout {
@@ -855,7 +855,7 @@
   @media (max-width: 520px) {
     .brand {
       letter-spacing: 0.28em;
-      font-size: 0.9rem;
+      font-size: var(--text-md);
     }
   }
   @media (prefers-reduced-motion: reduce) {

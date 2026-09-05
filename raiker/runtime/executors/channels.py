@@ -50,6 +50,32 @@ def _sign_delivery(body: bytes) -> tuple[str, bool]:
     return f"sha256={digest}", True
 
 
+TELEGRAM_HOST = "api.telegram.org"
+
+
+def _telegram_token() -> str:
+    """The bot token, from the owner's environment, read at delivery only.
+
+    Same posture as ``RAIKER_CHANNEL_OUTBOUND_SECRET`` and the telemetry
+    credential: Raiker takes the *name* of a variable it will read, never the
+    value, so a token cannot be typed into a browser field, cannot be stored in
+    the workspace database, and does not survive the process.
+    """
+    return os.environ.get("RAIKER_TELEGRAM_BOT_TOKEN", "").strip()
+
+
+def _telegram_delivery(chat_id: str, text: str) -> tuple[str, bytes]:
+    """``(url, body)`` for one Telegram ``sendMessage``.
+
+    The token lives in the *path*, which is why `post_url` was hardened to
+    report only scheme and host on a bad URL: a reason code reaches the audit
+    log, and the whole URL would have written a live token into it.
+    """
+    url = f"https://{TELEGRAM_HOST}/bot{_telegram_token()}/sendMessage"
+    body = json.dumps({"chat_id": chat_id, "text": text}, sort_keys=True).encode("utf-8")
+    return url, body
+
+
 def _enabled_pairing(store: SQLiteStore, connector_id: str) -> dict | None:
     for pairing in store.list_channel_pairings(enabled_only=True):
         if pairing.get("connector_id") == connector_id:
@@ -70,7 +96,7 @@ class ExternalChannelExecutor:
         connector_id = str(action.arguments.get("connector_id", "")).strip()
         url = str(action.arguments.get("url", "")).strip()
         text = str(action.arguments.get("text", ""))
-        if not connector_id or not url:
+        if not connector_id:
             return ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,
                 reason_code="missing_argument:connector_id_or_url",
@@ -83,21 +109,65 @@ class ExternalChannelExecutor:
                 reason_code="channel_not_paired_or_disabled",
                 summary="Channel delivery denied: connector is not paired/enabled.",
             )
+
+        channel_type = str(pairing.get("channel_type") or "webhooks")
         delivered_at = utc_now()
-        body = json.dumps(
-            {
-                "text": text,
-                "connector_id": connector_id,
-                "delivered_at": delivered_at,
-            },
-            sort_keys=True,
-        ).encode("utf-8")
-        signature, signed = _sign_delivery(body)
-        headers = (
-            {"X-Raiker-Signature": signature, "X-Raiker-Delivered-At": delivered_at}
-            if signed
-            else {"X-Raiker-Delivered-At": delivered_at}
-        )
+        signed = False
+
+        if channel_type == "telegram":
+            # A provider transport, so the shape is the provider's: Raiker does
+            # not get to invent Telegram's body, and there is no Raiker
+            # signature on it because the receiver is Telegram, which
+            # authenticates the *token in the URL* rather than a body HMAC.
+            #
+            # The URL is built here rather than taken from the action. That is
+            # the point: a model-proposed URL is untrusted, and the one thing
+            # this transport must never do is POST an owner's bot token at a
+            # host the owner did not name.
+            if not _telegram_token():
+                return ExecutionResult(
+                    ok=False, capability=self.capability, action_id=action.action_id,
+                    reason_code="telegram_bot_token_missing",
+                    summary=(
+                        "Telegram delivery refused: RAIKER_TELEGRAM_BOT_TOKEN is unset "
+                        "in the host environment."
+                    ),
+                )
+            chat_id = str(
+                action.arguments.get("chat_id") or pairing.get("owner_sender_id") or ""
+            ).strip()
+            if not chat_id:
+                return ExecutionResult(
+                    ok=False, capability=self.capability, action_id=action.action_id,
+                    reason_code="telegram_chat_id_missing",
+                    summary=(
+                        "Telegram delivery refused: no chat_id given and the pairing "
+                        "has no bound owner sender."
+                    ),
+                )
+            url, body = _telegram_delivery(chat_id, text)
+            headers = {"X-Raiker-Delivered-At": delivered_at}
+        else:
+            if not url:
+                return ExecutionResult(
+                    ok=False, capability=self.capability, action_id=action.action_id,
+                    reason_code="missing_argument:connector_id_or_url",
+                    summary="Channel delivery denied: connector_id and url required.",
+                )
+            body = json.dumps(
+                {
+                    "text": text,
+                    "connector_id": connector_id,
+                    "delivered_at": delivered_at,
+                },
+                sort_keys=True,
+            ).encode("utf-8")
+            signature, signed = _sign_delivery(body)
+            headers = (
+                {"X-Raiker-Signature": signature, "X-Raiker-Delivered-At": delivered_at}
+                if signed
+                else {"X-Raiker-Delivered-At": delivered_at}
+            )
         try:
             result = post_url(
                 url, body, egress_allowlist=channel_egress_allowlist(), headers=headers
@@ -112,12 +182,20 @@ class ExternalChannelExecutor:
             ok=True, capability=self.capability, action_id=action.action_id,
             summary=(
                 f"Delivered to '{connector_id}' ({result['sent_bytes']}b)"
-                + (", signed." if signed else ", UNSIGNED — set RAIKER_CHANNEL_OUTBOUND_SECRET.")
+                + (
+                    "."
+                    if channel_type == "telegram"
+                    else ", signed."
+                    if signed
+                    else ", UNSIGNED — set RAIKER_CHANNEL_OUTBOUND_SECRET."
+                )
             ),
             # Metadata only — never the message text, the target URL, or the
-            # signature itself.
+            # signature itself. For Telegram the URL matters twice over: it
+            # carries the bot token.
             artifacts={
                 "connector_id": connector_id,
+                "channel_type": channel_type,
                 "sent_bytes": result["sent_bytes"],
                 "status": result["status"],
                 "signed": signed,

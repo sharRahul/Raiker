@@ -213,6 +213,27 @@
       "capability_policy_template": "channel.webhooks.default.json"
     },
     {
+      "connector_id": "channel.telegram",
+      "channel_type": "telegram",
+      "display_name": "Telegram",
+      "build_phase": "phase_4",
+      "default_state": "disabled",
+      "transport": "provider_bot_api",
+      "auth_method": "bot_token_reference",
+      "supports_inbound_messages": true,
+      "supports_replies": true,
+      "supports_attachments": false,
+      "supports_approvals": true,
+      "supports_side_questions": true,
+      "supports_interrupts": false,
+      "interface_status": "equal_primary_when_enabled",
+      "requires_pairing": true,
+      "requires_sender_allowlist": true,
+      "requires_network": true,
+      "setup_ui": "channel_link_wizard",
+      "capability_policy_template": "channel.telegram.default.json"
+    },
+    {
       "connector_id": "channel.email",
       "channel_type": "email",
       "display_name": "Email",

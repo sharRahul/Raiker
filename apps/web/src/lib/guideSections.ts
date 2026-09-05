@@ -23,6 +23,7 @@ const SECTIONS: Record<string, GuideTarget> = {
   projects: { slug: "tasks-and-projects", label: "How projects work" },
   tasks: { slug: "tasks-and-projects", label: "How tasks work" },
   extensions: { slug: "extensions-and-mcp", label: "How extensions work" },
+  messaging: { slug: "messaging", label: "How a channel is governed" },
   connections: { slug: "extensions-and-mcp", label: "How connectors work" },
   "new-chat": { slug: "working-in-chat", label: "How Chat works" },
   "search-chat": { slug: "working-in-chat", label: "How threads and chat history work" },

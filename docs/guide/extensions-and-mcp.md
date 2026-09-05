@@ -507,51 +507,7 @@ hand-editing the file afterwards cannot smuggle one in.
 
 ## Channels
 
-A channel is the one place where content Raiker did not ask for enters a turn.
-That content is defined: **untrusted content with a named sender who is not you.**
-Never a prompt. Never able to enable a capability, widen an approval mode, or
-approve anything. Trust comes from the pairing record, never from anything inside
-the message.
-
-The tab lists every connector profile and lets you **pair** one. Pairing does not
-switch it on and does not trust anyone — linked, enabled and trusted are three
-separate facts, and the tab shows them separately:
-
-- **Pair** stores the link, switched off, with whatever sender allowlist you gave
-  it. A profile that accepts inbound messages cannot be paired without one.
-- **Turn on** is a second decision.
-- **Send a test delivery** runs the *same governed path* a real delivery takes —
-  the capability gate, the decision mode, the egress allowlist and the audit
-  event all apply. It is not a shortcut that proves nothing.
-- **Unpair** deletes the link. Both the outbound executor and the inbound
-  receiver read that record, so unpairing is what actually stops the channel.
-- **Routing** chooses `record_only`, a normal owner turn, a tool-free side
-  question, or an interrupt/steer bound to one conversation. The pairing stores
-  this choice; message content cannot choose it.
-
-Four things are fail-closed or off by default, and each has its own remedy, so
-the tab reports them one by one rather than as a single "ready":
-
-| Gate | What it is | Where you change it |
-|---|---|---|
-| Capability | `external_channel_runtime` | Permissions |
-| Egress | `RAIKER_CHANNEL_EGRESS_ALLOWLIST` — empty means deny | Your environment |
-| Signing | `RAIKER_CHANNEL_OUTBOUND_SECRET` — unset means unsigned, not refused | Your environment |
-| Inbound secret | `RAIKER_CHANNEL_INBOUND_SECRET` — unset means refuse | Your environment |
-
-A fifth row states the **inbound budget**: 60 messages per sender per minute by
-default, `RAIKER_CHANNEL_INBOUND_RATE` to change it. Allowlisting says *who* may
-speak; the budget says how often, and they are different questions — a sender
-that goes over is refused and the refusal is recorded, so a channel that goes
-quiet is answerable from Observability rather than a mystery.
-
-`record_only` is the default and keeps the message quarantined. A routed message
-is still structurally untrusted data: it never occupies the owner's instruction
-slot and cannot raise authority. New turns and interrupts require the exact
-owner identity stored on the pairing; side questions have no tool budget.
-Accepted, routed, and rejected messages appear in Observability → Activity.
-
-Approval response is separately off. When enabled it accepts only the bound
-owner and one exact pending relay/action pair, once. Critical and connector-write
-approvals remain local-only.
-Full contract: [`docs/architecture/CHANNELS_SPEC.md`](../architecture/CHANNELS_SPEC.md).
+Channels moved to their own page and their own guide: see
+[Messaging](messaging.md). A connector, an MCP server, a skill, a hook and a
+plugin are all things the agent *uses*; a channel is a place a person writes to
+it from, which is a different kind of thing and answers to a different contract.

@@ -172,7 +172,12 @@ def get_url(
     from urllib.parse import urlparse
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        raise SandboxError(f"invalid_url:{url}")
+        # Scheme and host only. A reason code reaches the audit log, and some
+        # provider APIs carry their credential in the *path* — Telegram's bot
+        # endpoint is `/bot<token>/sendMessage` — so echoing the whole URL
+        # here would write a live token into the record. The other failure
+        # paths already say only the host or the exception type.
+        raise SandboxError(f"invalid_url:{parsed.scheme or 'none'}://{parsed.netloc or 'none'}")
     if not egress_allowlist:
         raise SandboxError("egress_denied:no_allowlist")
     if not any(fnmatch.fnmatch(parsed.netloc, pattern) for pattern in egress_allowlist):
@@ -221,7 +226,12 @@ def post_url(
     from urllib.parse import urlparse
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        raise SandboxError(f"invalid_url:{url}")
+        # Scheme and host only. A reason code reaches the audit log, and some
+        # provider APIs carry their credential in the *path* — Telegram's bot
+        # endpoint is `/bot<token>/sendMessage` — so echoing the whole URL
+        # here would write a live token into the record. The other failure
+        # paths already say only the host or the exception type.
+        raise SandboxError(f"invalid_url:{parsed.scheme or 'none'}://{parsed.netloc or 'none'}")
     if not egress_allowlist:
         raise SandboxError("egress_denied:no_allowlist")
     if not any(fnmatch.fnmatch(parsed.netloc, pattern) for pattern in egress_allowlist):
@@ -355,7 +365,12 @@ def post_json_url(
     from urllib.parse import urlparse
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        raise SandboxError(f"invalid_url:{url}")
+        # Scheme and host only. A reason code reaches the audit log, and some
+        # provider APIs carry their credential in the *path* — Telegram's bot
+        # endpoint is `/bot<token>/sendMessage` — so echoing the whole URL
+        # here would write a live token into the record. The other failure
+        # paths already say only the host or the exception type.
+        raise SandboxError(f"invalid_url:{parsed.scheme or 'none'}://{parsed.netloc or 'none'}")
     if not egress_allowlist:
         raise SandboxError("egress_denied:no_allowlist")
     if not any(fnmatch.fnmatch(parsed.netloc, pattern) for pattern in egress_allowlist):

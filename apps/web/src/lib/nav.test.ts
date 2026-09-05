@@ -52,6 +52,7 @@ describe("nav model", () => {
       "tasks",
       "projects",
       "approvals",
+      "messaging",
     ]);
   });
 
@@ -80,6 +81,11 @@ describe("nav model", () => {
       "models",
       "extensions",
     ]);
+    // Channels left Extensions for their own destination; the alias keeps every
+    // link that named the tab working, which is what that map is for.
+    expect(HUB_TABS.extensions).not.toContain("channels");
+    expect(routeFromHash("#/channels")).toBe("messaging");
+    expect(routeFromHash("#/extensions?tab=channels")).toBe("extensions");
     // Hooks sits with the other extension surfaces rather than under Permissions:
     // a hook is something the owner installs, and it can only ever tighten what
     // Permissions already allows.
@@ -89,7 +95,6 @@ describe("nav model", () => {
       "skills",
       "hooks",
       "plugins",
-      "channels",
     ]);
   });
 

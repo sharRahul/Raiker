@@ -23,6 +23,10 @@ export const NAV_GROUPS: NavGroup[] = [
     // Permissions and Models are configured once and revisited. It moved here
     // when Manage left the sidebar for the gear.
     { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
+    // A channel is a place a person reaches Raiker from, which is a different
+    // kind of thing from the connectors, servers and hooks the agent *uses* —
+    // it was a tab inside Extensions and is its own destination now.
+    { id: "messaging", label: "Messaging", icon: "chat", hint: "Channels that reach Raiker from somewhere else" },
   ] },
   { id: "knowledge", label: "Knowledge", collapsible: true, items: [
     { id: "memory", label: "Memory", icon: "activity", hint: "Approved memories the agent can recall" },
@@ -85,7 +89,7 @@ export const HUB_TABS: Record<string, string[]> = {
     "routing",
     "pricing",
   ],
-  extensions: ["connectors", "mcp", "skills", "hooks", "plugins", "channels"],
+  extensions: ["connectors", "mcp", "skills", "hooks", "plugins"],
   observe: ["overview", "sessions", "activity", "checkpoints", "work", "notifications"],
   // Every section the settings rail renders, in rail order. The two lists have
   // to agree: a section the rail shows but this list omits is a deep link that
@@ -122,6 +126,8 @@ const ROUTE_ALIASES: Record<string, { route: string; tab: string }> = {
   work: { route: "observe", tab: "work" },
   notifications: { route: "observe", tab: "notifications" },
   sessions: { route: "observe", tab: "sessions" },
+  // Channels left Extensions for their own page.
+  channels: { route: "messaging", tab: "" },
 };
 
 /**

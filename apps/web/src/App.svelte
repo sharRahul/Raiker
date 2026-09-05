@@ -316,6 +316,8 @@
               route="extensions"
               props={{ tab: currentTab ?? "connectors" }}
             />
+          {:else if current === "messaging"}
+            <LazyRoute route="messaging" />
           {:else if current === "guide"}
             <LazyRoute route="guide" props={{ section: currentSection }} />
           {:else if current === "observe"}

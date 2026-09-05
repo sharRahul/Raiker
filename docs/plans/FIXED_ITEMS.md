@@ -413,6 +413,8 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-398](#fixed-398--the-design-system-was-stated-in-a-comment-and-enforced-by-nothing) | High | Web UI / design system | Fixed 2026-09-04 (raised by the owner, from Hermes Agent and OpenClaw) |
 | [FIXED-399](#fixed-399--the-knowledge-map-carried-four-palettes-and-two-of-them-were-the-same-one) | High | Web UI / theming | Fixed 2026-09-04 (found by FIXED-398's audit) |
 | [FIXED-400](#fixed-400--ten-var-references-to-tokens-that-do-not-exist) | Medium | Web UI / design system | Fixed 2026-09-04 (found by FIXED-398's audit) |
+| [FIXED-401](#fixed-401--a-scale-that-existed-and-a-sidebar-that-vanished-instead-of-collapsing) | Medium | Web UI / shell | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-402](#fixed-402--messaging-is-its-own-destination-and-telegram-is-a-real-transport) | High | Channels / messaging | Fixed 2026-09-05 (raised by the owner) |
 
 ---
 
@@ -17630,3 +17632,122 @@ for dangling ones.
 
 **User-interface outcome.** No `var()` in any component names a token nothing
 defines, and the checker fails the build if one appears.
+
+## FIXED-401 — A scale that existed, and a sidebar that vanished instead of collapsing
+
+**Severity: Medium. Area: Web UI / shell. Status: Fixed 2026-09-05. Raised by the
+owner, from Hermes Agent and Claude.**
+
+**Observed.** Seven separate complaints that turned out to share two causes.
+
+**Icons were sixteen different sizes** — 12 through 44 — with 212 of them in the
+13–18 band, which is one inline icon written six ways. The scale to fix this
+already existed: **BUG-37** created `ICON_SIZE` (`sm` 14, `md` 16, `lg` 20, `xl`
+24) and its comment names this exact complaint — *"call sites passed 14, 15, 16,
+17, 18, 20 and 22 more or less interchangeably, which is why an icon in a button
+and an icon in a nav row were different sizes that both looked almost right."*
+The scale was built and the call sites never moved onto it. All 212 have now,
+and `Icon`'s own default went from a numeric `18` to `md`.
+
+**Sliders had no styling at all**, so every range input was the browser's default
+pill — the one fully rounded control in a surface language whose radii are
+8/12/16/20 and whose buttons and fields are rectangles. Squared once, globally.
+
+**Dialogs read smaller than the page that summoned them**, setting their own body
+text between 0.68 and 0.86rem against a 1rem page. A floor in `app.css` plus the
+per-dialog rules that sat under it; a kicker that is meant to be small still asks
+for that deliberately.
+
+**The sidebar did not collapse — it disappeared.** `desktop-hidden` was width 0
+plus `translateX(-100%)`, `inert`, and `aria-hidden`, so the only way to see
+where you were was to bring all 256px back. It is a rail now: icons stay, the
+active row stays marked, `inert` and `aria-hidden` came off because a rail is on
+screen and clickable, and the toggle says **Collapse**/**Expand** rather than
+Hide/Show.
+
+**Everything you configure once moved behind the gear.** The rail carries what an
+owner opens many times an hour; Permissions, Models, Extensions, Observability,
+Guide and Settings are now a window in the top right with a filter over every
+page and every settings section. Routing is untouched and no deep link broke —
+`nav.ts` still holds every destination in `NAV_GROUPS` because `routeFromHash`
+resolves against `NAV_ITEMS`; `SIDEBAR_GROUPS` and `HUB_GROUPS` decide only where
+a link is *drawn*. **Approvals moved the other way**, out of Manage into Core: a
+decision waiting on you is the work, not setup, and it was only grouped with
+Models because both were called "management".
+
+**The Knowledge Map lost two controls and gained an answer.** Fullscreen is gone
+— the graph already fills the content area, and the browser's own fullscreen took
+the sidebar and topbar away without replacing them. Global/Local is gone, and the
+answer to whether it was needed is in `centreNode()`: focusing a node *already*
+switches to local, so the segmented control's only unique job was getting back
+out, and it spent the rest of its life half disabled. That is a **Show all**
+beside the depth slider now — the other control that exists only in local mode.
+The filter sits at the right end of a toolbar that is a flex row rather than a
+fixed six-slot grid. A second search input in the graph settings panel, bound to
+the *same* `search` state as the toolbar's, went with it.
+
+**Capabilities groups fold.** 66 gates across a dozen domains all rendered
+expanded. A search overrides a fold, because answering a query with a hidden
+group is the page arguing with it.
+
+**User-interface outcome.** Every page renders at 390/768/1280/1920 and through
+the 26-route capture; 1,294 unit tests and 9 mocked e2e green.
+
+## FIXED-402 — Messaging is its own destination, and Telegram is a real transport
+
+**Severity: High. Area: Channels / messaging. Status: Fixed 2026-09-05. Raised by
+the owner, who asked for a messaging page like Hermes Agent's.**
+
+**Observed.** Raiker's channels were a **tab inside Extensions**, beside
+connectors, MCP servers, skills, hooks and plugins. Those are all things the agent
+*uses*; a channel is the opposite direction — a place a person writes to Raiker
+from — and it is the one surface where content Raiker did not ask for enters a
+turn. It also had exactly one real transport: a signed HTTP webhook.
+
+**What was already there, which changed the shape of the work.** The governed
+pipeline was complete and good: `executors/channels.py` with an egress allowlist,
+HMAC signing and a metadata-only approval relay; `routes_channels.py` with a
+shared inbound secret, pairing lookup, sender allowlist, per-sender budget,
+redacted preview, audit events and quarantine. What was missing was not a
+transport — it was **a transport that is somebody else's shape**.
+
+**Fix, in two halves.**
+
+*The page.* `MessagingView.svelte` is the channels panel moved out of Extensions
+rather than copied: Extensions is 1,486 → 1,084 lines, its `channels` tab is
+gone, and `#/channels` aliases to the new route so no link breaks. Its seven
+tests moved with it into `MessagingView.test.ts`.
+
+*The adapter.* `channel.telegram` is a real profile with a real delivery path,
+and being a name you recognise buys it nothing:
+
+* **Outbound** branches on the pairing's `channel_type` and builds Telegram's own
+  `sendMessage` body. The URL is constructed in the executor, never taken from
+  the action — a model-proposed URL is untrusted, and the one thing this
+  transport must never do is POST an owner's bot token at a host the owner did
+  not name.
+* **The token is a variable name, not a value**, read from
+  `RAIKER_TELEGRAM_BOT_TOKEN` at delivery: never stored in the workspace, never
+  logged, never returned.
+* **A bot token is not authorisation to reach the network.**
+  `api.telegram.org` must be on the egress allowlist separately, and the refusal
+  names the host.
+* **Inbound** translates Telegram's update shape at the edge and then takes the
+  same path every channel takes. A non-message update is acknowledged and dropped
+  rather than refused, because Telegram retries anything that is not a `2xx` and
+  retrying a join forever helps nobody.
+
+**One hardening the adapter forced, which applies to every caller.** Telegram
+carries its credential in the URL *path* (`/bot<token>/sendMessage`), and
+`post_url`'s `invalid_url` branch echoed the **whole URL** into a `SandboxError`
+— a reason code, which reaches the audit log. That is a live-token write to the
+record. All three call sites now report scheme and host only; the other two
+failure paths already said just the host or the exception type. Two tests hold
+it: a delivery that fails at transport, and one that fails at egress, with the
+token asserted absent from the result *and* from every event payload.
+
+**User-interface outcome.** Messaging is a sidebar destination. Telegram appears
+in its connector list, off, with the four fail-closed facts stated separately.
+21 channel tests pass, including eight new ones covering the token, the chat id,
+the egress boundary, the inbound translation, an unallowlisted sender, a bad
+secret, and an update that cannot be used.

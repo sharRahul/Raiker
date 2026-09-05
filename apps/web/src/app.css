@@ -889,14 +889,29 @@ code,
     background var(--motion-fast) var(--ease),
     border-color var(--motion-fast) var(--ease);
 }
-:where(button):hover:not(:disabled) {
+/* The three state rules had the pseudo-classes *outside* `:where()`, which put
+   them at (0,2,0) rather than the zero the comment above promises — so the
+   floor's hover fill tied every component's own two-class rule and won on
+   order. That is not a floor, it is a ceiling that only shows up on hover.
+
+   It was visible as a full-screen opaque panel: both of the app's dismiss
+   scrims are a `<button>` stretched over the viewport, so as soon as the
+   pointer was anywhere on screen the catch-all painted them `--sunken` and the
+   page vanished behind a flat grey sheet. The settings window and the
+   notification panel had it, and it looked like a deliberate modal treatment
+   rather than a bug, which is why it survived a whole responsive sweep.
+
+   Wrapping each whole selector restores the stated contract: a component that
+   says anything about its own hover, disabled or focus state wins, and one that
+   says nothing still gets the floor. */
+:where(button:hover:not(:disabled)) {
   background: var(--sunken);
 }
-:where(button):disabled {
+:where(button:disabled) {
   opacity: 0.5;
   cursor: not-allowed;
 }
-:where(button):focus-visible {
+:where(button:focus-visible) {
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }

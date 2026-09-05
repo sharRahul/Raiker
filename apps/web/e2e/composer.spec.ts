@@ -338,6 +338,32 @@ test("the Hooks tab tells an enforcing rule from a dead one and a broken file", 
   await capture(page, join(shots, "hooks-tab.png"));
 });
 
+test("a dismiss scrim stays a scrim when the pointer is on it", async ({ page }) => {
+  // Both of the app's dismiss layers are a `<button>` stretched over the
+  // viewport. The element floor in `app.css` used to write its hover fill as
+  // `:where(button):hover:not(:disabled)`, which leaves the pseudo-classes
+  // outside `:where()` and so is (0,2,0), not the zero the rule promises. It
+  // tied every component's own two-class rule and won on order, so the moment
+  // the pointer was anywhere on screen the whole page went behind a flat opaque
+  // sheet — and it looked enough like a deliberate modal that a full responsive
+  // sweep never questioned it.
+  await page.goto("http://raiker.test/#/home");
+  await page.getByRole("button", { name: "Settings and pages" }).click();
+  await expect(page.getByRole("dialog", { name: /settings & pages/i })).toBeVisible();
+  await page.mouse.move(400, 500);
+  const scrim = page.locator(".scrim");
+  await expect(scrim).toHaveCSS("background-color", "rgba(15, 23, 42, 0.48)");
+
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: /Notifications/ }).first().click();
+  await page.mouse.move(400, 500);
+  // The notification panel is not modal, so its catcher stays fully invisible.
+  await expect(page.locator(".panel-backdrop")).toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+});
+
 test("Settings presents one section rail rather than a wall of fields", async ({ page }) => {
   await page.goto("http://raiker.test/#/settings");
   // Scoped to the content region: the top bar carries the same page name, and an

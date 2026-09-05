@@ -26,11 +26,17 @@ git clone https://github.com/sharRahul/Raiker.git
 cd Raiker
 python -m venv .venv
 . .venv/bin/activate          # Windows: .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 npm --prefix apps/web ci
 npm --prefix apps/web run build
 raiker-app
 ```
+
+Upgrade pip first — an old resolver downloads whole 10 MB wheels just to read
+their metadata. With [uv](https://github.com/astral-sh/uv), `uv sync --extra dev`
+installs the exact set in `uv.lock` and resolves nothing at all. See
+[Getting started](docs/guide/getting-started.md#why-the-pip-upgrade-comes-first).
 
 `raiker-app` starts Raiker on a loopback address and opens the dashboard in
 your browser. On first run, create the local owner account and connect a model.

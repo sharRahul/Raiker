@@ -419,6 +419,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-404](#fixed-404--a-nine-step-type-scale-with-sixty-three-sizes-in-front-of-it) | Medium | Web UI / design system | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-405](#fixed-405--the-element-floor-was-a-ceiling-and-it-painted-the-page-out) | High | Web UI / shell | Fixed 2026-09-05 (raised by the owner) |
 | [FIXED-406](#fixed-406--two-ideas-from-hermes-agent-and-the-one-that-was-not-worth-taking) | Medium | Channels / messaging | Fixed 2026-09-05 (raised by the owner) |
+| [FIXED-407](#fixed-407--the-install-downloaded-a-run-of-10-mb-binaries-to-read-their-metadata) | Medium | Install / dependencies | Fixed 2026-09-05 (raised by the owner) |
 
 ---
 
@@ -17967,3 +17968,76 @@ which is a much larger question than the one being asked.
 each marked Set or Missing, with a link to BotFather for the token. 24 channel
 tests pass, including the unsupported-transport refusal, the adapter's public
 surface, and that a set token never appears in the channels read.
+
+## FIXED-407 — The install downloaded a run of 10 MB binaries to read their metadata
+
+**Severity: Medium. Area: Install / dependencies. Status: Fixed 2026-09-05.
+Raised by the owner: "it is downloading multiple binaries while setup."**
+
+**Observed.** `python -m pip install -e ".[dev]"` on Windows printed a descending
+run of ruff wheels — `ruff-0.15.3-…win_amd64.whl (11.4 MB)`, then `0.15.2`, then
+`0.15.1`, then `0.15.0`, then `0.14.8` — each fully downloaded, each discarded.
+Nothing failed; the install simply spent a great deal of bandwidth on a question
+about a few kilobytes of metadata.
+
+**Root cause, and the honest limit of it.** That descending run is pip
+*backtracking*: when it cannot settle a version from index metadata alone it
+fetches the whole wheel to read the metadata inside, throws it away, and tries
+the version below. Ruff ships as a platform binary, so the cost of the search is
+measured in the size of the artefacts rather than the size of the answer.
+
+**Measured, so the number is checkable.** A correct `.[dev]` resolution for
+`win_amd64` / cp311 is **54 wheels, 49.1 MB in total** — `ruff` at 10.1 MB and
+`mypy` at 10.6 MB are the two platform binaries in it. The five discarded ruff
+wheels in the screenshot are ~57 MB on their own: **more than the whole correct
+install**, spent on one package.
+
+**What was not established.** The trigger was not reproduced here. pip 24.0 (what
+`ensurepip` bundles for Python 3.11) and pip 26.2.1 were both run against this
+`pyproject.toml`, on Linux and cross-resolving for `--platform win_amd64
+--python-version 3.11 --abi cp311`; all four resolved cleanly, downloading
+exactly **one** ruff wheel. No conflicting ruff pin exists anywhere in the
+repository. So what follows reduces the blast radius of a backtrack rather than
+proving the cause of one, and this entry says so rather than claiming a fix it
+cannot demonstrate.
+
+**Taken.**
+
+*The floor was as wide as the worst case.* `ruff>=0.6` admitted **110** of ruff's
+422 published releases. Nothing in `[tool.ruff]` uses a rule or setting the older
+releases lacked, so that width bought nothing and priced the failure mode: 110
+admissible releases × ~10 MB is the ceiling on what a backtrack can walk. The
+floor is now `ruff>=0.15`, which admits **30**.
+
+*The install upgrades pip before it installs.* A `venv` created by Python 3.11
+bundles pip 24. Newer pip reads [PEP 658](https://peps.python.org/pep-0658/)
+metadata served beside the wheel, so in the common case it never fetches the
+binary it is only asking a question about. The step was already in the Linux and
+macOS sections of the guide and missing from the quickstart and the Windows
+reinstall block — the two paths the owner was actually on.
+
+*The lock was an orphan, and stale.* `uv.lock` was referenced by nothing — not
+CI, not the docs, not `pyproject.toml` — and had drifted to `starlette 1.3.1`
+while the project resolves and tests against **1.6.0**. That matters more than it
+looks: starlette 1.6's `TestClient` requires `httpx2`, which is why the dev extra
+carries it, so `uv sync` against the stale lock would have produced an
+environment the test suite does not pass in. The lock is refreshed to the set the
+project actually resolves today, which makes `uv sync --extra dev` a real
+install path — and one where no resolution runs at all, so nothing can be
+downloaded speculatively.
+
+**A wrong turn, recorded because it was nearly shipped.** `httpx2>=2.9` in the dev
+extra reads exactly like a typo for `httpx`, which is already a runtime
+dependency, and it was removed on that reading. mypy caught it: `Incompatible
+return value type (got "httpx2._models.Response", expected
+"httpx._models.Response")`. Starlette 1.6's test client does `import httpx2 as
+httpx` first and warns that using `httpx` with it is deprecated. The two are
+different packages that share a name; both belong here, and `pyproject.toml` now
+says so at the line rather than leaving the next reader to make the same edit.
+
+**User-interface outcome.** No UI surface. The install path is the surface: the
+quickstart in [`README.md`](../../README.md) and every first-install block in
+[`docs/guide/getting-started.md`](../guide/getting-started.md) upgrade pip before
+installing, and the guide's *Why the pip upgrade comes first* section names the
+symptom — the descending run of wheels — so a reader who sees it recognises it
+instead of assuming a broken install.

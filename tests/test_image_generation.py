@@ -22,7 +22,7 @@ from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id, utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
-from raiker.runtime.authority import GovernedAction, RuntimeAuthority
+from raiker.runtime.authority import GovernedAction, GovernedActionResult, RuntimeAuthority
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import (
     REAL_EXECUTOR_CAPABILITIES,
@@ -82,7 +82,7 @@ def _action(principal_id: str, **args: object) -> GovernedAction:
     )
 
 
-def _generate(ws: Path, **args: object):
+def _generate(ws: Path, **args: object) -> GovernedActionResult:
     authority, principal = _authority(ws)
     return authority.route_action(_action(principal.principal_id, **args), principal)
 
@@ -202,7 +202,14 @@ def test_a_successful_generation_stores_the_bytes_and_records_the_attempt(
 
     seen: dict[str, object] = {}
 
-    def fake_post(url, payload, *, egress_allowlist=None, headers=None, timeout=60.0):
+    def fake_post(
+        url: str,
+        payload: dict[str, object],
+        *,
+        egress_allowlist: frozenset[str] | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: float = 60.0,
+    ) -> dict:
         seen["url"] = url
         seen["allowlist"] = egress_allowlist
         seen["headers"] = headers

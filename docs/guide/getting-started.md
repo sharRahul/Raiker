@@ -18,8 +18,42 @@ git clone https://github.com/sharRahul/Raiker.git
 cd Raiker
 python -m venv .venv
 . .venv/bin/activate          # Windows: .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
+
+#### Why the pip upgrade comes first
+
+If the install prints a long run of `Downloading ruff-0.15.3-…whl (11.4 MB)`,
+`Downloading ruff-0.15.2-…whl (11.4 MB)`, one version after another, nothing is
+broken: pip is *backtracking*. When it cannot decide a version from metadata
+alone, it downloads the whole wheel to read the metadata inside, discards it,
+and tries the version below.
+
+Some downloading is normal, and it is worth knowing the size of it: a correct
+`.[dev]` install on Windows is **54 wheels, 49 MB in total**, of which `ruff`
+(10.1 MB) and `mypy` (10.6 MB) are the two platform binaries. So five discarded
+ruff wheels cost more than the entire install ought to.
+
+Two things make that far less likely, and the install block does both:
+
+- **Upgrade pip before installing.** A `venv` created by Python 3.11 bundles
+  pip 24. Newer pip reads [PEP 658](https://peps.python.org/pep-0658/) metadata
+  served alongside the wheel, so in the common case it never fetches the binary
+  it is only asking about.
+- **Keep the floors current.** Raiker's dev extra requires `ruff>=0.15`. The
+  previous floor, `ruff>=0.6`, admitted 110 published releases; the current one
+  admits 30. Nothing in `[tool.ruff]` uses a rule the older releases lacked, so
+  the wide floor bought nothing and paid for the worst case.
+
+If you have [uv](https://github.com/astral-sh/uv), skip the question entirely:
+
+```bash
+uv sync --extra dev
+```
+
+That installs the exact set pinned in `uv.lock`. No resolution runs, so no
+wheel can be downloaded speculatively.
 
 The following platform sections spell out the same source install with the
 correct shell and package manager. Raiker does not currently publish a signed
@@ -120,6 +154,7 @@ Raiker repository, reinstall it and try again:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
+python.exe -m pip install --upgrade pip
 python.exe -m pip install -e ".[dev]"
 Get-Command raiker-app
 raiker-app

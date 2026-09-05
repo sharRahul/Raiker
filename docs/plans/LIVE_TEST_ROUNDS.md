@@ -82,6 +82,25 @@ so the workspace id is again not recoverable from the credential.
 is blocked for a fourth time on the same missing value, and the round said so and
 moved on rather than attempting the three model-dependent scenarios blind.
 
+**It was still entered through the interface, and that re-proved two fixes on a
+fourth key.** Connected from **Models → Hosted → Anthropic → Connect**; the card
+read *"Connection saved"* and the setup meter moved to *1 of 14 connected*. Then
+**Test**, and the card answered with the provider's actual refusal rather than a
+network story:
+
+> Anthropic: This key is identity-linked, so it acts inside one workspace. Add
+> the workspace ID to this connection — it is beside the key in the provider's
+> console — then connect again. **The key you pasted is fine.**
+
+That is [FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network)
+holding on a key it was not written against, and
+[FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one)'s
+repair sitting on the card where the refusal is read: **Add workspace ID**
+reveals the field in place, and the field is offered by the refusal rather than
+carried on the connect dialog for every owner who will never need it. The
+connection could not be completed, because the value the field wants is the one
+only the key's issuer has.
+
 **What the round did instead: it walked the product.** Every destination, every
 hub tab, at 360, 768, 1024 and 1440. That found four defects, and then a fifth
 underneath them.

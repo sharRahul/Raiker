@@ -164,7 +164,7 @@
   }
   .error {
     color: var(--danger);
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     margin-top: 0.6rem;
   }
   .actions {

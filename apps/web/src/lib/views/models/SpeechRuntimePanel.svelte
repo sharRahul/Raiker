@@ -116,7 +116,6 @@
     border-radius: var(--r-sm); background: var(--surface-raised); color: var(--text-1);
   }
   .error, .notice { margin: 0.55rem 0 0; font-size: 0.78rem; }
-  .error { color: var(--danger); }
   .notice { color: var(--text-2); }
   @media (max-width: 560px) {
     .row-heading { display: block; }

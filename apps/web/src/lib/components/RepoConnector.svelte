@@ -541,7 +541,7 @@
   }
   .error {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--danger);
   }
   @media (max-width: 42rem) {

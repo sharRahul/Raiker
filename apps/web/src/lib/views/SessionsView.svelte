@@ -805,7 +805,4 @@
     font-size: 0.74rem;
     white-space: nowrap;
   }
-  .error {
-    color: var(--danger);
-  }
 </style>

@@ -2803,7 +2803,7 @@
   .standing-compact { display: none; }
   .error {
     margin: 0;
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     color: var(--danger);
   }
   .stopped-line {

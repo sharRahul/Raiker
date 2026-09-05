@@ -469,7 +469,6 @@
   .support-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .copy-note { color: var(--ok); font-size: 0.8rem; font-weight: 600; }
   .copy-note.warn { color: var(--warn); }
-  .error { color: var(--danger); }
   .bundle {
     margin: var(--space-3) 0 0;
     padding: var(--space-3);

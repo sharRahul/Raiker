@@ -3002,9 +3002,6 @@
     font-size: var(--text-sm);
     margin: 0;
   }
-  .error {
-    color: var(--danger);
-  }
   @media (max-width: 44rem) {
     .head-row,
     .setup-overview,

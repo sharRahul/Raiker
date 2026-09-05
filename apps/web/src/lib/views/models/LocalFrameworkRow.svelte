@@ -191,7 +191,6 @@
   select { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-raised); color: var(--text-1); padding: 0.45rem 0.5rem; }
   .framework-actions { display: flex; gap: 0.4rem; justify-content: flex-end; margin-top: 0.65rem; }
   .error, .notice { margin: 0.55rem 0 0; font-size: 0.78rem; }
-  .error { color: var(--danger); }
   .notice { color: var(--text-2); }
   @media (max-width: 900px) { .model-slots { grid-template-columns: repeat(2, minmax(8rem, 1fr)); } }
   @media (max-width: 560px) { .model-slots { grid-template-columns: 1fr; } .framework-heading { display: block; } }

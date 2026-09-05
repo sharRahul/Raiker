@@ -977,9 +977,6 @@
     color: var(--text-2);
     margin: var(--space-3) 0 0;
   }
-  .error {
-    color: var(--danger);
-  }
   .overlay {
     position: fixed;
     inset: 0;

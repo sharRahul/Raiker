@@ -858,9 +858,6 @@
     margin: 0.3rem 0 0;
     overflow-wrap: anywhere;
   }
-  .error {
-    color: var(--danger);
-  }
   .cross-link {
     display: inline-block;
     font-size: 0.8rem;

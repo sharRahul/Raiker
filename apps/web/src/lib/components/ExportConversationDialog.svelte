@@ -243,6 +243,6 @@
   footer { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .spacer { flex: 1; }
   .muted { color: var(--text-2); font-size: var(--text-sm); margin: 0; }
-  .error { color: var(--danger); font-size: 0.82rem; margin: 0; }
+  .error { color: var(--danger); font-size: var(--text-sm); margin: 0; }
   .ok { color: var(--ok); font-size: 0.82rem; margin: 0; font-weight: 600; }
 </style>

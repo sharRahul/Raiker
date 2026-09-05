@@ -376,7 +376,7 @@
   .pricing-head h2 { margin: 0 0 .25rem; }
   .sub { color: var(--text-2); font-size: .84rem; margin: 0; max-width: 68ch; line-height: 1.5; }
   .ok-note { color: var(--ok); font-size: .82rem; margin: 0; font-weight: 600; }
-  .error { color: var(--danger); font-size: .82rem; margin: 0; }
+  .error { color: var(--danger); font-size: var(--text-sm); margin: 0; }
 
   .sync { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; }
   .sync li {

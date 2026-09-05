@@ -311,7 +311,6 @@
   .muted { color: var(--text-3); font-size: var(--text-sm); }
   .tag { font-size: 0.72rem; color: var(--text-3); border: 1px solid var(--border); border-radius: 999px; padding: 0.05rem 0.5rem; }
   .cadence select { font-size: 0.78rem; padding: 0.2rem 0.4rem; }
-  .error { color: var(--danger); }
   .notice { color: var(--text-2); }
   .notice a { margin-left: 0.35rem; }
   .add { display: grid; gap: var(--space-3); max-width: 32rem; }

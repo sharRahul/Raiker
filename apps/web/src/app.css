@@ -1124,6 +1124,15 @@ code,
    and card hover treatments. Each one is a token composition, never a new
    colour, so both themes stay in lockstep and a view cannot drift. */
 
+/* ── The error line ──
+   Twenty components defined `.error`, and twelve of them defined exactly this.
+   The other eight added a margin or a font size, and those eight disagreed with
+   each other about the size — 0.78, 0.8, 0.82 and 0.85rem for the same
+   sentence. Only the unanimous half is hoisted: a component that genuinely
+   needs the line offset from what is above it still says so, and the sizes that
+   had drifted are on the scale now. */
+.error { color: var(--danger); }
+
 /* ── Range inputs ──
    Nothing styled these, so every slider was the browser's default pill — the
    one control in the product with fully rounded geometry, against a surface

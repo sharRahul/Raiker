@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from importlib import resources
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any
 
 from raiker.contracts.models import ModelProfile
@@ -29,42 +29,105 @@ _BUILTIN_CONFIG_RESOURCES = {
 }
 
 
-def _config_path(path: str | Path) -> Path:
-    """Resolve a filesystem config file.
+class BuiltinConfigSource:
+    """Where a built-in registry was actually read from, and why.
 
-    Priority: an existing path as given (absolute, or relative to cwd), then
-    the repository root next to the ``raiker`` package for editable installs
-    and repo checkouts.
+    GCR-45 — the answer used to depend on the current working directory, so the
+    same install answered differently depending on where the owner happened to
+    launch it from. It is reported now because a resolution nobody can see is a
+    resolution nobody can check.
+    """
+
+    __slots__ = ("kind", "location")
+
+    def __init__(self, kind: str, location: str) -> None:
+        self.kind = kind
+        self.location = location
+
+    def __repr__(self) -> str:  # pragma: no cover - diagnostics only
+        return f"BuiltinConfigSource(kind={self.kind!r}, location={self.location!r})"
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, BuiltinConfigSource)
+            and other.kind == self.kind
+            and other.location == self.location
+        )
+
+    def as_dict(self) -> dict[str, str]:
+        return {"kind": self.kind, "location": self.location}
+
+
+def config_override_dir() -> Path | None:
+    """The one explicit override for built-in config, or ``None``.
+
+    An override is a decision the owner states, not a directory they happened to
+    be standing in. ``RAIKER_CONFIG_DIR`` is that statement.
+    """
+    raw = os.environ.get("RAIKER_CONFIG_DIR", "").strip()
+    return Path(raw).expanduser() if raw else None
+
+
+def _builtin_resource_name(path: str | Path) -> str | None:
+    return _BUILTIN_CONFIG_RESOURCES.get(PurePath(str(path)).as_posix())
+
+
+def _config_path(path: str | Path) -> Path:
+    """Resolve a caller-named config file on the filesystem.
+
+    This is for a path the caller chose. A built-in registry does not come
+    through here unless ``RAIKER_CONFIG_DIR`` named it: see
+    :func:`resolve_builtin_config`.
     """
     candidate = Path(path)
     if candidate.exists():
         return candidate
-    cwd_candidate = Path.cwd() / path
-    if cwd_candidate.exists():
-        return cwd_candidate
     package_root = Path(__file__).resolve().parent.parent.parent
     packaged = package_root / path
     if packaged.exists():
         return packaged
-    return cwd_candidate
+    return candidate
+
+
+def resolve_builtin_config(path: str | Path) -> BuiltinConfigSource:
+    """Say where the built-in registry named by ``path`` will be read from.
+
+    Order, and there are only two entries in it: the explicit
+    ``RAIKER_CONFIG_DIR`` override, then the packaged resource that ships with
+    Raiker. The current working directory is not consulted (GCR-45) — for an
+    installed application it is incidental process state, and letting it win
+    meant a stale checkout beside the terminal could silently replace the model
+    registry.
+    """
+    resource_name = _builtin_resource_name(path)
+    if resource_name is None:
+        return BuiltinConfigSource("explicit_path", str(_config_path(path)))
+    override_dir = config_override_dir()
+    if override_dir is not None:
+        override = override_dir / resource_name
+        if override.exists():
+            return BuiltinConfigSource("override", str(override))
+    return BuiltinConfigSource("packaged", f"{_BUILTIN_CONFIG_PACKAGE}/{resource_name}")
 
 
 def _read_config_text(path: str | Path) -> str:
-    """Read built-in config with workspace overrides and packaged fallback."""
-    config_path = _config_path(path)
-    if config_path.exists():
-        return config_path.read_text(encoding="utf-8")
-
-    resource_name = _BUILTIN_CONFIG_RESOURCES.get(Path(path).as_posix())
-    if resource_name is not None:
+    """Read a config file from its resolved, reportable source."""
+    source = resolve_builtin_config(path)
+    if source.kind == "packaged":
+        resource_name = _builtin_resource_name(path)
+        assert resource_name is not None  # noqa: S101 - kind == packaged implies it
         try:
             resource = resources.files(_BUILTIN_CONFIG_PACKAGE).joinpath(resource_name)
             if resource.is_file():
                 return resource.read_text(encoding="utf-8")
         except ModuleNotFoundError:
             pass
-
-    return config_path.read_text(encoding="utf-8")
+        # No packaged resource: fall back to the repository copy an editable
+        # checkout carries, so a source tree without an installed package still
+        # runs. Still never the working directory.
+        package_root = Path(__file__).resolve().parent.parent
+        return (package_root / "config" / resource_name).read_text(encoding="utf-8")
+    return Path(source.location).read_text(encoding="utf-8")
 
 
 class ModelProfileRegistry:

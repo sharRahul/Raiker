@@ -81,5 +81,59 @@ class TestDiagnostics:
         # the machine there is genuinely no model selected, and diagnostics
         # saying so is the difference between a fixable gap and a turn that
         # fails for reasons the owner cannot see.
+        #
+        # The absence is recorded rather than assumed: this used to depend on
+        # the *host* not having Ollama installed, so the test passed on CI and
+        # failed on any developer machine that had it — a test asserting a fact
+        # about the workspace was reading a fact about the laptop.
+        SQLiteStore(workspace).save_local_runtime_presence(
+            "ollama", present=False, executable=None
+        )
         body = client.get("/api/diagnostics", headers=_headers(workspace)).json()
         assert any("model profile" in gap.lower() for gap in body["missing_config"])
+
+
+class TestBuiltinConfigSource:
+    """GCR-45 — where the built-in model registry came from, said out loud."""
+
+    def test_diagnostics_names_the_packaged_registry(
+        self, workspace: Path, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("RAIKER_CONFIG_DIR", raising=False)
+        body = client.get("/api/diagnostics", headers=_headers(workspace)).json()
+        assert body["model_profile_source"] == {
+            "kind": "packaged",
+            "location": "raiker.config/model-profiles.json",
+        }
+
+
+class TestModelOperationRecovery:
+    """GCR-25 — the row is durable, the worker that drives it is not."""
+
+    def test_startup_settles_operations_a_restart_abandoned(
+        self, workspace: Path
+    ) -> None:
+        from raiker.models.local_operations import (
+            ModelOperationRequest,
+            ModelOperationService,
+        )
+
+        store = SQLiteStore(workspace)
+        service = ModelOperationService(store)
+        running = service.start(
+            "principal_owner",
+            ModelOperationRequest(kind="download", target="repo/model", confirmed=True),
+            payload={"repo_id": "repo/model"},
+        )
+        store.update_model_operation(
+            running.operation_id, state="running", phase="downloading"
+        )
+
+        # Booting the app is what runs the sweep: entering the client enters the
+        # lifespan, which is the only place this recovery happens.
+        with TestClient(create_app(workspace)):
+            pass
+
+        settled = ModelOperationService(SQLiteStore(workspace)).list("principal_owner")[0]
+        assert settled.state == "failed"
+        assert settled.error_code == "host_restarted"

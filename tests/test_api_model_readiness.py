@@ -9,6 +9,7 @@ from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.models import ModelProfile
+from raiker.models import local_presence
 from raiker.models.contracts import ProviderModelInfo
 from raiker.models.exceptions import (
     ProviderAuthenticationError,
@@ -79,8 +80,16 @@ def test_native_default_is_selected_but_not_ready_without_a_check(
 def test_undetected_native_default_is_not_configured_and_not_selected(
     client: TestClient,
     owner_token: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """BUG-270 — nothing on this host serves `gemma4:31b-cloud`, so nothing says so."""
+    """BUG-270 — nothing on this host serves `gemma4:31b-cloud`, so nothing says so.
+
+    The "nothing on this host" is stated rather than assumed. It used to depend
+    on the machine running the suite genuinely not having Ollama installed, so
+    this passed on CI and failed on any developer laptop that did — a test about
+    what Raiker reports was reading a fact about the computer.
+    """
+    monkeypatch.setattr(local_presence.shutil, "which", lambda _name: None)
     body = client.get("/api/models", headers=_auth(owner_token)).json()
 
     ollama = next(

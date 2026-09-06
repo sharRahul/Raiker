@@ -6,9 +6,8 @@ from pathlib import Path
 
 import pytest
 
-import raiker.models.registry as model_registry_module
 from raiker.channels.registry import ConnectorRegistry
-from raiker.models.registry import ModelProfileRegistry
+from raiker.models.registry import ModelProfileRegistry, resolve_builtin_config
 
 
 def test_model_registry_loads_from_foreign_cwd(
@@ -28,36 +27,84 @@ def test_connector_registry_loads_from_foreign_cwd(
     assert registry.list_profiles()
 
 
-def test_registries_load_from_packaged_resources_when_repo_config_is_absent(
+def test_builtin_config_resolves_to_the_packaged_resource(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Non-editable installs do not carry the repo root next to ``raiker``."""
-    missing = tmp_path / "missing-config.json"
-    monkeypatch.setattr(model_registry_module, "_config_path", lambda _path: missing)
+    monkeypatch.delenv("RAIKER_CONFIG_DIR", raising=False)
+    monkeypatch.chdir(tmp_path)
 
-    model_registry = ModelProfileRegistry.load()
-    connector_registry = ConnectorRegistry.load()
+    source = resolve_builtin_config("config/model-profiles.json")
+    assert source.kind == "packaged"
+    assert source.location == "raiker.config/model-profiles.json"
 
     assert any(
         profile.profile_id == "raiker-local-llama-cpp"
-        for profile in model_registry.list_profiles()
+        for profile in ModelProfileRegistry.load().list_profiles()
     )
-    assert connector_registry.get("channel.cli").display_name == "Command Line"
+    assert ConnectorRegistry.load().get("channel.cli").display_name == "Command Line"
 
 
-def test_workspace_local_config_still_wins(
+def test_a_config_directory_in_the_cwd_does_not_win(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A workspace-local config/ copy takes priority over the packaged one."""
-    config_dir = tmp_path / "config"
-    config_dir.mkdir()
-    (config_dir / "model-profiles.json").write_text(
-        '{"schema_version": "1.0", "description": "local override", "profiles": []}',
+    """GCR-45 — the working directory is not a configuration boundary.
+
+    Raiker used to resolve `config/model-profiles.json` against the current
+    working directory before the packaged registry. Launching the installed
+    application from a stale checkout — or from any directory that happened to
+    hold that name — therefore replaced the built-in model registry with no
+    error, no warning, and a different answer depending on how it was started.
+    """
+    monkeypatch.delenv("RAIKER_CONFIG_DIR", raising=False)
+    stray = tmp_path / "config"
+    stray.mkdir()
+    (stray / "model-profiles.json").write_text(
+        '{"schema_version": "1.0", "description": "stray", "profiles": []}',
         encoding="utf-8",
     )
     monkeypatch.chdir(tmp_path)
-    registry = ModelProfileRegistry.load()
-    assert registry.list_profiles() == []
+
+    assert resolve_builtin_config("config/model-profiles.json").kind == "packaged"
+    assert ModelProfileRegistry.load().list_profiles()
+
+
+def test_an_explicit_override_directory_wins_and_says_so(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An override is a decision the owner states, and it is reportable."""
+    override = tmp_path / "raiker-config"
+    override.mkdir()
+    (override / "model-profiles.json").write_text(
+        '{"schema_version": "1.0", "description": "override", "profiles": []}',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("RAIKER_CONFIG_DIR", str(override))
+
+    source = resolve_builtin_config("config/model-profiles.json")
+    assert source.kind == "override"
+    assert source.location == str(override / "model-profiles.json")
+    assert ModelProfileRegistry.load().list_profiles() == []
+
+
+def test_an_override_directory_without_the_file_falls_back_to_packaged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RAIKER_CONFIG_DIR", str(tmp_path))
+    assert resolve_builtin_config("config/channel-connectors.json").kind == "packaged"
+    assert ConnectorRegistry.load().list_profiles()
+
+
+def test_a_caller_named_path_is_still_a_filesystem_path(tmp_path: Path) -> None:
+    """Only the two built-in names resolve as built-ins."""
+    named = tmp_path / "my-profiles.json"
+    named.write_text(
+        '{"schema_version": "1.0", "description": "named", "profiles": []}',
+        encoding="utf-8",
+    )
+    source = resolve_builtin_config(named)
+    assert source.kind == "explicit_path"
+    assert ModelProfileRegistry.load(named).list_profiles() == []
 
 
 def test_the_builtin_config_has_exactly_one_copy() -> None:
@@ -72,8 +119,8 @@ def test_the_builtin_config_has_exactly_one_copy() -> None:
     non-editable install has ever used.
 
     The duplicate is gone, so the invariant is stronger and simpler — the copy
-    must not come back. A workspace-local `config/` is a different thing
-    entirely and still wins; that is the owner's override, covered above.
+    must not come back. A workspace-local `config/` is no longer an override at
+    all (GCR-45); `RAIKER_CONFIG_DIR` is, and it is covered above.
     """
     package_config = resources.files("raiker.config")
     for name in ("model-profiles.json", "channel-connectors.json"):

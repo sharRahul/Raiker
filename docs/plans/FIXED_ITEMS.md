@@ -448,6 +448,13 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-433](#fixed-433--a-database-raiker-could-not-read-was-reported-as-a-model-the-owner-never-chose) | Medium | Models / configured-model resolution | Fixed 2026-09-06 (third-pass static review) |
 | [FIXED-434](#fixed-434--two-public-parameters-that-changed-nothing) | Low | Models / API clarity | Fixed 2026-09-06 (first-pass static review) |
 | [FIXED-435](#fixed-435--the-models-page-said-a-gate-was-on-above-providers-it-would-refuse) | Medium | Models / capability gates / web UI | Fixed 2026-09-06 (found live) |
+| [FIXED-436](#fixed-436--the-registry-raiker-loaded-depended-on-the-folder-it-was-started-from) | Medium | Startup / built-in configuration | Fixed 2026-09-06 (third-pass static review) |
+| [FIXED-437](#fixed-437--a-download-the-host-restarted-away-from-stayed-running-for-ever) | Medium/High | Models / durable operations | Fixed 2026-09-06 (third-pass static review) |
+| [FIXED-438](#fixed-438--two-deploys-at-once-could-take-the-same-slot-and-the-same-port) | High | Models / managed local runtimes | Fixed 2026-09-06 (third-pass static review) |
+| [FIXED-439](#fixed-439--a-runtime-on-a-custom-port-reported-the-slots-declared-one) | Medium | Models / managed local runtimes | Fixed 2026-09-06 (third-pass static review) |
+| [FIXED-440](#fixed-440--two-expired-calls-presented-the-same-refresh-token-and-one-was-already-retired) | Medium/High | Connectors / OAuth | Fixed 2026-09-06 (third-pass static review) |
+| [FIXED-441](#fixed-441--an-event-the-index-never-heard-of-was-invisible-to-the-check-for-exactly-that) | High | Observability / event integrity | Fixed 2026-09-06 (third-pass static review) |
+| [FIXED-442](#fixed-442--seven-tests-asserted-facts-about-the-laptop-running-them) | Low | Test suite / hermeticity | Fixed 2026-09-06 (found while verifying FIXED-436) |
 
 ---
 
@@ -19520,3 +19527,296 @@ turned off reads **Off** whatever is connected — the one case that must never 
 softened, and it has its own test. Verified live on a workspace with Anthropic
 connected: both tiles read *On (by connection)*, in
 [`screenshots/working/models-posture-reports-the-enforced-answer.png`](screenshots/working/models-posture-reports-the-enforced-answer.png).
+
+---
+
+## FIXED-436 — The registry Raiker loaded depended on the folder it was started from
+
+**Severity: Medium. Area: startup / built-in configuration. Status: Fixed
+2026-09-06. Raised as
+[GCR-45](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-45--built-in-model-profile-selection-depends-on-current-working-directory).**
+
+**Observed.** `ModelProfileRegistry.load()` defaults to
+`config/model-profiles.json`, and `_config_path()` resolved that name against
+the process's current working directory *before* the packaged resource that
+ships with Raiker. So starting the installed application from a directory that
+happened to contain `config/model-profiles.json` — a stale checkout, an
+unrelated project, a shell that had been left somewhere — replaced the entire
+built-in model registry. There was no error, no warning, and no surface that
+could say which file had won.
+
+The same install therefore answered differently depending on how it was
+launched. A desktop shortcut, a terminal, and the tray could each produce a
+different set of model profiles, and the only symptom was models that were
+present one day and gone the next.
+
+**Root cause.** Working directory was being treated as a configuration
+boundary. For a repository checkout that reads as an override; for an installed
+application it is incidental process state that the owner never chose.
+
+**Fixed.** Built-in config now resolves through `resolve_builtin_config()`, and
+the order has exactly two entries: an explicit `RAIKER_CONFIG_DIR` override,
+then the packaged resource. The working directory is not consulted at all. A
+path a caller names directly is still an ordinary filesystem path — only the two
+built-in names (`model-profiles.json`, `channel-connectors.json`) resolve as
+built-ins.
+
+An override is still supported, because an owner running a modified registry is
+a legitimate thing to do. It is now something they state rather than something
+they fall into, and the resolution is reported rather than assumed.
+
+**User-interface outcome.** Diagnostics gained a **Built-in model profiles**
+card naming the source: `packaged` with the resource it read, or `override` with
+the exact file `RAIKER_CONFIG_DIR` pointed at. The distinction is carried by a
+badge *and* the words, not by colour alone. A resolution nobody can see is a
+resolution nobody can check.
+
+**Tests.** `tests/test_config_path_resolution.py` — a `config/` directory in the
+working directory no longer wins; an explicit override wins and reports itself;
+an override directory that does not hold the file falls back to packaged; a
+caller-named path is still a filesystem path.
+`tests/test_api_diagnostics.py::TestBuiltinConfigSource` and
+`apps/web/src/lib/views/DiagnosticsView.test.ts` cover the surface.
+
+---
+
+## FIXED-437 — A download the host restarted away from stayed "running" for ever
+
+**Severity: Medium/High. Area: models / durable operations. Status: Fixed
+2026-09-06. Raised as
+[GCR-25](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-25--durable-model-operation-rows-do-not-make-the-workers-durable).**
+
+**Observed.** Model pulls, conversions and deploys are durable rows in
+`model_operations`, executed by in-process background workers. The row outlives
+the host process; the worker does not. A host that stopped mid-download —
+quit, crash, reboot — came back reporting an operation that was still `running`
+with nobody advancing it, and the owner's only signal was a progress bar that
+would never move again.
+
+`ModelOperationService.recover_abandoned()` existed and was called from nowhere.
+The lifespan in `create_app()` started the scheduler, the approval-continuation
+worker and the attached-root watcher, and no model-operation recovery.
+
+**Root cause.** A durability mismatch: durable record, ephemeral executor, and
+no reconciliation between them at the one moment when the answer is knowable.
+
+**Fixed.** The lifespan settles abandoned operations before the first request is
+served. The sweep is contained like every other startup pass — a recovery that
+throws must not stop the host from booting — and logs what it recovered.
+
+`queued` was added to the states the sweep settles. Leaving it out is right
+while a process is live, where a queued row is one a dispatcher is about to
+claim; at startup nothing has been dispatched, so a queued row is abandoned by
+definition and would otherwise sit there for the life of the install. This
+mattered more than the `running` case it was grouped with: `running` at least
+looked wrong, while `queued` looked like patience.
+
+**User-interface outcome.** The operation reads as **failed** with
+`host_restarted` and the sentence "The host stopped before this operation
+completed." That is a terminal state, which is what Retry starts from — so the
+owner's next move is one press, on a row that previously offered nothing at all.
+
+**Tests.** `tests/test_model_local_operations.py` — a queued operation is
+settled and is then retryable; an operation that already reached a terminal
+state is left alone. `tests/test_api_diagnostics.py::TestModelOperationRecovery`
+drives it through the lifespan, which is the only place it happens.
+
+---
+
+## FIXED-438 — Two deploys at once could take the same slot, and the same port
+
+**Severity: High. Area: models / managed local runtimes. Status: Fixed
+2026-09-06. Raised as
+[GCR-28](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-28--managed-local-runtime-slot-allocation-is-not-concurrency-safe).**
+
+**Observed.** `ManagedLlamaRuntime` and `ManagedMlxRuntime` choose a free slot
+by reading `_processes`, and the launch that makes the answer true happens
+afterwards. Nothing serialised the gap. The runtime objects live on
+`app.state`, and deploys can arrive concurrently.
+
+Two deploys arriving together both observed the same slot as free, both launched
+a server, and the second overwrote the first's entry in the process map. One
+process was left orphaned and untracked — nothing could stop it, nothing knew it
+existed — while both contended for one port.
+
+**Root cause.** Selecting a slot, occupying it, and recording that were three
+steps with no lock and no reservation between them.
+
+**Fixed.** Selection, reservation, launch and recording happen as one step under
+a re-entrant lock, in both runtimes. A slot is reserved *before* the launch, so
+a concurrent deploy sees it as taken rather than free, and the reservation is
+rolled back if the launch fails — a launch that could not start must not cost
+the pool a slot for the life of the host.
+
+**User-interface outcome.** The local-runtime surface shows one running server
+per slot, which is what it always claimed. There is no orphaned process to
+explain, and Deploy no longer has an outcome that depends on timing.
+
+**Tests.** `tests/test_managed_llama_runtime.py::TestConcurrentDeploys` and
+`tests/test_managed_mlx_runtime.py` run two real threads that meet inside the
+launcher — exactly the window the old code left open — and assert two slots, two
+ports, two tracked processes. Both fail against the previous code. A separate
+test asserts a failed launch gives its slot back.
+
+---
+
+## FIXED-439 — A runtime on a custom port reported the slot's declared one
+
+**Severity: Medium. Area: models / managed local runtimes. Status: Fixed
+2026-09-06. Raised as
+[GCR-29](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-29--custom-llamacpp-port-can-be-reported-incorrectly).**
+
+**Observed.** `ManagedLlamaRuntime.start()` accepts an explicit port. A port
+outside the declared slot table runs on the first slot, launched on the port the
+caller asked for. `status()` did not retain that port and reported
+`http://127.0.0.1:{slot.port}/v1` — the slot's *declared* port.
+
+A server launched on 9000 therefore told the owner, and every client that
+believed the endpoint, that it was on 8080. The runtime was healthy and the
+address was wrong, which is the hardest shape of failure to diagnose: nothing
+is down, everything times out.
+
+**Fixed.** The port a slot was actually bound to is recorded with the process
+and reported by `status()`. Stopping a slot forgets it, so a later deploy that
+names no port reports the declared one again.
+
+**User-interface outcome.** The endpoint shown for a running local runtime is
+the endpoint that answers.
+
+**Tests.** `tests/test_managed_llama_runtime.py::TestTheReportedPort` — a custom
+port is reported rather than the slot's, and is forgotten on stop. The first
+fails against the previous code.
+
+---
+
+## FIXED-440 — Two expired calls presented the same refresh token, and one was already retired
+
+**Severity: Medium/High. Area: connectors / OAuth. Status: Fixed 2026-09-06.
+Raised as
+[GCR-33](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-33--oauth-refresh-is-vulnerable-to-refresh-token-rotation-races).**
+
+**Observed.** When a connector credential has expired, every invocation that
+reaches it notices, and each one called `_refresh_oauth()` independently. All of
+them read the same stored refresh token. There was no single-flight, no lock and
+no version check.
+
+For a provider that rotates refresh tokens — which is most of them — the first
+exchange invalidates R0 and stores R1. The second then presents R0, a token the
+provider has already retired. Depending on what that provider does with a
+retired token, the owner is handed a spurious failure or left holding a
+credential row that no longer matches anything upstream, and the only repair is
+to authorise the connector again.
+
+**Fixed.** Refresh is single-flight per `(principal, connector)`. The credential
+is re-read *after* the lease is acquired rather than trusted from the caller: a
+request that queued behind another refresh was holding the token as it stood
+before that refresh, and exchanging it a second time is the whole race. If the
+waiter's turn arrives and the credential is valid again, the refresh it was
+waiting for did the work and there is nothing left to do.
+
+`ConnectorInvoker` is built per request, so the lease cannot live on the
+instance. It is keyed by the running event loop as well as the credential — an
+`asyncio.Lock` binds to the loop that first awaits it, and a host that has torn
+one loop down and built another must not be handed a lock belonging to the dead
+one. The outer map is weak, so a loop that goes away takes its locks with it.
+
+**User-interface outcome.** A connector whose token expired while several calls
+were in flight stays connected. The owner is not sent back through an
+authorisation flow to repair a credential that Raiker broke.
+
+**Tests.** `tests/test_connector_ecosystem.py::TestOAuthRefreshIsSingleFlight`
+runs two expired invocations concurrently against a provider that rotates and is
+slow enough for the second to arrive mid-exchange. The retired token is
+presented exactly once; against the previous code it is presented twice.
+
+---
+
+## FIXED-441 — An event the index never heard of was invisible to the check for exactly that
+
+**Severity: High. Area: observability / event integrity. Status: Fixed
+2026-09-06. Raised as
+[GCR-40](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-40--event-jsonl-and-database-index-can-diverge-permanently).**
+
+**Observed.** `EventLogWriter.append()` performs two writes to two different
+stores under one session lock: the serialized event is appended and flushed to
+the JSONL, then `store.index_event(...)` records its offset and hash in
+SQLCipher. They are not one transaction. If the file append succeeded and the
+index write failed, the JSONL held a line the database had never heard of.
+
+That orphan was then permanent and undetectable:
+
+* `verify_session_events()` starts from
+  `list_session_events_for_integrity(session_id)` and reads each **indexed**
+  line by its stored offset. A line the index was missing could not be reached
+  by the one check whose job is to say whether the log and the index agree.
+* The next append takes `prev_hash` from the database, not from the last
+  physical line, so it chained straight past the orphan. The physical log and
+  the indexed hash chain diverged from that point on and never reconverged.
+
+**Fixed.** Two changes, because the gap and the blindness are separate faults.
+
+*The gap.* An index write that fails now undoes its own append. That is safe
+precisely there: the session lock is still held, so nothing else has appended,
+and the recorded offset is where the line starts — truncating to it restores the
+file to exactly what the index still describes. The exception still propagates;
+what does not survive is a line nothing knows about.
+
+*The blindness.* `verify_session_events()` now also scans the JSONL for lines
+whose offsets the index does not hold, and reports them as `unindexed_lines`.
+They are counted separately from `failed`, which counts indexed events that did
+not verify — an orphan is not a failed event, it is an event the index cannot
+count at all. Offsets are read as bytes so they are the same ones the writer
+recorded from `handle.tell()`; a text-mode read would count translated newlines
+on Windows and disagree with every offset in the index.
+
+An orphan also makes `chain_intact` false, which is the flag the existing
+integrity sweep already watches — so a divergence reaches the owner as a
+governed `event_chain` deviation and its notification, with no new plumbing.
+
+**User-interface outcome.** `/export --verify` names each orphan with its file
+and offset under an `ORPHAN:` line, distinct from the `FAIL:` lines for indexed
+events. The security integrity sweep raises an `event_chain` deviation and
+notifies the owner, so a divergence is reported rather than sitting in a log
+that still looks complete.
+
+**Tests.** `tests/test_event_log.py::TestIndexAndLogCannotDiverge` — a failed
+index write leaves the file byte-identical and the chain continues correctly
+from the surviving event; an orphan line is reported and breaks `chain_intact`
+while the indexed events still pass; the security sweep raises the deviation.
+The first two fail against the previous code.
+
+---
+
+## FIXED-442 — Seven tests asserted facts about the laptop running them
+
+**Severity: Low. Area: test suite / hermeticity. Status: Fixed 2026-09-06.
+Found while verifying [FIXED-436](#fixed-436--the-registry-raiker-loaded-depended-on-the-folder-it-was-started-from).**
+
+**Observed.** Seven tests asserted what Raiker says when no local model runtime
+is installed, and obtained that condition by *assuming* the host had none. On a
+machine with Ollama installed they failed:
+
+- `tests/test_local_runtime_presence.py::TestDetection::test_an_absent_runtime_is_recorded_as_absent`
+- `tests/test_local_runtime_presence.py::TestRoutes::test_detect_looks_again_for_an_owner_who_just_installed_one`
+- `tests/test_local_runtime_presence.py::TestTheCountThatWasWrong::test_empty_local_slots_are_not_counted_as_models_set_up`
+- `tests/test_local_runtime_presence.py::TestTheCountThatWasWrong::test_a_deployed_slot_counts`
+- `tests/test_api_diagnostics.py::TestDiagnostics::test_fresh_workspace_without_the_runtime_names_the_gap`
+- `tests/test_api_model_readiness.py::test_undetected_native_default_is_not_configured_and_not_selected`
+- `tests/test_api_model_selection.py::TestSetModelSelection::test_fresh_workspace_names_no_model_when_ollama_is_not_installed`
+
+Tests written about a workspace were reading a fact about the computer. They
+passed on CI, which has no Ollama, and failed for any developer who had it —
+which is the worst arrangement, because the failure looks like the change under
+review rather than like the test.
+
+**Fixed.** The absence is now stated rather than assumed: a `bare_host` fixture
+patches the PATH lookup, and the diagnostics test records the runtime as absent
+in the workspace it is asserting about. The sibling test that asserts the
+*present* case already stated its condition the same way, which is what made the
+inconsistency visible. The last of them,
+`test_fresh_workspace_names_no_model_when_ollama_is_not_installed`, states in
+its own name the condition it never enforced.
+
+**User-interface outcome.** None — a test-suite defect. Recorded because it was
+masking whether the changes around it were sound on a developer machine, and
+because "green on CI" was not the same as "true".

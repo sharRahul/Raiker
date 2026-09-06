@@ -27,6 +27,27 @@ raiker-app --workspace . --print-paths
 Use the same `--workspace` value for every command that refers to that
 instance. The option may appear before or after a subcommand.
 
+## Which built-in model registry is in use
+
+The list of model profiles Raiker ships with is packaged inside the application.
+It does **not** depend on the directory you start Raiker from — launching from a
+shell that happens to sit in an old checkout gives you the same registry as
+launching from the applications menu.
+
+To run a modified registry, say so explicitly. Set `RAIKER_CONFIG_DIR` to a
+directory holding `model-profiles.json` (and, if you are overriding it too,
+`channel-connectors.json`):
+
+```bash
+RAIKER_CONFIG_DIR=/srv/raiker/config raiker-web
+```
+
+Whichever applies, **Diagnostics → Built-in model profiles** names it: `packaged`
+with the resource Raiker read, or `override` with the exact file your override
+directory supplied. A file named in `RAIKER_CONFIG_DIR` that does not exist is
+not an error — Raiker falls back to the packaged registry and says so on that
+card.
+
 ## Start and inspect Raiker
 
 ```bash

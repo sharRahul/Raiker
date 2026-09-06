@@ -83,6 +83,7 @@ export const DIAGNOSTICS: Diagnostics = {
   missing_config: [],
   provider_health: [],
   background_workers: [],
+  model_profile_source: { kind: "packaged", location: "raiker.config/model-profiles.json" },
   scope_note: "Status reflects the local single-user runtime only.",
 };
 

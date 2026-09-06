@@ -2925,6 +2925,15 @@ def handle_export_command(command: str, *, workspace_root: str | Path = ".") -> 
         for d in result["details"]:
             if d.get("hash_matches") is False or d.get("chain_gap"):
                 lines.append(f"  FAIL: event={d['event_id']} error={d.get('error', 'chain_gap')}")
+        # GCR-40 - lines the log holds that the index has never heard of.
+        # They are not "failed events", because the index cannot count
+        # them at all; they are the divergence that used to be invisible
+        # to this very check.
+        for orphan in result["unindexed_lines"]:
+            lines.append(
+                f"  ORPHAN: {orphan['jsonl_path']} "
+                f"offset={orphan.get('jsonl_offset', '?')} error={orphan['error']}"
+            )
         return "\n".join(lines)
     from raiker.events.export import generate_export
 

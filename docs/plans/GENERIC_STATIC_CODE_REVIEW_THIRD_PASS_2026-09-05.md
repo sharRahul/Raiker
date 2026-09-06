@@ -38,6 +38,12 @@ the findings themselves are marked closed in
 | GCR-31 | The thinking-budget clamp clamped upward, past the limit | [FIXED-426](FIXED_ITEMS.md#fixed-426--a-thinking-budget-that-left-the-answer-nothing) |
 | GCR-38, GCR-39 | Host-tick passes suppressed in silence; one task's exception skipped the rest of its batch | [FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence) |
 | GCR-46 | A storage failure was reported as a model the owner never chose | [FIXED-433](FIXED_ITEMS.md#fixed-433--a-database-raiker-could-not-read-was-reported-as-a-model-the-owner-never-chose) |
+| GCR-45 | The built-in registry that loads depended on the folder Raiker was started from | [FIXED-436](FIXED_ITEMS.md#fixed-436--the-registry-raiker-loaded-depended-on-the-folder-it-was-started-from) |
+| GCR-25 | Durable operation rows, ephemeral workers, and no recovery at startup | [FIXED-437](FIXED_ITEMS.md#fixed-437--a-download-the-host-restarted-away-from-stayed-running-for-ever) |
+| GCR-28 | Two deploys at once could take the same slot and the same port | [FIXED-438](FIXED_ITEMS.md#fixed-438--two-deploys-at-once-could-take-the-same-slot-and-the-same-port) |
+| GCR-29 | A runtime on a custom port reported the slot's declared one | [FIXED-439](FIXED_ITEMS.md#fixed-439--a-runtime-on-a-custom-port-reported-the-slots-declared-one) |
+| GCR-33 | Two expired calls presented the same refresh token | [FIXED-440](FIXED_ITEMS.md#fixed-440--two-expired-calls-presented-the-same-refresh-token-and-one-was-already-retired) |
+| GCR-40 | An orphan JSONL line was invisible to the integrity check | [FIXED-441](FIXED_ITEMS.md#fixed-441--an-event-the-index-never-heard-of-was-invisible-to-the-check-for-exactly-that) |
 
 **Still open, and next by the same order:** GCR-08 (transactional instance
 creation), GCR-28 (local runtime slot concurrency), GCR-33 (OAuth refresh
@@ -67,27 +73,27 @@ The third theme is **durability mismatch**: a number of operations are represent
 | GCR-22 | Medium/High | P1 | Initial Hugging Face download runs synchronously while retry uses a background worker — **Closed 2026-09-05 ([FIXED-423](FIXED_ITEMS.md#fixed-423--a-multi-gigabyte-download-ran-inside-the-request-that-asked-for-it))** |
 | GCR-23 | High | P1 | Initial Hugging Face download can overwrite a concurrent cancel with `complete` — **Closed 2026-09-05 ([FIXED-421](FIXED_ITEMS.md#fixed-421--a-cancellation-could-be-overwritten-by-the-worker-it-cancelled))** |
 | GCR-24 | Medium/High | P1 | Long model conversion is effectively non-cancellable during a subprocess that may run for hours |
-| GCR-25 | Medium/High | P1 | Durable model-operation rows are executed by in-process background tasks; no startup recovery wiring was identified in the reviewed lifespan |
+| GCR-25 | Medium/High | P1 | Durable model-operation rows are executed by in-process background tasks; no startup recovery wiring was identified in the reviewed lifespan — **Closed 2026-09-06 ([FIXED-437](FIXED_ITEMS.md#fixed-437--a-download-the-host-restarted-away-from-stayed-running-for-ever))** |
 | GCR-26 | Medium/High | P1 | Conversion source fingerprint hashes names and sizes, not file contents |
 | GCR-27 | High | P1 | GGUF shard grouping can merge same-named shards from different directories — **Closed 2026-09-05 ([FIXED-424](FIXED_ITEMS.md#fixed-424--two-models-one-folder-apart-were-indexed-as-one))** |
-| GCR-28 | High | P1 | Managed llama.cpp/MLX runtime slot allocation and process maps are unsynchronized across concurrent deploys |
-| GCR-29 | Medium | P2 | Managed llama.cpp custom-port launch can report the wrong endpoint |
+| GCR-28 | High | P1 | Managed llama.cpp/MLX runtime slot allocation and process maps are unsynchronized across concurrent deploys — **Closed 2026-09-06 ([FIXED-438](FIXED_ITEMS.md#fixed-438--two-deploys-at-once-could-take-the-same-slot-and-the-same-port))** |
+| GCR-29 | Medium | P2 | Managed llama.cpp custom-port launch can report the wrong endpoint — **Closed 2026-09-06 ([FIXED-439](FIXED_ITEMS.md#fixed-439--a-runtime-on-a-custom-port-reported-the-slots-declared-one))** |
 | GCR-30 | Medium | P1/P2 | Provider `health()` can raise quota/workspace exceptions instead of returning `ProviderHealth` — **Closed 2026-09-05 ([FIXED-425](FIXED_ITEMS.md#fixed-425--a-method-whose-contract-was-to-return-health-raised-instead))** |
 | GCR-31 | Medium/High | P1 | Anthropic budgeted-thinking clamp can produce an invalid budget equal to or larger than available output capacity — **Closed 2026-09-05 ([FIXED-426](FIXED_ITEMS.md#fixed-426--a-thinking-budget-that-left-the-answer-nothing))** |
 | GCR-32 | Medium | P2 | Anthropic thinking-shape negotiation cache is process-global and keyed only by model name |
-| GCR-33 | Medium/High | P1 | Concurrent OAuth refresh can race when providers rotate refresh tokens |
+| GCR-33 | Medium/High | P1 | Concurrent OAuth refresh can race when providers rotate refresh tokens — **Closed 2026-09-06 ([FIXED-440](FIXED_ITEMS.md#fixed-440--two-expired-calls-presented-the-same-refresh-token-and-one-was-already-retired))** |
 | GCR-34 | Medium | P2 | Connector response truncation occurs before JSON parsing and silently changes a large JSON result into a string |
 | GCR-35 | Medium | P2 | Conversation-history budget can discard all history when the newest exchange alone exceeds the budget |
 | GCR-36 | Medium | P2 | Conversation-history read failures silently become an empty conversation context |
 | GCR-37 | Medium | P2 | SQLite connection cache uses recyclable numeric thread IDs as connection ownership identity |
 | GCR-38 | Medium/High | P1 | Scheduler top-level work passes suppress unexpected exceptions without recording worker health — **Closed 2026-09-05 ([FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence))** |
 | GCR-39 | Medium/High | P1 | One unexpected scheduled-task exception aborts the remainder of the claimed scheduler batch — **Closed 2026-09-05 ([FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence))** |
-| GCR-40 | High | P1 | Event JSONL append and database index update are not atomic; integrity verification is blind to unindexed orphan lines |
+| GCR-40 | High | P1 | Event JSONL append and database index update are not atomic; integrity verification is blind to unindexed orphan lines — **Closed 2026-09-06 ([FIXED-441](FIXED_ITEMS.md#fixed-441--an-event-the-index-never-heard-of-was-invisible-to-the-check-for-exactly-that))** |
 | GCR-41 | Medium/High | P1/P2 | Release artifact reproducibility is undermined by unpinned dependency resolution and mutable external build-tool downloads |
 | GCR-42 | Medium | P2 | Frontend API types are manually duplicated from backend DTOs instead of generated from the source contract |
 | GCR-43 | Medium | P2 | `raiker/control/dashboard.py` is a ~400 KB multi-domain integration/god module |
 | GCR-44 | Medium | P2 | API redaction buffering also copies large binary attachment preview/download responses |
-| GCR-45 | Medium | P2 | Model-profile configuration resolution depends on process current working directory before packaged resources |
+| GCR-45 | Medium | P2 | Model-profile configuration resolution depends on process current working directory before packaged resources — **Closed 2026-09-06 ([FIXED-436](FIXED_ITEMS.md#fixed-436--the-registry-raiker-loaded-depended-on-the-folder-it-was-started-from))** |
 | GCR-46 | Medium | P2 | Configured-model storage failures are silently treated as “no configured model,” changing fallback/readiness behavior — **Closed 2026-09-06 ([FIXED-433](FIXED_ITEMS.md#fixed-433--a-database-raiker-could-not-read-was-reported-as-a-model-the-owner-never-chose))** |
 | GCR-47 | Medium | P2 | Attached-root watcher can suppress cycle-level failures without updating any project health state |
 
@@ -261,6 +267,8 @@ So a Cancel request can remain `cancel_requested` until a potentially multi-hour
 
 **Severity: Medium/High — Priority: P1 — Confidence: Medium/High**
 
+**Status: Closed 2026-09-06 — [FIXED-437](FIXED_ITEMS.md#fixed-437--a-download-the-host-restarted-away-from-stayed-running-for-ever).** The lifespan settles abandoned operations before the first request is served, and `queued` was added to the states it settles: at startup nothing has been dispatched, so a queued row is abandoned by definition.
+
 Pull, conversion, deploy and retry execution are dispatched through FastAPI `BackgroundTasks` or in-process runtime objects. If the host process exits, the executable work disappears even though the operation row survives.
 
 `ModelOperationService` contains `recover_abandoned()`, but no call to it was identified in the reviewed `create_app()` lifespan/startup path. That lifespan starts scheduler, approval-continuation and attached-root-watcher workers, but no model-operation worker/recovery loop was visible.
@@ -320,6 +328,8 @@ The code also takes the expected total from the first shard and does not visibly
 
 **Severity: High — Priority: P1 — Confidence: High**
 
+**Status: Closed 2026-09-06 — [FIXED-438](FIXED_ITEMS.md#fixed-438--two-deploys-at-once-could-take-the-same-slot-and-the-same-port).** Selection, reservation, launch and recording are one step under a lock in both runtimes, and a failed launch rolls its reservation back.
+
 `ManagedLlamaRuntime` and `ManagedMlxRuntime` keep `_processes` and `_model_paths` mutable dictionaries and choose a free slot by reading those maps. There is no lock/async serialization around `start()`, slot selection, stop, or map mutation.
 
 The runtime objects live on `app.state` and background/synchronous routes can invoke deployments concurrently.
@@ -333,6 +343,8 @@ Two concurrent deployments can both observe the same slot as free, launch separa
 ## GCR-29 — Custom llama.cpp port can be reported incorrectly
 
 **Severity: Medium — Priority: P2 — Confidence: High**
+
+**Status: Closed 2026-09-06 — [FIXED-439](FIXED_ITEMS.md#fixed-439--a-runtime-on-a-custom-port-reported-the-slots-declared-one).** The bound port is stored with the running process and reported by `status()`.
 
 `ManagedLlamaRuntime.start()` permits an explicit port. `_assign_slot()` maps a non-declared custom port onto the first logical slot and launches with `bound_port = port`.
 
@@ -406,6 +418,8 @@ Different Raiker instances, different Anthropic-compatible endpoints, or differe
 ## GCR-33 — OAuth refresh is vulnerable to refresh-token rotation races
 
 **Severity: Medium/High — Priority: P1 — Confidence: High**
+
+**Status: Closed 2026-09-06 — [FIXED-440](FIXED_ITEMS.md#fixed-440--two-expired-calls-presented-the-same-refresh-token-and-one-was-already-retired).** Refresh is single-flight per `(principal, connector)`, and the credential is re-read after the lease is acquired so a waiter never re-presents the token the refresh it waited for has already retired.
 
 When a connector credential is expired, each invocation can independently call `_refresh_oauth()`. The refresh routine reads the same stored refresh token, performs an HTTP refresh and then overwrites the vault entry. There is no per-credential single-flight/lock/version check.
 
@@ -521,6 +535,8 @@ The outer lifespan catches/suppresses that exception (GCR-38), which protects th
 
 **Severity: High — Priority: P1 — Confidence: High**
 
+**Status: Closed 2026-09-06 — [FIXED-441](FIXED_ITEMS.md#fixed-441--an-event-the-index-never-heard-of-was-invisible-to-the-check-for-exactly-that).** Both halves: a failed index write undoes its own append under the still-held session lock, and `verify_session_events()` scans for lines the index does not hold and reports them as `unindexed_lines`, which also breaks `chain_intact` and so reaches the owner through the existing integrity sweep.
+
 `EventLogWriter.append()` performs two different persistence writes while holding the session lock:
 
 1. append and flush the serialized event to the JSONL file;
@@ -602,6 +618,8 @@ For documents up to the attachment cap, this creates avoidable extra memory copi
 ## GCR-45 — Built-in model profile selection depends on current working directory
 
 **Severity: Medium — Priority: P2 — Confidence: High**
+
+**Status: Closed 2026-09-06 — [FIXED-436](FIXED_ITEMS.md#fixed-436--the-registry-raiker-loaded-depended-on-the-folder-it-was-started-from).** The fix is the one proposed: resolution is packaged-resource deterministic, an override is the explicit `RAIKER_CONFIG_DIR`, and Diagnostics reports which of the two this host got.
 
 `ModelProfileRegistry.load()` defaults to `config/model-profiles.json`. `_config_path()` resolves an existing relative path/current-working-directory candidate before the repository/package fallback or packaged resource.
 

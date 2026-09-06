@@ -215,6 +215,39 @@
     </section>
 
     <!--
+      GCR-45 — which file the built-in model registry came from. This used to be
+      resolved against the working directory the host happened to be launched
+      from, so a stale `config/` beside the terminal silently replaced the model
+      registry and no surface could say so. Two answers now, and the page states
+      which one this host got.
+    -->
+    <section class="card" aria-labelledby="diag-profile-source-h">
+      <h2 id="diag-profile-source-h">Built-in model profiles</h2>
+      <p class="sub">
+        {#if diag.model_profile_source.kind === "override"}
+          Read from the directory <code class="mono">RAIKER_CONFIG_DIR</code> names, not the
+          copy that ships with Raiker.
+        {:else if diag.model_profile_source.kind === "packaged"}
+          The registry that ships with Raiker. Set <code class="mono">RAIKER_CONFIG_DIR</code>
+          to a directory holding <code class="mono">model-profiles.json</code> to override it.
+        {:else}
+          A path this process was given directly.
+        {/if}
+      </p>
+      <ul class="monitor">
+        <li>
+          <Badge
+            variant={diag.model_profile_source.kind === "packaged"
+              ? "implemented"
+              : "approval-required"}
+            label={diag.model_profile_source.kind === "packaged" ? "packaged" : "override"}
+          />
+          <span class="mono">{diag.model_profile_source.location}</span>
+        </li>
+      </ul>
+    </section>
+
+    <!--
       GCR-38 — the host tick's four background passes. Each was wrapped in
       `with suppress(Exception)`: isolated from the others, which is right, and
       silent, which is not. A pass could throw every fifteen seconds for days

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import weakref
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from importlib.resources import files
@@ -219,6 +221,39 @@ def credential_status(expires_at: str | None) -> str:
     except ValueError:
         return "reauth_required"
     return "reauth_required" if expiry <= datetime.now(UTC) else "connected"
+
+
+# GCR-33 — one refresh at a time per (owner, connector).
+#
+# A credential that has expired is noticed by every invocation that reaches it,
+# and each one used to call the refresh independently. All of them read the same
+# stored refresh token R0. For a provider that rotates refresh tokens, the first
+# exchange invalidates R0 and stores R1; the second then presents a token the
+# provider has already retired, and depending on what that provider does with a
+# retired token the owner is either handed a spurious failure or left with a
+# credential row that no longer matches anything upstream.
+#
+# `ConnectorInvoker` is built per request, so the lease cannot live on the
+# instance. It is keyed by the running loop as well as the credential: an
+# `asyncio.Lock` binds to the loop that first awaits it, and a host that has
+# torn a loop down and built another (the test client does exactly this) must
+# not be handed a lock belonging to the dead one. The outer map is weak, so a
+# loop that goes away takes its locks with it.
+_REFRESH_LEASES: weakref.WeakKeyDictionary[
+    asyncio.AbstractEventLoop, dict[tuple[str, str], asyncio.Lock]
+] = weakref.WeakKeyDictionary()
+
+
+def _refresh_lease(principal_id: str, connector_id: str) -> asyncio.Lock:
+    loop = asyncio.get_running_loop()
+    per_loop = _REFRESH_LEASES.get(loop)
+    if per_loop is None:
+        per_loop = _REFRESH_LEASES[loop] = {}
+    key = (principal_id, connector_id)
+    lock = per_loop.get(key)
+    if lock is None:
+        lock = per_loop[key] = asyncio.Lock()
+    return lock
 
 
 class ConnectorInvoker:
@@ -446,6 +481,33 @@ class ConnectorInvoker:
         connector_id: str,
         credential: dict[str, str],
     ) -> dict[str, str]:
+        async with _refresh_lease(principal_id, connector_id):
+            return await self._refresh_oauth_locked(
+                vault, principal_id, connector_id, credential
+            )
+
+    async def _refresh_oauth_locked(
+        self,
+        vault: ConnectorVault,
+        principal_id: str,
+        connector_id: str,
+        credential: dict[str, str],
+    ) -> dict[str, str]:
+        """The exchange itself, with the lease held.
+
+        The credential is re-read here rather than trusted from the caller: a
+        request that queued behind another refresh was holding the token as it
+        stood *before* that refresh, and exchanging it a second time is the
+        rotation race this lease exists to close. If the waiter's turn arrives
+        and the credential is already valid again, the refresh it was waiting
+        for did the work and there is nothing left to do.
+        """
+        current = vault.get(principal_id, connector_id)
+        if current is not None:
+            meta = vault.metadata(principal_id, connector_id)
+            if meta is None or credential_status(meta.get("expires_at")) == "connected":
+                return current
+            credential = current
         required = ("refresh_token", "client_id", "client_secret")
         if any(not credential.get(key) for key in required):
             raise ValueError("connector_reauth_required")

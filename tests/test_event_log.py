@@ -164,3 +164,108 @@ def test_the_previous_event_is_found_by_position_not_by_a_whole_second_timestamp
     integrity = verify_session_events(store, session_id)
     assert integrity["chain_intact"] is True
     assert integrity["failed"] == 0
+
+
+class TestIndexAndLogCannotDiverge:
+    """GCR-40 - the JSONL append and the index write are two different stores."""
+
+    @staticmethod
+    def _event(session_id: str, event_type: str = "prompt_received"):  # type: ignore[no-untyped-def]
+        return make_event(
+            session_id=session_id,
+            turn_id=new_id("turn_"),
+            event_type=event_type,
+            actor="test",
+            payload={},
+            client=ClientMetadata(type="tui", name="raiker-terminal", version="0.0.0"),
+        )
+
+    def test_a_failed_index_write_does_not_leave_the_line_behind(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The append is undone, so the file still matches what the index says.
+
+        Before this, a line whose index write failed stayed in the JSONL. The
+        verifier starts from the index and so could never see it, and the next
+        append read `prev_hash` from the index and chained straight past it, so
+        the physical log and the indexed chain diverged permanently.
+        """
+        store = SQLiteStore(tmp_path)
+        writer = EventLogWriter(store)
+        session_id = new_id("sess_")
+        writer.append(self._event(session_id))
+        path = writer.path_for_session(session_id)
+        before = path.read_bytes()
+
+        def explode(*args: object, **kwargs: object) -> None:
+            raise RuntimeError("index write failed")
+
+        monkeypatch.setattr(store, "index_event", explode)
+        with pytest.raises(RuntimeError, match="index write failed"):
+            writer.append(self._event(session_id, "turn_closed"))
+
+        assert path.read_bytes() == before
+        monkeypatch.undo()
+        report = verify_session_events(SQLiteStore(tmp_path), session_id)
+        assert report["unindexed_lines"] == []
+        assert report["chain_intact"] is True
+
+        # And the chain continues correctly from the surviving event.
+        writer.append(self._event(session_id, "turn_closed"))
+        healthy = verify_session_events(SQLiteStore(tmp_path), session_id)
+        assert healthy["total_events"] == 2
+        assert healthy["failed"] == 0
+        assert healthy["chain_intact"] is True
+
+    def test_an_orphan_line_is_reported_rather_than_invisible(
+        self, tmp_path: Path
+    ) -> None:
+        """The verifier used to be blind to exactly this.
+
+        It started from the index and read each *indexed* line by its stored
+        offset, so a line the index had never heard of could not be reached by
+        the check whose whole job is to say whether the two agree.
+        """
+        store = SQLiteStore(tmp_path)
+        writer = EventLogWriter(store)
+        session_id = new_id("sess_")
+        writer.append(self._event(session_id))
+        path = writer.path_for_session(session_id)
+
+        clean = verify_session_events(store, session_id)
+        assert clean["unindexed_lines"] == []
+        assert clean["chain_intact"] is True
+
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"event_id": "evt_orphan"}) + chr(10))
+
+        report = verify_session_events(SQLiteStore(tmp_path), session_id)
+        assert len(report["unindexed_lines"]) == 1
+        orphan = report["unindexed_lines"][0]
+        assert orphan["error"] == "unindexed_line"
+        assert orphan["jsonl_path"] == str(path)
+        # The indexed events themselves are still fine; the divergence is the
+        # finding, and it is what makes the session no longer intact.
+        assert report["failed"] == 0
+        assert report["chain_intact"] is False
+
+    def test_the_security_sweep_raises_a_deviation_for_an_orphan(
+        self, tmp_path: Path
+    ) -> None:
+        """`chain_intact` is what the sweep already watches, so the owner is told."""
+        from raiker.security.integrity_sweep import IntegritySweep
+
+        store = SQLiteStore(tmp_path)
+        writer = EventLogWriter(store)
+        session_id = new_id("sess_")
+        store.create_session(session_id, "principal_owner", "tui")
+        writer.append(self._event(session_id))
+        with writer.path_for_session(session_id).open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"event_id": "evt_orphan"}) + chr(10))
+
+        result = IntegritySweep(SQLiteStore(tmp_path)).run("principal_owner")
+
+        assert any(
+            deviation["kind"] == "event_chain" and deviation["session_id"] == session_id
+            for deviation in result["deviations"]
+        )

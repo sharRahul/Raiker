@@ -114,6 +114,45 @@ def test_abandoned_running_operation_is_failed_on_recovery(tmp_path: Path) -> No
     assert service.list("owner")[0].error_code == "host_restarted"
 
 
+def test_abandoned_queued_operation_is_failed_on_recovery(tmp_path: Path) -> None:
+    """GCR-25 — a queued row at startup has no dispatcher and never will.
+
+    `queued` used to be left out of the recovery sweep. That is right while a
+    process is live, where a queued row is one a dispatcher is about to claim.
+    At startup nothing has been dispatched, so the row sat at "queued" for the
+    life of the install with no worker, no error and no way for the owner to
+    reach Retry — which only starts from a terminal state.
+    """
+    store = SQLiteStore(tmp_path)
+    service = ModelOperationService(store)
+    operation = service.start(
+        "owner",
+        ModelOperationRequest(kind="download", target="repo/model", confirmed=True),
+        payload={"repo_id": "repo/model"},
+    )
+    assert operation.state == "queued"
+
+    assert service.recover_abandoned() == 1
+
+    recovered = service.list("owner")[0]
+    assert recovered.state == "failed"
+    assert recovered.error_code == "host_restarted"
+    # Terminal and retryable: the owner's next move is one press.
+    assert service.retry("owner", operation.operation_id).state == "queued"
+
+
+def test_recovery_leaves_operations_that_already_settled(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    service = ModelOperationService(store)
+    operation = service.start(
+        "owner", ModelOperationRequest(kind="download", target="repo/model", confirmed=True)
+    )
+    store.update_model_operation(operation.operation_id, state="complete", phase="complete")
+
+    assert service.recover_abandoned() == 0
+    assert service.list("owner")[0].state == "complete"
+
+
 def test_cleanup_only_removes_terminal_owner_operations(tmp_path: Path) -> None:
     service = ModelOperationService(SQLiteStore(tmp_path))
     operation = service.start("owner", ModelOperationRequest(kind="install", target="ollama", confirmed=True))

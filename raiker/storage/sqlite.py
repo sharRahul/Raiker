@@ -9242,11 +9242,26 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         ]
 
     def fail_running_model_operations(self) -> int:
+        """Fail every non-terminal model operation. **Startup only.**
+
+        GCR-25 — a pull, conversion or deploy is a durable row executed by an
+        in-process worker. The row outlives the process; the worker does not. A
+        host that stopped mid-download therefore came back reporting work that
+        was still `queued` or `running` and had nobody advancing it, and the
+        owner's only signal was a progress bar that never moved again.
+
+        `queued` is included deliberately. It used to be left alone, which was
+        right while a process was live — a queued row is one a dispatcher is
+        about to pick up. At startup nothing has been dispatched yet, so a
+        queued row is abandoned by definition and would otherwise sit there for
+        the life of the install. The state named here is terminal and
+        retryable, so the owner's next move is one press.
+        """
         with self.connect() as connection:
             cursor = connection.execute(
                 """UPDATE model_operations SET state = 'failed', phase = 'recovery',
                 error_code = 'host_restarted', error_detail = 'The host stopped before this operation completed.',
-                updated_at = ? WHERE state IN ('running', 'cancel_requested')""",
+                updated_at = ? WHERE state IN ('queued', 'running', 'cancel_requested')""",
                 (utc_now(),),
             )
         return cursor.rowcount

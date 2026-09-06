@@ -87,8 +87,43 @@ class EventLogWriter:
                 offset = handle.tell()
                 handle.write(serialised + "\n")
                 handle.flush()
-            self.store.index_event(
-                event, str(path), offset, digest, prev_event_sha256=prev_hash
-            )
+            try:
+                self.store.index_event(
+                    event, str(path), offset, digest, prev_event_sha256=prev_hash
+                )
+            except Exception:
+                # GCR-40 - the file append and the index write are two
+                # different stores, and this is the gap between them. An
+                # index write that failed used to leave the line behind: a
+                # JSONL line the database has never heard of, which the
+                # integrity verifier could not see (it starts from the
+                # index) and which the *next* append would chain straight
+                # past, because `prev_hash` also comes from the database.
+                # The physical log and the indexed hash chain then
+                # disagreed permanently.
+                #
+                # The append is undone instead. That is safe precisely
+                # here: the session lock is still held, so nothing else has
+                # appended, and `offset` is where this line starts, so
+                # truncating to it restores the file to what the index
+                # still describes. A truncation that itself fails leaves an
+                # orphan, which is why `verify_session_events` now scans
+                # for lines the index does not know about rather than
+                # trusting the index to be complete.
+                self._undo_append(path, offset)
+                raise
         self.last_event_id = event.event_id
         return path, offset
+
+    @staticmethod
+    def _undo_append(path: Path, offset: int) -> None:
+        """Cut the log back to ``offset``. Only ever called holding the session lock."""
+        try:
+            with path.open("r+b") as handle:
+                handle.truncate(offset)
+                handle.flush()
+                os.fsync(handle.fileno())
+        except OSError:
+            # Reported by the integrity scan rather than raised over the top
+            # of the failure that brought us here.
+            return

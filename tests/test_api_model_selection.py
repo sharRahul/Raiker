@@ -24,6 +24,7 @@ from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
 from raiker.auth.vault_key_file import VAULT_KEY_ENV, write_vault_key
 from raiker.cli.principal_resolver import bootstrap_owner
+from raiker.models import local_presence
 from raiker.models.connections import get_model_connection, put_model_connection
 from raiker.storage.sqlite import SQLiteStore
 
@@ -131,7 +132,7 @@ class TestProviderModelListing:
 
 class TestSetModelSelection:
     def test_fresh_workspace_names_no_model_when_ollama_is_not_installed(
-        self, client: TestClient, owner_token: str
+        self, client: TestClient, owner_token: str, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """BUG-270 — the native default is a claim about this machine.
 
@@ -141,7 +142,13 @@ class TestSetModelSelection:
         `gemma4:31b-cloud` in the setup meter, the Global model control and both
         composer chips on a host with no `ollama` binary. The profile has always
         declared `disabled_until_provider_detected`; nothing enforced it.
+
+        "with no `ollama` binary" is stated rather than assumed. It used to be
+        left to the machine running the suite, so a test whose own name is a
+        condition never enforced that condition: it passed on CI and failed on
+        any developer laptop with Ollama installed.
         """
+        monkeypatch.setattr(local_presence.shutil, "which", lambda _name: None)
         read = client.get("/api/models", headers=_auth(owner_token)).json()
         assert read["current_profile_id"] is None
         assert read["current_model"] is None

@@ -690,6 +690,13 @@ export interface Diagnostics {
   missing_config: string[];
   provider_health: ProviderHealth[];
   background_workers: BackgroundWorkerHealth[];
+  /**
+   * GCR-45 — where the built-in model registry was read from. `packaged` is the
+   * resource that ships with Raiker; `override` is the file an explicit
+   * `RAIKER_CONFIG_DIR` named. The working directory the host was launched from
+   * is no longer one of the answers.
+   */
+  model_profile_source: { kind: string; location: string };
   scope_note: string;
 }
 

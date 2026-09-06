@@ -345,6 +345,30 @@ def create_app(
                 with suppress(Exception):
                     await resume_approved(scheduler)
 
+        # GCR-25 — model pulls, conversions and deploys are durable rows driven
+        # by in-process workers. A host that stopped mid-download left the row
+        # behind and the worker with it, so the product came back showing
+        # `running` work nothing was advancing and a progress bar that would
+        # never move again. Settle them before the first request is served:
+        # each becomes a failed operation naming `host_restarted`, which is a
+        # state Retry can start from. Contained like every other pass — a
+        # recovery sweep that throws must not stop the host from booting.
+        from raiker.models.local_operations import ModelOperationService
+
+        try:
+            recovered = ModelOperationService(
+                SQLiteStore(app.state.workspace_root)
+            ).recover_abandoned()
+            if recovered:
+                _LOG.info(
+                    "recovered %d model operation(s) abandoned by a host restart",
+                    recovered,
+                )
+        except Exception as exc:  # noqa: BLE001 — boot must not depend on this
+            _LOG.warning(
+                "model-operation recovery failed: %s", type(exc).__name__
+            )
+
         worker = asyncio.create_task(tick())
         nudged = asyncio.create_task(continuations())
         # A folder attached to a project is edited by whatever the owner uses,

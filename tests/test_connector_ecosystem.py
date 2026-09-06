@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from pathlib import Path
@@ -274,3 +275,124 @@ def test_connector_write_approval_appears_in_owning_principals_inbox(
     assert other_inbox.status_code == 200
     assert other_inbox.json() == []
     assert client.get(f"/api/approvals/{proposed.json()['approval_id']}", headers=other_auth).status_code == 404
+
+
+class TestOAuthRefreshIsSingleFlight:
+    """GCR-33 — a rotating provider retires the refresh token it just accepted."""
+
+    @staticmethod
+    def _install_expired_credential(workspace: Path) -> SQLiteStore:
+        store = SQLiteStore(workspace)
+        document = json.dumps(
+                        {
+                            "openapi": "3.0.0",
+                            "servers": [{"url": "https://api.github.com"}],
+                            "paths": {},
+                            "components": {
+                                "securitySchemes": {
+                                    "oauth": {
+                                        "type": "oauth2",
+                                        "flows": {
+                                            "authorizationCode": {
+                                                "tokenUrl": "https://api.github.com/token"
+                                            }
+                                        },
+                                    }
+                                }
+                            },
+                        }
+        )
+        with store.connect() as connection:
+            connection.execute(
+                """INSERT INTO connector_manifests
+                   (connector_id, manifest_json, manifest_sha256, installed_by, installed_at)
+                   VALUES ('github', ?, ?, 'principal_owner', ?)""",
+                (
+                    document,
+                    hashlib.sha256(document.encode()).hexdigest(),
+                    utc_now(),
+                ),
+            )
+        ConnectorVault(store).put(
+            "principal_owner",
+            "github",
+            {
+                "access_token": "A0",
+                "refresh_token": "R0",
+                "client_id": "cid",
+                "client_secret": "csecret",
+            },
+            "2000-01-01T00:00:00+00:00",
+        )
+        return store
+
+    def test_two_expired_invocations_exchange_the_token_once(
+        self, workspace: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Both callers used to read R0 and both used to present it.
+
+        The first exchange invalidates R0 and stores R1; the second then hands
+        the provider a token it has already retired. With the lease, the second
+        caller finds the credential valid again when its turn comes and makes no
+        second exchange at all.
+        """
+        import asyncio
+
+        store = self._install_expired_credential(workspace)
+        presented: list[str] = []
+        issued = iter(["R1", "R2"])
+
+        class Response:
+            status_code = 200
+
+            def __init__(self, refresh: str) -> None:
+                self._refresh = refresh
+
+            def json(self) -> dict[str, Any]:
+                return {
+                    "access_token": f"access-for-{self._refresh}",
+                    "refresh_token": self._refresh,
+                    "expires_in": 3600,
+                }
+
+        class Client:
+            async def __aenter__(self) -> Client:
+                return self
+
+            async def __aexit__(self, *exc: object) -> None:
+                return None
+
+            async def post(self, url: str, data: dict[str, str]) -> Response:
+                presented.append(data["refresh_token"])
+                # The provider is slow enough for the second caller to arrive
+                # while the first exchange is still open — the whole window.
+                await asyncio.sleep(0.05)
+                return Response(next(issued))
+
+        monkeypatch.setattr(
+            "raiker.runtime.connector_ecosystem.httpx.AsyncClient",
+            lambda **kwargs: Client(),
+        )
+        monkeypatch.setattr(
+            "raiker.runtime.connector_ecosystem.connector_egress_allowlist",
+            lambda: {"api.github.com"},
+        )
+
+        async def refresh() -> dict[str, str]:
+            vault = ConnectorVault(store)
+            credential = vault.get("principal_owner", "github")
+            assert credential is not None
+            return await ConnectorInvoker(store)._refresh_oauth(
+                vault, "principal_owner", "github", credential
+            )
+
+        async def both() -> tuple[dict[str, str], dict[str, str]]:
+            return await asyncio.gather(refresh(), refresh())  # type: ignore[return-value]
+
+        first, second = asyncio.run(both())
+
+        assert presented == ["R0"], "the retired token must never be presented again"
+        # Both callers end up holding the same, current credential.
+        assert first["refresh_token"] == "R1"
+        assert second["refresh_token"] == "R1"
+        assert ConnectorVault(store).get("principal_owner", "github") == first

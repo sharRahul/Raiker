@@ -31,6 +31,20 @@ from raiker.storage.sqlite import SQLiteStore
 
 
 @pytest.fixture
+def bare_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A host with none of the local runtimes installed.
+
+    Several tests below assert what Raiker says when nothing is on the machine.
+    They used to get that by *assuming* the machine had nothing, so they passed
+    on CI and failed on any developer laptop with Ollama installed — tests about
+    a workspace were reading a fact about the computer running them. The absence
+    is stated here instead, and `test_a_present_runtime_records_the_executable`
+    states the presence the same way.
+    """
+    monkeypatch.setattr(local_presence.shutil, "which", lambda _name: None)
+
+
+@pytest.fixture
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "local_runtime_presence"
     ws.mkdir()
@@ -54,7 +68,9 @@ def _auth(token: str) -> dict[str, str]:
 
 
 class TestDetection:
-    def test_an_absent_runtime_is_recorded_as_absent(self, workspace: Path) -> None:
+    def test_an_absent_runtime_is_recorded_as_absent(
+        self, workspace: Path, bare_host: None
+    ) -> None:
         store = SQLiteStore(workspace)
         results = local_presence.detect(store, runtimes=("ollama",))
         assert results["ollama"].present is False
@@ -129,15 +145,15 @@ class TestRoutes:
         assert row["executable"] == "/usr/local/bin/ollama"
 
     def test_detect_looks_again_for_an_owner_who_just_installed_one(
-        self, client: TestClient, owner_token: str, workspace: Path
+        self, client: TestClient, owner_token: str, workspace: Path, bare_host: None
     ) -> None:
         SQLiteStore(workspace).save_local_runtime_presence(
             "ollama", present=True, executable="/usr/local/bin/ollama"
         )
         body = client.post("/api/local-runtimes/detect", headers=_auth(owner_token)).json()
         row = next(item for item in body["runtimes"] if item["runtime"] == "ollama")
-        # Nothing is installed on this host, so a forced look corrects the row
-        # rather than trusting the cache it was told to bypass.
+        # Nothing is installed on this host (`bare_host`), so a forced look
+        # corrects the row rather than trusting the cache it was told to bypass.
         assert row["present"] is False
 
     def test_both_routes_require_auth(self, client: TestClient) -> None:
@@ -147,7 +163,7 @@ class TestRoutes:
 
 class TestTheCountThatWasWrong:
     def test_empty_local_slots_are_not_counted_as_models_set_up(
-        self, client: TestClient, owner_token: str
+        self, client: TestClient, owner_token: str, bare_host: None
     ) -> None:
         """The other half of "5 models set up" on a machine with none.
 
@@ -167,7 +183,7 @@ class TestTheCountThatWasWrong:
         assert all(profile["configured"] is False for profile in slots)
 
     def test_a_deployed_slot_counts(
-        self, client: TestClient, owner_token: str, workspace: Path
+        self, client: TestClient, owner_token: str, workspace: Path, bare_host: None
     ) -> None:
         """Deploying a GGUF writes a configured model; that is the owner's own evidence."""
         SQLiteStore(workspace).save_configured_model(

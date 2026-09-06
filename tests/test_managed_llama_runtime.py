@@ -12,7 +12,10 @@ memory, and an unbounded pool is a way to exhaust a laptop by clicking Deploy.
 
 from __future__ import annotations
 
+import contextlib
+import threading
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -174,3 +177,138 @@ def test_every_slot_has_a_shipped_profile() -> None:
         profile = registry.resolve_profile_id(slot.profile_id)
         assert profile.model == slot.alias
         assert str(slot.port) in str(profile.raw["endpoint"])
+
+
+class TestConcurrentDeploys:
+    """GCR-28 — selecting a slot and occupying it must be one step."""
+
+    def test_two_simultaneous_deploys_take_two_different_slots(
+        self, tmp_path: Path
+    ) -> None:
+        """Slot selection read the process map; the launch came afterwards.
+
+        Two deploys arriving together both saw the same slot free, both
+        launched, and the second overwrote the first's map entry — one process
+        orphaned and untracked, two of them contending for one port. The launch
+        below blocks until both threads are inside it, which is exactly the
+        window the old code left open.
+        """
+
+        root = tmp_path / "library"
+        root.mkdir()
+        first = root / "a.gguf"
+        second = root / "b.gguf"
+        for model in (first, second):
+            model.write_bytes(b"gguf")
+        executable = tmp_path / "llama-server"
+        executable.write_text("llama-server stub", encoding="utf-8")
+
+        both_inside = threading.Barrier(2, timeout=5)
+        launched: list[tuple[str, ...]] = []
+        lock = threading.Lock()
+
+        def launch(argv: list[str]) -> FakeProcess:
+            # Without serialisation both threads reach here holding the same
+            # slot. With it, the second cannot start until the first is recorded.
+            with contextlib.suppress(threading.BrokenBarrierError):
+                both_inside.wait(timeout=0.5)
+            with lock:
+                launched.append(tuple(argv))
+            return FakeProcess()
+
+        runtime = ManagedLlamaRuntime(launch, approved_roots=(root,))
+        results: list[Any] = []
+        errors: list[BaseException] = []
+
+        def deploy(model: Path) -> None:
+            try:
+                results.append(runtime.start(model, executable=executable))
+            except BaseException as exc:  # noqa: BLE001 - reported below
+                errors.append(exc)
+
+        threads = [
+            threading.Thread(target=deploy, args=(first,)),
+            threading.Thread(target=deploy, args=(second,)),
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+
+        assert not errors, errors
+        assert len(launched) == 2
+        # Two deploys, two slots, two ports — never one slot twice.
+        assert len({result.slot for result in results}) == 2
+        assert len({result.endpoint for result in results}) == 2
+        assert len(runtime.statuses()) == 2
+
+    def test_a_launch_that_fails_gives_its_slot_back(self, tmp_path: Path) -> None:
+        """A reservation that is never released costs the pool a slot forever."""
+        root = tmp_path / "library"
+        root.mkdir()
+        model = root / "a.gguf"
+        model.write_bytes(b"gguf")
+        executable = tmp_path / "llama-server"
+        executable.write_text("llama-server stub", encoding="utf-8")
+
+        attempts: list[list[str]] = []
+
+        def launch(argv: list[str]) -> FakeProcess:
+            attempts.append(argv)
+            if len(attempts) == 1:
+                raise OSError("could not exec")
+            return FakeProcess()
+
+        runtime = ManagedLlamaRuntime(launch, approved_roots=(root,))
+        with pytest.raises(OSError, match="could not exec"):
+            runtime.start(model, executable=executable)
+
+        # The same first slot is offered again rather than being burnt.
+        status = runtime.start(model, executable=executable)
+        assert status.slot == LOCAL_SLOTS[0].profile_id
+
+
+class TestTheReportedPort:
+    """GCR-29 — a runtime must report the port it was actually launched on."""
+
+    def test_a_custom_port_is_reported_not_the_slots_declared_one(
+        self, tmp_path: Path
+    ) -> None:
+        """A port outside the declared table runs on the first slot.
+
+        `status()` read that slot's *declared* port, so a server launched on
+        9000 told the owner — and every client that believed the endpoint — that
+        it was on 8080.
+        """
+        root = tmp_path / "library"
+        root.mkdir()
+        model = root / "a.gguf"
+        model.write_bytes(b"gguf")
+        executable = tmp_path / "llama-server"
+        executable.write_text("llama-server stub", encoding="utf-8")
+
+        calls: list[tuple[str, ...]] = []
+        runtime = _runtime(calls, (root,))
+        status = runtime.start(model, executable=executable, port=9000)
+
+        assert "9000" in calls[0]
+        assert status.endpoint == "http://127.0.0.1:9000/v1"
+        assert runtime.status(status.slot).endpoint == "http://127.0.0.1:9000/v1"
+
+    def test_stopping_a_slot_forgets_the_port_it_was_bound_to(
+        self, tmp_path: Path
+    ) -> None:
+        root = tmp_path / "library"
+        root.mkdir()
+        model = root / "a.gguf"
+        model.write_bytes(b"gguf")
+        executable = tmp_path / "llama-server"
+        executable.write_text("llama-server stub", encoding="utf-8")
+
+        calls: list[tuple[str, ...]] = []
+        runtime = _runtime(calls, (root,))
+        started = runtime.start(model, executable=executable, port=9000)
+        runtime.stop(started.slot)
+
+        restarted = runtime.start(model, executable=executable)
+        assert restarted.endpoint == f"http://127.0.0.1:{LOCAL_SLOTS[0].port}/v1"

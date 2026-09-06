@@ -198,4 +198,28 @@ describe("DiagnosticsView", () => {
     expect(await screen.findByText("Background passes")).toBeInTheDocument();
     expect(screen.getByText(/no pass has run yet on this host/i)).toBeInTheDocument();
   });
+  it("names the packaged registry as the source of the built-in model profiles", async () => {
+    stubFetch({ "GET /api/diagnostics": DIAGNOSTICS, "GET /api/security/health": [] });
+    render(DiagnosticsView);
+
+    expect(await screen.findByText("Built-in model profiles")).toBeInTheDocument();
+    expect(screen.getByText("packaged")).toBeInTheDocument();
+    expect(screen.getByText("raiker.config/model-profiles.json")).toBeInTheDocument();
+  });
+
+  it("says when an explicit RAIKER_CONFIG_DIR replaced the packaged registry", async () => {
+    // GCR-45 — an override is legitimate; an override nobody can see is not.
+    stubFetch({
+      "GET /api/diagnostics": {
+        ...DIAGNOSTICS,
+        model_profile_source: { kind: "override", location: "/srv/raiker/model-profiles.json" },
+      },
+      "GET /api/security/health": [],
+    });
+    render(DiagnosticsView);
+
+    expect(await screen.findByText("Built-in model profiles")).toBeInTheDocument();
+    expect(screen.getByText("override")).toBeInTheDocument();
+    expect(screen.getByText("/srv/raiker/model-profiles.json")).toBeInTheDocument();
+  });
 });

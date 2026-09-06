@@ -79,7 +79,11 @@ from raiker.models.policy_state import (
     PRIVATE_NETWORK_MODEL_GATE,
     provider_runtime_policy_from_gates,
 )
-from raiker.models.registry import ModelProfileRegistry, profile_with_model
+from raiker.models.registry import (
+    ModelProfileRegistry,
+    profile_with_model,
+    resolve_builtin_config,
+)
 from raiker.models.router import ModelRouter
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
 from raiker.models.tool_projection import ALWAYS_PROJECTED, DEFERRABLE_TOOL_NAMES
@@ -1890,6 +1894,10 @@ class DiagnosticsView:
     # when it last threw, the exception *class* it threw, and how many times in
     # a row. A pass that fails every fifteen seconds used to be invisible.
     background_workers: tuple[dict[str, Any], ...] = ()
+    # GCR-45 — which file the built-in model registry was actually read from.
+    # It used to depend on the working directory the host was launched from, so
+    # the same install could answer differently and nothing said which one won.
+    model_profile_source: dict[str, str] = field(default_factory=dict)
     scope_note: str = "Status reflects the local single-user runtime only."
 
     def to_dict(self) -> dict[str, Any]:
@@ -1903,6 +1911,7 @@ class DiagnosticsView:
             "missing_config": list(self.missing_config),
             "provider_health": [p.to_dict() for p in self.provider_health],
             "background_workers": [dict(worker) for worker in self.background_workers],
+            "model_profile_source": dict(self.model_profile_source),
             "scope_note": self.scope_note,
         }
 
@@ -8079,6 +8088,9 @@ class DashboardService:
             missing_config=missing_config,
             provider_health=provider_health,
             background_workers=tuple(self.store.list_background_worker_health()),
+            model_profile_source=resolve_builtin_config(
+                "config/model-profiles.json"
+            ).as_dict(),
         )
 
     @staticmethod

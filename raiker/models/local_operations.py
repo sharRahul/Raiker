@@ -372,6 +372,12 @@ class ModelOperationService:
         return self.store.delete_model_operation(owner_principal_id, operation_id)
 
     def recover_abandoned(self) -> int:
+        """Settle every operation this host restarted away from. **Startup only.**
+
+        GCR-25 — the row is durable and the worker is not. Called once from the
+        API lifespan before any request is served, so nothing it settles can be
+        work a live worker is still doing.
+        """
         return self.store.fail_running_model_operations()
 
 

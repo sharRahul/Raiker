@@ -80,6 +80,12 @@ row, the exception class it last raised, and when it last succeeded, so a
 systemic fault cannot run for days behind a page that says the runtime is
 healthy.
 
+The same section names which built-in model registry this host is running:
+the packaged one, or the file an explicit `RAIKER_CONFIG_DIR` supplied. Raiker
+never picks that up from the folder it was started in, so the answer is the same
+however you launch it — see
+[Which built-in model registry is in use](managing-the-host.md#which-built-in-model-registry-is-in-use).
+
 There used to be a separate **Diagnostics** tab. It read the same runtime status
 this page reads and restated most of it — a tick list saying "ready" beside a
 tile saying "Ready", the same missing-configuration list twice, an expansion of

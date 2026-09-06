@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,6 +73,19 @@ class ManagedLlamaRuntime:
         self._on_stopped = on_stopped
         self._processes: dict[str, Any] = {}
         self._model_paths: dict[str, str] = {}
+        # GCR-29 — the port a slot was actually launched on. A caller may name a
+        # port outside the declared table, which runs on the first slot; status
+        # used to report that slot's *declared* port, so a runtime serving 9000
+        # told the owner it was on 8080 and every client that believed it failed.
+        self._bound_ports: dict[str, int] = {}
+        # GCR-28 — slot selection reads `_processes`, and the launch that makes
+        # the answer true happens afterwards. Two deploys arriving together both
+        # saw the same slot free, both launched, and the second overwrote the
+        # first's map entry: one process orphaned, two contending for one port.
+        # Reservation closes the window, and the lock is what makes selecting,
+        # reserving and launching one step rather than three.
+        self._lock = threading.RLock()
+        self._reserved: set[str] = set()
 
     @staticmethod
     def _launch(argv: list[str]) -> subprocess.Popen[bytes]:
@@ -86,6 +100,14 @@ class ManagedLlamaRuntime:
     def _alive(self, slot_id: str) -> bool:
         process = self._processes.get(slot_id)
         return process is not None and process.poll() is None
+
+    def _occupied(self, slot_id: str) -> bool:
+        """Alive, or reserved by a deploy that is launching right now.
+
+        Allocation asks this rather than `_alive`: a slot whose process has not
+        been created yet is not free, it is taken (GCR-28).
+        """
+        return slot_id in self._reserved or self._alive(slot_id)
 
     def _assign_slot(
         self, model_path: str, requested_port: int | None, profile_id: str | None = None
@@ -116,7 +138,7 @@ class ManagedLlamaRuntime:
             # so an operator-chosen port keeps its original meaning.
             return LOCAL_SLOTS[0]
         free = next(
-            (slot for slot in LOCAL_SLOTS if not self._alive(slot.profile_id)),
+            (slot for slot in LOCAL_SLOTS if not self._occupied(slot.profile_id)),
             None,
         )
         if free is None:
@@ -144,31 +166,43 @@ class ManagedLlamaRuntime:
             raise ValueError("model_outside_approved_library")
         if port is not None and not 1024 <= port <= 65535:
             raise ValueError("invalid_runtime_port")
-        slot = self._assign_slot(str(model), port, profile_id)
-        bound_port = port if port is not None else slot.port
-        if self._alive(slot.profile_id):
-            self.stop(slot.profile_id)
-        argv = [
-            str(executable),
-            "--model",
-            str(model),
-            "--alias",
-            slot.alias,
-            "--host",
-            "127.0.0.1",
-            "--port",
-            str(bound_port),
-        ]
-        self._processes[slot.profile_id] = self._launcher(argv)
-        self._model_paths[slot.profile_id] = str(model)
-        return self.status(slot.profile_id)
+        with self._lock:
+            slot = self._assign_slot(str(model), port, profile_id)
+            bound_port = port if port is not None else slot.port
+            if self._alive(slot.profile_id):
+                self.stop(slot.profile_id)
+            self._reserved.add(slot.profile_id)
+            argv = [
+                str(executable),
+                "--model",
+                str(model),
+                "--alias",
+                slot.alias,
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(bound_port),
+            ]
+            try:
+                process = self._launcher(argv)
+            except Exception:
+                # The reservation is rolled back, so a launch that could not
+                # start does not cost the pool a slot for the life of the host.
+                self._reserved.discard(slot.profile_id)
+                raise
+            self._processes[slot.profile_id] = process
+            self._model_paths[slot.profile_id] = str(model)
+            self._bound_ports[slot.profile_id] = bound_port
+            self._reserved.discard(slot.profile_id)
+            return self.status(slot.profile_id)
 
     def stop(self, slot_id: str | None = None) -> LocalRuntimeStatus:
         """Stop one slot, or every slot when none is named (host shutdown)."""
-        if slot_id is None:
-            stopped = [self._stop_slot(slot.profile_id) for slot in LOCAL_SLOTS]
-            return stopped[0]
-        return self._stop_slot(slot_id)
+        with self._lock:
+            if slot_id is None:
+                stopped = [self._stop_slot(slot.profile_id) for slot in LOCAL_SLOTS]
+                return stopped[0]
+            return self._stop_slot(slot_id)
 
     def _stop_slot(self, slot_id: str) -> LocalRuntimeStatus:
         process = self._processes.get(slot_id)
@@ -184,6 +218,7 @@ class ManagedLlamaRuntime:
                     wait(timeout=5)
         self._processes.pop(slot_id, None)
         self._model_paths.pop(slot_id, None)
+        self._bound_ports.pop(slot_id, None)
         if model_path is not None and self._on_stopped is not None:
             self._on_stopped(model_path)
         return self.status(slot_id)
@@ -196,7 +231,9 @@ class ManagedLlamaRuntime:
         return LocalRuntimeStatus(
             running,
             getattr(process, "pid", None) if running else None,
-            f"http://127.0.0.1:{slot.port}/v1" if running else None,
+            f"http://127.0.0.1:{self._bound_ports.get(resolved, slot.port)}/v1"
+            if running
+            else None,
             self._model_paths.get(resolved) if running else None,
             slot.profile_id,
         )

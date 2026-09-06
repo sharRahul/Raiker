@@ -20,6 +20,7 @@ from raiker.models.contracts import (
     ToolCallProposal,
 )
 from raiker.models.exceptions import (
+    ModelProviderError,
     ProviderAuthenticationError,
     ProviderConnectionError,
     ProviderModelNotFoundError,
@@ -84,6 +85,11 @@ THINKING_BUDGETED = "enabled"
 # be useful on a hard question without dominating a short turn's cost; the
 # adaptive spelling lets the provider decide, which is why it is preferred.
 THINKING_BUDGET_TOKENS = 2048
+# The API's own floor for the budgeted spelling, and the room the answer needs
+# after the thinking is paid for. `max_tokens` counts both, so a turn whose
+# whole allowance is 1024 cannot carry a 1024-token minimum *and* an answer.
+MINIMUM_THINKING_BUDGET_TOKENS = 1024
+RESERVED_ANSWER_TOKENS = 512
 # What each model turned out to accept, keyed by model id and kept for the life
 # of the process. Cleared by `reset_thinking_negotiation()` in tests.
 _NEGOTIATED_THINKING: dict[str, str] = {}
@@ -297,14 +303,15 @@ class AsyncAnthropicMessagesProvider:
                 True,
                 "model_available" if available else "model_missing",
             )
-        except (
-            ProviderConnectionError,
-            ProviderTimeoutError,
-            ProviderAuthenticationError,
-            ProviderRateLimitError,
-            ProviderModelNotFoundError,
-            ProviderResponseValidationError,
-        ) as exc:
+        except ModelProviderError as exc:
+            # GCR-30 — the base class, not a hand-kept list of six. The status
+            # mapper this probe runs through also raises quota exhaustion and
+            # the two workspace refusals, and none of them was named here, so a
+            # method whose whole contract is "return a ProviderHealth" raised
+            # instead and the readiness check died on a provider state it had
+            # already classified correctly. Every provider-domain failure is a
+            # health answer; anything that is not one is a bug and still
+            # escapes.
             return ProviderHealth(self.provider, False, False, type(exc).__name__)
 
     async def list_models(self) -> list[ProviderModelInfo]:
@@ -390,8 +397,21 @@ class AsyncAnthropicMessagesProvider:
             budget = reasoning.budget_tokens or THINKING_BUDGET_TOKENS
             # The budget has to leave room for the answer, and `max_tokens`
             # counts both. A budget that met or exceeded it would be refused.
+            #
+            # GCR-31 — the clamp used to end at `max(1024, …)`, which clamps
+            # *upward*: with `max_tokens` at 1024 it returned a 1024-token
+            # thinking budget and left the answer nothing, so the request the
+            # comment above describes was exactly the request being built. A
+            # budget that will not fit is now said out loud, with the field to
+            # change, rather than sent to the provider to be refused as a 400.
             limit = request.max_tokens or self.max_tokens
-            return {"type": "enabled", "budget_tokens": max(1024, min(budget, limit - 512))}
+            available = limit - RESERVED_ANSWER_TOKENS
+            if available < MINIMUM_THINKING_BUDGET_TOKENS:
+                raise ProviderUnsupportedCapabilityError("reasoning_budget_exceeds_output_limit")
+            return {
+                "type": "enabled",
+                "budget_tokens": max(MINIMUM_THINKING_BUDGET_TOKENS, min(budget, available)),
+            }
         thinking: dict[str, Any] = {"type": THINKING_ADAPTIVE}
         # `display: summarized` is what the owner should see: the provider's own
         # summary of its reasoning rather than its raw scratch text. Asked for

@@ -154,4 +154,97 @@ describe("HuggingFacePanel", () => {
     expect(screen.getByText("Ready to deploy")).toBeTruthy();
     expect(screen.getByText("Requires isolated conversion")).toBeTruthy();
   });
+  it("queues the download and follows it instead of blocking on it", async () => {
+    // GCR-22/GCR-23 — the snapshot download used to run inside the request, so
+    // a multi-gigabyte pull held a request worker for its whole duration and
+    // the completion written at the end could not see a Cancel pressed in
+    // between. It is a durable background operation now: the panel gets the
+    // operation back straight away and follows it.
+    const revision = "a".repeat(40);
+    stubFetch({
+      "GET /api/hugging-face/search": {
+        items: [{ repo_id: "org/model-GGUF", downloads: 42, likes: 3, gated: false }],
+      },
+      "GET /api/hugging-face/org/model-GGUF/variants": {
+        items: [
+          {
+            repo_id: "org/model-GGUF",
+            revision,
+            files: ["model-Q4_K_M.gguf"],
+            format: "gguf",
+            quantization: "Q4_K_M",
+            total_bytes: 100,
+            cached_bytes: 0,
+            gated: false,
+            license_id: "apache-2.0",
+            complete: true,
+          },
+        ],
+      },
+      "GET /api/model-library": { roots: [{ path: "/models" }], models: [] },
+      "POST /api/hugging-face/download/preview": {
+        repo_id: "org/model-GGUF",
+        revision,
+        files: ["model-Q4_K_M.gguf"],
+        total_bytes: 100,
+        cached_bytes: 0,
+        download_bytes: 100,
+      },
+      "POST /api/hugging-face/download": {
+        operation_id: "mop_dl",
+        owner_principal_id: "owner",
+        kind: "download",
+        target: "org/model-GGUF@aaaaaaaaaaaa",
+        state: "queued",
+        phase: "queued",
+        progress_bytes: 0,
+        total_bytes: null,
+        progress_percent: null,
+        source_url: "https://huggingface.co/org/model-GGUF",
+        destination: "<model-library>/snapshot",
+        error_code: null,
+        error_detail: null,
+        created_at: "now",
+        updated_at: "now",
+        retryable: true,
+        partial_files_present: false,
+        snapshot_path: "/models/.raiker-hf/org--model-GGUF/aaaaaaaaaa",
+        conversion_output_path: "/models/converted",
+      },
+      "GET /api/model-operations": {
+        items: [
+          {
+            operation_id: "mop_dl",
+            owner_principal_id: "owner",
+            kind: "download",
+            target: "org/model-GGUF@aaaaaaaaaaaa",
+            state: "running",
+            phase: "downloading",
+            progress_bytes: 40,
+            total_bytes: 100,
+            progress_percent: 40,
+            source_url: "https://huggingface.co/org/model-GGUF",
+            destination: "<model-library>/snapshot",
+            error_code: null,
+            error_detail: null,
+            created_at: "now",
+            updated_at: "now",
+            retryable: true,
+            partial_files_present: false,
+          },
+        ],
+      },
+    });
+    render(HuggingFacePanel);
+    await fireEvent.input(screen.getByLabelText("Search Hugging Face models"), {
+      target: { value: "gemma" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Search models" }));
+    await fireEvent.click(await screen.findByText("org/model-GGUF"));
+    await fireEvent.click(await screen.findByText("Q4_K_M"));
+    await fireEvent.click(await screen.findByRole("button", { name: "Confirm download" }));
+
+    expect(await screen.findByText(/Download queued/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cancel download" })).toBeTruthy();
+  });
 });

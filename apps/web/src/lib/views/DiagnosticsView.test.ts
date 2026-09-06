@@ -149,4 +149,53 @@ describe("DiagnosticsView", () => {
     );
     expect(await screen.findByText(/12 rows indexed/i)).toBeInTheDocument();
   });
+  it("names a background pass that keeps failing, and how long since it worked", async () => {
+    // GCR-38 — the host tick's four passes were each `with suppress(Exception)`.
+    // A pass could throw every fifteen seconds for days and this page reported a
+    // healthy runtime, because nothing counted the failure and no surface showed
+    // it. The streak and the exception class are the two facts that separate a
+    // blip from a systemic fault.
+    stubFetch({
+      "GET /api/diagnostics": {
+        ...DIAGNOSTICS,
+        background_workers: [
+          {
+            pass_name: "telemetry_delivery",
+            last_success_at: null,
+            last_failure_at: "2026-07-18T01:00:00Z",
+            last_error_class: "ProviderConnectionError",
+            consecutive_failures: 240,
+            total_failures: 240,
+            healthy: false,
+            updated_at: "2026-07-18T01:00:00Z",
+          },
+          {
+            pass_name: "scheduled_tasks",
+            last_success_at: "2026-07-18T01:00:00Z",
+            last_failure_at: null,
+            last_error_class: null,
+            consecutive_failures: 0,
+            total_failures: 0,
+            healthy: true,
+            updated_at: "2026-07-18T01:00:00Z",
+          },
+        ],
+      },
+      "GET /api/security/health": [],
+    });
+    render(DiagnosticsView);
+
+    expect(await screen.findByText("Background passes")).toBeInTheDocument();
+    expect(screen.getByText("240 in a row")).toBeInTheDocument();
+    expect(screen.getByText("ProviderConnectionError")).toBeInTheDocument();
+    expect(screen.getByText(/never succeeded/i)).toBeInTheDocument();
+    expect(screen.getByText(/telemetry delivery/i)).toBeInTheDocument();
+  });
+
+  it("says plainly when no background pass has run yet", async () => {
+    stubFetch({ "GET /api/diagnostics": DIAGNOSTICS, "GET /api/security/health": [] });
+    render(DiagnosticsView);
+    expect(await screen.findByText("Background passes")).toBeInTheDocument();
+    expect(screen.getByText(/no pass has run yet on this host/i)).toBeInTheDocument();
+  });
 });

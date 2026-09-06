@@ -82,6 +82,7 @@ export const DIAGNOSTICS: Diagnostics = {
   readiness: {},
   missing_config: [],
   provider_health: [],
+  background_workers: [],
   scope_note: "Status reflects the local single-user runtime only.",
 };
 

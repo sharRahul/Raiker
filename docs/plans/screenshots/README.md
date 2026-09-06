@@ -90,6 +90,7 @@ forty-seven, not a missing capture.
 
 | Prefix | Round | Provider |
 |---|---|---|
+| `gcr-19-`, `gcr-38-`, `gcr-round-` | **2026-09-05 (second)**, the third-pass review's P0 proved on a library that had something to lose: a failed conversion's cleanup naming its own files and leaving the model beside them intact, Retry refused on an unfinished job, and the host's background passes reported on Observability | Anthropic, a fifth identity-linked key entered through the interface |
 | `bug-276-`, `bug-277-`, `bug-278-`, refreshed `pages/` | **2026-09-04 (third)**, a telemetry destination on an owner-chosen cadence, a valid key answered with a repair instead of "check your network", and connector conditions readable in greyscale | Anthropic, a third identity-linked key entered through the interface |
 | `bug-274-`, refreshed `pages/` | **2026-09-04**, a key Raiker previously had no way to use, the field that makes it usable reached from where the refusal is read, and every route measured at 390/768/1024/1440 in both themes | Anthropic, an identity-linked key entered through the interface |
 | `bug-256-`, refreshed `pages/` | **2026-09-03**, dictation transcribed by a runtime on this machine, the Voice section that chooses it, and a full responsive catalogue at 390/1920/3840/7680 in both themes | Anthropic, key entered through the interface; the transcription runtime is a loopback stand-in |

@@ -3823,3 +3823,32 @@ CREATE INDEX IF NOT EXISTS idx_image_generations_created
 CREATE INDEX IF NOT EXISTS idx_image_generations_owner
   ON image_generations (owner_principal_id, created_at DESC);
 """
+
+
+# ── Background worker health (GCR-38) ────────────────────────────────────────
+#
+# The host tick runs four passes every fifteen seconds and each was wrapped in
+# `with suppress(Exception)`. Isolating the passes from one another is right —
+# a telemetry collector that is down must not stop due tasks from starting —
+# but suppressing without recording meant a pass could fail every fifteen
+# seconds for days while the product reported a healthy host. Nothing counted
+# it, nothing logged it, and no surface could show it.
+#
+# One row per pass. `consecutive_failures` is the number that says "this is not
+# a blip", `last_error_class` is the exception type only — never its message,
+# which can carry provider text — and both timestamps are what let a reader
+# tell a pass that has never succeeded from one that stopped succeeding an hour
+# ago.
+BACKGROUND_WORKER_HEALTH_MIGRATION_ID = "RAIKER-2065-background-worker-health"
+
+BACKGROUND_WORKER_HEALTH_SQL = """
+CREATE TABLE IF NOT EXISTS background_worker_health (
+  pass_name TEXT PRIMARY KEY,
+  last_success_at TEXT,
+  last_failure_at TEXT,
+  last_error_class TEXT,
+  consecutive_failures INTEGER NOT NULL DEFAULT 0,
+  total_failures INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+);
+"""

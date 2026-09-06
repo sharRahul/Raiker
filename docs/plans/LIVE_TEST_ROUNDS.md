@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-05 (second) | Targeted | `gcr-19-`, `gcr-38-`, `gcr-round-` | Anthropic, a fifth **identity-linked** key entered through the interface | The third-pass review's P0 proved on a real library — a failed conversion's cleanup naming its own files and leaving the model beside them intact — plus Retry refused on an unfinished job, the host's background passes reported on Observability, and one label the redactor had been eating |
 | 2026-09-05 | Targeted + derived four-width sweep + full page sweep | `pages/` | Anthropic, a fourth **identity-linked** key — blocked in two requests rather than a round | A stop switch that shouts on every page, a Hub failure nobody was told about, two kinds of deep link that opened the wrong page, and the nine guards that were supposed to catch them |
 | 2026-09-04 (fourth) | Targeted + measured four-width sweep | `pages/` | — (no model needed) | Two tabs folded out of the nav, 244 words moved to the guide, and three mobile bleeds the width sweep found only because the workspace had been worked in |
 | 2026-09-04 (third) | Targeted + measured four-width sweep + full page sweep | `bug-276-`, `bug-277-`, `bug-278-`, `pages/` | Anthropic, a third **identity-linked** key entered through the interface | A telemetry cadence that runs without a button, and three defects the round found in the product by using it: a valid key answered with "check your network", twenty-six connectors that said they were installed, and a "next run" printed as a full timestamp |
@@ -65,6 +66,80 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-09-05 (second) — The P0, proved against a library that had something to lose
+
+**Tier: Targeted. Build: production `npm run build`. Providers: Anthropic, a
+fifth identity-linked key, entered through the Connect dialog. Owner: the shared
+`OWNER_CREDENTIALS`. Workspace: a fresh `/tmp/raiker-live`. Screenshots:
+`gcr-19-cleanup-names-its-own-artifacts.png`,
+`gcr-38-background-passes.png`, `gcr-round-anthropic-connection.png`. Spec:
+`apps/web/e2e/gcr-third-pass-round-live.spec.ts`, four scenarios, all passing.**
+
+**What it was for.** Ten findings of the
+[third-pass static review](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md)
+closed in one change, and three of them have a surface an owner touches. A
+static finding is not evidence that the product behaves; this round is.
+
+**The provider leg, again, in two steps.** The key supplied for this round is
+identity-linked like the four before it. Connected from **Models → Hosted →
+Anthropic → Connect**: the card read *"Connection saved"* and the setup meter
+moved to *1 of 14 connected*. **Test** answered with the provider's own refusal
+in words, with no `http_400` anywhere on the card —
+[FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network)
+holding on a fifth key it was not written against.
+[BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)
+is blocked for a fifth time on the same missing workspace id, and the round said
+so and proved the things that do not need a turn.
+
+**The P0, on a library with something to lose.** A model folder was approved
+through **Models → Local library → Add and scan**, holding
+`converted/gemma-2b.Q4_K_M.gguf` — an earlier conversion that had worked. A
+second conversion into the same folder was started and failed (this host has no
+container runtime, which is one of the ways it fails), and the half-written
+intermediate was left where a failed conversion leaves one.
+
+**Models → Activity** then showed the job `failed`, offering **Retry**, **Delete
+partial files** and **Clear record**. The confirmation read:
+
+> **Delete the files this job left behind?**
+> 1 file, 17 B. Only what this job created is removed — nothing else in your
+> model library. This cannot be undone.
+> * `/tmp/raiker-live-models/converted/snapshot-dddddddddddd.bf16.gguf`
+
+One path — the operation's own artifact. Not the folder, which is what the same
+dialog named before
+[FIXED-420](FIXED_ITEMS.md#fixed-420--a-failed-conversions-cleanup-could-delete-every-model-beside-it),
+and not the model beside it. Confirmed: the intermediate is gone, the folder is
+still there, and `gemma-2b.Q4_K_M.gguf` is byte-for-byte what it was.
+
+**Retry, refused where it should be.** A queued operation answered a retry with
+`422 operation_not_retryable_from_state` —
+[FIXED-422](FIXED_ITEMS.md#fixed-422--retry-checked-the-kind-and-the-payload-and-never-the-state).
+The panel offers the control only on a terminal job, and the route refuses it
+even when something else asks.
+
+**The background passes, on Observability.** **Overview → Is the runtime itself
+healthy?** carries the new card, and after one tick it listed all four passes —
+*Approved continuations*, *Model capacity refresh*, *Scheduled tasks*,
+*Telemetry delivery* — each `ok`, each *succeeded just now*
+([FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence)).
+
+**What the round found, by looking at its own evidence.**
+
+* **[FIXED-428](FIXED_ITEMS.md#fixed-428--every-conversion-in-activity-was-called-snapshotredacted_secret)** —
+  the conversion in the first screenshot was labelled
+  `snapshot@[REDACTED_SECRET]`. A forty-character Hub revision behind a snapshot
+  name is forty-nine URL-safe characters in one run, which is what the API
+  redactor's entropy fallback is for. Same shape as
+  [FIXED-361](FIXED_ITEMS.md#fixed-361--the-folder-picker-handed-back-redacted_secret-instead-of-a-path).
+  The row carries the short revision now, as the download row beside it already
+  did.
+* **[FIXED-429](FIXED_ITEMS.md#fixed-429--a-shared-live-helper-spent-a-whole-spec-timeout-on-a-button-nobody-needed)** —
+  running the spec a second time against the same workspace took the *Reconnect*
+  route, and the shared helper spent its whole four-minute timeout clicking a
+  Details close button behind the sign-in overlay. The product had stopped
+  leaving that modal open; the helper kept the workaround.
 
 ## 2026-09-05 — Six things the product was quietly wrong about, and the guards that should have found them
 

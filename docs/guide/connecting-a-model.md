@@ -91,7 +91,10 @@ for offers no button rather than one that cannot work.
   you have somewhere to start without knowing a repository id; search the Hub
   for anything else. Raiker shows immutable revision, files, size, format,
   licence and gated status; GGUF variants are preferred. Confirming a download
-  writes a collision-safe snapshot beneath an approved library. Gated
+  writes a collision-safe snapshot beneath an approved library. It runs as a
+  durable background job, so a multi-gigabyte pull keeps going if you navigate
+  away — the panel shows its progress and a **Cancel download**, and **Models →
+  Activity** is the same job under a different heading. Gated
   repositories require your own Hub token and accepted upstream terms. On a
   machine with no route to `huggingface.co` the tab says so where the results
   would be, with a **Try again** — rather than showing an empty list you would
@@ -101,6 +104,30 @@ for offers no button rather than one that cannot work.
   runs in a digest-pinned llama.cpp container with no network, a read-only
   source, a separate writable output, and resource limits. Pick GGUF when one
   exists.
+
+### Downloads, conversions and other long jobs
+
+**Models → Activity** is where every durable model job lives: downloads,
+conversions, runtime installs, Ollama pulls, and local deployments. They survive
+navigation and an interrupted app session, and none of them is ever silently
+retried.
+
+- **Cancel** asks a running job to stop at its next safe point. A job that had
+  not started yet stops immediately. Once you have asked, nothing the worker
+  does afterwards can put the job back to *running* or report it *complete* —
+  your decision is the one that stands.
+- **Retry** appears on a job that **failed or was cancelled**, and only when
+  Raiker recorded enough to reconstruct it. It re-runs the same job from the
+  parameters saved when it started, re-reading any credential from the vault
+  rather than remembering it. A job that is still running is not offered a
+  retry, and pressing Retry twice starts one worker, not two.
+- **Delete partial files** removes what that job left on disk, and nothing else.
+  It names every exact path and the total size before you confirm — a
+  conversion writes into the model-library folder *you* chose, which holds the
+  models earlier conversions succeeded at, so the folder itself is never
+  offered as something to delete. The button appears only when Raiker recorded
+  which files the job created.
+- **Clear record** removes the row and never touches a byte on disk.
 
 ---
 

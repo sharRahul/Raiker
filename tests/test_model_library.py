@@ -77,3 +77,52 @@ def test_scan_detects_complete_mlx_directory_without_loading_model_code(tmp_path
     assert models[0].architecture == "qwen2"
     assert models[0].quantization == "4-bit"
     assert models[0].to_dict()["format"] == "mlx"
+
+
+def test_shards_with_the_same_name_in_two_folders_are_two_models(tmp_path: Path) -> None:
+    """GCR-27 — the group key was a base name, and `model` is the commonest one.
+
+    A split GGUF is named `model-00001-of-00002.gguf` by every tool that writes
+    one, so two unrelated models one folder apart were grouped into a single
+    entry: one model's metadata over the other's files, with a shard count, a
+    size and a primary path that belonged to neither.
+    """
+    root = tmp_path / "models"
+    (root / "mistral").mkdir(parents=True)
+    (root / "qwen").mkdir(parents=True)
+    _gguf(root / "mistral" / "model-00001-of-00002.gguf", "Mistral")
+    _gguf(root / "mistral" / "model-00002-of-00002.gguf", "Mistral")
+    _gguf(root / "qwen" / "model-00001-of-00002.gguf", "Qwen")
+    _gguf(root / "qwen" / "model-00002-of-00002.gguf", "Qwen")
+    service = ModelLibraryService(SQLiteStore(tmp_path / "db"))
+    service.add_root("owner", root)
+
+    models = service.rescan("owner")
+
+    assert sorted(model.name for model in models) == ["Mistral", "Qwen"]
+    for model in models:
+        assert model.shard_count == 2
+        assert model.expected_shards == 2
+        assert model.complete is True
+        assert model.name.lower() in model.primary_path.lower()
+
+
+def test_two_shard_sets_declaring_different_totals_stay_separate(tmp_path: Path) -> None:
+    """A directory holding `-of-00002` and `-of-00003` holds two incomplete sets.
+
+    The total was taken from the first shard and never checked against the
+    others, so mixed declarations were added up into one set that could look
+    complete.
+    """
+    root = tmp_path / "models"
+    root.mkdir()
+    _gguf(root / "mix-00001-of-00002.gguf", "Two")
+    _gguf(root / "mix-00001-of-00003.gguf", "Three")
+    service = ModelLibraryService(SQLiteStore(tmp_path / "db"))
+    service.add_root("owner", root)
+
+    models = service.rescan("owner")
+
+    assert len(models) == 2
+    assert all(model.complete is False for model in models)
+    assert sorted(model.expected_shards for model in models) == [2, 3]

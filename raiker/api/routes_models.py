@@ -27,7 +27,11 @@ from raiker.api.schemas import (
 )
 from raiker.api.sessions import ApiSession
 from raiker.models import local_presence
-from raiker.models.conversion import ConversionRefused, ModelConversionService
+from raiker.models.conversion import (
+    ConversionRefused,
+    ModelConversionService,
+    conversion_artifacts,
+)
 from raiker.models.huggingface import HfVariant, HuggingFaceAccessError, HuggingFaceService
 from raiker.models.library import ModelLibraryService
 from raiker.models.local_operations import (
@@ -421,10 +425,18 @@ def _run_hugging_face_download(
     token: str | None,
     service: HuggingFaceService,
 ) -> None:
-    """Re-run one Hugging Face snapshot download from its persisted payload."""
+    """Run one Hugging Face snapshot download from its persisted payload.
+
+    The only downloader: the first attempt and every retry are this worker
+    (GCR-22), so cancellation, failure and completion mean the same thing
+    whichever one the owner is watching.
+    """
     operations = ModelOperationService(SQLiteStore(workspace))
     try:
-        operations.running(owner, operation_id, phase="downloading")
+        if operations.running(owner, operation_id, phase="downloading").state != "running":
+            # Cancelled before this worker could claim it, or already settled by
+            # another. Either way it is not this worker's job any more.
+            return
         repo_id = str(payload.get("repo_id", ""))
         revision = str(payload.get("revision", ""))
         files = tuple(part for part in str(payload.get("variant", "")).split(",") if part)
@@ -497,14 +509,17 @@ def retry_model_operation(
     _require_human(principal)
     service = _operation_service(request)
     try:
-        operation = service.require(session.principal_id, operation_id)
+        service.require(session.principal_id, operation_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail={"reason_code": str(exc.args[0])}) from exc
     try:
+        # The re-queue *is* the claim (GCR-21): only one of two simultaneous
+        # presses can take a terminal operation, so only one worker is
+        # dispatched below.
         requeued = service.retry(session.principal_id, operation_id)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail={"reason_code": str(exc)}) from exc
-    _dispatch_operation(background, request, session.principal_id, operation)
+    _dispatch_operation(background, request, session.principal_id, requeued)
     return requeued.to_dict()
 
 
@@ -528,12 +543,15 @@ def delete_partial_files(
     confirmed: bool = False,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    """Delete the incomplete destination an abandoned operation left behind.
+    """Delete the incomplete files an abandoned operation left behind.
 
     Separate from **Clear record**, which stays metadata-only: removing bytes
-    from disk is its own decision, so it takes its own confirmation and names the
-    exact path and size first. The path must resolve inside one of the owner's
-    approved model-library roots — anything else is refused rather than deleted.
+    from disk is its own decision, so it takes its own confirmation and names
+    every exact path and the total size first. Only the paths the operation
+    recorded as its own are removed (GCR-19) — never the library directory it
+    wrote them into — and each must still resolve *strictly inside* one of the
+    owner's approved model-library roots. Anything else is refused rather than
+    deleted.
     """
     session, principal = auth_data
     _require_human(principal)
@@ -541,22 +559,32 @@ def delete_partial_files(
         raise HTTPException(status_code=409, detail={"reason_code": "confirmation_required"})
     service = _operation_service(request)
     try:
+        operation = service.require(session.principal_id, operation_id)
         summary = service.partial_files(session.principal_id, operation_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail={"reason_code": str(exc.args[0])}) from exc
-    path = summary.get("path")
-    if not path or not summary.get("exists"):
+    paths = [str(item) for item in summary.get("paths") or []]
+    if not paths or not summary.get("exists"):
         return {"ok": False, "reason_code": "no_partial_files", **summary}
-    target = Path(str(path)).resolve()
+    # Re-read what this operation owns rather than trusting the summary: the
+    # deletion set is the recorded one, checked again at the moment of deletion.
+    owned = {str(Path(item).resolve()) for item in operation.cleanup_targets()}
     roots = [Path(root).resolve() for root in _library_service(request).roots(session.principal_id)]
-    if not any(target == root or root in target.parents for root in roots):
-        raise HTTPException(
-            status_code=422, detail={"reason_code": "destination_not_in_model_library"}
-        )
-    if target.is_dir():
-        shutil.rmtree(target)
-    else:
-        target.unlink()
+    targets: list[Path] = []
+    for path in paths:
+        target = Path(path).resolve()
+        # `root in target.parents` and not `target == root`: an approved root is
+        # the boundary of the check, never a thing the check permits deleting.
+        if str(target) not in owned or not any(root in target.parents for root in roots):
+            raise HTTPException(
+                status_code=422, detail={"reason_code": "destination_not_in_model_library"}
+            )
+        targets.append(target)
+    for target in targets:
+        if target.is_dir():
+            shutil.rmtree(target)
+        else:
+            target.unlink(missing_ok=True)
     _library_service(request).rescan(session.principal_id)
     return {"ok": True, **summary}
 
@@ -629,7 +657,8 @@ def _run_local_deployment(
     operations = ModelOperationService(SQLiteStore(workspace))
     started_slot: str | None = None
     try:
-        operations.running(owner, operation_id, phase="starting_llama_cpp")
+        if operations.running(owner, operation_id, phase="starting_llama_cpp").state != "running":
+            return
         if operations.cancel_requested(owner, operation_id):
             operations.cancelled(owner, operation_id)
             return
@@ -756,7 +785,8 @@ def _run_mlx_deployment(
     operations = ModelOperationService(SQLiteStore(workspace))
     started_slot: str | None = None
     try:
-        operations.running(owner, operation_id, phase="starting_mlx")
+        if operations.running(owner, operation_id, phase="starting_mlx").state != "running":
+            return
         if operations.cancel_requested(owner, operation_id):
             operations.cancelled(owner, operation_id)
             return
@@ -1000,9 +1030,19 @@ def preview_hugging_face_download(
 @router.post("/api/hugging-face/download")
 def download_hugging_face_model(
     body: HuggingFaceSelectionRequest,
+    background: BackgroundTasks,
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
+    """Queue one immutable snapshot download and return its durable operation.
+
+    The download used to run inside this request: a multi-gigabyte snapshot held
+    a request worker for its whole duration, and the completion it wrote at the
+    end could not see a Cancel the owner had pressed in the meantime, so the row
+    ended `complete` against the owner's decision (GCR-22, GCR-23). Retry
+    already had a background worker that checked cancellation; there is one
+    worker now, and the first attempt is the same job as the second.
+    """
     session, principal = auth_data
     _require_human(principal)
     if not body.confirmed or not body.destination:
@@ -1031,6 +1071,24 @@ def download_hugging_face_model(
         / body.revision[30:40].lower()
     ).resolve()
     conversion_output = (library_root / "converted").resolve()
+    # Resolved before anything is queued: a selection that has changed under the
+    # owner is refused here, with its own reason, rather than becoming a failed
+    # background job they have to go and read.
+    try:
+        _resolve_hugging_face_selection(body, request, session.principal_id)
+    except (ValueError, HuggingFaceAccessError) as exc:
+        code = exc.code if isinstance(exc, HuggingFaceAccessError) else str(exc)
+        raise HTTPException(status_code=422, detail={"reason_code": code}) from exc
+    try:
+        conversion_output.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        # It used to be made after a successful download, so a library folder
+        # the owner cannot write to surfaced at the end of a multi-gigabyte
+        # pull. Made up front now, and refused in the owner's terms rather than
+        # as an unhandled 500.
+        raise HTTPException(
+            status_code=422, detail={"reason_code": "model_library_not_writable"}
+        ) from exc
     operation = _operation_service(request).start(
         session.principal_id,
         ModelOperationRequest(
@@ -1047,33 +1105,14 @@ def download_hugging_face_model(
             "destination": str(destination),
         },
     )
-    operations = _operation_service(request)
-    try:
-        variant = _resolve_hugging_face_selection(body, request, session.principal_id)
-        operations.running(session.principal_id, operation.operation_id, phase="downloading")
-        _hugging_face_service(request).download(
-            body.repo_id,
-            variant,
-            destination,
-            token=_hugging_face_token(request, session.principal_id),
-        )
-        _library_service(request).rescan(session.principal_id)
-        conversion_output.mkdir(parents=True, exist_ok=True)
-        result = operations.complete(session.principal_id, operation.operation_id).to_dict()
-        result["snapshot_path"] = str(destination)
-        result["conversion_output_path"] = str(conversion_output)
-        return result
-    except Exception as exc:
-        operations.fail(
-            session.principal_id, operation.operation_id, code="hugging_face_download_failed"
-        )
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "reason_code": "hugging_face_download_failed",
-                "operation_id": operation.operation_id,
-            },
-        ) from exc
+    _dispatch_operation(background, request, session.principal_id, operation)
+    result = operation.to_dict()
+    # Both paths are derived from the approved destination and the immutable
+    # revision, so they are known before a byte moves: the panel can offer the
+    # conversion review the moment the operation reports `complete`.
+    result["snapshot_path"] = str(destination)
+    result["conversion_output_path"] = str(conversion_output)
+    return result
 
 
 def _require_approved_conversion_paths(
@@ -1113,7 +1152,8 @@ def _run_model_conversion(
 ) -> None:
     operations = ModelOperationService(SQLiteStore(workspace))
     try:
-        operations.running(owner, operation_id, phase="converting")
+        if operations.running(owner, operation_id, phase="converting").state != "running":
+            return
         service = ModelConversionService()
         preview = service.preview(
             Path(body.source), Path(body.output), body.revision, body.quantization
@@ -1148,14 +1188,23 @@ def start_model_conversion(
     source, output = Path(body.source), Path(body.output)
     _require_approved_conversion_paths(request, session.principal_id, source, output)
     try:
-        ModelConversionService().preview(source, output, body.revision, body.quantization)
+        preview = ModelConversionService().preview(
+            source, output, body.revision, body.quantization
+        )
     except ConversionRefused as exc:
         raise HTTPException(status_code=422, detail={"reason_code": str(exc)}) from exc
     operation = _operation_service(request).start(
         session.principal_id,
         ModelOperationRequest(
             kind="convert",
-            target=f"{source.name}@{body.revision}",
+            # The short revision, as the download row beside it already uses.
+            # Found live 2026-09-05: `snapshot@<40 hex>` is 49 URL-safe
+            # characters in one run, so the API redactor's high-entropy fallback
+            # replaced the whole label with `[REDACTED_SECRET]` and every
+            # conversion of the same snapshot became indistinguishable in
+            # Activity. An immutable Hub revision is public, not a credential —
+            # and twelve characters is the convention the product already had.
+            target=f"{source.name}@{body.revision[:12]}",
             confirmed=True,
             destination=str(output),
         ),
@@ -1165,6 +1214,11 @@ def start_model_conversion(
             "revision": body.revision,
             "quantization": body.quantization,
             "destination": str(output),
+            # GCR-19 — the three files this conversion can create, recorded
+            # before it runs. `output` is the owner's shared library directory
+            # and is deliberately *not* a cleanup boundary: it holds the models
+            # earlier conversions succeeded at.
+            "artifacts": [str(path) for path in conversion_artifacts(preview)],
         },
     )
     background.add_task(
@@ -1180,7 +1234,8 @@ def start_model_conversion(
 async def _pull_ollama_model(workspace: Path, owner: str, operation_id: str, model: str) -> None:
     operations = ModelOperationService(SQLiteStore(workspace))
     try:
-        operations.running(owner, operation_id, phase="contacting_ollama")
+        if operations.running(owner, operation_id, phase="contacting_ollama").state != "running":
+            return
         timeout = httpx.Timeout(connect=10.0, read=None, write=30.0, pool=10.0)
         async with (
             httpx.AsyncClient(timeout=timeout, trust_env=False) as client,

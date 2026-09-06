@@ -66,8 +66,19 @@ Three tiles at the top give the runtime's readiness, how many capability gates
 are closed, and what configuration is missing — each linking to the page where
 you change it. Underneath, **Is the runtime itself healthy?** carries what only
 the runtime knows about itself: the health transitions its own monitors
-recorded, the memory integrity report and the one repair it offers, and any
-readiness check that actually failed, with its reason code and remediation.
+recorded, the memory integrity report and the one repair it offers, the
+background passes the host runs on its own, and any readiness check that
+actually failed, with its reason code and remediation.
+
+**Background passes** is the work the host does every fifteen seconds without
+anybody asking: starting due scheduled tasks, continuing runs you have
+approved, refreshing model capacity, and delivering telemetry on its cadence.
+Each pass is isolated from the others — a collector that is down never stops due
+work from starting — and each is now recorded rather than merely survived. A
+pass that is fine is one line. A pass that is failing says how many times in a
+row, the exception class it last raised, and when it last succeeded, so a
+systemic fault cannot run for days behind a page that says the runtime is
+healthy.
 
 There used to be a separate **Diagnostics** tab. It read the same runtime status
 this page reads and restated most of it — a tick list saying "ready" beside a

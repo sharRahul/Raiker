@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { api, ApiError } from "../../api";
   import ProviderLogo from "../../components/ProviderLogo.svelte";
   import type {
@@ -64,6 +65,9 @@
     }
   }
   void loadTrending();
+  // The follow timer is the one thing here that outlives the panel if nobody
+  // stops it, so it is stopped when the panel goes.
+  onDestroy(stopFollowing);
 
   async function search() {
     if (!query.trim()) return;
@@ -111,30 +115,110 @@
           : "Could not estimate download";
     }
   }
-  async function download() {
-    if (!selected || !destination) return;
+  // GCR-22 — the download no longer happens inside the request. A multi-gigabyte
+  // snapshot used to hold one open for its whole duration, and the completion it
+  // wrote at the end could not see a Cancel pressed in between. It is a durable
+  // background operation now, so this panel follows it: the same job Activity
+  // shows, watched here until it can offer the conversion step.
+  let downloadingOperationId = $state<string | null>(null);
+  let downloadState = $state<string | null>(null);
+  let downloadPercent = $state<number | null>(null);
+  let followTimer: number | undefined;
+
+  function stopFollowing() {
+    if (followTimer !== undefined) window.clearTimeout(followTimer);
+    followTimer = undefined;
+  }
+
+  async function follow(format: string, revision: string) {
+    const operationId = downloadingOperationId;
+    if (operationId === null) return;
+    let item;
     try {
-      const result = await api.downloadHuggingFaceModel(selected, destination);
+      item = (await api.modelOperations()).items.find(
+        (candidate) => candidate.operation_id === operationId,
+      );
+    } catch {
+      // A single failed poll is not a failed download. Ask again.
+      followTimer = window.setTimeout(() => void follow(format, revision), 3000);
+      return;
+    }
+    if (item === undefined) {
+      // The record was cleared while it was being watched: stop, and say so
+      // rather than waiting on a job that is no longer there.
+      stopFollowing();
+      downloadingOperationId = null;
+      downloadState = null;
+      return;
+    }
+    downloadState = item.state;
+    downloadPercent = item.progress_percent;
+    if (item.state === "complete") {
+      stopFollowing();
+      downloadingOperationId = null;
       notice =
-        selected.format === "safetensors"
+        format === "safetensors"
           ? "Safetensors downloaded. Review the isolated conversion below."
           : "GGUF downloaded and indexed in your local library.";
-      preview = null;
-      if (selected.format === "safetensors") {
-        conversionSource = result.snapshot_path;
-        conversionOutput = result.conversion_output_path;
-        conversionPreview = await api.previewModelConversion(
-          conversionSource,
-          conversionOutput,
-          selected.revision,
-          quantization,
-        );
+      if (format === "safetensors") {
+        try {
+          conversionPreview = await api.previewModelConversion(
+            conversionSource,
+            conversionOutput,
+            revision,
+            quantization,
+          );
+        } catch (e) {
+          error =
+            e instanceof ApiError
+              ? (e.reasonCode ?? "Conversion cannot run safely")
+              : "Conversion cannot run safely";
+        }
       }
+      return;
+    }
+    if (item.state === "failed" || item.state === "cancelled") {
+      stopFollowing();
+      downloadingOperationId = null;
+      error =
+        item.state === "cancelled"
+          ? "You cancelled this download. Nothing was added to your library."
+          : (item.error_code ?? "hugging_face_download_failed");
+      return;
+    }
+    followTimer = window.setTimeout(() => void follow(format, revision), 2000);
+  }
+
+  async function download() {
+    if (!selected || !destination) return;
+    const format = selected.format;
+    const revision = selected.revision;
+    try {
+      const result = await api.downloadHuggingFaceModel(selected, destination);
+      conversionSource = result.snapshot_path;
+      conversionOutput = result.conversion_output_path;
+      preview = null;
+      error = null;
+      notice = "Download queued. It keeps running if you leave this page.";
+      downloadingOperationId = result.operation_id;
+      downloadState = result.state;
+      downloadPercent = result.progress_percent;
+      stopFollowing();
+      void follow(format, revision);
     } catch (e) {
       error =
         e instanceof ApiError
           ? (e.reasonCode ?? "Download could not start")
           : "Download could not start";
+    }
+  }
+
+  async function cancelDownload() {
+    if (downloadingOperationId === null) return;
+    try {
+      await api.cancelModelOperation(downloadingOperationId);
+    } catch {
+      error = "That download could not be cancelled.";
     }
   }
   async function reviewConversion() {
@@ -375,6 +459,32 @@
           >Approve a model folder first →</a
         >{/if}
     </section>{/if}
+  <!--
+    GCR-22 — the download is a durable operation, so it has a state worth
+    showing while it runs, and a Cancel that reaches it. Leaving this page does
+    not stop it: Activity is the same job under a different heading.
+  -->
+  {#if downloadingOperationId !== null}
+    <section class="downloading card" aria-live="polite">
+      <div>
+        <p class="eyebrow">Downloading</p>
+        <h3>{(downloadState ?? "queued").replaceAll("_", " ")}</h3>
+        <p>
+          This keeps running if you leave the page. Follow it in
+          <a href="#/models?tab=activity">Activity</a>.
+        </p>
+      </div>
+      {#if downloadPercent !== null}<div
+          class="progress"
+          aria-label={`${downloadPercent}% complete`}
+        >
+          <span style={`width:${downloadPercent}%`}></span>
+        </div>{/if}
+      <button class="btn btn-ghost btn-sm" type="button" onclick={() => void cancelDownload()}
+        >Cancel download</button
+      >
+    </section>
+  {/if}
   {#if conversionSource}<section class="conversion-card card">
       <div>
         <p class="eyebrow">Optional conversion</p>
@@ -603,6 +713,26 @@
   }
   .notice {
     color: var(--success);
+  }
+  .downloading {
+    display: grid;
+    gap: 12px;
+    padding: 16px 18px;
+  }
+  .downloading h3 {
+    margin: 3px 0;
+    text-transform: capitalize;
+  }
+  .downloading .progress {
+    height: 5px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .downloading .progress span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
   }
   .curated-embedding {
     display: flex;

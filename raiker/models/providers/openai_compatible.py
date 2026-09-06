@@ -21,6 +21,7 @@ from raiker.models.contracts import (
     ProviderModelInfo,
 )
 from raiker.models.exceptions import (
+    ModelProviderError,
     ProviderAuthenticationError,
     ProviderConnectionError,
     ProviderModelNotFoundError,
@@ -327,14 +328,15 @@ class AsyncOpenAICompatibleProvider:
                 detail = "model_available" if any(item.id == self.model for item in models) else "model_missing"
                 return ProviderHealth(self.provider, detail == "model_available", True, detail)
             return ProviderHealth(self.provider, True, True, detail)
-        except (
-            ProviderConnectionError,
-            ProviderTimeoutError,
-            ProviderAuthenticationError,
-            ProviderRateLimitError,
-            ProviderModelNotFoundError,
-            ProviderResponseValidationError,
-        ) as exc:
+        except ModelProviderError as exc:
+            # GCR-30 — the base class, not a hand-kept list of six. The status
+            # mapper this probe runs through also raises quota exhaustion and
+            # the two workspace refusals, and none of them was named here, so a
+            # method whose whole contract is "return a ProviderHealth" raised
+            # instead and the readiness check died on a provider state it had
+            # already classified correctly. Every provider-domain failure is a
+            # health answer; anything that is not one is a bug and still
+            # escapes.
             return ProviderHealth(self.provider, False, False, type(exc).__name__)
 
     async def list_models(self) -> list[ProviderModelInfo]:

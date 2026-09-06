@@ -69,6 +69,8 @@ from raiker.storage.migrations import (
     APPROVAL_DECISION_SCOPE_SQL,
     ATTACHMENT_STORE_MIGRATION_ID,
     ATTACHMENT_STORE_SQL,
+    BACKGROUND_WORKER_HEALTH_MIGRATION_ID,
+    BACKGROUND_WORKER_HEALTH_SQL,
     BRAIN_PREFERENCES_MIGRATION_ID,
     BRAIN_PREFERENCES_SQL,
     BRAIN_SOURCE_GRANTS_MIGRATION_ID,
@@ -463,6 +465,20 @@ _CONNECTIONS_LOCK = threading.RLock()
 # transactions that both try to upgrade to writers.
 _BOOTSTRAP_LOCK = threading.RLock()
 _LOG = logging.getLogger(__name__)
+# The model-operation columns a lifecycle write may set. An allowlist, so a
+# transition can never reach the owner, the kind, the recorded payload, or the
+# creation time — the parts of the row that identify what the job *is*.
+_OPERATION_COLUMNS = frozenset(
+    {
+        "state",
+        "phase",
+        "progress_bytes",
+        "total_bytes",
+        "progress_percent",
+        "error_code",
+        "error_detail",
+    }
+)
 
 
 class StoreUnavailableError(RuntimeError):
@@ -1586,6 +1602,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 IMAGE_GENERATIONS_MIGRATION_ID,
                 IMAGE_GENERATIONS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                BACKGROUND_WORKER_HEALTH_MIGRATION_ID,
+                BACKGROUND_WORKER_HEALTH_SQL,
                 connection,
             )
             self._apply_migration(TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection)
@@ -9109,17 +9130,46 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             raise KeyError("model_operation_not_found")
         return ModelOperation(**dict(row))
 
+    def transition_model_operation(
+        self,
+        owner_principal_id: str,
+        operation_id: str,
+        *,
+        expected_states: Sequence[str],
+        **updates: Any,
+    ) -> ModelOperation | None:
+        """Move one operation, and only from a state the caller expected (GCR-20).
+
+        Every lifecycle write used to be load, replace, save, so a worker that
+        had already computed its progress row could store `running` over a
+        cancellation the owner had asked for in between and the request was
+        lost. This is the one write the lifecycle uses: an
+        ``UPDATE ... WHERE state IN (...)`` that either moves the row or reports
+        that somebody else moved it first. Returns the row as it now stands, or
+        ``None`` when the expected state no longer held.
+        """
+        fields = {key: value for key, value in updates.items() if key in _OPERATION_COLUMNS}
+        if not fields or not expected_states:
+            return None
+        fields["updated_at"] = utc_now()
+        assignments = ", ".join(f"{key} = ?" for key in fields)
+        placeholders = ", ".join("?" for _ in expected_states)
+        with self.connect() as connection:
+            cursor = connection.execute(
+                f"UPDATE model_operations SET {assignments} "  # noqa: S608 -- allowlisted column names only
+                f"WHERE owner_principal_id = ? AND operation_id = ? AND state IN ({placeholders})",
+                (*fields.values(), owner_principal_id, operation_id, *expected_states),
+            )
+            if cursor.rowcount != 1:
+                return None
+            row = connection.execute(
+                "SELECT * FROM model_operations WHERE owner_principal_id = ? AND operation_id = ?",
+                (owner_principal_id, operation_id),
+            ).fetchone()
+        return None if row is None else ModelOperation(**dict(row))
+
     def update_model_operation(self, operation_id: str, **updates: Any) -> None:
-        allowed = {
-            "state",
-            "phase",
-            "progress_bytes",
-            "total_bytes",
-            "progress_percent",
-            "error_code",
-            "error_detail",
-        }
-        fields = {key: value for key, value in updates.items() if key in allowed}
+        fields = {key: value for key, value in updates.items() if key in _OPERATION_COLUMNS}
         if not fields:
             return
         fields["updated_at"] = utc_now()
@@ -9129,6 +9179,67 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 f"UPDATE model_operations SET {assignments} WHERE operation_id = ?",  # noqa: S608 -- allowlisted column names only
                 (*fields.values(), operation_id),
             )
+
+    # ── Background worker health (GCR-38) ────────────────────────────────────
+    def record_background_pass(
+        self, pass_name: str, *, error_class: str | None = None
+    ) -> None:
+        """Record one host-tick pass, whether it succeeded or threw.
+
+        The passes stay isolated from one another — that part was right — but a
+        suppressed exception now leaves evidence. A success resets the streak;
+        a failure records only the exception's *class*, never its message, so a
+        provider that put a key fragment or a body in the text cannot reach a
+        durable row.
+        """
+        now = utc_now()
+        with self.connect() as connection:
+            if error_class is None:
+                connection.execute(
+                    """INSERT INTO background_worker_health
+                    (pass_name, last_success_at, consecutive_failures, updated_at)
+                    VALUES (?, ?, 0, ?)
+                    ON CONFLICT(pass_name) DO UPDATE SET
+                      last_success_at = excluded.last_success_at,
+                      consecutive_failures = 0,
+                      updated_at = excluded.updated_at""",
+                    (pass_name, now, now),
+                )
+                return
+            connection.execute(
+                """INSERT INTO background_worker_health
+                (pass_name, last_failure_at, last_error_class, consecutive_failures,
+                 total_failures, updated_at)
+                VALUES (?, ?, ?, 1, 1, ?)
+                ON CONFLICT(pass_name) DO UPDATE SET
+                  last_failure_at = excluded.last_failure_at,
+                  last_error_class = excluded.last_error_class,
+                  consecutive_failures = background_worker_health.consecutive_failures + 1,
+                  total_failures = background_worker_health.total_failures + 1,
+                  updated_at = excluded.updated_at""",
+                (pass_name, now, error_class[:120], now),
+            )
+
+    def list_background_worker_health(self) -> list[dict[str, Any]]:
+        """Every recorded host-tick pass, worst first."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM background_worker_health
+                ORDER BY consecutive_failures DESC, pass_name""",
+            ).fetchall()
+        return [
+            {
+                "pass_name": str(row["pass_name"]),
+                "last_success_at": row["last_success_at"],
+                "last_failure_at": row["last_failure_at"],
+                "last_error_class": row["last_error_class"],
+                "consecutive_failures": int(row["consecutive_failures"]),
+                "total_failures": int(row["total_failures"]),
+                "healthy": int(row["consecutive_failures"]) == 0,
+                "updated_at": str(row["updated_at"]),
+            }
+            for row in rows
+        ]
 
     def fail_running_model_operations(self) -> int:
         with self.connect() as connection:

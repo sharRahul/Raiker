@@ -258,7 +258,7 @@ other link in the readiness chain was.
 Evidence: `bug69-models-quota-readiness-live.png` and
 `bug69-chat-quota-readiness-live.png` — **not retained in the repository**;
 the round's committed evidence is under
-[`plans/screenshots/working/`](../plans/screenshots/working/).
+`plans/screenshots/working/`.
 
 ## Result — 2026-07-11 (Task 4: Gmail read-only connector, hosted Anthropic Haiku 4.5)
 

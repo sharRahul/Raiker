@@ -15,8 +15,17 @@ monitored, not prevention-by-restriction** — is stated at the top of
 [`TO_BE_FIXED.md`](TO_BE_FIXED.md) and in
 [`docs/architecture/SECURITY_AND_POLICY.md`](../architecture/SECURITY_AND_POLICY.md).
 
-Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
-[`screenshots/not-working/`](screenshots/not-working) (the defects as found).
+Evidence: `screenshots/working/` (verified behaviour),
+`screenshots/not-working/` (the defects as found).
+
+**Those two capture sets are no longer stored in the repository.** They were
+removed on 2026-09-06 to stop carrying roughly a hundred megabytes of binaries
+in the tree. Entries below still name the capture each observation came from,
+as a plain filename rather than a link, so the record of *what was photographed*
+survives even though the photograph does not. A filename in this document is
+therefore a reference to evidence that was taken and reviewed at the time, not a
+file you can open. The two capture sets that remain — `screenshots/pages/` and
+`screenshots/widths/` — are still in the tree and still linked.
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
@@ -7971,7 +7980,7 @@ Provider unreachable`. Anthropic, reachable in the same run, still goes
 0 console errors.
 
 Evidence:
-[`screenshots/not-working/bug198-first-run-connected-unreachable.png`](screenshots/not-working/bug198-first-run-connected-unreachable.png)
+`screenshots/not-working/bug198-first-run-connected-unreachable.png`
 (as found) and
 `screenshots/working/fixed204-first-run-model-choice-labels.png`
 (after). Specs:
@@ -8535,7 +8544,7 @@ Evidence:
 `bug-207-live-reasoning-streaming.png`, `bug-207-live-reasoning-settled.png`
 and `bug-207-live-no-reasoning.png` — **not retained in the repository**; the
 committed evidence for this round is under
-[`screenshots/working/`](screenshots/working/).
+`screenshots/working/`.
 Specs:
 [`bug-206-207-tool-rows-and-reasoning-live.spec.ts`](../../apps/web/e2e/bug-206-207-tool-rows-and-reasoning-live.spec.ts),
 [`tests/test_bug_206_207_tool_rows_and_reasoning.py`](../../tests/test_bug_206_207_tool_rows_and_reasoning.py).
@@ -8802,7 +8811,7 @@ Claude Code/Codex bar; they differ only where the surfaces genuinely differ.
 
 **Verified live** against hosted Anthropic on 2026-08-16, seven scenarios in
 `apps/web/e2e/composer-parity-and-turn-honesty-live.spec.ts`
-([`screenshots/working/`](screenshots/working) prefixed `r0816-`), plus twelve
+(`screenshots/working/` prefixed `r0816-`), plus twelve
 unit tests over the parsing rules and eight over the two composers.
 
 **User-interface outcome.** Both composers carry the commands, completion,
@@ -9979,7 +9988,7 @@ Diagnostics and approval receipts name the failed operation and reason.
 **Evidence.** `tests/test_windows_internal_paths.py`,
 `tests/test_internal_path_audit.py`, `tests/test_checkpoint_restore.py`, and the
 Approvals/Diagnostics view tests. Live desktop verification is captured in
-[`working/2026-08-21-diagnostics-1440.png`](screenshots/working/2026-08-21-diagnostics-1440.png).
+`working/2026-08-21-diagnostics-1440.png`.
 
 ---
 
@@ -9999,9 +10008,9 @@ extractor never promotes its own inference into fact.
 `tests/test_model_facing_memory_graph.py` continues to prove MEM-11/MEM-12
 retrieval consistency and query-resolved anchors. Live verification found six
 owner-scoped nodes and five relationships in Rahul's existing workspace; see
-[`working/2026-08-21-brain-1440.png`](screenshots/working/2026-08-21-brain-1440.png),
-[`working/2026-08-21-memory-375.png`](screenshots/working/2026-08-21-memory-375.png),
-and [`working/2026-08-21-memory-768.png`](screenshots/working/2026-08-21-memory-768.png).
+`working/2026-08-21-brain-1440.png`,
+`working/2026-08-21-memory-375.png`,
+and `working/2026-08-21-memory-768.png`.
 
 ---
 
@@ -10028,7 +10037,7 @@ overlays also remove their deliberately read-only Git snapshot on Windows.
 **Evidence.** `tests/test_execution_environments.py`,
 `tests/test_native_artifact_packaging.py`, and `tests/test_credential_overlay.py`;
 the repaired page has zero console errors and is captured in
-[`working/2026-08-21-runtime-1024-full.png`](screenshots/working/2026-08-21-runtime-1024-full.png).
+`working/2026-08-21-runtime-1024-full.png`.
 
 ---
 
@@ -13494,8 +13503,8 @@ rows and the project it was filed under. The address bar carries it, so the
 conversation can be linked to.
 
 **Evidence.** `apps/web/e2e/bug-242-build-restore-mem-09-live.spec.ts` against a
-live Anthropic turn: [`fixed-309-build-turn.png`](screenshots/working/fixed-309-build-turn.png),
-[`fixed-309-build-after-reload.png`](screenshots/working/fixed-309-build-after-reload.png).
+live Anthropic turn: `fixed-309-build-turn.png`,
+`fixed-309-build-after-reload.png`.
 Unit coverage in `apps/web/src/lib/sessionRoute.test.ts` and
 `apps/web/src/lib/views/BuildView.test.ts`.
 
@@ -13540,7 +13549,7 @@ that is not zero — and offers **Rescan**. When the conversation index has
 drifted, and only then, it offers **Rebuild conversation index** beside the
 finding it repairs.
 
-**Evidence.** [`fixed-310-memory-integrity-card.png`](screenshots/working/fixed-310-memory-integrity-card.png),
+**Evidence.** `fixed-310-memory-integrity-card.png`,
 captured live. `tests/test_memory_integrity.py` covers the drift and the repair;
 `tests/test_memory_controls.py` covers the route, its auth boundary and the
 round trip; `apps/web/src/lib/views/DiagnosticsView.test.ts` covers both states
@@ -13589,8 +13598,8 @@ never show a stale copy, and offering correction and forgetting at the point of
 use is not something the reviewed documentation for Cowork, ChatGPT Work, Codex,
 OpenClaw, DeepSeek Harness or Hermes establishes.
 
-**Evidence.** [`fixed-311-chat-recall-strip.png`](screenshots/working/fixed-311-chat-recall-strip.png)
-and [`fixed-311-memory-page.png`](screenshots/working/fixed-311-memory-page.png),
+**Evidence.** `fixed-311-chat-recall-strip.png`
+and `fixed-311-memory-page.png`,
 captured live against a real Anthropic turn.
 `apps/web/e2e/c17-b14-recall-and-inline-diff-live.spec.ts`,
 `apps/web/src/lib/components/RecallStrip.test.ts`, and the live round trip in
@@ -13630,7 +13639,7 @@ would not keep. That half of B14 stays open.
 the file it touches, `+n −m`, the hunk, and **Accept** / **Reject** on one screen.
 A preview that cannot be read leaves the decision intact and simply shows no diff.
 
-**Evidence.** [`fixed-312-build-inline-diff.png`](screenshots/working/fixed-312-build-inline-diff.png),
+**Evidence.** `fixed-312-build-inline-diff.png`,
 captured live from a real parked `file_write`. `apps/web/src/lib/diff.test.ts`,
 `apps/web/src/lib/components/DiffView.test.ts`, and the inline-review and
 preview-failure cases in `apps/web/src/lib/views/BuildView.test.ts`.
@@ -13664,7 +13673,7 @@ cheapest way to be certain the section a capture is named for is in it;
 `captureElement` shoots one element for evidence about a single card. All 56
 live specs that passed `fullPage: true` now go through it.
 
-**Evidence.** [`fixed-310-memory-integrity-card.png`](screenshots/working/fixed-310-memory-integrity-card.png)
+**Evidence.** `fixed-310-memory-integrity-card.png`
 is 2097 px tall on a 1000 px viewport — the whole Diagnostics route, which is
 what `fullPage` was always supposed to mean.
 
@@ -13784,11 +13793,11 @@ states what would be rewritten, deleted and skipped, names a cross-principal
 escalation before the ask rather than after it, and says in words that it asks
 for a rewind rather than performing one.
 
-**Evidence.** [`b18-01-message-menu.png`](screenshots/working/b18-01-message-menu.png),
-[`b18-02-rewind-preflight.png`](screenshots/working/b18-02-rewind-preflight.png),
-[`b18-03-message-menu-mobile.png`](screenshots/working/b18-03-message-menu-mobile.png),
-[`b18-04-rewind-preflight-mobile.png`](screenshots/working/b18-04-rewind-preflight-mobile.png)
-and [`b18-05-build-rewind-preflight.png`](screenshots/working/b18-05-build-rewind-preflight.png) —
+**Evidence.** `b18-01-message-menu.png`,
+`b18-02-rewind-preflight.png`,
+`b18-03-message-menu-mobile.png`,
+`b18-04-rewind-preflight-mobile.png`
+and `b18-05-build-rewind-preflight.png` —
 Build's workspace grid is a different layout from Chat's, which is where a
 shared panel goes wrong — all captured live against Anthropic
 `claude-haiku-4-5-20251001`.
@@ -13847,9 +13856,9 @@ rather than half-built.
 that exchange marked. Checking what was said is one click, from search, from a
 checkpoint, and from the audit record of a turn.
 
-**Evidence.** [`mem08-01-search-result.png`](screenshots/working/mem08-01-search-result.png),
-[`mem08-02-landed-on-the-exchange.png`](screenshots/working/mem08-02-landed-on-the-exchange.png)
-and [`mem08-03-checkpoint-links-to-its-turn.png`](screenshots/working/mem08-03-checkpoint-links-to-its-turn.png).
+**Evidence.** `mem08-01-search-result.png`,
+`mem08-02-landed-on-the-exchange.png`
+and `mem08-03-checkpoint-links-to-its-turn.png`.
 `apps/web/src/lib/turnAnchor.test.ts`,
 `apps/web/src/lib/views/ChatView.anchor.test.ts`,
 `apps/web/src/lib/routeState.test.ts`, `apps/web/src/lib/views/SearchChatView.test.ts`
@@ -13982,8 +13991,8 @@ what it will do. A file whose every record is already stored says so and offers
 only the deliberate second copy. Afterwards the notice states what changed —
 *“Imported 1 record; skipped 3 already stored.”*
 
-**Evidence.** [`bug-244-01-first-import-two-new.png`](screenshots/working/bug-244-01-first-import-two-new.png)
-and [`bug-244-02-re-import-already-stored.png`](screenshots/working/bug-244-02-re-import-already-stored.png),
+**Evidence.** `bug-244-01-first-import-two-new.png`
+and `bug-244-02-re-import-already-stored.png`,
 captured live against a running instance.
 `apps/web/e2e/bug-244-246-import-duplicates-and-narrow-authority-live.spec.ts`,
 the `TestImportDoesNotDuplicateWhatIsAlreadyStored` cases in
@@ -14024,7 +14033,7 @@ what the test asserts, on the declaration itself, since only `display` has it.
 **User-interface outcome.** At a phone width every capability's owner control and
 agent verdict are readable without a sideways scroll, and the words are whole.
 
-**Evidence.** [`bug-246-01-authority-at-phone-width.png`](screenshots/working/bug-246-01-authority-at-phone-width.png).
+**Evidence.** `bug-246-01-authority-at-phone-width.png`.
 `apps/web/src/lib/components/AuthorityMatrix.test.ts` and the live spec above.
 
 ---
@@ -14094,9 +14103,9 @@ highlighted, drag or key the divider to resize, and press **@** to put the open
 file's path into the composer as the same mention the completion menu writes.
 
 **Evidence.**
-[`b13-build-file-explorer.png`](screenshots/working/b13-build-file-explorer.png)
+`b13-build-file-explorer.png`
 and
-[`b13-build-file-explorer-narrow.png`](screenshots/working/b13-build-file-explorer-narrow.png),
+`b13-build-file-explorer-narrow.png`,
 captured live. `apps/web/e2e/b13-build-file-explorer-live.spec.ts`,
 `tests/test_code_repo_files_api.py`,
 `apps/web/src/lib/components/CodeExplorer.test.ts`,
@@ -14162,7 +14171,7 @@ explains that an empty table on a new install is not a refusal, and it offers
 **Turn off**. *Shell commands* still reads **Off** and still offers **Turn on**.
 
 **Evidence.**
-[`bug-239-unset-gate-honesty.png`](screenshots/working/bug-239-unset-gate-honesty.png),
+`bug-239-unset-gate-honesty.png`,
 captured live. `apps/web/e2e/bug-239-unset-gate-honesty-live.spec.ts`, the
 gate-view cases at the end of `tests/test_capability_admission.py`, and the
 "what an untouched switch means" and "delegated-authority summary" cases in
@@ -14225,7 +14234,7 @@ returned, and each one opens the conversation at that exchange with the same
 brief mark a search hit gets.
 
 **Evidence.**
-[`bug-245-cited-exchanges.png`](screenshots/working/bug-245-cited-exchanges.png),
+`bug-245-cited-exchanges.png`,
 captured live against a real Anthropic turn.
 `apps/web/e2e/bug-245-cited-exchanges-live.spec.ts`, the
 `TestCitedExchangesOpen` cases in `tests/test_turn_sources.py`, and
@@ -14333,8 +14342,8 @@ with nothing clipped, and the Knowledge Map opens with its graph centred and on
 screen at all three.
 
 **Evidence.**
-[`ui-sweep-models-phone.png`](screenshots/working/ui-sweep-models-phone.png) and
-[`ui-sweep-knowledge-map-phone.png`](screenshots/working/ui-sweep-knowledge-map-phone.png),
+`ui-sweep-models-phone.png` and
+`ui-sweep-knowledge-map-phone.png`,
 captured live. `apps/web/e2e/ui-sweep-clipping-live.spec.ts`.
 
 
@@ -15263,7 +15272,7 @@ Codex on this device and Raiker will not use it until told to.
 **Guarded.** `tests/test_api_codex_subscription.py`.
 
 **Evidence.**
-[`screenshots/working/2026-09-03-fixed-357-subscription-offered-not-adopted.png`](screenshots/working/2026-09-03-fixed-357-subscription-offered-not-adopted.png)
+`screenshots/working/2026-09-03-fixed-357-subscription-offered-not-adopted.png`
 — a genuinely fresh workspace, on a machine whose Codex client holds a ChatGPT
 Plus session.
 
@@ -15309,7 +15318,7 @@ the search is *visible* rather than merely present.
 `apps/web/src/lib/views/models/AvailableModels.test.ts`.
 
 **Evidence.**
-[`screenshots/working/2026-09-03-fixed-358-model-picker-search.png`](screenshots/working/2026-09-03-fixed-358-model-picker-search.png).
+`screenshots/working/2026-09-03-fixed-358-model-picker-search.png`.
 
 **User-interface outcome.** One control, with a search, on both the Models page
 and the first-run screen.
@@ -15536,9 +15545,9 @@ it is raised as [BUG-269](TO_BE_FIXED.md#bug-269--read-aloud-is-the-half-of-voic
 the owner sets a runtime up; **Settings → Voice** states which of the two is in
 use; and the disclosure under the button says what is actually happening to the
 audio instead of assuming the browser. Evidence:
-[`screenshots/working/bug-256-voice-settings.png`](screenshots/working/bug-256-voice-settings.png),
-[`screenshots/working/bug-256-speech-runtime-models.png`](screenshots/working/bug-256-speech-runtime-models.png),
-[`screenshots/working/bug-256-dictated-on-device.png`](screenshots/working/bug-256-dictated-on-device.png).
+`screenshots/working/bug-256-voice-settings.png`,
+`screenshots/working/bug-256-speech-runtime-models.png`,
+`screenshots/working/bug-256-dictated-on-device.png`.
 
 ---
 
@@ -15942,7 +15951,7 @@ rather than the key. The new answer was added to it in the same change.
 identity-linked, so the provider wants a workspace named with it. Use a standard
 API key from the provider's console, or one scoped to a single workspace, then
 connect again. The key you pasted is not broken — it is the wrong kind for this
-call."* Evidence: [`screenshots/working/bug-272-provider-answer-live.png`](screenshots/working/bug-272-provider-answer-live.png).
+call."* Evidence: `screenshots/working/bug-272-provider-answer-live.png`.
 
 ---
 
@@ -16090,9 +16099,9 @@ screen also stopped printing bare reason codes at them. Details reports
 *"workspace named"* — that one is set, never which one.
 
 **Live evidence**, against a real identity-linked key:
-[`screenshots/working/bug-274-workspace-answer-live.png`](screenshots/working/bug-274-workspace-answer-live.png)
+`screenshots/working/bug-274-workspace-answer-live.png`
 (the provider's refusal as a repair, on the card) and
-[`screenshots/working/bug-274-workspace-field-live.png`](screenshots/working/bug-274-workspace-field-live.png)
+`screenshots/working/bug-274-workspace-field-live.png`
 (the field it opens on). `e2e/identity-linked-key-live.spec.ts` drives both and
 skips itself when no key is supplied.
 
@@ -16427,7 +16436,7 @@ deferring, revealing and searching.
 **Proven live, 2026-09-04.** The reviewed echo template was built and connected
 through the interface on a fresh workspace: the card reads `echo · text` and
 `workspace_ping · Takes no arguments`, negotiated on revision `2026-07-28`.
-Evidence: [`screenshots/working/backlog-16-mcp-declared-arguments.png`](screenshots/working/backlog-16-mcp-declared-arguments.png).
+Evidence: `screenshots/working/backlog-16-mcp-declared-arguments.png`.
 
 **User-interface outcome.** Extensions → MCP lists one line per tool — its name
 and what it takes: `echo · text · optional: uppercase`. A tool that takes nothing
@@ -16567,7 +16576,7 @@ added through the interface and three **Deliver now** runs landed **166 records*
 The last run carried five — only what was new — and the received bodies contain
 **no summary and no path**, which is metadata-only asserted against the wire
 rather than against the encoder. Evidence:
-[`screenshots/working/backlog-18-otlp-collector.png`](screenshots/working/backlog-18-otlp-collector.png).
+`screenshots/working/backlog-18-otlp-collector.png`.
 
 **What is deliberately not built, and is now an open entry.** There is no
 background sender: a delivery happens when the owner asks for one. That is stated
@@ -16650,7 +16659,7 @@ the opt-in, the other two types still refused at parse time, a URL-less or
 `http` handlers — one destination the grant covers and one it does not. Both
 parse and both match; the tab shows the granted one as `advisory` and names the
 allowlist on the other. Evidence:
-[`screenshots/working/bug-226-http-hook-grant.png`](screenshots/working/bug-226-http-hook-grant.png).
+`screenshots/working/bug-226-http-hook-grant.png`.
 
 **User-interface outcome.** Extensions → Hooks lists an `http` handler with the
 URL it posts to — the host is the fact the owner has to act on — and, when the
@@ -16720,7 +16729,7 @@ an unfinished build child still parking.
 
 **Proven live, 2026-09-04.** On Tasks outside a project there is no *How to
 work* group at all, because Build's method is a repository it can read. Evidence:
-[`screenshots/working/backlog-23-task-surface.png`](screenshots/working/backlog-23-task-surface.png).
+`screenshots/working/backlog-23-task-surface.png`.
 
 **User-interface outcome.** The Tasks composer's chip row says *when* — Task,
 Once, Routine, Background — and a second row inside a project says *how*: **Chat**
@@ -16778,7 +16787,7 @@ UI and asserts the dialog explains itself.
 models…** now reads: *"This key is identity-linked, so it acts inside one
 workspace. Add the workspace ID to this connection — it is beside the key in the
 provider's console — then connect again. The key you pasted is fine."* Evidence:
-[`screenshots/working/anthropic-identity-linked-key.png`](screenshots/working/anthropic-identity-linked-key.png).
+`screenshots/working/anthropic-identity-linked-key.png`.
 
 ---
 
@@ -16962,7 +16971,7 @@ fallback, a paused host leaving the claim where it is, the notification
 transition rule, and the whole path end to end on the tick.
 
 **Live evidence, and it is the wire rather than the screen.**
-[`screenshots/working/bug-276-delivery-cadence.png`](screenshots/working/bug-276-delivery-cadence.png)
+`screenshots/working/bug-276-delivery-cadence.png`
 from `e2e/round-2026-09-04b-priority-live.spec.ts` shows the control; the
 measurement behind it was taken against a real OTLP/HTTP receiver on
 `127.0.0.1:4318` with the destination's next run moved into the past, and both
@@ -17130,8 +17139,8 @@ ordinary 400 is untouched, a rejected id still wins, and nothing from the body
 reaches the reason code.
 
 **Live evidence.**
-[`screenshots/working/bug-277-workspace-repair-live.png`](screenshots/working/bug-277-workspace-repair-live.png)
-and [`screenshots/working/bug-274-workspace-answer-live.png`](screenshots/working/bug-274-workspace-answer-live.png),
+`screenshots/working/bug-277-workspace-repair-live.png`
+and `screenshots/working/bug-274-workspace-answer-live.png`,
 from `e2e/round-2026-09-04b-priority-live.spec.ts` and
 `e2e/identity-linked-key-live.spec.ts` against the round's own key.
 
@@ -17174,7 +17183,7 @@ one, two components apart, which is what it should have been. The marker sits
 inside the pill so a row stays one line at every width the list is used at.
 
 **Live evidence.**
-[`screenshots/working/bug-278-connector-facts.png`](screenshots/working/bug-278-connector-facts.png),
+`screenshots/working/bug-278-connector-facts.png`,
 from `e2e/round-2026-09-04b-priority-live.spec.ts`, which asserts every pill
 starts with one of the two markers and that the words are present for a screen
 reader.
@@ -19526,7 +19535,7 @@ revocation still outranks any connection, so a gate the owner deliberately
 turned off reads **Off** whatever is connected — the one case that must never be
 softened, and it has its own test. Verified live on a workspace with Anthropic
 connected: both tiles read *On (by connection)*, in
-[`screenshots/working/models-posture-reports-the-enforced-answer.png`](screenshots/working/models-posture-reports-the-enforced-answer.png).
+`screenshots/working/models-posture-reports-the-enforced-answer.png`.
 
 ---
 

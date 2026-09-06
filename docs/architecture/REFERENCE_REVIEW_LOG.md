@@ -709,7 +709,7 @@ Status: ✅ at parity or beyond · 🟡 partial / designed · ❌ absent.
 Design contract and closure evidence:
 [`plans/FIXED_ITEMS.md`](../plans/FIXED_ITEMS.md) — FIXED entries for BUG-46, 48,
 51, 60, 64, 65 and 88. Implemented and live-verified on Windows on 2026-08-11. Evidence is under
-[`plans/screenshots/working/`](../plans/screenshots/working/); the SQLCipher host
+`plans/screenshots/working/`; the SQLCipher host
 reports the expected degraded memory-lock posture while database encryption
 and application health remain independently verified.
 
@@ -729,7 +729,7 @@ work surfaces of **Claude Cowork** and **ChatGPT**. Primary sources:
 [Hermes tools](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/features/tools.md).
 
 Re-verified live on **2026-08-15** after the native OS sandbox landed
-(screenshots prefixed `r0815-` in [`plans/screenshots/working/`](../plans/screenshots/working)).
+(screenshots prefixed `r0815-` in `plans/screenshots/working/`).
 
 Status: ✅ at parity or beyond · 🟡 partial · ❌ absent. A row is green only
 when the current product path and tests prove it; specification alone does not

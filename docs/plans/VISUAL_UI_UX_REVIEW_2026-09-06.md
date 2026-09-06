@@ -409,7 +409,7 @@ A Task thread should look related to a Chat thread rather than belonging to anot
 
 **Priority: P1/P2 — Impact: Medium/high**
 
-**Status: Partly done 2026-09-06.** The two controls added in this pass follow the rule — the approvals button and the posture chip are neutral at rest and colour only when something actually wants attention. The existing chips and status backgrounds across the operational pages are the rest of it.
+**Status: Done 2026-09-06.** The two controls added in this pass were neutral at rest already. The badge registry was not: `safe` ("low-risk, auto-allowed") and `implemented` ("real, working capability") are the *resting* state of most of the gate table, and both were green, so Permissions opened as a wall of colour reporting that nothing was wrong. Both are muted now — the symbol and the label still say it. `done` and `active` keep their colour, because finishing and being in flight are things that happen rather than states that simply are. `tone-safe` had no user left and is gone. The rubric holds a named list of the states that earn colour, so a new one has to be argued onto it.
 
 Raiker legitimately needs success/warn/deny/read-only states, but repeated coloured chips/backgrounds/borders can make the product look like monitoring software.
 

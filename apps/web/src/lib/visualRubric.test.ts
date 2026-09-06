@@ -27,6 +27,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { NAV_ITEMS, SIDEBAR_ITEM_IDS } from "./nav";
+import { BADGES } from "./badges";
 
 const VIEWS = resolve(process.cwd(), "src", "lib", "views");
 const COMPONENTS = resolve(process.cwd(), "src", "lib", "components");
@@ -130,6 +131,30 @@ describe("visual rubric", () => {
         }
       }
       expect(redefines, mark + " is redefined per view").toEqual([]);
+    }
+  });
+
+  it("spends status colour on exceptions, not on the resting state", () => {
+    // VIS-15. `safe` ("low-risk, auto-allowed") and `implemented` ("real,
+    // working capability") are the resting state of most of the gate table, and
+    // both were green — so Permissions opened as a wall of colour reporting
+    // that nothing was wrong, which is what makes a product read as monitoring
+    // software rather than as a work tool.
+    //
+    // The named list is the point: a state has to be argued onto it. `done` is
+    // on it because finishing is something that happened; `active` because work
+    // in flight is worth finding on a page.
+    const EARNS_COLOUR = new Set([
+      "needs-approval", "approval-required", "blocked", "risk-acceptance-required",
+      "metadata-only", "read-only", "active", "done", "stopped",
+    ]);
+
+    for (const [variant, meta] of Object.entries(BADGES)) {
+      if (meta.tone === "tone-muted") continue;
+      expect(
+        EARNS_COLOUR.has(variant),
+        `badge "${variant}" is coloured (${meta.tone}) but is not on the list of states that earn colour`,
+      ).toBe(true);
     }
   });
 

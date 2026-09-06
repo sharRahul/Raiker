@@ -846,12 +846,8 @@
     border-bottom: 1px dashed var(--border);
     padding-bottom: 0.3rem;
   }
+  /* `.kicker` is a shared rule; only the spacing above it is this view's. */
   .kicker {
-    font-size: var(--text-xs);
-    font-weight: 650;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-3);
     margin: var(--space-3) 0 0.4rem;
   }
   .sub {

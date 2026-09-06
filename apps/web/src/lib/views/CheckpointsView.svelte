@@ -270,7 +270,7 @@
     font-size: var(--text-2xs);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
     color: var(--text-3);
   }
   .context dd {

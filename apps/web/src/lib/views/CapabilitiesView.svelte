@@ -574,7 +574,8 @@
   .phase-fold { display:flex; align-items:center; gap:0.35rem; border:0; padding:0.15rem 0.2rem; background:transparent; color:var(--text-3); cursor:pointer; }
   .phase-fold:hover { color: var(--text-1); }
   .phase-count { font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
-  .phase-select-all { display:flex; align-items:center; gap:0.4rem; font-size:var(--text-xs); font-weight:650; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); cursor:pointer; }
+  /* VIS-06 — this is a control the owner clicks, not a status chip. */
+  .phase-select-all { display:flex; align-items:center; gap:0.4rem; font-size:var(--text-xs); font-weight:650; color:var(--text-3); cursor:pointer; }
   .phase-select-all input { accent-color: var(--accent); }
   .cap-check { accent-color: var(--accent); flex:0 0 auto; }
   .bulk-bar { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; padding:0.55rem 0.9rem; border:1px solid var(--accent-border); border-radius:var(--r-md); background:var(--accent-soft); margin-bottom:var(--space-4); }

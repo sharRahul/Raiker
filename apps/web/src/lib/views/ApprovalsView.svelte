@@ -816,10 +816,11 @@
     padding: 0.6rem 0.75rem;
     margin: 0.5rem 0;
   }
+  /* VIS-06 — the owner reads this to answer the question under it, which
+     makes it functional text rather than a status marker. */
   .question legend {
     font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-weight: 650;
     opacity: 0.7;
   }
   .question-text {

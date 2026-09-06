@@ -2385,14 +2385,6 @@
     font-size: var(--text-sm);
     margin: 0;
   }
-  .eyebrow {
-    color: var(--accent);
-    font-size: var(--text-2xs);
-    font-weight: 750;
-    letter-spacing: 0.08em;
-    margin: 0 0 0.25rem;
-    text-transform: uppercase;
-  }
   .setup-meter {
     min-width: 9rem;
     text-align: right;

@@ -161,7 +161,7 @@ Operational screens can retain richer headers.
 
 **Priority: P2 — Impact: Medium**
 
-**Status: Partly done 2026-09-06.** The `.head-row` consolidation under VIS-23 removed one whole class of per-view divergence. The five-archetype catalogue itself is not written down yet.
+**Status: Done 2026-09-06.** The five surfaces are written down in `VISUAL_DESIGN_SPEC.md` → "The five surfaces", with the two rules that follow from them: a container has to earn its border, and a shared label mark is declared once. `.head-row` was the first per-view divergence removed; `.eyebrow` was the second, and it had fragmented into six private copies at four weights and five trackings. `visualRubric.test.ts` holds both.
 
 The design system is mature, but cards/panels/sunken/raised/operational surfaces can make different subsystems feel visually distinct simply because they are implemented differently.
 
@@ -202,7 +202,7 @@ A premium interface generally has fewer visible containers.
 
 **Priority: P1 — Impact: High**
 
-**Status: Partly done 2026-09-06.** Table headings, navigation group labels and the wordmark are sentence-cased or de-tracked; the kicker keeps its caps at reduced tracking, which is the tiny-metadata case the finding allows. Roughly sixty component-local `text-transform: uppercase` declarations remain and are the rest of this item.
+**Status: Done 2026-09-06.** The fifty-one component-local declarations were classified rather than removed wholesale, because the finding keeps caps for tiny metadata. Sentence case now for the things it names — the Settings rail's group labels, a graph panel's own title, a day heading in the thread list, a fieldset legend, a clickable select-all — and caps kept, at one shared tracking, for the marks that really are metadata. `.kicker` and `.eyebrow` are the two, declared once each.
 
 The type scale is better than earlier iterations, but sidebar groups and control-plane labels still rely heavily on uppercase/tracking.
 

@@ -109,14 +109,13 @@
     gap: var(--space-2);
     margin-bottom: var(--space-2);
   }
+  /* Size, weight and tracking come from the shared `.eyebrow` in app.css. What
+     is local is that this one carries an icon, and that it is muted rather than
+     accent because it sits inside a panel that already has a subject. */
   .eyebrow {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    font-size: var(--text-2xs);
-    font-weight: 600;
-    letter-spacing: var(--tracking-wide);
-    text-transform: uppercase;
     color: var(--text-3);
   }
   header strong {

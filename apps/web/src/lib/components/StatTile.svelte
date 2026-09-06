@@ -61,7 +61,7 @@
     margin: 0;
     font-size: var(--text-xs);
     font-weight: 700;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--text-3);
   }

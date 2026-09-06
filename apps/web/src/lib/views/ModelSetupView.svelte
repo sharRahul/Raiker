@@ -197,7 +197,9 @@
   li > span { display: grid; place-items: center; width: 1.55rem; height: 1.55rem; border: 1px solid var(--neutral-border); border-radius: 50%; font-family: var(--font-mono); font-size: var(--text-2xs); }
   li.active { color: var(--accent); } li.active > span { background: var(--accent); border-color: var(--accent); color: white; } li.done:not(.active) { color: var(--text-2); }
   .setup-content { min-width: 0; display: grid; align-content: start; gap: var(--space-4); }
-  header { max-width: 45rem; } .eyebrow { margin: 0 0 .4rem; color: var(--accent); font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+  header { max-width: 45rem; } /* Shared `.eyebrow` sets size, weight, caps and tracking. First run keeps
+     the mono face and a little more room under it. */
+  .eyebrow { margin: 0 0 .4rem; font-family: var(--font-mono); }
   h2 { margin: 0; color: var(--text-1); font-family: var(--font-serif); font-size: clamp(1.7rem, 4vw, 2.6rem); } header p:last-child { color: var(--text-2); line-height: 1.6; }
   .choice-list { display: grid; gap: var(--space-2); } .choice-list button { display: grid; gap: .3rem; padding: var(--space-4); border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); text-align: left; }
   .choice-list button { cursor: pointer; } .choice-list button:hover { border-color: var(--accent-border); background: var(--accent-soft); } strong { color: var(--text-1); } span { font-size: var(--text-sm); line-height: 1.45; }

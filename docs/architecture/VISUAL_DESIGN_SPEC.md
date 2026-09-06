@@ -253,6 +253,31 @@ restated here so this document is complete:
 Both themes are peers. A component uses tokens only — never a raw colour — so
 neither theme can drift from the other without the other moving too.
 
+## The five surfaces
+
+VIS-04: the token system is mature, but subsystems were reading as visually
+distinct because they were *implemented* separately rather than because they
+differ. There are five surfaces and no sixth. Anything that feels like it needs
+a new one is almost always one of these with a different name.
+
+| # | Surface | What it is | Built from |
+|---|---|---|---|
+| 1 | **Page ground** | The room the work sits in. Never bordered, never raised. | `--bg`, `ResponsivePage` |
+| 2 | **Primary work surface** | The one thing this route is for — a transcript, a graph, a repository tree. Fills the room; owns its own scrolling. | `--surface`, the route's own layout |
+| 3 | **Secondary panel** | Something *about* the work surface, beside or over it — an inspector, a side rail, a popover. Raised, dismissible or collapsible. | `--raised`, `--r-lg`, `--shadow-2` |
+| 4 | **Entity card or row** | One object the owner can act on: a project, a task, a model, an approval. A card when it stands alone, a row when it repeats — repeated entities are a list or a table, never a wall of cards (VIS-05). | `.card`, `.table`, `--r-md` |
+| 5 | **Transient overlay** | A dialog, a drawer, the command palette. Modal, focus-trapped, escapable. | `--overlay`, `modalDrawer.ts` |
+
+Two rules follow from the table rather than being separate opinions:
+
+- **A container has to earn its border.** If a group of things is not one of the
+  five, it is whitespace and a heading, not a card.
+- **A label mark is declared once.** `.kicker` (muted) and `.eyebrow` (accent)
+  are the two tiny-metadata marks; a view may adjust their spacing or colour and
+  may not restate their type. `visualRubric.test.ts` holds this, because
+  `.eyebrow` had already fragmented into six private copies at four weights and
+  five trackings without anyone disagreeing on purpose.
+
 ## How this is enforced
 
 | Rule | Enforced by |
@@ -265,7 +290,7 @@ neither theme can drift from the other without the other moving too.
 | Primitives are token-only (no hex, no `rgb()`) | `apps/web/src/lib/appCss.test.ts` |
 | Every page renders in both themes at four widths | `apps/web/e2e/all-pages-theme-live.spec.ts`, `apps/web/e2e/visual-refresh-live.spec.ts` |
 | Contrast and focus order | `apps/web/src/a11y.test.ts`, the live axe scans |
-| The rail stays short, every route stays reachable, the header contract is declared once, every empty state offers a way out | `apps/web/src/lib/visualRubric.test.ts` |
+| The rail stays short, every route stays reachable, the header contract is declared once, every empty state offers a way out, the shared label marks are not restated per view | `apps/web/src/lib/visualRubric.test.ts` |
 
 ## The visual rubric
 

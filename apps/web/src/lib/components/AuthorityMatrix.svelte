@@ -92,7 +92,6 @@
 <style>
   .authority-matrix { margin:var(--space-4) 0; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); overflow:hidden; }
   .matrix-intro { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); padding:var(--space-4); border-bottom:1px solid var(--border); background:linear-gradient(100deg, var(--surface), var(--accent-soft)); }
-  .eyebrow { margin:0 0 .18rem; color:var(--accent); font-size:var(--text-2xs); font-weight:750; letter-spacing:.12em; text-transform:uppercase; }
   h2 { margin:0; font-size:var(--text-md); font-weight:650; }
   .delegation-rail { display:flex; align-items:center; gap:.42rem; color:var(--text-2); font-size:var(--text-2xs); white-space:nowrap; }
   .delegation-rail i { width:2.4rem; height:1px; background:var(--accent); position:relative; }

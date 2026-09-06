@@ -288,12 +288,14 @@
   .day-group {
     margin-top: var(--space-5);
   }
+  /* VIS-06 — a day heading in a list of threads is a section label. Size and
+     colour separate it from the rows; caps and wide tracking were a third and
+     fourth device for the same job. */
   h3 {
     margin: 0 0 var(--space-2);
     color: var(--text-3);
     font-size: var(--text-xs);
-    letter-spacing: var(--tracking-wide);
-    text-transform: uppercase;
+    font-weight: 650;
   }
   ul {
     list-style: none;

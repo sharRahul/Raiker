@@ -103,6 +103,36 @@ describe("visual rubric", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("declares each shared label mark once, not once per view", () => {
+    // VIS-04/VIS-06. `.eyebrow` had six private definitions at four weights
+    // (600, 750, 750, 800) and five trackings (wide, 0.08, 0.09, 0.12, 0.13em),
+    // and `.kicker` had a private copy of the shared rule beside it. None of
+    // them disagreed on purpose - they were written separately, which is all
+    // it takes for a design system to stop being one.
+    //
+    // A local rule that only adjusts spacing or colour is fine. One that sets
+    // the *type* again is a second opinion about what the mark is.
+    const TYPE_PROPERTIES = ["font-size", "font-weight", "text-transform"];
+
+    for (const mark of [".eyebrow", ".kicker"]) {
+      expect(stylesheet.includes(mark + " {"), mark + " is not defined in app.css").toBe(true);
+
+      const redefines: string[] = [];
+      for (const { name, text } of [...sources(VIEWS), ...sources(COMPONENTS)]) {
+        let from = text.indexOf(mark + " {");
+        while (from !== -1) {
+          const body = text.slice(from, text.indexOf("}", from));
+          if (TYPE_PROPERTIES.some((property) => body.includes(property))) {
+            redefines.push(name);
+            break;
+          }
+          from = text.indexOf(mark + " {", from + 1);
+        }
+      }
+      expect(redefines, mark + " is redefined per view").toEqual([]);
+    }
+  });
+
   it("does not send the owner to a file the product no longer reads", () => {
     // FIXED-436 removed working-directory config resolution, which turned the
     // Models empty state into an instruction to edit a file that has no effect.

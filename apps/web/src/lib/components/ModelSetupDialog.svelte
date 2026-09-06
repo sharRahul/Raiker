@@ -152,7 +152,6 @@
   dialog { width: min(31rem, calc(100vw - 2rem)); padding: 0; border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); box-shadow: var(--shadow-2); }
   dialog::backdrop { background: var(--overlay); backdrop-filter: blur(3px); }
   .dialog-card { padding: 1.2rem; }
-  .eyebrow { color: var(--accent); font-size: var(--text-2xs); font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
   h2 { margin: .3rem 0 .6rem; color: var(--text-1); font-size: var(--text-xl); }
   p { margin: .35rem 0; font-size: var(--text-sm); line-height: 1.5; }
   .summary { color: var(--text-1); font-weight: 700; }

@@ -664,7 +664,8 @@
      themes, and all three override blocks are gone. */
   .knowledge-shell { height:calc(100vh - 58px); min-height:650px; display:grid; grid-template-rows:64px 1fr; background:var(--bg); color:var(--text-1); }
   .graph-toolbar { display:flex; gap:10px; align-items:center; padding:0 18px; border-bottom:1px solid var(--border); background:color-mix(in srgb, var(--surface) 96%, transparent); box-shadow:var(--shadow-1); z-index:20; }
-  .title-block { min-width:190px; margin-right:auto; } .title-block h2 { overflow-wrap:anywhere; } .title-block h2 { margin:1px 0 0; color:var(--text-1); font-size:var(--text-base); letter-spacing:-.01em; } .eyebrow { color:var(--text-2); font-size:var(--text-2xs); letter-spacing:.13em; text-transform:uppercase; }
+  .title-block { min-width:190px; margin-right:auto; } .title-block h2 { overflow-wrap:anywhere; } .title-block h2 { margin:1px 0 0; color:var(--text-1); font-size:var(--text-base); letter-spacing:-.01em; } /* Shared `.eyebrow` sets the type; muted here because the graph toolbar
+     already carries the accent. */ .eyebrow { color:var(--text-2); }
   .search { flex:0 1 min(380px, 42vw); display:flex; align-items:center; gap:8px; height:36px; padding:0 11px; border:1px solid var(--border-strong); border-radius:7px; background:var(--surface); color:var(--text-2); } .search:focus-within { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); } .search input { width:100%; border:0; outline:0; background:transparent; color:var(--text-1); font:inherit; font-size:var(--text-sm); }
   .icon-button { border:0; color:var(--text-2); background:transparent; cursor:pointer; }
   .icon-button { display:grid; place-items:center; width:34px; height:34px; border:1px solid var(--border-strong); border-radius:7px; font-size:var(--text-xl); } .icon-button:hover { color:var(--accent-strong); border-color:var(--accent-border); background:var(--accent-soft); }
@@ -695,7 +696,10 @@
     .depth-control input { width:auto; flex:1; }
   }
   .settings-panel,.inspector { position:absolute; z-index:10; top:14px; right:14px; bottom:58px; width:300px; overflow:auto; border:1px solid var(--border-strong); border-radius:11px; background:color-mix(in srgb, var(--surface) 96%, transparent); backdrop-filter:blur(18px); box-shadow:var(--shadow-2); cursor:default; }
-  .panel-title { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:center; padding:15px 16px 12px; border-bottom:1px solid var(--border); background:var(--raised); text-transform:uppercase; letter-spacing:.1em; font-size:var(--text-2xs); } .panel-title small { display:block; margin-top:4px; color:var(--text-3); text-transform:none; letter-spacing:0; } .panel-title button,.close { border:0; background:transparent; color:var(--text-2); cursor:pointer; font-size:var(--text-xl); }
+  /* VIS-06 — "Graph settings" is the heading of the panel it sits on, not a
+     status marker. At 2xs in caps with .1em tracking it was the smallest and
+     hardest-to-read text in a panel it is supposed to title. */
+  .panel-title { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:center; padding:15px 16px 12px; border-bottom:1px solid var(--border); background:var(--raised); font-size:var(--text-sm); font-weight:650; } .panel-title small { display:block; margin-top:4px; color:var(--text-3); text-transform:none; letter-spacing:0; } .panel-title button,.close { border:0; background:transparent; color:var(--text-2); cursor:pointer; font-size:var(--text-xl); }
   details { border-bottom:1px solid var(--border); padding:12px 16px; } summary { color:var(--text-1); cursor:pointer; font-size:var(--text-xs); font-weight:650; letter-spacing:.04em; } details > :not(summary) { margin-top:10px; }
   .group-form input { min-width:0; width:100%; border:0; outline:0; background:transparent; color:var(--text-1); font:inherit; font-size:var(--text-2xs); }
   .check-row,.range-row { display:flex; align-items:center; justify-content:space-between; gap:10px; color:var(--text-2); font-size:var(--text-2xs); margin:8px 0 0 !important; } .check-row { justify-content:flex-start; } input[type="checkbox"],input[type="radio"] { accent-color:var(--accent); } .range-row input { width:120px; accent-color:var(--accent); }

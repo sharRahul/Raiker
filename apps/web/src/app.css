@@ -1090,6 +1090,22 @@ code,
   margin: 0 0 var(--space-1);
 }
 
+/* The same mark in the accent colour, for a kicker that is naming *what this
+   card is* rather than labelling a field.
+
+   Four views each carried a private `.eyebrow` meaning exactly this, at four
+   different weights (600, 750, 750, 800) and four different trackings (wide,
+   0.08, 0.09, 0.12em). None of them disagreed on purpose; they were written
+   separately, which is all it takes (VIS-04, VIS-06). */
+.eyebrow {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  margin: 0 0 var(--space-1);
+}
+
 /* VIS-23/VIS-04 — one page-header contract, defined once.
    ┌──────────────────────────────────────────────┐
    │ Title / lead                  Primary action │

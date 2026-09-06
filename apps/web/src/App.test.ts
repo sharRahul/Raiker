@@ -69,24 +69,30 @@ describe("App shell", () => {
     // Grouped nav with every governed surface reachable.
     const nav = screen.getByRole("navigation", { name: /all navigation/i });
     expect(nav).toBeInTheDocument();
-    for (const label of [
-      "Workbench",
-      "Chat",
-      "Threads",
-      "Approvals",
-      "Tasks",
-    ]) {
+    for (const label of ["Home", "Chat", "Threads", "Tasks", "Projects"]) {
       expect(within(nav).getByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument();
     }
     // Manage, Observe and Support left the rail for the gear's window. They are
     // still routes — `nav.ts` still holds them — but the sidebar no longer
     // carries a standing row for work that happens on a handful of days.
-    for (const label of ["Permissions", "Models", "Extensions", "Observability", "Settings"]) {
+    //
+    // VIS-01 — and neither do Approvals, Design and Messaging. Nine peers in
+    // one group asked the owner to learn nine product nouns before starting.
+    // Approvals is a counted button in the top bar, which is *more* available
+    // than a sidebar row; the other two are reached from the gear or the
+    // palette, and every one of them is still a live route.
+    for (const label of [
+      "Permissions", "Models", "Extensions", "Observability", "Settings",
+      "Approvals", "Design", "Messaging",
+    ]) {
       expect(within(nav).queryByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeNull();
     }
     await fireEvent.click(screen.getByRole("button", { name: "Settings and pages" }));
     const pages = await screen.findByRole("dialog", { name: /settings & pages/i });
-    for (const label of ["Permissions", "Models", "Extensions", "Observability"]) {
+    for (const label of [
+      "Permissions", "Models", "Extensions", "Observability",
+      "Approvals", "Design", "Messaging",
+    ]) {
       expect(within(pages).getByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument();
     }
     // The acting principal and mode are surfaced, honestly, from the API — the runtime

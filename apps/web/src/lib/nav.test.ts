@@ -21,9 +21,11 @@ describe("nav model", () => {
     expect(routeFromHash("#/nonsense")).toBe("home");
   });
 
-  it("uses one direct Core section plus four discoverable groups", () => {
+  it("uses one direct Work section plus four discoverable groups", () => {
     expect(NAV_GROUPS.map((g) => [g.id, g.label, g.collapsible])).toEqual([
-      ["core", "Core", false],
+      // VIS-01/VIS-06 — "Core" named the group after the architecture. "Work"
+      // names it after what is in it, in sentence case like every other label.
+      ["core", "Work", false],
       ["knowledge", "Knowledge", true],
       ["manage", "Manage", true],
       ["observe", "Observe", true],

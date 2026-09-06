@@ -193,8 +193,12 @@
   {:else if threads === null || threads.length === 0}
     <EmptyState
       title="Nothing going yet"
-      body="Start a conversation or a routine and it will show up here."
-    />
+      body="Every chat and routine you have running shows up here."
+    >
+      {#snippet action()}
+        <a class="btn btn-primary" href="#/new-chat">Start a chat</a>
+      {/snippet}
+    </EmptyState>
   {:else if visible.length === 0}
     <EmptyState title="Nothing in this view" body="Widen the filters to see your other threads." />
   {:else}

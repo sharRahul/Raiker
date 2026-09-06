@@ -1296,11 +1296,21 @@
       {#if tab === "local"}<ProvidersPanel onCatalogueChanged={refreshProviderCatalogues} />{/if}
       {#if models.profiles.length === 0}
         <div class="card">
+          <!-- VIS-12/FIXED-436 — this said "Add profiles in
+               config/model-profiles.json", which named a file Raiker no longer
+               reads from the working directory and told the owner to edit
+               something they do not have. The shipped registry is never empty,
+               so reaching this state means an override replaced it; the page
+               that names which registry loaded is the one that can answer. -->
           <EmptyState
             icon="models"
-            title="No model profiles configured"
-            body="Add profiles in config/model-profiles.json."
-          />
+            title="No model profiles are loaded"
+            body="Raiker ships with a registry of profiles, so an empty list means an override replaced it."
+          >
+            {#snippet action()}
+              <a class="btn btn-primary" href="#/observe?tab=overview">See which registry loaded</a>
+            {/snippet}
+          </EmptyState>
         </div>
       {:else}
 

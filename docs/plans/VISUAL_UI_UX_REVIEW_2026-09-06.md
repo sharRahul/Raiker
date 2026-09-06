@@ -88,6 +88,8 @@ Raiker implication:
 
 **Priority: P0/P1 — Impact: Very high**
 
+**Status: Done 2026-09-06.** The rail carries eight rows, down from eleven. Approvals is a counted button in the top bar — visible from every route, which is strictly more available than a sidebar row; Design and Messaging keep their routes and are reached from the gear's window or the palette. `SIDEBAR_ITEM_IDS` separates *what the rail draws* from the route registry, so nothing became unreachable.
+
 The Core group contains Workbench, Chat, Build, Design, Threads, Tasks, Projects, Approvals and Messaging. Knowledge adds Memory and Knowledge Map. Even though Manage/Observe/Support were moved behind the gear, the primary rail still asks the user to understand many product nouns before starting work.
 
 ### Recommendation
@@ -117,6 +119,8 @@ The user should not need a taxonomy lesson to use Raiker.
 ## VIS-02 — Make Chat and Build unmistakable top-level modes
 
 **Priority: P0/P1 — Impact: Very high**
+
+**Status: Done 2026-09-06.** A segmented `Chat | Build` control in the top bar, marking the current mode, in the same place on every route.
 
 Raiker's product story is fundamentally Assistant + Agent/Build. The shell should communicate that immediately.
 
@@ -192,6 +196,8 @@ A premium interface generally has fewer visible containers.
 
 **Priority: P1 — Impact: High**
 
+**Status: Partly done 2026-09-06.** Table headings, navigation group labels and the wordmark are sentence-cased or de-tracked; the kicker keeps its caps at reduced tracking, which is the tiny-metadata case the finding allows. Roughly sixty component-local `text-transform: uppercase` declarations remain and are the rest of this item.
+
 The type scale is better than earlier iterations, but sidebar groups and control-plane labels still rely heavily on uppercase/tracking.
 
 ### Recommendation
@@ -225,6 +231,8 @@ Brand should emerge through behaviour and composition, not ornamental chrome.
 ## VIS-08 — Make governance contextual rather than permanently visible
 
 **Priority: P0/P1 — Impact: Very high**
+
+**Status: Done 2026-09-06.** `PostureControl` is one chip — *Protected · Local · Ask first* — that opens the approval control and the environment badge unchanged, so nothing moved further away than one click, and the full gate matrix stays on Permissions.
 
 Governance is Raiker's strongest differentiator, but showing every gate/state on normal work surfaces can make ordinary tasks feel bureaucratic.
 
@@ -318,6 +326,8 @@ Build:
 ## VIS-12 — Improve empty states
 
 **Priority: P1 — Impact: High**
+
+**Status: Done 2026-09-06.** The component had carried an `action` slot for a while and not one of the thirteen call sites used it. Projects, Tasks, Sessions, Checkpoints, Threads and Models now each carry one sentence and one primary action. Models also stopped naming a file Raiker no longer reads.
 
 A complex agent platform has many zero-data screens: no projects, tasks, memories, model, approvals or connected tools.
 
@@ -530,6 +540,8 @@ Light:
 ## VIS-22 — Add a global command palette
 
 **Priority: P1/P2 — Impact: High for advanced users**
+
+**Status: Done 2026-09-06.** `Ctrl/Cmd+K` from anywhere, including from inside a text field. Finds commands, every page on the rail or off it, and each settings section by its own name. This is what allows the rail to be short.
 
 The All Pages dialog and Threads search already provide pieces of this.
 

@@ -117,12 +117,18 @@
   .brand { display:flex; align-items:center; gap:.6rem; padding:.25rem .5rem var(--space-3); text-decoration:none; }
   .brand:hover { text-decoration:none; }
   .brand-text { display:flex; flex-direction:column; line-height:1.15; }
-  .brand-name { font-weight:800; font-size:var(--text-sm); letter-spacing:.45em; text-transform:uppercase; color:var(--text-1); }
-  .brand-sub { font-size:var(--text-2xs); font-weight:600; text-transform:uppercase; letter-spacing:.09em; color:var(--text-3); }
+  /* VIS-07 — the brand should not rest on a letter-spaced wordmark. .45em was
+     spacing the name out until it read as a logotype by force; the mark beside
+     it is the identity. */
+  .brand-name { font-weight:800; font-size:var(--text-sm); letter-spacing:.14em; text-transform:uppercase; color:var(--text-1); }
+  .brand-sub { font-size:var(--text-2xs); font-weight:600; letter-spacing:normal; color:var(--text-3); }
   .navigation-sections { display:grid; gap:var(--space-2); }
   .group { position:relative; }
   .group.contains-active::before { content:""; position:absolute; inset:.2rem auto .2rem -.75rem; width:3px; border-radius:var(--r-pill); background:var(--accent); }
-  .group-label,.group-toggle { width:100%; min-height:2rem; margin:0; padding:.35rem .55rem; color:var(--text-3); font-size:var(--text-2xs); font-weight:700; letter-spacing:.09em; text-transform:uppercase; }
+  /* VIS-06 — a navigation group label in caps at 2xs with .09em tracking is
+     four typographic devices doing one job. Sentence case at xs, and the colour
+     and weight are what separate it from the rows beneath. */
+  .group-label,.group-toggle { width:100%; min-height:2rem; margin:0; padding:.35rem .55rem; color:var(--text-3); font-size:var(--text-xs); font-weight:650; letter-spacing:normal; }
   .group-toggle { display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:.35rem; border:0; background:transparent; text-align:left; }
   .group-toggle:hover { background:var(--sunken); color:var(--text-1); }
   .group-toggle[aria-expanded="true"] :global(svg) { transform:rotate(90deg); }

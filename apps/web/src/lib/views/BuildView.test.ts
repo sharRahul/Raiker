@@ -234,8 +234,10 @@ describe("Build composer modes", () => {
     await screen.findByLabelText("Describe the change");
     expect(screen.queryByRole("group", { name: "Chat or Build" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Model context capacity")).not.toBeInTheDocument();
-    // Build keeps the one badge that is about where the work runs.
-    expect(screen.getByLabelText("Execution environment")).toBeInTheDocument();
+    // VIS-08 — Build still says where the work runs, in the posture chip rather
+    // than as a second permanent badge beside the approval control.
+    expect(screen.getByRole("button", { name: /governance posture/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Execution environment")).not.toBeInTheDocument();
   });
 
 

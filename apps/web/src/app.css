@@ -1042,12 +1042,15 @@ code,
   border-collapse: collapse;
   font-size: var(--text-sm);
 }
+/* VIS-06 — a column heading is a label, not a status chip. Uppercase plus wide
+   tracking at 2xs made every table in the product read like a monitoring
+   console, and it costs legibility at exactly the size that can least afford
+   it. Sentence case, one step larger, and the weight does the separating. */
 .table th {
   text-align: left;
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: normal;
   color: var(--text-3);
   padding: var(--row-y) var(--row-x);
   border-bottom: 1px solid var(--border);
@@ -1075,11 +1078,14 @@ code,
   text-align: right;
 }
 
+/* A kicker is the one thing VIS-06 leaves in uppercase: tiny metadata sitting
+   above a heading, where the caps *are* the hierarchy. The tracking comes down,
+   because 0.09em at this size is decoration rather than legibility. */
 .kicker {
   font-size: var(--text-2xs);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.05em;
   color: var(--text-3);
   margin: 0 0 var(--space-1);
 }

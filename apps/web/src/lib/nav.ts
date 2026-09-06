@@ -8,8 +8,10 @@ export interface NavGroup { id: NavGroupId; label: string; collapsible: boolean;
 // one place, and read-first operational evidence is one destination rather than
 // three competing pages.
 export const NAV_GROUPS: NavGroup[] = [
-  { id: "core", label: "Core", collapsible: false, items: [
-    { id: "home", label: "Workbench", icon: "spark", hint: "Resume governed work and see what needs attention" },
+  { id: "core", label: "Work", collapsible: false, items: [
+    // VIS-13 — "Workbench" was a name for a page whose job is to be the place
+    // you land. "Home" is what it is, and it costs the owner no vocabulary.
+    { id: "home", label: "Home", icon: "spark", hint: "Resume governed work and see what needs attention" },
     { id: "new-chat", label: "Chat", icon: "chat", hint: "Start or continue a governed conversation" },
     { id: "build", label: "Build", icon: "code", hint: "Code against a repository with Plan, Edit, and Auto" },
     // Design sits with Chat and Build because it is the same kind of thing: you
@@ -67,13 +69,59 @@ export const DEFAULT_ROUTE = "home";
  * work that happens on a handful of days.
  */
 export const SIDEBAR_GROUP_IDS: NavGroupId[] = ["core", "knowledge"];
+
+/**
+ * The destinations the permanent rail draws. VIS-01.
+ *
+ * Grouping and route registration are one thing; what the rail is worth
+ * spending a permanent row on is another, and they were the same list. Core
+ * held nine peers — Workbench, Chat, Build, Design, Threads, Tasks, Projects,
+ * Approvals, Messaging — so before starting work the owner had to learn nine
+ * product nouns and decide which of them they were in. A rail is not an index.
+ *
+ * What comes off it, and where each goes instead:
+ *
+ * * **Approvals** — a decision waiting on you is not a place you navigate to,
+ *   it is a thing that arrives. It is a counted button in the top bar now,
+ *   visible from every route, which is strictly more available than a row you
+ *   have to be looking at the sidebar to notice.
+ * * **Design** and **Messaging** — real destinations, reached rarely. They keep
+ *   their routes and are listed in the gear's window.
+ *
+ * Nothing is unreachable: `NAV_ITEMS` is still the route registry, the gear's
+ * window lists everything this array leaves out, and the command palette finds
+ * all of them by name.
+ */
+export const SIDEBAR_ITEM_IDS: string[] = [
+  "home",
+  "new-chat",
+  "build",
+  "search-chat",
+  "tasks",
+  "projects",
+  "memory",
+  "brain",
+];
+
 export const SIDEBAR_GROUPS: NavGroup[] = NAV_GROUPS.filter((g) =>
   SIDEBAR_GROUP_IDS.includes(g.id),
-);
-/** Everything the gear's window lists, in the order it lists them. */
-export const HUB_GROUPS: NavGroup[] = NAV_GROUPS.filter(
-  (g) => !SIDEBAR_GROUP_IDS.includes(g.id),
-);
+)
+  .map((group) => ({
+    ...group,
+    items: group.items.filter((item) => SIDEBAR_ITEM_IDS.includes(item.id)),
+  }))
+  .filter((group) => group.items.length > 0);
+
+/**
+ * Everything the gear's window lists, in the order it lists them.
+ *
+ * Every destination that is not on the rail, which now includes the ones taken
+ * off it above — a page with no link anywhere is a page that does not exist.
+ */
+export const HUB_GROUPS: NavGroup[] = NAV_GROUPS.map((group) => ({
+  ...group,
+  items: group.items.filter((item) => !SIDEBAR_ITEM_IDS.includes(item.id)),
+})).filter((group) => group.items.length > 0);
 
 /**
  * Tabs inside a consolidated destination. The hub owns the tab list so a deep

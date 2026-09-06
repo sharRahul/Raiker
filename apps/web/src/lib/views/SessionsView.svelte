@@ -308,7 +308,11 @@
   <PageState state="loading" title="Loading sessions…" />
 {:else if sessions.length === 0}
   <div class="card">
-    <EmptyState icon="sessions" title="No sessions yet" body="Start a chat to create your first governed session." />
+    <EmptyState icon="sessions" title="No sessions yet" body="Every conversation Raiker runs is recorded here.">
+      {#snippet action()}
+        <a class="btn btn-primary" href="#/new-chat">Start a chat</a>
+      {/snippet}
+    </EmptyState>
   </div>
 {:else}
   {#if selected.size > 0}

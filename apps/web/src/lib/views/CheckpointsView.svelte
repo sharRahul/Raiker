@@ -109,7 +109,11 @@
   <PageState state="loading" title="Loading checkpoints…" />
 {:else if groups.length === 0}
   <div class="card">
-    <EmptyState icon="checkpoints" title="No checkpoints" body="Checkpoints are recorded as sessions run." />
+    <EmptyState icon="checkpoints" title="No checkpoints" body="Raiker records a point you can rewind to each time it changes a file.">
+      {#snippet action()}
+        <a class="btn btn-primary" href="#/build">Open Build</a>
+      {/snippet}
+    </EmptyState>
   </div>
 {:else}
   {#each groups as group (group.sessionId)}

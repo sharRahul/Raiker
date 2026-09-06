@@ -12,18 +12,34 @@
   // whole session; the theme toggle moved into Settings, where a preference
   // belongs. A global selector that silently retargeted every surface was the
   // thing worth removing: nothing about a page told you which project it meant.
-  let { title, hint, connecting = false,
+  let { title, hint, current = "", connecting = false,
     navigationOpen = true, compactNavigation = false, onNavigationToggle = () => {},
-    onOpenAllPages = () => {} }: {
+    onOpenAllPages = () => {}, onOpenPalette = () => {} }: {
     title: string;
     hint: string;
+    /** The active route id, so the Chat/Build mode switch can mark itself. */
+    current?: string;
     connecting?: boolean;
     navigationOpen?: boolean;
     compactNavigation?: boolean;
     onNavigationToggle?: (trigger: HTMLElement) => void;
     /** Opens the window holding Settings and every page not on the rail. */
     onOpenAllPages?: (trigger: HTMLElement) => void;
+    /** Opens the command palette. */
+    onOpenPalette?: () => void;
   } = $props();
+
+  // VIS-01 — Approvals came off the rail. A decision waiting on you is not a
+  // place you navigate to, it is a thing that arrives, so it is a counted
+  // button here: visible from every route rather than only when the sidebar is.
+  let pendingApprovals = $state(0);
+  async function loadApprovals() {
+    try {
+      pendingApprovals = (await api.approvals("pending")).length;
+    } catch {
+      // A failed read leaves the last known count. Never a broken shell.
+    }
+  }
 
   // Owner-scoped notifications, reachable from every route. Reads are
   // best-effort: a failed read shows an empty panel, never a broken shell.
@@ -67,7 +83,10 @@
     }
   }
 
-  onMount(loadNotifications);
+  onMount(() => {
+    void loadNotifications();
+    void loadApprovals();
+  });
 
   $effect(() => {
     if (!panelOpen) return;
@@ -93,10 +112,36 @@
     ><Icon name="panel" size="md" /></button>
   </div>
   <div class="page-id"><h1 class="page-title">{title}</h1><p class="page-hint">{hint}</p></div>
+  <!-- VIS-02 — Raiker's product story is Assistant + Agent, and the shell said
+       so only by listing two rows among nine. These are modes, not destinations:
+       one control, always in the same place, showing which one you are in. -->
+  <nav class="modes" aria-label="Mode">
+    <a href="#/new-chat" class="mode" class:active={current === "new-chat"}
+      aria-current={current === "new-chat" ? "page" : undefined}>Chat</a>
+    <a href="#/build" class="mode" class:active={current === "build"}
+      aria-current={current === "build" ? "page" : undefined}>Build</a>
+  </nav>
   <div class="status" role="status" aria-live="polite">
     {#if connecting}<span class="pill">Connecting…</span>{/if}
   </div>
   <div class="controls">
+    <button
+      type="button"
+      class="btn btn-ghost palette-button"
+      aria-label="Search and commands"
+      onclick={onOpenPalette}
+    ><Icon name="search" size="md" /><kbd class="palette-key">Ctrl K</kbd></button>
+    <a
+      href="#/approvals"
+      class="btn btn-ghost approvals-link"
+      class:waiting={pendingApprovals > 0}
+      aria-label={pendingApprovals > 0
+        ? `Approvals (${pendingApprovals} waiting on you)`
+        : "Approvals"}
+    >
+      <Icon name="approvals" size="md" />
+      {#if pendingApprovals > 0}<span class="approval-count">{pendingApprovals}</span>{/if}
+    </a>
     <div class="bell-wrap">
       <button
         type="button"
@@ -159,6 +204,19 @@
 
 <style>
   .topbar{height:var(--topbar-h);display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-5);border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}.navigation-reveal-zone{width:48px;height:48px;margin-left:-.75rem;display:grid;place-items:center}.navigation-toggle{transition:opacity var(--motion-shell) var(--ease-shell),background var(--motion-fast) var(--ease)}.navigation-reveal-zone[data-navigation-open="false"] .navigation-toggle{opacity:.28}.navigation-reveal-zone:hover .navigation-toggle,.navigation-toggle:focus-visible{opacity:1!important}.page-id{min-width:0}.page-title{font-size:var(--text-base);margin:0;line-height:1.2}.page-hint{font-size:var(--text-xs);color:var(--text-3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto}.pill{font-size:var(--text-xs);font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
+  /* VIS-02 — a segmented control, not two links: the pair reads as one choice
+     with a current value. Sentence case and no tracking (VIS-06). */
+  .modes{display:flex;gap:2px;padding:2px;margin-left:var(--space-3);border:1px solid var(--border);border-radius:var(--r-pill);background:var(--sunken)}
+  .modes .mode{padding:.24rem .85rem;border-radius:var(--r-pill);font-size:var(--text-sm);font-weight:600;color:var(--text-2);text-decoration:none;white-space:nowrap;transition:background var(--motion-fast) var(--ease),color var(--motion-fast) var(--ease)}
+  .modes .mode:hover{color:var(--text-1);text-decoration:none}
+  .modes .mode.active{background:var(--raised);color:var(--text-1);box-shadow:var(--shadow-1)}
+  .palette-button{display:inline-flex;align-items:center;gap:.4rem}
+  .palette-key{font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-3);border:1px solid var(--border);border-radius:var(--r-xs);padding:.05rem .3rem;background:var(--sunken)}
+  /* VIS-15 — the resting state is neutral. Colour arrives only when something
+     is actually waiting on the owner, which is what makes it mean anything. */
+  .approvals-link{position:relative;display:inline-grid;place-items:center;padding:.35rem .5rem}
+  .approvals-link.waiting{color:var(--accent)}
+  .approval-count{position:absolute;top:-2px;right:-2px;min-width:1rem;height:1rem;display:grid;place-items:center;font-size:var(--text-2xs);font-weight:700;border-radius:var(--r-pill);background:var(--accent);color:var(--text-inverse);padding:0 .2rem}
   .bell-wrap{position:relative}
   .bell{position:relative;padding:.35rem .5rem}
   .unread-count{position:absolute;top:-2px;right:-2px;min-width:1rem;height:1rem;display:grid;place-items:center;font-size:var(--text-2xs);font-weight:700;border-radius:var(--r-pill);background:var(--danger);color:var(--text-inverse);padding:0 .2rem}
@@ -172,6 +230,10 @@
   .panel li.unread{border-left-color:var(--accent)}
   .panel li span{color:var(--text-2)}
   .panel li time{color:var(--text-3);font-size:var(--text-xs)}
-  @media(max-width:900px){.page-hint{display:none}}@media(max-width:720px){.topbar{gap:var(--space-2);padding:0 var(--space-3)}.page-title{font-size:var(--text-md)}.status{display:none}}
+  @media(max-width:1100px){.palette-key{display:none}}@media(max-width:900px){.page-hint{display:none}}@media(max-width:720px){.topbar{gap:var(--space-2);padding:0 var(--space-3)}.page-title{font-size:var(--text-md)}.status{display:none}.modes{margin-left:var(--space-2)}.modes .mode{padding:.24rem .6rem}}
+  /* Below this the title and the mode switch compete for the same row; the
+     title loses, because the mode switch is the only way back to the two
+     surfaces the product is for. */
+  @media(max-width:560px){.page-id{display:none}}
   @media(max-width:720px){.navigation-reveal-zone{margin-left:-.5rem}}
 </style>

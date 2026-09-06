@@ -221,7 +221,7 @@
   <PageState state="loading" title="Loading events…" />
 {:else if events.length === 0}
   <div class="card">
-    <EmptyState icon="activity" title="No events match" body="Adjust the filters or run a turn first." />
+    <EmptyState icon="activity" title="No events match" body="Nothing in the governed record matches these filters." />
   </div>
 {:else}
   <div class="card list-card">

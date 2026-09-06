@@ -8,7 +8,7 @@
   import Markdown from "../components/Markdown.svelte";
   import FileInspector from "../components/FileInspector.svelte";
   import RewindPanel from "../components/RewindPanel.svelte";
-  import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
+  import PostureControl from "../components/PostureControl.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
   import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
@@ -2026,7 +2026,9 @@
               </select>
             </label>
           {/if}
-          <ApprovalModeControl />
+          <!-- VIS-08 — one posture chip instead of a permanently open control.
+               It opens the same approval control, unchanged. -->
+          <PostureControl showEnvironment={false} />
     {/snippet}
 
     {#snippet right()}

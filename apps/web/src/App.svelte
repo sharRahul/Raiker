@@ -3,6 +3,7 @@
   import Sidebar from "./lib/components/Sidebar.svelte";
   import Topbar from "./lib/components/Topbar.svelte";
   import AllPagesDialog from "./lib/components/AllPagesDialog.svelte";
+  import CommandPalette from "./lib/components/CommandPalette.svelte";
   import ResponsivePage from "./lib/components/ResponsivePage.svelte";
   import {
     DEFAULT_ROUTE,
@@ -63,6 +64,11 @@
     allPagesTrigger = trigger;
     allPagesOpen = !allPagesOpen;
   }
+  // VIS-22 — the launcher that lets the rail be short. Ctrl/Cmd+K from
+  // anywhere, including from inside a field, because that is the one shortcut
+  // people expect to work while they are typing.
+  let paletteOpen = $state(false);
+  let paletteTrigger = $state<HTMLElement | null>(null);
   let appMain = $state<HTMLElement>();
   const pageLayout = $derived(
     // Design joins Chat and Build here: all three are a transcript that fills
@@ -150,6 +156,18 @@
       document.getElementById("main")?.focus();
     };
     window.addEventListener("hashchange", handler);
+    // VIS-22 — Ctrl/Cmd+K opens the palette from anywhere. Deliberately not
+    // gated on "is a field focused": this is the one shortcut people press
+    // *while* typing, and a launcher that refuses mid-sentence is not a
+    // launcher. `preventDefault` stops the browser's own find-in-page binding.
+    const openPalette = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        paletteTrigger = document.activeElement as HTMLElement | null;
+        paletteOpen = true;
+      }
+    };
+    window.addEventListener("keydown", openPalette);
     // BUG-83 — while a work surface is open, the selected model's readiness is
     // re-confirmed in the background as its window runs down, so a long session
     // does not spontaneously disable Send.
@@ -159,6 +177,7 @@
     prefetchRoutes();
     return () => {
       window.removeEventListener("hashchange", handler);
+      window.removeEventListener("keydown", openPalette);
       navigationQuery?.removeEventListener("change", updateNavigationMode);
       stopRevalidation();
     };
@@ -239,10 +258,20 @@
       <Topbar
         title={activeItem.label}
         hint={activeItem.hint}
+        {current}
         navigationOpen={compactNavigation ? navigationDrawerOpen : desktopNavigationOpen}
         {compactNavigation}
         onNavigationToggle={toggleNavigation}
         onOpenAllPages={openAllPages}
+        onOpenPalette={() => {
+          paletteTrigger = document.activeElement as HTMLElement | null;
+          paletteOpen = true;
+        }}
+      />
+      <CommandPalette
+        open={paletteOpen}
+        returnFocusTo={paletteTrigger}
+        onClose={() => (paletteOpen = false)}
       />
       <AllPagesDialog
         open={allPagesOpen}

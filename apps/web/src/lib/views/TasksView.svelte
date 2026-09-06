@@ -330,7 +330,22 @@
   {:else if tasks === null}<PageState state="loading" title="Loading tasks…" lines={3} />
   {:else}
     <div class="summary"><span><strong>{active.length}</strong> open</span><span><strong>{scheduled.length}</strong> scheduled</span><span><strong>{history.length}</strong> finished</span></div>
-    {#if rows.length === 0}<div class="card"><EmptyState icon="tasks" title="No work queued" body="Create a task for immediate work, or schedule a routine for later." /></div>
+    {#if rows.length === 0}<div class="card">
+        <EmptyState
+          icon="tasks"
+          title="No work queued"
+          body="Give Raiker work that can continue after you leave."
+        >
+          {#snippet action()}
+            <!-- VIS-12 — the plan form is already on this page, above the empty
+                 state. Naming where it is would be worse than putting the
+                 cursor in it. -->
+            <button type="button" class="btn btn-primary" onclick={() => titleEl?.focus()}>
+              Plan your first task
+            </button>
+          {/snippet}
+        </EmptyState>
+      </div>
     {:else}
       <section class="work-list" aria-labelledby="open-work">
         <h3 id="open-work">Open work</h3>

@@ -242,7 +242,10 @@ describe("ChatView composer parity", () => {
     expect(rail.closest(".chat")).toBeNull();
     expect(rail.closest(".chat-layout")).toHaveClass("with-rail");
     expect(screen.getByLabelText("Project for this chat")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /approval mode/i })).toBeInTheDocument();
+    // VIS-08 — the approval control is behind the posture chip now. What the
+    // composer shows is one summary; what it still *offers* is the same
+    // control, one click away, which is where it always was.
+    expect(screen.getByRole("button", { name: /governance posture/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Context window/ })).toBeInTheDocument();
   });
 

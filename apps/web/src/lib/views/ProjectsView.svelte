@@ -30,6 +30,10 @@
 
   let newName = $state("");
   let creating = $state(false);
+  // VIS-12 — the empty state's primary action. The create field is already on
+  // the page, above the empty state; the button that says "start here" should
+  // put the cursor in it rather than describe where it is.
+  let nameField = $state<HTMLInputElement>();
   let createError = $state<string | null>(null);
 
   // Attaching an existing folder sits beside creating one, because for anyone
@@ -357,6 +361,7 @@
     type="text"
     placeholder="New project name…"
     bind:value={newName}
+    bind:this={nameField}
     aria-label="New project name"
     maxlength={100}
   />
@@ -438,8 +443,14 @@
     <EmptyState
       icon="projects"
       title="No projects yet"
-      body="Create one to scope your sessions and checkpoints to a piece of work."
-    />
+      body="Keep the chats, tasks and files for one goal together."
+    >
+      {#snippet action()}
+        <button type="button" class="btn btn-primary" onclick={() => nameField?.focus()}>
+          Name your first project
+        </button>
+      {/snippet}
+    </EmptyState>
   </div>
 {:else}
   <div class="layout">

@@ -29,10 +29,9 @@
     rememberExplorerWidth,
   } from "../buildExplorer";
   import Badge from "../components/Badge.svelte";
-  import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
+  import PostureControl from "../components/PostureControl.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
   import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
-  import ExecutionEnvironmentBadge from "../components/ExecutionEnvironmentBadge.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import CodeExplorer from "../components/CodeExplorer.svelte";
   import EmptyState from "../components/EmptyState.svelte";
@@ -2166,8 +2165,10 @@
                 {/each}
               </select>
             </label>
-            <ApprovalModeControl />
-            <ExecutionEnvironmentBadge />
+            <!-- VIS-08 — the approval control and the environment badge were
+                 two permanent configuration surfaces under every message. One
+                 chip, and it opens both. -->
+            <PostureControl />
       {/snippet}
 
       {#snippet right()}

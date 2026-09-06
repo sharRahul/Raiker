@@ -205,6 +205,46 @@ async function renderBuildWithProject(props: Record<string, unknown> = {}) {
   return result;
 }
 
+describe("Build's artifact zone", () => {
+  it("opens the governed terminal beside the conversation, not under it", async () => {
+    // VIS-10 — the third zone. Expanded, the terminal used to stack between the
+    // transcript and the composer and take the conversation's height in the
+    // same column, so the two things the owner reads at once competed for one
+    // column of room.
+    stubFetch(baseRoutes());
+    await renderBuildWithProject();
+
+    await fireEvent.click(
+      await screen.findByRole("button", { name: "Show the governed terminal" }),
+    );
+
+    const pane = (await screen.findByText("Governed terminal")).closest("section");
+    expect(pane).not.toBeNull();
+    // It lives in the artifact column, which is a sibling of the conversation
+    // rather than a block inside it.
+    expect(pane?.closest("#build-rail")).not.toBeNull();
+    expect(pane?.closest(".main")).toBeNull();
+  });
+
+  it("closes the zone again, and the toggle says which state it is in", async () => {
+    stubFetch(baseRoutes());
+    await renderBuildWithProject();
+
+    const open = await screen.findByRole("button", { name: "Show the governed terminal" });
+    await fireEvent.click(open);
+    expect(screen.getByText("Governed terminal")).toBeInTheDocument();
+
+    await fireEvent.click(
+      await screen.findByRole("button", { name: "Hide the governed terminal" }),
+    );
+    expect(screen.queryByText("Governed terminal")).toBeNull();
+  });
+
+  // The narrow case — no third column, so the pane renders in place with its
+  // own collapsed header — is a media-query branch (`compactRail`) that this
+  // harness cannot set from props. It is covered by the width sweep.
+});
+
 describe("Build composer modes", () => {
   it("opens in Auto and sends no turn-scoped override for it", async () => {
     stubFetch(baseRoutes());

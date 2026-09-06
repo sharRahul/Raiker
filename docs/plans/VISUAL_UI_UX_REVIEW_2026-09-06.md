@@ -292,6 +292,10 @@ Use a concise action sentence, destination chip, affected-files/data summary, ri
 
 **Priority: P0/P1 — Impact: Very high**
 
+**Status: Done 2026-09-06.** Two of the three zones already existed — the repository explorer takes the first column at a width the owner drags, the conversation the middle. The third was the gap: the governed terminal stacked *between* the transcript and the composer, in the conversation's own column, so the two things the owner reads at once competed for one column of room. It takes the third zone now, sharing it with the background-work panel, which is the other thing that is *about* the work rather than part of it. Narrow, there is no third column and the pane stays where it was. The terminal also gained a header toggle beside Files and Background work: it had been reachable only through its own collapsed header, so moving the pane without one would have stranded it behind the `/terminal` command.
+
+What this finding still leaves open is the *artifact* half of the zone — a diff or a generated file opening there rather than inline in the transcript. That needs the typed output components of VIS-19 to exist first.
+
 Build is a defining surface. A chat-shaped page with repository controls will not visually compete with Cursor, Codex or artifact-style workflows.
 
 ### Recommendation

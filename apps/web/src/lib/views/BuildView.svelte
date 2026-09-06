@@ -734,6 +734,10 @@
   // path typed exactly.
   let modelPickerOpen = $state(false);
   let commandPaneOpen = $state(false);
+  // VIS-10 — the third zone is present when something wants it. The terminal
+  // claims it only on a window wide enough to hold three; narrow, there is no
+  // third column and the pane stays under the transcript where it was.
+  const artifactZone = $derived(commandPaneOpen && !compactRail);
   let menuKind = $state<"none" | "slash" | "mention">("none");
   let menuActive = $state(0);
   let mentionItems = $state<MenuItem[]>([]);
@@ -1583,7 +1587,7 @@
 <div
   class="build"
   class:with-files={filesOpen && !compactRail}
-  class:with-rail={railOpen && !compactRail}
+  class:with-rail={(railOpen || artifactZone) && !compactRail}
   class:with-panel={rewindCheckpointId !== null}
   style={`--explorer-w:${filesWidth}px`}
 >
@@ -1723,6 +1727,24 @@
         >
           <Icon name="panel" size="sm" />
           <span class="rail-label">{railOpen ? "Hide background work" : "Background work"}</span>
+        </button>
+        <!-- VIS-10 — the terminal is a zone now rather than a block stacked
+             under the transcript, so it needs a control that exists whether or
+             not the zone is open. It used to be reachable only by its own
+             collapsed header, which meant moving the pane would have stranded
+             it behind the `/terminal` command. Beside Files and Background
+             work, because the three open the same kind of thing. -->
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm rail-toggle"
+          onclick={() => (commandPaneOpen = !commandPaneOpen)}
+          aria-expanded={commandPaneOpen}
+          aria-controls="build-rail"
+          aria-label={commandPaneOpen ? "Hide the governed terminal" : "Show the governed terminal"}
+          title={commandPaneOpen ? "Hide the governed terminal" : "Governed terminal"}
+        >
+          <Icon name="terminal" size="sm" />
+          <span class="rail-label">{commandPaneOpen ? "Hide terminal" : "Terminal"}</span>
         </button>
       </div>
     </header>
@@ -2061,7 +2083,16 @@
       {/if}
     </div>
 
-    <CommandOutputPane {sessionId} {visible} bind:open={commandPaneOpen} />
+    <!-- VIS-10 — the artifact zone. Expanded, the governed terminal used to
+         stack between the transcript and the composer and eat the
+         conversation's height in the same column: the two things the owner is
+         reading at once competed for one column of room. On a window wide
+         enough for three zones it moves beside the conversation instead, which
+         is what "give the artifact more area than explanatory cards" means in
+         practice. Narrow, there is no third zone and it stays where it was. -->
+    {#if compactRail}
+      <CommandOutputPane {sessionId} {visible} bind:open={commandPaneOpen} />
+    {/if}
 
     <Composer
       ariaLabel="Build composer"
@@ -2253,24 +2284,29 @@
     />
   {/if}
 
-  {#if railOpen}
-    {#if compactRail}
+  {#if railOpen || artifactZone}
+    {#if compactRail && railOpen}
       <button type="button" class="rail-scrim" aria-label="Close background work" onclick={() => closeRail(true)}></button>
     {/if}
     <div
       id="build-rail"
       class="rail-slot"
-      class:drawer={compactRail}
-      role={compactRail ? "dialog" : undefined}
-      aria-modal={compactRail ? "true" : undefined}
-      aria-label={compactRail ? "Background work" : undefined}
+      class:drawer={compactRail && railOpen}
+      role={compactRail && railOpen ? "dialog" : undefined}
+      aria-modal={compactRail && railOpen ? "true" : undefined}
+      aria-label={compactRail && railOpen ? "Background work" : undefined}
       bind:this={railElement}
     >
-      <BuildSidePanel
-        projectId={projectId || null}
-        {projects}
-        onclose={() => closeRail(true)}
-      />
+      {#if railOpen}
+        <BuildSidePanel
+          projectId={projectId || null}
+          {projects}
+          onclose={() => closeRail(true)}
+        />
+      {/if}
+      {#if artifactZone}
+        <CommandOutputPane {sessionId} {visible} bind:open={commandPaneOpen} />
+      {/if}
     </div>
   {/if}
 
@@ -2400,13 +2436,28 @@
     min-width: 0;
     gap: var(--space-3);
   }
+  /* VIS-10 — the artifact zone can hold the background-work panel, the governed
+     terminal, or both. Column rather than row, and it scrolls, so two occupants
+     share the height instead of squashing each other flat. */
   .rail-slot {
     min-height: 0;
     display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    overflow-y: auto;
   }
   .rail-slot > :global(*) {
-    flex: 1;
+    flex: 0 0 auto;
     min-height: 0;
+  }
+  /* With only one occupant it fills the column, which is what it did before. */
+  .rail-slot > :global(*:only-child) {
+    flex: 1;
+  }
+  /* The pane sets a transcript-column margin on itself; in this column the
+     column's own gap is the spacing. */
+  .rail-slot > :global(.command-pane) {
+    margin: 0;
   }
   .rail-scrim {
     position: fixed;

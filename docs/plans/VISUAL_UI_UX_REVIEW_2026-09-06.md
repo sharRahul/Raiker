@@ -1,771 +1,1138 @@
 # Raiker Visual UI/UX Review — 2026-09-06
 
-## Scope
+## Review state
 
-This pass reviews the current Raiker web UI at `main` commit `371ccdddcf6ac1e82da4771b513dec64015f263a` for visual quality, hierarchy, product coherence, information density, navigation, interaction design, theming and perceived polish.
+This document now contains **two visual-review passes**.
 
-Evidence reviewed:
+- **Pass 1** reviewed Raiker at `371ccdddcf6ac1e82da4771b513dec64015f263a` and produced `VIS-01` through `VIS-24`.
+- Most Pass-1 items were subsequently implemented and verified on `main` during 2026-09-06.
+- **Pass 2** reviews the **post-fix product** at `main` commit `6b79870a104c9a0ff6c237209338489148629e3e` and adds a new set of recommendations, `VIS2-01` onward.
 
-- current screenshot catalogue under `docs/plans/screenshots/pages/` and its responsive/theme sweep documentation;
-- `apps/web/src/app.css` and the Control Deck design tokens;
-- `App.svelte`, `Sidebar.svelte`, `nav.ts` and representative view/component structure;
-- current product patterns from ChatGPT, Claude, Gemini, Perplexity and Cursor as reference points, not templates to copy.
+The purpose of Pass 2 is not to reopen completed work. It asks a harder question:
 
-This is a design review, not a request to make Raiker imitate another product. Raiker's differentiation is governed agency. The goal is to make that capability feel calmer, more premium and easier to understand.
+> Now that the basic information architecture and Control Deck system are substantially improved, what still stops Raiker from feeling as visually calm, intentional and premium as the strongest current AI products?
 
----
+Evidence reviewed in Pass 2:
 
-# Executive assessment
+- the current screenshot catalogue under `docs/plans/screenshots/pages/`, including the 390 px mobile, 1080p, 4K and 8K light/dark sweeps;
+- the latest visual-verification commit and current page/component catalogue;
+- `apps/web/src/app.css` and current design tokens;
+- current `Sidebar.svelte`, `Topbar.svelte`, `Composer.svelte`, `PostureControl.svelte`, `nav.ts` and representative view/component structures;
+- the implemented output/work components such as `BuildSidePanel`, `DiffView`, `FileInspector`, `CommandOutputPane`, `ImageViewport`, `LifecycleTrack`, `ToolActivity`, `SourceChips`, `EmptyState`, `CommandPalette` and related controls;
+- current public product patterns from ChatGPT Projects, Perplexity Projects, Cursor 3/Design Mode and Gemini's 2026 Neural Expressive redesign.
 
-Raiker already has the foundations of a real design system: consistent spacing/radius tokens, Manrope + JetBrains Mono + Source Serif 4, bounded canvases, dual-theme support, responsive sweeps, density controls, semantic state colours and a deliberately limited palette.
-
-The main visual problem is **not lack of styling**. It is that too much of Raiker's internal architecture remains visible at once.
-
-The interface often behaves like a polished control plane. That is appropriate for Permissions, Observability and advanced runtime configuration, but it leaks into ordinary Chat, Build, Projects and Tasks. As a result, Raiker can feel more like an administration console with an assistant inside it than an assistant/agent product with governance available when needed.
-
-The target should be:
-
-> **Conversation-first and work-first in normal use; control-deck precision only when the user enters governance, diagnostics or advanced configuration.**
-
-Raiker should look quieter than it is powerful.
+This remains a visual/product-design review, not a request to imitate another product. Raiker's differentiated value is **governed agency**. The design goal is to make that depth feel understandable and reassuring without making ordinary work look like system administration.
 
 ---
 
-# Competitive patterns worth borrowing
+# Executive assessment — Pass 2
 
-## ChatGPT
+## What improved materially
 
-Useful pattern: simplify the primary workspace and move model/thinking controls into the composer. Recent desktop changes also make Chat/Work separation clearer while unifying recents/projects.
+The first review's main structural criticism was valid at the time: Raiker exposed too much architecture at once. That is **no longer the dominant problem**.
+
+The post-fix interface now has several strong product-level improvements:
+
+- a visible global **Chat | Build** mode distinction;
+- a smaller permanent navigation rail;
+- Approvals moved to a counted global affordance instead of a permanent navigation row;
+- a command palette for low-frequency navigation and actions;
+- a compact governance posture control instead of multiple permanent governance controls;
+- a shared Chat/Build composer frame;
+- Build's file explorer and third work zone;
+- fewer card walls and more neutral healthy states;
+- improved approval information order;
+- better empty states;
+- grouped Settings;
+- an already-spatial Knowledge Map;
+- a richer component vocabulary for diffs, terminals, files, sources, plans, images and tool activity;
+- explicit visual-quality and responsive regression coverage.
+
+This moves Raiker from **“polished control plane containing an assistant”** toward **“assistant/agent product with a governed control plane underneath.”**
+
+## The new visual problem
+
+The remaining gap is now **optical and compositional rather than architectural**.
+
+Raiker has many correct controls, correct surfaces and correct states, but some screens can still communicate *all of them with similar visual weight*. The result risks being technically clean but visually busy.
+
+The next target should be:
+
+> **One dominant thing per screen, one obvious next action, and governance that becomes visually prominent only when it changes the user's decision.**
+
+The design system should now optimize for **quiet confidence**, not additional visible structure.
+
+## Updated product-direction statement
+
+The first pass said:
+
+> Conversation-first and work-first in normal use; Control Deck precision only when the user enters governance, diagnostics or advanced configuration.
+
+That remains correct, but Pass 2 sharpens it:
+
+> **Work should occupy the foreground. Context should sit one layer behind it. Governance should become foreground only at a decision boundary. Infrastructure should stay another layer deeper.**
+
+That four-level hierarchy should govern every new screen and component.
+
+---
+
+# Pass-1 status summary
+
+The old implementation-order section is superseded. These findings are retained as historical design decisions, not as an active backlog.
+
+| Finding | Pass-1 conclusion | Current disposition |
+|---|---|---|
+| VIS-01 | Simplify permanent sidebar | Done |
+| VIS-02 | Make Chat/Build top-level modes | Done |
+| VIS-03 | Reduce work-surface chrome | Done |
+| VIS-04 | Standardize surface archetypes | Done |
+| VIS-05 | Reduce card walls | Done |
+| VIS-06 | Reduce uppercase/tracking dependence | Done |
+| VIS-07 | Distinctive Raiker identity through behaviour | Owner/product-design decision; still optional |
+| VIS-08 | Contextual governance posture | Done |
+| VIS-09 | Premium approval hierarchy | Done |
+| VIS-10 | Stronger Build workbench | Core layout done; artifact half remains a Pass-2 opportunity |
+| VIS-11 | Chat visually simpler than Build | Done |
+| VIS-12 | Better empty states | Done |
+| VIS-13 | Make Home useful or remove it | Done |
+| VIS-14 | Unify Threads/Tasks/Projects vocabulary | Done at component-vocabulary level; deeper project continuity remains a Pass-2 opportunity |
+| VIS-15 | Reduce status colour | Done |
+| VIS-16 | De-emphasize technical IDs | Done |
+| VIS-17 | Regroup Settings | Done |
+| VIS-18 | Spatial Knowledge Map | Already satisfied |
+| VIS-19 | Rich typed output vocabulary | Most presentation components exist; typed output channel/chart remain incomplete |
+| VIS-20 | Motion only for meaningful state change | Done |
+| VIS-21 | Theme-specific depth | Done |
+| VIS-22 | Command palette | Done |
+| VIS-23 | Clear page-level actions | Done |
+| VIS-24 | Visual-quality rubric | Done |
+
+---
+
+# Competitive reference update — September 2026
+
+The point of these references is not visual copying. They show where product interfaces are converging.
+
+## ChatGPT — persistent work context
+
+Current ChatGPT Projects keep chats, files, instructions, memory/context and tools around one ongoing body of work. The visual lesson is that **project context can reduce navigation**, because the user does not need separate top-level places for every artifact type.
 
 Raiker implication:
 
-- Chat and Build should feel like primary modes, not two rows among many navigation destinations;
-- model, execution context and approval mode belong close to the composer;
-- infrastructure should recede until it affects the current turn.
+- continue making Project the place where threads, tasks, files and instructions visibly belong together;
+- retain global aggregate views, but make project-scoped work feel like one coherent workspace rather than several linked apps.
 
-## Claude
+## Perplexity — Projects and unified work history
 
-Useful pattern: keep conversation visually calm while opening substantial work in a side-by-side artifact/work surface.
-
-Raiker implication:
-
-- Build should lean harder into a dual-pane or three-pane workbench when code/files/diffs are active;
-- generated documents, code previews and rich outputs should not have to compete with conversation width.
-
-## Gemini
-
-Useful pattern: stronger expressive typography, motion and visual response modules without filling the chrome with decoration.
+Perplexity's current Projects combine search conversations, Computer tasks, files, instructions, connected tools and persistent context. Its desktop history also presents Ask threads and Computer tasks together rather than forcing users to understand execution taxonomy first.
 
 Raiker implication:
 
-- Raiker can feel more alive through restrained transitions, richer empty states and better output presentation while keeping control surfaces sober;
-- the current palette discipline is good, but the product can use more depth through typography, scale and motion rather than more colours.
+- Threads and Tasks can remain different object types, but the visual shell should increasingly present them as **work sessions inside a project**;
+- distinguish by state and affordance, not by entirely different page languages.
 
-## Perplexity
+## Cursor 3 / Design Mode — agent-first spatial work
 
-Useful pattern: persistent Projects unify threads, tasks, files, instructions and tools into a work context; session history is unified instead of fragmented by execution type.
-
-Raiker implication:
-
-- Projects should become a stronger contextual home;
-- Threads and Tasks should feel like two states of work rather than unrelated app destinations;
-- sidebar hierarchy can be flatter.
-
-## Cursor
-
-Useful pattern: coding/agent work becomes spatial when the UI understands files, selected regions, diffs and visual context.
+Cursor's 2026 Agents Window intentionally centers agent work while preserving IDE depth, and Design Mode lets users select/draw on the actual UI so the agent receives spatial context.
 
 Raiker implication:
 
-- Build should prioritize repository/file/diff context visually over general dashboard cards;
-- future Design/Build workflows should allow selecting the object being discussed rather than making every interaction begin as free text.
+- Build's third pane should become a first-class artifact/preview/diff surface rather than mainly a terminal/background-work area;
+- Design should eventually become canvas-first and selection-aware rather than only prompt-first;
+- agent work benefits from a visible object of focus.
+
+## Gemini Neural Expressive — response composition
+
+Gemini's 2026 redesign explicitly moves away from long text-only answers toward dynamically composed imagery, timelines and interactive response modules.
+
+Raiker implication:
+
+- finish the typed presentation channel already anticipated by VIS-19;
+- Raiker should use richer response composition **without arbitrary provider HTML**;
+- rich output should still look like Raiker and remain governed, inspectable and deterministic.
 
 ---
 
-# Findings
+# Pass-2 findings
 
-## VIS-01 — The sidebar exposes too many peer destinations
+## VIS2-01 — Repair the dead type-scale step and strengthen optical hierarchy
 
-**Priority: P0/P1 — Impact: Very high**
+**Priority: P1 — Effort: Low — Visual impact: High**
 
-**Status: Done 2026-09-06.** The rail carries eight rows, down from eleven. Approvals is a counted button in the top bar — visible from every route, which is strictly more available than a sidebar row; Design and Messaging keep their routes and are reached from the gear's window or the palette. `SIDEBAR_ITEM_IDS` separates *what the rail draws* from the route registry, so nothing became unreachable.
+### Observation
 
-The Core group contains Workbench, Chat, Build, Design, Threads, Tasks, Projects, Approvals and Messaging. Knowledge adds Memory and Knowledge Map. Even though Manage/Observe/Support were moved behind the gear, the primary rail still asks the user to understand many product nouns before starting work.
+The current type tokens define:
 
-### Recommendation
-
-Promote only the most frequent destinations:
-
-```text
-New / Chat
-Build
-Tasks / Work
-Projects
-Recents
+```css
+--text-base: 1rem;
+--text-lg:   1rem;
+--text-xl:   1.22rem;
+--text-2xl:  1.49rem;
+--text-display: 1.82rem;
 ```
 
-Treat the rest contextually:
+`--text-lg` is therefore not a scale step at all. A semantic token that produces no visual change encourages components to reach for weight, caps, colour or local pixel values instead.
 
-- Approvals → persistent badge/inbox button in top bar;
-- Design → composer capability or a mode under Create unless proven high-frequency;
-- Messaging → Settings/Connections unless it becomes high-frequency;
-- Memory / Knowledge Map → Project/Knowledge contextual areas plus advanced navigation;
-- Workbench → either true Home or remove if it duplicates recent/tasks/project summaries.
-
-The user should not need a taxonomy lesson to use Raiker.
-
----
-
-## VIS-02 — Make Chat and Build unmistakable top-level modes
-
-**Priority: P0/P1 — Impact: Very high**
-
-**Status: Done 2026-09-06.** A segmented `Chat | Build` control in the top bar, marking the current mode, in the same place on every route.
-
-Raiker's product story is fundamentally Assistant + Agent/Build. The shell should communicate that immediately.
+Raiker's hierarchy has improved, but the overall interface still tends toward similar-sized text with different weights.
 
 ### Recommendation
 
-Use a compact global mode switch near the top-left/top-center:
+Make every named type step visually meaningful. A restrained scale is still appropriate, for example:
 
 ```text
-Chat | Build
+base      1.00rem
+large     1.10–1.125rem
+xl        1.25rem
+2xl       1.50rem
+display   2.00–2.20rem
 ```
 
-Workbench, Tasks and Projects can remain navigational objects, but Chat/Build should feel like operating modes.
+Do **not** make operational pages oversized. Spend the larger display size only on:
+
+- Home/first-run moments;
+- empty-state hero moments;
+- Project identity;
+- major artifact title/preview moments.
+
+### Acceptance
+
+- no two adjacent semantic type tokens resolve to the same size;
+- normal operational pages remain compact;
+- hierarchy can be read in greyscale without relying on bold alone.
 
 ---
 
-## VIS-03 — Reduce top-level chrome on work surfaces
+## VIS2-02 — Remove developer/project metadata from the permanent sidebar footer
 
-**Priority: P1 — Impact: High**
+**Priority: P1 — Effort: Low — Visual impact: High**
 
-**Status: Done 2026-09-06.** On Chat, Build and Design the top bar drops the route title and hint: the mode switch beside them already says where you are, and the hint was explaining a route the owner is inside. The heading stays in the accessibility tree — visually hidden, not removed — so the page keeps exactly one `h1`. Operational pages keep their full header.
+### Observation
 
-The shell combines sidebar + top bar + page lead + tabs + cards on many operational pages. This is structurally clear but can make the interface feel layered before the user reaches the work.
+The permanent sidebar footer still renders:
+
+- `Local & loopback-only`
+- `Apache License, Version 2.0`
+
+The first is a real runtime/data-boundary fact, but it is already represented more contextually through governance posture. The second is project/legal metadata, not something a normal user needs during every interaction.
+
+This small footer disproportionately makes Raiker feel like an open-source admin console rather than a finished product.
 
 ### Recommendation
 
-On Chat and Build:
+- move Apache licence information to **Settings → About/Updates** or an About dialog;
+- remove the permanent runtime sentence or replace it with one small host/workspace status affordance that opens detail;
+- allow the bottom of the sidebar to breathe.
 
-- use a very quiet top bar;
-- hide descriptive route hints after first use or move them to tooltips;
-- avoid repeating route/page explanations;
-- reserve vertical space for transcript, files and work output.
+### Acceptance
 
-Operational screens can retain richer headers.
+The persistent navigation contains only navigation, current work/account context and genuinely actionable state.
 
 ---
 
-## VIS-04 — Reduce the number of visual surface archetypes
+## VIS2-03 — Reduce top-bar control saturation and create explicit control clusters
 
-**Priority: P2 — Impact: Medium**
+**Priority: P1 — Effort: Low/Medium — Visual impact: Very high**
 
-**Status: Done 2026-09-06.** The five surfaces are written down in `VISUAL_DESIGN_SPEC.md` → "The five surfaces", with the two rules that follow from them: a container has to earn its border, and a shared label mark is declared once. `.head-row` was the first per-view divergence removed; `.eyebrow` was the second, and it had fragmented into six private copies at four weights and five trackings. `visualRubric.test.ts` holds both.
+### Observation
 
-The design system is mature, but cards/panels/sunken/raised/operational surfaces can make different subsystems feel visually distinct simply because they are implemented differently.
+The top bar currently needs to accommodate, depending on width/state:
 
-### Recommendation
+- Chat | Build switch;
+- command/search;
+- approvals counter;
+- notifications counter;
+- all-pages/settings entry;
+- host control;
+- stop switch.
 
-Standardize around five recurring surface archetypes:
-
-1. page background;
-2. primary work surface;
-3. secondary panel;
-4. interactive entity card/row;
-5. transient overlay.
-
----
-
-## VIS-05 — Use fewer cards on information-heavy pages
-
-**Priority: P1 — Impact: High**
-
-**Status: Done 2026-09-06.** Home stopped rendering a card per empty board, which was the clearest card-wall-of-nothing in the product. The operational pages were then measured rather than assumed: at 1440, Models shows **2** primary cards above the fold and Observability **4**, both inside the rubric's ceiling. Permissions draws 51, and they are the case the finding explicitly allows — one repeated entity per full-width row, which is a list. VIS-21 removed their outline in dark, so they now read as one.
-
-Raiker's governance/status concepts naturally tend toward "card walls".
+Every control is individually defensible. Together they can turn the quiet top bar back into a compact control plane.
 
 ### Recommendation
 
-Prefer:
-
-- one page section with rows over five sibling cards;
-- tables/lists for repeated entities;
-- cards only for independently actionable objects;
-- whitespace/dividers instead of borders around every semantic unit.
-
-A premium interface generally has fewer visible containers.
-
----
-
-## VIS-06 — Strengthen hierarchy through size and space, not uppercase
-
-**Priority: P1 — Impact: High**
-
-**Status: Done 2026-09-06.** The fifty-one component-local declarations were classified rather than removed wholesale, because the finding keeps caps for tiny metadata. Sentence case now for the things it names — the Settings rail's group labels, a graph panel's own title, a day heading in the thread list, a fieldset legend, a clickable select-all — and caps kept, at one shared tracking, for the marks that really are metadata. `.kicker` and `.eyebrow` are the two, declared once each.
-
-The type scale is better than earlier iterations, but sidebar groups and control-plane labels still rely heavily on uppercase/tracking.
-
-### Recommendation
-
-- keep uppercase for tiny metadata/status only;
-- use sentence case for most navigation and section labels;
-- reduce letter-spacing in functional UI text;
-- let larger headings and whitespace establish hierarchy;
-- reserve Source Serif 4 for a few high-value moments, not normal operational screens.
-
----
-
-## VIS-07 — Make the Raiker identity more distinctive through behaviour
-
-**Priority: P2 — Impact: Medium/high**
-
-**Status: An owner decision — 2026-09-06.** The three suggestions (an eye/lock identity moment, a gold authority trace on agent actions, a signature plan visualization) are brand design rather than defect repair: each invents a behaviour the product does not have, and inventing one badly is worse than leaving it. Two of the three also overlap work already done — VIS-15 spent the gold deliberately on pending and authority, and `LifecycleTrack` is the plan visualization. This is left as a decision for the owner, in the same way GEP-02 and BUG-239's remainder are.
-
-The gold/blue/neutral palette is recognizable, but brand should not depend mainly on logo + letter-spaced RAIKER + Control Deck language.
-
-### Recommendation
-
-Develop two or three signature behaviours:
-
-- the eye/lock identity in unlock and agent-active moments;
-- a subtle gold authority trace around approvals/agent actions;
-- a distinctive plan/progress visualization for governed work.
-
-Brand should emerge through behaviour and composition, not ornamental chrome.
-
----
-
-## VIS-08 — Make governance contextual rather than permanently visible
-
-**Priority: P0/P1 — Impact: Very high**
-
-**Status: Done 2026-09-06.** `PostureControl` is one chip — *Protected · Local · Ask first* — that opens the approval control and the environment badge unchanged, so nothing moved further away than one click, and the full gate matrix stays on Permissions.
-
-Governance is Raiker's strongest differentiator, but showing every gate/state on normal work surfaces can make ordinary tasks feel bureaucratic.
-
-### Recommendation
-
-Use progressive disclosure.
-
-Normal state:
+Create three visual clusters:
 
 ```text
-Protected • Local project • Ask before external actions
+[ Work mode ]      [ Search ]      [ Attention ] [ Settings ]   |   [ Runtime safety ]
+Chat | Build                        Approvals
+                                     Activity
 ```
 
-Expanded state:
+Rules:
+
+- **Search/navigation cluster** is neutral.
+- **Attention cluster** only gains colour/count when something needs action.
+- **Runtime safety cluster** is visibly separate from ordinary navigation.
+- Emergency stop remains immediately available where safety requires it, but should not use high-alert styling while there is nothing active to stop.
+
+Consider whether passive Notifications belong inside an **Attention** popover with Approvals while keeping Approvals individually reachable when pending.
+
+### Acceptance
+
+At rest, the top bar has one dominant mode control and no more than one visually loud status.
+
+---
+
+## VIS2-04 — Render platform-appropriate shortcut labels
+
+**Priority: P1 — Effort: Low — Visual impact: Low/medium, polish impact: High**
+
+### Observation
+
+The command control currently presents `Ctrl K` in the desktop chrome even though the implementation comments and command model support Ctrl/Cmd concepts.
+
+On macOS, a hard-coded Windows shortcut is an immediate premium-polish miss.
+
+### Recommendation
+
+Render platform-aware notation:
+
+- macOS: `⌘K`
+- Windows/Linux: `Ctrl K`
+
+Use the same shortcut-label component everywhere, including the shortcut sheet.
+
+---
+
+## VIS2-05 — Keep model and context recognisable on compact layouts
+
+**Priority: P1 — Effort: Medium — Visual impact: High**
+
+### Observation
+
+Below the desktop breakpoint the shared Composer intentionally removes labels to protect space. However:
+
+- the selected model becomes primarily a **provider logo**;
+- scope/context controls can disappear entirely;
+- approval/model controls become similar circular icon buttons.
+
+A provider logo does not identify a model when several models come from the same provider. Hiding context completely also weakens the user's ability to answer “what is this turn using?” precisely when screen space is limited.
+
+### Recommendation
+
+Use a **compact context affordance**, not silent removal.
+
+Possible mobile/tablet composer:
 
 ```text
-Model
-Execution environment
-Network posture
-Approval policy
-Data boundary
+[ + ] [ Model short-name ] [ Context 3 ] [ Protected ]                [ Send ]
 ```
 
-Only show the full matrix on Permissions/Observability.
-
----
-
-## VIS-09 — Turn approval into a premium interaction
-
-**Priority: P1 — Impact: High**
-
-**Status: Done 2026-09-06.** The five questions were being answered in almost the reverse order. Under the title came eight rows of provenance — session, requested, proposed by, batch, expiry, authorized by — then the execution evidence, and only then the diff, so the one thing the decision turns on sat below all the record-keeping. The proposed change is first now. Two facts stay above it because they decide whether the decision can be made at all rather than describing it: the capability being asked for, and whether pressing Approve performs the action or only records a decision. Provenance and evidence are complete, collapsed, and read after.
-
-Approval is core to Raiker, so it should be one of the best-designed interactions.
-
-### Recommendation
-
-An approval should answer visually, in this order:
-
-1. **What is Raiker trying to do?**
-2. **Why?**
-3. **What changes/leaves the machine?**
-4. **What is the blast radius?**
-5. **Approve / edit / deny**
-
-Use a concise action sentence, destination chip, affected-files/data summary, risk badge and expandable technical details. Do not lead with policy/schema detail.
-
----
-
-## VIS-10 — Build needs a stronger IDE/workbench composition
-
-**Priority: P0/P1 — Impact: Very high**
-
-**Status: Done 2026-09-06.** Two of the three zones already existed — the repository explorer takes the first column at a width the owner drags, the conversation the middle. The third was the gap: the governed terminal stacked *between* the transcript and the composer, in the conversation's own column, so the two things the owner reads at once competed for one column of room. It takes the third zone now, sharing it with the background-work panel, which is the other thing that is *about* the work rather than part of it. Narrow, there is no third column and the pane stays where it was. The terminal also gained a header toggle beside Files and Background work: it had been reachable only through its own collapsed header, so moving the pane without one would have stranded it behind the `/terminal` command.
-
-What this finding still leaves open is the *artifact* half of the zone — a diff or a generated file opening there rather than inline in the transcript. That needs the typed output components of VIS-19 to exist first.
-
-Build is a defining surface. A chat-shaped page with repository controls will not visually compete with Cursor, Codex or artifact-style workflows.
-
-### Recommendation
-
-Desktop Build should converge on a flexible three-zone composition:
+or, at the narrowest width:
 
 ```text
-Repository / files | Conversation + plan | Artifact / diff / terminal
+[ + ] [ Model glyph ] [ Context ring ] [ Shield ]                     [ Send ]
 ```
 
-Panels should collapse intelligently. When a diff, generated file, terminal or preview is active, give it more screen area than explanatory cards.
+Requirements:
+
+- model identity must distinguish two models from the same provider;
+- context/scope must remain inspectable in one tap;
+- the compact shape must still explain itself through tooltip/accessible label;
+- do not add another permanent row.
 
 ---
 
-## VIS-11 — Chat should be visibly simpler than Build
+## VIS2-06 — Make the composer feel less like a bordered form with toolbars
 
-**Priority: P1 — Impact: High**
+**Priority: P1 — Effort: Medium — Visual impact: Very high**
 
-**Status: Done 2026-09-06.** Reached by VIS-03 and VIS-08 rather than by a change of its own: Chat lost the route title and hint, and both surfaces traded two permanent configuration controls for one posture chip. Build kept its repository picker, its mode picker and now a terminal toggle. The gap is a rubric rule rather than an impression — Chat's composer must carry fewer turn-governing controls than Build's, counted from the composer's own left cluster.
+### Observation
 
-Chat and Build can share design primitives without sharing density.
+The shared Composer is a major improvement, but its composition still uses:
+
+- an outer bordered card;
+- shadow/elevation on focus;
+- a full-width top border before each composer bar;
+- potentially a separate running-turn bar and the normal control bar.
+
+This is structurally clear, but the composer can read as a form panel with toolbar rows rather than the natural “floor” of the conversation.
 
 ### Recommendation
 
-Chat:
+Reduce visible framing:
 
-- generous conversational measure;
-- simple composer;
-- minimal side information;
-- model/project/approval controls integrated into composer chrome;
-- tool activity summarized inline and expandable.
+- keep one soft outer shell;
+- use tonal separation or spacing for the utility row instead of a full-width rule in the normal state;
+- when a live-turn steering row exists, give **that** row the separator/emphasis;
+- prefer grouped icon/text affordances over many independently outlined controls;
+- preserve strong focus visibility through a subtle focus ring/edge, not necessarily more shadow.
 
-Build:
+### Acceptance
 
-- denser controls;
-- file/diff/terminal affordances;
-- persistent plan/progress;
-- repository context.
+At a glance, the prompt area is the largest visual region of the composer and controls feel attached to it rather than stacked underneath it.
 
 ---
 
-## VIS-12 — Improve empty states
+## VIS2-07 — Make governance wording state-aware, not only governance colour
 
-**Priority: P1 — Impact: High**
+**Priority: P1 — Effort: Low — Visual impact: Medium/high**
 
-**Status: Done 2026-09-06.** The component had carried an `action` slot for a while and not one of the thirteen call sites used it. Projects, Tasks, Sessions, Checkpoints, Threads and Models now each carry one sentence and one primary action. Models also stopped naming a file Raiker no longer reads.
+### Observation
 
-A complex agent platform has many zero-data screens: no projects, tasks, memories, model, approvals or connected tools.
+`PostureControl` correctly changes to warning colour for relaxed modes, but its summary always begins with `Protected`:
+
+```text
+Protected · Local · Auto-approve
+Protected · Local · Skip prompts
+```
+
+The colour says “pay attention,” while the first word says the same reassuring thing as the stricter mode.
 
 ### Recommendation
 
-Every major empty state should contain:
+Use state-aware lead copy while remaining factual, for example:
 
-- one clear sentence;
-- one primary action;
-- optionally 2–4 examples;
-- no diagnostic jargon unless the absence is actually an error.
+```text
+Protected · Local · Ask first
+Protected · Local · Decline unattended
+Auto approval · Local
+Reduced prompts · Local
+```
+
+or another wording that accurately reflects the runtime semantics.
+
+Do not imply “unsafe” if other controls remain enforced. The goal is simply to prevent reassurance copy from visually cancelling the warning state.
+
+---
+
+## VIS2-08 — Simplify the sidebar's active-state language
+
+**Priority: P1 — Effort: Low — Visual impact: Medium/high**
+
+### Observation
+
+The selected navigation location can currently be communicated by several simultaneous cues:
+
+- group-level accent bar;
+- active row background;
+- active row accent text;
+- stronger font weight;
+- `Current` group text for an active collapsible group.
+
+The redundancy is accessible, but visually it is more signalling than a calm rail needs.
+
+### Recommendation
+
+Keep two cues maximum:
+
+- active row tonal background;
+- one accent cue (icon/text or edge marker).
+
+Remove `Current` and/or the group-level accent bar once the active row remains visible.
+
+---
+
+## VIS2-09 — Give top-level destinations distinct icon identities
+
+**Priority: P1 — Effort: Low/Medium — Visual impact: High**
+
+### Observation
+
+Several conceptually different destinations reuse the same visual metaphor, including `spark` across multiple creation/knowledge surfaces and chat-like symbols across communication surfaces.
+
+Repeated icons force users back to labels and weaken the collapsed rail, where icons are the only visible navigation language.
+
+### Recommendation
+
+Establish a semantic icon map with no duplication among permanent rail destinations:
+
+```text
+Home          house / workspace
+Chat          message
+Build         code / terminal brackets
+Threads       history / conversation stack
+Tasks         check / clock
+Projects      folder / workspace
+Memory        memory / bookmark / layers
+Knowledge Map graph / nodes
+```
+
+Reserve the Raiker spark/eye identity for **AI/agent action** rather than generic navigation.
+
+### Acceptance
+
+A user familiar with Raiker should be able to recognise all permanent-rail destinations with labels hidden.
+
+---
+
+## VIS2-10 — Make Models, Extensions, Observability and Settings feel composed, not tab-warehoused
+
+**Priority: P1 — Effort: Medium — Visual impact: High**
+
+### Observation
+
+The current grouping solved the old flat-navigation problem, but the secondary hubs are still large:
+
+- Models: 6 tabs;
+- Extensions: 5 tabs;
+- Observability: 6 tabs;
+- Settings: 10 sections.
+
+The organisation is logical, yet a large tab strip can still feel like configuration software rather than a deliberately composed workspace.
+
+### Recommendation
+
+Use **task-oriented hub landings** and subsection navigation.
 
 Examples:
 
-**Projects** — "Keep chats, tasks and files for one goal together." → New project
-
-**Tasks** — "Give Raiker work that can continue after you leave." → New task
-
-**Memory** — "Raiker only remembers what is approved here." → Explain memory
-
----
-
-## VIS-13 — Make Workbench a real command centre or remove it
-
-**Priority: P1 — Impact: High**
-
-**Status: Done 2026-09-06.** It was already close — it shows running work, standing agents, scheduled runs, threads to continue and what needs attention, and no healthy-subsystem telemetry. What it also did was render three of those boards as full cards *whatever* the state, so an idle Home opened on three bordered rectangles reporting an absence its own lead sentence already stated, beside a *Needs your attention* rail holding three tiles that read 0. A board appears when it has something in it, a tile appears when its own count is not zero, and an idle Home says "Nothing needs you right now." once. The route is also called Home now, which is what it is.
-
-Workbench must earn being the default route. If it mostly repeats cards linking elsewhere, it adds another layer.
-
-### Recommendation
-
-Show only high-signal items:
-
-- Continue recent work
-- Approvals requiring attention
-- Active/background tasks
-- Recent Projects
-- Runtime issue only when action is required
-
-Do not show healthy subsystem status by default.
-
-If Workbench cannot be reduced to a genuinely useful start page, make Chat/new work the default.
-
----
-
-## VIS-14 — Unify Threads, Tasks and Projects visually
-
-**Priority: P1 — Impact: High**
-
-**Status: Done 2026-09-06.** `WorkMeta` is the vocabulary: project, state, one object-specific detail, last activity — in that order, with the same weight, wherever a piece of work is drawn. The three views had been saying the same facts three ways: a thread "3 turns · 2h ago" with the project as a bare tag, a task "Runs hourly · updated 2h ago" with its state as a Badge, a project "4 sessions". Each part is optional and leaves no trace when absent, so a project with no state renders no empty chip.
-
-These are different views of work but should feel related.
-
-### Recommendation
-
-Use one consistent object vocabulary:
-
-- title;
-- Project;
-- state;
-- last activity;
-- model/runtime only when relevant;
-- primary continuation action.
-
-A Task thread should look related to a Chat thread rather than belonging to another application.
-
----
-
-## VIS-15 — Use status colour more sparingly
-
-**Priority: P1/P2 — Impact: Medium/high**
-
-**Status: Done 2026-09-06.** The two controls added in this pass were neutral at rest already. The badge registry was not: `safe` ("low-risk, auto-allowed") and `implemented` ("real, working capability") are the *resting* state of most of the gate table, and both were green, so Permissions opened as a wall of colour reporting that nothing was wrong. Both are muted now — the symbol and the label still say it. `done` and `active` keep their colour, because finishing and being in flight are things that happen rather than states that simply are. `tone-safe` had no user left and is gone. The rubric holds a named list of the states that earn colour, so a new one has to be argued onto it.
-
-Raiker legitimately needs success/warn/deny/read-only states, but repeated coloured chips/backgrounds/borders can make the product look like monitoring software.
-
-### Recommendation
-
-- colour exceptions and actions, not every normal state;
-- healthy/allowed can often be neutral text + icon;
-- reserve red for true denial/destructive/error states;
-- use gold primarily for pending/authority/brand moments;
-- use blue primarily for selection/action.
-
----
-
-## VIS-16 — Reduce prominence of technical identifiers
-
-**Priority: P2 — Impact: Medium**
-
-**Status: Done 2026-09-06.** The global chrome already followed it — the model chip leads with a human provider name and keeps the raw model id in its tooltip. The one place a technical identifier led was the project card, where the on-disk path opened the sentence about the work; it reads below the name in mono now, which is what it is.
-
-Provider/model/tool/protocol identifiers should not dominate normal cards.
-
-### Recommendation
-
-- human label first;
-- technical ID in mono secondary line or detail drawer;
-- protocol/version only where troubleshooting requires it;
-- shorten repetitive provider/model naming in normal conversation chrome.
-
----
-
-## VIS-17 — Regroup Settings
-
-**Priority: P2 — Impact: Medium**
-
-**Status: Done 2026-09-06.** Three groups — Experience, Security & data, Developer & runtime. "Personal" had been holding six of the ten sections, so it was the flat list the grouping existed to break up. The rail derives the group order from the section list rather than restating it.
-
-Settings has many sections and reads as a flat list.
-
-### Recommendation
-
-Group visually:
+**Models landing**
 
 ```text
-Experience
-  General
-  Notifications
-  Personalisation
+Active model
+Ready alternatives
+Recent model operation
 
-Security & data
-  Security
-  Privacy
-  Account
-
-Developer & runtime
-  Web access
-  Git credentials
-  Runtime
-  Updates
+Manage
+  Local
+  Hosted
+  Hugging Face
+  Routing
+  Pricing
 ```
 
----
+**Observability landing**
 
-## VIS-18 — Give Knowledge Map a spatial visual grammar
+```text
+Needs attention
+Active work
+Recent approvals/denials
+Last integrity check
 
-**Priority: P2 — Impact: Medium/high**
+Inspect
+  Sessions
+  Activity
+  Checkpoints
+  Work
+  Notifications
+```
 
-**Status: Already satisfied — verified live 2026-09-06, no change needed.** Measured at 1440: the graph is 94% of the page's height, the page carries **zero** cards, and the controls float over the canvas — summary, viewport, live-state and depth. Settings and the record inspector are dismissible panels over the graph rather than permanent columns, and the inspector appears on selection. The finding was written from the screenshot catalogue; the implementation already matched it.
-
-Knowledge Map is inherently spatial and should not look like an admin page surrounding a graph.
-
-### Recommendation
-
-- graph/canvas as hero;
-- filters/provenance in collapsible side panels;
-- selection inspector instead of permanent cards;
-- subtle relationship-focus animation.
-
----
-
-## VIS-19 — Introduce richer inline output components
-
-**Priority: P1 — Impact: High**
-
-**Status: Specified, not built — 2026-09-06.** Worth stating precisely, because the finding reads as "build ten components" and that is not the work. Nine of the ten already exist: `.property-list`, `.table`, `SourceChips` and `SourceExcerptPanel`, `AttachmentCard`, `LifecycleTrack` and `ToolActivity`, `ApprovalPrompt`, `DiffView`, `CommandOutputPane`, `ImageViewport`. Only the chart block is genuinely absent. The catalogue is in `VISUAL_DESIGN_SPEC.md` → "The output vocabulary".
-
-What is missing is the **typed channel**: a block schema a turn can emit, a backend that produces it, and a renderer that maps each type to its component and refuses anything it does not recognise. That refusal is the governed half and is why this cannot be Markdown with HTML passed through. It is a backend contract as much as a visual change, so it is not a stylesheet pass and is not attempted here.
-
-Modern assistants increasingly render structured modules rather than Markdown plus generic tool rows.
-
-### Recommendation
-
-Create a governed presentation vocabulary:
-
-- key-value summary;
-- comparison table;
-- cited source row;
-- file/artifact card;
-- plan/progress block;
-- approval block;
-- diff block;
-- terminal block;
-- chart/visual block;
-- generated asset preview.
-
-These should be typed Raiker UI components, not arbitrary provider HTML.
+On mobile, prefer a drill-in list or segmented grouped navigation rather than a long horizontally scrolling tab strip.
 
 ---
 
-## VIS-20 — Spend motion only on state changes
+## VIS2-11 — Continue the move toward Project as the persistent visual context
 
-**Priority: P2 — Impact: Medium**
+**Priority: P1 — Effort: Medium/High — Visual impact: Very high**
 
-**Status: Done 2026-09-06 — no change needed, and that is the finding's answer rather than a dismissal.** Every infinite animation in the product is a progress indicator: the skeleton loader, the streaming pulse in Chat and Build, the reasoning and tool-activity pulses, the dictation dot, the sign-in spinner. Each one is a state change that has not finished yet, which is exactly what the finding says motion is for. The global `prefers-reduced-motion` guard collapses all of them with `!important` on `*`, so none needs to opt in.
+### Observation
 
-The one genuinely ambient case is the Work-in-action illustration — a glowing lamp, a flickering screen, an idling character. It is decoration, it is disclosed as decoration on the page itself (*"Idle character movement is visual-only; it does not mean the agent is working"*), and whether Raiker wants an illustrative scene at all is a product decision rather than a visual defect.
+VIS-14 successfully unified metadata vocabulary, but Threads, Tasks and Projects remain separate top-level concepts. Current competitors increasingly make Project the persistent context that holds multiple work types.
 
-The design system already defines thoughtful motion tokens and reduced-motion behavior.
+Raiker's architecture already has the right ingredients. The visual hierarchy can go further.
 
 ### Recommendation
 
-Animate only meaningful transitions:
+Inside a Project, treat these as sections of one workspace:
 
-- approval arrives because work is blocked;
-- plan step completes;
-- task changes state;
-- Build artifact panel opens;
-- model/runtime state changes;
-- navigation rail expands/collapses.
+```text
+Project name / goal / posture
 
-Avoid ambient dashboard animation.
+Overview
+Threads
+Tasks
+Files
+Memory / context
+Instructions
+Activity
+```
+
+Global Threads and Tasks remain useful as **cross-project aggregate views**, but entering one Project should reduce the need to jump among global destinations.
+
+Add restrained project identity:
+
+- icon/glyph;
+- optional accent choice drawn from approved theme tokens;
+- project title + goal at the top of relevant work surfaces;
+- consistent breadcrumb/project switcher.
+
+Do not create a second navigation tree. The Project context should simplify orientation, not add more chrome.
 
 ---
 
-## VIS-21 — Refine dark/light through depth, not more colours
+## VIS2-12 — Complete Build's artifact half: third pane should be the object of work
 
-**Priority: P2 — Impact: Medium**
+**Priority: P1 — Effort: Medium — Visual impact: Very high**
 
-**Status: Done 2026-09-06.** A card is separated from the ground by one device, and each theme spends the one it can afford. Dark already climbs `#0B0D10` → `#12161F` → `#171C26`, so the outline on top of that step was a second edge doing a job the luminance had already done — it is what made Permissions read as a grid of boxes rather than as raised paper. Light has almost no luminance to spend, a white card on a near-white ground, so it keeps the outline. `--card-edge` is set per theme beside the other tokens, so neither theme can drift from the other without the other moving.
+### Observation
 
-Dark can remain flagship while light stays first-class.
+VIS-10 moved terminal/background work into the third zone, but its own status note left the artifact half open. Since then, Raiker already has components for:
+
+- `DiffView`;
+- `FileInspector`;
+- `ImageViewport`;
+- `CommandOutputPane`;
+- source/file presentation.
+
+The primitives now exist to finish the composition.
 
 ### Recommendation
 
-Dark:
+Turn the third pane into a **contextual work inspector**:
 
-- deeper neutral layering instead of many borders;
-- gold used as sparse authority/action highlight;
-- terminal/diff surfaces integrated into the surrounding workbench.
+```text
+Changes | Preview | Terminal | Runs
+```
+
+Behaviour:
+
+- opening a changed file selects **Changes**;
+- generated code/file selects **Preview** or file inspector;
+- command execution selects **Terminal** only when relevant;
+- background task selects **Runs**;
+- user can pin the pane open;
+- pane collapses when no object warrants it.
+
+This makes Build visually communicate “the agent is working on *this object*,” which is stronger than showing all artifacts inline in a transcript.
+
+---
+
+## VIS2-13 — Establish a badge/chip budget
+
+**Priority: P2 — Effort: Low/Medium — Visual impact: High**
+
+### Observation
+
+Raiker now has a rich set of good status primitives: badges, model capacity, readiness, subscription limits, identity chips, source chips, posture, work metadata and state labels.
+
+The risk is no longer bad individual badges. It is **chip accumulation**.
+
+### Recommendation
+
+Add a design-rubric rule:
+
+- one primary status token per repeated row/card;
+- at most one additional contextual token before overflow/detail;
+- healthy/default facts should usually be plain text/icon;
+- chips are for things the eye should scan as discrete state;
+- never put a chip around a value merely because a component exists for chips.
+
+Example:
+
+Bad:
+
+```text
+[Ready] [Local] [Safe] [Implemented] [Ask] [Owner]
+```
+
+Better:
+
+```text
+Ready                      Local · Ask first · Owner
+```
+
+with detail on expansion.
+
+---
+
+## VIS2-14 — Add a theme-specific optical pass, not another palette redesign
+
+**Priority: P2 — Effort: Medium — Visual impact: Medium/high**
+
+### Observation
+
+VIS-21 correctly let dark surfaces rely more on luminance than outlines. The next step should not be adding more colours.
+
+Light and dark themes need slightly different **optical composition** even when they share semantic tokens.
+
+### Recommendation
 
 Light:
 
-- reduce grey-outline accumulation;
-- rely more on whitespace/subtle elevation;
-- keep blue quieter than conventional enterprise dashboards.
+- let larger blank areas remain blank rather than filling them with cards;
+- use subtle tonal section separation before adding borders;
+- keep shadows very restrained;
+- avoid making every white entity float on a near-white page.
+
+Dark:
+
+- keep borders rare;
+- prevent gold + warning + active colours from appearing simultaneously in one cluster;
+- rely on surface luminance and spacing for normal grouping;
+- ensure terminal/code surfaces do not visually merge into the page background.
+
+### Acceptance
+
+A screenshot converted to greyscale should still show the same reading order in both themes.
 
 ---
 
-## VIS-22 — Add a global command palette
+## VIS2-15 — Treat 4K/8K as composition classes, not only bounded-width validation
 
-**Priority: P1/P2 — Impact: High for advanced users**
+**Priority: P2 — Effort: Medium — Visual impact: Medium**
 
-**Status: Done 2026-09-06.** `Ctrl/Cmd+K` from anywhere, including from inside a text field. Finds commands, every page on the rail or off it, and each settings section by its own name. This is what allows the rail to be short.
+### Observation
 
-The All Pages dialog and Threads search already provide pieces of this.
+Raiker has unusually strong high-resolution screenshot coverage. Fixed reading/workspace/operational maxima prevent content from becoming absurdly wide, which is correct.
+
+However, a bounded central island on 4K/8K can still look visually small even when it is technically readable.
 
 ### Recommendation
 
-`Cmd/Ctrl+K` should find:
+At very large widths:
 
-- pages;
-- threads;
-- projects;
-- tasks;
-- settings;
-- models;
-- commands such as New task/Open approvals.
+- keep prose measure fixed;
+- allow operational pages to use more simultaneous columns where useful;
+- let Build/Knowledge Map/Observability exploit extra horizontal room;
+- increase **inter-region whitespace**, not font size;
+- consider a subtle max-canvas background/surface treatment so the work area feels intentionally framed rather than stranded.
 
-This allows permanent navigation to shrink without harming discoverability.
+Do not scale controls with resolution.
 
 ---
 
-## VIS-23 — Standardize page-level action placement
+## VIS2-16 — Make normal state quieter than successful state
 
-**Priority: P2 — Impact: Medium**
+**Priority: P2 — Effort: Low — Visual impact: Medium**
 
-**Status: Done 2026-09-06.** `.head-row` is one rule in `app.css` rather than eight byte-identical private copies, at the breakpoint all eight already used. Nothing had to disagree for the surfaces to drift — only to be edited separately.
+### Observation
 
-A product with many management surfaces looks assembled if New/Add/Connect/Export/Repair actions move around unpredictably.
+VIS-15 neutralised many healthy badges, but this principle should become stronger across pages:
+
+- `ready` can be normal;
+- `connected` can be normal;
+- `implemented` can be normal;
+- `allowed` can be normal.
+
+Success colour should represent **something just completed** or something the user is actively verifying, not a permanent background condition.
 
 ### Recommendation
 
-Use one header contract:
+Add this explicit rule to the visual rubric:
 
-```text
-Title                           Primary action
-One-line purpose                Secondary actions / overflow
-```
+> Persistent normal state is neutral. Success colour is temporal or confirmatory.
 
-Entity-level actions stay with entities; page-wide actions stay in the header.
+This helps Raiker avoid monitoring-dashboard aesthetics as more integrations are added.
 
 ---
 
-## VIS-24 — Add a visual-quality rubric to screenshot sweeps
+## VIS2-17 — Standardise overlay/popover composition
 
-**Priority: P1 — Impact: High over time**
+**Priority: P2 — Effort: Medium — Visual impact: Medium/high**
 
-**Status: Done 2026-09-06.** The mechanisable half is `apps/web/src/lib/visualRubric.test.ts` — rail length, reachability, the header contract, empty-state actions, and stale configuration paths in copy — and each rule is one that was actually broken rather than one invented to have a test. The human half is seven questions in `VISUAL_DESIGN_SPEC.md` → "The visual rubric", to be answered out loud on any shell, composer or navigation change.
+### Observation
 
-Raiker already has unusually strong responsive screenshot coverage. The catalogue documents 26 route/tab states across four display classes and both themes, plus separate width assertions.
+Raiker now has many transient surfaces:
+
+- Command Palette;
+- All Pages;
+- Model picker;
+- Posture popover;
+- notifications;
+- step-up/approval dialogs;
+- attach panel;
+- source/file inspectors.
+
+Individually they are reasonable. As the product grows, they need one visual grammar.
 
 ### Recommendation
 
-Add human-review criteria:
+Define overlay classes by role:
 
-- no page with excessive primary cards above the fold;
-- one obvious primary action per empty state;
-- no more than two accent colours in normal non-status areas;
-- no technical identifier at primary hierarchy unless user-selected;
-- heading hierarchy visibly distinct;
-- top routes reviewed at 1440/light and 1440/dark on every shell/composer redesign;
-- screenshot-diff threshold plus explicit visual approval for shell/composer/nav changes.
+1. **menu/popover** — small, anchored, immediate choices;
+2. **picker** — searchable selection, medium width;
+3. **inspector** — contextual details, side panel;
+4. **decision dialog** — modal, one consequential action;
+5. **command palette** — global search/action surface.
 
-Automated overflow/a11y tests prove the interface works. They do not prove it looks calm or intentional.
+Standardise:
 
----
-
-# Recommended visual direction
-
-## Product personality
-
-**Calm, capable, governed, technical when requested.**
-
-Avoid both extremes:
-
-- not a colourful consumer chatbot;
-- not a cyber-security SIEM dashboard.
-
-Raiker should look like a premium work tool whose safety system is deeply integrated rather than constantly announced.
-
-## Visual hierarchy
-
-```text
-1. User's current work
-2. Agent response / artifact / task state
-3. Context and next action
-4. Governance summary
-5. Technical evidence and configuration
-```
-
-The current product sometimes visually promotes levels 4 and 5 too early.
-
-## Shell proposal
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ Raiker    Chat | Build             [Project]  [Approvals 2] │
-├──────────────┬──────────────────────────────────────────────┤
-│ New          │                                              │
-│ Recents      │            current work surface              │
-│ Projects     │                                              │
-│ Tasks        │                                              │
-│              │                                              │
-│ ───────────  │                                              │
-│ More / ⚙     │                                              │
-└──────────────┴──────────────────────────────────────────────┘
-```
-
-## Composer proposal
-
-```text
-┌──────────────────────────────────────────────────────┐
-│ Ask Raiker…                                          │
-│                                                      │
-│ +  Project  Model · Auto   Protected        🎙  Send │
-└──────────────────────────────────────────────────────┘
-```
-
-Expanded `Protected` reveals execution/data/approval posture. Normal users get assurance; advanced users get exact controls.
-
-## Build proposal
-
-```text
-┌──────────────┬───────────────────────┬─────────────────────┐
-│ Files        │ Conversation / Plan   │ Diff / Preview      │
-│              │                       │ Terminal / Artifact │
-│ repo tree    │ agent progress        │                     │
-└──────────────┴───────────────────────┴─────────────────────┘
-```
-
-Collapse any column when it is not useful. Do not keep empty panels merely to preserve symmetry.
+- header height;
+- radius;
+- border/shadow;
+- title size;
+- close affordance;
+- action placement;
+- maximum width;
+- backdrop behaviour;
+- mobile transformation (popover → bottom sheet/full-width panel where appropriate).
 
 ---
 
-# Implementation order
+## VIS2-18 — Separate “attention” from “information” throughout the product
 
-## Wave 1 — highest visual return, modest engineering effort
+**Priority: P1 — Effort: Medium — Visual impact: High**
 
-1. VIS-01 simplify sidebar.
-2. VIS-02 create clear Chat/Build mode switch.
-3. VIS-08 compact governance posture on work surfaces.
-4. VIS-12 redesign empty states.
-5. VIS-15 reduce routine status colour.
-6. VIS-23 standardize page header/action placement.
-7. VIS-22 add global command/search launcher.
+### Observation
 
-## Wave 2 — work-surface redesign
+Home, Observability, Models and governance pages all contain a mixture of:
 
-1. VIS-10 Build three-zone layout.
-2. VIS-11 differentiate Chat density from Build.
-3. VIS-19 structured inline output components.
-4. VIS-09 approval interaction redesign.
-5. VIS-13 simplify Workbench.
-6. VIS-14 visually unify Threads/Tasks/Projects.
+- things the user must act on;
+- things worth knowing;
+- supporting evidence.
 
-## Wave 3 — polish
+If those have similar card/header/badge treatment, the user must read everything to discover importance.
 
-1. VIS-05 reduce card walls.
-2. VIS-06 typography cleanup.
-3. VIS-07 signature Raiker behaviours.
-4. VIS-17 Settings regrouping.
-5. VIS-18 Knowledge Map spatial treatment.
-6. VIS-20 functional motion pass.
-7. VIS-21 theme refinement.
-8. VIS-24 visual-regression rubric.
+### Recommendation
 
----
+Use a consistent three-level hierarchy:
 
-# Design acceptance criteria
+```text
+Needs action     explicit action / count / exception tone
+Worth knowing    neutral summary
+Evidence/detail  collapsed or lower visual weight
+```
 
-A successful redesign should make the following true:
+Apply this especially to:
 
-- a first-time user can identify Chat, Build and Projects in under five seconds;
-- a normal chat does not require understanding Permissions, Models, MCP, hooks or runtime terminology;
-- governance is always available but normally summarized in one compact posture control;
-- Build visually prioritizes files/diffs/artifacts when they exist;
-- Approvals explain proposed effect before technical detail;
-- the default route contains actionable work rather than healthy-system telemetry;
-- repeated entities use lists/tables instead of walls of cards;
-- dark and light modes share hierarchy and density;
-- mobile navigation remains task-oriented, not a compressed desktop control plane;
-- every advanced control remains available after the user asks for or needs it.
+- Home;
+- Observability overview;
+- Model readiness;
+- Extensions health;
+- Memory integrity;
+- Approvals.
+
+### Acceptance
+
+A user should be able to identify all required actions from a page in a 2-second scan without reading explanatory paragraphs.
 
 ---
 
-# Final judgement
+## VIS2-19 — Make Design canvas-first, not a third chat variant
 
-Raiker does **not** need a wholesale visual rebrand. The current Control Deck system is a good foundation.
+**Priority: P2 — Effort: Medium/High — Visual impact: High**
 
-It needs an information-hierarchy redesign.
+### Observation
 
-The most important change is to make the product look simpler than its architecture: Chat and Build first, current work second, governance summarized contextually, infrastructure behind progressive disclosure. That would preserve Raiker's technical seriousness while moving its perceived quality much closer to the best modern AI products.
+The overall shell correctly treats Design as a work surface, and `ImageViewport` already exists. Current agent/design tools are increasingly spatial: the object being changed is visible and selectable.
+
+### Recommendation
+
+As Design matures, use this hierarchy:
+
+```text
+Large image/canvas
+Selected object / version / crop state
+Compact prompt + controls
+History / variations in a collapsible rail
+```
+
+Long-term direction:
+
+- click/select the generated asset or region;
+- send selection context with the next instruction;
+- compare variants visually;
+- keep generation metadata secondary.
+
+This should look closer to a creative workspace than Chat with an image in it.
+
+---
+
+## VIS2-20 — Use the component system to prevent visual drift in the largest views
+
+**Priority: P2 — Effort: Medium — Visual impact: Medium/high**
+
+### Observation
+
+Several major view files remain very large, particularly Build, Knowledge Map/Brain and Approvals. Large view components are not automatically visually poor, but they make it easier for spacing, headings, responsive behaviour and one-off state treatments to drift locally.
+
+### Recommendation
+
+When touching these views for product work, extract **visual regions**, not arbitrary code fragments:
+
+```text
+BuildWorkspaceShell
+BuildConversationRegion
+BuildArtifactRegion
+ApprovalDecisionSummary
+ApprovalEvidenceSection
+KnowledgeMapToolbar
+KnowledgeMapInspector
+```
+
+Each extracted region should consume the design tokens/surface vocabulary rather than re-declaring local visual rules.
+
+This is a visual consistency measure, not a LOC target.
+
+---
+
+# Page-by-page Pass-2 observations
+
+## Home
+
+What is now strong:
+
+- empty card walls were removed;
+- attention content is conditional;
+- Home has a clearer reason to exist.
+
+Next polish:
+
+- make **Continue work** the visually strongest normal-state region;
+- make **Needs attention** visually strongest only when it is non-empty;
+- avoid equal-weight headings for “recent”, “scheduled”, “standing” and “attention” if only one has useful content;
+- use project identity sparingly so recent work is recognisable before the user reads every title.
+
+## Chat
+
+What is now strong:
+
+- low chrome;
+- shared composer;
+- compact posture;
+- Chat is clearly less dense than Build.
+
+Next polish:
+
+- simplify composer separators per VIS2-06;
+- preserve model/context identity on compact widths per VIS2-05;
+- keep ToolActivity collapsed to one readable sentence unless the user expands it;
+- avoid surrounding ordinary assistant text with unnecessary containers;
+- use richer typed blocks only when the answer actually benefits from structure.
+
+## Build
+
+This remains the highest-value visual investment.
+
+Next polish:
+
+- complete the contextual artifact pane (`Changes | Preview | Terminal | Runs`);
+- let selected file/diff become the visual focus automatically;
+- keep the conversation readable rather than letting three dense panes compete at equal weight;
+- show plan/progress near the work object, not as another dashboard card;
+- remember pane widths and last useful pane per project.
+
+## Design
+
+Next polish:
+
+- progressively become canvas-first;
+- let the image/asset occupy more of the screen than explanatory controls;
+- move size/count/model options into a compact creation bar;
+- make iteration/history visual rather than a list of technical generation records.
+
+## Threads
+
+Next polish:
+
+- keep list-first presentation;
+- use date/group separators quietly;
+- project should be recognisable without turning every project name into a coloured chip;
+- if task-generated sessions appear here, distinguish with one icon/state—not a totally different card.
+
+## Tasks
+
+Next polish:
+
+- favour dense list rows over cards;
+- surface state, next run and project as the scan line;
+- open full evidence/logs in a side inspector;
+- distinguish “needs you” from “running normally” more strongly than different shades of badge.
+
+## Projects
+
+Projects should become more visually important over time.
+
+Next polish:
+
+- add clear project identity and goal at the top;
+- bring Threads, Tasks, Files and context together inside a project workspace;
+- allow global views to remain aggregates rather than the primary way to navigate a long-running goal;
+- do not duplicate the entire main sidebar inside Projects.
+
+## Memory
+
+Next polish:
+
+- orient the normal user around **what Raiker remembers and why**;
+- keep embedding/vector/backend implementation detail in Advanced/diagnostic views;
+- visually distinguish approved memory, observed context and recall evidence through hierarchy and labels, not three unrelated card styles.
+
+## Knowledge Map
+
+The canvas-first direction is already strong.
+
+Next polish:
+
+- default to a useful focus rather than “everything” when the graph is dense;
+- fade unrelated nodes/edges on selection;
+- show labels progressively by zoom/focus;
+- keep inspector and filter panels dismissible;
+- treat animation as relationship/state feedback, not ambient movement.
+
+## Approvals
+
+The decision ordering is much better.
+
+Next polish:
+
+- make destination/affected-files/data scope instantly scannable;
+- keep provenance/evidence collapsed until requested;
+- if a diff exists, give it more visual area than policy metadata;
+- distinguish **Approve**, **Approve once**, **Edit**, **Deny** only when the runtime actually supports semantically distinct actions—do not add decorative choice.
+
+## Permissions
+
+The row/list treatment is appropriate.
+
+Next polish:
+
+- search/filter should be visually prominent once the list grows;
+- group high-risk/external capabilities ahead of routine ones where useful;
+- default enabled/implemented states remain neutral;
+- allow an expanded row to explain “what this allows” in plain language before schema/technical details.
+
+## Models
+
+Next polish:
+
+- lead with **the model currently answering** and ready alternatives;
+- provider-management internals should sit below that goal;
+- recent failed/download/conversion activity appears only when relevant;
+- pricing/routing can remain advanced destinations rather than equal-weight first impressions.
+
+## Extensions
+
+Next polish:
+
+- visually separate **Connected/Installed** from **Available**;
+- use provider/tool identity consistently;
+- avoid each extension category inventing a new card structure;
+- make permission/data-boundary consequences visible on connection, not permanently repeated on every card.
+
+## Observability
+
+Next polish:
+
+- exceptions-first rather than “dashboard because dashboards have tiles”;
+- show active work and failed/degraded subsystems before healthy telemetry;
+- use timeline/table structures for evidence;
+- collapse normal integrity/readiness history;
+- let one action-required issue dominate instead of giving six subsystem states equal weight.
+
+## Settings
+
+The three-group structure is better.
+
+Next polish:
+
+- maintain clear group headings in the settings rail;
+- keep destructive/security-sensitive actions visually separated from ordinary preferences;
+- move licence/about/build information here from persistent sidebar chrome;
+- avoid turning each setting into its own bordered card.
+
+---
+
+# Updated visual-system rules
+
+These rules should be added to or cross-referenced from the visual rubric/design spec.
+
+## Rule A — One dominant visual task per viewport
+
+At normal desktop width, a screen should have one region that clearly reads first.
+
+Exceptions: deliberate split workspaces such as Build, where two/three regions are simultaneously necessary.
+
+## Rule B — Two active-state cues maximum
+
+Do not combine colour, background, border, marker, bold and label to express one selection.
+
+## Rule C — One primary status token per repeated entity
+
+Additional state becomes plain metadata or detail.
+
+## Rule D — Persistent normal state is neutral
+
+Success colour is temporal or confirmatory; warning/error colour is exceptional.
+
+## Rule E — Compact does not mean contextless
+
+At narrow widths, combine context into one inspectable affordance instead of silently removing important turn identity.
+
+## Rule F — Governance foregrounds only at a decision boundary
+
+At rest, posture is a summary. At approval/risk transition, governance may become the dominant visual object.
+
+## Rule G — The object of work wins the screen
+
+In Build/Design, a diff/file/image/terminal becomes larger than explanatory chrome when it is the thing the user is reviewing.
+
+## Rule H — Legal/build metadata belongs in About/Settings
+
+Persistent workspace chrome should not contain repository/project-development metadata.
+
+---
+
+# Updated implementation order
+
+Priority first, then effort.
+
+## Wave 1 — Small polish with immediate visual return
+
+1. **VIS2-02** — remove licence/runtime prose from permanent sidebar footer.
+2. **VIS2-04** — platform-aware shortcut labels.
+3. **VIS2-08** — simplify sidebar active-state cues.
+4. **VIS2-09** — unique permanent-nav icon identities.
+5. **VIS2-01** — repair type-scale dead step.
+6. **VIS2-07** — state-aware posture wording.
+7. **VIS2-16** — codify normal-state neutrality.
+
+## Wave 2 — Everyday work-surface refinement
+
+8. **VIS2-03** — top-bar clustering and badge/attention hierarchy.
+9. **VIS2-05** — compact model/context recognisability.
+10. **VIS2-06** — quieter composer composition.
+11. **VIS2-13** — badge/chip budget.
+12. **VIS2-18** — action vs information hierarchy across Home/Observe/Models.
+13. **VIS2-17** — standard overlay vocabulary.
+
+## Wave 3 — Product-level composition
+
+14. **VIS2-12** — complete Build artifact pane.
+15. **VIS2-10** — compose secondary hubs beyond flat tab strips.
+16. **VIS2-11** — stronger Project workspace continuity.
+17. **VIS2-19** — canvas-first Design evolution.
+18. **VIS2-14** — theme-specific optical pass.
+19. **VIS2-15** — high-resolution compositional refinement.
+20. **VIS2-20** — extract large-view visual regions opportunistically.
+
+---
+
+# What should not change
+
+Pass 2 does **not** recommend replacing the Control Deck identity.
+
+Keep:
+
+- the restrained gold/steel/neutral palette;
+- Manrope as the main UI face;
+- JetBrains Mono for technical evidence;
+- Source Serif 4 only for selective high-value display/editorial moments;
+- dual first-class light/dark themes;
+- bounded reading widths;
+- density controls;
+- reduced-motion behaviour;
+- semantic warning/error states;
+- the explicit approval/governance model;
+- the current strong responsive screenshot/rubric discipline;
+- typed, governed presentation components instead of arbitrary provider HTML.
+
+Do **not** chase “premium” by adding gradients, glass effects, neon status colours, unnecessary animation or decorative dashboards.
+
+Raiker should be visually richer through **composition, hierarchy and contextual depth**, not ornament.
+
+---
+
+# Final Pass-2 judgment
+
+The first review concluded that Raiker needed an information-hierarchy redesign. That statement is now stale.
+
+**The hierarchy redesign has largely happened.**
+
+The post-fix product has a credible visual system and a much clearer product shape. The remaining work is the kind of refinement that separates a good technical product from a polished daily-use product:
+
+- remove persistent developer residue;
+- make the top bar and composer quieter;
+- preserve context when compact rather than hiding it;
+- reduce redundant active/status signalling;
+- strengthen typographic hierarchy;
+- make Projects more visibly persistent;
+- make Build's artifact the object of focus;
+- make complex hubs feel composed rather than merely categorized;
+- finish richer governed response composition.
+
+The desired end state remains:
+
+> **Raiker should look simpler than the architecture underneath it, calmer than the authority it controls, and more focused as the work becomes more complex.**
+
+That is the correct visual expression of a governed agent: power is present, but the interface only asks the user to look at the part that matters now.

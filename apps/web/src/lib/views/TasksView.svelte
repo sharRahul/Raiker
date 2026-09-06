@@ -1,4 +1,5 @@
 <script lang="ts">
+  import WorkMeta from "../components/WorkMeta.svelte";
   import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
@@ -416,13 +417,19 @@
               <div class="progress" role="progressbar" aria-valuenow={task.progress_percent} aria-valuemin="0" aria-valuemax="100"><div style={`width:${task.progress_percent}%`}></div></div>
             {/if}
             <footer>
-              <span title={task.scheduled_at ?? task.updated_at}>
-                {scheduleLabel(task)} · updated {relativeTime(task.updated_at)}
-                <!-- Backlog #23 — which working method this task's cycles run
-                     under. Only said when it is not the default, so the common
-                     case stays quiet and a Build child stands out on the board. -->
-                {#if task.surface === "build"} · Build{/if}
-              </span>
+              <!-- VIS-14 — the same order a thread and a project use: where the
+                   work lives, what it is doing, when it last moved. The state
+                   badge is above, on the title row, because a task's status is
+                   the first thing this card is read for.
+
+                   Backlog #23 — the working method is said only when it is not
+                   the default, so the common case stays quiet and a Build child
+                   stands out on the board. -->
+              <WorkMeta
+                project={task.surface === "build" ? "Build" : null}
+                detail={scheduleLabel(task)}
+                activityAt={task.updated_at}
+              />
               <span class="task-actions">
                 <!-- C11 — background work used to finish into a status line.
                      Each task now runs its cycles in a conversation of its own,

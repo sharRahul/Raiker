@@ -475,8 +475,10 @@ describe("TasksView blocked-on-approval pointer", () => {
     render(TasksView);
 
     await screen.findByRole("heading", { name: "Fix the failing test" });
-    // Said once, on the one that is not the default.
-    expect(screen.getAllByText(/· Build/)).toHaveLength(1);
+    // Said once, on the one that is not the default. VIS-14 — it is a chip in
+    // the shared work-meta line now rather than "· Build" appended to a
+    // sentence, so it reads the same way as a thread's project chip.
+    expect(screen.getAllByText("Build")).toHaveLength(1);
   });
 
   // The control is offered only where Build's method can work: a repository.

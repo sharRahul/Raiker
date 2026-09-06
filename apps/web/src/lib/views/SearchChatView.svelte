@@ -1,4 +1,5 @@
 <script lang="ts">
+  import WorkMeta from "../components/WorkMeta.svelte";
   /**
    * GAP-CHAT C18 — the cross-chat surface.
    *
@@ -211,16 +212,15 @@
               {#if thread.kind === "routine"}<Icon name="tasks" size="sm" />{/if}
               {thread.title}
             </span>
-            <span class="meta">
-              {thread.turn_count} turn{thread.turn_count === 1 ? "" : "s"} · {relativeTime(
-                thread.updated_at,
-              )} →
-            </span>
-            <span class="tags">
-              {#if thread.project_name}<span class="tag">{thread.project_name}</span>{/if}
-              {#if thread.cadence}<span class="tag">{cadenceLabel(thread.cadence)}</span>{/if}
-              {#if thread.waiting_on}<span class="tag warn">{thread.waiting_on}</span>{/if}
-            </span>
+            <!-- VIS-14 — project, state, last activity, in the one order every
+                 surface that draws a piece of work now uses. -->
+            <WorkMeta
+              project={thread.project_name}
+              state={thread.waiting_on ?? (thread.cadence ? cadenceLabel(thread.cadence) : null)}
+              stateVariant={thread.waiting_on ? "approval-required" : "metadata-only"}
+              detail={`${thread.turn_count} turn${thread.turn_count === 1 ? "" : "s"}`}
+              activityAt={thread.updated_at}
+            />
           </a>
         </li>
       {/each}

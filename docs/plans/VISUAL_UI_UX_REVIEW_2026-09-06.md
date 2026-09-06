@@ -386,6 +386,8 @@ If Workbench cannot be reduced to a genuinely useful start page, make Chat/new w
 
 **Priority: P1 — Impact: High**
 
+**Status: Done 2026-09-06.** `WorkMeta` is the vocabulary: project, state, one object-specific detail, last activity — in that order, with the same weight, wherever a piece of work is drawn. The three views had been saying the same facts three ways: a thread "3 turns · 2h ago" with the project as a bare tag, a task "Runs hourly · updated 2h ago" with its state as a Badge, a project "4 sessions". Each part is optional and leaves no trace when absent, so a project with no state renders no empty chip.
+
 These are different views of work but should feel related.
 
 ### Recommendation
@@ -424,6 +426,8 @@ Raiker legitimately needs success/warn/deny/read-only states, but repeated colou
 ## VIS-16 — Reduce prominence of technical identifiers
 
 **Priority: P2 — Impact: Medium**
+
+**Status: Done 2026-09-06.** The global chrome already followed it — the model chip leads with a human provider name and keeps the raw model id in its tooltip. The one place a technical identifier led was the project card, where the on-disk path opened the sentence about the work; it reads below the name in mono now, which is what it is.
 
 Provider/model/tool/protocol identifiers should not dominate normal cards.
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import WorkMeta from "../components/WorkMeta.svelte";
   import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
@@ -482,11 +483,17 @@
                 <Badge variant="read-only" label="attached folder" />
               {/if}
             </span>
-            <span class="sub">
-              <code class="mono">{p.root_kind === "attached" ? p.root_label : p.root_subpath}</code>
-              · {p.session_count} session{p.session_count === 1 ? "" : "s"}
-              · created {relativeTime(p.created_at)}
-            </span>
+            <!-- VIS-16 — the path is what this project *is* on disk, and it
+                 is the technical identifier, so it reads below the name in mono
+                 rather than inside the sentence about the work.
+                 VIS-14 — the counts and the age use the shared vocabulary, in
+                 the order a thread and a task use. -->
+            <code class="project-root mono">{p.root_kind === "attached" ? p.root_label : p.root_subpath}</code>
+            <WorkMeta
+              detail={`${p.session_count} session${p.session_count === 1 ? "" : "s"}`}
+              activityAt={p.created_at}
+              activityVerb="created"
+            />
           </button>
           <div class="project-actions">
             <button
@@ -847,6 +854,12 @@
     padding-bottom: 0.3rem;
   }
   /* `.kicker` is a shared rule; only the spacing above it is this view's. */
+  .project-root {
+    display: block;
+    color: var(--text-3);
+    font-size: var(--text-2xs);
+    overflow-wrap: anywhere;
+  }
   .kicker {
     margin: var(--space-3) 0 0.4rem;
   }

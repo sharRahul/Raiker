@@ -61,6 +61,10 @@ MODELS_VIEW = {
     "current_profile_id",
     "hosted_model_gate_state",
     "private_network_model_gate_state",
+    # What the enforcing path answers, beside what the gate row says. The two are
+    # different facts: a saved connection opens a gate whose row is still unset.
+    "hosted_model_gate_enforced",
+    "private_network_model_gate_enforced",
     "model_egress_allowlist_configured",
     "remote_profile_count",
     "no_silent_hosted_fallback",

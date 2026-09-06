@@ -1739,6 +1739,15 @@ class ModelsView:
     current_profile_id: str | None
     hosted_model_gate_state: str
     private_network_model_gate_state: str
+    # What the *enforcing* path answers for these two gates right now, which is
+    # not the same question as what the gate row says. A saved connection is the
+    # owner's consent to use that provider (`provider_runtime_policy_from_gates`,
+    # resolution 3), so a hosted provider runs with the gate row still unset.
+    # Reporting only `..._state` printed "Off" directly above a connected
+    # provider that had just answered — FIXED-322's defect, on a second surface.
+    # `state` is untouched, so nothing that already consumes it changes meaning.
+    hosted_model_gate_enforced: bool
+    private_network_model_gate_enforced: bool
     model_egress_allowlist_configured: bool
     remote_profile_count: int
     ready_provider_count: int = 0
@@ -1793,6 +1802,8 @@ class ModelsView:
             "advisor_readiness_checked_at": self.advisor_readiness_checked_at,
             "hosted_model_gate_state": self.hosted_model_gate_state,
             "private_network_model_gate_state": self.private_network_model_gate_state,
+            "hosted_model_gate_enforced": self.hosted_model_gate_enforced,
+            "private_network_model_gate_enforced": self.private_network_model_gate_enforced,
             "model_egress_allowlist_configured": self.model_egress_allowlist_configured,
             "remote_profile_count": self.remote_profile_count,
             "ready_provider_count": self.ready_provider_count,
@@ -6588,6 +6599,10 @@ class DashboardService:
         advisor_gate = self.control.get_capability_gate(
             "advisor_model_runtime", acting_principal_id
         )
+        # The same resolution the provider factory is built with everywhere else,
+        # so the posture tiles report the answer the enforcing path gives rather
+        # than the gate row alone.
+        enforced_policy = provider_runtime_policy_from_gates(self.store, acting_principal_id)
         from raiker.models.connections import get_model_connection
         from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
         from raiker.runtime.model_usage import ModelUsageLedger, sum_totals
@@ -6811,6 +6826,10 @@ class DashboardService:
             private_network_model_gate_state=private_gate.state
             if private_gate is not None
             else "unknown",
+            hosted_model_gate_enforced=enforced_policy.allow_hosted_provider,
+            private_network_model_gate_enforced=(
+                enforced_policy.allow_private_network_provider
+            ),
             model_egress_allowlist_configured=bool(
                 os.environ.get(MODEL_EGRESS_ALLOWLIST_ENV, "").strip()
             ),
@@ -7955,12 +7974,16 @@ class DashboardService:
         try:
             from raiker.models.connections import get_model_connection
 
-            validator = ModelProviderFactory(
+            # GCR-02 — the question is whether `effective` would run, so ask it
+            # without building anything. The provider this used to construct was
+            # closed by hand below, through a `getattr(..., "aclose")` that had to
+            # exist because the call returned a live client nobody wanted.
+            ModelProviderFactory(
                 policy=provider_runtime_policy_from_gates(self.store, principal.principal_id),
                 connection=get_model_connection(
                     self.store, principal.principal_id, profile.profile_id
                 ),
-            ).create(effective)
+            ).validate(effective)
         except Exception as exc:  # noqa: BLE001 — provider policy failures fail closed
             self._append_model_event(
                 "model_provider_rejected_by_policy",
@@ -7972,9 +7995,6 @@ class DashboardService:
                 },
             )
             return ControlResult(ok=False, reason_code=safe_error(str(exc)))
-        aclose = getattr(validator, "aclose", None)
-        if aclose is not None:
-            await aclose()
         state = ModelSessionState(
             session_id=principal.principal_id
             if self.store.get_account(principal.principal_id) is not None

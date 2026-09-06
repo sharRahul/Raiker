@@ -261,32 +261,83 @@ class ModelRouter:
             return asyncio.run(self.achat(provider, model, messages, tools))
         raise RuntimeError("use achat inside an active event loop")
 
-    def generate(
-        self,
-        provider: str,
-        model: str,
-        prompt: str,
-        context: dict[str, object] | None = None,
-    ) -> str:
+    def generate(self, provider: str, model: str, prompt: str) -> str:
+        """One prompt, one answer, no conversation.
+
+        GCR-04 — this used to accept a `context` mapping and drop it on the
+        floor, so a caller could hand it the context it wanted honoured and get
+        a turn that had never seen it. A parameter that changes nothing is worse
+        than no parameter: build the messages you want and call :meth:`chat`.
+        """
         return self.chat(provider, model, [ModelMessage(role="user", content=prompt)]).text
 
-    def default_provider(self, *, health_timeout: float = 1.0) -> tuple[str, str]:
+    def default_provider(self) -> tuple[str, str]:
+        """The registry's native default backend as ``(provider, model)``.
+
+        GCR-18 — the `health_timeout` this used to accept was never read; no
+        health check happens here, and no caller ever passed one.
+        """
+        profile = self.default_profile()
+        return profile.provider, profile.model
+
+    def default_profile(self) -> ModelProfile:
+        """The one profile the shipped registry marks as the native default."""
         for profile in self.registry.list_profiles():
             if profile.raw.get("is_native_default"):
-                return profile.provider, profile.model
+                return profile
         raise RegistryError("no_real_model_provider_available")
 
+    def validate_profile(self, profile: ModelProfile, *, require_model: bool = True) -> None:
+        """Raise if *profile* could not run under this router's policy and connection.
+
+        The one place a caller should ask "would this work?" — it resolves the
+        owner's saved connection exactly as a turn does, and it opens nothing.
+        """
+        self._factory(profile).validate(profile, require_model=require_model)
+
     def select_profile(self, profile_id: str) -> ModelProfile:
+        """Make *profile_id* the active profile, refusing one that could not run.
+
+        GCR-02: the check is :meth:`~ModelProviderFactory.validate`, not a
+        provider that gets built and dropped. Selecting a model is a thing an
+        owner does repeatedly while looking for the right one, and every one of
+        those presses used to leave an `httpx.AsyncClient` and its connection
+        pool open for the life of the process.
+        """
         profile = self.registry.resolve_profile_id(profile_id)
-        self._factory(profile).create(profile)
+        self.validate_profile(profile)
         self.active_profile_id = profile.profile_id
         return profile
 
-    def set_reasoning(self, value: str) -> str:
+    def reasoning_profile(self) -> ModelProfile:
+        """The profile a reasoning setting is judged against.
+
+        The active selection when there is one, and otherwise the registry's
+        native default — the profile :meth:`default_provider` returns and the one
+        a turn with no selection actually runs on.
+
+        GCR-03: this used to be `list_profiles()[0]`, a position in a shipped
+        file rather than a choice anyone made. `active_profile_id` is only set
+        when something calls :meth:`select_profile`, which the web and gateway
+        paths never did, so an owner running a hosted reasoning model had their
+        reasoning setting judged against the first registry entry — a local
+        llama.cpp profile that declares no reasoning support at all, and so
+        refuses every value with `reasoning_not_supported`.
+        """
+        if self.active_profile_id:
+            return self.registry.resolve_profile_id(self.active_profile_id)
+        return self.default_profile()
+
+    def set_reasoning(self, value: str, *, profile_id: str | None = None) -> str:
+        """Set the reasoning options for *profile_id*, or for the active profile.
+
+        A caller that knows which model the turn will run on should name it;
+        Raiker's own surfaces resolve it through :meth:`reasoning_profile`.
+        """
         profile = (
-            self.registry.resolve_profile_id(self.active_profile_id)
-            if self.active_profile_id
-            else self.registry.list_profiles()[0]
+            self.registry.resolve_profile_id(profile_id)
+            if profile_id
+            else self.reasoning_profile()
         )
         capabilities = capabilities_from_profile(profile)
         if value == "off":
@@ -324,7 +375,14 @@ class ModelRouter:
             )
         try:
             profile = self.registry.resolve(provider, model)
-            ModelProviderFactory(policy=self.runtime_policy).create(profile)
+            # GCR-01 — through `_factory`, so launch validates the owner's saved
+            # endpoint, key and workspace rather than the profile's shipped
+            # defaults. Built directly, this call could not see the connection
+            # vault at all: a hosted profile that runs every turn was reported
+            # as missing its API key the moment anyone pressed launch, and a
+            # profile pointed at a saved endpoint was validated against the
+            # shipped one. GCR-02 — and it validates without opening a client.
+            self.validate_profile(profile)
         except (RegistryError, ModelProviderError) as exc:
             if self.writer is not None:
                 self.writer.append(

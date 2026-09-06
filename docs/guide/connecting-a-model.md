@@ -43,6 +43,13 @@ A successful profile carries a green **Ready** label, and the Models header says
 **Check expired**, **Runtime stopped**, **Model missing**, **Key rejected**, or
 **No credit** name what still needs attention.
 
+One of them is not about the model at all. **Choice unreadable** means Raiker
+could not read back which model you chose — a workspace database that is locked,
+damaged, or on a full disk. Your choice is still saved; nothing has been changed
+or forgotten. The turn is refused rather than run on some other model, and you
+are deliberately not asked to pick again, because picking again would not fix a
+disk. Repair the workspace and the label clears on its own.
+
 **The first-run screen can do all of this on its own.** Stage 02 of setup shows one
 row per provider. The three local runtimes are *asked* what they are serving and
 offer the answer in a dropdown; a runtime that is not running says so. Every
@@ -359,6 +366,13 @@ leave this machine: the hosted model gate, the private-network gate, whether an
 egress allowlist is configured, and how many off-machine profiles exist. It is
 status, not a control — allowlist values and API keys are never displayed
 anywhere in the product, including here.
+
+The two gates report **what they answer**, not what is stored against them.
+Connecting a provider is itself consent to use it, so a gate nobody has touched
+reads **On (by connection)** once any provider is connected; before that it
+reads **Off until connected**, which is both the verdict and the thing that
+changes it. A gate you deliberately turned off in **Permissions** reads **Off**
+whatever is connected — an explicit decision outranks a connection, always.
 
 A hosted provider fails closed unless **all** of the following are present: the
 runtime gate, the threat-model acknowledgement, the confirmation token, the

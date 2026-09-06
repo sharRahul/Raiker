@@ -174,6 +174,17 @@ class TestReads:
         # hosted / private model runtimes are integrated (real executors) -> enabled by default.
         assert body["hosted_model_gate_state"] == "enabled_runtime"
         assert body["private_network_model_gate_state"] == "enabled_runtime"
+        # Found live 2026-09-06: the Models page rendered the gate *row* alone,
+        # and the row and the enforcing path answer different questions. Here
+        # they disagree in the direction that matters most — the row resolves to
+        # `enabled_runtime` from the shipped default table while the model
+        # provider policy refuses every hosted provider, because this instance
+        # has no saved connection and nobody turned the gate on. The page used to
+        # print "On" above providers that would answer
+        # `hosted_provider_requires_explicit_policy` at the first turn; it now
+        # reports both facts and reads "Off until connected".
+        assert body["hosted_model_gate_enforced"] is False
+        assert body["private_network_model_gate_enforced"] is False
         assert body["model_egress_allowlist_configured"] is True
         assert "api.openai.com" not in resp.text
         ids = [p["profile_id"] for p in body["profiles"]]

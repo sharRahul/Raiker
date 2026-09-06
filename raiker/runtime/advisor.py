@@ -4,6 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from raiker.models.configured_models import pinned_model
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
 from raiker.models.tool_registry import tool_risk_band
 from raiker.runtime.authority.admission import capability_admission
@@ -85,14 +86,7 @@ class AdvisorService:
         """
         if not self._principal_id:
             return None
-        try:
-            pairs = self._store.list_configured_models(self._principal_id)
-        except Exception:  # noqa: BLE001 — an unreadable pin resolves nothing
-            return None
-        for candidate_profile, candidate_model in reversed(list(pairs or [])):
-            if candidate_profile == profile_id and candidate_model:
-                return str(candidate_model)
-        return None
+        return pinned_model(self._store, self._principal_id, profile_id)
 
     def resolved_advisor(self) -> tuple[str, str] | None:
         """``(profile_id, model)`` the next consult would actually call, or None.

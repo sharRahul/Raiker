@@ -67,7 +67,7 @@ from raiker.memory.readiness_registry import (
 from raiker.memory.review import MemoryReviewQueue
 from raiker.memory.semantic import semantic_memory_status
 from raiker.models.exceptions import ModelProviderError, ProviderPolicyError, safe_error
-from raiker.models.factory import ModelProviderFactory, capabilities_from_profile
+from raiker.models.factory import capabilities_from_profile
 from raiker.models.policy_state import provider_runtime_policy_from_gates
 from raiker.models.registry import ModelProfileRegistry, RegistryError, profile_with_model
 from raiker.models.router import ModelRouter
@@ -2004,11 +2004,12 @@ async def handle_model_command_async(command: str, *, workspace_root: str | Path
                 if resolved_model == profile.model
                 else profile_with_model(profile, resolved_model)
             )
-            # Validate the effective profile (concrete model + endpoint + provider policy) without connecting.
-            validator = ModelProviderFactory(policy=router.runtime_policy).create(effective)
-            aclose = getattr(validator, "aclose", None)
-            if aclose is not None:
-                await aclose()
+            # Validate the effective profile (concrete model + endpoint + provider
+            # policy) without connecting — GCR-01/GCR-02: through the router's own
+            # factory, so the owner's saved connection is what gets validated, and
+            # through `validate`, so the comment above is finally true. This used
+            # to build a provider from the shipped defaults and close it again.
+            router.validate_profile(effective)
             router.active_profile_id = profile.profile_id
             store.save_model_session_state(
                 ModelSessionState(

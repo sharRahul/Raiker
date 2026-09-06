@@ -324,7 +324,11 @@ export type ModelReadinessState =
   | "quota_exhausted"
   | "unreachable"
   | "unsupported"
-  | "stale";
+  | "stale"
+  // GCR-46 — Raiker could not read which model the owner chose. A verdict about
+  // Raiker's own storage, not about the model, and deliberately not
+  // `not_configured`: that one asks the owner to make a choice they made.
+  | "configuration_unreadable";
 
 /** Reachability of one exact owner/profile/model/endpoint tuple. */
 export interface ModelReadinessView {
@@ -964,6 +968,13 @@ export interface ModelsView {
   advisor_readiness_remediation?: string | null;
   advisor_readiness_checked_at?: string | null;
   hosted_model_gate_state: string;
+  /**
+   * What the enforcing path answers for these two gates right now — not the same
+   * question as the gate row above. A saved connection is the owner's consent to
+   * use that provider, so a hosted provider runs with the gate row still unset.
+   */
+  hosted_model_gate_enforced?: boolean;
+  private_network_model_gate_enforced?: boolean;
   private_network_model_gate_state: string;
   model_egress_allowlist_configured: boolean;
   remote_profile_count: number;

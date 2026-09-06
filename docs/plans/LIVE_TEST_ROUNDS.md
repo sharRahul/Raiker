@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-06 | Targeted | `gcr-01-`, `gcr-02-`, `models-posture-` | Anthropic, a **sixth** identity-linked key entered through the interface; no local runtime on the host | Provider validation that opens no client — measured against the host's own socket count — the connection and the pin both going through it, and one defect the evidence screenshot itself showed: the Models page calling the hosted gate **Off** above the provider it had just accepted a model for |
 | 2026-09-05 (second) | Targeted | `gcr-19-`, `gcr-38-`, `gcr-round-` | Anthropic, a fifth **identity-linked** key entered through the interface | The third-pass review's P0 proved on a real library — a failed conversion's cleanup naming its own files and leaving the model beside them intact — plus Retry refused on an unfinished job, the host's background passes reported on Observability, and one label the redactor had been eating |
 | 2026-09-05 | Targeted + derived four-width sweep + full page sweep | `pages/` | Anthropic, a fourth **identity-linked** key — blocked in two requests rather than a round | A stop switch that shouts on every page, a Hub failure nobody was told about, two kinds of deep link that opened the wrong page, and the nine guards that were supposed to catch them |
 | 2026-09-04 (fourth) | Targeted + measured four-width sweep | `pages/` | — (no model needed) | Two tabs folded out of the nav, 244 words moved to the guide, and three mobile bleeds the width sweep found only because the workspace had been worked in |
@@ -64,6 +65,69 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-09-06 — Validation that opens nothing, measured on the host's own sockets
+
+**Tier: Targeted. Build: production `npm run build`. Providers: Anthropic, a
+sixth identity-linked key, entered through the Connect dialog. Owner: the shared
+`OWNER_CREDENTIALS`. Workspace: `/tmp/raiker-manual-test`, reset with
+`scripts/reset_live_workspace.py`. Screenshots: `gcr-01-02-connection-saved.png`,
+`gcr-02-model-pinned-without-a-leaked-client.png`,
+`gcr-01-permissions-gate-agrees.png`,
+`models-posture-reports-the-enforced-answer.png`, and
+`not-working/bug-273-identity-linked-key-blocks-the-round.png`.**
+
+The round covered the six findings of the 2026-09-06 pass — GCR-01, GCR-02,
+GCR-03, GCR-04, GCR-06 and GCR-18 — of which three touch a surface an owner
+reaches.
+
+1. Connect Anthropic through the Connect dialog. The card reads **Connection
+   saved**. The save is the call site that used to build a live provider purely
+   to validate the values; it validates without one now, and the outcome the
+   owner sees is unchanged.
+2. Pin a model three times through **Select models…**. The provider will not list
+   its catalogue for this key, and the dialog's **Custom model name** field is
+   the path for exactly that case, so the changed validation path was pressed
+   three times without a turn.
+3. Read the host's open-socket count either side of the whole run with
+   `scripts/live_socket_check.sh 8765 before|after`: **3 before, 3 after.** That
+   is the GCR-02 measurement — the old path left one unclosed `httpx.AsyncClient`
+   per press.
+4. Open **Permissions** and confirm the hosted gate the validation consults is
+   the one the page reports.
+
+**What it found.** Two things, one of them in its own evidence.
+
+*The round is blocked, for the fifth time, on the same value.* `/v1/models`
+answers this key `400` — *"This API key is not scoped to a workspace…"* — and
+`/v1/organizations/workspaces`, `/v1/organizations/me` and
+`/v1/organizations/api_keys` all answer `403 Missing permissions`, so the id is
+again not recoverable from the credential. This host has no local runtime either:
+neither Ollama nor llama.cpp is installed and nothing answers on `:11434`. So no
+provider on this machine can complete a turn, and BUG-273's three scenarios
+stayed unrun for a fifth round. Raiker's half holds under a sixth key: the picker
+says *"This key is identity-linked, so it acts inside one workspace. Add the
+workspace ID to this connection…"*, and **Provider unreachable** appears nowhere.
+
+*A defect in the screenshot taken as evidence for something else.* The Models
+page's off-machine posture panel read `HOSTED MODEL GATE: Off` directly above the
+connected Anthropic card, its pinned `Haiku 4.5`, and a header saying `1 model set
+up`. Connecting a provider is consent to use it, so the enforcing path had said
+yes and the panel was reporting the gate *row*. Asserting the same panel against a
+workspace with nothing connected found the other direction and the worse one: the
+row resolves to `enabled_runtime` from the shipped default table while the
+enforcing path refuses every hosted provider, so the panel read **On** above
+providers that would answer `hosted_provider_requires_explicit_policy` at the
+first turn. Closed the same day as
+[FIXED-435](FIXED_ITEMS.md#fixed-435--the-models-page-said-a-gate-was-on-above-providers-it-would-refuse),
+in the shape
+[FIXED-322](FIXED_ITEMS.md#fixed-322--permissions-said-off-about-a-capability-that-would-have-run)
+established, and re-verified live: both tiles now read *On (by connection)*.
+
+**Result: ✅ for the six findings' interface halves and the socket measurement;
+⛔ BUG-273 still blocked, on a value only the key's owner holds.**
 
 ---
 

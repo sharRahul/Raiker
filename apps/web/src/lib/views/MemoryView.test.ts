@@ -654,7 +654,7 @@ describe("MemoryView observations (MEM-04)", () => {
     const select = await screen.findByLabelText(/embedding model/i);
     expect(
       screen.getByRole("link", { name: /review and download it in models/i }),
-    ).toHaveAttribute("href", "#/models?tab=huggingface");
+    ).toHaveAttribute("href", "#/models?tab=add");
     await fireEvent.change(select, { target: { value: "openai:text-embedding-3-small" } });
     await fireEvent.click(screen.getByRole("button", { name: /embed 6/i }));
 

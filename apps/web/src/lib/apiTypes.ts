@@ -3092,3 +3092,35 @@ export interface TelemetryDestination {
   delivery_cadence: string;
   next_delivery_at: string | null;
 }
+
+/**
+ * MODEL-01 — the one authoritative answer to "which model is this, and which
+ * one will actually run".
+ *
+ * `selected` is the owner's choice and persists whether or not it can serve;
+ * `effective` is what a turn started right now would use. They are the same
+ * pair in the ordinary case, and when they are not, that is a fact the owner is
+ * entitled to read rather than a silent substitution. Every surface that names
+ * a model reads this instead of assembling its own answer.
+ */
+export interface ModelDecision {
+  scope: { surface: string; project_id: string | null };
+  selected: {
+    profile_id: string;
+    model: string;
+    /** Where the choice came from, most specific first. */
+    source: "surface_default" | "global_default" | "native_default";
+  };
+  effective: {
+    profile_id: string;
+    model: string;
+    /** Why this pair, rather than the selection. */
+    reason: "selected" | "fallback" | "no_ready_candidate";
+  };
+  ready: boolean;
+  /** Only meaningful for a profile with a managed local slot; null otherwise. */
+  running: boolean | null;
+  problem: { reason_code: string; summary: string; remediation: string } | null;
+  /** Changes exactly when the decision changes. A fingerprint, not a counter. */
+  revision: string;
+}

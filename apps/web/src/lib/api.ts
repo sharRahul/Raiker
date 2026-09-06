@@ -72,6 +72,7 @@ import type {
   GuideSection,
   MemorySettingsView,
   ObservationsView,
+  ModelDecision,
   ModelPricingView,
   ModelReadinessView,
   ModelSetupState,
@@ -672,6 +673,27 @@ export const api = {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ surface, profile_id, model }),
     }),
+  /**
+   * MODEL-01 — which model is selected here, and which one will actually run.
+   *
+   * Read by every surface that names a model. Before this, the Models page, the
+   * composer picker, Chat, Build and Design each assembled their own answer
+   * from the selection store, the surface defaults, readiness and the fallback
+   * sequence — five correct facts that could not be made to agree.
+   */
+  modelDecision: (surface: string, projectId?: string) =>
+    request<ModelDecision>(
+      `/api/model-decision?surface=${encodeURIComponent(surface)}` +
+        (projectId ? `&project_id=${encodeURIComponent(projectId)}` : ""),
+    ),
+  /**
+   * Every surface's decision in one read. The Models Overview answers "what
+   * powers Chat, Build and Design" as its first fact; asking per surface would
+   * be five separately-timed answers and a page that can show one row from
+   * before a change beside one from after it.
+   */
+  modelDecisions: () =>
+    request<{ surfaces: Record<string, ModelDecision> }>("/api/model-decisions"),
   modelSetup: () => request<ModelSetupState>("/api/model-setup"),
   updateModelSetup: (
     body: Omit<

@@ -9,6 +9,30 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+
+/**
+ * Press "Delete partial files" wherever this job's state put it.
+ *
+ * MODEL-10/MODEL-15 give a job row one visible action: Cancel while it runs,
+ * Retry once it has failed in a way that can be started again. Deleting the
+ * bytes a job left behind is the visible action only when it is the *recovery*
+ * task — a job that cannot be retried — and otherwise sits in the overflow
+ * beside "Clear record".
+ */
+async function deletePartialFiles(): Promise<void> {
+  const visible = screen.queryAllByRole("button", { name: "Delete partial files" });
+  if (visible.length > 0) {
+    await fireEvent.click(visible[0]);
+    return;
+  }
+  await fireEvent.click(
+    (await screen.findAllByRole("button", { name: /^More actions for / }))[0],
+  );
+  await fireEvent.click(
+    screen.getByRole("menuitem", { name: "Delete partial files" }),
+  );
+}
+
 describe("DownloadsPanel", () => {
   it("keeps failed operations visible with an explicit retry", async () => {
     stubFetch({
@@ -110,8 +134,8 @@ describe("DownloadsPanel", () => {
       },
     });
     render(DownloadsPanel);
-    const button = await screen.findByRole("button", { name: "Delete partial files" });
-    await fireEvent.click(button);
+    await screen.findByText("org/model@abc");
+    await deletePartialFiles();
     expect(await screen.findByText("/models/library/snapshot", { exact: false })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Delete files" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Keep them" })).toBeTruthy();
@@ -159,9 +183,8 @@ describe("DownloadsPanel", () => {
       },
     });
     render(DownloadsPanel);
-    await fireEvent.click(
-      await screen.findByRole("button", { name: "Delete partial files" }),
-    );
+    await screen.findByText("mistral@abc");
+    await deletePartialFiles();
     expect(
       await screen.findByText("/models/converted/mistral-abcdef123456.bf16.gguf"),
     ).toBeTruthy();

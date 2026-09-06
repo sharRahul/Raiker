@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ModelProfile } from "../apiTypes";
+  import type { ModelDecision, ModelProfile } from "../apiTypes";
   import { providerName } from "../format";
   import { modelName } from "../modelPresentation";
   import {
@@ -21,6 +21,7 @@
     open = $bindable(false),
     efforts = [],
     effort = $bindable(""),
+    decision = null,
   }: {
     profiles: ModelProfile[];
     selectedProfile?: ModelProfile | null;
@@ -53,6 +54,18 @@
      * the same wire fact, so they are the same piece of state.
      */
     effort?: string;
+    /**
+     * MODEL-01 — the authoritative decision for this surface, when the view has
+     * read one.
+     *
+     * The picker's own `profiles` list answers "what could be chosen". It
+     * cannot answer "what is chosen but cannot run" or "what will actually run
+     * instead", because those are facts about the fallback sequence and the
+     * readiness gate rather than about the catalogue. Without this the menu had
+     * one honest option when the selected model went unreachable: drop it,
+     * which is indistinguishable from losing the owner's choice.
+     */
+    decision?: ModelDecision | null;
   } = $props();
   let rootEl: HTMLDivElement | undefined = $state();
   let triggerEl: HTMLButtonElement | undefined = $state();
@@ -122,6 +135,31 @@
   const firstUnconfigured = $derived(
     choices.find((profile) => !isChoosableModel(profile)) ?? null,
   );
+  /**
+   * The selected pair, kept in the menu whether or not it can currently serve.
+   *
+   * `providerGroups` below lists only what is choosable, which is right for a
+   * catalogue and wrong for the owner's own choice: a model that stopped being
+   * reachable would simply vanish from the list, and a picker that silently
+   * shows a different model than the one you set is the exact symptom the
+   * review describes as "selection loss". It stays, with its state and its fix.
+   */
+  const selectedIsUnavailable = $derived(
+    decision !== null &&
+      decision.selected.profile_id !== "" &&
+      !profiles.some(
+        (profile) =>
+          profile.profile_id === decision.selected.profile_id &&
+          profile.model === decision.selected.model &&
+          isChoosableModel(profile),
+      ),
+  );
+
+  /** The model that will really serve, when it is not the one selected. */
+  const displacedBy = $derived(
+    decision !== null && decision.effective.reason === "fallback" ? decision.effective : null,
+  );
+
   const activeProfileId = $derived(profileId || value);
   const active = $derived(
     profiles.find(
@@ -198,6 +236,32 @@
       tabindex="-1"
       onkeydown={closeOnEscape}
     >
+      <!-- MODEL-01 — the owner's choice, and what will actually answer.
+           Two separate facts, and collapsing them is what made persistence look
+           broken: a picker that renames itself to the fallback is
+           indistinguishable from one that forgot the choice. Shown only when
+           they differ or when the selection cannot serve, so the ordinary case
+           stays a plain list. -->
+      {#if selectedIsUnavailable || displacedBy !== null}
+        <div class="decision-note" role="status">
+          {#if selectedIsUnavailable}
+            <p class="decision-line">
+              <strong>{modelName(decision!.selected.model)}</strong>
+              <span class="decision-state">Selected · unavailable</span>
+            </p>
+            {#if decision?.problem}
+              <p class="decision-detail">{decision.problem.summary}</p>
+              <p class="decision-detail">{decision.problem.remediation}</p>
+            {/if}
+          {/if}
+          {#if displacedBy !== null}
+            <p class="decision-detail">
+              Using <strong>{modelName(displacedBy.model)}</strong> for now.
+            </p>
+          {/if}
+        </div>
+      {/if}
+
       {#each providerGroups as group (group.provider)}
         <div
           class="model-provider-group"
@@ -241,6 +305,14 @@
           </button>
         </div>
       {/if}
+
+      <!-- COMPOSER-05/COMPOSER-18 — the composer changes the model for work; it
+           does not administer providers. Everything past that is one link, so
+           the menu does not grow into the Models page. -->
+      <a class="manage-link menu-item" href="#/models" onclick={() => (open = false)}>
+        Manage models
+        <Icon name="chevron-right" size="sm" />
+      </a>
 
       {#if efforts.length > 0}
         <!-- The thinking budget belongs to the model, so it lives inside the
@@ -410,6 +482,55 @@
     width: 1.15rem;
     height: 1.15rem;
     flex-basis: 1.15rem;
+  }
+  /* MODEL-01 — the owner's choice and what will actually answer, stated as two
+     facts rather than one substitution. Warn-toned because it is an exception:
+     a picker that looks like this every day would be telling nobody anything. */
+  .decision-note {
+    display: grid;
+    gap: 0.15rem;
+    margin-bottom: 0.3rem;
+    padding: 0.45rem 0.5rem;
+    border: 1px solid var(--warn-border);
+    border-radius: var(--r-sm);
+    background: var(--warn-soft);
+  }
+  .decision-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--text-1);
+  }
+  .decision-state {
+    flex: none;
+    color: var(--warn);
+    font-size: var(--text-2xs);
+    font-weight: 650;
+  }
+  .decision-detail {
+    margin: 0;
+    color: var(--text-2);
+    font-size: var(--text-xs);
+  }
+  .manage-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+    padding: 0.4rem 0.48rem;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    text-decoration: none;
+  }
+  .manage-link:hover {
+    color: var(--text-1);
+    text-decoration: none;
   }
   .setup-choice {
     display: flex;

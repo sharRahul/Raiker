@@ -3,6 +3,7 @@
   import { api } from "../../api";
   import type { ModelOperation, PartialFiles } from "../../apiTypes";
   import { formatBytes } from "../../composerAttachments.svelte";
+  import RowOverflow from "../../components/RowOverflow.svelte";
   let items = $state<ModelOperation[]>([]);
   let error = $state<string | null>(null);
   // BUG-75 — deleting bytes from disk is its own decision, so it takes its own
@@ -19,12 +20,27 @@
   // thing: a terminal, retryable job, and nothing else.
   const retryableNow = (item: ModelOperation) =>
     item.retryable && ["failed", "cancelled"].includes(item.state);
+  /**
+   * MODEL-10 — whether the adaptive poll below is currently working.
+   *
+   * The panel carried a permanent Refresh button beside a loop that already
+   * re-reads every two seconds while anything is running. A control that
+   * duplicates what the page is doing on its own is not an affordance, it is a
+   * suggestion that the page might not be doing it — so an owner watching a
+   * download presses it, repeatedly, to check. It appears only once a read has
+   * actually failed, which is the one moment the loop cannot recover from
+   * without being asked.
+   */
+  let readFailed = $state(false);
+
   async function load() {
     try {
       items = (await api.modelOperations()).items;
       error = null;
+      readFailed = false;
     } catch {
       error = "Could not load model activity.";
+      readFailed = true;
     }
   }
   async function cancel(id: string) {
@@ -82,6 +98,19 @@
     }, anyRunning ? ACTIVE_POLL_MS : IDLE_POLL_MS);
   }
 
+  /**
+   * MODEL-10 — running work first, then what failed, then what finished.
+   *
+   * The panel is called Activity and answers "what is happening"; a completed
+   * download from last week sitting above a stalled conversion answers a
+   * different question. Order is by what still wants attention, and the API's
+   * own ordering is preserved inside each band.
+   */
+  const BAND: Record<string, number> = { failed: 1, cancelled: 1, complete: 2 };
+  const ordered = $derived(
+    [...items].sort((left, right) => (BAND[left.state] ?? 0) - (BAND[right.state] ?? 0)),
+  );
+
   onMount(() => {
     void load().then(schedule);
     return () => {
@@ -100,7 +129,9 @@
         never silently retried.
       </p>
     </div>
-    <button class="btn btn-ghost" type="button" onclick={load}>Refresh</button>
+    {#if readFailed}
+      <button class="btn btn-sm" type="button" onclick={() => void load()}>Retry status</button>
+    {/if}
   </header>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
   {#if deleting !== null}
@@ -146,7 +177,7 @@
       >
     </div>
   {:else}<div class="timeline">
-      {#each items as item (item.operation_id)}<article>
+      {#each ordered as item (item.operation_id)}<article>
           <div
             class="rail"
             class:done={item.state === "complete"}
@@ -172,26 +203,52 @@
               >
                 <span style={`width:${item.progress_percent}%`}></span>
               </div>{/if}
+            <!-- MODEL-10/MODEL-15 - one visible action, chosen by state:
+                 Cancel while it is running (time-sensitive, so it is never
+                 buried), Retry once it has failed in a way that can be started
+                 again, and nothing at all for a job that simply finished.
+                 "Clear record" is housekeeping and goes in the overflow.
+                 "Delete partial files" stays out of the overflow only when it
+                 *is* the recovery task - a job that cannot be retried and left
+                 bytes behind has one useful action, and hiding it would make
+                 the row a dead end. -->
             <div class="actions">
-              {#if !terminal(item.state)}<button
+              {#if !terminal(item.state)}
+                <button
                   class="btn btn-ghost btn-sm"
                   type="button"
                   onclick={() => void cancel(item.operation_id)}>Cancel</button
-                >{:else if retryableNow(item)}<button
+                >
+              {:else if retryableNow(item)}
+                <button
                   class="btn btn-sm"
                   type="button"
                   onclick={() => void retry(item.operation_id)}>Retry</button
-                >{/if}{#if item.partial_files_present}<button
-                  class="btn btn-ghost btn-sm"
+                >
+              {:else if item.partial_files_present}
+                <button
+                  class="btn btn-sm"
                   type="button"
                   onclick={() => void askDeletePartial(item.operation_id)}
                   >Delete partial files</button
-                >{/if}{#if terminal(item.state)}<button
-                  class="btn btn-ghost btn-sm"
-                  type="button"
-                  onclick={() => void cleanup(item.operation_id)}
-                  >Clear record</button
-                >{/if}
+                >
+              {/if}
+              <RowOverflow
+                label={item.target}
+                items={[
+                  ...(item.partial_files_present && (retryableNow(item) || !terminal(item.state))
+                    ? [
+                        {
+                          label: "Delete partial files",
+                          run: () => void askDeletePartial(item.operation_id),
+                        },
+                      ]
+                    : []),
+                  ...(terminal(item.state)
+                    ? [{ label: "Clear record", run: () => void cleanup(item.operation_id) }]
+                    : []),
+                ]}
+              />
             </div>
             {#if ["failed", "cancelled"].includes(item.state) && !item.retryable}
               <p class="note">

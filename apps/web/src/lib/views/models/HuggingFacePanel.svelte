@@ -455,7 +455,7 @@
         type="button"
         disabled={!destination || preview === null}
         onclick={() => void download()}>Confirm download</button
-      >{#if !destination}<a href="#/models?tab=local"
+      >{#if !destination}<a href="#/models?tab=models"
           >Approve a model folder first →</a
         >{/if}
     </section>{/if}
@@ -471,7 +471,7 @@
         <h3>{(downloadState ?? "queued").replaceAll("_", " ")}</h3>
         <p>
           This keeps running if you leave the page. Follow it in
-          <a href="#/models?tab=activity">Activity</a>.
+          <a href="#/models?tab=runtime">Activity</a>.
         </p>
       </div>
       {#if downloadPercent !== null}<div

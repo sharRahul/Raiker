@@ -425,7 +425,7 @@
             <Icon name="download" size="sm" />
             <span>
               Need a local embedding model? The curated Apache-2.0 Nomic Embed
-              Q4_K_M option is about 81 MiB. <a href="#/models?tab=huggingface">Review and download it in Models</a>;
+              Q4_K_M option is about 81 MiB. <a href="#/models?tab=add">Review and download it in Models</a>;
               Raiker pins the revision and shows the exact bytes before download.
             </span>
           </p>

@@ -16,7 +16,7 @@
    * surfaces the rest of the workspace uses.
    */
   import { onMount, tick, untrack } from "svelte";
-  import { rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
+  import { modelDecision, rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import { readBuildProject, rememberBuildProject } from "../buildProject";
   import {
     clampExplorerWidth,
@@ -63,6 +63,7 @@
     CodeRepo,
     CodeReposView,
     ContextUsage,
+    ModelDecision,
     ProjectsList,
     SessionDetail,
     StreamEvent,
@@ -610,6 +611,15 @@
 
   let modelProfile = $state("");
   let model = $state("");
+  /**
+   * MODEL-01 — the authoritative answer for this surface.
+   *
+   * `null` until the first read, and `null` again if that read fails: the
+   * composer renders identically without it, minus the line explaining a
+   * fallback. A model control that will not draw because a status endpoint is
+   * down is worse for the owner than one that simply says less.
+   */
+  let decision = $state<ModelDecision | null>(null);
   let reasoningEffort = $state("");
   // One reactive view of the shared model store; refreshes live when the
   // Models page connects a provider or selects a model, without a remount.
@@ -662,6 +672,10 @@
       modelProfile = remembered.profileId;
       model = remembered.model;
     });
+    // MODEL-01 — what is selected here, what will actually run, and why they
+    // differ when they do. Read once per mount; the picker keeps an
+    // unavailable selection visible rather than re-rendering as the fallback.
+    void modelDecision("build").then((answer) => (decision = answer));
     void readStandingModes();
     const onCompose = (event: Event) => {
       const detail = (event as CustomEvent<{
@@ -2211,6 +2225,7 @@
               efforts={reasoningEfforts}
               {profiles}
               {selectedProfile}
+              {decision}
               onchosen={(profileId, chosen) => void rememberSurfaceModel("build", profileId, chosen)}
               disabled={streaming}
             />

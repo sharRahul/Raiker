@@ -156,25 +156,39 @@ describe("nav model", () => {
   // "Use models LM Studio already downloaded →" link and the operation tray's
   // "View downloads" both pointed.
   it("resolves every Models panel from a deep link", () => {
-    expect(tabFromHash("#/models?tab=local")).toBe("local");
-    expect(tabFromHash("#/models?tab=hosted")).toBe("hosted");
-    expect(tabFromHash("#/models?tab=huggingface")).toBe("huggingface");
-    expect(tabFromHash("#/models?tab=activity")).toBe("activity");
-    expect(tabFromHash("#/models?tab=routing")).toBe("routing");
-    expect(tabFromHash("#/models?tab=pricing")).toBe("pricing");
+    expect(tabFromHash("#/models?tab=overview")).toBe("overview");
+    expect(tabFromHash("#/models?tab=models")).toBe("models");
+    expect(tabFromHash("#/models?tab=add")).toBe("add");
+    expect(tabFromHash("#/models?tab=runtime")).toBe("runtime");
+    expect(tabFromHash("#/models?tab=usage")).toBe("usage");
   });
 
   // Bookmarks and older builds still emit the pre-split ids. They must land on
   // the panel that now owns their content, not on the default tab.
+  //
+  // MODEL-03 replaced six tabs at once, so the alias map has to carry all six
+  // of those *and* the ids their own predecessors used — a link written before
+  // the Providers split is two renames old and must still resolve.
   it("maps a superseded Models tab id onto the panel that replaced it", () => {
-    expect(tabFromHash("#/models?tab=providers")).toBe("local");
-    // Posture held four read-only facts and a paragraph. The facts are a strip
-    // at the top of Hosted, where they explain the cards beneath them; the
-    // paragraph is in the guide.
-    expect(tabFromHash("#/models?tab=posture")).toBe("hosted");
-    expect(tabFromHash("#/models?tab=library")).toBe("local");
-    expect(tabFromHash("#/models?tab=discover")).toBe("huggingface");
-    expect(tabFromHash("#/models?tab=downloads")).toBe("activity");
+    // The six MODEL-03 replaced. `local` and `hosted` land on the inventory:
+    // a link named for where a model lives was almost always followed to look
+    // at models the owner already had.
+    expect(tabFromHash("#/models?tab=local")).toBe("models");
+    expect(tabFromHash("#/models?tab=hosted")).toBe("models");
+    expect(tabFromHash("#/models?tab=huggingface")).toBe("add");
+    expect(tabFromHash("#/models?tab=activity")).toBe("runtime");
+    expect(tabFromHash("#/models?tab=routing")).toBe("runtime");
+    expect(tabFromHash("#/models?tab=pricing")).toBe("usage");
+
+    // And the generation before them.
+    expect(tabFromHash("#/models?tab=providers")).toBe("models");
+    // Posture held four read-only facts and a paragraph. The facts are stated
+    // where a provider is connected, before it can refuse; the paragraph is in
+    // the guide.
+    expect(tabFromHash("#/models?tab=posture")).toBe("add");
+    expect(tabFromHash("#/models?tab=library")).toBe("runtime");
+    expect(tabFromHash("#/models?tab=discover")).toBe("add");
+    expect(tabFromHash("#/models?tab=downloads")).toBe("runtime");
   });
 
   it("falls back to a hub's first panel for an unknown or absent tab", () => {
@@ -244,7 +258,7 @@ describe("a hub tab addressed as a path segment", () => {
   });
 
   it("reads the same aliases the query form does", () => {
-    expect(tabFromHash("#/models/providers")).toBe("local");
+    expect(tabFromHash("#/models/providers")).toBe("models");
     expect(tabFromHash("#/observe/diagnostics")).toBe("overview");
   });
 

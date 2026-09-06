@@ -161,18 +161,23 @@ export const HUB_GROUPS: NavGroup[] = NAV_GROUPS.map((group) => ({
  * link, the sidebar, and the hub's own tab strip all resolve to the same panel.
  */
 export const HUB_TABS: Record<string, string[]> = {
-  // Models is organised by what you came to do, not by which table the data
-  // lives in: obtain a model that runs on this machine, sign in to somebody
-  // else's, fetch or convert one from the Hub, watch that work, decide what
-  // serves a turn when the first choice cannot, see what it costs, or read the
-  // off-machine posture.
+  // MODEL-03 — organised by the questions an owner actually arrives with, not
+  // by which table the data lives in.
+  //
+  // The six tabs it replaces — Local, Hosted, Hugging Face, Activity, Routing,
+  // Pricing — were a filing system: three of them named *where a model is
+  // stored*, which is an attribute of the answer rather than a choice anyone
+  // makes, and none of them answered "what is running my work". Overview does,
+  // first; My models is the inventory; Add model is the one errand that used to
+  // be split three ways; Runtime & routing is what is serving and what happens
+  // when it cannot; Usage is the bill and the rates that produce it, which were
+  // two tabs asking the owner to do the multiplication.
   models: [
-    "local",
-    "hosted",
-    "huggingface",
-    "activity",
-    "routing",
-    "pricing",
+    "overview",
+    "models",
+    "add",
+    "runtime",
+    "usage",
   ],
   extensions: ["connectors", "mcp", "skills", "hooks", "plugins"],
   observe: ["overview", "sessions", "activity", "checkpoints", "work", "notifications"],
@@ -227,15 +232,25 @@ const HUB_TAB_ALIASES: Record<string, Record<string, string>> = {
   // The single "Providers" scroll became Local and Hosted; "Library" was the
   // local GGUF index, now part of Local; "Discover" was the Hub search.
   models: {
-    providers: "local",
-    library: "local",
-    discover: "huggingface",
-    downloads: "activity",
+    // The pre-MODEL-03 six, each pointing at whichever panel took over its
+    // content. `local` and `hosted` land on the inventory rather than on Add:
+    // a link named for where a model lives was almost always followed to look
+    // at models the owner already had.
+    local: "models",
+    hosted: "models",
+    huggingface: "add",
+    activity: "runtime",
+    routing: "runtime",
+    pricing: "usage",
+    providers: "models",
+    library: "runtime",
+    discover: "add",
+    downloads: "runtime",
     // "Posture" was a tab holding four read-only facts and a paragraph. The
-    // facts moved onto Hosted, where they explain the cards under them; the
-    // paragraph moved to the guide. The alias keeps every link that named the
-    // tab working, which is what this map is for.
-    posture: "hosted",
+    // facts moved onto the provider cards, where they explain what is under
+    // them; the paragraph moved to the guide. The alias keeps every link that
+    // named the tab working, which is what this map is for.
+    posture: "add",
   },
   // "Diagnostics" read the same `diagnostics` object Overview reads and restated
   // four of its six cards from it. What was unique — runtime health transitions,

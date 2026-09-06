@@ -4,6 +4,7 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import ProviderLogo from "../components/ProviderLogo.svelte";
+  import RowOverflow from "../components/RowOverflow.svelte";
   import ModelPricingPanel from "../components/ModelPricingPanel.svelte";
   import TabStrip from "../components/TabStrip.svelte";
   import GuideLink from "../components/GuideLink.svelte";
@@ -11,6 +12,7 @@
   import type {
     CodexSubscriptionStatus,
     ModelCapacitiesView,
+    ModelDecision,
     ModelProfile,
     ModelsView as ModelsData,
     ProviderModelList,
@@ -27,6 +29,7 @@
   import { isChoosableModel } from "../modelReadiness.svelte";
   import { installerRuntimeFor, openRuntimeInstaller } from "../runtimeInstall";
   import { setModels } from "../models.svelte";
+  import { modelDecisions } from "../surfaceModel.svelte";
   import LocalLibraryPanel from "./models/LocalLibraryPanel.svelte";
   import HuggingFacePanel from "./models/HuggingFacePanel.svelte";
   import DownloadsPanel from "./models/DownloadsPanel.svelte";
@@ -35,14 +38,17 @@
   import ProvidersPanel from "./models/ProvidersPanel.svelte";
   import LocalFrameworkRow from "./models/LocalFrameworkRow.svelte";
   import SpeechRuntimePanel from "./models/SpeechRuntimePanel.svelte";
+  import ModelsOverview from "./models/ModelsOverview.svelte";
+  import MyModels from "./models/MyModels.svelte";
+  import WorkDefaults from "./models/WorkDefaults.svelte";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
   // so a selection here is reflected there without a full page reload. `tab`
   // comes from the hash, so every panel is a shareable location — the context
-  // popover's "Configure →" links straight to #/models?tab=pricing.
+  // popover's "Configure →" links straight to #/models?tab=usage.
   let {
     onchanged,
-    tab = "local",
+    tab = "overview",
   }: { onchanged?: () => void; tab?: string } = $props();
 
   /**
@@ -59,19 +65,23 @@
    * Local is first because Raiker prefers local backends.
    */
   const TABS = [
-    { id: "local", label: "Local" },
-    { id: "hosted", label: "Hosted" },
-    { id: "huggingface", label: "Hugging Face" },
-    { id: "activity", label: "Activity" },
-    { id: "routing", label: "Routing" },
-    { id: "pricing", label: "Pricing" },
+    { id: "overview", label: "Overview" },
+    { id: "models", label: "My models" },
+    { id: "add", label: "Add model" },
+    { id: "runtime", label: "Runtime & routing" },
+    { id: "usage", label: "Usage" },
   ];
 
   // Which provider sections each tab owns. The three groups already existed as
   // headings inside one scroll; the split promotes them to destinations.
   const TAB_SECTIONS: Record<string, readonly ("Local" | "Hosted" | "Advanced")[]> = {
-    local: ["Local"],
-    hosted: ["Hosted", "Advanced"],
+    // MODEL-03/MODEL-07 — one tab for acquiring a model, whichever kind it is.
+    // Local and Hosted were peers because that is how the profiles are stored,
+    // not because it is a choice anyone makes: an owner arrives wanting *a
+    // model*, and "is it on this machine" is an attribute of the answer rather
+    // than the first question. What the owner already has is `My models`;
+    // adding one is here.
+    add: ["Local", "Hosted", "Advanced"],
   };
   const visibleSections = $derived(TAB_SECTIONS[tab] ?? []);
   const showsProviderCards = $derived(visibleSections.length > 0);
@@ -82,6 +92,15 @@
   }
 
   let models = $state<ModelsData | null>(null);
+  /**
+   * MODEL-01 — every surface's decision, read once for the whole page.
+   *
+   * The inventory needs it to say which rows are a Work default and whether a
+   * local one is serving. Assembling that from the profile list would be the
+   * page computing its own answer again, which is the thing the contract
+   * exists to stop.
+   */
+  let decisions = $state<Record<string, ModelDecision> | null>(null);
   let loadError = $state<string | null>(null);
   let capacities = $state<ModelCapacitiesView | null>(null);
   let capacityRefreshAttempted = false;
@@ -114,6 +133,9 @@
 
   async function load() {
     loadError = null;
+    // Never fatal: the page is readable without the per-surface decisions, and
+    // a status read that fails must not take the model list down with it.
+    void modelDecisions().then((answer) => (decisions = answer));
     try {
       models = await api.models();
       if (models.profiles.some(isCodexSubscription)) {
@@ -1178,8 +1200,13 @@
     </div>
   </section>
 
+  <!-- MODEL-03 — the global choice belongs with the rest of the model
+       decision, which is Overview's whole subject. Above the strip it was a
+       third statement of the same fact on every tab, competing with the
+       per-surface defaults it is only the fallback for. -->
   <section
     class="global-model-card card"
+    class:tab-scoped={tab !== "overview"}
     aria-labelledby="global-model-title"
   >
     <div class="global-model-copy">
@@ -1226,22 +1253,33 @@
 {:else if models === null}
   <PageState state="loading" title="Loading models…" />
 {:else}
-  {#if tab === "huggingface"}<div
+  {#if tab === "overview"}<div
       class="panel"
       role="tabpanel"
-      id="panel-huggingface"
-      aria-labelledby="tab-huggingface"
+      id="panel-overview"
+      aria-labelledby="tab-overview"
     >
-      <HuggingFacePanel />
+      <ModelsOverview {models} onopen={selectTab} />
     </div>{/if}
-  {#if tab === "activity"}<div
+  {#if tab === "models"}<div
       class="panel"
       role="tabpanel"
-      id="panel-activity"
-      aria-labelledby="tab-activity"
+      id="panel-models"
+      aria-labelledby="tab-models"
     >
-      <ProviderUsagePanel />
-      <DownloadsPanel />
+      <p class="tab-lead">
+        Every model you have set up, wherever it runs. The one in force is at
+        the top; a row asks something of you only when it needs it.
+      </p>
+      <MyModels
+        profiles={models.profiles}
+        {decisions}
+        busy={selecting}
+        onuse={(profile) => void select(profile.profile_id, profile.model)}
+        onstart={() => selectTab("runtime")}
+        ondetails={(profile) => (detailsFor = profile)}
+        onchanged={() => void load()}
+      />
     </div>{/if}
   {#if showsProviderCards}
     <div
@@ -1251,24 +1289,22 @@
       aria-labelledby={`tab-${tab}`}
     >
       <p class="tab-lead">
-        {#if tab === "local"}
-          Models that run on this machine. Install or start a runtime, pull a
-          model, or index GGUF files you already have — nothing here leaves
-          this device.
-        {:else}
-          Accounts you hold with a model provider, and custom endpoints or
-          routers you run yourself. You can also choose per prompt in Chat, or
-          in the terminal client (<code>/model use …</code>).
-        {/if}
+        Add a model that runs on this machine, or connect an account you hold
+        with a provider. Local first: nothing on this device leaves it. You can
+        also choose per prompt in Chat, or in the terminal client
+        (<code>/model use …</code>).
       </p>
       <!--
-        The four off-machine facts, on the tab they are about. They were their
-        own top-level tab — seven words of state and a paragraph, one click away
-        from the cards they explain. Read here, they answer the question the
-        Hosted tab actually raises: why did this provider refuse. The paragraph
-        that sat under them is the guide's *Off-machine provider posture*.
+        The four off-machine facts, on the tab where a provider is connected.
+        They were their own top-level destination — seven words of state and a
+        paragraph, one click away from the question they answer: why did this
+        provider refuse. They are stated before the connecting rather than
+        after the refusal, and they stay when there is no hosted card yet,
+        because "the gate is off" is exactly what an owner about to connect one
+        needs to know. The paragraph that sat under them is the guide's
+        *Off-machine provider posture*.
       -->
-      {#if tab === "hosted"}
+      {#if tab === "add"}
         <dl class="gates" aria-label="Off-machine provider posture">
           <div>
             <dt>Hosted model gate</dt>
@@ -1293,7 +1329,7 @@
           </div>
         </dl>
       {/if}
-      {#if tab === "local"}<ProvidersPanel onCatalogueChanged={refreshProviderCatalogues} />{/if}
+      {#if tab === "add"}<ProvidersPanel onCatalogueChanged={refreshProviderCatalogues} />{/if}
       {#if models.profiles.length === 0}
         <div class="card">
           <!-- VIS-12/FIXED-436 — this said "Add profiles in
@@ -1435,29 +1471,22 @@
                         </div>
                       </div>
                       <div class="row-usage"><span>{usageLine(p)}</span></div>
+                      <!-- MODEL-15 — one visible action, and it is whichever
+                           one this row's state actually calls for: name a model
+                           when none is named, put it in force when one is, and
+                           nothing at all when it already is. Test and Details
+                           are troubleshooting, which is what an overflow is
+                           for. -->
                       <div class="row-actions">
-                        <button
-                          type="button"
-                          class="btn btn-ghost btn-sm"
-                          onclick={() => void testConnection(p)}
-                          disabled={testing[p.profile_id] === true}
-                          >{testing[p.profile_id] === true
-                            ? "Testing…"
-                            : "Test"}</button
-                        >
-                        <button
-                          type="button"
-                          class="btn btn-ghost btn-sm"
-                          onclick={() => (detailsFor = p)}>Details</button
-                        >
-                        <button
-                          type="button"
-                          class="btn btn-ghost btn-sm"
-                          onclick={() => void openPicker(p.profile_id)}
-                          aria-expanded={pickerFor === p.profile_id}
-                          >Select models…</button
-                        >
-                        {#if !p.selected && p.model !== "<model>"}
+                        {#if p.model === "<model>"}
+                          <button
+                            type="button"
+                            class="btn btn-sm"
+                            onclick={() => void openPicker(p.profile_id)}
+                            aria-expanded={pickerFor === p.profile_id}
+                            >Select models…</button
+                          >
+                        {:else if !p.selected}
                           <button
                             type="button"
                             class="btn btn-sm"
@@ -1465,6 +1494,20 @@
                             disabled={selecting}>Select</button
                           >
                         {/if}
+                        <RowOverflow
+                          label={providerName(p.provider)}
+                          items={[
+                            ...(p.model === "<model>"
+                              ? []
+                              : [{ label: "Select models…", run: () => void openPicker(p.profile_id) }]),
+                            {
+                              label: testing[p.profile_id] === true ? "Testing…" : "Test connection",
+                              run: () => void testConnection(p),
+                              disabled: testing[p.profile_id] === true,
+                            },
+                            { label: "Details", run: () => (detailsFor = p) },
+                          ]}
+                        />
                       </div>
                       <!-- BUG-47 — the local row that ran the test is where its
                      answer belongs. Without this the result had nowhere to go
@@ -1480,42 +1523,6 @@
                       {/if}
                     </div>
                   {/each}
-                  {#if frameworkProfiles("llama.cpp").length > 0}
-                    <LocalFrameworkRow
-                      provider="llama.cpp"
-                      title="GGUF"
-                      format="gguf"
-                      profiles={frameworkProfiles("llama.cpp")}
-                      description="Up to four detected GGUF models, each served in its own slot by the llama.cpp server Raiker runs for you."
-                      onchanged={() => void load()}
-                      ontest={(profile) => void testConnection(profile)}
-                      ondetails={(profile) => (detailsFor = profile)}
-                      onselect={(profile) => void select(profile.profile_id)}
-                      testing={testing[frameworkProfiles("llama.cpp")[0].profile_id] === true}
-                      {selecting}
-                      testResult={testResults[frameworkProfiles("llama.cpp")[0].profile_id] ?? null}
-                    />
-                  {/if}
-                  {#if frameworkProfiles("mlx").length > 0}
-                    <LocalFrameworkRow
-                      provider="mlx"
-                      title="MLX"
-                      format="mlx"
-                      profiles={frameworkProfiles("mlx")}
-                      description="Choose up to four detected MLX models optimized for Apple silicon."
-                      onchanged={() => void load()}
-                      ontest={(profile) => void testConnection(profile)}
-                      ondetails={(profile) => (detailsFor = profile)}
-                      onselect={(profile) => void select(profile.profile_id)}
-                      testing={testing[frameworkProfiles("mlx")[0].profile_id] === true}
-                      {selecting}
-                      testResult={testResults[frameworkProfiles("mlx")[0].profile_id] ?? null}
-                    />
-                  {/if}
-                  <!-- BUG-256 — dictation's runtime is a local runtime, and it
-                       belongs beside the others rather than in a category of
-                       its own. Nothing here is contacted until Save and test. -->
-                  <SpeechRuntimePanel />
                 </div>
               {:else}
                 <div class="provider-grid">
@@ -1714,29 +1721,17 @@
                             onclick={() => openSignIn(p.profile_id)}
                             style={`--brand:${b.tint}`}>Connect</button
                           >
-                        {:else}
-                          <!-- BUG-208 slice E — Reconnect and Disconnect are
-                               credential management, not the thing an owner came
-                               to this card to do. They live in Details, which is
-                               one click away and already open on this profile. -->
+                        {:else if p.model === "<model>"}
+                          <!-- Connected, no model named yet: naming one is the
+                               only thing left to do here. -->
                           <button
                             type="button"
-                            class="btn btn-ghost btn-sm"
-                            onclick={() => void testConnection(p)}
-                            disabled={testing[p.profile_id] === true}
-                            >{testing[p.profile_id] === true
-                              ? "Testing…"
-                              : "Test"}</button
+                            class="btn btn-sm"
+                            onclick={() => void openPicker(p.profile_id)}
+                            aria-expanded={pickerFor === p.profile_id}
+                            >Select models…</button
                           >
-                        {/if}
-                        <button
-                          type="button"
-                          class="btn btn-ghost btn-sm"
-                          onclick={() => void openPicker(p.profile_id)}
-                          aria-expanded={pickerFor === p.profile_id}
-                          >Select models…</button
-                        >
-                        {#if p.connection_configured && !p.selected && p.model !== "<model>"}
+                        {:else if !p.selected}
                           <button
                             type="button"
                             class="btn btn-sm"
@@ -1744,11 +1739,39 @@
                             disabled={selecting}>Select</button
                           >
                         {/if}
-                        <button
-                          type="button"
-                          class="btn btn-ghost btn-sm"
-                          onclick={() => (detailsFor = p)}>Details</button
-                        >
+                        <!-- MODEL-07/MODEL-15 — a connected provider used to
+                             carry Test, Select models, Select and Details at
+                             once, permanently, on every card. Test is
+                             troubleshooting: it belongs where you go when
+                             something is wrong, not as a standing invitation to
+                             re-prove a connection that is working. BUG-208
+                             slice E already moved Reconnect and Disconnect into
+                             Details for the same reason. -->
+                        <RowOverflow
+                          label={providerName(p.provider)}
+                          items={[
+                            // Everywhere it is not already the visible primary.
+                            // Browsing what a provider serves is how an owner
+                            // decides whether to keep the connection at all, so
+                            // it must not depend on having one.
+                            ...(p.connection_configured && p.model === "<model>"
+                              ? []
+                              : [{ label: "Select models…", run: () => void openPicker(p.profile_id) }]),
+                            ...(p.connection_configured
+                              ? [
+                                  {
+                                    label:
+                                      testing[p.profile_id] === true
+                                        ? "Testing…"
+                                        : "Test connection",
+                                    run: () => void testConnection(p),
+                                    disabled: testing[p.profile_id] === true,
+                                  },
+                                ]
+                              : []),
+                            { label: "Details", run: () => (detailsFor = p) },
+                          ]}
+                        />
                       </div>
                       {#if testResults[p.profile_id]}
                         <p
@@ -1793,17 +1816,81 @@
       <!-- Building a local model finishes here: a runtime above, and the GGUF
            files this machine already holds below. Splitting them across two
            tabs made the owner navigate mid-task. -->
-      {#if tab === "local"}<LocalLibraryPanel />{/if}
+      <!-- MODEL-09 — Hugging Face is a way of adding a local model, not a
+           peer destination to "Local" and "Hosted". It was its own tab, which
+           gave a download-and-convert workflow the same weight as the two
+           categories every model belongs to. -->
+      {#if tab === "add"}<HuggingFacePanel />{/if}
     </div>
   {/if}
 
-  {#if tab === "routing"}
+  {#if tab === "runtime"}
     <div
       class="panel"
       role="tabpanel"
-      id="panel-routing"
-      aria-labelledby="tab-routing"
+      id="panel-runtime"
+      aria-labelledby="tab-runtime"
     >
+      <p class="tab-lead">
+        What is serving, what a turn falls back to, and where models on this
+        machine are found. MODEL-05's separation holds here: choosing a model
+        and serving one are different acts, so a model can be selected and
+        stopped, running and unselected, or both at once, and each of those
+        reads differently.
+      </p>
+
+      <!-- MODEL-05 — local serving, in the section about runtime rather than
+           in the middle of the list of things you could add. The slot rows are
+           unchanged; what moved is which question they answer. -->
+      <div class="local-list local-serving">
+        {#if frameworkProfiles("llama.cpp").length > 0}
+          <LocalFrameworkRow
+            provider="llama.cpp"
+            title="GGUF"
+            format="gguf"
+            profiles={frameworkProfiles("llama.cpp")}
+            description="Up to four detected GGUF models, each served in its own slot by the llama.cpp server Raiker runs for you."
+            onchanged={() => void load()}
+            ontest={(profile) => void testConnection(profile)}
+            ondetails={(profile) => (detailsFor = profile)}
+            onselect={(profile) => void select(profile.profile_id)}
+            testing={testing[frameworkProfiles("llama.cpp")[0].profile_id] === true}
+            {selecting}
+            testResult={testResults[frameworkProfiles("llama.cpp")[0].profile_id] ?? null}
+          />
+        {/if}
+        {#if frameworkProfiles("mlx").length > 0}
+          <LocalFrameworkRow
+            provider="mlx"
+            title="MLX"
+            format="mlx"
+            profiles={frameworkProfiles("mlx")}
+            description="Choose up to four detected MLX models optimized for Apple silicon."
+            onchanged={() => void load()}
+            ontest={(profile) => void testConnection(profile)}
+            ondetails={(profile) => (detailsFor = profile)}
+            onselect={(profile) => void select(profile.profile_id)}
+            testing={testing[frameworkProfiles("mlx")[0].profile_id] === true}
+            {selecting}
+            testResult={testResults[frameworkProfiles("mlx")[0].profile_id] ?? null}
+          />
+        {/if}
+        <!-- BUG-256 — dictation's runtime is a local runtime, and it
+             belongs beside the others rather than in a category of
+             its own. Nothing here is contacted until Save and test. -->
+        <SpeechRuntimePanel />
+      </div>
+
+      <!-- MODEL-06 — the library answers "what is on disk"; the serving rows
+           above answer "what is running". They were interleaved. -->
+      <LocalLibraryPanel />
+
+      <!-- MODEL-11 — the four words the page used to spell "active", told
+           apart: what each surface starts on, and what would really answer
+           right now. The fallback sequence that produces the second is edited
+           directly beneath, so cause and effect are on one screen. -->
+      <WorkDefaults {models} />
+
       <section class="card fallback" aria-labelledby="fallback-h">
         <h2 id="fallback-h">Model fallback sequence</h2>
 
@@ -1948,18 +2035,26 @@
           {/if}
         {/if}
       </section>
+
+      <!-- MODEL-03/MODEL-10 — downloads, conversions and pulls are what the
+           runtime is *doing*, so they belong to the runtime rather than beside
+           Pricing as a sixth peer tab. -->
+      <DownloadsPanel />
     </div>
   {/if}
 
-  {#if tab === "pricing"}
+  {#if tab === "usage"}
     <div
       class="panel"
       role="tabpanel"
-      id="panel-pricing"
-      aria-labelledby="tab-pricing"
+      id="panel-usage"
+      aria-labelledby="tab-usage"
     >
-      <!-- BUG-21 — the price registry. Its own destination, because looking up
-         what a model costs is its own errand, not a footnote to connecting one. -->
+      <!-- MODEL-12 — what you spent and what it costs are one question asked
+           twice. Pricing was a top-level tab of its own, so an owner checking a
+           bill read the rate on one page and the usage on another and did the
+           multiplication themselves. -->
+      <ProviderUsagePanel />
       <ModelPricingPanel />
     </div>
   {/if}

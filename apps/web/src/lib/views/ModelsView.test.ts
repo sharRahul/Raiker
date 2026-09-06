@@ -1,6 +1,6 @@
-// Coverage for the Models view: its action-category tabs (Local, Hosted,
-// Hugging Face, Activity, Routing, Pricing, Posture), provider selection and catalogue, and the fallback-sequence
-// and advisor editors on the Routing tab. The read is the single GET
+// Coverage for the Models view: its tabs (Overview, My models, Add model,
+// Runtime & routing, Usage — MODEL-03), provider selection and catalogue, and
+// the fallback-sequence and advisor editors on Runtime & routing. The read is the single GET
 // /api/models; writes go to PUT /api/model-fallback, /api/model-selection, and
 // /api/model-advisor (human gate-manager only, enforced server-side).
 import {
@@ -16,6 +16,40 @@ import { stubFetch, stubFetchPending } from "../test-helpers";
 import ModelsView from "./ModelsView.svelte";
 
 afterEach(() => vi.unstubAllGlobals());
+
+/**
+ * Press a row action, wherever this row's state put it.
+ *
+ * MODEL-15 gives a repeated provider row one visible action and one overflow,
+ * and *which* action is visible depends on the row: a provider with no model
+ * named shows "Select models…" outright, while a connected one keeps it in the
+ * menu beside Test connection and Details. Both are the same action to the
+ * owner, so they are the same call here — a spec about what a provider row can
+ * do should not also be a spec about which of the two places today's state puts
+ * it in.
+ *
+ * `nth` picks among rows when a fixture has more than one provider.
+ */
+async function rowAction(label: string, nth = 0): Promise<void> {
+  // The rows arrive with the first read, so wait for either shape before
+  // deciding which one this row is in. Checking synchronously first would
+  // always find nothing and always take the overflow path.
+  const overflow = /^More actions for /;
+  await waitFor(() => {
+    const found =
+      screen.queryAllByRole("button", { name: label }).length +
+      screen.queryAllByRole("button", { name: overflow }).length;
+    expect(found).toBeGreaterThan(nth);
+  });
+  const visible = screen.queryAllByRole("button", { name: label });
+  if (visible.length > nth) {
+    await fireEvent.click(visible[nth]);
+    return;
+  }
+  await fireEvent.click(screen.getAllByRole("button", { name: overflow })[nth]);
+  const menu = screen.getAllByRole("menu")[0];
+  await fireEvent.click(within(menu).getByRole("menuitem", { name: label }));
+}
 
 function profile(partial: Partial<ModelProfile>): ModelProfile {
   return {
@@ -77,7 +111,7 @@ describe("BUG-270 — a card never claims a runtime that is not here", () => {
       }),
       "POST /api/local-runtimes/detect": { runtimes: [] },
     });
-    render(ModelsView, { tab: "local" });
+    render(ModelsView, { tab: "add" });
 
     // The line carries a warning icon and an inline action, so it is matched on
     // the element that holds all three rather than on a bare text node.
@@ -122,7 +156,7 @@ describe("BUG-270 — a card never claims a runtime that is not here", () => {
     });
     const open = vi.fn();
     vi.stubGlobal("open", open);
-    render(ModelsView, { tab: "local" });
+    render(ModelsView, { tab: "add" });
 
     await fireEvent.click(await screen.findByRole("button", { name: "Set up Ollama" }));
 
@@ -170,7 +204,7 @@ describe("BUG-270 — a card never claims a runtime that is not here", () => {
     });
     const open = vi.fn();
     vi.stubGlobal("open", open);
-    render(ModelsView, { tab: "local" });
+    render(ModelsView, { tab: "add" });
 
     await fireEvent.click(await screen.findByRole("button", { name: "Set up Ollama" }));
 
@@ -195,7 +229,7 @@ describe("BUG-270 — a card never claims a runtime that is not here", () => {
         ],
       }),
     });
-    render(ModelsView, { tab: "local" });
+    render(ModelsView, { tab: "add" });
 
     expect(await screen.findByText(/Not installed on this machine/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^Set up / })).toBeNull();
@@ -215,7 +249,7 @@ describe("BUG-270 — a card never claims a runtime that is not here", () => {
         ],
       }),
     });
-    render(ModelsView, { tab: "local" });
+    render(ModelsView, { tab: "add" });
 
     await waitFor(() =>
       expect(screen.getAllByRole("heading", { name: "Ollama" }).length).toBeGreaterThan(0),
@@ -236,7 +270,7 @@ describe("BUG-270 — a card never claims a runtime that is not here", () => {
         ready_provider_count: 0,
       }),
     });
-    render(ModelsView, { tab: "local" });
+    render(ModelsView, { tab: "add" });
 
     expect(await screen.findByText("No model ready")).toBeTruthy();
   });
@@ -266,7 +300,7 @@ describe("ModelsView state grammar", () => {
         ],
       },
     });
-    render(ModelsView, { tab: "local" });
+    render(ModelsView, { tab: "add" });
 
     await fireEvent.click(
       await screen.findByRole("button", { name: "Refresh connected providers" }),
@@ -302,7 +336,7 @@ describe("ModelsView state grammar", () => {
       "GET /api/models/chatgpt-codex/status": { connection_status: "signed_out", plan_type: null },
       "POST /api/models/chatgpt-codex/login": { connection_status: "login_pending", plan_type: null },
     });
-    render(ModelsView, { tab: "hosted" });
+    render(ModelsView, { tab: "add" });
 
     await fireEvent.click(await screen.findByRole("button", { name: "Sign in with ChatGPT" }));
     await waitFor(() =>
@@ -327,7 +361,7 @@ describe("ModelsView state grammar", () => {
       }),
       "GET /api/models/chatgpt-codex/status": { connection_status: "connected", plan_type: "plus" },
     });
-    render(ModelsView, { tab: "hosted" });
+    render(ModelsView, { tab: "add" });
 
     expect(await screen.findByText("ChatGPT Plus connected")).toBeInTheDocument();
     expect(screen.queryByText("Connection saved")).not.toBeInTheDocument();
@@ -349,7 +383,7 @@ describe("ModelsView state grammar", () => {
       }),
       "GET /api/models/chatgpt-codex/status": { connection_status: "codex_missing", plan_type: null },
     });
-    render(ModelsView, { tab: "hosted" });
+    render(ModelsView, { tab: "add" });
 
     expect(await screen.findByText(/Codex not installed/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign in with ChatGPT" })).toBeInTheDocument();
@@ -378,7 +412,7 @@ describe("ModelsView state grammar", () => {
       },
     });
 
-    render(ModelsView, { tab: "local" });
+    render(ModelsView, { tab: "runtime" });
 
     const gguf = await screen.findByRole("group", { name: "GGUF" });
     const mlx = screen.getByRole("group", { name: "MLX" });
@@ -488,7 +522,12 @@ describe("ModelsView state grammar", () => {
       endpoint_kind: "hosted",
     });
 
-  it("keeps hosted accounts off the Local tab", async () => {
+  // MODEL-03/MODEL-07 — Local and Hosted were peers because that is how the
+  // profiles are stored, not because it is a choice anyone makes: an owner
+  // arrives wanting *a model*, and where it runs is an attribute of the answer.
+  // Both sections live under Add model, each keeping its own heading and its own
+  // controls, so nothing was merged except the errand.
+  it("gathers local and hosted under one add-a-model errand", async () => {
     stubFetch({
       "GET /api/models": models({
         profiles: [localProfile(), hostedProfile()],
@@ -496,29 +535,27 @@ describe("ModelsView state grammar", () => {
       }),
       "GET /api/model-library": { roots: [], models: [] },
     });
-    render(ModelsView, { tab: "local" });
+    render(ModelsView, { tab: "add" });
 
     expect(await screen.findByText("On this device")).toBeInTheDocument();
     // Building a local model lives here: install a runtime, pull, and index.
     expect(screen.getByText("Install, connect, or pull")).toBeInTheDocument();
-    expect(screen.queryByText("Your hosted providers")).not.toBeInTheDocument();
-    expect(screen.queryByText("Advanced connections")).not.toBeInTheDocument();
   });
 
-  it("keeps local runtimes and install actions off the Hosted tab", async () => {
+  it("still separates hosted accounts from local runtimes by section", async () => {
+    // One tab, two headings. The distinction that mattered — sign in to
+    // somebody else's account, or run something here — is a section boundary
+    // rather than a navigation choice made before you know which you want.
     stubFetch({
       "GET /api/models": models({
         profiles: [localProfile(), hostedProfile()],
         chat_profiles: [localProfile(), hostedProfile()],
       }),
     });
-    render(ModelsView, { tab: "hosted" });
+    render(ModelsView, { tab: "add" });
 
     expect(await screen.findByText("Your hosted providers")).toBeInTheDocument();
-    expect(screen.queryByText("On this device")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Install, connect, or pull"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("On this device")).toBeInTheDocument();
   });
 
   // A card's model line is a fact about the owner's provider or it is nothing.
@@ -544,7 +581,7 @@ describe("ModelsView state grammar", () => {
         chat_profiles: [hostedProfile()],
       }),
     });
-    render(ModelsView, { tab: "hosted" });
+    render(ModelsView, { tab: "add" });
 
     expect(await screen.findByText("Your hosted providers")).toBeInTheDocument();
     expect(screen.queryByText(/no model pinned/i)).not.toBeInTheDocument();
@@ -565,7 +602,7 @@ describe("ModelsView state grammar", () => {
         ready_provider_count: 0,
       }),
     });
-    render(ModelsView, { tab: "pricing" });
+    render(ModelsView, { tab: "usage" });
 
     // Hosted, with no credential saved: nothing here is set up either.
     expect(await screen.findByText("No model ready")).toBeInTheDocument();
@@ -593,7 +630,7 @@ describe("ModelsView state grammar", () => {
         ready_provider_count: 0,
       }),
     });
-    render(ModelsView);
+    render(ModelsView, { tab: "add" });
 
     expect(await screen.findByText("No credit")).toBeInTheDocument();
   });
@@ -624,7 +661,7 @@ describe("ModelsView state grammar", () => {
         current_model: "gemma4:31b-cloud",
       }),
     });
-    render(ModelsView);
+    render(ModelsView, { tab: "add" });
     await screen.findByRole("combobox", { name: "Global model" });
     expect(screen.queryByText("selected")).not.toBeInTheDocument();
   });
@@ -642,10 +679,8 @@ describe("ModelsView state grammar", () => {
         ],
       }),
     });
-    render(ModelsView);
-    await fireEvent.click(
-      await screen.findByRole("button", { name: "Details" }),
-    );
+    render(ModelsView, { tab: "runtime" });
+    await fireEvent.click(await screen.findByRole("button", { name: "Details" }));
     expect(
       screen.getByText(/32,768 tokens · Reported by the provider runtime/),
     ).toBeInTheDocument();
@@ -653,7 +688,7 @@ describe("ModelsView state grammar", () => {
 
   it("shows a route-level loading state while model truth is fetched", async () => {
     stubFetchPending();
-    render(ModelsView);
+    render(ModelsView, { tab: "add" });
     const statuses = await screen.findAllByRole("status");
     expect(
       statuses.some((el) => /loading models/i.test(el.textContent ?? "")),
@@ -662,7 +697,7 @@ describe("ModelsView state grammar", () => {
 
   it("shows a route-level error state when model truth cannot load", async () => {
     stubFetch({});
-    render(ModelsView);
+    render(ModelsView, { tab: "add" });
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/couldn't load models/i);
     expect(alert).toHaveTextContent(/unavailable \(404\)/i);
@@ -684,7 +719,7 @@ describe("ModelsView state grammar", () => {
         ],
       }),
     });
-    render(ModelsView, { tab: "hosted" });
+    render(ModelsView, { tab: "add" });
 
     // BUG-208 slice E — a provider with no turns has no cost to report, so the
     // usage strip is not rendered at all. What must never happen is the opposite
@@ -706,7 +741,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         fallback_sequence: ["anthropic-hosted", "raiker-local-llama-cpp"],
       }),
     });
-    render(ModelsView, { props: { tab: "routing" } });
+    render(ModelsView, { props: { tab: "runtime" } });
     await waitFor(() =>
       expect(screen.getByText("Model fallback sequence")).toBeTruthy(),
     );
@@ -728,7 +763,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         ],
       }),
     });
-    render(ModelsView);
+    render(ModelsView, { tab: "add" });
     await waitFor(() => expect(screen.getByText("Cache 5m")).toBeTruthy());
   });
 
@@ -749,7 +784,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         connection_configured: true,
       },
     });
-    render(ModelsView, { props: { tab: "hosted" } });
+    render(ModelsView, { props: { tab: "add" } });
 
     await fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
     await fireEvent.input(screen.getByLabelText("Anthropic API key"), {
@@ -781,7 +816,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
 
   it("shows the empty state when no fallback is configured", async () => {
     stubFetch({ "GET /api/models": models({ fallback_sequence: [] }) });
-    render(ModelsView, { props: { tab: "routing" } });
+    render(ModelsView, { props: { tab: "runtime" } });
     await waitFor(() =>
       expect(screen.getByText(/No fallback configured/)).toBeTruthy(),
     );
@@ -795,7 +830,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         fallback_sequence: ["raiker-local-llama-cpp"],
       },
     });
-    render(ModelsView, { props: { tab: "routing" } });
+    render(ModelsView, { props: { tab: "runtime" } });
     await waitFor(() =>
       expect(screen.getByText("Model fallback sequence")).toBeTruthy(),
     );
@@ -829,7 +864,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         model: "local-gguf",
       },
     });
-    render(ModelsView);
+    render(ModelsView, { tab: "runtime" });
     const llamaRow = await screen.findByRole("group", { name: "GGUF" });
     await fireEvent.click(within(llamaRow).getByText("Select"));
 
@@ -857,7 +892,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
       },
     });
     const onchanged = vi.fn();
-    render(ModelsView, { props: { onchanged } });
+    render(ModelsView, { props: { onchanged, tab: "runtime" } });
     await waitFor(() =>
       expect(screen.getAllByText("Select").length).toBeGreaterThan(0),
     );
@@ -896,10 +931,8 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         remediation: "Add credit or raise the quota, then check again.",
       },
     });
-    render(ModelsView);
-    await waitFor(() => expect(screen.getByText("Test")).toBeTruthy());
-
-    await fireEvent.click(screen.getByText("Test"));
+    render(ModelsView, { tab: "add" });
+    await rowAction("Test connection");
 
     await waitFor(() => {
       const post = mock.mock.calls.find(
@@ -948,7 +981,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
           connection_configured: true,
         },
       });
-      render(ModelsView, { props: { tab: "hosted" } });
+      render(ModelsView, { props: { tab: "add" } });
 
       await fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
       await fireEvent.input(screen.getByLabelText(/API key/i), {
@@ -991,9 +1024,9 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
           connection_configured: true,
         },
       });
-      render(ModelsView, { props: { tab: "hosted" } });
+      render(ModelsView, { props: { tab: "add" } });
 
-      await fireEvent.click(await screen.findByRole("button", { name: "Details" }));
+      await rowAction("Details");
       await fireEvent.click(await screen.findByRole("button", { name: "Reconnect" }));
       await fireEvent.input(screen.getByLabelText(/API key/i), {
         target: { value: "sk-ant-test" },
@@ -1027,9 +1060,9 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
           models: [],
         },
       });
-      render(ModelsView, { props: { tab: "hosted" } });
+      render(ModelsView, { props: { tab: "add" } });
 
-      await fireEvent.click(await screen.findByRole("button", { name: "Test" }));
+      await rowAction("Test connection");
       await fireEvent.click(
         await screen.findByRole("button", { name: "Add workspace ID" }),
       );
@@ -1051,11 +1084,11 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
           chat_profiles: [connected],
         }),
       });
-      render(ModelsView, { props: { tab: "hosted" } });
+      render(ModelsView, { props: { tab: "add" } });
 
       // In Details, where credential management lives — the card carries
       // readiness and nothing else by design.
-      await fireEvent.click(await screen.findByRole("button", { name: "Details" }));
+      await rowAction("Details");
       expect(
         await screen.findByText(/workspace named/i),
       ).toBeInTheDocument();
@@ -1086,11 +1119,11 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
       },
     });
     vi.stubGlobal("confirm", vi.fn(() => true));
-    render(ModelsView, { props: { tab: "hosted" } });
+    render(ModelsView, { props: { tab: "add" } });
 
     // BUG-208 slice E moved credential management into Details: it is not the
     // thing an owner came to the card to do, and the card had five controls.
-    await fireEvent.click(await screen.findByRole("button", { name: "Details" }));
+    await rowAction("Details");
     await fireEvent.click(await screen.findByRole("button", { name: "Disconnect Anthropic" }));
 
     await waitFor(() =>
@@ -1134,10 +1167,8 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         models: [],
       },
     });
-    render(ModelsView);
-    await waitFor(() => expect(screen.getByText("Select models…")).toBeTruthy());
-
-    await fireEvent.click(screen.getByText("Select models…"));
+    render(ModelsView, { tab: "add" });
+    await rowAction("Select models…");
 
     expect(await screen.findByText(/identity-linked, so it acts inside one workspace/i)).toBeTruthy();
     expect(screen.queryByText(/Provider unreachable/i)).toBeNull();
@@ -1167,10 +1198,8 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         models: ["qwen2.5"],
       },
     });
-    render(ModelsView);
-    await waitFor(() => expect(screen.getByText("Select models…")).toBeTruthy());
-
-    await fireEvent.click(screen.getByText("Select models…"));
+    render(ModelsView, { tab: "add" });
+    await rowAction("Select models…");
     // One switch per model the provider published, and the switch is the whole
     // decision — there is no second "Use model" step.
     const qwen = await screen.findByRole("checkbox", { name: "Qwen 2.5" });
@@ -1212,11 +1241,11 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         ],
       },
     });
-    render(ModelsView, { tab: "hosted" });
-    await fireEvent.click(
-      await screen.findByRole("button", { name: /select models/i }),
-    );
-    expect(await screen.findAllByRole("checkbox", { name: "GPT-4o Mini" })).toHaveLength(1);
+    render(ModelsView, { tab: "add" });
+    await rowAction("Select models…");
+    expect(
+      await screen.findAllByRole("checkbox", { name: "GPT-4o Mini" }),
+    ).toHaveLength(1);
     expect(screen.getByRole("checkbox", { name: "Llama 3.1 8B Instruct" })).toBeTruthy();
   });
 
@@ -1240,10 +1269,8 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         models: [],
       },
     });
-    render(ModelsView);
-    await waitFor(() => expect(screen.getByText("Select models…")).toBeTruthy());
-
-    await fireEvent.click(screen.getByText("Select models…"));
+    render(ModelsView, { tab: "add" });
+    await rowAction("Select models…");
     await waitFor(() =>
       expect(screen.getByText(/denied by provider policy/i)).toBeTruthy(),
     );
@@ -1258,7 +1285,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         advisor_profile_id: "anthropic-hosted",
       },
     });
-    render(ModelsView, { props: { tab: "routing" } });
+    render(ModelsView, { props: { tab: "runtime" } });
     await waitFor(() => expect(screen.getByText("Advisor model")).toBeTruthy());
 
     const select = screen.getByLabelText(
@@ -1287,7 +1314,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
       "GET /api/models": models({ advisor_profile_id: "anthropic-hosted" }),
       "PUT /api/model-advisor": { ok: true, advisor_profile_id: null },
     });
-    render(ModelsView, { props: { tab: "routing" } });
+    render(ModelsView, { props: { tab: "runtime" } });
     await waitFor(() => expect(screen.getByText("Advisor model")).toBeTruthy());
 
     const select = screen.getByLabelText(
@@ -1321,7 +1348,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         ],
       }),
     });
-    render(ModelsView, { props: { tab: "routing" } });
+    render(ModelsView, { props: { tab: "runtime" } });
     await waitFor(() => expect(screen.getByText("Advisor model")).toBeTruthy());
     const select = screen.getByLabelText(
       "Advisor model profile",
@@ -1343,17 +1370,24 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
             }),
           } as Response;
         }
+        // MODEL-05/MODEL-06 put the local library on this tab, and a mock
+        // that answers every GET with the models payload hands it a body with
+        // no `roots`, which fails the whole panel render rather than only the
+        // panel that asked. Route by path.
+        const path = String(_input).split("?")[0];
         return {
           ok: true,
           status: 200,
           json: async () =>
-            models({ fallback_sequence: ["raiker-local-llama-cpp"] }),
+            path.endsWith("/api/model-library")
+              ? { roots: [], models: [] }
+              : models({ fallback_sequence: ["raiker-local-llama-cpp"] }),
         } as Response;
       },
     );
     vi.stubGlobal("fetch", mock);
 
-    render(ModelsView, { props: { tab: "routing" } });
+    render(ModelsView, { props: { tab: "runtime" } });
     await waitFor(() =>
       expect(screen.getByText("Model fallback sequence")).toBeTruthy(),
     );
@@ -1367,7 +1401,11 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
 });
 
 describe("ModelsView action-category tabs", () => {
-  it("offers one tab per action category", async () => {
+  // MODEL-03 — the six tabs this replaces named where a model was *stored*
+  // (Local, Hosted, Hugging Face) or which table a fact came out of (Activity,
+  // Routing, Pricing). None of them answered the question every owner arrives
+  // with, which is what is running their work.
+  it("offers one tab per question an owner arrives with", async () => {
     stubFetch({ "GET /api/models": models({}) });
     render(ModelsView);
     const strip = await screen.findByRole("tablist", {
@@ -1378,12 +1416,11 @@ describe("ModelsView action-category tabs", () => {
         .getAllByRole("tab")
         .map((tab) => tab.textContent?.trim()),
     ).toEqual([
-      "Local",
-      "Hosted",
-      "Hugging Face",
-      "Activity",
-      "Routing",
-      "Pricing",
+      "Overview",
+      "My models",
+      "Add model",
+      "Runtime & routing",
+      "Usage",
     ]);
   });
 
@@ -1401,17 +1438,20 @@ describe("ModelsView action-category tabs", () => {
     expect(screen.queryByText("Off-machine provider posture")).toBeNull();
   });
 
-  it("puts Pricing on its own tab", async () => {
+  // MODEL-12 — what you spent and what it costs were two top-level tabs, so an
+  // owner checking a bill read the rate on one page and the usage on another
+  // and did the multiplication themselves.
+  it("puts pricing and usage on one tab", async () => {
     stubFetch({
       "GET /api/models": models({}),
       "GET /api/models/pricing": { entries: [], sync: [], can_override: false },
     });
-    render(ModelsView, { props: { tab: "pricing" } });
+    render(ModelsView, { props: { tab: "usage" } });
     expect(
       await screen.findByRole("heading", { name: "Pricing" }),
     ).toBeInTheDocument();
-    // Provider cards belong to Local and Hosted. The readiness summary and the
-    // global default are page-level on purpose and stay visible here.
+    // Provider cards belong to Add model. The readiness summary is page-level
+    // on purpose and stays visible here.
     expect(screen.queryByText("On this device")).toBeNull();
     expect(screen.queryByText("Your hosted providers")).toBeNull();
   });
@@ -1422,14 +1462,14 @@ describe("ModelsView action-category tabs", () => {
   // put the answer one click away from the question.
   it("reads the off-machine posture above the hosted cards it explains", async () => {
     stubFetch({ "GET /api/models": models({}) });
-    render(ModelsView, { props: { tab: "hosted" } });
+    render(ModelsView, { props: { tab: "add" } });
     const posture = await screen.findByLabelText("Off-machine provider posture");
     expect(within(posture).getByText("Hosted model gate")).toBeInTheDocument();
     expect(within(posture).getByText("Private-network gate")).toBeInTheDocument();
     expect(within(posture).getByText("Egress allowlist")).toBeInTheDocument();
     expect(within(posture).getByText("Off-machine profiles")).toBeInTheDocument();
     // On the tab it is about, not on one of its own.
-    expect(screen.getByRole("tab", { name: "Hosted" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Add model" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -1447,7 +1487,7 @@ describe("ModelsView action-category tabs", () => {
         hosted_model_gate_enforced: true,
       }),
     });
-    render(ModelsView, { props: { tab: "hosted" } });
+    render(ModelsView, { props: { tab: "add" } });
     const posture = await screen.findByLabelText("Off-machine provider posture");
     expect(within(posture).getByText("On (by connection)")).toBeInTheDocument();
   });
@@ -1462,7 +1502,7 @@ describe("ModelsView action-category tabs", () => {
         hosted_model_gate_enforced: false,
       }),
     });
-    render(ModelsView, { props: { tab: "hosted" } });
+    render(ModelsView, { props: { tab: "add" } });
     const posture = await screen.findByLabelText("Off-machine provider posture");
     expect(within(posture).queryByText("On (by connection)")).toBeNull();
     expect(within(posture).getAllByText("Off").length).toBeGreaterThan(0);
@@ -1480,46 +1520,51 @@ describe("ModelsView action-category tabs", () => {
         hosted_model_gate_enforced: false,
       }),
     });
-    render(ModelsView, { props: { tab: "hosted" } });
+    render(ModelsView, { props: { tab: "add" } });
     const posture = await screen.findByLabelText("Off-machine provider posture");
     expect(within(posture).getByText("Off until connected")).toBeInTheDocument();
   });
 
-  it("does not read the posture on the local tab, which is not about it", async () => {
+  // Its predecessor asserted the posture stayed off the Local tab. With Local
+  // and Hosted merged into one add-a-model errand there is no such tab, and the
+  // facts are stated *before* a provider is connected rather than after it
+  // refuses — "the hosted gate is off" is exactly what an owner about to
+  // connect one needs. What must not happen is the posture appearing on a tab
+  // that is not about connecting anything.
+  it("does not read the off-machine posture where nothing connects", async () => {
     stubFetch({ "GET /api/models": models({}) });
-    render(ModelsView, { props: { tab: "local" } });
-    await screen.findByText("On this device");
+    render(ModelsView, { props: { tab: "runtime" } });
     expect(screen.queryByLabelText("Off-machine provider posture")).toBeNull();
   });
 
   it("marks the selected tab and links each panel back to it", async () => {
     stubFetch({ "GET /api/models": models({}) });
-    render(ModelsView, { props: { tab: "routing" } });
+    render(ModelsView, { props: { tab: "runtime" } });
     await waitFor(() =>
       expect(screen.getByText("Model fallback sequence")).toBeTruthy(),
     );
-    expect(screen.getByRole("tab", { name: "Routing" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Runtime & routing" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
     expect(screen.getByRole("tabpanel")).toHaveAttribute(
       "aria-labelledby",
-      "tab-routing",
+      "tab-runtime",
     );
   });
 
   it("selecting a tab writes it into the hash, so a panel is shareable", async () => {
     stubFetch({ "GET /api/models": models({}) });
     render(ModelsView);
-    await fireEvent.click(await screen.findByRole("tab", { name: "Pricing" }));
-    expect(window.location.hash).toBe("#/models?tab=pricing");
-    expect(screen.getByRole("tab", { name: "Pricing" })).toHaveAttribute(
+    await fireEvent.click(await screen.findByRole("tab", { name: "Usage" }));
+    expect(window.location.hash).toBe("#/models?tab=usage");
+    expect(screen.getByRole("tab", { name: "Usage" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
     expect(await screen.findByRole("tabpanel")).toHaveAttribute(
       "aria-labelledby",
-      "tab-pricing",
+      "tab-usage",
     );
   });
 });
@@ -1542,11 +1587,11 @@ describe("ModelsView provider test feedback", () => {
       model: "gemma4:31b-cloud",
       connection_configured: true,
     });
-  const llamaCpp = () =>
+  const lmStudio = () =>
     profile({
-      profile_id: "raiker-local-llama-cpp",
-      provider: "llama.cpp",
-      model: "local-gguf",
+      profile_id: "lm-studio-local",
+      provider: "lm-studio",
+      model: "local-lmstudio",
       connection_configured: true,
     });
   const anthropic = () =>
@@ -1572,9 +1617,12 @@ describe("ModelsView provider test feedback", () => {
       connection_configured: true,
     });
 
+  // The second provider is LM Studio rather than llama.cpp: MODEL-05 moved the
+  // framework slot rows to Runtime & routing, and the claim under test is about
+  // two ordinary local rows on one tab, not about which two.
   it("shows one provider's result only under that provider", async () => {
     stubFetch({
-      "GET /api/models": models({ profiles: [ollama(), llamaCpp()] }),
+      "GET /api/models": models({ profiles: [ollama(), lmStudio()] }),
       "GET /api/model-library": { roots: [], models: [] },
       "POST /api/model-readiness/check": {
         state: "ready",
@@ -1584,11 +1632,18 @@ describe("ModelsView provider test feedback", () => {
         remediation: "",
       },
     });
-    render(ModelsView, { tab: "local" });
+    render(ModelsView, { tab: "add" });
 
-    const tests = await screen.findAllByRole("button", { name: "Test" });
-    expect(tests).toHaveLength(2);
-    await fireEvent.click(tests[0]);
+    // MODEL-15 — Test is troubleshooting, so it is inside each row's overflow
+    // rather than a standing invitation to re-prove a working connection. Two
+    // rows, two overflows, and the one that ran the check is still the one that
+    // shows the answer, which is the whole claim here.
+    await waitFor(async () =>
+      expect(
+        (await screen.findAllByRole("button", { name: /^More actions for / })).length,
+      ).toBe(2),
+    );
+    await rowAction("Test connection", 0);
 
     const message = "Ollama can reach gemma4:31b-cloud.";
     await waitFor(() => expect(screen.getAllByText(message)).toHaveLength(1));
@@ -1620,16 +1675,15 @@ describe("ModelsView provider test feedback", () => {
         remediation: "",
       },
     });
-    render(ModelsView, { tab: "hosted" });
+    render(ModelsView, { tab: "add" });
 
-    const tests = await screen.findAllByRole("button", { name: "Test" });
-    await fireEvent.click(tests[0]);
+    await rowAction("Test connection", 0);
     await waitFor(() =>
       expect(screen.getAllByText("The exact model is reachable.")).toHaveLength(
         1,
       ),
     );
-    await fireEvent.click(screen.getAllByRole("button", { name: "Test" })[1]);
+    await rowAction("Test connection", 1);
 
     // Testing the second provider does not overwrite the first: two results
     // stand, each attributed to the card whose Test produced it.
@@ -1650,10 +1704,9 @@ describe("ModelsView provider test feedback", () => {
     stubFetch({
       "GET /api/models": models({ profiles: [anthropic(), openrouter()] }),
     });
-    render(ModelsView, { tab: "hosted" });
+    render(ModelsView, { tab: "add" });
 
-    const tests = await screen.findAllByRole("button", { name: "Test" });
-    await fireEvent.click(tests[0]);
+    await rowAction("Test connection", 0);
     await waitFor(() =>
       expect(
         screen.getByText("Raiker could not check Anthropic."),
@@ -1666,7 +1719,7 @@ describe("ModelsView provider test feedback", () => {
     // An anonymous "Provider unreachable" is what let a misplaced result go
     // unnoticed: nothing in the sentence contradicted the card above it.
     stubFetch({
-      "GET /api/models": models({ profiles: [ollama(), llamaCpp()] }),
+      "GET /api/models": models({ profiles: [ollama(), lmStudio()] }),
       "GET /api/model-library": { roots: [], models: [] },
       "POST /api/model-readiness/check": {
         state: "runtime_stopped",
@@ -1676,11 +1729,9 @@ describe("ModelsView provider test feedback", () => {
         remediation: "Start or reconnect Ollama, then check again.",
       },
     });
-    render(ModelsView, { tab: "local" });
+    render(ModelsView, { tab: "add" });
 
-    await fireEvent.click(
-      (await screen.findAllByRole("button", { name: "Test" }))[0],
-    );
+    await rowAction("Test connection", 0);
     const result = await screen.findByText(/^Ollama is not reachable\./);
     expect(result).toHaveAttribute(
       "data-test-result",

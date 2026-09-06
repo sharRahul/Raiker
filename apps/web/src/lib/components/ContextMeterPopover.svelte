@@ -164,7 +164,7 @@
         <p class="price-note">
           No rate is recorded for <strong>{usage.model ?? "this model"}</strong> in the price
           registry, so its cost cannot be shown.
-          <a class="configure" href="#/models?tab=pricing">Configure →</a>
+          <a class="configure" href="#/models?tab=usage">Configure →</a>
         </p>
       {:else if sessionCost}
         <div class="cost-row"><span>This chat</span><strong>{sessionCost}</strong></div>

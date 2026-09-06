@@ -32,6 +32,8 @@ from raiker.models.conversion import (
     ModelConversionService,
     conversion_artifacts,
 )
+from raiker.models.decision import SURFACES as DECISION_SURFACES
+from raiker.models.decision import ModelDecisionService
 from raiker.models.huggingface import HfVariant, HuggingFaceAccessError, HuggingFaceService
 from raiker.models.library import ModelLibraryService
 from raiker.models.local_operations import (
@@ -126,10 +128,14 @@ async def check_model_readiness(
     return readiness.to_dict()
 
 
-# The work surfaces that may hold their own default model. Chat and Build are
-# conversational surfaces; Tasks and Schedule capture the model onto the task
-# they create, so a scheduled run keeps the model chosen when it was scheduled.
-SURFACES = ("chat", "build", "tasks", "schedule")
+# The work surfaces that may hold their own default model.
+#
+# MODEL-01/MODEL-02 — this list used to be declared here and nowhere else, which
+# is how `design` came to be missing from it while the product model was Chat |
+# Build | Design. It lives beside the decision contract now, so the routes, the
+# read model and the tests cannot hold three different opinions about what a
+# work surface is.
+SURFACES = DECISION_SURFACES
 
 
 @router.get("/api/surface-models")
@@ -185,6 +191,62 @@ def set_surface_model(
         )
     store.save_surface_model_default(session.principal_id, surface, profile.profile_id, model)
     return {"ok": True, "surface": surface, "profile_id": profile.profile_id, "model": model}
+
+
+@router.get("/api/model-decision")
+def get_model_decision(
+    request: Request,
+    surface: str = "chat",
+    project_id: str = "",
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """The one authoritative answer to "which model, and which one will run".
+
+    MODEL-01. Every surface that names a model — the Models page, the composer
+    picker, Chat, Build, Design and task creation — reads this rather than
+    assembling its own answer from the selection store, the surface defaults,
+    readiness and the fallback sequence. Those five were each individually
+    correct and collectively unable to agree.
+
+    A read, and only a read: selection is written through `/api/model-selection`
+    and `/api/surface-models`, which validate against the provider factory. A
+    read model that could also write would be a second way to set a model, which
+    is the shape of the problem this endpoint exists to close.
+    """
+    session, _principal = auth_data
+    requested = surface.strip() or "chat"
+    if requested not in SURFACES:
+        raise HTTPException(status_code=422, detail={"reason_code": "unknown_surface"})
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    decision = ModelDecisionService(store, readiness=_service(request)).decide(
+        session.principal_id, requested, project_id.strip() or None
+    )
+    return decision.to_dict()
+
+
+@router.get("/api/model-decisions")
+def get_model_decisions(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Every surface's decision in one read.
+
+    MODEL-03's Overview answers "what powers Chat, Build and Design" as its
+    first fact, which is five of the read above. Asking five times is five
+    round trips and — worse — five separately-timed answers, so the page could
+    render a Chat row from before a change and a Build row from after it. One
+    service instance, so every surface is judged against the same readiness
+    cache.
+    """
+    session, _principal = auth_data
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    service = ModelDecisionService(store, readiness=_service(request))
+    return {
+        "surfaces": {
+            surface: service.decide(session.principal_id, surface).to_dict()
+            for surface in SURFACES
+        }
+    }
 
 
 @router.get("/api/model-setup")

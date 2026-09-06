@@ -72,18 +72,6 @@
     await api.removeModelLibraryRoot(path);
     await load();
   }
-  async function deploy(modelId: string) {
-    busy = true;
-    try {
-      await api.deployLocalModel(modelId);
-      notice =
-        "Deployment queued. It joins any models already serving — track it in Activity.";
-    } catch {
-      error = "Could not queue deployment.";
-    } finally {
-      busy = false;
-    }
-  }
   onMount(load);
 </script>
 
@@ -98,8 +86,9 @@
         they are.
       </p>
       <p class="slot-note">
-        Up to four deployed models serve at once, each on its own local port, so
-        Chat, Build, Tasks and Schedule can each use a different one.
+        Up to four models serve at once, each on its own local port, so Chat,
+        Build and Design can each use a different one. Which of them serves is
+        chosen in the slot rows above — this list is what is on disk.
       </p>
     </div>
     <button class="btn btn-primary" type="button" onclick={scan} disabled={busy}
@@ -190,13 +179,12 @@
                 file{model.expected_shards === 1 ? "" : "s"}</small
               >
             </div>
-            <button
-              class="btn btn-sm"
-              type="button"
-              disabled={busy || !model.complete}
-              onclick={() => void deploy(model.model_id)}
-              >{model.complete ? "Deploy" : "Incomplete"}</button
-            >
+            <!-- MODEL-06 — the library answers "what is on disk"; the slot
+                 rows above answer "what is serving". Deploy was the one control
+                 that crossed the two, so a card here could put a model into a
+                 runtime slot without ever showing which slot it took or what it
+                 displaced. Serving is chosen where the slots are. -->
+            <span class="model-state">{model.complete ? "Ready to serve" : "Incomplete"}</span>
           </article>{/each}
       </div>{/if}
   </section>
@@ -222,6 +210,16 @@
        is allowed to be narrower than its contents want. */
     grid-template-columns: minmax(0, 1fr);
     gap: 18px;
+  }
+  /* VIS2-16 — "on disk and complete" is the resting state of every row here,
+     so it is plain metadata; the incomplete card already carries its own
+     treatment. */
+  .model-state {
+    align-self: center;
+    color: var(--text-3);
+    font-size: var(--text-2xs);
+    font-weight: 650;
+    white-space: nowrap;
   }
   .slot-note {
     color: var(--text-3);
@@ -362,8 +360,9 @@
     .model-card {
       grid-template-columns: 42px 1fr;
     }
-    .model-card button {
+    .model-state {
       grid-column: 2;
+      justify-self: start;
     }
   }
 </style>

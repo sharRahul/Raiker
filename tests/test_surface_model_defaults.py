@@ -21,9 +21,12 @@ from fastapi.testclient import TestClient
 from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.storage.sqlite import SQLiteStore
 
-SURFACES = ("chat", "build", "tasks", "schedule")
+# Imported rather than restated: MODEL-02's whole failure was that this list
+# lived in one module and the product model lived in another, so `design` was
+# missing from the first for as long as nobody compared them.
+from raiker.models.decision import SURFACES
+from raiker.storage.sqlite import SQLiteStore
 
 
 @pytest.fixture
@@ -176,6 +179,52 @@ def test_api_clears_a_default_with_an_empty_profile(
         json={"surface": "chat", "profile_id": "", "model": ""},
     )
 
+    assert cleared.status_code == 200
+    assert client.get("/api/surface-models", headers=_auth(owner_token)).json() == {
+        "surfaces": {}
+    }
+
+
+def test_design_is_one_of_the_surfaces_that_may_hold_a_default() -> None:
+    """MODEL-02 — the product model is Chat | Build | Design.
+
+    Two of the three had explicit surface state and the third silently borrowed
+    the global default, so an owner who put Chat on a small local model had
+    their image prompts follow it there. The list is asserted whole rather than
+    only for the entry that was missing: the point is that it matches the Work
+    modes, and a future surface added to one place and not the other is the
+    same defect again.
+    """
+    assert SURFACES == ("chat", "build", "design", "tasks", "schedule")
+
+
+def test_design_round_trips_through_the_api(client: TestClient, owner_token: str) -> None:
+    saved = client.put(
+        "/api/surface-models",
+        headers=_auth(owner_token),
+        json={
+            "surface": "design",
+            "profile_id": "ollama-local-openai-compatible",
+            "model": "gemma4:31b-cloud",
+        },
+    )
+    assert saved.status_code == 200
+
+    body = client.get("/api/surface-models", headers=_auth(owner_token)).json()
+    assert body["surfaces"]["design"] == {
+        "profile_id": "ollama-local-openai-compatible",
+        "model": "gemma4:31b-cloud",
+    }
+
+    # And it is genuinely its own scope, not an alias for the global one: Chat
+    # keeps no opinion while Design holds one.
+    assert "chat" not in body["surfaces"]
+
+    cleared = client.put(
+        "/api/surface-models",
+        headers=_auth(owner_token),
+        json={"surface": "design", "profile_id": "", "model": ""},
+    )
     assert cleared.status_code == 200
     assert client.get("/api/surface-models", headers=_auth(owner_token)).json() == {
         "surfaces": {}

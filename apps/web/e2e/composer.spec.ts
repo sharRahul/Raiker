@@ -106,6 +106,31 @@ test.beforeEach(async ({ page }) => {
       // in the route audit — which passed, because an error state is still a
       // laid-out page, so the surface was never actually exercised. One good
       // generation and one refusal, which are the two halves of the transcript.
+      // MODEL-01 — the one authoritative answer about which model is selected
+      // and which one will really run. Answered here because every Work surface
+      // and the whole Models page read it, and because the unrouted default
+      // below is an empty object: a 200 whose shape is wrong is exactly the
+      // case the client-side check exists for, and it must not be the case this
+      // suite silently runs in.
+      else if (path === "/api/model-decision") body = {
+        scope: { surface: url.searchParams.get("surface") ?? "chat", project_id: null },
+        selected: { profile_id: "anthropic-hosted", model: "claude-sonnet-4-5", source: "surface_default" },
+        effective: { profile_id: "anthropic-hosted", model: "claude-sonnet-4-5", reason: "selected" },
+        ready: true, running: null, problem: null, revision: "fixture0000000001",
+      };
+      else if (path === "/api/model-decisions") body = {
+        surfaces: Object.fromEntries(
+          ["chat", "build", "design", "tasks", "schedule"].map((surface) => [
+            surface,
+            {
+              scope: { surface, project_id: null },
+              selected: { profile_id: "anthropic-hosted", model: "claude-sonnet-4-5", source: "surface_default" },
+              effective: { profile_id: "anthropic-hosted", model: "claude-sonnet-4-5", reason: "selected" },
+              ready: true, running: null, problem: null, revision: "fixture0000000001",
+            },
+          ]),
+        ),
+      };
       else if (path === "/api/images") body = {
         sizes: ["1024x1024", "1024x1536", "1536x1024"],
         generations: [
@@ -169,6 +194,8 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole("button", { name: /unlock/i }).click();
   await expect(page.getByLabel("Prompt", { exact: true })).toBeVisible();
 });
+
+
 
 test("governed voice stays editable and visually consistent in Chat, Build, mobile, and Settings", async ({ page }) => {
   const promptPosts: string[] = [];
@@ -436,18 +463,65 @@ test("Settings presents one section rail rather than a wall of fields", async ({
 });
 
 test("Models names providers in plain language and offers a real model list", async ({ page }) => {
-  // The fixture profile is a hosted Anthropic account, so its card lives on the
-  // Hosted tab; Local holds the runtimes that run on this machine.
-  await page.goto("http://raiker.test/#/models?tab=hosted");
+  // MODEL-03 — Local and Hosted were peers because that is how profiles are
+  // stored; both are the same errand, so both are under "Add model" now.
+  await page.goto("http://raiker.test/#/models?tab=add");
   await expect(page.getByRole("heading", { name: "Choose where Raiker thinks" })).toBeVisible();
   // The internal profile id is never the thing the owner is shown.
   await expect(page.getByText("anthropic-hosted")).toHaveCount(0);
-  // Choosing models is a dialog of switches now, not an inline select: each
-  // switch keeps one of the provider's models offered in every picker.
-  await page.getByRole("button", { name: /Select models/i }).first().click();
+  // MODEL-15 — one visible action per provider row. Browsing a provider's
+  // catalogue is either that action or the first item of the row's overflow,
+  // depending on whether a model is already named.
+  const picker = page.getByRole("button", { name: /^Select models/ }).first();
+  if ((await picker.count()) > 0 && (await picker.isVisible())) {
+    await picker.click();
+  } else {
+    await page.getByRole("button", { name: /^More actions for / }).first().click();
+    await page.getByRole("menuitem", { name: /^Select models/ }).click();
+  }
   await expect(page.getByRole("dialog", { name: /models/i })).toBeVisible();
   await expect(page.getByRole("checkbox").first()).toBeVisible();
   await capture(page, join(shots, "models-redesign.png"));
+});
+
+test("Models opens on what is running the work, not on a filing system", async ({ page }) => {
+  // MODEL-03 — the six tabs this replaces named where a model was stored or
+  // which table a fact came out of. None answered the question every owner
+  // arrives with, which is what is powering Chat, Build and Design.
+  await page.goto("http://raiker.test/#/models");
+  const strip = page.getByRole("tablist", { name: "Model settings" });
+  await expect(strip.getByRole("tab")).toHaveText([
+    "Overview",
+    "My models",
+    "Add model",
+    "Runtime & routing",
+    "Usage",
+  ]);
+  await expect(page.getByRole("heading", { name: "What powers your work" })).toBeVisible();
+  for (const surface of ["Chat", "Build", "Design"]) {
+    await expect(page.getByRole("tabpanel").getByText(surface, { exact: true })).toBeVisible();
+  }
+  await capture(page, join(shots, "models-overview.png"));
+
+  // MODEL-11 — Default and Effective are separate columns, because the page
+  // used to call both of them "active".
+  await page.goto("http://raiker.test/#/models?tab=runtime");
+  await expect(page.getByRole("heading", { name: "Work defaults" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Default" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Effective now" })).toBeVisible();
+  await capture(page, join(shots, "models-work-defaults.png"));
+
+  // MODEL-04 — one inventory, one primary action per row.
+  await page.goto("http://raiker.test/#/models?tab=models");
+  await expect(page.getByLabel("Filter models")).toBeVisible();
+  await capture(page, join(shots, "models-inventory.png"));
+
+  // A pre-MODEL-03 deep link still resolves to the panel that took its content.
+  await page.goto("http://raiker.test/#/models?tab=pricing");
+  await expect(page.locator('[role="tab"][data-tab="usage"]')).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
 });
 
 test("new-account Workbench is a board over the work, not a second composer", async ({ page }) => {
@@ -502,7 +576,7 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     ["brain", "Knowledge Map", "operational"],
     ["approvals", "Approvals", "operational"],
     ["capabilities", "Permissions", "operational"],
-    ["models?tab=local", "Models", "operational"],
+    ["models?tab=overview", "Models", "operational"],
     ["extensions?tab=connectors", "Extensions", "operational"],
     ["extensions?tab=mcp", "Extensions", "operational"],
     ["extensions?tab=skills", "Extensions", "operational"],
@@ -521,7 +595,7 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     ["guide", "Guide", "reading"],
     ["settings?tab=general", "Settings", "workspace"],
   ] as const;
-  const modelTabs = ["hosted", "huggingface", "activity", "routing", "pricing"] as const;
+  const modelTabs = ["models", "add", "runtime", "usage"] as const;
   const settingsSections = [
     "notification", "personalisation", "security", "privacy", "account",
     "web-access", "git-credential", "runtime",

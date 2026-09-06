@@ -25,6 +25,7 @@
   import { providerName, relativeTime } from "../format";
   import { runtimeBlock } from "../capabilityModel";
   import { imageCandidates, modelName } from "../modelPresentation";
+  import { rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import type { CapabilityGate, ImageGeneration, ModelsView } from "../apiTypes";
 
   let view = $state<{ sizes: string[]; generations: ImageGeneration[] } | null>(null);
@@ -69,6 +70,21 @@
 
   /** The pick, as `profile_id::model`. */
   let choiceKey = $state("");
+
+  /**
+   * MODEL-02 — Design remembers its own model.
+   *
+   * Every other Work surface did. Design's picker started on whatever happened
+   * to be first in the list of image models on every load, so an owner with two
+   * connected image providers re-chose on every visit, and the choice they made
+   * last time was not stored anywhere to re-choose *from*. It is a preference
+   * like Chat's and Build's: it decides where the picker starts, and the
+   * request still names the exact profile and model that readiness judges.
+   */
+  function remember(key: string) {
+    const picked = imageChoices.find((item) => item.key === key);
+    if (picked) void rememberSurfaceModel("design", picked.profileId, picked.model);
+  }
   const choice = $derived(
     imageChoices.find((item) => item.key === choiceKey) ?? imageChoices[0] ?? null,
   );
@@ -132,7 +148,20 @@
     }
     try {
       models = await api.models();
-      if (!choiceKey && imageChoices.length) choiceKey = imageChoices[0].key;
+      if (!choiceKey && imageChoices.length) {
+        // The remembered choice first, and only then the head of the list. A
+        // model that is no longer connected is not restored: falling back to
+        // the first available one is right here, because a Design turn cannot
+        // run at all without an image model and there is nothing to explain.
+        const remembered = await surfaceModel("design");
+        const restored = remembered
+          ? imageChoices.find(
+              (item) =>
+                item.profileId === remembered.profileId && item.model === remembered.model,
+            )
+          : undefined;
+        choiceKey = (restored ?? imageChoices[0]).key;
+      }
     } catch {
       models = null;
     }
@@ -249,7 +278,13 @@
         <span class="sr-only">Image model</span>
         <Icon name="models" size="sm" />
         {#if imageChoices.length > 0}
-          <select class="bar-select" bind:value={choiceKey} aria-label="Image model" disabled={busy}>
+          <select
+            class="bar-select"
+            bind:value={choiceKey}
+            aria-label="Image model"
+            disabled={busy}
+            onchange={(event) => remember((event.currentTarget as HTMLSelectElement).value)}
+          >
             {#each imageChoices as item (item.key)}
               <option value={item.key}>
                 {providerName(item.provider)} · {modelName(item.model)}

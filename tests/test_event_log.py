@@ -4,6 +4,7 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -265,7 +266,10 @@ class TestIndexAndLogCannotDiverge:
 
         result = IntegritySweep(SQLiteStore(tmp_path)).run("principal_owner")
 
+        # `run` is typed `dict[str, object]`, so the list needs naming before it
+        # can be iterated.
+        deviations = cast(list[dict[str, object]], result["deviations"])
         assert any(
             deviation["kind"] == "event_chain" and deviation["session_id"] == session_id
-            for deviation in result["deviations"]
+            for deviation in deviations
         )

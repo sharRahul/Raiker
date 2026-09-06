@@ -249,5 +249,12 @@
      title loses, because the mode switch is the only way back to the two
      surfaces the product is for. */
   @media(max-width:560px){.page-id{display:none}}
+  /* At 375 the six controls plus the mode switch are wider than the bar, and
+     the bar scrolls rather than the page — which is worse than either, because
+     nothing tells you the rest is there. The palette button is the one to lose:
+     it is a keyboard affordance (Ctrl/Cmd+K), there is no keyboard here, and
+     everything it reaches is in the drawer and the gear's window. */
+  @media(max-width:560px){.palette-button{display:none}}
+  @media(max-width:420px){.modes .mode{padding:.24rem .5rem}.modes{margin-left:var(--space-1)}.controls{gap:.3rem}}
   @media(max-width:720px){.navigation-reveal-zone{margin-left:-.5rem}}
 </style>

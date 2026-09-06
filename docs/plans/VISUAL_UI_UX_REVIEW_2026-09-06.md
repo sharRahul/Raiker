@@ -140,6 +140,8 @@ Workbench, Tasks and Projects can remain navigational objects, but Chat/Build sh
 
 **Priority: P1 — Impact: High**
 
+**Status: Done 2026-09-06.** On Chat, Build and Design the top bar drops the route title and hint: the mode switch beside them already says where you are, and the hint was explaining a route the owner is inside. The heading stays in the accessibility tree — visually hidden, not removed — so the page keeps exactly one `h1`. Operational pages keep their full header.
+
 The shell combines sidebar + top bar + page lead + tabs + cards on many operational pages. This is structurally clear but can make the interface feel layered before the user reaches the work.
 
 ### Recommendation
@@ -358,7 +360,7 @@ Examples:
 
 **Priority: P1 — Impact: High**
 
-**Status: Done 2026-09-06.** It was already close — it shows running work, standing agents, scheduled runs, threads to continue and what needs attention, and no healthy-subsystem telemetry. What it also did was render three of those boards as full cards *whatever* the state, so an idle Home opened on three bordered rectangles reporting an absence its own lead sentence already stated. A board appears when it has something in it. The route is also called Home now, which is what it is.
+**Status: Done 2026-09-06.** It was already close — it shows running work, standing agents, scheduled runs, threads to continue and what needs attention, and no healthy-subsystem telemetry. What it also did was render three of those boards as full cards *whatever* the state, so an idle Home opened on three bordered rectangles reporting an absence its own lead sentence already stated, beside a *Needs your attention* rail holding three tiles that read 0. A board appears when it has something in it, a tile appears when its own count is not zero, and an idle Home says "Nothing needs you right now." once. The route is also called Home now, which is what it is.
 
 Workbench must earn being the default route. If it mostly repeats cards linking elsewhere, it adds another layer.
 

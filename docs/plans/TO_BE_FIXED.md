@@ -177,6 +177,27 @@ the Models page reported the hosted gate from its capability *row* rather than
 from the enforcing path, so it said **Off** above a connected provider it had
 just accepted a model for — and **On** above providers it would refuse.
 
+**Six more closed later the same day**, again in the order the third-pass
+remediation table gives, plus the startup path issue that sits underneath the
+first of them: GCR-45 as
+[FIXED-436](FIXED_ITEMS.md#fixed-436--the-registry-raiker-loaded-depended-on-the-folder-it-was-started-from),
+GCR-25 as [FIXED-437](FIXED_ITEMS.md#fixed-437--a-download-the-host-restarted-away-from-stayed-running-for-ever),
+GCR-28 as [FIXED-438](FIXED_ITEMS.md#fixed-438--two-deploys-at-once-could-take-the-same-slot-and-the-same-port),
+GCR-29 as [FIXED-439](FIXED_ITEMS.md#fixed-439--a-runtime-on-a-custom-port-reported-the-slots-declared-one),
+GCR-33 as [FIXED-440](FIXED_ITEMS.md#fixed-440--two-expired-calls-presented-the-same-refresh-token-and-one-was-already-retired),
+and GCR-40 as [FIXED-441](FIXED_ITEMS.md#fixed-441--an-event-the-index-never-heard-of-was-invisible-to-the-check-for-exactly-that).
+Verifying them found a defect in the test suite rather than the product, closed
+as [FIXED-442](FIXED_ITEMS.md#fixed-442--seven-tests-asserted-facts-about-the-laptop-running-them):
+seven tests asserted what Raiker reports when no local runtime is installed and
+obtained that condition by assuming the host had none, so they passed on CI and
+failed on any machine with Ollama.
+
+**Still open in the third-pass document, in its own priority order:** GCR-24 and
+GCR-26 (P1), then GCR-32, GCR-34, GCR-35, GCR-36, GCR-37, GCR-41, GCR-42,
+GCR-43, GCR-44 and GCR-47 (P2). GCR-24 — a conversion that cannot be cancelled
+while its subprocess runs, for up to six hours — is the largest remaining piece
+of owner-visible work in that set.
+
 ---
 
 ## BUG-194 — The governed shell has an OS boundary, but no interactive, background or remote execution

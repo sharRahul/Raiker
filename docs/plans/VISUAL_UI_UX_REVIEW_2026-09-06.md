@@ -6,7 +6,7 @@ This document now contains **two visual-review passes**.
 
 - **Pass 1** reviewed Raiker at `371ccdddcf6ac1e82da4771b513dec64015f263a` and produced `VIS-01` through `VIS-24`.
 - Most Pass-1 items were subsequently implemented and verified on `main` during 2026-09-06.
-- **Pass 2** reviews the **post-fix product** at `main` commit `6b79870a104c9a0ff6c237209338489148629e3e` and adds a new set of recommendations, `VIS2-01` onward.
+- **Pass 2** reviews the **post-fix product** at `main` commit `ac32915101de6b6562b09b1e09c4f76a24b00878` and adds a new set of recommendations, `VIS2-01` onward.
 
 The purpose of Pass 2 is not to reopen completed work. It asks a harder question:
 

@@ -108,7 +108,9 @@ describe("WorkbenchView", () => {
     stubFetch(routes());
     render(WorkbenchView);
 
-    await waitFor(() => expect(screen.getByText("Running now")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole("navigation", { name: "Start work" })).toBeInTheDocument(),
+    );
     // The removed box: a prompt field, its mode tabs, and its send control.
     expect(screen.queryByLabelText(/what would you like raiker to do/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Build" })).not.toBeInTheDocument();
@@ -154,16 +156,35 @@ describe("WorkbenchView", () => {
     expect(within(schedules).queryByText("Watch the release branch")).not.toBeInTheDocument();
   });
 
-  it("says each group is empty rather than leaving a blank card", async () => {
+  it("says nothing is running once, rather than in four places", async () => {
+    // This used to assert the opposite, and the concern behind it was right: a
+    // card with nothing in it is worse than a sentence. Removing the card is
+    // the stronger form of the same rule (VIS-13/VIS-05). An idle Home showed
+    // three bordered rectangles reading "Nothing is running", "No agent is
+    // standing" and "Nothing is scheduled", above a lead sentence that already
+    // said all three — four containers to report an absence.
+    //
+    // The absence is still reported. It is reported once.
     stubFetch(routes());
     render(WorkbenchView);
 
-    expect(await screen.findByText("Nothing is running.")).toBeInTheDocument();
-    expect(screen.getByText("No agent is standing.")).toBeInTheDocument();
-    expect(screen.getByText("Nothing is scheduled.")).toBeInTheDocument();
     expect(
-      screen.getByText(/Nothing is running, standing, or scheduled/),
+      await screen.findByText(/Nothing is running, standing, or scheduled/),
     ).toBeInTheDocument();
+    expect(screen.queryByText("Running now")).not.toBeInTheDocument();
+    expect(screen.queryByText("Standing agents")).not.toBeInTheDocument();
+    expect(screen.queryByText("Scheduled runs")).not.toBeInTheDocument();
+    // And starting work is still one click from the same screen.
+    expect(screen.getByRole("navigation", { name: "Start work" })).toBeInTheDocument();
+  });
+
+  it("shows a board as soon as it has something in it", async () => {
+    stubFetch(routes({ "GET /api/tasks": [RUNNING] }));
+    render(WorkbenchView);
+
+    expect(await screen.findByText("Running now")).toBeInTheDocument();
+    // The two that are still empty stay out of the way.
+    expect(screen.queryByText("Scheduled runs")).not.toBeInTheDocument();
   });
 
   it("stops a run at its safe boundary through the governed interrupt", async () => {

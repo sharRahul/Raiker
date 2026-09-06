@@ -51,15 +51,26 @@ function stubApi(options: { failPut?: boolean } = {}) {
 }
 
 describe("supported-preferences settings", () => {
-  it("separates Personal and System sections into labelled groups", async () => {
+  it("separates the three subjects into labelled groups", async () => {
+    // VIS-17 — "Personal" held six of the ten sections, so it was the flat list
+    // the grouping was meant to break up: appearance sat beside sign-in and
+    // beside the account itself. Three groups, each with one subject.
     stubApi();
     render(SettingsView, { props: { principal: "alice" } });
-    const personal = screen.getByRole("group", { name: "Personal settings" });
-    const system = screen.getByRole("group", { name: "System settings" });
-    expect(within(personal).getByRole("button", { name: "Account" })).toBeVisible();
+
+    const experience = screen.getByRole("group", { name: "Experience settings" });
+    const secure = screen.getByRole("group", { name: "Security & data settings" });
+    const runtime = screen.getByRole("group", { name: "Developer & runtime settings" });
+
+    expect(within(experience).getByRole("button", { name: "Personalisation" })).toBeVisible();
+    expect(within(secure).getByRole("button", { name: "Account" })).toBeVisible();
+    expect(within(secure).getByRole("button", { name: "Privacy" })).toBeVisible();
+    // A setting belongs to exactly one group.
+    expect(within(experience).queryByRole("button", { name: "Account" })).toBeNull();
     for (const label of ["Web access", "Git credential", "Runtime configuration"]) {
-      expect(within(system).getByRole("button", { name: label })).toBeVisible();
-      expect(within(personal).queryByRole("button", { name: label })).toBeNull();
+      expect(within(runtime).getByRole("button", { name: label })).toBeVisible();
+      expect(within(experience).queryByRole("button", { name: label })).toBeNull();
+      expect(within(secure).queryByRole("button", { name: label })).toBeNull();
     }
   });
 

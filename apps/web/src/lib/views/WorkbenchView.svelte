@@ -224,14 +224,19 @@
       {:else if tasks === null}
         <PageState state="loading" title="Loading status…" lines={3} />
       {:else}
+        <!-- VIS-13/VIS-05 — a board that is empty is not a board. Each of these
+             three rendered as a full card whatever the state, so a fresh
+             install opened on three bordered rectangles saying "Nothing is
+             running", "No standing agents" and "Nothing is scheduled" — three
+             containers to explain an absence the lead sentence above already
+             states in one line. They appear when there is something in them.
+             "Continue working" already worked this way; now they all do. -->
+        {#if runningNow.length > 0}
         <section class="board card" aria-labelledby="running-h">
           <div class="card-head">
             <h3 id="running-h">Running now</h3>
             <a href="#/observe?tab=work">Live board</a>
           </div>
-          {#if runningNow.length === 0}
-            <p class="empty">Nothing is running.</p>
-          {:else}
             <ul class="rows">
               {#each runningNow as task (task.task_id)}
                 <li>
@@ -260,17 +265,15 @@
                 </li>
               {/each}
             </ul>
-          {/if}
         </section>
+        {/if}
 
+        {#if agents.length > 0}
         <section class="board card" aria-labelledby="agents-h">
           <div class="card-head">
             <h3 id="agents-h">Standing agents</h3>
             <a href="#/tasks">Manage agents</a>
           </div>
-          {#if agents.length === 0}
-            <p class="empty">No agent is standing.</p>
-          {:else}
             <ul class="rows">
               {#each agents as task (task.task_id)}
                 <li>
@@ -297,17 +300,15 @@
                 </li>
               {/each}
             </ul>
-          {/if}
         </section>
+        {/if}
 
+        {#if scheduled.length > 0}
         <section class="board card" aria-labelledby="scheduled-h">
           <div class="card-head">
             <h3 id="scheduled-h">Scheduled runs</h3>
             <a href="#/tasks">Manage schedules</a>
           </div>
-          {#if scheduled.length === 0}
-            <p class="empty">Nothing is scheduled.</p>
-          {:else}
             <ul class="rows">
               {#each scheduled as task (task.task_id)}
                 <li>
@@ -332,8 +333,8 @@
                 </li>
               {/each}
             </ul>
-          {/if}
         </section>
+        {/if}
 
         {#if named.length > 0}
           <section class="board card" aria-labelledby="resume-h">

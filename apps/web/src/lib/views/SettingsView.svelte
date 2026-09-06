@@ -16,6 +16,8 @@
   import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
   import { SETTINGS_SECTIONS as SECTIONS } from "../settingsSections";
+  /** Group names in rail order, taken from the sections themselves (VIS-17). */
+  const GROUPS = [...new Set(SECTIONS.map((section) => section.group))];
 
   let { principal = "—", tab = "general" }: { principal?: string; tab?: string } = $props();
 
@@ -138,7 +140,11 @@
 
 <div class="settings-layout">
   <nav class="section-rail" aria-label="Settings sections">
-    {#each ["Personal", "System"] as group}
+    <!-- VIS-17 — the group order is derived from the one list rather than
+         restated here, so a new section joins its group without touching this
+         file. Hard-coding the names is exactly the two-lists-that-can-disagree
+         shape the section list's own comment warns about. -->
+    {#each GROUPS as group (group)}
       <div class="rail-section" role="group" aria-label={`${group} settings`}>
         <p class="rail-group">{group}</p>
         {#each SECTIONS.filter((section) => section.group === group) as section (section.id)}

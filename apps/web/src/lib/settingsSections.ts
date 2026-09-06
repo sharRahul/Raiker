@@ -4,7 +4,7 @@ export interface SettingsSection {
   id: string;
   label: string;
   icon: IconName;
-  group: "Personal" | "System";
+  group: "Experience" | "Security & data" | "Developer & runtime";
 }
 
 /**
@@ -23,15 +23,24 @@ export interface SettingsSection {
  * opened General, and the guard could not see it because it had the same
  * omission. Two lists can disagree; a list and a reference to it cannot.
  */
+/**
+ * VIS-17 — three groups, not two.
+ *
+ * "Personal" held six of the ten sections, which made it the list it was meant
+ * to break up: appearance sat beside sign-in and beside the account itself, so
+ * the grouping separated *whose* setting it was rather than what kind of
+ * decision it is. Splitting the security and data half out gives each group one
+ * subject, and the ten rows stop reading as a flat list with a divider in it.
+ */
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
-  { id: "general", label: "General", icon: "settings", group: "Personal" },
-  { id: "notification", label: "Notifications", icon: "bell", group: "Personal" },
-  { id: "personalisation", label: "Personalisation", icon: "spark", group: "Personal" },
-  { id: "security", label: "Security & sign-in", icon: "lock", group: "Personal" },
-  { id: "privacy", label: "Privacy", icon: "shield", group: "Personal" },
-  { id: "account", label: "Account", icon: "user", group: "Personal" },
-  { id: "web-access", label: "Web access", icon: "connections", group: "System" },
-  { id: "git-credential", label: "Git credential", icon: "branch", group: "System" },
-  { id: "runtime", label: "Runtime configuration", icon: "system", group: "System" },
-  { id: "updates", label: "Updates", icon: "refresh", group: "System" },
+  { id: "general", label: "General", icon: "settings", group: "Experience" },
+  { id: "notification", label: "Notifications", icon: "bell", group: "Experience" },
+  { id: "personalisation", label: "Personalisation", icon: "spark", group: "Experience" },
+  { id: "security", label: "Security & sign-in", icon: "lock", group: "Security & data" },
+  { id: "privacy", label: "Privacy", icon: "shield", group: "Security & data" },
+  { id: "account", label: "Account", icon: "user", group: "Security & data" },
+  { id: "web-access", label: "Web access", icon: "connections", group: "Developer & runtime" },
+  { id: "git-credential", label: "Git credential", icon: "branch", group: "Developer & runtime" },
+  { id: "runtime", label: "Runtime configuration", icon: "system", group: "Developer & runtime" },
+  { id: "updates", label: "Updates", icon: "refresh", group: "Developer & runtime" },
 ];

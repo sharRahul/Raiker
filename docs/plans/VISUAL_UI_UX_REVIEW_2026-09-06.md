@@ -179,6 +179,8 @@ Standardize around five recurring surface archetypes:
 
 **Priority: P1 — Impact: High**
 
+**Status: Partly done 2026-09-06.** Home stopped rendering a card per empty board, which was the clearest card-wall-of-nothing in the product. The operational pages — Models, Extensions, Observability — are the rest of it.
+
 Raiker's governance/status concepts naturally tend toward "card walls".
 
 ### Recommendation
@@ -356,6 +358,8 @@ Examples:
 
 **Priority: P1 — Impact: High**
 
+**Status: Done 2026-09-06.** It was already close — it shows running work, standing agents, scheduled runs, threads to continue and what needs attention, and no healthy-subsystem telemetry. What it also did was render three of those boards as full cards *whatever* the state, so an idle Home opened on three bordered rectangles reporting an absence its own lead sentence already stated. A board appears when it has something in it. The route is also called Home now, which is what it is.
+
 Workbench must earn being the default route. If it mostly repeats cards linking elsewhere, it adds another layer.
 
 ### Recommendation
@@ -431,6 +435,8 @@ Provider/model/tool/protocol identifiers should not dominate normal cards.
 ## VIS-17 — Regroup Settings
 
 **Priority: P2 — Impact: Medium**
+
+**Status: Done 2026-09-06.** Three groups — Experience, Security & data, Developer & runtime. "Personal" had been holding six of the ten sections, so it was the flat list the grouping existed to break up. The rail derives the group order from the section list rather than restating it.
 
 Settings has many sections and reads as a flat list.
 

@@ -8,8 +8,8 @@ evidence those write-ups point at.
 
 | Folder | Contents |
 |---|---|
-| [`working/`](working) | Verified behaviour — every surface that did what it claims. Round-stamped: a file here is evidence of what was true on the day its prefix names, and is **not** re-captured later, because a defect that no longer reproduces cannot be photographed again |
-| [`not-working/`](not-working) | Reproduced defects, one per file, named for its entry in [To be fixed](../TO_BE_FIXED.md) |
+| `working/` | **Removed 2026-09-06.** Verified behaviour — every surface that did what it claims. Round-stamped: a file here was evidence of what was true on the day its prefix names. The filenames survive in the write-ups; the images do not |
+| `not-working/` | **Removed 2026-09-06.** Reproduced defects, one per file, named for its entry in [To be fixed](../TO_BE_FIXED.md) |
 | [`pages/`](pages) | The **current** state of every application page. Unlike the two above this folder is not an archive — it is re-captured in full by [`ui-sweep-responsive-live.spec.ts`](../../../apps/web/e2e/ui-sweep-responsive-live.spec.ts), so a file here is always the latest version and a stale one is a bug in the sweep |
 | [`widths/`](widths) | The **current** state of every route at 390 and 1920, written by [`ui-sweep-widths-live.spec.ts`](../../../apps/web/e2e/ui-sweep-widths-live.spec.ts). That spec's captures are the visible half of a run whose real output is four *assertions* per route per width — no sideways scroll, nothing bleeding out of a `visible` box, every control named, and no control that draws nothing. Like `pages/` it is re-captured rather than archived |
 
@@ -74,17 +74,24 @@ The same run also exercises all seven Models tabs and all nine Settings sections
 as rendered audit states. Those extra deep links are assertions rather than new
 committed capture names, so the catalogue remains exactly 208 PNGs.
 
-Only `pages/` is replaced by this sweep. `working/` and `not-working/` retain
-round-specific evidence and must never be deleted during a catalogue refresh.
+Only `pages/` is replaced by a sweep.
 
-**Part of `working/` was pruned, and the write-ups still name what it held.**
-Forty-seven captures from the 2026-07-26 → 2026-08-10 rounds were removed from
-the repository to keep its size down. [Fixed items](../FIXED_ITEMS.md) still
-records each filename, because the filename is the evidence record — but it
-names them as plain text rather than as links, since a link to a file that was
-deliberately removed reads as a broken document rather than a closed one. A
-`working/` filename in a write-up that does not resolve here is one of those
-forty-seven, not a missing capture.
+**`working/` and `not-working/` are gone, and the write-ups still name what
+they held.** All 397 captures were removed from the repository on 2026-09-06 to
+stop carrying roughly a hundred megabytes of binaries in the tree. [Fixed
+items](../FIXED_ITEMS.md), [To be fixed](../TO_BE_FIXED.md) and the live-round
+log still record each filename, because the filename is the evidence record —
+but they name them as plain text rather than as links, since a link to a file
+that was deliberately removed reads as a broken document rather than a closed
+one. **A `working/` or `not-working/` filename in a write-up is a reference to
+evidence that was taken and reviewed on the day its prefix names, not a file you
+can open, and not a missing capture.**
+
+The pruning happened in two steps and this document described only the first:
+forty-seven captures from the 2026-07-26 → 2026-08-10 rounds went first, and
+the rest followed. The section below, written for that first step, described
+these two folders as never-deleted; that is no longer what happened to them, so
+it says what did.
 
 ## Rounds
 
@@ -153,15 +160,17 @@ The whole `pages/` sweep was re-captured in the same round, with zero console
 errors across all 23 pages.
 
 **On re-capturing the other two folders.** `pages/` is the folder that is meant
-to be replaced wholesale, and it was. `working/` and `not-working/` are not
-refreshable in the same way and deliberately so: a `working/` file is evidence
-of what was true on the day its prefix names, and 110 links in
-[`FIXED_ITEMS.md`](../FIXED_ITEMS.md) and [`TO_BE_FIXED.md`](../TO_BE_FIXED.md)
-cite specific files there; a `not-working/` file photographs a defect, and a
-defect that has since been fixed cannot be photographed again. Replacing either
-folder would delete the evidence those documents read against and leave the
-claims uncheckable. New rounds therefore *add* their prefix rather than
-replacing what came before.
+to be replaced wholesale, and it was. `working/` and `not-working/` never could
+be, and that reasoning still holds for anything captured in future: a `working/`
+file is evidence of what was true on the day its prefix names, and a
+`not-working/` file photographs a defect, which cannot be photographed again
+once it is fixed. A new round therefore *adds* its prefix rather than replacing
+what came before.
+
+What changed on 2026-09-06 is that both folders were removed from the repository
+altogether rather than re-captured — the size of the binaries, not a judgement
+about the evidence. The filenames remain in the write-ups as the record of what
+was photographed.
 
 ---
 

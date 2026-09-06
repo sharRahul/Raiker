@@ -33,7 +33,7 @@ closes the coverage question, and the last one is named at the top of
 - **[S]** — in the Smoke tier as well as the Full sweep.
 - **MUST** — a failure here is a defect. File it in
   [`TO_BE_FIXED.md`](TO_BE_FIXED.md) with a screenshot under
-  [`screenshots/not-working/`](screenshots/not-working).
+  `screenshots/not-working/`.
 - **Automated** — an e2e spec already asserts this. Named so you know it is
   covered, and so you do not spend a manual round re-proving it. Do not skip it
   in a Full sweep if the step also has a manual half.
@@ -1061,11 +1061,11 @@ treat §3–§17 as the obligation and this note as the honest caveat.
 Do not write results here. Add a section to
 [`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md), newest first, with the date, the
 tier you ran, the build, the providers, what it proved and what it found — then
-put screenshots under [`screenshots/working/`](screenshots/working) with a fresh
+put screenshots under `screenshots/working/` with a fresh
 prefix and add that prefix to [`screenshots/README.md`](screenshots/README.md).
 
 Defects go to [`TO_BE_FIXED.md`](TO_BE_FIXED.md) with a reproduction and a
-screenshot under [`screenshots/not-working/`](screenshots/not-working).
+screenshot under `screenshots/not-working/`.
 
 **If a step here was wrong, fix the step.** That is the one edit this document
 wants from a round — not a note about what you saw.

@@ -16,9 +16,9 @@ round that has been folded into the procedure has stopped being evidence.
 1. Run a tier from the plan — **Smoke** or **Full sweep** — and record which.
 2. Add a section here, newest first, with: the date, the tier, the build, the
    providers, what it proved, what it found, and the screenshot prefix.
-3. Put screenshots under [`screenshots/working/`](screenshots/working) with that
+3. Put screenshots under `screenshots/working/` with that
    prefix, and defects under
-   [`screenshots/not-working/`](screenshots/not-working) named for their entry
+   `screenshots/not-working/` named for their entry
    in [`TO_BE_FIXED.md`](TO_BE_FIXED.md).
 4. Add the prefix to the rounds table in
    [`screenshots/README.md`](screenshots/README.md).
@@ -1325,7 +1325,7 @@ Screenshots: `bug-52-chat-refusal-does-not-end-the-turn.png`,
 `round0811-hosted-provider-readiness.png`,
 `round0811-provider-usage-connected.png`, and
 `round0811-provider-usage-compact.png` in
-[`screenshots/working/`](screenshots/working). Every retained image was reviewed
+`screenshots/working/`. Every retained image was reviewed
 after dialogs closed; none contains a credential value.
 
 
@@ -1375,7 +1375,7 @@ already-driven workspace.
 **Result: ✅ eleven entries closed** — FIXED-133 re-verified and FIXED-161
 through FIXED-170. Screenshots: `round0810-01-first-run-model-setup.png` through
 `round0810-11-containment-resumed.png` in
-[`screenshots/working/`](screenshots/working). The production build reports no
+`screenshots/working/`. The production build reports no
 chunk-size warning: the entry chunk is 237 kB against the previous 690 kB, and
 the largest route chunk is Models at 82 kB.
 ---
@@ -1416,7 +1416,7 @@ Closed as [FIXED-398](FIXED_ITEMS.md#fixed-398--the-design-system-was-stated-in-
 and [FIXED-400](FIXED_ITEMS.md#fixed-400--ten-var-references-to-tokens-that-do-not-exist).
 
 **Screenshots:** `round0904-knowledge-map-light.png` and
-`round0904-knowledge-map-dark.png` in [`screenshots/working/`](screenshots/working).
+`round0904-knowledge-map-dark.png` in `screenshots/working/`.
 
 ---
 
@@ -1460,7 +1460,7 @@ edit.
 
 **Screenshots:** `round0904-models-hosted-no-pinning-placeholder.png` and
 `round0904-observe-overview-no-disabled-chips.png` in
-[`screenshots/working/`](screenshots/working). No dialog was open in either and
+`screenshots/working/`. No dialog was open in either and
 neither contains a credential value.
 
 ---
@@ -1701,7 +1701,7 @@ stays open for that reason, unchanged: it is waiting on a value, not on code.
 
 **Screenshots:** [`screenshots/widths/`](screenshots/widths) — every route at 390
 and 1920 — and `anthropic-identity-linked-key.png` in
-[`screenshots/working/`](screenshots/working).
+`screenshots/working/`.
 
 ---
 
@@ -1752,7 +1752,7 @@ stays open for that reason and is now waiting on a value rather than on a
 product change.
 
 **Screenshots:** `bug-274-workspace-answer-live.png` and
-`bug-274-workspace-field-live.png` in [`screenshots/working/`](screenshots/working);
+`bug-274-workspace-field-live.png` in `screenshots/working/`;
 the page sweep refreshed [`screenshots/pages/`](screenshots/pages) in full.
 
 ## 2026-08-09 — BUG-69 closure round

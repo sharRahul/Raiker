@@ -66,8 +66,8 @@ agentic work assistant that acts across the owner's tools and files. They are
 written to the same standard as the defects: what exists today with the file
 that proves it, what is missing, and the concrete work.
 
-Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
-[`screenshots/working/`](screenshots/working) (verified behaviour).
+Evidence: `screenshots/not-working/` (defects),
+`screenshots/working/` (verified behaviour).
 
 **This list holds only what is still open.** A row marked *Fixed* is kept in the
 index so a reader arriving with that number is not left wondering; its full

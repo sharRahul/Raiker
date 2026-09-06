@@ -557,49 +557,37 @@
 
     <p class="notice">{selected.metadata_only_notice}</p>
 
-    <dl class="meta">
-      <div><dt>Capability</dt><dd>{capabilityLabel(selected.approval.capability)}</dd></div>
-      <div><dt>Risk</dt><dd>{selected.approval.risk_level}</dd></div>
-      <div><dt>Session</dt><dd><a class="mono" href={`#/sessions?session=${encodeURIComponent(selected.approval.session_id)}`}>View session</a></dd></div>
-      <div><dt>Requested</dt><dd>{relativeTime(selected.approval.created_at)}</dd></div>
-      <div><dt>Proposed by</dt><dd><IdentityChip identity={selected.approval.proposed_by} /></dd></div>
-      {#if selected.approval.queue_total > 1}
-        <div>
-          <dt>Batch</dt>
-          <dd>
-            Decision {selected.approval.queue_position} of {selected.approval.queue_total} —
-            the calls after it are queued on this turn and each gets its own decision.
-          </dd>
-        </div>
-      {/if}
-      {#if selected.approval.expires_at}
-        <div><dt>Expires</dt><dd>{formatTimestamp(selected.approval.expires_at)}</dd></div>
-      {/if}
-      {#if selected.approval.approved_by}
-        <div><dt>Authorized by</dt><dd><IdentityChip identity={selected.approval.approved_by} /></dd></div>
-      {/if}
-    </dl>
+    <!-- VIS-09 — an approval should answer, in this order: what is Raiker
+         trying to do, why, what changes or leaves the machine, how far does it
+         reach, and then decide.
 
-    {#if Object.keys(selected.execution_evidence ?? {}).length > 0}
-      <h3>Execution evidence</h3>
-      <dl class="meta">
-        <div><dt>Principal</dt><dd class="mono">{selected.execution_evidence.principal_id ?? selected.approval.resolved_by ?? "unknown"}</dd></div>
-        <div><dt>Exit</dt><dd>{selected.execution_evidence.returncode ?? "n/a"}</dd></div>
-        <div><dt>Output</dt><dd>{selected.execution_evidence.stdout_bytes ?? 0} B stdout / {selected.execution_evidence.stderr_bytes ?? 0} B stderr</dd></div>
-      </dl>
-      {#if selected.execution_evidence.stdout}
-        <pre class="diff">{selected.execution_evidence.stdout}</pre>
-      {/if}
-      {#if selected.execution_evidence.stderr}
-        <pre class="diff">{selected.execution_evidence.stderr}</pre>
-      {/if}
-      {#if selected.execution_evidence.truncated}
-        <p class="notice">Output was truncated at the approved bound.</p>
-      {/if}
-      {#if selected.execution_evidence.output_redacted}
-        <p class="notice">Secret-like output was redacted before it entered history.</p>
-      {/if}
-    {/if}
+         It used to answer them in almost the reverse. Under the title came
+         eight rows of provenance — session, requested, proposed by, batch,
+         expiry, authorized by — and the execution evidence, and only then the
+         diff. The single thing the decision actually turns on was below all of
+         it, and the owner scrolled past the record-keeping to reach the change
+         they were being asked about.
+
+         Two facts stay above the change, because they decide whether the
+         decision can be made at all rather than describing it: what capability
+         is being asked for, and whether pressing Approve performs the action or
+         only records a decision. Everything else is provenance and reads after,
+         behind a summary. -->
+    <p class="effect">
+      <span class="effect-capability">{capabilityLabel(selected.approval.capability)}</span>
+      <Badge
+        variant={selected.approval.risk_level === "critical" || selected.approval.risk_level === "high"
+          ? "blocked"
+          : "metadata-only"}
+        label={`${selected.approval.risk_level} risk`}
+      />
+      <span class="effect-executes">
+        {selected.executes_on_approval
+          ? "Approving runs this action."
+          : "Approving records a decision; it does not run anything."}
+      </span>
+    </p>
+
 
     {#if selected.approval.is_expired}
       <p class="notice notice-danger" role="alert">
@@ -646,6 +634,55 @@
       <h3>Proposed arguments (redacted)</h3>
       <pre class="diff">{JSON.stringify(selected.arguments, null, 2)}</pre>
     {/if}
+
+    <!-- Kept, moved. None of this is wrong to record; it is wrong to read
+         first. -->
+    <details class="provenance">
+      <summary>Provenance and evidence</summary>
+    <dl class="meta">
+      <div><dt>Capability</dt><dd>{capabilityLabel(selected.approval.capability)}</dd></div>
+      <div><dt>Risk</dt><dd>{selected.approval.risk_level}</dd></div>
+      <div><dt>Session</dt><dd><a class="mono" href={`#/sessions?session=${encodeURIComponent(selected.approval.session_id)}`}>View session</a></dd></div>
+      <div><dt>Requested</dt><dd>{relativeTime(selected.approval.created_at)}</dd></div>
+      <div><dt>Proposed by</dt><dd><IdentityChip identity={selected.approval.proposed_by} /></dd></div>
+      {#if selected.approval.queue_total > 1}
+        <div>
+          <dt>Batch</dt>
+          <dd>
+            Decision {selected.approval.queue_position} of {selected.approval.queue_total} —
+            the calls after it are queued on this turn and each gets its own decision.
+          </dd>
+        </div>
+      {/if}
+      {#if selected.approval.expires_at}
+        <div><dt>Expires</dt><dd>{formatTimestamp(selected.approval.expires_at)}</dd></div>
+      {/if}
+      {#if selected.approval.approved_by}
+        <div><dt>Authorized by</dt><dd><IdentityChip identity={selected.approval.approved_by} /></dd></div>
+      {/if}
+    </dl>
+    {#if Object.keys(selected.execution_evidence ?? {}).length > 0}
+      <h3>Execution evidence</h3>
+      <dl class="meta">
+        <div><dt>Principal</dt><dd class="mono">{selected.execution_evidence.principal_id ?? selected.approval.resolved_by ?? "unknown"}</dd></div>
+        <div><dt>Exit</dt><dd>{selected.execution_evidence.returncode ?? "n/a"}</dd></div>
+        <div><dt>Output</dt><dd>{selected.execution_evidence.stdout_bytes ?? 0} B stdout / {selected.execution_evidence.stderr_bytes ?? 0} B stderr</dd></div>
+      </dl>
+      {#if selected.execution_evidence.stdout}
+        <pre class="diff">{selected.execution_evidence.stdout}</pre>
+      {/if}
+      {#if selected.execution_evidence.stderr}
+        <pre class="diff">{selected.execution_evidence.stderr}</pre>
+      {/if}
+      {#if selected.execution_evidence.truncated}
+        <p class="notice">Output was truncated at the approved bound.</p>
+      {/if}
+      {#if selected.execution_evidence.output_redacted}
+        <p class="notice">Secret-like output was redacted before it entered history.</p>
+      {/if}
+    {/if}
+
+    </details>
 
     {#if isQuestion && selected.approval.status === "pending" && !selected.approval.is_expired}
       <div class="question-block">
@@ -822,6 +859,33 @@
     font-size: var(--text-xs);
     font-weight: 650;
     opacity: 0.7;
+  }
+  /* VIS-09 — the two facts that stay above the change, on one line. */
+  .effect {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-3);
+  }
+  .effect-capability {
+    color: var(--text-1);
+    font-weight: 650;
+  }
+  .effect-executes {
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+  .provenance {
+    margin: var(--space-4) 0 0;
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-3);
+  }
+  .provenance > summary {
+    color: var(--text-3);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    width: max-content;
   }
   .question-text {
     margin: 0 0 0.5rem;

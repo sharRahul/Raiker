@@ -270,6 +270,8 @@ Only show the full matrix on Permissions/Observability.
 
 **Priority: P1 — Impact: High**
 
+**Status: Done 2026-09-06.** The five questions were being answered in almost the reverse order. Under the title came eight rows of provenance — session, requested, proposed by, batch, expiry, authorized by — then the execution evidence, and only then the diff, so the one thing the decision turns on sat below all the record-keeping. The proposed change is first now. Two facts stay above it because they decide whether the decision can be made at all rather than describing it: the capability being asked for, and whether pressing Approve performs the action or only records a decision. Provenance and evidence are complete, collapsed, and read after.
+
 Approval is core to Raiker, so it should be one of the best-designed interactions.
 
 ### Recommendation

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ApprovalsView from "./ApprovalsView.svelte";
 import { stubFetch, stubFetchPending } from "../test-helpers";
@@ -183,6 +183,48 @@ describe("ApprovalsView", () => {
     expect(screen.getByText("notes.txt")).toBeInTheDocument();
     // Approve is explicit about not executing.
     expect(screen.getByRole("button", { name: /approve \(record only\)/i })).toBeInTheDocument();
+  });
+
+  it("puts the proposed change above the provenance, not below it", async () => {
+    // VIS-09 — an approval answers what, why, what changes, how far it reaches,
+    // then decide. It used to answer them almost in reverse: eight rows of
+    // provenance and the execution evidence came first, and the diff — the one
+    // thing the decision turns on — was below all of it.
+    stubFetch({
+      "GET /api/approvals": [PENDING],
+      "GET /api/approvals/appr_1": DETAIL,
+    });
+    render(ApprovalsView);
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+
+    const heading = await screen.findByRole("heading", { name: /^Review / });
+    const panel = heading.closest("section");
+    const order = panel?.textContent ?? "";
+    expect(order.indexOf("notes.txt")).toBeGreaterThan(-1);
+    // The change comes before the provenance disclosure.
+    expect(order.indexOf("notes.txt")).toBeLessThan(order.indexOf("Provenance and evidence"));
+
+    // Provenance is still there, and still complete — collapsed, not dropped.
+    const provenance = screen.getByText("Provenance and evidence");
+    await fireEvent.click(provenance);
+    // Scoped to the panel: the queue table also has a "Requested" column.
+    const details = provenance.closest("details") as HTMLElement;
+    expect(within(details).getByText("Requested")).toBeInTheDocument();
+    expect(within(details).getByText("Session")).toBeInTheDocument();
+    expect(within(details).getByText("Proposed by")).toBeInTheDocument();
+  });
+
+  it("says whether approving runs the action, above the change", async () => {
+    stubFetch({
+      "GET /api/approvals": [PENDING],
+      "GET /api/approvals/appr_1": DETAIL,
+    });
+    render(ApprovalsView);
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+
+    expect(
+      await screen.findByText(/Approving records a decision; it does not run anything\./),
+    ).toBeInTheDocument();
   });
 
   it("shows a server-reported expiry warning and withholds decision controls", async () => {

@@ -2273,12 +2273,15 @@ async def set_model_connection(
     # demand; Settings keeps the controls to view, rotate, and clear it.
     ensure_vault_key(request.app.state.workspace_root)  # type: ignore[attr-defined]
     try:
+        # GCR-02 — `validate`, not `create`: saving a connection asks whether the
+        # values would run, and the answer needs no client. Built as a provider,
+        # every save left one open.
         ModelProviderFactory(
             policy=provider_runtime_policy_from_gates(
                 store, session.principal_id, configuring_profile_id=profile_id
             ),
             connection={key: value for key, value in values.items() if key != "admin_api_key"},
-        ).create(profile, require_model=False)
+        ).validate(profile, require_model=False)
         put_model_connection(store, session.principal_id, profile_id, values)
     except ValueError as exc:
         raise HTTPException(status_code=503, detail={"reason_code": str(exc)}) from exc

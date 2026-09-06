@@ -568,7 +568,15 @@ class ToolBroker:
                 "error": {"type": "command_not_authorised", "fallback_tool": "shell"},
             }
         try:
-            check_command_allowlist(command, ALLOWED_SHELL_COMMANDS)
+            # GCR-06 — the workspace this command will actually run in, stated
+            # here rather than read from a module global. This call site never
+            # set that global at all, so it validated every `run_command` against
+            # whichever root the last caller happened to leave behind.
+            check_command_allowlist(
+                command,
+                ALLOWED_SHELL_COMMANDS,
+                workspace_root=self.command_service.workspace_root,
+            )
             grant_identity = hashlib.sha256(
                 json.dumps(
                     {

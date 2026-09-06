@@ -105,7 +105,7 @@ names.
 | [BUG-282](FIXED_ITEMS.md#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier) | Medium | Documentation / memory | **Closed 2026-09-04 ([FIXED-393](FIXED_ITEMS.md#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier))** — the guide told owners semantic recall was half-built, nine days after FIXED-292 finished it |
 | [BUG-283](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others) | Low | Web UI / information architecture | **Closed 2026-09-04 ([FIXED-394](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others))** — 244 words of explanation to the guide, one contract that was stated twice, and two tabs that were copies of other surfaces |
 | [BUG-284](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything) | Medium | Web UI / responsive layout | **Closed 2026-09-04 ([FIXED-395](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything))** — found by running the width sweep against a workspace that had been worked in; reproduced on unmodified `main` |
-| [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — **a fourth round blocked on the same value, 2026-09-05**; confirmed in two requests rather than a round. The key supplied for this round is identity-linked too, and re-establishing that found [FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network): Raiker had been answering the provider's actual refusal with "check your network" |
+| [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — **a fifth round blocked on the same value, 2026-09-06**; confirmed in two requests again, and this host has no local runtime either. Raiker's half holds under a fifth key: the refusal reads as itself in the picker, not as *Provider unreachable*. The attempt found [FIXED-435](FIXED_ITEMS.md#fixed-435--the-models-page-said-a-gate-was-on-above-providers-it-would-refuse) |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-04 to **twelve**; eight more converted and each re-run against a used workspace, three must keep their own |
@@ -162,6 +162,20 @@ GCR-27 as [FIXED-424](FIXED_ITEMS.md#fixed-424--two-models-one-folder-apart-were
 GCR-30 as [FIXED-425](FIXED_ITEMS.md#fixed-425--a-method-whose-contract-was-to-return-health-raised-instead),
 GCR-31 as [FIXED-426](FIXED_ITEMS.md#fixed-426--a-thinking-budget-that-left-the-answer-nothing),
 and GCR-38/39 as [FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence).
+
+**Six more closed 2026-09-06**, taken in the order the third-pass remediation
+table gives — its next four entries, plus the two dead parameters that live in
+the same two methods: GCR-01/02 as
+[FIXED-430](FIXED_ITEMS.md#fixed-430--five-surfaces-asked-would-this-model-run-by-building-one-and-dropping-it),
+GCR-03 as [FIXED-431](FIXED_ITEMS.md#fixed-431--a-reasoning-setting-judged-against-whichever-profile-was-first-in-the-file),
+GCR-06 as [FIXED-432](FIXED_ITEMS.md#fixed-432--two-commands-running-at-once-could-be-judged-against-each-others-workspace),
+GCR-46 as [FIXED-433](FIXED_ITEMS.md#fixed-433--a-database-raiker-could-not-read-was-reported-as-a-model-the-owner-never-chose),
+and GCR-04/18 as [FIXED-434](FIXED_ITEMS.md#fixed-434--two-public-parameters-that-changed-nothing).
+Running the live evidence for them found one product defect, closed the same day
+as [FIXED-435](FIXED_ITEMS.md#fixed-435--the-models-page-said-a-gate-was-on-above-providers-it-would-refuse):
+the Models page reported the hosted gate from its capability *row* rather than
+from the enforcing path, so it said **Off** above a connected provider it had
+just accepted a model for — and **On** above providers it would refuse.
 
 ---
 
@@ -1075,6 +1089,27 @@ covered by unit and API tests
 surfaces themselves were walked live at four widths with no console error. What
 is missing is the end-to-end evidence a FIXED entry is normally held to: a real
 turn, in a real thread, on a real provider.
+
+**Re-attempted 2026-09-06 (fifth round), and blocked on the same value for the
+fifth time.** Same two commands, same two answers: `/v1/models` replies `400`
+with *"This API key is not scoped to a workspace…"*, and
+`/v1/organizations/workspaces`, `/v1/organizations/me` and
+`/v1/organizations/api_keys` all reply `403 Missing permissions`. There is no
+local runtime on this host either — neither Ollama nor llama.cpp is installed and
+nothing answers on `:11434` — so no provider on this machine can complete a turn,
+and the three scenarios stayed unrun.
+
+What the attempt *did* buy, keeping the entry's own rule that the attempt is
+cheap: the connection was driven through the interface end to end and the
+refusal reads as itself in the picker —
+*"This key is identity-linked, so it acts inside one workspace. Add the workspace
+ID to this connection…"* — with no *Provider unreachable* anywhere, so FIXED-370,
+FIXED-372, FIXED-382 and FIXED-388 all still hold under a fifth key. And the
+screenshot taken as evidence for
+[FIXED-430](FIXED_ITEMS.md#fixed-430--five-surfaces-asked-would-this-model-run-by-building-one-and-dropping-it)
+showed the Models page reporting the hosted gate as **Off** above the connected
+provider it had just accepted a model for, which is
+[FIXED-435](FIXED_ITEMS.md#fixed-435--the-models-page-said-a-gate-was-on-above-providers-it-would-refuse).
 
 **Re-attempted 2026-09-05 (fourth round), and blocked on the same value for the
 fourth time — but the check is now two commands rather than a round.** The key

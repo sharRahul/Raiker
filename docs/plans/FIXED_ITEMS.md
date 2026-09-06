@@ -442,6 +442,12 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-427](#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence) | Medium/High | Host lifecycle / observability | Fixed 2026-09-05 (third-pass static review) |
 | [FIXED-428](#fixed-428--every-conversion-in-activity-was-called-snapshotredacted_secret) | Medium | Web UI / API redaction | Fixed 2026-09-05 (found live) |
 | [FIXED-429](#fixed-429--a-shared-live-helper-spent-a-whole-spec-timeout-on-a-button-nobody-needed) | Low | Live test harness | Fixed 2026-09-05 (found live) |
+| [FIXED-430](#fixed-430--five-surfaces-asked-would-this-model-run-by-building-one-and-dropping-it) | High | Models / provider construction | Fixed 2026-09-06 (first-pass static review) |
+| [FIXED-431](#fixed-431--a-reasoning-setting-judged-against-whichever-profile-was-first-in-the-file) | Medium/High | Models / reasoning controls | Fixed 2026-09-06 (first-pass static review) |
+| [FIXED-432](#fixed-432--two-commands-running-at-once-could-be-judged-against-each-others-workspace) | High | Shell / command policy | Fixed 2026-09-06 (first-pass static review) |
+| [FIXED-433](#fixed-433--a-database-raiker-could-not-read-was-reported-as-a-model-the-owner-never-chose) | Medium | Models / configured-model resolution | Fixed 2026-09-06 (third-pass static review) |
+| [FIXED-434](#fixed-434--two-public-parameters-that-changed-nothing) | Low | Models / API clarity | Fixed 2026-09-06 (first-pass static review) |
+| [FIXED-435](#fixed-435--the-models-page-said-a-gate-was-on-above-providers-it-would-refuse) | Medium | Models / capability gates / web UI | Fixed 2026-09-06 (found live) |
 
 ---
 
@@ -19210,3 +19216,307 @@ guard now rather than the fix.
 **User-interface outcome.** None; harness-only. A stale guard that cannot fail
 visibly is the shape [FIXED-419](#fixed-419--four-live-guards-had-gone-stale-and-could-not-say-so)
 recorded, and this is the same lesson one layer down.
+
+---
+
+## FIXED-430 — Five surfaces asked "would this model run?" by building one and dropping it
+
+**Severity: High. Area: Models / provider construction. Status: Fixed
+2026-09-06. Raised as
+[GCR-01](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-01--modelrouterlaunch-ignores-saved-connection-configuration)
+and
+[GCR-02](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-02--provider-clients-can-leak-during-validation).**
+
+**Observed.** Five places in the product only ever needed to know whether a
+profile *would* run: selecting a model (`ModelRouter.select_profile`), launching
+one (`ModelRouter.launch`), saving a connection
+(`PUT /api/model-connections/{profile_id}`), `/model use` in the CLI, and the
+dashboard's model selection. Every one of them answered by calling
+`ModelProviderFactory.create(profile)` — which builds a live provider — and then
+throwing the result away.
+
+Two things followed from that, and they are the two findings.
+
+*The configuration was the wrong one.* `launch()` and the CLI built their
+factory directly:
+
+```python
+ModelProviderFactory(policy=self.runtime_policy).create(profile)
+```
+
+with no `connection=`. The owner's saved endpoint, API key and workspace id live
+in the connection vault, and that path could not see them. So **launch validated
+a different provider than the turn would run**: a hosted profile the owner had
+connected through Settings — the only place a key is entered — was refused for
+having no key, and a profile pointed at a saved endpoint was judged against the
+shipped one. Worse, because a saved connection is also what authorises this
+profile's own endpoint for egress, the refusal arrived even earlier, as
+`model_egress_denied:no_allowlist`, about a host the owner had explicitly
+configured. The CLI's comment said *"without connecting"* while the line beneath
+it opened a connection.
+
+*The transport was never closed.* `AsyncOpenAICompatibleProvider` and
+`AsyncAnthropicMessagesProvider` create their own `httpx.AsyncClient` in
+`__post_init__` when none is supplied, and close it in `finally` — but only in
+the execution methods. Four of the five validation paths never called `aclose()`,
+so every press of Connect, Change model or launch left an async client and its
+connection pool open for the life of the process. Only the dashboard closed
+its one, through a `getattr(validator, "aclose", None)` dance that existed
+because the call returned something nobody wanted.
+
+**Fixed.** `create()` is split at the point where deciding ends and building
+begins:
+
+* `ModelProviderFactory.resolve(profile)` runs every check — provider alias,
+  policy gates, concrete model name, configured endpoint, endpoint policy and
+  egress, the provider-specific requirements, the credential, and the Anthropic
+  workspace-id shape — and returns a `ResolvedProviderConfig`. It opens nothing.
+* `validate(profile)` is that call with the result discarded: the question, asked
+  directly.
+* `create(profile)` resolves first and then constructs, so the execution path is
+  unchanged and there is exactly one copy of the rules.
+
+All five call sites now use `validate`, and the two that built their own factory
+go through `ModelRouter.validate_profile`, which resolves the owner's connection
+exactly as a turn does.
+
+One check moved, and gained reach by moving: BUG-274's workspace-id shape
+validation used to sit inside the branch that constructs the Anthropic provider,
+so a malformed stored value passed every validation in the product and failed at
+the first turn. It is part of `resolve` now, so Connect refuses it where the
+owner entered it.
+
+**User-interface outcome.** A hosted provider the owner connected through
+Settings launches from the launcher instead of being refused for a key it has;
+the reason a launch fails is now the same reason a turn would fail, because both
+read the same connection. Connect, Change model and launch can be pressed as
+often as an owner pressing them naturally does without the host accumulating
+sockets — `scripts/live_socket_check.sh` brackets the live round that presses
+them and fails if the count grows. And an Anthropic connection saved with a
+malformed workspace id is refused in the dialog, beside the field, rather than
+at the first turn.
+
+---
+
+## FIXED-431 — A reasoning setting judged against whichever profile was first in the file
+
+**Severity: Medium/High. Area: Models / reasoning controls. Status: Fixed
+2026-09-06. Raised as
+[GCR-03](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-03--reasoning-settings-can-be-validated-against-the-wrong-model-profile).**
+
+**Observed.** `ModelRouter.set_reasoning()` resolved the profile it was about to
+judge a value against as:
+
+```python
+self.registry.resolve_profile_id(self.active_profile_id)
+if self.active_profile_id
+else self.registry.list_profiles()[0]
+```
+
+`active_profile_id` was set in exactly one place — `select_profile()` — which
+only the CLI's `/model use` calls. The gateway and every web path resolve the
+turn's profile without going near it, so `active_profile_id` was `None` for the
+whole product and the fallback was live.
+
+`list_profiles()[0]` is `raiker-local-llama-cpp`, a position in
+`raiker/config/model-profiles.json` rather than a choice anyone made, and it
+declares `supports_reasoning: false`. So the capability check ran against a
+local llama.cpp profile whatever model the owner had selected, and every value
+was refused with `reasoning_not_supported` — including on `anthropic-hosted`,
+which declares `supports_reasoning: true` and the `adaptive` mode.
+
+**Fixed.** Two halves, because the arbitrary fallback and the empty
+`active_profile_id` were both real.
+
+* `ModelRouter.reasoning_profile()` names the target: the active selection when
+  there is one, and otherwise the registry's **native default** — the profile
+  `default_provider()` returns and the one a turn with no selection actually runs
+  on. `set_reasoning(value, *, profile_id=None)` also lets a caller that knows
+  the target say so.
+* `AgentGateway._resolve_default_provider()` sets `active_profile_id` from the
+  same persisted selection it binds the turn to, so the router's idea of the
+  active profile is the owner's.
+
+**User-interface outcome.** The effort control on a hosted reasoning model
+accepts the modes that model publishes instead of answering every one of them
+with "this model does not support reasoning controls". A model that genuinely
+declares none still refuses, and `off` still needs no support at all — the
+refusal is now about the model in front of the owner.
+
+---
+
+## FIXED-432 — Two commands running at once could be judged against each other's workspace
+
+**Severity: High. Area: Shell / command policy. Status: Fixed 2026-09-06. Raised
+as
+[GCR-06](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-06--command-validation-uses-process-global-workspace-state).**
+
+**Observed.** The command policy refuses any path outside the workspace, and the
+workspace it compared against was a module global in
+`raiker/runtime/executors/sandbox.py`:
+
+```python
+_COMMAND_WORKSPACE: Path | None = None
+```
+
+`run_command()` assigned it with `set_command_workspace(cwd)` on the line before
+`check_command_allowlist(...)`, and the validator read it back through
+`_command_workspace()`. Not thread-local, not request-local, not passed. Two
+governed commands validating at once — two mounted Raiker instances, or one
+instance with a background run in flight, both of which the product supports —
+read whichever root was written last. A path could be accepted for being inside
+a workspace it would never run in, or refused for being outside one it was
+inside.
+
+The tool broker made it plainer: `ToolBroker._run_command` called
+`check_command_allowlist(command, ALLOWED_SHELL_COMMANDS)` and **never set the
+global at all**, so every `run_command` tool call was validated against whatever
+the previous caller had left behind, or against the process working directory
+when nothing had.
+
+**Fixed.** The global is gone, along with `set_command_workspace` and
+`_command_workspace`. `check_command_allowlist(command, allowlist, *,
+workspace_root)` takes the root as a required keyword, so a caller cannot forget
+it and silently inherit somebody else's. `run_command` passes its own `cwd`; the
+broker passes `self.command_service.workspace_root`, which is the root the run
+will actually execute under. `None` still means the process working directory —
+the same behaviour a caller with no workspace of its own always had — but as a
+stated choice rather than a leftover.
+
+The race is held by a test that runs two workspaces through the validator
+concurrently and asserts that every path inside its own workspace is accepted
+and every path in the other refused, on every interleaving.
+
+**User-interface outcome.** None visible, and that is the finding: the defect
+was that an allow/deny decision could come out differently depending on what
+another session was doing at the same moment. A refusal an owner sees now
+depends on nothing but the command and the workspace it was asked to run in.
+
+---
+
+## FIXED-433 — A database Raiker could not read was reported as a model the owner never chose
+
+**Severity: Medium. Area: Models / configured-model resolution. Status: Fixed
+2026-09-06. Raised as
+[GCR-46](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-46--configured-model-read-errors-are-treated-as-an-absent-choice).**
+
+**Observed.** A hosted profile ships a `<model>` placeholder, so the model it
+runs is the one the owner pinned, and that pin lives in
+`principal_configured_models`. Three readers of it —
+`AgentGateway._configured_model`, `ModelReadinessService._configured_model` and
+`AdvisorState.pinned_model` — each held the same nine lines:
+
+```python
+try:
+    pairs = self.store.list_configured_models(...)
+except Exception:  # noqa: BLE001 — an unreadable pin resolves nothing
+    return None
+```
+
+`None` already means something here, and it is not "the read failed". It means
+*the owner pinned nothing*, which for a placeholder profile makes the profile
+unrunnable. So a locked database, a corrupt page or a bad disk did not surface
+as a storage failure: it dropped the owner's model from the fallback chain,
+resolved readiness against the `<model>` placeholder, and reported
+`not_configured` — **asking the owner to set up a model they had already set
+up**, which is the same shape of dishonesty
+[FIXED-278](#fixed-278--every-restart-asked-the-owner-to-set-up-a-model-they-had-already-set-up)
+removed for expiry.
+
+**Fixed.** `raiker/models/configured_models.py` holds the one reader.
+`pinned_model(store, principal_id, profile_id)` returns `None` only for a store
+it read that holds no pin, and raises `ConfiguredModelStoreUnavailable` when the
+read itself failed. All three call sites use it, so the distinction cannot be
+lost in one of them again.
+
+Readiness carries the answer. `ModelReadinessState.CONFIGURATION_UNREADABLE` is
+a new state, deliberately separate from `NOT_CONFIGURED`, and `resolve_chain`
+returns it rather than resolving a target it cannot know. It is never stored: it
+describes the moment the question was asked, not an observation of a provider,
+and it clears as soon as the store is readable again.
+
+**User-interface outcome.** The readiness strip reads **Choice unreadable**, and
+the refusal says *"Raiker could not read which model you chose. This is a storage
+failure in this workspace, not a problem with the model or your key. Your choice
+is still saved."* — with the same words in the provider-error guidance table, so
+the message is identical wherever the owner meets it. The turn is refused rather
+than run on a model the owner did not pick, and nothing on the screen tells them
+to go and re-choose a model that is already stored.
+
+---
+
+## FIXED-434 — Two public parameters that changed nothing
+
+**Severity: Low. Area: Models / API clarity. Status: Fixed 2026-09-06. Raised as
+[GCR-04](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-04--generate-context-ignores-context)
+and
+[GCR-18](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-18--unused-public-parameters-make-contracts-misleading).**
+
+**Observed.** `ModelRouter.generate(provider, model, prompt, context=None)`
+accepted a context mapping and then called `self.chat(...)` with a single user
+message built from `prompt` alone. A caller could hand it the context it wanted
+honoured and get a turn that had never seen it. `ModelRouter.default_provider(*,
+health_timeout=1.0)` accepted a timeout for a health check it does not perform;
+no caller in the repository ever passed one.
+
+**Fixed.** Both removed. A parameter that changes nothing is worse than no
+parameter, because it reads as a promise. `default_provider()` also grew a
+sibling, `default_profile()`, which FIXED-431 needs to name the native default
+without going through a `(provider, model)` tuple.
+
+**User-interface outcome.** None; both are internal API surfaces with no caller
+that passed the removed argument. Recorded because a silently ignored argument
+is the kind of thing that is only ever found by reading, and the reading has
+been done.
+
+---
+
+## FIXED-435 — The Models page said a gate was On above providers it would refuse
+
+**Severity: Medium. Area: Models / capability gates / web UI. Status: Fixed
+2026-09-06. Found live, on the screenshot taken as evidence for
+[FIXED-430](#fixed-430--five-surfaces-asked-would-this-model-run-by-building-one-and-dropping-it).**
+
+**Observed.** The **Off-machine provider posture** panel on **Models → Hosted**
+read `HOSTED MODEL GATE: Off` directly above an Anthropic card showing
+*Connection saved*, a pinned `Haiku 4.5`, and a header saying `1 model set up`.
+The provider had just accepted a model through the governed path; the panel two
+inches above it said its gate was off.
+
+Running the same panel's assertion against a workspace with **nothing**
+connected found the other direction, and it is the worse one: the panel read
+`HOSTED MODEL GATE: On` while every hosted provider would have answered
+`hosted_provider_requires_explicit_policy` at the first turn.
+
+**Root cause.** The panel rendered `hosted_model_gate_state` — the capability
+**row**, resolved by `get_effective_capability_gate` — and the model provider
+policy asks a different question. `provider_runtime_policy_from_gates` has three
+inputs in decreasing authority: an explicit revocation, an explicit enablement,
+and *an owner-configured connection*, because connecting a provider is consent to
+use it and RAIKER's posture rejects making the owner then discover a separate
+switch. So the row and the enforcing path disagree in both directions — the row
+says off while a connection has opened it, and the row resolves to
+`enabled_runtime` from the shipped default table while the enforcing path,
+reading persisted state, refuses.
+
+This is exactly
+[FIXED-322](#fixed-322--permissions-said-off-about-a-capability-that-would-have-run)'s
+defect on a second surface. That entry fixed the Permissions page by reporting
+what the enforcing path answers beside what is stored; Models was never brought
+along.
+
+**Fixed — in the same shape, and nothing about behaviour changes.** `ModelsView`
+gains `hosted_model_gate_enforced` and `private_network_model_gate_enforced`,
+read from the same `provider_runtime_policy_from_gates` the provider factory is
+built with everywhere else. `..._state` is untouched, so nothing that already
+consumes it changes meaning.
+
+**User-interface outcome.** The panel names the answer and the reason for it. A
+gate the row calls off and the enforcing path allows reads **On (by
+connection)**; a gate the row calls on and the enforcing path refuses reads
+**Off until connected**, which is both the verdict and the action. An explicit
+revocation still outranks any connection, so a gate the owner deliberately
+turned off reads **Off** whatever is connected — the one case that must never be
+softened, and it has its own test. Verified live on a workspace with Anthropic
+connected: both tiles read *On (by connection)*, in
+[`screenshots/working/models-posture-reports-the-enforced-answer.png`](screenshots/working/models-posture-reports-the-enforced-answer.png).

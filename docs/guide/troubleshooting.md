@@ -28,6 +28,7 @@ itself. They remain below because they can still appear for a provider you have
 | `openrouter_requires_https` | OpenRouter needs HTTPS | Remove or fix the custom endpoint |
 | `unknown_provider:<name>` | Unrecognised provider in a profile | Fix the profile in `raiker/config/model-profiles.json` |
 | `test_provider_not_available` | Raiker ships no mock provider | Pick a real backend |
+| `configured_model_store_unavailable` | Raiker could not read *which model you chose*. This is a failure of the workspace database, not of the model, the key, or the provider — your choice is still saved | Check the workspace directory is readable and not out of disk, then try again. Raiker refuses the turn rather than quietly running on a different model, and it deliberately does not tell you to re-pick a model you have already picked. |
 | `model_not_checked` | This exact profile, model and endpoint has never been checked | Open **Models**, choose the model, and press **Check again**. (An *expired* check needs nothing from you: Raiker re-takes it as it admits the turn.) |
 | `local_runtime_unreachable` / `local_runtime_missing` | The selected Ollama, LM Studio, or llama.cpp service is stopped or absent | Start/install the named runtime, pull or load the exact model, then check again. |
 | `local_model_missing` / `provider_model_missing` | The provider is reachable but its catalogue does not contain the exact selection | Pull, load, or choose a listed model. |

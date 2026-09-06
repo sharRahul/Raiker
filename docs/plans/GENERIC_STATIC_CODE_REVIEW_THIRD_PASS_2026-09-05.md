@@ -8,13 +8,24 @@ It is a companion to `docs/plans/GENERIC_STATIC_CODE_REVIEW_2026-09-05.md`. The 
 
 This remains a static review. It is not a runtime stress test, profiler run, fuzzing campaign, or proof that no additional defects exist. Findings are included only where the reviewed `main` implementation provides concrete evidence.
 
-## Status — 2026-09-05
+## Status — 2026-09-06
 
-Ten of the forty-seven are closed, taken in the order this document's own
+Eleven of the forty-seven are closed here, taken in the order this document's own
 remediation table gives — priority first, then effort. Every entry below keeps
 its original analysis; a closed one carries a **Status** line naming the
 [`FIXED_ITEMS.md`](FIXED_ITEMS.md) record that closed it, so the evidence and the
 finding stay together.
+
+The 2026-09-06 pass also closed the four first-pass findings this document's
+remediation order puts next — GCR-01, GCR-02, GCR-03 and GCR-06 — plus GCR-04 and
+GCR-18, which live in the same two methods. Their records are
+[FIXED-430](FIXED_ITEMS.md#fixed-430--five-surfaces-asked-would-this-model-run-by-building-one-and-dropping-it),
+[FIXED-431](FIXED_ITEMS.md#fixed-431--a-reasoning-setting-judged-against-whichever-profile-was-first-in-the-file),
+[FIXED-432](FIXED_ITEMS.md#fixed-432--two-commands-running-at-once-could-be-judged-against-each-others-workspace)
+and
+[FIXED-434](FIXED_ITEMS.md#fixed-434--two-public-parameters-that-changed-nothing);
+the findings themselves are marked closed in
+[`GENERIC_STATIC_CODE_REVIEW_2026-09-05.md`](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md).
 
 | Closed | What it was | Record |
 |---|---|---|
@@ -26,12 +37,13 @@ finding stay together.
 | GCR-30 | `health()` could raise instead of returning `ProviderHealth` | [FIXED-425](FIXED_ITEMS.md#fixed-425--a-method-whose-contract-was-to-return-health-raised-instead) |
 | GCR-31 | The thinking-budget clamp clamped upward, past the limit | [FIXED-426](FIXED_ITEMS.md#fixed-426--a-thinking-budget-that-left-the-answer-nothing) |
 | GCR-38, GCR-39 | Host-tick passes suppressed in silence; one task's exception skipped the rest of its batch | [FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence) |
+| GCR-46 | A storage failure was reported as a model the owner never chose | [FIXED-433](FIXED_ITEMS.md#fixed-433--a-database-raiker-could-not-read-was-reported-as-a-model-the-owner-never-chose) |
 
-**Still open, and next by the same order:** GCR-01/02/03 (provider launch
-configuration, client leak, reasoning profile resolution — all Low effort),
-GCR-06 (the global command workspace), GCR-24/25 (a cancellable conversion
-subprocess and an app-owned durable job runner), GCR-26, GCR-28, GCR-33, GCR-40,
-and the P2 architecture work below them.
+**Still open, and next by the same order:** GCR-08 (transactional instance
+creation), GCR-28 (local runtime slot concurrency), GCR-33 (OAuth refresh
+single-flight), GCR-40 (event dual-write recovery), GCR-24/25 (a cancellable
+conversion subprocess and an app-owned durable job runner), GCR-26, GCR-41, and
+the P2 architecture work below them.
 
 ## Executive judgement
 
@@ -76,7 +88,7 @@ The third theme is **durability mismatch**: a number of operations are represent
 | GCR-43 | Medium | P2 | `raiker/control/dashboard.py` is a ~400 KB multi-domain integration/god module |
 | GCR-44 | Medium | P2 | API redaction buffering also copies large binary attachment preview/download responses |
 | GCR-45 | Medium | P2 | Model-profile configuration resolution depends on process current working directory before packaged resources |
-| GCR-46 | Medium | P2 | Configured-model storage failures are silently treated as “no configured model,” changing fallback/readiness behavior |
+| GCR-46 | Medium | P2 | Configured-model storage failures are silently treated as “no configured model,” changing fallback/readiness behavior — **Closed 2026-09-06 ([FIXED-433](FIXED_ITEMS.md#fixed-433--a-database-raiker-could-not-read-was-reported-as-a-model-the-owner-never-chose))** |
 | GCR-47 | Medium | P2 | Attached-root watcher can suppress cycle-level failures without updating any project health state |
 
 ---
@@ -605,6 +617,8 @@ This also makes behavior differ between launch methods and can accidentally pick
 
 **Severity: Medium — Priority: P2 — Confidence: High**
 
+**Status: Closed 2026-09-06 — [FIXED-433](FIXED_ITEMS.md#fixed-433--a-database-raiker-could-not-read-was-reported-as-a-model-the-owner-never-chose).** The fix is the one proposed: `configured_model_store_unavailable` is a distinct outcome from an absent pin, raised by the single reader all three call sites now share, and readiness reports it as its own `configuration_unreadable` state rather than resolving a model it cannot know.
+
 Both `AgentGateway._configured_model()` and `ModelReadinessService._configured_model()` catch broad exceptions from the configured-model store and return `None`.
 
 For placeholder profiles, `None` means the profile can disappear from fallback resolution/readiness as if the owner never configured it. A storage failure therefore changes model selection rather than surfacing a degraded configuration state.
@@ -677,13 +691,13 @@ The order below combines the new third-pass findings with the most important fir
 | 2 | GCR-20 operation CAS/state machine | P1 | Medium | Atomic expected-state transitions — **Closed** |
 | 3 | GCR-21 retry state validation | P1 | Low | Retry only failed/cancelled and atomically claim — **Closed** |
 | 4 | GCR-23 HF cancel overwrite | P1 | Low-Medium after GCR-20 | Unify worker + CAS completion — **Closed** |
-| 5 | GCR-01 provider launch configuration | P1 | Low | Route validation through `_factory(profile)` |
-| 6 | GCR-02 provider client leak | P1 | Low | Avoid constructing transport for validation or close it deterministically |
-| 7 | GCR-03 reasoning profile mismatch | P1 | Low | Resolve actual selected/default profile |
+| 5 | GCR-01 provider launch configuration | P1 | Low | Route validation through `_factory(profile)` — **Closed** |
+| 6 | GCR-02 provider client leak | P1 | Low | Avoid constructing transport for validation or close it deterministically — **Closed** |
+| 7 | GCR-03 reasoning profile mismatch | P1 | Low | Resolve actual selected/default profile — **Closed** |
 | 8 | GCR-27 GGUF shard grouping | P1 | Low-Medium | Include relative parent + validate shard totals — **Closed** |
 | 9 | GCR-30 provider health exception completeness | P1/P2 | Low | Complete health classification tests — **Closed** |
 | 10 | GCR-31 Anthropic budget clamp | P1 | Low | Validate minimum reasoning/output budget — **Closed** |
-| 11 | GCR-06 global command workspace | P0/P1 | Medium | Pass workspace explicitly; remove mutable global |
+| 11 | GCR-06 global command workspace | P0/P1 | Medium | Pass workspace explicitly; remove mutable global — **Closed** |
 | 12 | GCR-08 transactional instance creation | P1 | Medium | Stage/register then publish/mount atomically |
 | 13 | GCR-28 local runtime concurrency | P1 | Medium | Atomic slot supervisor |
 | 14 | GCR-33 OAuth refresh single-flight | P1 | Medium | Per-credential lease/CAS refresh |
@@ -704,6 +718,7 @@ The order below combines the new third-pass findings with the most important fir
 | 29 | GCR-44 content-type-aware redaction | P2 | Medium | Do not buffer binary API responses |
 | 30 | GCR-42 generated frontend contracts | P2 | Medium | Generate TS/OpenAPI types and run contract CI |
 | 31 | GCR-45 deterministic config source | P2 | Low-Medium | Explicit override, packaged default |
+| 31a | GCR-46 configured-model store failure | P2 | Low | Name the unreadable store; never resolve a model from it — **Closed** |
 | 32 | GCR-43 dashboard decomposition | P2 | High | Characterize then split by domain |
 | 33 | GCR-11 storage decomposition | P2 | High | Repositories/migration runner over smaller core |
 

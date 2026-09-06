@@ -28,6 +28,7 @@ from raiker.hooks.dispatcher import HookDispatcher
 from raiker.hooks.handlers.prompt import prompt_runner
 from raiker.hooks.owner_switch import hooks_disabled
 from raiker.hooks.registry import HooksRegistry
+from raiker.models.configured_models import pinned_model
 from raiker.models.connections import get_model_connection
 from raiker.models.contracts import ModelMessage, ToolCallProposal
 from raiker.models.policy_state import provider_runtime_policy_from_gates
@@ -152,6 +153,12 @@ class AgentGateway:
             return native_default
         if effective_model != profile.model:
             self.model_registry.register(profile_with_model(profile, effective_model))
+        # GCR-03 — tell the router which profile the owner actually selected.
+        # `active_profile_id` was only ever set by `ModelRouter.select_profile`,
+        # which the CLI calls and this path does not, so every reasoning setting
+        # made through the web surface was judged against the first entry in the
+        # shipped registry instead of the model about to run the turn.
+        self.model_router.active_profile_id = profile.profile_id
         return (profile.provider, effective_model)
 
     def _resolve_profile_for_turn(
@@ -201,15 +208,15 @@ class AgentGateway:
         return (profile.provider, effective_model)
 
     def _configured_model(self, profile_id: str) -> str | None:
-        """The owner's most recent pinned model for one profile, if any."""
-        try:
-            pairs = self.store.list_configured_models(self.tool_broker.principal_id)
-        except Exception:  # noqa: BLE001 — an unreadable pin resolves nothing
-            return None
-        for candidate_profile, candidate_model in reversed(list(pairs or [])):
-            if candidate_profile == profile_id and candidate_model:
-                return str(candidate_model)
-        return None
+        """The owner's most recent pinned model for one profile, if any.
+
+        GCR-46 — raises :class:`ConfiguredModelStoreUnavailable` rather than
+        answering ``None`` when the store cannot be read. ``None`` here means the
+        owner pinned nothing, which for a placeholder profile makes it
+        unrunnable; returning it for a storage failure changed which model the
+        turn ran on and said nothing about why.
+        """
+        return pinned_model(self.store, self.tool_broker.principal_id, profile_id)
 
     def _resolve_fallback_chain(self) -> list[tuple[str, str]]:
         """Resolve the user-owned ordered fallback sequence to ``(provider, model)`` pairs.

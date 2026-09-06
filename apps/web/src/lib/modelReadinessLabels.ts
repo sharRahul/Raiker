@@ -36,6 +36,11 @@ const READINESS_LABEL: Record<ModelReadinessState, string> = {
   quota_exhausted: "No credit",
   unreachable: "Unreachable",
   unsupported: "Unsupported",
+  // GCR-46 — names the failure that actually happened. The owner's chosen model
+  // could not be read back, so nothing on this screen knows which model was
+  // being judged; saying "Not checked" would blame the model and send them to
+  // re-pick one that is already stored.
+  configuration_unreadable: "Choice unreadable",
 };
 
 /** The label for a readiness state, or null when the backend sent none. */

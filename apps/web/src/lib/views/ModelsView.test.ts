@@ -1435,6 +1435,56 @@ describe("ModelsView action-category tabs", () => {
     );
   });
 
+  // Found live, 2026-09-06: with Anthropic connected and a model pinned, this
+  // panel printed "Off" for the hosted gate directly above the connected card.
+  // Connecting a provider *is* consent to use it, so the enforcing path had
+  // said yes and the panel was reporting the gate row alone — FIXED-322's
+  // defect on a second surface.
+  it("says a gate is on by connection when the enforcing path allows it", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        hosted_model_gate_state: "disabled",
+        hosted_model_gate_enforced: true,
+      }),
+    });
+    render(ModelsView, { props: { tab: "hosted" } });
+    const posture = await screen.findByLabelText("Off-machine provider posture");
+    expect(within(posture).getByText("On (by connection)")).toBeInTheDocument();
+  });
+
+  // The case that must never be softened: an explicit revocation outranks a
+  // saved connection, so a gate the owner turned off reads Off whatever is
+  // connected.
+  it("still reads Off for a gate the enforcing path refuses", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        hosted_model_gate_state: "disabled",
+        hosted_model_gate_enforced: false,
+      }),
+    });
+    render(ModelsView, { props: { tab: "hosted" } });
+    const posture = await screen.findByLabelText("Off-machine provider posture");
+    expect(within(posture).queryByText("On (by connection)")).toBeNull();
+    expect(within(posture).getAllByText("Off").length).toBeGreaterThan(0);
+  });
+
+  // The other direction, and the worse one. On an instance with nothing
+  // connected the row resolves to `enabled_runtime` from the shipped default
+  // table while the enforcing path refuses every hosted provider, so the panel
+  // read "On" above providers that answer
+  // `hosted_provider_requires_explicit_policy` at the first turn.
+  it("does not read On for a gate that would refuse the turn", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        hosted_model_gate_state: "enabled_runtime",
+        hosted_model_gate_enforced: false,
+      }),
+    });
+    render(ModelsView, { props: { tab: "hosted" } });
+    const posture = await screen.findByLabelText("Off-machine provider posture");
+    expect(within(posture).getByText("Off until connected")).toBeInTheDocument();
+  });
+
   it("does not read the posture on the local tab, which is not about it", async () => {
     stubFetch({ "GET /api/models": models({}) });
     render(ModelsView, { props: { tab: "local" } });

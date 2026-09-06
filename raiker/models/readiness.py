@@ -9,6 +9,11 @@ from enum import StrEnum
 from typing import Any, Protocol
 from urllib.parse import urlsplit, urlunsplit
 
+from raiker.models.configured_models import (
+    ConfiguredModelStoreUnavailable,
+    pinned_model,
+)
+
 
 class ModelReadinessState(StrEnum):
     NOT_CONFIGURED = "not_configured"
@@ -23,6 +28,12 @@ class ModelReadinessState(StrEnum):
     UNREACHABLE = "unreachable"
     UNSUPPORTED = "unsupported"
     STALE = "stale"
+    #: Raiker could not read which model the owner chose (GCR-46). Not a verdict
+    #: about the model — a verdict about Raiker's own storage. It is separate
+    #: from NOT_CONFIGURED because that one means the owner has not chosen yet,
+    #: and answering a storage failure with "you have not chosen" sends them to
+    #: make a choice they already made.
+    CONFIGURATION_UNREADABLE = "configuration_unreadable"
 
 
 @dataclass(frozen=True)
@@ -157,6 +168,14 @@ class ModelReadinessStore(Protocol):
         owner_principal_id: str,
         profile_id: str | None = None,
     ) -> list[ModelReadiness]: ...
+
+    # Readiness resolves the target it reports on, and for a profile shipping a
+    # `<model>` placeholder that target is whatever the owner pinned. The read
+    # goes through `raiker.models.configured_models.pinned_model`, which tells an
+    # unreadable store apart from an unset one (GCR-46); it is declared here
+    # because it is genuinely part of what readiness needs from a store, and was
+    # previously reached through an `# type: ignore[attr-defined]`.
+    def list_configured_models(self, principal_id: str) -> list[tuple[str, str]]: ...
 
 
 def _utc_now() -> datetime:
@@ -636,6 +655,30 @@ class ModelReadinessService:
             evidence={},
         )
 
+    @staticmethod
+    def _configuration_unreadable(
+        key: ModelReadinessKey, reason_code: str
+    ) -> ModelReadiness:
+        """GCR-46 — the chain says the store failed rather than resolving anyway.
+
+        Never stored: it describes the moment the question was asked, not an
+        observation of a provider, and it clears the moment the store is
+        readable again.
+        """
+        return ModelReadiness(
+            key=key,
+            state=ModelReadinessState.CONFIGURATION_UNREADABLE,
+            checked_at=None,
+            expires_at=None,
+            summary="Raiker could not read which model you chose.",
+            reason_code=reason_code,
+            remediation=(
+                "This is a storage failure in this workspace, not a problem with "
+                "the model. Check the workspace database, then try again."
+            ),
+            evidence={},
+        )
+
     async def check(
         self,
         owner_principal_id: str,
@@ -731,15 +774,13 @@ class ModelReadinessService:
         )
 
     def _configured_model(self, owner_principal_id: str, profile_id: str) -> str | None:
-        """The owner's most recent pinned model for one profile, if any."""
-        try:
-            pairs = self.store.list_configured_models(owner_principal_id)  # type: ignore[attr-defined]
-        except Exception:  # noqa: BLE001 — an unreadable pin resolves nothing
-            return None
-        for candidate_profile, candidate_model in reversed(list(pairs or [])):
-            if candidate_profile == profile_id and candidate_model:
-                return str(candidate_model)
-        return None
+        """The owner's most recent pinned model for one profile, if any.
+
+        GCR-46 — an unreadable store raises rather than resolving ``None``, which
+        would have readiness report on a placeholder as though the owner had
+        never chosen a model.
+        """
+        return pinned_model(self.store, owner_principal_id, profile_id)
 
     def resolve_request_target(
         self,
@@ -820,11 +861,29 @@ class ModelReadinessService:
         each entry in turn. Judging readiness on the primary alone therefore
         answers a question the runtime never asks.
         """
-        resolved_profile, resolved_model = self.resolve_request_target(
-            owner_principal_id,
-            profile_id,
-            model,
-        )
+        try:
+            resolved_profile, resolved_model = self.resolve_request_target(
+                owner_principal_id,
+                profile_id,
+                model,
+            )
+        except ConfiguredModelStoreUnavailable as exc:
+            # GCR-46 — the owner's pinned model could not be read, so there is no
+            # honest target to report on. Resolving anyway would fall back to the
+            # profile's shipped `<model>` placeholder and report `not_configured`
+            # about an owner who *had* configured it, sending them to redo a
+            # choice that is already stored and merely unreadable.
+            return [
+                self._configuration_unreadable(
+                    self.key(
+                        owner_principal_id,
+                        (profile_id or "").strip(),
+                        (model or "").strip(),
+                        "",
+                    ),
+                    exc.reason_code,
+                )
+            ]
         chain = [
             self.current_selected(owner_principal_id, resolved_profile, resolved_model)
         ]
@@ -834,6 +893,17 @@ class ModelReadinessService:
                 candidate_profile, candidate_model = self.resolve_request_target(
                     owner_principal_id, candidate_id, None
                 )
+            except ConfiguredModelStoreUnavailable as exc:
+                # The primary resolved, so the store was readable a moment ago.
+                # Say the fallbacks are unknown rather than returning a chain
+                # that is silently shorter than the one the runtime will try.
+                chain.append(
+                    self._configuration_unreadable(
+                        self.key(owner_principal_id, candidate_id, "", ""),
+                        exc.reason_code,
+                    )
+                )
+                break
             except (KeyError, ValueError, StopIteration):
                 continue
             # An unresolved `<model>` placeholder is not a runnable candidate;

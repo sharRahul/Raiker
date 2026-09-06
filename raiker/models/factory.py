@@ -40,6 +40,49 @@ def capabilities_from_profile(profile: ModelProfile) -> ModelCapabilities:
     )
 
 
+#: Every provider Raiker knows how to build. The three adapters behind them are
+#: the Anthropic Messages API, the Codex app server, and one OpenAI-compatible
+#: client — OpenAI, Gemini, Ollama Cloud and Hugging Face all speak the latter.
+_PROVIDER_ALIASES = frozenset(
+    {
+        "llama-cpp",
+        "llama.cpp",
+        "llama-cpp-server",
+        "mlx",
+        "ollama",
+        "ollama-cloud",
+        "lm-studio",
+        "lm-studio-remote",
+        "vllm",
+        "openai-compatible",
+        "openrouter",
+        "huggingface",
+        "openai",
+        "gemini",
+        "anthropic",
+        "chatgpt-codex",
+    }
+)
+
+
+@dataclass(frozen=True)
+class ResolvedProviderConfig:
+    """What a profile resolves to once every gate and credential check passes.
+
+    Returned by :meth:`ModelProviderFactory.resolve`, which is the whole of
+    ``create`` except the part that opens a connection. It carries the decision,
+    not the transport: the normalized provider alias, the model name that goes on
+    the wire, the endpoint and the policy verdict on it, and the request headers
+    including the resolved credential.
+    """
+
+    provider: str
+    served_model: str
+    endpoint: str
+    endpoint_kind: str
+    headers: dict[str, str]
+
+
 @dataclass(frozen=True)
 class ProviderRuntimePolicy:
     allow_policy_gated_provider: bool = False
@@ -92,35 +135,32 @@ class ModelProviderFactory:
                 return configured
         return str(raw.get("endpoint") or raw.get("base_url") or "").strip()
 
-    def create(self, profile: ModelProfile, *, require_model: bool = True) -> Any:
+    def resolve(
+        self, profile: ModelProfile, *, require_model: bool = True
+    ) -> ResolvedProviderConfig:
+        """Decide everything :meth:`create` needs, and build nothing.
+
+        Every check a profile has to pass before it may run lives here: the
+        provider alias, the policy gates, a concrete model name, a configured
+        endpoint, the endpoint policy and egress decision, the provider-specific
+        requirements, and the credential. What it returns is the resolved
+        configuration — no client, no socket, no process.
+
+        GCR-01/GCR-02: five call sites only ever wanted this answer. Selecting a
+        model, launching one, saving a connection, `/model use`, and Test all
+        asked "would this profile run?" by constructing a live provider and
+        throwing it away. Two of them built the provider without the owner's
+        saved connection, so they answered about a different endpoint than the
+        turn would use; four of them left the provider's own `httpx.AsyncClient`
+        open. :meth:`validate` is that question asked directly.
+        """
         provider = profile.provider.replace("_", "-").lower()
         raw = profile.raw
         # Raiker ships no built-in test/mock model provider. Any profile that
         # still claims to be one is rejected fail-closed rather than served.
         if provider in {"mock", "test"} or bool(raw.get("test_only")):
             raise ProviderPolicyError("test_provider_not_available")
-        aliases = {
-            "llama-cpp",
-            "llama.cpp",
-            "llama-cpp-server",
-            "mlx",
-            "ollama",
-            "ollama-cloud",
-            "lm-studio",
-            "lm-studio-remote",
-            "vllm",
-            "openai-compatible",
-            "openrouter",
-            "huggingface",
-            # Hosted providers: OpenAI, Gemini, Ollama Cloud and Hugging Face
-            # speak the OpenAI-compatible protocol; Anthropic uses its native
-            # Messages API adapter.
-            "openai",
-            "gemini",
-            "anthropic",
-            "chatgpt-codex",
-        }
-        if provider not in aliases:
+        if provider not in _PROVIDER_ALIASES:
             raise ProviderConfigurationError(f"unknown_provider:{profile.provider}")
         state = str(raw.get("default_state", ""))
         if state == "enabled_for_tests_only":
@@ -204,13 +244,6 @@ class ModelProviderFactory:
             and provider != "chatgpt-codex"
         ):
             raise ProviderConfigurationError("hosted_api_key_missing")
-        if provider == "chatgpt-codex":
-            return AsyncCodexAppServerProvider(
-                profile_id=profile.profile_id,
-                model=str(raw.get("served_model_name", profile.model)),
-                capabilities=capabilities_from_profile(profile),
-                on_limit_windows=self.limit_window_sink,
-            )
         if provider == "anthropic":
             if api_key:
                 headers["x-api-key"] = api_key
@@ -227,10 +260,44 @@ class ModelProviderFactory:
                     # longer passes the shape check is a misconfiguration, and
                     # the owner repairs it where they entered it.
                     raise ProviderConfigurationError(str(exc)) from exc
+        elif provider != "chatgpt-codex":
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+            raw_extra = raw.get("extra_headers")
+            extra: dict[Any, Any] = raw_extra if isinstance(raw_extra, dict) else {}
+            for key, value in extra.items():
+                if isinstance(key, str) and isinstance(value, str):
+                    headers[key] = value
+        return ResolvedProviderConfig(
+            provider=provider,
+            served_model=str(raw.get("served_model_name", profile.model)),
+            endpoint=endpoint,
+            endpoint_kind=endpoint_kind,
+            headers=headers,
+        )
+
+    def validate(self, profile: ModelProfile, *, require_model: bool = True) -> None:
+        """Raise if this profile would not run, and open nothing if it would."""
+        self.resolve(profile, require_model=require_model)
+
+    def create(self, profile: ModelProfile, *, require_model: bool = True) -> Any:
+        resolved = self.resolve(profile, require_model=require_model)
+        provider = resolved.provider
+        raw = profile.raw
+        headers = resolved.headers
+        endpoint = resolved.endpoint
+        if provider == "chatgpt-codex":
+            return AsyncCodexAppServerProvider(
+                profile_id=profile.profile_id,
+                model=resolved.served_model,
+                capabilities=capabilities_from_profile(profile),
+                on_limit_windows=self.limit_window_sink,
+            )
+        if provider == "anthropic":
             return AsyncAnthropicMessagesProvider(
                 profile_id=profile.profile_id,
                 provider=profile.provider,
-                model=str(raw.get("served_model_name", profile.model)),
+                model=resolved.served_model,
                 endpoint=endpoint,
                 capabilities=capabilities_from_profile(profile),
                 timeout=float(raw.get("timeout_seconds", 120.0)),
@@ -240,17 +307,10 @@ class ModelProviderFactory:
                 extra_headers=headers,
                 client=self.client,
             )
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-        raw_extra = raw.get("extra_headers")
-        extra: dict[Any, Any] = raw_extra if isinstance(raw_extra, dict) else {}
-        for key, value in extra.items():
-            if isinstance(key, str) and isinstance(value, str):
-                headers[key] = value
         return AsyncOpenAICompatibleProvider(
             profile_id=profile.profile_id,
             provider=profile.provider,
-            model=str(raw.get("served_model_name", profile.model)),
+            model=resolved.served_model,
             endpoint=endpoint,
             capabilities=capabilities_from_profile(profile),
             timeout=float(raw.get("timeout_seconds", 120.0)),

@@ -24,6 +24,16 @@ export interface ProviderErrorGuidance {
 }
 
 const GUIDANCE: Record<string, Omit<ProviderErrorGuidance, "code">> = {
+  // GCR-46 — the one code in this table that is not about a provider at all.
+  // The owner's chosen model is stored and could not be read back, so every
+  // other message here would be a lie about a model nothing has judged. It is
+  // included because the readiness refusal it produces arrives on the same
+  // surface as the rest, and arriving there with no guidance is what made a
+  // storage failure look like a model the owner had failed to set up.
+  configured_model_store_unavailable: {
+    message: "Raiker could not read which model you chose.",
+    fix: "This is a storage failure in this workspace, not a problem with the model or your key. Your choice is still saved. Check the workspace database is readable, then try again.",
+  },
   provider_requires_explicit_policy_approval: {
     message: "This provider stays off until you open its runtime gate.",
     fix: "Open Permissions, find “Hosted models” (or “Home-lab models” for a private-network endpoint), expand it and choose Turn on. It asks for a reason, a confirmation token — any phrase you type, it records your intent — and a threat-model acknowledgement.",

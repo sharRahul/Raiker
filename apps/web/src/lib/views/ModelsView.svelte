@@ -856,6 +856,40 @@
     }
   }
 
+  /**
+   * What this gate does, rather than what its row says.
+   *
+   * Connecting a provider *is* consent to use it — `provider_runtime_policy_from_gates`
+   * treats a saved connection as the third and lowest-authority route to an open
+   * gate, which is what removes the "configure a provider, then separately
+   * discover you must also flip a switch" trap. So an owner with Anthropic
+   * connected has hosted models running while the gate row is still unset, and
+   * this panel printed **Off** directly above the connected card that had just
+   * answered.
+   *
+   * It is wrong in the other direction too, and worse. On an instance with
+   * nothing connected the row resolves to `enabled_runtime` from the shipped
+   * default table while the enforcing path refuses every hosted provider, so the
+   * panel read **On** above providers that would answer
+   * `hosted_provider_requires_explicit_policy` at the first turn.
+   *
+   * That is FIXED-322's defect on a second surface, and this is its fix, in the
+   * same shape: the stored state is reported unchanged and the enforcing answer
+   * decides the word. An explicit revocation still outranks a connection, so a
+   * gate the owner turned off reads **Off** whatever is connected — which is the
+   * case that must never be softened.
+   */
+  function gateLabel(state: string, enforced: boolean | undefined): string {
+    if (enforced === undefined) return gateStateLabel(state);
+    const stored = gateStateLabel(state);
+    if (enforced) return stored === "Off" ? "On (by connection)" : stored;
+    // The enforcing path refuses, and this is the more dangerous half: an owner
+    // reading "On" here connects nothing, sends a turn, and meets
+    // `hosted_provider_requires_explicit_policy`. The label names both the
+    // answer and the thing that changes it.
+    return stored === "Off" ? "Off" : "Off until connected";
+  }
+
   function sectionFor(profile: ModelProfile): "Local" | "Hosted" | "Advanced" {
     if (
       profile.provider === "openrouter" ||
@@ -1238,11 +1272,16 @@
         <dl class="gates" aria-label="Off-machine provider posture">
           <div>
             <dt>Hosted model gate</dt>
-            <dd>{gateStateLabel(models.hosted_model_gate_state)}</dd>
+            <dd>{gateLabel(models.hosted_model_gate_state, models.hosted_model_gate_enforced)}</dd>
           </div>
           <div>
             <dt>Private-network gate</dt>
-            <dd>{gateStateLabel(models.private_network_model_gate_state)}</dd>
+            <dd>
+              {gateLabel(
+                models.private_network_model_gate_state,
+                models.private_network_model_gate_enforced,
+              )}
+            </dd>
           </div>
           <div>
             <dt>Egress allowlist</dt>

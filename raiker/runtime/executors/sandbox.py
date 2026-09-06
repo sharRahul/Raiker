@@ -21,7 +21,12 @@ class SandboxError(Exception):
     pass
 
 
-def check_command_allowlist(command: Sequence[str], allowlist: frozenset[str]) -> None:
+def check_command_allowlist(
+    command: Sequence[str],
+    allowlist: frozenset[str],
+    *,
+    workspace_root: str | Path | None,
+) -> None:
     """The full command policy, raised as a :class:`SandboxError`.
 
     RAIKER-2023: this used to be a one-line check on the binary's basename, which
@@ -31,32 +36,25 @@ def check_command_allowlist(command: Sequence[str], allowlist: frozenset[str]) -
     whole argv — including any string that will itself be read as shell source —
     and refuses chaining, pipes, redirection, substitution, expansion, globbing,
     interpreters, per-binary escape flags, and any path outside the workspace.
+
+    *workspace_root* is the directory this command may touch, and it is the
+    caller's to state. GCR-06: it used to be a module global that
+    :func:`run_command` assigned immediately before calling this, and that the
+    tool broker never assigned at all. Two commands running at once — two
+    mounted instances, or one instance with a background run in flight —
+    validated against whichever root was written last, so a path could be
+    accepted for being inside a workspace that was not the one it would run in.
+    ``None`` still means the process working directory, which is what a caller
+    with no workspace of its own has always been held to; it is now a stated
+    choice rather than a leftover.
     """
     from raiker.runtime.command_policy import CommandRejected, validate_command
 
+    root = Path(workspace_root).resolve() if workspace_root else Path.cwd().resolve()
     try:
-        validate_command(command, workspace_root=_command_workspace(), allowlist=allowlist)
+        validate_command(command, workspace_root=root, allowlist=allowlist)
     except CommandRejected as exc:
         raise SandboxError(exc.reason_code) from None
-
-
-_COMMAND_WORKSPACE: Path | None = None
-
-
-def set_command_workspace(root: str | Path | None) -> None:
-    """Name the directory a governed command may touch.
-
-    Set by the executors, which know the workspace; kept here because
-    ``check_command_allowlist`` is reached through call sites that do not carry
-    it. Unset, containment falls back to the process working directory, which is
-    the workspace for every path Raiker actually launches commands from.
-    """
-    global _COMMAND_WORKSPACE
-    _COMMAND_WORKSPACE = Path(root).resolve() if root else None
-
-
-def _command_workspace() -> Path:
-    return _COMMAND_WORKSPACE or Path.cwd().resolve()
 
 
 def run_command(
@@ -70,8 +68,7 @@ def run_command(
     stdin_text: str | None = None,
 ) -> dict[str, Any]:
     if allowlist is not None:
-        set_command_workspace(cwd)
-        check_command_allowlist(command, allowlist)
+        check_command_allowlist(command, allowlist, workspace_root=cwd)
     # A child gets a constructed environment, never the host's. Inheriting it
     # would hand every command every credential the host holds — including the
     # git token this runtime lends for exactly one command at a time.

@@ -39,8 +39,8 @@ Raiker has unusually strong explanatory comments, extensive tests, explicit fail
 
 The largest issues found in this first generic pass are:
 
-1. multiple `ModelRouter` code paths construct providers differently, causing configuration inconsistency and leaked clients;
-2. multi-instance execution shares module-global command workspace state;
+1. multiple `ModelRouter` code paths construct providers differently, causing configuration inconsistency and leaked clients — **closed 2026-09-06 ([FIXED-430](FIXED_ITEMS.md#fixed-430--five-surfaces-asked-would-this-model-run-by-building-one-and-dropping-it))**;
+2. multi-instance execution shares module-global command workspace state — **closed 2026-09-06 ([FIXED-432](FIXED_ITEMS.md#fixed-432--two-commands-running-at-once-could-be-judged-against-each-others-workspace))**;
 3. mounted Raiker instances are built as FastAPI sub-applications with their own lifespan workers, but mounted sub-app lifespans do not run under FastAPI;
 4. instance creation is non-transactional and mutates the live route table from a synchronous worker thread;
 5. `SQLiteStore` performs bootstrap/migration work in every constructor while hot request paths repeatedly construct stores;
@@ -53,12 +53,12 @@ The third pass adds more urgent correctness issues; see the companion document a
 
 | ID | Severity | Priority | Finding |
 |---|---|---:|---|
-| GCR-01 | High | P1 | `ModelRouter.launch()` ignores the configured connection resolver |
-| GCR-02 | High | P1 | `ModelRouter.select_profile()` and `launch()` can leak provider HTTP clients |
-| GCR-03 | Medium/High | P1 | `ModelRouter.set_reasoning()` validates against the first registry profile rather than the active/default runtime profile |
-| GCR-04 | Medium | P2 | `ModelRouter.generate()` accepts `context` but ignores it |
+| GCR-01 | High | P1 | `ModelRouter.launch()` ignores the configured connection resolver — **Closed 2026-09-06 ([FIXED-430](FIXED_ITEMS.md#fixed-430--five-surfaces-asked-would-this-model-run-by-building-one-and-dropping-it))** |
+| GCR-02 | High | P1 | `ModelRouter.select_profile()` and `launch()` can leak provider HTTP clients — **Closed 2026-09-06 ([FIXED-430](FIXED_ITEMS.md#fixed-430--five-surfaces-asked-would-this-model-run-by-building-one-and-dropping-it))** |
+| GCR-03 | Medium/High | P1 | `ModelRouter.set_reasoning()` validates against the first registry profile rather than the active/default runtime profile — **Closed 2026-09-06 ([FIXED-431](FIXED_ITEMS.md#fixed-431--a-reasoning-setting-judged-against-whichever-profile-was-first-in-the-file))** |
+| GCR-04 | Medium | P2 | `ModelRouter.generate()` accepts `context` but ignores it — **Closed 2026-09-06 ([FIXED-434](FIXED_ITEMS.md#fixed-434--two-public-parameters-that-changed-nothing))** |
 | GCR-05 | Medium | P1 | `run_coro()` blocks an already-running event loop and creates a thread pool per call |
-| GCR-06 | High | P0/P1 | Module-global command workspace creates a cross-instance/concurrency race |
+| GCR-06 | High | P0/P1 | Module-global command workspace creates a cross-instance/concurrency race — **Closed 2026-09-06 ([FIXED-432](FIXED_ITEMS.md#fixed-432--two-commands-running-at-once-could-be-judged-against-each-others-workspace))** |
 | GCR-07 | High | P1 | Mounted Raiker instances do not receive their own FastAPI lifespan workers |
 | GCR-08 | High | P1 | Instance creation can leave a partially created/mounted instance when account registration fails |
 | GCR-09 | High | P1 | Instance registry/routing mutation is non-atomic and performed from a sync route worker thread |
@@ -70,7 +70,7 @@ The third pass adds more urgent correctness issues; see the companion document a
 | GCR-15 | Medium | P2 | Frontend CI does not run for backend/API contract-only changes |
 | GCR-16 | Low/Medium | P2 | Version metadata is split between hard-coded `0.0.0`, FastAPI `0.1.0`, and release input versions |
 | GCR-17 | Low | P3 | Model registry lookup normalization differs between `resolve`, `profiles_for_provider`, and `find` |
-| GCR-18 | Low | P3 | Public method parameters exist that are unused (`health_timeout`, `context`) and weaken API clarity |
+| GCR-18 | Low | P3 | Public method parameters exist that are unused (`health_timeout`, `context`) and weaken API clarity — **Closed 2026-09-06 ([FIXED-434](FIXED_ITEMS.md#fixed-434--two-public-parameters-that-changed-nothing))** |
 
 ---
 
@@ -79,6 +79,8 @@ The third pass adds more urgent correctness issues; see the companion document a
 ## GCR-01 — `ModelRouter.launch()` ignores saved connection configuration
 
 **Severity: High — Priority: P1 — Confidence: High**
+
+**Status: Closed 2026-09-06 — [FIXED-430](FIXED_ITEMS.md#fixed-430--five-surfaces-asked-would-this-model-run-by-building-one-and-dropping-it).** The recommendation's second option was taken: `ModelProviderFactory.resolve()` decides everything `create()` decides and builds nothing, `validate()` is that call with the result discarded, and all five validation-only call sites use it through the owner's connection.
 
 ### Evidence
 
@@ -106,6 +108,8 @@ Route all provider construction/validation through one helper. If launch only va
 
 **Severity: High — Priority: P1 — Confidence: High**
 
+**Status: Closed 2026-09-06 — [FIXED-430](FIXED_ITEMS.md#fixed-430--five-surfaces-asked-would-this-model-run-by-building-one-and-dropping-it).** No transport is constructed for configuration validation at all, which is the first of the two options offered.
+
 `select_profile()` calls `self._factory(profile).create(profile)` only to validate it and discards the returned provider. `launch()` similarly constructs a provider and does not close it.
 
 OpenAI-compatible and Anthropic providers create an owned `httpx.AsyncClient` in `__post_init__` when no client is supplied. Their normal async execution methods close that client in `finally`, but these validation paths do not.
@@ -119,6 +123,8 @@ Repeated model selection/launch validation can therefore create unclosed async c
 ## GCR-03 — Reasoning settings can be validated against the wrong model profile
 
 **Severity: Medium/High — Priority: P1 — Confidence: High**
+
+**Status: Closed 2026-09-06 — [FIXED-431](FIXED_ITEMS.md#fixed-431--a-reasoning-setting-judged-against-whichever-profile-was-first-in-the-file).** Both halves: `set_reasoning` takes an optional `profile_id` and otherwise resolves through `reasoning_profile()` (active selection, else the native default — never `list_profiles()[0]`), and the gateway sets `active_profile_id` from the same persisted selection it binds the turn to.
 
 `ModelRouter.set_reasoning()` resolves the profile as:
 
@@ -139,6 +145,8 @@ Therefore an owner using a different selected/default model can have reasoning c
 ## GCR-04 — `generate(..., context=...)` ignores `context`
 
 **Severity: Medium — Priority: P2 — Confidence: High**
+
+**Status: Closed 2026-09-06 — [FIXED-434](FIXED_ITEMS.md#fixed-434--two-public-parameters-that-changed-nothing).** Removed rather than defined: no caller in the repository passed one.
 
 `ModelRouter.generate(provider, model, prompt, context=None)` accepts a context parameter but simply calls:
 
@@ -169,6 +177,8 @@ The coroutine no longer conflicts with the active event loop, but the caller's e
 ## GCR-06 — Command validation uses process-global workspace state
 
 **Severity: High — Priority: P0/P1 — Confidence: High**
+
+**Status: Closed 2026-09-06 — [FIXED-432](FIXED_ITEMS.md#fixed-432--two-commands-running-at-once-could-be-judged-against-each-others-workspace).** Exactly as recommended: the global is deleted and `workspace_root` is a required keyword on `check_command_allowlist`, passed by both callers. The tool broker, which never set the global at all, now passes the root its run will execute under.
 
 `raiker/runtime/executors/sandbox.py` stores command-policy workspace state in module global `_COMMAND_WORKSPACE`. `run_command()` calls `set_command_workspace(cwd)` immediately before `check_command_allowlist()`, while the validator later reads `_command_workspace()`.
 

@@ -158,6 +158,32 @@ describe("visual rubric", () => {
     }
   });
 
+  it("keeps Chat's composer simpler than Build's", () => {
+    // VIS-11. The two share design primitives and must not share density:
+    // Chat is a conversation, Build is a workbench. The gap is not decoration -
+    // it is what tells a first-time owner which of the two they are in.
+    //
+    // Counted from the composer's own left cluster, which is where a surface
+    // puts the controls that govern the turn.
+    const TURN_CONTROLS = ["<ModelPicker", "<PostureControl", "<ComposerAttach", "<BuildModePicker", "<select"];
+
+    const controls = (view: string) => {
+      const text = readFileSync(resolve(VIEWS, view), "utf8");
+      const from = text.indexOf("snippet left()");
+      expect(from, view + " has no composer left cluster").toBeGreaterThan(-1);
+      const cluster = text.slice(from, text.indexOf("{/snippet}", from));
+      return TURN_CONTROLS.reduce(
+        (total, control) => total + cluster.split(control).length - 1,
+        0,
+      );
+    };
+
+    const chat = controls("ChatView.svelte");
+    const build = controls("BuildView.svelte");
+    expect(chat).toBeGreaterThan(0);
+    expect(build).toBeGreaterThan(chat);
+  });
+
   it("does not send the owner to a file the product no longer reads", () => {
     // FIXED-436 removed working-directory config resolution, which turned the
     // Models empty state into an instruction to edit a file that has no effect.

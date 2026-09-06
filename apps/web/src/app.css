@@ -228,6 +228,9 @@
   --raised: #FFFFFF;
   --border: #E2E8F0;
   --border-strong: #CBD5E1;
+  /* Light has almost no luminance to spend — a white card on a near-white
+     ground — so the outline stays and is the only separator. */
+  --card-edge: var(--border);
 
   --text-1: #0F172A;
   --palette-secondary: #475569;
@@ -308,6 +311,11 @@
   --raised: #171C26;
   --border: #1F242F;
   --border-strong: #303847;
+  /* VIS-21 — dark separates a card from the ground by luminance: the ground
+     is #0B0D10 and the card #12161F. An outline on top of that step is a
+     second edge doing a job the step already did, and it is what made a page
+     of cards read as a grid of boxes rather than as raised paper. */
+  --card-edge: transparent;
 
   --text-1: #E2E8F0;
   --palette-secondary: #64748B;
@@ -370,6 +378,7 @@
     --raised: #171C26;
     --border: #1F242F;
     --border-strong: #303847;
+    --card-edge: transparent;
 
     --text-1: #E2E8F0;
     --palette-secondary: #64748B;
@@ -778,9 +787,16 @@ code,
   z-index: 1;
 }
 
+/* VIS-21 — a card is separated from the ground by one device, not two.
+   `--card-edge` is that device, and each theme picks the one it can afford:
+   light has almost no luminance to spend (white card on a near-white ground)
+   so it keeps the outline; dark already climbs 0B0D10 → 12161F → 171C26, and
+   an outline on top of that step was a fourth edge doing a job the step had
+   already done. Set per theme below, so neither theme can drift from the
+   other without the other moving too. */
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-edge, var(--border));
   border-radius: var(--r-md);
   padding: var(--card-pad-y) var(--card-pad-x);
   box-shadow: var(--shadow-1);

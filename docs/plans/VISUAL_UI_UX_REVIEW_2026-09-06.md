@@ -314,6 +314,8 @@ Panels should collapse intelligently. When a diff, generated file, terminal or p
 
 **Priority: P1 — Impact: High**
 
+**Status: Done 2026-09-06.** Reached by VIS-03 and VIS-08 rather than by a change of its own: Chat lost the route title and hint, and both surfaces traded two permanent configuration controls for one posture chip. Build kept its repository picker, its mode picker and now a terminal toggle. The gap is a rubric rule rather than an impression — Chat's composer must carry fewer turn-governing controls than Build's, counted from the composer's own left cluster.
+
 Chat and Build can share design primitives without sharing density.
 
 ### Recommendation
@@ -520,6 +522,10 @@ These should be typed Raiker UI components, not arbitrary provider HTML.
 
 **Priority: P2 — Impact: Medium**
 
+**Status: Done 2026-09-06 — no change needed, and that is the finding's answer rather than a dismissal.** Every infinite animation in the product is a progress indicator: the skeleton loader, the streaming pulse in Chat and Build, the reasoning and tool-activity pulses, the dictation dot, the sign-in spinner. Each one is a state change that has not finished yet, which is exactly what the finding says motion is for. The global `prefers-reduced-motion` guard collapses all of them with `!important` on `*`, so none needs to opt in.
+
+The one genuinely ambient case is the Work-in-action illustration — a glowing lamp, a flickering screen, an idling character. It is decoration, it is disclosed as decoration on the page itself (*"Idle character movement is visual-only; it does not mean the agent is working"*), and whether Raiker wants an illustrative scene at all is a product decision rather than a visual defect.
+
 The design system already defines thoughtful motion tokens and reduced-motion behavior.
 
 ### Recommendation
@@ -540,6 +546,8 @@ Avoid ambient dashboard animation.
 ## VIS-21 — Refine dark/light through depth, not more colours
 
 **Priority: P2 — Impact: Medium**
+
+**Status: Done 2026-09-06.** A card is separated from the ground by one device, and each theme spends the one it can afford. Dark already climbs `#0B0D10` → `#12161F` → `#171C26`, so the outline on top of that step was a second edge doing a job the luminance had already done — it is what made Permissions read as a grid of boxes rather than as raised paper. Light has almost no luminance to spend, a white card on a near-white ground, so it keeps the outline. `--card-edge` is set per theme beside the other tokens, so neither theme can drift from the other without the other moving.
 
 Dark can remain flagship while light stays first-class.
 

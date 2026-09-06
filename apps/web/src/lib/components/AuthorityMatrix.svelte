@@ -101,7 +101,9 @@
   table { width:100%; border-collapse:collapse; font-size:var(--text-xs); }
   th, td { padding:.58rem var(--space-4); text-align:left; border-bottom:1px solid var(--border); }
   tbody tr:last-child th, tbody tr:last-child td { border-bottom:0; }
-  thead th { color:var(--text-2); font-size:var(--text-2xs); letter-spacing:.06em; text-transform:uppercase; }
+  /* VIS-06 — a column heading, same as the shared `.table th`. This table is
+     not built on `.table`, so it carried its own copy of the old styling. */
+  thead th { color:var(--text-2); font-size:var(--text-xs); font-weight:650; }
   tbody th { font-weight:600; }
   code { color:var(--text-2); font-family:var(--font-mono); font-size:var(--text-2xs); }
   .authority-state { font-weight:700; color:var(--ok); }
@@ -119,7 +121,7 @@
     .matrix-cards li:last-child { border-bottom:0; }
     .matrix-cards dl { display:grid; grid-template-columns:auto minmax(0,1fr); gap:.15rem var(--space-3); margin:0; }
     .matrix-cards dl > div { display:contents; }
-    .matrix-cards dt { color:var(--text-2); font-size:var(--text-2xs); letter-spacing:.06em; text-transform:uppercase; align-self:baseline; }
+    .matrix-cards dt { color:var(--text-2); font-size:var(--text-2xs); letter-spacing:.05em; text-transform:uppercase; align-self:baseline; }
     .matrix-cards dd { margin:0; font-size:var(--text-sm); }
   }
 </style>

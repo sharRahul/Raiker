@@ -548,7 +548,7 @@
   .actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }
   .meta { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: var(--space-3) 0 0; }
   .meta div { display: flex; flex-direction: column; gap: 0.15rem; }
-  .meta dt { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); }
+  .meta dt { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3); }
   .meta dd { margin: 0; font-size: var(--text-sm); color: var(--text-2); }
   .meta code { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-1); background: var(--sunken); padding: 0.1rem 0.4rem; border-radius: 4px; }
   .tools { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }

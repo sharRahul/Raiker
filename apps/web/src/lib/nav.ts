@@ -11,13 +11,13 @@ export const NAV_GROUPS: NavGroup[] = [
   { id: "core", label: "Work", collapsible: false, items: [
     // VIS-13 — "Workbench" was a name for a page whose job is to be the place
     // you land. "Home" is what it is, and it costs the owner no vocabulary.
-    { id: "home", label: "Home", icon: "spark", hint: "Resume governed work and see what needs attention" },
+    { id: "home", label: "Home", icon: "home", hint: "Resume governed work and see what needs attention" },
     { id: "new-chat", label: "Chat", icon: "chat", hint: "Start or continue a governed conversation" },
     { id: "build", label: "Build", icon: "code", hint: "Code against a repository with Plan, Edit, and Auto" },
     // Design sits with Chat and Build because it is the same kind of thing: you
     // describe what you want and a model answers. It was last in the group, next
     // to Messaging, which put a making surface among the plumbing.
-    { id: "design", label: "Design", icon: "spark", hint: "Describe an image and generate it" },
+    { id: "design", label: "Design", icon: "design", hint: "Create and edit images with a connected model" },
     // C18 — this destination stopped being only a search. With an empty box it
     // is the board of everything the owner has going, chats and routine threads
     // alike; with a query it is the search it always was.
@@ -36,7 +36,7 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   { id: "knowledge", label: "Knowledge", collapsible: true, items: [
     { id: "memory", label: "Memory", icon: "activity", hint: "Approved memories the agent can recall" },
-    { id: "brain", label: "Knowledge Map", icon: "spark", hint: "Governed workspace relationships and sources" },
+    { id: "brain", label: "Knowledge Map", icon: "map", hint: "Governed workspace relationships and sources" },
   ] },
   { id: "manage", label: "Manage", collapsible: true, items: [
     { id: "capabilities", label: "Permissions", icon: "capabilities", hint: "What the agent may do, and how it must ask" },
@@ -85,8 +85,14 @@ export const SIDEBAR_GROUP_IDS: NavGroupId[] = ["core", "knowledge"];
  *   it is a thing that arrives. It is a counted button in the top bar now,
  *   visible from every route, which is strictly more available than a row you
  *   have to be looking at the sidebar to notice.
- * * **Design** and **Messaging** — real destinations, reached rarely. They keep
- *   their routes and are listed in the gear's window.
+ * * **Messaging** — a real destination, reached rarely. It keeps its route and
+ *   is listed in the gear's window.
+ *
+ * **VIS2-03 put Design back.** Taking it off the rail was right when Design was
+ * a form over a gallery reached a few times a month. It is a Work mode now —
+ * Chat, Build and Design are the three ways to give Raiker something to do —
+ * and a Work mode whose only discovery path is a window behind a gear reads as
+ * a feature the product is unsure about. Its peers are on the rail; so is it.
  *
  * Nothing is unreachable: `NAV_ITEMS` is still the route registry, the gear's
  * window lists everything this array leaves out, and the command palette finds
@@ -96,12 +102,39 @@ export const SIDEBAR_ITEM_IDS: string[] = [
   "home",
   "new-chat",
   "build",
+  "design",
   "search-chat",
   "tasks",
   "projects",
   "memory",
   "brain",
 ];
+
+/**
+ * The three Work modes, in the order every surface must list them.
+ *
+ * VIS2-03. Chat, Build and Design are peers: you say what you want and Raiker
+ * answers with prose, with a change, or with an image. The top bar's mode
+ * switch drew two of them, which told a new owner that Design was a lesser
+ * kind of thing reached from somewhere else. One array, so the switch, the
+ * rail and the command palette cannot drift into three different answers about
+ * what the product is for.
+ */
+export const WORK_MODES: {
+  id: string;
+  label: string;
+  hash: string;
+  icon: IconName;
+}[] = [
+  { id: "new-chat", label: "Chat", hash: "#/new-chat", icon: "chat" },
+  { id: "build", label: "Build", hash: "#/build", icon: "code" },
+  { id: "design", label: "Design", hash: "#/design", icon: "design" },
+];
+
+/** True when a route is one of the three Work modes. */
+export function isWorkMode(route: string): boolean {
+  return WORK_MODES.some((mode) => mode.id === route);
+}
 
 export const SIDEBAR_GROUPS: NavGroup[] = NAV_GROUPS.filter((g) =>
   SIDEBAR_GROUP_IDS.includes(g.id),

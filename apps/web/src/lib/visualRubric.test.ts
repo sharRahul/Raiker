@@ -44,7 +44,14 @@ describe("visual rubric", () => {
     // VIS-01. The number is a judgement, but "no ceiling at all" is how a rail
     // reaches nine peers one reasonable addition at a time. Anything above this
     // belongs behind the gear or in the palette, both of which reach everything.
-    expect(SIDEBAR_ITEM_IDS.length).toBeLessThanOrEqual(8);
+    //
+    // VIS2-03 raised it by one, for Design and for nothing else. The ceiling is
+    // there to stop a rail growing by convenience; a Work mode is not a
+    // convenience. Chat, Build and Design are the three ways to give Raiker
+    // something to do, and a rail that draws two of them tells a new owner the
+    // third is a lesser kind of thing. The next addition still has to argue for
+    // itself against this line.
+    expect(SIDEBAR_ITEM_IDS.length).toBeLessThanOrEqual(9);
   });
 
   it("still reaches every route from somewhere", () => {
@@ -202,6 +209,63 @@ describe("visual rubric", () => {
     for (const { name, text } of sources(VIEWS)) {
       expect(withoutComments(text), `${name} tells the owner to edit a path Raiker no longer reads`)
         .not.toMatch(/config\/model-profiles\.json/);
+    }
+  });
+
+  it("gives every step of the type scale a size of its own", () => {
+    // VIS2-01. `--text-lg` resolved to exactly `--text-base`, so a view that
+    // reached for "one size up from body" got body text in a heavier weight and
+    // the call site still read as deliberate hierarchy. A named step that
+    // resolves to its neighbour is worse than a missing one, because nothing
+    // about the code says so.
+    const steps = [
+      "--text-2xs", "--text-xs", "--text-sm", "--text-md", "--text-base",
+      "--text-lg", "--text-xl", "--text-2xl", "--text-display",
+    ];
+    const sizes = steps.map((token) => {
+      const found = new RegExp(`${token}: ([\\d.]+)rem`).exec(stylesheet)?.[1];
+      expect(found, `${token} is not declared in rem`).toBeTruthy();
+      return Number(found);
+    });
+    for (let i = 1; i < sizes.length; i += 1) {
+      expect(sizes[i], `${steps[i]} is not larger than ${steps[i - 1]}`)
+        .toBeGreaterThan(sizes[i - 1]);
+    }
+  });
+
+  it("names an elevation for every surface that claims one", () => {
+    // VIS2-17. The command palette asked for `--shadow-3` through a fallback,
+    // which is a token that does not exist wearing the appearance of one that
+    // does: the fallback fires silently and every overlay above a dialog
+    // rendered at dialog depth. A `var()` with a fallback is still a name the
+    // design system has to own.
+    for (const token of ["--shadow-0", "--shadow-1", "--shadow-2", "--shadow-3"]) {
+      expect(stylesheet, `${token} is used by the overlay ladder`).toContain(`${token}:`);
+    }
+  });
+
+  it("spends success colour on what just happened, not on what is merely fine", () => {
+    // VIS2-16. Green as the standing representation of connected / enabled /
+    // verified / ready is on screen constantly, which is the one condition
+    // under which a colour stops carrying information. These are the resting
+    // states that were painted with it; each is plain metadata now, and the
+    // exception beside it keeps its tone precisely because its neighbour does
+    // not have one.
+    const resting: [string, string][] = [
+      ["components/AuthorityMatrix.svelte", ".authority-state"],
+      ["components/ExecutionEnvironmentBadge.svelte", ".dot"],
+      ["components/FileInspector.svelte", ".resolution-badge.verified"],
+      ["views/McpView.svelte", ".status.connected"],
+      ["views/WorkbenchView.svelte", ".notice"],
+    ];
+    for (const [file, selector] of resting) {
+      const text = readFileSync(resolve(process.cwd(), "src", "lib", file), "utf8");
+      const rule = new RegExp(
+        `${selector.replace(/[.]/g, "\\.")}\\s*\\{[^}]*\\}`,
+      ).exec(text)?.[0];
+      expect(rule, `${file} no longer declares ${selector}`).toBeTruthy();
+      expect(rule, `${file} paints the resting ${selector} with success colour`)
+        .not.toMatch(/var\(--ok\)/);
     }
   });
 });

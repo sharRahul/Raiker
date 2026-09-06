@@ -380,7 +380,12 @@
     text-transform: uppercase;
   }
   .resolution-badge { color:var(--text-3); font-size:var(--text-2xs); font-weight:650; }
-  .resolution-badge.verified { color:var(--ok); }
+  /* VIS2-16 — a persistent normal state is neutral. Success colour is spent on
+     something that just happened or on a decision that was just confirmed; used
+     as the standing representation of "connected", "enabled", "verified" or
+     "ready" it is on screen constantly, which is the one condition under which
+     a colour stops carrying information. Exceptions keep their tone. */
+  .resolution-badge.verified { color:var(--text-2); }
   .source-note { margin: 0; font-size: var(--text-sm); }
   .source-excerpt {
     margin: 0;

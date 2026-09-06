@@ -69,21 +69,24 @@ describe("App shell", () => {
     // Grouped nav with every governed surface reachable.
     const nav = screen.getByRole("navigation", { name: /all navigation/i });
     expect(nav).toBeInTheDocument();
-    for (const label of ["Home", "Chat", "Threads", "Tasks", "Projects"]) {
+    for (const label of ["Home", "Chat", "Build", "Design", "Threads", "Tasks", "Projects"]) {
       expect(within(nav).getByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument();
     }
     // Manage, Observe and Support left the rail for the gear's window. They are
     // still routes — `nav.ts` still holds them — but the sidebar no longer
     // carries a standing row for work that happens on a handful of days.
     //
-    // VIS-01 — and neither do Approvals, Design and Messaging. Nine peers in
-    // one group asked the owner to learn nine product nouns before starting.
-    // Approvals is a counted button in the top bar, which is *more* available
-    // than a sidebar row; the other two are reached from the gear or the
-    // palette, and every one of them is still a live route.
+    // VIS-01 — and neither do Approvals and Messaging. Nine peers in one group
+    // asked the owner to learn nine product nouns before starting. Approvals is
+    // a counted button in the top bar, which is *more* available than a sidebar
+    // row; Messaging is reached from the gear or the palette, and both are
+    // still live routes.
+    //
+    // VIS2-03 took Design back out of this list: it is a Work mode, so it is on
+    // the rail and in the top bar's mode switch beside Chat and Build.
     for (const label of [
       "Permissions", "Models", "Extensions", "Observability", "Settings",
-      "Approvals", "Design", "Messaging",
+      "Approvals", "Messaging",
     ]) {
       expect(within(nav).queryByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeNull();
     }
@@ -91,7 +94,7 @@ describe("App shell", () => {
     const pages = await screen.findByRole("dialog", { name: /settings & pages/i });
     for (const label of [
       "Permissions", "Models", "Extensions", "Observability",
-      "Approvals", "Design", "Messaging",
+      "Approvals", "Messaging",
     ]) {
       expect(within(pages).getByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument();
     }

@@ -449,18 +449,20 @@
   .observations li span, .observations li strong, .environment-grid article small.plain { text-transform:none; }
   .observations li span { color:var(--text-2); }
   .observations li strong { font-size:var(--text-2xs); font-weight:650; white-space:nowrap; }
-  .observations li.enforced strong { color:var(--ok); }
+  /* VIS2-16 — an enforced boundary is the normal case and reads as plain
+     fact; the two states that are not normal keep their tone. */
+  .observations li.enforced strong { color:var(--text-1); }
   .observations li.unenforced strong { color:var(--danger); }
   .observations li.indeterminate strong { color:var(--warn); }
   .trust-posture { color:var(--warn) !important; text-transform:none !important; }
-  .trust-posture.verified { color:var(--ok) !important; }
+  .trust-posture.verified { color:var(--text-1) !important; }
   .reprobe { justify-self:start; margin-top:.35rem; }
   /* BUG-194 — the capabilities a boundary really has. Same weight as the
      measured observations above them, because they are the same kind of claim:
      a statement of what was built, not of what was configured. */
   .capabilities { display:grid; gap:.15rem; margin:.35rem 0 0; padding:0; list-style:none; }
   .capabilities li { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:var(--text-xs); text-transform:none; }
-  .capabilities li :global(svg) { flex:none; color:var(--ok); }
+  .capabilities li :global(svg) { flex:none; color:var(--text-3); }
   .egress-status { display:grid; gap:.2rem; margin-top:.45rem; padding:.65rem .75rem; border-left:3px solid var(--warn); background:var(--sunken); }
   .egress-status strong { color:var(--warn); font-size:var(--text-xs); }
   .egress-status span { color:var(--text-1); font-family:var(--font-mono); font-size:var(--text-xs); text-transform:none; overflow-wrap:anywhere; }

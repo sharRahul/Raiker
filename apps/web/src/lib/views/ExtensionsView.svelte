@@ -1040,7 +1040,12 @@
      pill so the row stays one line at every width the list is used at. */
   .fact .mark { margin-right: 0.28rem; font-weight: 700; }
   .empty-row { color: var(--text-3); padding: var(--space-4); }
-  .reason { color: var(--ok); font-weight: 600; margin: 0; }
+  /* VIS2-16 — a persistent normal state is neutral. Success colour is spent on
+     something that just happened or on a decision that was just confirmed; used
+     as the standing representation of "connected", "enabled", "verified" or
+     "ready" it is on screen constantly, which is the one condition under which
+     a colour stops carrying information. Exceptions keep their tone. */
+  .reason { color: var(--text-2); font-weight: 600; margin: 0; }
   .reason.blocked { color: var(--warn); }
   .pending-approval {
     margin: 0;

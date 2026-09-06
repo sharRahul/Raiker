@@ -175,7 +175,6 @@
     >
       <div class="search">
         <Icon name="search" size="md" />
-        <!-- svelte-ignore a11y_autofocus -->
         <input
           type="text"
           bind:this={input}
@@ -235,7 +234,7 @@
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
     background: var(--raised);
-    box-shadow: var(--shadow-3, var(--shadow-2));
+    box-shadow: var(--shadow-3);
     overflow: hidden;
   }
   .search {

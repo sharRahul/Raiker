@@ -78,11 +78,39 @@ describe("Sidebar navigation", () => {
     expect(within(nav).getByRole("link", { name: "Memory" })).toBeInTheDocument();
   });
 
-  it("shows the runtime scope and project license in the footer", () => {
+  // VIS2-02 — the rail carried two lines of standing prose: where the workspace
+  // runs, and which licence the project ships under. Both are facts about the
+  // installation, read once and never again, and both were repeated on every
+  // page of the product. Locality is on the host panel; the licence is in
+  // Settings → Updates with the version and channel it belongs beside.
+  it("carries no licence or runtime prose in its footer", () => {
     render(Sidebar, { current: "new-chat" });
     const nav = screen.getByRole("navigation", { name: "All navigation" });
-    expect(within(nav).getByText("Local & loopback-only")).toBeInTheDocument();
-    expect(within(nav).getByText("Apache License, Version 2.0")).toBeInTheDocument();
+    expect(within(nav).queryByText("Local & loopback-only")).not.toBeInTheDocument();
+    expect(within(nav).queryByText("Apache License, Version 2.0")).not.toBeInTheDocument();
+  });
+
+  // VIS2-03 — Design is a Work mode, so it has a permanent row beside its two
+  // peers rather than being reachable only from the gear's window.
+  it("gives all three Work modes a permanent row", () => {
+    render(Sidebar, { current: "design" });
+    const nav = screen.getByRole("navigation", { name: "All navigation" });
+    for (const label of ["Chat", "Build", "Design"]) {
+      expect(within(nav).getByRole("link", { name: label })).toBeInTheDocument();
+    }
+  });
+
+  // VIS2-08 — at most two cues say which row is current. The gutter bar, the
+  // accent text, the heavier weight and the word "Current" beside the group
+  // name are gone; the tinted row and the filled glyph are what is left, and
+  // they are the two that survive a rail with no labels.
+  it("marks the current row with no more than two cues", () => {
+    render(Sidebar, { current: "build" });
+    const nav = screen.getByRole("navigation", { name: "All navigation" });
+    expect(within(nav).queryByText("Current")).not.toBeInTheDocument();
+    const active = within(nav).getByRole("link", { name: "Build" });
+    expect(active.className).toContain("active");
+    expect(active).toHaveAttribute("aria-current", "page");
   });
 
   it("closes controlled compact navigation with Escape", async () => {

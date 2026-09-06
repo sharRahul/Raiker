@@ -46,6 +46,10 @@
       <div><dt>Installed version</dt><dd>{update.installation.version}</dd></div>
       <div><dt>Channel</dt><dd>{update.channel ? update.channel.channel : "Not configured"}</dd></div>
       {#if update.recovery_points.length}<div><dt>Recovery</dt><dd>{update.recovery_points.map((point) => point.version).join(", ")}</dd></div>{/if}
+      <!-- VIS2-02 — the licence was permanent prose at the foot of the
+           navigation rail. It is a fact about the installation, read once, and
+           this is where the rest of the facts about the installation are. -->
+      <div><dt>Licence</dt><dd>Apache License, Version 2.0</dd></div>
     </dl>
     {#if update.available}
       <p class="description">Version {update.available.version} is ready to install. Its release metadata and bundle are verified before Raiker replaces files.</p>

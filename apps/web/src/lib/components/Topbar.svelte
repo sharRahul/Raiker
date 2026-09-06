@@ -6,6 +6,8 @@
   import Icon from "./Icon.svelte";
   import HostControl from "./HostControl.svelte";
   import StopSwitch from "./StopSwitch.svelte";
+  import { WORK_MODES } from "../nav";
+  import { shortcutLabel, shortcutSpoken } from "../shortcutLabel";
 
   // The top bar carries the shell's own controls only. The project selector
   // moved into Build, where the execution boundary it sets is visible for the
@@ -17,7 +19,7 @@
     onOpenAllPages = () => {}, onOpenPalette = () => {} }: {
     title: string;
     hint: string;
-    /** The active route id, so the Chat/Build mode switch can mark itself. */
+    /** The active route id, so the Work-mode switch can mark itself. */
     current?: string;
     /** Work surfaces hide the route title and hint; see the markup (VIS-03). */
     quietHeader?: boolean;
@@ -124,12 +126,22 @@
   </div>
   <!-- VIS-02 — Raiker's product story is Assistant + Agent, and the shell said
        so only by listing two rows among nine. These are modes, not destinations:
-       one control, always in the same place, showing which one you are in. -->
-  <nav class="modes" aria-label="Mode">
-    <a href="#/new-chat" class="mode" class:active={current === "new-chat"}
-      aria-current={current === "new-chat" ? "page" : undefined}>Chat</a>
-    <a href="#/build" class="mode" class:active={current === "build"}
-      aria-current={current === "build" ? "page" : undefined}>Build</a>
+       one control, always in the same place, showing which one you are in.
+
+       VIS2-03 — and there are three of them. Drawing Chat and Build here while
+       Design lived behind a gear said Design was a different kind of thing; it
+       is not, it is the third way to give Raiker something to do. The list comes
+       from `WORK_MODES` so the rail and this control cannot disagree. -->
+  <nav class="modes" aria-label="Work mode">
+    {#each WORK_MODES as workMode (workMode.id)}
+      <a
+        href={workMode.hash}
+        class="mode"
+        class:active={current === workMode.id}
+        aria-label={workMode.label}
+        aria-current={current === workMode.id ? "page" : undefined}
+      ><Icon name={workMode.icon} size="sm" /><span class="mode-label">{workMode.label}</span></a>
+    {/each}
   </nav>
   <div class="status" role="status" aria-live="polite">
     {#if connecting}<span class="pill">Connecting…</span>{/if}
@@ -138,9 +150,10 @@
     <button
       type="button"
       class="btn btn-ghost palette-button"
-      aria-label="Search and commands"
+      aria-label={`Search and commands (${shortcutSpoken("mod", "K")})`}
       onclick={onOpenPalette}
-    ><Icon name="search" size="md" /><kbd class="palette-key">Ctrl K</kbd></button>
+    ><Icon name="search" size="md" /><kbd class="palette-key" aria-hidden="true"
+      >{shortcutLabel("mod", "K")}</kbd></button>
     <a
       href="#/approvals"
       class="btn btn-ghost approvals-link"
@@ -207,8 +220,11 @@
       aria-haspopup="dialog"
       onclick={(event) => onOpenAllPages(event.currentTarget)}
     ><Icon name="settings" size="md" /></button>
-    <HostControl />
-    <StopSwitch />
+    <span class="cluster-rule" aria-hidden="true"></span>
+    <div class="runtime-cluster">
+      <HostControl />
+      <StopSwitch />
+    </div>
   </div>
 </header>
 
@@ -218,10 +234,14 @@
      document outline is unchanged. */
   .page-id.quiet{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
   .page-title{font-size:var(--text-base);margin:0;line-height:1.2}.page-hint{font-size:var(--text-xs);color:var(--text-3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto}.pill{font-size:var(--text-xs);font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
+  /* VIS2-03 — navigation and attention on one side of the rule, where the
+     workspace runs and how it is stopped on the other. */
+  .cluster-rule{width:1px;height:1.35rem;background:var(--border);margin:0 .1rem;flex-shrink:0}
+  .runtime-cluster{display:flex;align-items:center;gap:.5rem}
   /* VIS-02 — a segmented control, not two links: the pair reads as one choice
      with a current value. Sentence case and no tracking (VIS-06). */
   .modes{display:flex;gap:2px;padding:2px;margin-left:var(--space-3);border:1px solid var(--border);border-radius:var(--r-pill);background:var(--sunken)}
-  .modes .mode{padding:.24rem .85rem;border-radius:var(--r-pill);font-size:var(--text-sm);font-weight:600;color:var(--text-2);text-decoration:none;white-space:nowrap;transition:background var(--motion-fast) var(--ease),color var(--motion-fast) var(--ease)}
+  .modes .mode{display:inline-flex;align-items:center;gap:.3rem;padding:.24rem .7rem;border-radius:var(--r-pill);font-size:var(--text-sm);font-weight:600;color:var(--text-2);text-decoration:none;white-space:nowrap;transition:background var(--motion-fast) var(--ease),color var(--motion-fast) var(--ease)}
   .modes .mode:hover{color:var(--text-1);text-decoration:none}
   .modes .mode.active{background:var(--raised);color:var(--text-1);box-shadow:var(--shadow-1)}
   .palette-button{display:inline-flex;align-items:center;gap:.4rem}
@@ -244,7 +264,15 @@
   .panel li.unread{border-left-color:var(--accent)}
   .panel li span{color:var(--text-2)}
   .panel li time{color:var(--text-3);font-size:var(--text-xs)}
-  @media(max-width:1100px){.palette-key{display:none}}@media(max-width:900px){.page-hint{display:none}}@media(max-width:720px){.topbar{gap:var(--space-2);padding:0 var(--space-3)}.page-title{font-size:var(--text-md)}.status{display:none}.modes{margin-left:var(--space-2)}.modes .mode{padding:.24rem .6rem}}
+  @media(max-width:1100px){.palette-key{display:none}}
+  @media(max-width:900px){.page-hint{display:none}}
+  @media(max-width:720px){
+    .topbar{gap:var(--space-2);padding:0 var(--space-3)}
+    .page-title{font-size:var(--text-md)}
+    .status{display:none}
+    .modes{margin-left:var(--space-2)}
+    .modes .mode{padding:.24rem .6rem}
+  }
   /* Below this the title and the mode switch compete for the same row; the
      title loses, because the mode switch is the only way back to the two
      surfaces the product is for. */
@@ -255,6 +283,11 @@
      it is a keyboard affordance (Ctrl/Cmd+K), there is no keyboard here, and
      everything it reaches is in the drawer and the gear's window. */
   @media(max-width:560px){.palette-button{display:none}}
-  @media(max-width:420px){.modes .mode{padding:.24rem .5rem}.modes{margin-left:var(--space-1)}.controls{gap:.3rem}}
+  @media(max-width:480px){
+    .modes .mode-label{display:none}
+    .modes .mode{padding:.3rem .5rem}
+    .cluster-rule{display:none}
+  }
+  @media(max-width:420px){.modes{margin-left:var(--space-1)}.controls{gap:.3rem}}
   @media(max-width:720px){.navigation-reveal-zone{margin-left:-.5rem}}
 </style>

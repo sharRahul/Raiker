@@ -179,6 +179,12 @@
 
       {#if host}
         <dl class="property-list">
+          <!-- VIS2-02 — where this workspace runs. It was a line of permanent
+               prose at the foot of the navigation rail, which is chrome saying
+               the same thing on every page whether or not it is what the owner
+               came to check. It belongs with the rest of the host's posture. -->
+          <dt>Reachable from</dt>
+          <dd>This machine only — loopback, not the network.</dd>
           {#if host.pid !== null}<dt>Process</dt><dd class="mono">{host.pid}{host.port !== null ? ` · port ${host.port}` : ""}</dd>{/if}
           <dt>Starts on its own</dt>
           <dd>

@@ -65,12 +65,6 @@
   const repeats = (task: TaskView) => REPEATING.includes(task.recurrence ?? "");
 
   const active = $derived((tasks ?? []).filter((task) => isActiveTask(task.status)));
-  // VIS-13 — the rail is called "Needs your attention"; when nothing does, it
-  // should say so once rather than in three tiles reading zero.
-  const nothingNeedsAttention = $derived(
-    (approvals ?? []).length === 0 && runtimeIssues === 0 && active.length === 0,
-  );
-
   /**
    * A cycle is in flight, or parked mid-flight. `queued` is deliberately excluded
    * here and handled below: the scheduler stores an *armed* task as `queued` with
@@ -106,6 +100,14 @@
         : diagnostics.production_ready_local_single_user_runtime
           ? 0
           : 1,
+  );
+
+  // VIS-13 — the rail is called "Needs your attention"; when nothing does, it
+  // should say so once rather than in three tiles reading zero. Declared after
+  // `runtimeIssues` because it reads it: a `$derived` re-runs lazily so the
+  // earlier position worked, and named a binding in its own temporal dead zone.
+  const nothingNeedsAttention = $derived(
+    (approvals ?? []).length === 0 && runtimeIssues === 0 && active.length === 0,
   );
 
   async function load() {
@@ -463,8 +465,12 @@
   .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
   .card-head h3 { margin: 0; }
   .card-head a { font-size: var(--text-sm); }
-  .empty { margin: var(--space-3) 0 0; color: var(--text-3); font-size: var(--text-sm); }
-  .notice { margin: 0; color: var(--ok); font-size: var(--text-sm); font-weight: 650; }
+  /* VIS2-16 — a persistent normal state is neutral. Success colour is spent on
+     something that just happened or on a decision that was just confirmed; used
+     as the standing representation of "connected", "enabled", "verified" or
+     "ready" it is on screen constantly, which is the one condition under which
+     a colour stops carrying information. Exceptions keep their tone. */
+  .notice { margin: 0; color: var(--text-2); font-size: var(--text-sm); font-weight: 650; }
   .rows { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
   /* One row: what it is, what state it is in, and the one control that changes
      it. The three parts hold their own columns wide and stack narrow. */

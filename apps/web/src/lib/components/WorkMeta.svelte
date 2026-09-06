@@ -21,6 +21,7 @@
    */
   import Badge from "./Badge.svelte";
   import { relativeTime } from "../format";
+  import type { BadgeVariant } from "../types";
 
   let {
     project = null,
@@ -33,7 +34,7 @@
   }: {
     project?: string | null;
     state?: string | null;
-    stateVariant?: string;
+    stateVariant?: BadgeVariant;
     activityAt?: string | null;
     activityVerb?: string;
     /** One extra fact this object has and the others do not — turns, sessions. */

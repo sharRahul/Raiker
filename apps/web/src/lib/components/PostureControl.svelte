@@ -11,7 +11,7 @@
    *
    * The posture is one chip now:
    *
-   *     Protected · Local · Ask first
+   *     Local · Asks first
    *
    * and that chip opens the exact same controls, unchanged — the approval-mode
    * control and the environment badge are composed here rather than replaced,
@@ -19,10 +19,23 @@
    * is removed and nothing is one click further away than it was: the chip is a
    * click, and so was opening the approval menu.
    *
-   * The word "Protected" leads because it is the assurance a normal user wants
-   * from a glance. The two facts after it are the ones that change what happens
-   * to *this* turn. Everything below the fold in the popover — the full gate
-   * matrix — stays on Permissions, which is where a matrix belongs.
+   * VIS2-07 — the chip used to open with the constant word "Protected", so a
+   * workspace set to approve everything automatically read
+   *
+   *     Protected · Local · Auto-approve
+   *
+   * in amber. The colour said "this is a relaxed posture" and the first word
+   * said "you are covered", about the same setting, at the same moment. A
+   * standing reassurance is not a state: it is true in every state, so it
+   * cannot be read as a description of this one, and next to a warning tone it
+   * actively misleads.
+   *
+   * The chip now states only what changed and what it does — where work runs,
+   * and what happens when a decision is needed — in the mode's own words. What
+   * *does* still hold in every posture has not been deleted; it moved into the
+   * popover, where it is a sentence naming the specific protections rather than
+   * one adjective standing in for all of them. Everything below that — the full
+   * gate matrix — stays on Permissions, which is where a matrix belongs.
    */
   import { onMount } from "svelte";
   import { api } from "../api";
@@ -75,13 +88,19 @@
     return environment.kind === "container" ? "Sandboxed" : "Local";
   });
 
-  /** The shortest true thing about what happens when a decision is needed. */
+  /**
+   * The shortest true thing about what happens when a decision is needed.
+   *
+   * Written as what Raiker does, not as how safe that is. "Approves
+   * automatically" is a fact the owner can check against what they chose;
+   * "Protected" was a verdict on it.
+   */
   const askSummary = $derived.by(() => {
     if (mode === null) return null;
-    if (mode === "manual") return "Ask first";
-    if (mode === "auto") return "Auto-approve";
-    if (mode === "skip") return "Skip prompts";
-    return "Decline unattended";
+    if (mode === "manual") return "Asks first";
+    if (mode === "auto") return "Approves automatically";
+    if (mode === "skip") return "Raises no approvals";
+    return "Declines unattended";
   });
 
   // VIS-15 — the resting state is neutral. This turns amber only for a posture
@@ -89,9 +108,12 @@
   // something the one time it appears.
   const relaxed = $derived(mode === "auto" || mode === "skip");
 
-  const summary = $derived(
-    ["Protected", whereSummary, askSummary].filter((part) => part !== null).join(" · "),
-  );
+  const summary = $derived.by(() => {
+    const parts = [whereSummary, askSummary].filter((part) => part !== null);
+    // Never an empty chip: a posture that could not be read says so, which is a
+    // different thing from a posture that is fine.
+    return parts.length > 0 ? parts.join(" · ") : "Not readable";
+  });
 
   const modeDetail = $derived(
     APPROVAL_MODES.find((option) => option.mode === mode)?.detail ?? null,
@@ -148,11 +170,17 @@
         </div>
       {/if}
 
+      <!-- VIS2-07 — what holds in *every* posture, named rather than summarised
+           as an adjective on the chip. This is the half of "Protected" that was
+           worth keeping: it says which protections do not depend on the
+           approval mode, so relaxing that mode does not read as switching
+           everything off. -->
       <div class="field">
-        <p class="field-label">Data boundary</p>
+        <p class="field-label">Regardless of this setting</p>
         <p class="field-detail">
-          This Raiker runs on your machine and answers only on loopback. Anything
-          that leaves it is a gated action.
+          This Raiker runs on your machine and answers only on loopback.
+          Capability gates and policy still apply to every action, and every
+          action is still recorded.
         </p>
       </div>
 

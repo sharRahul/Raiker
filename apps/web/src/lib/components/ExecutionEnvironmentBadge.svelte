@@ -26,5 +26,8 @@
 </a>
 
 <style>
-  .environment-badge { display:inline-flex; align-items:center; gap:.38rem; min-height:28px; padding:.25rem .55rem; border:1px solid var(--border); border-radius:var(--r-pill); background:var(--surface); color:var(--text-2); font-size:var(--text-xs); text-decoration:none; white-space:nowrap; } .dot { width:6px; height:6px; border-radius:50%; background:var(--ok); } .unavailable .dot { background:var(--warn); }
+  .environment-badge { display:inline-flex; align-items:center; gap:.38rem; min-height:28px; padding:.25rem .55rem; border:1px solid var(--border); border-radius:var(--r-pill); background:var(--surface); color:var(--text-2); font-size:var(--text-xs); text-decoration:none; white-space:nowrap; } /* VIS2-16 — the healthy dot is neutral. This badge is on screen under every
+     turn, so a green dot there is a green dot the owner sees all day; the
+     amber one only means something because its neighbour does not. */
+  .dot { width:6px; height:6px; border-radius:50%; background:var(--text-3); } .unavailable .dot { background:var(--warn); }
 </style>

@@ -81,6 +81,7 @@
      a softer corner, and the panels that hold a whole object get the largest.
      Nothing here is decorative — the step tells you what kind of thing you are
      looking at. */
+  --r-xs: 4px;
   --r-sm: 8px;
   --r-md: 12px;
   --r-lg: 16px;
@@ -121,16 +122,23 @@
      set in the serif face without looking like a mistake.
 
      The scale is a token set rather than a set of element rules so a view can
-     reach for a step by name instead of inventing 0.83rem. */
+     reach for a step by name instead of inventing 0.83rem.
+
+     VIS2-01 — `--text-lg` resolved to exactly `--text-base`, so the step a view
+     reached for when it wanted "one size up from body" gave it body text in a
+     heavier weight. A named step that resolves to its neighbour is worse than a
+     missing one: the call site reads as deliberate hierarchy and renders as
+     none. The four upper steps moved together so every interval stays visible
+     and `--text-display` gets the room Home and Project identity need. */
   --text-2xs: 0.68rem;
   --text-xs: 0.74rem;
   --text-sm: 0.82rem;
   --text-md: 0.9rem;
   --text-base: 1rem;
-  --text-lg: 1rem;
-  --text-xl: 1.22rem;
-  --text-2xl: 1.49rem;
-  --text-display: 1.82rem;
+  --text-lg: 1.12rem;
+  --text-xl: 1.32rem;
+  --text-2xl: 1.6rem;
+  --text-display: 2rem;
 
   /* Optical tracking. Type set large keeps the spacing it was drawn with, which
      reads loose; display sizes need it pulled in. Body text is left alone. */
@@ -294,6 +302,10 @@
   --shadow-0: 0 1px 1px rgba(27, 28, 30, 0.04);
   --shadow-1: 0 1px 1px rgba(27, 28, 30, 0.04), 0 2px 6px -1px rgba(27, 28, 30, 0.07);
   --shadow-2: 0 2px 4px -1px rgba(27, 28, 30, 0.06), 0 12px 28px -6px rgba(27, 28, 30, 0.16);
+  /* The top of the ladder: a surface that floats over the whole application
+     rather than over a page region — the command palette and full-screen
+     pickers. Nothing below a modal may use it. */
+  --shadow-3: 0 4px 8px -2px rgba(27, 28, 30, 0.08), 0 24px 56px -12px rgba(27, 28, 30, 0.24);
   --overlay: rgba(15, 23, 42, 0.48);
   --focus-ring: #365F7D;
 }
@@ -363,6 +375,7 @@
   --shadow-0: 0 1px 1px rgba(0, 0, 0, 0.5);
   --shadow-1: 0 1px 1px rgba(0, 0, 0, 0.55), 0 2px 6px -1px rgba(0, 0, 0, 0.65);
   --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.6), 0 14px 32px -6px rgba(0, 0, 0, 0.8);
+  --shadow-3: 0 4px 8px -2px rgba(0, 0, 0, 0.65), 0 28px 64px -12px rgba(0, 0, 0, 0.9);
   --overlay: rgba(3, 5, 8, 0.72);
   --focus-ring: #91B4CD;
 }
@@ -426,6 +439,7 @@
     --shadow-0: 0 1px 1px rgba(0, 0, 0, 0.5);
     --shadow-1: 0 1px 1px rgba(0, 0, 0, 0.55), 0 2px 6px -1px rgba(0, 0, 0, 0.65);
     --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.6), 0 14px 32px -6px rgba(0, 0, 0, 0.8);
+  --shadow-3: 0 4px 8px -2px rgba(0, 0, 0, 0.65), 0 28px 64px -12px rgba(0, 0, 0, 0.9);
     --overlay: rgba(3, 5, 8, 0.72);
     --focus-ring: #91B4CD;
   }

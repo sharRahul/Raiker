@@ -33,7 +33,7 @@ describe("posture control", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /Protected · Local · Ask first/i }),
+        screen.getByRole("button", { name: /Local · Asks first/i }),
       ).toBeInTheDocument();
     });
   });
@@ -68,7 +68,7 @@ describe("posture control", () => {
     render(PostureControl, { showEnvironment: false });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Protected · Ask first/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Asks first/i })).toBeInTheDocument();
     });
     expect(screen.queryByText(/Local/)).not.toBeInTheDocument();
   });
@@ -83,8 +83,26 @@ describe("posture control", () => {
 
     render(PostureControl);
 
-    const chip = await screen.findByRole("button", { name: /Auto-approve/i });
+    const chip = await screen.findByRole("button", { name: /Approves automatically/i });
     expect(chip.className).toContain("relaxed");
+    // VIS2-07 — and it does not simultaneously call itself protected. A chip
+    // that reads "Protected · Auto-approve" in amber is telling the owner two
+    // contradictory things about one setting.
+    expect(chip.textContent).not.toMatch(/Protected/i);
+  });
+
+  // VIS2-07 — what does not depend on the approval mode is stated in the
+  // popover, in the specific, so relaxing the mode does not read as switching
+  // every protection off.
+  it("names the protections that hold in every posture", async () => {
+    stubFetch({
+      "GET /api/settings/composer-approval-mode": { approval_mode: "skip" },
+      "GET /api/execution-environments": ENVIRONMENTS,
+    });
+    render(PostureControl);
+    await fireEvent.click(await screen.findByRole("button", { name: /governance posture/i }));
+    expect(screen.getByText("Regardless of this setting")).toBeInTheDocument();
+    expect(screen.getByText(/Capability gates and policy still apply/i)).toBeInTheDocument();
   });
 
   it("stays readable when the approval mode cannot be read", async () => {
@@ -93,7 +111,7 @@ describe("posture control", () => {
 
     // Never a chip that says nothing, and never a crash.
     expect(
-      await screen.findByRole("button", { name: /governance posture: Protected/i }),
+      await screen.findByRole("button", { name: /governance posture: Not readable/i }),
     ).toBeInTheDocument();
   });
 });

@@ -104,7 +104,14 @@ export type IconName =
   // BUG-251 — "go up one folder" in the path picker. Its own glyph rather than a
   // rotated `chevron-right`: a bare chevron beside a path reads as "expand this",
   // and the folder is the half that says which direction is meant.
-  | "folder-up";
+  | "folder-up"
+  // VIS2-09 — three permanent destinations drew the same spark. A rail whose
+  // rows are only told apart by their labels is not an icon set, and the spark
+  // is Raiker's mark for agent action: spending it on "Home" spends the one
+  // glyph that should mean the agent did something.
+  | "home"
+  | "design"
+  | "map";
 
 // Each icon is one or more SVG path `d` strings (stroke, round caps).
 export const ICON_PATHS: Record<IconName, string[]> = {
@@ -289,5 +296,28 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   more: ["M6 12h.01", "M12 12h.01", "M18 12h.01"],
   tool: [
     "M14.8 3.6a5 5 0 0 0-6 6.6l-5.2 5.2a2 2 0 0 0 0 2.8l2.2 2.2a2 2 0 0 0 2.8 0l5.2-5.2a5 5 0 0 0 6.6-6l-3.1 3.1-3-.6-.6-3 3.1-3.1Z",
+  ],
+  // A roof and a doorway. Home is where you land, and every product the owner
+  // already uses draws that as a house.
+  home: [
+    "M3.6 10.8 12 4l8.4 6.8",
+    "M6 9.6V19a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9.6",
+  ],
+  // A framed picture: the object Design works on is an image, and the frame is
+  // the canvas boundary the mode is about. Deliberately not the spark — Design
+  // is a place, not an agent action.
+  design: [
+    "M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z",
+    "M10 10.2a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0Z",
+    "M3.4 16.6 9 12l3.8 3.4 3.2-2.7 4.6 4.3",
+  ],
+  // Three nodes and the edges between them. The Knowledge Map is a graph, and
+  // the glyph says graph rather than "something clever happens here".
+  map: [
+    "M6 5.4a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2Z",
+    "M18 4.4a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2Z",
+    "M12 15.4a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2Z",
+    "M7.7 9.2 10.8 14.4",
+    "M16.5 8.2 13.3 14.4",
   ],
 };

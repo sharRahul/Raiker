@@ -543,7 +543,12 @@
   .name { font-weight: 700; font-size: var(--text-base); }
   .status { display: flex; align-items: center; gap: 0.4rem; color: var(--text-3); font-size: var(--text-xs); font-weight: 600; }
   .status i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  .status.connected { color: var(--ok); }
+  /* VIS2-16 — a persistent normal state is neutral. Success colour is spent on
+     something that just happened or on a decision that was just confirmed; used
+     as the standing representation of "connected", "enabled", "verified" or
+     "ready" it is on screen constantly, which is the one condition under which
+     a colour stops carrying information. Exceptions keep their tone. */
+  .status.connected { color: var(--text-2); }
   .status.danger { color: var(--danger); }
   .actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }
   .meta { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: var(--space-3) 0 0; }

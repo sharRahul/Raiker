@@ -300,7 +300,14 @@ test("minimal composers fit representative iPhone, Android, and tablet viewports
       expect(geometry.sendHeight, `${device} ${route} send height`).toBeGreaterThanOrEqual(44);
 
       if (route === "build") {
-        await expect(page.getByRole("button", { name: "Governed terminal" })).toBeHidden();
+        // VIS2-05 — compact does not mean contextless. The three zone toggles
+        // stay reachable on a phone; what a narrow window drops is their
+        // visible words, not the control. Each keeps its `aria-label`, so the
+        // button is still nameable by voice and readable by a screen reader on
+        // exactly the device that needs it most.
+        const terminal = page.getByRole("button", { name: "Governed terminal" });
+        await expect(terminal).toBeVisible();
+        await expect(terminal.locator(".rail-label")).toBeHidden();
         await expect(page.getByText("Auto follows your Permissions.")).toBeVisible();
       }
     }
@@ -452,12 +459,16 @@ test("new-account Workbench is a board over the work, not a second composer", as
   // composer. What is left is the live answer to "what is Raiker doing".
   await expect(page.getByLabel("What would you like Raiker to do?")).toHaveCount(0);
   await expect(page.getByRole("tablist", { name: "Work mode" })).toHaveCount(0);
+  // VIS-05 — a fresh install used to open on three bordered rectangles saying
+  // "Nothing is running", "No standing agents" and "Nothing is scheduled":
+  // three containers explaining an absence one sentence already states. The
+  // boards appear when they have something in them.
+  await expect(
+    page.getByText("Nothing is running, standing, or scheduled.", { exact: false }),
+  ).toBeVisible();
   for (const group of ["Running now", "Standing agents", "Scheduled runs"]) {
-    await expect(page.getByRole("heading", { name: group })).toBeVisible();
+    await expect(page.getByRole("heading", { name: group })).toHaveCount(0);
   }
-  await expect(page.getByText("Nothing is running.")).toBeVisible();
-  await expect(page.getByText("No agent is standing.")).toBeVisible();
-  await expect(page.getByText("Nothing is scheduled.")).toBeVisible();
 
   // Starting work is a link to the surface that owns a composer, so there is
   // exactly one composer per kind of work.
@@ -481,7 +492,7 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
   await page.setViewportSize({ width: 1920, height: 1080 });
 
   const canonical = [
-    ["workbench", "Workbench", "operational"],
+    ["workbench", "Home", "operational"],
     ["new-chat", "Chat", "work-surface"],
     ["build", "Build", "work-surface"],
     ["search-chat", "Threads", "reading"],

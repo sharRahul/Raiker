@@ -337,24 +337,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .tags {
-    grid-column: 1/-1;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-  }
-  .tag {
-    padding: 0.1rem 0.45rem;
-    border: 1px solid var(--border);
-    border-radius: var(--r-pill);
-    color: var(--text-3);
-    font-size: var(--text-xs);
-  }
-  .tag.warn {
-    border-color: var(--warn-border);
-    background: var(--warn-soft);
-    color: var(--warn);
-  }
   @media (max-width: 42rem) {
     li a {
       grid-template-columns: 1fr;

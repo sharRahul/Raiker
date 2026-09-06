@@ -198,7 +198,12 @@
   .card h3 { margin: 0 0 0.3rem; font-size: var(--text-lg); }
   .lead { color: var(--text-2); font-size: var(--text-sm); margin: 0 0 var(--space-3); }
   .state { font-size: var(--text-sm); color: var(--text-2); margin: 0 0 var(--space-2); }
-  .state.ok { color: var(--ok); }
+  /* VIS2-16 — a persistent normal state is neutral. Success colour is spent on
+     something that just happened or on a decision that was just confirmed; used
+     as the standing representation of "connected", "enabled", "verified" or
+     "ready" it is on screen constantly, which is the one condition under which
+     a colour stops carrying information. Exceptions keep their tone. */
+  .state.ok { color: var(--text-1); }
   .row { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2); align-items: end; }
   .row .field-label { grid-column: 1 / -1; margin: 0; }
   .forget { margin-top: var(--space-3); }

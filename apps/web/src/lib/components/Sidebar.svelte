@@ -69,10 +69,10 @@
 
   <div class="navigation-sections">
     {#each SIDEBAR_GROUPS as group (group.id)}
-      <section class="group" class:contains-active={activeGroup?.id === group.id}>
+      <section class="group">
         {#if group.collapsible}
           <button type="button" class="group-toggle" aria-label={group.label} aria-expanded={isOpen(group)} aria-controls={`navigation-group-${group.id}`} onclick={() => toggleGroup(group)}>
-            <span>{group.label}</span>{#if activeGroup?.id === group.id}<span class="current-summary">Current</span>{/if}<Icon name="chevron-right" size="sm" />
+            <span>{group.label}</span><Icon name="chevron-right" size="sm" />
           </button>
         {:else}<p class="group-label">{group.label}</p>{/if}
         {#if isOpen(group)}
@@ -91,7 +91,6 @@
       </section>
     {/each}
   </div>
-  <div class="scope-notes"><p><Icon name="lock" size="sm" />Local &amp; loopback-only</p><p><Icon name="license" size="sm" />Apache License, Version 2.0</p></div>
 </nav>
 
 <style>
@@ -106,13 +105,9 @@
   .sidebar.desktop-hidden .brand-text,
   .sidebar.desktop-hidden .group-label,
   .sidebar.desktop-hidden .group-toggle,
-  .sidebar.desktop-hidden .scope-notes,
   .sidebar.desktop-hidden .nav-link span { display:none; }
   .sidebar.desktop-hidden .brand { justify-content:center; padding-inline:0; }
   .sidebar.desktop-hidden .nav-link { justify-content:center; padding-inline:0; }
-  /* The group's active bar is positioned into the old padding, which the rail
-     does not have; without this it is clipped by `overflow-x`. */
-  .sidebar.desktop-hidden .group.contains-active::before { inset-inline:auto; left:-.35rem; }
   .drawer-scrim,.drawer-close { display:none; }
   .brand { display:flex; align-items:center; gap:.6rem; padding:.25rem .5rem var(--space-3); text-decoration:none; }
   .brand:hover { text-decoration:none; }
@@ -124,7 +119,6 @@
   .brand-sub { font-size:var(--text-2xs); font-weight:600; letter-spacing:normal; color:var(--text-3); }
   .navigation-sections { display:grid; gap:var(--space-2); }
   .group { position:relative; }
-  .group.contains-active::before { content:""; position:absolute; inset:.2rem auto .2rem -.75rem; width:3px; border-radius:var(--r-pill); background:var(--accent); }
   /* VIS-06 — a navigation group label in caps at 2xs with .09em tracking is
      four typographic devices doing one job. Sentence case at xs, and the colour
      and weight are what separate it from the rows beneath. */
@@ -132,13 +126,16 @@
   .group-toggle { display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:.35rem; border:0; background:transparent; text-align:left; }
   .group-toggle:hover { background:var(--sunken); color:var(--text-1); }
   .group-toggle[aria-expanded="true"] :global(svg) { transform:rotate(90deg); }
-  .current-summary { color:var(--accent); font-size:var(--text-2xs); letter-spacing:.04em; }
   ul { list-style:none; margin:0; padding:0; display:grid; gap:2px; }
   .nav-link { display:flex; align-items:center; gap:.65rem; min-height:2.35rem; padding:.42rem .55rem; border-radius:var(--r-sm); color:var(--text-2); font-size:var(--text-md); font-weight:550; text-decoration:none; transition:background var(--motion-fast) var(--ease),color var(--motion-fast) var(--ease); }
   .nav-link:hover { background:var(--sunken); color:var(--text-1); text-decoration:none; }
-  .nav-link.active { background:var(--accent-soft); color:var(--accent); font-weight:650; }
-  .scope-notes { margin-top:auto; padding-top:var(--space-5); display:grid; gap:.35rem; }
-  .scope-notes p { display:flex; align-items:center; gap:.4rem; margin:0; padding:0 .55rem; color:var(--text-3); font-size:var(--text-2xs); }
+  /* VIS2-08 — the current row carried five cues at once: a group bar in the
+     gutter, a tinted background, accent text, a heavier weight, and the word
+     "Current" beside the group name. Five ways of saying one thing is not
+     emphasis, it is noise, and the row still had to be read to find out which
+     one it was. Two remain, and they are the two that survive a rail with no
+     labels: the tinted row, and the filled glyph. */
+  .nav-link.active { background:var(--accent-soft); color:var(--text-1); }
   @media (max-width:1023px) {
     .drawer-scrim { display:block; position:fixed; inset:0; z-index:90; border:0; background:var(--overlay); }
     .sidebar,.sidebar.desktop-hidden { position:fixed; inset:0 auto 0 0; z-index:100; width:min(19rem,84vw); padding:var(--space-4) var(--space-3); border-right-width:1px; transform:translateX(-105%); box-shadow:var(--shadow-2); }

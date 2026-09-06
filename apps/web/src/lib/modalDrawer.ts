@@ -1,5 +1,12 @@
 export interface ModalDrawerOptions {
-  id: "navigation" | "build-background" | "build-files" | "all-pages";
+  /** Which drawer this is. One union rather than a free string so a second
+   *  caller cannot register under a name the singleton below does not know. */
+  id:
+    | "navigation"
+    | "build-background"
+    | "build-files"
+    | "all-pages"
+    | "command-palette";
   container: HTMLElement;
   returnFocusTo: HTMLElement | null;
   backgroundElements: HTMLElement[];

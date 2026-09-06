@@ -178,6 +178,32 @@ describe("WorkbenchView", () => {
     expect(screen.getByRole("navigation", { name: "Start work" })).toBeInTheDocument();
   });
 
+  it("says nothing needs you, rather than three tiles reading zero", async () => {
+    // VIS-13 — "do not show healthy subsystem status by default". Under a
+    // heading that says *Needs your attention*, three big zeros were the
+    // largest thing on an idle Home: a report that there is nothing to report.
+    stubFetch(routes());
+    render(WorkbenchView);
+
+    const rail = await screen.findByRole("complementary", { name: "Needs your attention" });
+    // The rail exists immediately with a loading state; wait for the answer.
+    expect(await within(rail).findByText(/nothing needs you right now/i)).toBeInTheDocument();
+    expect(within(rail).queryByText("Approvals")).toBeNull();
+    expect(within(rail).queryByText("Runtime issues")).toBeNull();
+    expect(within(rail).queryByText("Active work")).toBeNull();
+  });
+
+  it("brings a tile back the moment its own count is not zero", async () => {
+    stubFetch(routes({ "GET /api/tasks": [RUNNING] }));
+    render(WorkbenchView);
+
+    const rail = await screen.findByRole("complementary", { name: "Needs your attention" });
+    expect(await within(rail).findByText("Active work")).toBeInTheDocument();
+    // The two that are still clear stay quiet.
+    expect(within(rail).queryByText("Approvals")).toBeNull();
+    expect(within(rail).queryByText(/nothing needs you right now/i)).toBeNull();
+  });
+
   it("shows a board as soon as it has something in it", async () => {
     stubFetch(routes({ "GET /api/tasks": [RUNNING] }));
     render(WorkbenchView);

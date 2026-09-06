@@ -65,6 +65,11 @@
   const repeats = (task: TaskView) => REPEATING.includes(task.recurrence ?? "");
 
   const active = $derived((tasks ?? []).filter((task) => isActiveTask(task.status)));
+  // VIS-13 — the rail is called "Needs your attention"; when nothing does, it
+  // should say so once rather than in three tiles reading zero.
+  const nothingNeedsAttention = $derived(
+    (approvals ?? []).length === 0 && runtimeIssues === 0 && active.length === 0,
+  );
 
   /**
    * A cycle is in flight, or parked mid-flight. `queued` is deliberately excluded
@@ -369,7 +374,15 @@
         />
       {:else if approvals === null || tasks === null}
         <PageState state="loading" title="Loading status…" lines={3} />
+      {:else if nothingNeedsAttention}
+        <!-- VIS-13 — "Do not show healthy subsystem status by default." Under a
+             heading that says *Needs your attention*, three tiles reading 0 are
+             a report that there is nothing to report, and they were the largest
+             thing on an idle Home. One line instead, and each tile comes back
+             the moment its own count is not zero. -->
+        <p class="all-clear">Nothing needs you right now.</p>
       {:else}
+        {#if approvals.length > 0}
         <StatTile
           label="Approvals"
           value={approvals.length}
@@ -383,6 +396,8 @@
           href="#/approvals"
           linkLabel="Review approvals"
         />
+        {/if}
+        {#if runtimeIssues > 0}
         <StatTile
           label="Runtime issues"
           value={runtimeIssues}
@@ -394,6 +409,8 @@
           href="#/observe?tab=diagnostics"
           linkLabel="Review issues"
         />
+        {/if}
+        {#if active.length > 0}
         <StatTile
           label="Active work"
           value={active.length}
@@ -404,6 +421,7 @@
           href="#/observe?tab=work"
           linkLabel="Open the live board"
         />
+        {/if}
       {/if}
     </aside>
   </div>
@@ -417,6 +435,7 @@
      so this page cannot drift from the spec. */
   .intro h2 { margin: 0.15rem 0; }
   .lead { color: var(--text-2); max-width: 62ch; margin: 0; }
+  .all-clear { color: var(--text-3); font-size: var(--text-sm); margin: 0; }
   .refresh-state { display: flex; align-items: center; gap: var(--space-3); color: var(--text-3); font-size: var(--text-sm); flex-wrap: wrap; justify-content: flex-end; }
   /* Starting work is a link to the surface that owns the composer, so the board
      never becomes a second send path. */

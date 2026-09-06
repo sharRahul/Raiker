@@ -259,6 +259,7 @@
         title={activeItem.label}
         hint={activeItem.hint}
         {current}
+        quietHeader={pageLayout === "work-surface"}
         navigationOpen={compactNavigation ? navigationDrawerOpen : desktopNavigationOpen}
         {compactNavigation}
         onNavigationToggle={toggleNavigation}

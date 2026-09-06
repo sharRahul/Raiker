@@ -12,13 +12,15 @@
   // whole session; the theme toggle moved into Settings, where a preference
   // belongs. A global selector that silently retargeted every surface was the
   // thing worth removing: nothing about a page told you which project it meant.
-  let { title, hint, current = "", connecting = false,
+  let { title, hint, current = "", quietHeader = false, connecting = false,
     navigationOpen = true, compactNavigation = false, onNavigationToggle = () => {},
     onOpenAllPages = () => {}, onOpenPalette = () => {} }: {
     title: string;
     hint: string;
     /** The active route id, so the Chat/Build mode switch can mark itself. */
     current?: string;
+    /** Work surfaces hide the route title and hint; see the markup (VIS-03). */
+    quietHeader?: boolean;
     connecting?: boolean;
     navigationOpen?: boolean;
     compactNavigation?: boolean;
@@ -111,7 +113,15 @@
       onclick={(event) => onNavigationToggle(event.currentTarget)}
     ><Icon name="panel" size="md" /></button>
   </div>
-  <div class="page-id"><h1 class="page-title">{title}</h1><p class="page-hint">{hint}</p></div>
+  <!-- VIS-03 — on a work surface the mode switch beside this already says
+       where you are, so the title repeated it and the hint explained a route
+       the owner is already inside. Both go, and the transcript gets the room.
+       The heading still exists for screen readers and for the document outline;
+       it is only visually hidden. Operational pages keep their full header. -->
+  <div class="page-id" class:quiet={quietHeader}>
+    <h1 class="page-title">{title}</h1>
+    <p class="page-hint">{hint}</p>
+  </div>
   <!-- VIS-02 — Raiker's product story is Assistant + Agent, and the shell said
        so only by listing two rows among nine. These are modes, not destinations:
        one control, always in the same place, showing which one you are in. -->
@@ -203,7 +213,11 @@
 </header>
 
 <style>
-  .topbar{height:var(--topbar-h);display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-5);border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}.navigation-reveal-zone{width:48px;height:48px;margin-left:-.75rem;display:grid;place-items:center}.navigation-toggle{transition:opacity var(--motion-shell) var(--ease-shell),background var(--motion-fast) var(--ease)}.navigation-reveal-zone[data-navigation-open="false"] .navigation-toggle{opacity:.28}.navigation-reveal-zone:hover .navigation-toggle,.navigation-toggle:focus-visible{opacity:1!important}.page-id{min-width:0}.page-title{font-size:var(--text-base);margin:0;line-height:1.2}.page-hint{font-size:var(--text-xs);color:var(--text-3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto}.pill{font-size:var(--text-xs);font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
+  .topbar{height:var(--topbar-h);display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-5);border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}.navigation-reveal-zone{width:48px;height:48px;margin-left:-.75rem;display:grid;place-items:center}.navigation-toggle{transition:opacity var(--motion-shell) var(--ease-shell),background var(--motion-fast) var(--ease)}.navigation-reveal-zone[data-navigation-open="false"] .navigation-toggle{opacity:.28}.navigation-reveal-zone:hover .navigation-toggle,.navigation-toggle:focus-visible{opacity:1!important}.page-id{min-width:0}
+  /* Visually hidden, not removed: the page keeps exactly one h1 and the
+     document outline is unchanged. */
+  .page-id.quiet{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+  .page-title{font-size:var(--text-base);margin:0;line-height:1.2}.page-hint{font-size:var(--text-xs);color:var(--text-3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto}.pill{font-size:var(--text-xs);font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
   /* VIS-02 — a segmented control, not two links: the pair reads as one choice
      with a current value. Sentence case and no tracking (VIS-06). */
   .modes{display:flex;gap:2px;padding:2px;margin-left:var(--space-3);border:1px solid var(--border);border-radius:var(--r-pill);background:var(--sunken)}

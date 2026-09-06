@@ -39,6 +39,10 @@ test-results/
 # looking at; they are not worth carrying in the tree.
 docs/plans/screenshots/working/
 docs/plans/screenshots/not-working/
+# Working captures taken while driving the app during development. Four of
+# these reached a commit before this line existed, which is the same hundred
+# megabytes of binaries arriving one convenience at a time.
+/*.png
 /artifacts/
 .playwright-mcp/
 .playwright/

@@ -2332,12 +2332,6 @@
     line-height: 1.5;
     max-width: 72ch;
   }
-  .head-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-4);
-  }
   .setup-overview,
   .global-model-card,
   .section-heading {
@@ -3052,7 +3046,6 @@
     margin: 0;
   }
   @media (max-width: 44rem) {
-    .head-row,
     .setup-overview,
     .global-model-card,
     .section-heading {

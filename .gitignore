@@ -31,6 +31,14 @@ output/
 # Playwright writes its last-run marker beside the config unless outputDir
 # covers it; the evidence itself lives in output/ and docs/plans/screenshots.
 test-results/
+# The two round-stamped capture folders were removed from the repository on
+# 2026-09-06 (roughly a hundred megabytes of binaries). Sixty-three live specs
+# still write into them, and `page.screenshot` creates the parent directory, so
+# a live round recreates both — as *untracked* files that a `git add -A` would
+# happily commit straight back in. The captures are still worth taking and
+# looking at; they are not worth carrying in the tree.
+docs/plans/screenshots/working/
+docs/plans/screenshots/not-working/
 /artifacts/
 .playwright-mcp/
 .playwright/

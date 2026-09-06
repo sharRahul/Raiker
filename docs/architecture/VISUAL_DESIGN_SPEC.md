@@ -265,6 +265,46 @@ neither theme can drift from the other without the other moving too.
 | Primitives are token-only (no hex, no `rgb()`) | `apps/web/src/lib/appCss.test.ts` |
 | Every page renders in both themes at four widths | `apps/web/e2e/all-pages-theme-live.spec.ts`, `apps/web/e2e/visual-refresh-live.spec.ts` |
 | Contrast and focus order | `apps/web/src/a11y.test.ts`, the live axe scans |
+| The rail stays short, every route stays reachable, the header contract is declared once, every empty state offers a way out | `apps/web/src/lib/visualRubric.test.ts` |
+
+## The visual rubric
+
+Everything above proves the interface **works**. None of it proves the
+interface looks calm or intentional — a page can pass the width sweep, the axe
+scan and every token check and still be a wall of cards shouting in five
+colours. That judgement is a review, not a test, and this is what the review
+asks (VIS-24).
+
+**Mechanised**, in `visualRubric.test.ts`, because each one was broken in
+practice rather than merely disagreed with:
+
+- the permanent rail carries at most eight destinations — it reached nine peers
+  one reasonable addition at a time;
+- everything off the rail is still reachable, from the gear's window and the
+  command palette;
+- the page-header contract is declared once in `app.css`, not privately per
+  view — eight views each held a byte-identical copy;
+- every empty state offers one action, or is on the short list where offering
+  one would be wrong (a filtered list with no matches, a success state, a real
+  error);
+- no interface copy names a configuration path the product no longer reads.
+
+**Human**, on any change to the shell, the composer or navigation. Review at
+1440 in both themes and answer each of these out loud:
+
+1. Is there a page whose first screen is more than about four primary cards?
+2. Does every empty state have one obvious primary action?
+3. Are there more than two accent colours in a normal, non-status area?
+4. Is any technical identifier — a provider id, a model string, a protocol
+   version — sitting at the top of the hierarchy, where the owner did not
+   choose to put it?
+5. Are the heading levels distinguishable without measuring them?
+6. Would a first-time user find Chat, Build and Projects in five seconds?
+7. Does a normal chat require understanding Permissions, Models, MCP or hooks?
+
+A shell, composer or navigation change also needs an explicit visual approval
+alongside the screenshot diff. "The tests pass" is not an answer to any of the
+seven questions above.
 
 ## Building a new page
 

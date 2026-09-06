@@ -746,16 +746,7 @@
 <style>
   .path-field { display: flex; gap: var(--space-2); align-items: center; }
   .path-field .input { flex: 1; min-width: 0; }
-  .head-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-4);
-  }
   @media (max-width: 720px) {
-    .head-row {
-      flex-direction: column;
-    }
   }
   .create-row {
     display: flex;

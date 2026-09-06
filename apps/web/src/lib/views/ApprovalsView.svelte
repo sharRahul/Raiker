@@ -846,16 +846,7 @@
     font-size: var(--text-2xs);
     white-space: nowrap;
   }
-  .head-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-4);
-  }
   @media (max-width: 720px) {
-    .head-row {
-      flex-direction: column;
-    }
   }
   .filters {
     display: inline-flex;

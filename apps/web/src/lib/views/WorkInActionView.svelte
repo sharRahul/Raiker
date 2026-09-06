@@ -182,7 +182,9 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
 {/if}
 
 <style>
-  .head-row { display:flex; justify-content:space-between; align-items:flex-start; gap:var(--space-4); margin-bottom:var(--space-4); }
+  /* Layout comes from the shared `.head-row` in app.css; only the spacing
+     below it is this view's own. */
+  .head-row { margin-bottom:var(--space-4); }
   .page-lead { margin:0; max-width:760px; color:var(--text-2); }
   .truth-note { display:flex; align-items:center; gap:6px; margin:var(--space-2) 0 0; color:var(--text-2); font-size:var(--text-sm); }
 
@@ -273,5 +275,5 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
   @keyframes crate-glide { from { opacity:0; transform:translateX(-8px); } to { opacity:1; transform:translateX(0); } }
 
   @media (max-width:900px) { .work-layout { grid-template-columns:1fr; } .desks { grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); } }
-  @media (max-width:600px) { .head-row { flex-direction:column; } .desks { grid-template-columns:1fr; } }
+  @media (max-width:600px) { .desks { grid-template-columns:1fr; } }
 </style>

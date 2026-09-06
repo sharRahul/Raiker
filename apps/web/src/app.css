@@ -1090,6 +1090,28 @@ code,
   margin: 0 0 var(--space-1);
 }
 
+/* VIS-23/VIS-04 — one page-header contract, defined once.
+   ┌──────────────────────────────────────────────┐
+   │ Title / lead                  Primary action │
+   └──────────────────────────────────────────────┘
+   Eight views each carried a byte-identical private copy of this rule, plus a
+   byte-identical narrow-width override. That is how a product built by one
+   team starts to look assembled by several: nothing had to *disagree* for the
+   surfaces to drift, only to be edited separately. Page-wide actions sit at the
+   end of this row; entity actions stay with their entity. */
+.head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+/* 720px, which is the width all eight private copies already used. */
+@media (max-width: 720px) {
+  .head-row {
+    flex-direction: column;
+  }
+}
+
 .page-lead {
   color: var(--text-2);
   max-width: 68ch;

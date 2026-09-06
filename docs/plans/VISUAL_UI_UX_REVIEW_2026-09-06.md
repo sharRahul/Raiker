@@ -159,6 +159,8 @@ Operational screens can retain richer headers.
 
 **Priority: P2 — Impact: Medium**
 
+**Status: Partly done 2026-09-06.** The `.head-row` consolidation under VIS-23 removed one whole class of per-view divergence. The five-archetype catalogue itself is not written down yet.
+
 The design system is mature, but cards/panels/sunken/raised/operational surfaces can make different subsystems feel visually distinct simply because they are implemented differently.
 
 ### Recommendation
@@ -397,6 +399,8 @@ A Task thread should look related to a Chat thread rather than belonging to anot
 
 **Priority: P1/P2 — Impact: Medium/high**
 
+**Status: Partly done 2026-09-06.** The two controls added in this pass follow the rule — the approvals button and the posture chip are neutral at rest and colour only when something actually wants attention. The existing chips and status backgrounds across the operational pages are the rest of it.
+
 Raiker legitimately needs success/warn/deny/read-only states, but repeated coloured chips/backgrounds/borders can make the product look like monitoring software.
 
 ### Recommendation
@@ -565,6 +569,8 @@ This allows permanent navigation to shrink without harming discoverability.
 
 **Priority: P2 — Impact: Medium**
 
+**Status: Done 2026-09-06.** `.head-row` is one rule in `app.css` rather than eight byte-identical private copies, at the breakpoint all eight already used. Nothing had to disagree for the surfaces to drift — only to be edited separately.
+
 A product with many management surfaces looks assembled if New/Add/Connect/Export/Repair actions move around unpredictably.
 
 ### Recommendation
@@ -583,6 +589,8 @@ Entity-level actions stay with entities; page-wide actions stay in the header.
 ## VIS-24 — Add a visual-quality rubric to screenshot sweeps
 
 **Priority: P1 — Impact: High over time**
+
+**Status: Done 2026-09-06.** The mechanisable half is `apps/web/src/lib/visualRubric.test.ts` — rail length, reachability, the header contract, empty-state actions, and stale configuration paths in copy — and each rule is one that was actually broken rather than one invented to have a test. The human half is seven questions in `VISUAL_DESIGN_SPEC.md` → "The visual rubric", to be answered out loud on any shell, composer or navigation change.
 
 Raiker already has unusually strong responsive screenshot coverage. The catalogue documents 26 route/tab states across four display classes and both themes, plus separate width assertions.
 

@@ -278,6 +278,37 @@ Two rules follow from the table rather than being separate opinions:
   `.eyebrow` had already fragmented into six private copies at four weights and
   five trackings without anyone disagreeing on purpose.
 
+## The output vocabulary
+
+VIS-19 asks for a governed presentation vocabulary — typed Raiker components
+rather than Markdown plus generic tool rows, and never arbitrary provider HTML.
+Nine of the ten already exist as components. What does **not** exist is the
+typed channel that would let a turn *address* them.
+
+| Block | Component today |
+|---|---|
+| Key-value summary | `.property-list` |
+| Comparison table | `.table` |
+| Cited source row | `SourceChips`, `SourceExcerptPanel`, `SourceAnchorLinks` |
+| File / artifact card | `AttachmentCard` |
+| Plan / progress block | `LifecycleTrack`, `ToolActivity` |
+| Approval block | `ApprovalPrompt`, the Approvals detail panel |
+| Diff block | `DiffView` |
+| Terminal block | `CommandOutputPane` |
+| Generated asset preview | `ImageViewport` |
+| Chart / visual block | **missing** |
+
+So the remaining work is not "build ten components". It is:
+
+1. a typed block schema a turn can emit, and a backend that produces it;
+2. a renderer that maps each type to the component above and **refuses anything
+   it does not recognise** — that refusal is the governed half, and it is why
+   this cannot be Markdown with HTML passed through;
+3. one chart component, which is the only genuinely absent block.
+
+That is a backend contract as much as a visual change, which is why it is not a
+pass over the stylesheet.
+
 ## How this is enforced
 
 | Rule | Enforced by |

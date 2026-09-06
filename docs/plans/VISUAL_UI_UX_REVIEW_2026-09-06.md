@@ -181,7 +181,7 @@ Standardize around five recurring surface archetypes:
 
 **Priority: P1 — Impact: High**
 
-**Status: Partly done 2026-09-06.** Home stopped rendering a card per empty board, which was the clearest card-wall-of-nothing in the product. The operational pages — Models, Extensions, Observability — are the rest of it.
+**Status: Done 2026-09-06.** Home stopped rendering a card per empty board, which was the clearest card-wall-of-nothing in the product. The operational pages were then measured rather than assumed: at 1440, Models shows **2** primary cards above the fold and Observability **4**, both inside the rubric's ceiling. Permissions draws 51, and they are the case the finding explicitly allows — one repeated entity per full-width row, which is a list. VIS-21 removed their outline in dark, so they now read as one.
 
 Raiker's governance/status concepts naturally tend toward "card walls".
 
@@ -219,6 +219,8 @@ The type scale is better than earlier iterations, but sidebar groups and control
 ## VIS-07 — Make the Raiker identity more distinctive through behaviour
 
 **Priority: P2 — Impact: Medium/high**
+
+**Status: An owner decision — 2026-09-06.** The three suggestions (an eye/lock identity moment, a gold authority trace on agent actions, a signature plan visualization) are brand design rather than defect repair: each invents a behaviour the product does not have, and inventing one badly is worse than leaving it. Two of the three also overlap work already done — VIS-15 spent the gold deliberately on pending and authority, and `LifecycleTrack` is the plan visualization. This is left as a decision for the owner, in the same way GEP-02 and BUG-239's remainder are.
 
 The gold/blue/neutral palette is recognizable, but brand should not depend mainly on logo + letter-spaced RAIKER + Control Deck language.
 
@@ -482,6 +484,8 @@ Developer & runtime
 
 **Priority: P2 — Impact: Medium/high**
 
+**Status: Already satisfied — verified live 2026-09-06, no change needed.** Measured at 1440: the graph is 94% of the page's height, the page carries **zero** cards, and the controls float over the canvas — summary, viewport, live-state and depth. Settings and the record inspector are dismissible panels over the graph rather than permanent columns, and the inspector appears on selection. The finding was written from the screenshot catalogue; the implementation already matched it.
+
 Knowledge Map is inherently spatial and should not look like an admin page surrounding a graph.
 
 ### Recommendation
@@ -496,6 +500,10 @@ Knowledge Map is inherently spatial and should not look like an admin page surro
 ## VIS-19 — Introduce richer inline output components
 
 **Priority: P1 — Impact: High**
+
+**Status: Specified, not built — 2026-09-06.** Worth stating precisely, because the finding reads as "build ten components" and that is not the work. Nine of the ten already exist: `.property-list`, `.table`, `SourceChips` and `SourceExcerptPanel`, `AttachmentCard`, `LifecycleTrack` and `ToolActivity`, `ApprovalPrompt`, `DiffView`, `CommandOutputPane`, `ImageViewport`. Only the chart block is genuinely absent. The catalogue is in `VISUAL_DESIGN_SPEC.md` → "The output vocabulary".
+
+What is missing is the **typed channel**: a block schema a turn can emit, a backend that produces it, and a renderer that maps each type to its component and refuses anything it does not recognise. That refusal is the governed half and is why this cannot be Markdown with HTML passed through. It is a backend contract as much as a visual change, so it is not a stylesheet pass and is not attempted here.
 
 Modern assistants increasingly render structured modules rather than Markdown plus generic tool rows.
 

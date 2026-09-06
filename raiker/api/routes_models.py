@@ -1079,7 +1079,16 @@ def download_hugging_face_model(
     except (ValueError, HuggingFaceAccessError) as exc:
         code = exc.code if isinstance(exc, HuggingFaceAccessError) else str(exc)
         raise HTTPException(status_code=422, detail={"reason_code": code}) from exc
-    conversion_output.mkdir(parents=True, exist_ok=True)
+    try:
+        conversion_output.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        # It used to be made after a successful download, so a library folder
+        # the owner cannot write to surfaced at the end of a multi-gigabyte
+        # pull. Made up front now, and refused in the owner's terms rather than
+        # as an unhandled 500.
+        raise HTTPException(
+            status_code=422, detail={"reason_code": "model_library_not_writable"}
+        ) from exc
     operation = _operation_service(request).start(
         session.principal_id,
         ModelOperationRequest(

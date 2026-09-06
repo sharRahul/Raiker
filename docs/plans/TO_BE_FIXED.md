@@ -129,6 +129,7 @@ names.
 | [BUG-261, BUG-262](FIXED_ITEMS.md#fixed-359--first-run-could-detect-a-missing-runtime-and-not-offer-to-install-it) | Medium | Models / first run | **Closed 2026-09-03 (FIXED-359)** — install a runtime and choose a model without leaving first run |
 | [BUG-265](FIXED_ITEMS.md#fixed-360--a-policy-refusal-was-reported-as-a-wrong-password) | Medium | Authentication / web UI | **Closed 2026-09-03 (FIXED-360)** — "Authentication failed." for a one-owner-per-instance refusal |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (18 complete, 2 partial; B14 closed 2026-09-04 as [FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one), B10 2026-09-03 as FIXED-366, B13 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, B16 by BUG-206 slice D. B15 and B20 remain partial on [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution)) |
+| [VIS](VISUAL_UI_UX_REVIEW_2026-09-06.md) | — | Visual / information hierarchy | Analysis (24 findings; 11 done and 4 partly done 2026-09-06 — see below) |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (16 complete, 1 partial, 1 open; C15 closed by C1/C4, C11 2026-09-03 as FIXED-367, C18 as FIXED-368, C17 2026-08-29 as FIXED-311. C10 is partial — the notification half ships as [FIXED-374](FIXED_ITEMS.md#fixed-374--a-routine-ran-all-night-and-told-nobody); C12 stays an architecture decision) |
 
 The memory audit of **2026-08-11** has its own document,
@@ -191,6 +192,41 @@ as [FIXED-442](FIXED_ITEMS.md#fixed-442--seven-tests-asserted-facts-about-the-la
 seven tests asserted what Raiker reports when no local runtime is installed and
 obtained that condition by assuming the host had none, so they passed on CI and
 failed on any machine with Ollama.
+
+The visual UI/UX review of **2026-09-06** has its own document,
+[`VISUAL_UI_UX_REVIEW_2026-09-06.md`](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+(VIS-01 … VIS-24). Its findings are design defects rather than functional ones,
+so they are not duplicated here; that document carries each one's status.
+
+**Eleven are done as of 2026-09-06** — the whole of its Wave 1 (VIS-01 the
+sidebar, VIS-02 the Chat/Build mode switch, VIS-08 the governance posture chip,
+VIS-12 empty-state actions, VIS-22 the command palette, VIS-23 the page-header
+contract), plus VIS-03 quiet chrome on work surfaces, VIS-13 Home, VIS-17
+Settings grouping, VIS-24 the visual rubric, and VIS-06's shared-stylesheet
+half. Four more are partly done: VIS-04, VIS-05, VIS-06 and VIS-15.
+
+**Nine remain open**, and the four largest are genuine redesigns rather than
+passes:
+
+* **VIS-10** — Build as a three-zone workbench (files | conversation and plan |
+  diff, terminal, artifact). The pieces exist as components; the composition
+  does not.
+* **VIS-19** — a typed vocabulary of inline output components (key-value
+  summary, comparison table, cited source, artifact card, plan block, approval
+  block, diff, terminal, chart). Today a turn renders Markdown plus generic
+  tool rows.
+* **VIS-09** — the approval interaction, ordered as *what, why, what changes,
+  blast radius, decide*.
+* **VIS-18** — Knowledge Map with the graph as the hero rather than an admin
+  page around a canvas.
+
+The other five are smaller: VIS-07 (signature Raiker behaviours), VIS-11
+(Chat/Build density, largely reached by VIS-03 and VIS-08), VIS-14 (one object
+vocabulary across Threads, Tasks and Projects), VIS-16 (technical identifiers —
+the global chrome already follows it; the operational pages are unaudited), and
+VIS-20/VIS-21 (motion and theme depth; the motion audit found no defect, since
+every infinite animation is a progress indicator and the global
+`prefers-reduced-motion` guard covers all of them).
 
 **Still open in the third-pass document, in its own priority order:** GCR-24 and
 GCR-26 (P1), then GCR-32, GCR-34, GCR-35, GCR-36, GCR-37, GCR-41, GCR-42,

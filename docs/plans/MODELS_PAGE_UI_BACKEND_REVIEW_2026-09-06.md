@@ -1,5 +1,39 @@
 # Raiker Models Page UI + Backend Review — 2026-09-06
 
+## Implementation status — 2026-09-07
+
+Waves 0 to 4 are implemented and verified against a live runtime holding real
+Anthropic, OpenAI and OpenRouter credentials, each connected through the
+product's own flow rather than seeded into the store. Recorded as
+[FIXED-451](FIXED_ITEMS.md#fixed-451--five-stores-five-read-paths-and-no-way-to-say-which-was-wrong),
+[FIXED-452](FIXED_ITEMS.md#fixed-452--design-had-no-model-default-of-its-own)
+and
+[FIXED-453](FIXED_ITEMS.md#fixed-453--the-models-page-was-a-filing-system-for-its-own-rows).
+
+| Item | State |
+|---|---|
+| MODEL-01 authoritative selection/effective contract | Done — `raiker/models/decision.py`, `GET /api/model-decision(s)` |
+| MODEL-02 Design surface default | Done |
+| MODEL-03 Overview replaces the six-tab first impression | Done |
+| MODEL-04 compact My models inventory | Done |
+| MODEL-05 local runtime as its own subsection | Done |
+| MODEL-06 simplified local library | Done — `Deploy` left the library |
+| MODEL-07 Hosted as connections | Done — Test moved to the row's overflow |
+| MODEL-08 one model picker per provider | Already satisfied by `AvailableModels`; the row no longer repeats `Use` beside it |
+| MODEL-09 Hugging Face as "Add local model" | Partial — it lives under Add model; its internal flow is not yet step-oriented |
+| MODEL-10 exception- and progress-led Activity | Done |
+| MODEL-11 combined routing, defaults and effective model | Done — Default and Effective are separate columns |
+| MODEL-12 Pricing merged with Usage | Done |
+| MODEL-13 health as exceptions | Done — the Overview shows only what needs a person |
+| MODEL-14 return-and-detect for vendor links | Partial — connect and validate happen inside Raiker; the runtime installers still open a vendor page |
+| MODEL-15 page/action budget | Done — one primary action and one overflow per repeated row |
+
+The acceptance tests under *Backend/state acceptance tests* are covered by
+`tests/test_model_decision.py`, `tests/test_surface_model_defaults.py` and the
+live round in `apps/web/e2e/composer-models-redesign-live.spec.ts`.
+
+---
+
 ## Scope
 
 This is a focused review of the Models experience at `main` commit `ac32915101de6b6562b09b1e09c4f76a24b00878`.

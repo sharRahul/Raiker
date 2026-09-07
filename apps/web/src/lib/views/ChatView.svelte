@@ -369,6 +369,35 @@
     (projects?.projects ?? []).find((project) => project.project_id === projectId) ?? null,
   );
 
+  /**
+   * The token count this turn carries, provider-reported once a turn has run
+   * and locally estimated before that. The same precedence the context meter
+   * uses, so the line and the panel it opens cannot disagree.
+   */
+  const usedTokens = $derived(
+    contextUsage?.usage_source === "provider" && contextUsage.used_tokens !== null
+      ? contextUsage.used_tokens
+      : estimatedContextTokens,
+  );
+
+  /** "12.4k" rather than "12,431" — a summary line has one line of room. */
+  function compactTokens(count: number): string {
+    if (count < 1000) return String(count);
+    if (count < 1_000_000) return `${(count / 1000).toFixed(count < 10_000 ? 1 : 0)}k`;
+    return `${(count / 1_000_000).toFixed(1)}M`;
+  }
+
+  const contextPercent = $derived.by(() => {
+    // The provider's own count once a turn has produced one, the local estimate
+    // until then. The ring this replaces drew the same distinction; losing it
+    // would turn a measured number into a guess without saying so.
+    const window =
+      contextUsage?.context_window_tokens ?? activeProfile?.context_window_tokens ?? null;
+    if (!window) return null;
+    const used = contextUsage?.used_tokens ?? estimatedContextTokens;
+    return Math.min(100, (used / window) * 100);
+  });
+
   const contextFacts = $derived([
     ...(selectedProject !== null
       ? [
@@ -390,18 +419,21 @@
           },
         ]
       : []),
+    // The conversation's own size, once there is one. Without this the line
+    // disappears entirely on a model that reports no context window — which is
+    // a real state, and one the ring this replaces at least said out loud
+    // ("capacity unknown"). How much is in play is true and useful whether or
+    // not the window it is measured against is known.
+    ...(usedTokens > 0
+      ? [
+          {
+            label: "Conversation",
+            value: `${usedTokens.toLocaleString()} tokens so far`,
+            short: contextPercent === null ? `${compactTokens(usedTokens)} tokens` : undefined,
+          },
+        ]
+      : []),
   ]);
-
-  const contextPercent = $derived.by(() => {
-    // The provider's own count once a turn has produced one, the local estimate
-    // until then. The ring this replaces drew the same distinction; losing it
-    // would turn a measured number into a guess without saying so.
-    const window =
-      contextUsage?.context_window_tokens ?? activeProfile?.context_window_tokens ?? null;
-    if (!window) return null;
-    const used = contextUsage?.used_tokens ?? estimatedContextTokens;
-    return Math.min(100, (used / window) * 100);
-  });
 
   // Thumbnails for images already in the transcript, keyed by attachment id.
   //
@@ -938,7 +970,7 @@
             // they resolve against, so it is refreshed with the turn.
             void refreshTurnSources(event.response.session_id);
             void refreshRecall(event.response.session_id);
-            if (contextOpen) void refreshContextUsage();
+            void refreshContextUsage();
             if (plan === null) void loadPlan();
             window.dispatchEvent(new Event("raiker:chats-changed"));
           } else if (event.kind === "error") {
@@ -1589,7 +1621,7 @@
           turn.resumeNote = null;
           void restoreAttachmentChips(event.response.session_id);
           void refreshTurnSources(event.response.session_id);
-          if (contextOpen) void refreshContextUsage();
+          void refreshContextUsage();
         } else if (event.kind === "error") {
           turn.error = event.text || "The continuation reported an error.";
         } else {
@@ -2207,6 +2239,7 @@
             facts={contextFacts}
             usedPercent={contextPercent}
             disabled={streaming}
+            bind:open={contextOpen}
             onopen={() => void refreshContextUsage()}
           >
           {#snippet detail()}

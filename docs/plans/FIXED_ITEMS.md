@@ -464,6 +464,21 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-440](#fixed-440--two-expired-calls-presented-the-same-refresh-token-and-one-was-already-retired) | Medium/High | Connectors / OAuth | Fixed 2026-09-06 (third-pass static review) |
 | [FIXED-441](#fixed-441--an-event-the-index-never-heard-of-was-invisible-to-the-check-for-exactly-that) | High | Observability / event integrity | Fixed 2026-09-06 (third-pass static review) |
 | [FIXED-442](#fixed-442--seven-tests-asserted-facts-about-the-laptop-running-them) | Low | Test suite / hermeticity | Fixed 2026-09-06 (found while verifying FIXED-436) |
+| [FIXED-443](#fixed-443--the-web-suite-was-red-on-main-before-any-of-this) | Medium | Web CI | Fixed 2026-09-07 |
+| [FIXED-444](#fixed-444--a-named-type-step-that-resolved-to-its-neighbour) | Low | Design system | Fixed 2026-09-07 (VIS2-01) |
+| [FIXED-445](#fixed-445--two-lines-of-standing-prose-under-every-page-of-the-product) | Low | Navigation | Fixed 2026-09-07 (VIS2-02) |
+| [FIXED-446](#fixed-446--design-was-a-work-mode-the-shell-did-not-draw) | High | Navigation / product model | Fixed 2026-09-07 (VIS2-03, VIS2-09) |
+| [FIXED-447](#fixed-447--ctrl-k-printed-to-a-keyboard-that-has-no-ctrl-there) | Low | Shortcuts | Fixed 2026-09-07 (VIS2-04) |
+| [FIXED-448](#fixed-448--the-posture-chip-said-protected-while-its-colour-said-otherwise) | Medium | Governance copy | Fixed 2026-09-07 (VIS2-07) |
+| [FIXED-449](#fixed-449--five-ways-of-saying-which-row-you-are-on) | Low | Navigation | Fixed 2026-09-07 (VIS2-08) |
+| [FIXED-450](#fixed-450--success-colour-as-the-standing-state-of-everything-that-is-merely-fine) | Low | Visual system | Fixed 2026-09-07 (VIS2-16) |
+| [FIXED-451](#fixed-451--five-stores-five-read-paths-and-no-way-to-say-which-was-wrong) | **Critical** | Models / contract | Fixed 2026-09-07 (MODEL-01) |
+| [FIXED-452](#fixed-452--design-had-no-model-default-of-its-own) | High | Models / Design | Fixed 2026-09-07 (MODEL-02) |
+| [FIXED-453](#fixed-453--the-models-page-was-a-filing-system-for-its-own-rows) | High | Models | Fixed 2026-09-07 (MODEL-03…15) |
+| [FIXED-454](#fixed-454--the-composer-grew-one-permanent-button-at-a-time) | High | Composer | Fixed 2026-09-07 (COMPOSER-01…20) |
+| [FIXED-455](#fixed-455--two-reads-whose-shape-nothing-checked-took-the-page-down) | High | Web resilience | Fixed 2026-09-07 (found live) |
+| [FIXED-456](#fixed-456--three-models-modals-that-escape-could-not-close) | Medium | Models / accessibility | Fixed 2026-09-07 (found live) |
+| [FIXED-457](#fixed-457--rows-that-offered-raikers-own-placeholder-as-a-models-name) | Low | Models | Fixed 2026-09-07 (found live) |
 
 ---
 
@@ -19829,3 +19844,467 @@ its own name the condition it never enforced.
 **User-interface outcome.** None — a test-suite defect. Recorded because it was
 masking whether the changes around it were sound on a developer machine, and
 because "green on CI" was not the same as "true".
+
+---
+
+## FIXED-443 — The web suite was red on `main` before any of this
+
+**Severity: Medium. Area: web CI. Status: Fixed 2026-09-07.**
+
+**Observed.** Before a line of the 2026-09-06 reviews was implemented, `npm run
+lint`, `npm run check` and `npm run test:e2e:mocked` all failed on a clean
+checkout of `main`:
+
+* `CommandPalette` carried a `svelte-ignore` for a warning the attribute it
+  named no longer raises, which eslint reports as an error;
+* four design-token violations — `--shadow-3` and `--r-xs` were named by
+  `var()` and defined nowhere, and `Topbar` kept three media queries minified
+  onto one physical line, so the "no raw type size" rule read across four
+  declarations that happen not to be separated by a semicolon and flagged a
+  `var()` step;
+* four svelte-check type errors: `modalDrawer`'s id union did not include the
+  palette that registers under it, `WorkMeta.stateVariant` was `string` where
+  `Badge` takes a union, and `WorkbenchView` read a `$derived` declared below
+  it, which works only because `$derived` is lazy;
+* three mocked end-to-end specs asserted surfaces two earlier redesigns had
+  already replaced — a "Workbench" page title that VIS-13 renamed to Home,
+  three empty-state boards VIS-05 removed, and a Build zone toggle that VIS2-05
+  keeps visible on a phone.
+
+`--shadow-3` is the interesting one. It was requested through a `var()`
+fallback, which makes a missing token look like a present one: the fallback
+fires silently, so every overlay above a dialog rendered at dialog depth and
+nothing said so.
+
+**Fixed.** All eleven. `--shadow-3` and `--r-xs` are real tokens now, and the
+rubric asserts that every elevation the ladder names is defined — a `var()`
+with a fallback is still a name the design system has to own.
+
+**User-interface outcome.** None directly; this is the precondition for the
+rest of the round being verifiable at all. A suite that is already red cannot
+tell you whether the next change broke something.
+
+---
+
+## FIXED-444 — A named type step that resolved to its neighbour
+
+**Severity: Low. Area: design system. Status: Fixed 2026-09-07. Raised as
+[VIS2-01](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-01--repair-the-dead-type-scale-step-and-strengthen-optical-hierarchy).**
+
+**Observed.** `--text-lg` resolved to exactly `--text-base`. A view that
+reached for "one size up from body" got body text in a heavier weight, and the
+call site still read as deliberate hierarchy.
+
+A named step that resolves to its neighbour is worse than a missing one:
+nothing about the code says so, and the h3 rule that used it looked correct in
+review and rendered as a bold paragraph.
+
+**Fixed.** The four upper steps move together — 1.12 / 1.32 / 1.6 / 2rem — so
+every interval stays visible and `--text-display` gets the room Home and
+Project identity need. `visualRubric.test.ts` now asserts the whole ladder is
+strictly ascending, so no future edit can flatten a step silently.
+
+**User-interface outcome.** Section headings are a visible size apart from the
+prose under them, and display type has somewhere to go above them.
+
+---
+
+## FIXED-445 — Two lines of standing prose under every page of the product
+
+**Severity: Low. Area: navigation. Status: Fixed 2026-09-07. Raised as
+[VIS2-02](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-02--remove-developerproject-metadata-from-permanent-sidebar-chrome).**
+
+**Observed.** The navigation rail ended in "Local & loopback-only" and "Apache
+License, Version 2.0". Both are facts about the installation, read once, and
+both were repeated on every page of the product for the life of the session.
+
+**Fixed.** The licence is in Settings → Updates beside the version, the channel
+and the recovery points — the rest of the facts about the installation. The
+locality is on the host panel, which is where the rest of the posture is and
+which is what the review means by "a compact status surface".
+
+**User-interface outcome.** The rail ends at the last destination. Both facts
+are still reachable, in the one place each belongs.
+
+---
+
+## FIXED-446 — Design was a Work mode the shell did not draw
+
+**Severity: High. Area: navigation / product model. Status: Fixed 2026-09-07.
+Raised as
+[VIS2-03](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-03--make-work-mode-explicit-as-chat--build--design-and-reduce-top-bar-saturation)
+and
+[VIS2-09](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-09--give-permanent-destinations-unique-icon-identities).**
+
+**Observed.** Raiker's Work model is **Chat | Build | Design**. The top bar's
+mode switch drew two of them and the rail drew two of them; Design was reachable
+only through the gear's window. A Work mode whose one discovery path is behind
+a gear reads as a feature the product is unsure about.
+
+Three permanent destinations — Home, Design and the Knowledge Map — also drew
+the same spark glyph, so a rail collapsed to icons could not be read at all, and
+the spark is Raiker's mark for *agent action*: spending it on "Home" spends the
+one glyph that should mean the agent did something.
+
+**Fixed.** `WORK_MODES` names the three once; the top bar's switch and the rail
+both read it, so they cannot drift. Home, Design and the Knowledge Map have
+their own glyphs — a house, a framed picture, a node graph. Below 480px the
+switch drops the labels rather than a mode, which is why the distinct icons had
+to come first. A hairline separates the runtime cluster, so the switch that
+halts the agent is not one more icon in a row of bells.
+
+**User-interface outcome.** A new owner can see the three ways to work with
+Raiker without opening anything, on a phone as well as a desktop.
+
+---
+
+## FIXED-447 — `Ctrl K` printed to a keyboard that has no Ctrl there
+
+**Severity: Low. Area: shortcuts. Status: Fixed 2026-09-07. Raised as
+[VIS2-04](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-04--render-platform-appropriate-shortcut-labels).**
+
+**Observed.** The command palette's hint read `Ctrl K` to every owner. The
+handler has always accepted either modifier, so the label was the only part
+with an opinion about the platform, and it was wrong for every owner on a Mac.
+
+**Fixed.** One module. `⌘K` on Apple platforms, `Ctrl K` elsewhere, and the
+Windows spelling when the platform cannot be read — a guess that names a key
+that exists beats one that does not. Screen readers get "Command K", never the
+glyph: `⌘` is announced as "place of interest sign" by some and as nothing at
+all by others.
+
+**User-interface outcome.** The hint names a key the owner has.
+
+---
+
+## FIXED-448 — The posture chip said "Protected" while its colour said otherwise
+
+**Severity: Medium. Area: governance copy. Status: Fixed 2026-09-07. Raised as
+[VIS2-07](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-07--make-governance-wording-state-aware).**
+
+**Observed.** The chip opened with the constant word "Protected", so a
+workspace set to approve everything automatically read
+
+```text
+Protected · Local · Auto-approve
+```
+
+in amber. The colour said "this is a relaxed posture" and the first word said
+"you are covered", about the same setting, at the same moment.
+
+A standing reassurance is not a state: it is true in every state, so it cannot
+be read as a description of this one, and next to a warning tone it actively
+misleads.
+
+**Fixed.** The chip states what Raiker does, in the mode's own words — "Asks
+first", "Approves automatically", "Raises no approvals", "Declines unattended".
+What holds in *every* posture is not deleted; it moved into the popover under
+"Regardless of this setting", where it names the specific protections rather
+than standing in for all of them with one adjective.
+
+**User-interface outcome.** The words and the colour agree, and a relaxed
+posture no longer describes itself as protection.
+
+---
+
+## FIXED-449 — Five ways of saying which row you are on
+
+**Severity: Low. Area: navigation. Status: Fixed 2026-09-07. Raised as
+[VIS2-08](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-08--simplify-sidebar-active-state-language).**
+
+**Observed.** The current rail row carried a bar in the gutter, a tinted
+background, accent text, a heavier weight, and the word "Current" beside its
+group name. Five devices for one fact is not emphasis; the row still had to be
+read to find out which one it was.
+
+**Fixed.** Two remain, and they are the two that survive a rail with no labels:
+the tinted row and the filled glyph.
+
+**User-interface outcome.** Where you are is legible at a glance and at rail
+width, without the rail shouting it five times.
+
+---
+
+## FIXED-450 — Success colour as the standing state of everything that is merely fine
+
+**Severity: Low. Area: visual system. Status: Fixed 2026-09-07. Raised as
+[VIS2-16](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-16--persistent-normal-state-is-neutral).**
+
+**Observed.** Green was the resting representation of connected, enabled,
+verified and ready — on the execution-environment badge under every message, on
+every MCP row, on the authority matrix, on Home's "nothing needs attention"
+line. A colour that is on screen constantly is the one condition under which a
+colour stops carrying information, and it trains the owner to ignore the one
+row that is not green.
+
+**Fixed.** Those resting states are plain metadata. Success colour is spent on
+something that just happened or a decision just confirmed — a copy, a save, a
+completed step — and the exceptions beside them keep their tone precisely
+because their neighbours no longer have one. `visualRubric.test.ts` pins the
+five that were changed.
+
+**User-interface outcome.** Colour on a status means something again.
+
+---
+
+## FIXED-451 — Five stores, five read paths, and no way to say which was wrong
+
+**Severity: Critical. Area: models / contract. Status: Fixed 2026-09-07. Raised
+as
+[MODEL-01](MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md#model-01--create-one-authoritative-selectioneffective-model-contract).**
+
+**Observed.** Every part of the model decision was already persisted correctly:
+the global selection, the per-surface default, the readiness verdict, the
+ordered fallback sequence, the managed local runtime. They were five stores
+read through five paths, and each surface assembled its own answer from
+whichever subset it happened to need.
+
+So the Models page, the composer picker, Chat, Build and Design agreed by
+coincidence, and when they disagreed nobody could say which was wrong — each was
+telling the truth about a different question. Worse, a selected model that could
+not currently serve simply vanished from the picker, which is indistinguishable
+from having lost the owner's choice. "My model keeps changing" and "my model
+never saved" were the same report about entirely different states.
+
+**Fixed.** `raiker/models/decision.py` and `GET /api/model-decision` answer one
+question for a scope: what is *selected*, what is *effective*, is it *ready*, is
+it *running*, and if it cannot serve, what fixes it. `GET /api/model-decisions`
+answers for every surface at once, so a page cannot render a Chat row from
+before a change beside a Build row from after it.
+
+The invariant the file exists to enforce:
+
+> A selected model never disappears because it is not currently ready.
+
+It is reported as selected-and-unavailable with readiness's own reason and
+remediation, and the model that *would* serve is named separately. `running` is
+`null` for anything hosted, because "not running" is not a true statement about
+somebody else's endpoint.
+
+It is a read model and only a read model. Selection is still written through the
+routes that validate against the provider factory; a read model that could also
+write would be a second way to set a model, which is the shape of the original
+problem.
+
+**User-interface outcome.** The Models Overview, the inventory, the Work-defaults
+table and every composer picker draw the same decision. A fallback is named
+beside the choice it displaced instead of replacing it.
+
+**Tests.** `tests/test_model_decision.py` — sixteen cases covering resolution
+order, the survival of an unready selection, fallback naming, the running claim,
+the revision token and the endpoint contract.
+`apps/web/src/lib/surfaceModel.test.ts` covers the client half.
+
+---
+
+## FIXED-452 — Design had no model default of its own
+
+**Severity: High. Area: models / Design. Status: Fixed 2026-09-07. Raised as
+[MODEL-02](MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md#model-02--add-design-to-surface-model-defaults).**
+
+**Observed.** The backend's list of surfaces that may hold a model default was
+`chat, build, tasks, schedule`. The product model is Chat | Build | Design, so
+two of the three Work modes had explicit surface state and the third silently
+borrowed the global default — an owner who put Chat on a small local model had
+their image prompts follow it there. Design's picker also started on whatever
+happened to be first in the list of image models on every load, because there
+was nowhere to store the choice they made last time.
+
+**Fixed.** `design` is one of the surfaces. The list lives beside the decision
+contract and is imported by the routes and by the tests, so it cannot go stale
+in one place again, and Design restores its remembered image model on load.
+
+**User-interface outcome.** Chat on the small local model, Build on the big
+hosted one, Design on the one that draws — and each stays where it was put.
+
+**Tests.** `tests/test_surface_model_defaults.py` asserts the surface list
+whole rather than only the entry that was missing, and round-trips `design`
+through the API.
+
+---
+
+## FIXED-453 — The Models page was a filing system for its own rows
+
+**Severity: High. Area: models. Status: Fixed 2026-09-07. Raised as MODEL-03
+through MODEL-15 in
+[the Models review](MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md).**
+
+**Observed.** Six equal tabs — Local, Hosted, Hugging Face, Activity, Routing,
+Pricing. Three named *where a model is stored*, which is an attribute of the
+answer rather than a choice anyone makes; the other three named which table a
+fact came out of. None answered the question every owner arrives with, which is
+what is running their work.
+
+Underneath, the same model appeared in a different visual container depending on
+who served it: a local GGUF was a runtime row with Test, Details, Select, Scan
+folders and Serve selected beside it; a hosted model was a catalogue entry with
+a keep-available switch and a Use button. Five controls repeated down forty rows
+is two hundred controls, and the owner reads all of them to find the one they
+came for.
+
+**Fixed.**
+
+* **MODEL-03** — five tabs named for the questions an owner arrives with:
+  Overview, My models, Add model, Runtime & routing, Usage. Every superseded
+  tab id, and the ids *those* replaced, still resolves.
+* **MODEL-04/15** — one inventory with one visible action per row, chosen by
+  state: `Use` when ready and not in force, `Start` when selected and stopped,
+  `Fix` when it cannot serve, and nothing when it already is the answer.
+  Details, the connection test and the three per-surface defaults are in the
+  overflow.
+* **MODEL-05/06** — the runtime slot rows and the local library moved to the tab
+  about what is *serving*, and `Deploy` left the library. It was the one control
+  that crossed the two, so a card could fill a slot without showing which slot
+  it took or what it displaced.
+* **MODEL-07** — a connected provider no longer carries Test, Select models…,
+  Select and Details at once. Test is troubleshooting, not a standing invitation
+  to re-prove a connection that is working.
+* **MODEL-10** — Activity is exception- and progress-led: running work first,
+  then failures, then history. The permanent Refresh is gone — a button that
+  duplicates a two-second poll reads as a suggestion the poll might not be
+  running — and reappears as "Retry status" once a read has actually failed.
+* **MODEL-11/13** — a Work-defaults table with Default and Effective as separate
+  columns, and an Overview that shows only what needs attention. The page used
+  to call Default, Selected, Effective and Fallback all "active".
+* **MODEL-12** — Pricing merged into Usage. They were two top-level tabs, so an
+  owner checking a bill read the rate on one page and the usage on another and
+  did the multiplication themselves.
+
+**User-interface outcome.** The page opens on what powers Chat, Build and
+Design, with a "Needs attention" section that is absent when there is nothing to
+fix. Live evidence: `live-models-overview.png`, `live-models-inventory.png`,
+`live-models-work-defaults.png`.
+
+---
+
+## FIXED-454 — The composer grew one permanent button at a time
+
+**Severity: High. Area: composer. Status: Fixed 2026-09-07. Raised as
+COMPOSER-01 through COMPOSER-20 in
+[the composer redesign](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md).**
+
+**Observed.** Every capability Raiker gained arrived as one more permanent
+control, because a permanent control is the cheapest thing to add and nothing
+said not to. Chat's bar reached four — attach, dictate, a project select, a
+posture chip — and Build's six, under every message anyone ever typed. The
+review's count of what could have been there by the same logic runs to twenty.
+Asking a question looked like operating a control plane.
+
+**Fixed.** The missing piece was a contract, not a stylesheet.
+`composerCapabilities.ts` makes a composer capability a typed record — id,
+label, hint, group, surfaces, the gate it answers to, where to go when that gate
+is off — and two rules the type enforces:
+
+* **Visibility is not authority.** An entry reflects a capability the runtime
+  may still allow, ask about, or deny when it is invoked. A governed-off
+  capability stays listed with its reason and the route that changes it, because
+  an owner who cannot find "Run a command" concludes Raiker cannot run commands.
+* **An entry has to reach something real.** The view supplies handlers by id and
+  anything it has no handler for is not drawn, so the review's own acceptance
+  test holds by construction rather than by review.
+
+On that: `+` brings something into this turn, `Tools` asks Raiker to do a kind
+of thing, and both are one component. Model identity stays visible and model
+*management* does not. A project select, an attachment count, a repository label
+and a context ring became one inspectable line — four controls answering "what
+is this turn going to see" in four places at four weights; the token counts and
+the compaction notice are one click in, drawn by the same meter as before rather
+than a second copy. The posture chip renders only when the posture is not the
+careful default. Below the split the menus are bottom sheets.
+
+Design's Tools control is deliberately absent: the governed image endpoint takes
+a prompt, a size and a model, so there is no capability for the menu to invoke,
+and an empty trigger would be the permanent-button problem in miniature.
+
+**User-interface outcome.** Chat's composer is `[+] [Tools] … model … Send`.
+Live evidence: `live-composer-new-chat.png`, `live-composer-build.png`,
+`live-composer-design.png`, `live-composer-tools.png`.
+
+---
+
+## FIXED-455 — Two reads whose shape nothing checked took the page down
+
+**Severity: High. Area: web resilience. Status: Fixed 2026-09-07. Found while
+building FIXED-451 and FIXED-454.**
+
+**Observed.** Two client reads trusted the *shape* of what came back:
+
+* the model decision — the composer's picker read `decision.selected.profile_id`
+  off whatever the endpoint answered with;
+* the capability gates — the composer's menus called `.find` on whatever
+  `/api/capability-gates` answered with.
+
+A 200 whose body is wrong is not hypothetical: a truncated response, a proxy's
+error page served as JSON, or a running host older than the build all arrive
+exactly that way. Both threw, and a throw inside a `$derived` takes the whole
+composer with it — a page that will not render, in answer to a *status* read.
+
+**Fixed.** A decision is checked once, in `isModelDecision`, rather than by each
+caller remembering to guard the field it happens to use; the guard that is
+missed is the one that throws. A body that does not carry the contract is not a
+degraded decision, it is no decision, and every surface already renders
+correctly without one. A gate list that is not a list is no evidence about
+anything, so the menu offers the capability and lets the runtime judge it at the
+point of use — on better evidence than the status call that did not answer.
+
+**User-interface outcome.** A failed or malformed status read costs the
+explanatory line, not the composer.
+
+**Tests.** `apps/web/src/lib/surfaceModel.test.ts` and
+`apps/web/src/lib/composerCapabilities.test.ts`. The mocked end-to-end fixture
+now answers both endpoints with real shapes, so the suite cannot silently run in
+the degraded case it exists to catch.
+
+---
+
+## FIXED-456 — Three Models modals that Escape could not close
+
+**Severity: Medium. Area: models / accessibility. Status: Fixed 2026-09-07.
+Found in the live round of 2026-09-07.**
+
+**Observed.** The Models page's model picker, provider sign-in dialog and
+details panel could each be dismissed by clicking the backdrop or a button
+inside them, and by nothing else. An owner who opened a provider's catalogue and
+reached for the key every other dialog in the product answers to was left
+holding a modal that would not go.
+
+Found by a live spec that opened one provider's catalogue and could not reach
+the next provider's card: the picker was still up, and its overlay intercepted
+every pointer event on the page behind it.
+
+**Fixed.** Escape closes whichever of the three is open, innermost first, so it
+unwinds one layer at a time rather than clearing the stack — the picker can be
+opened from the details panel, and closing both at once loses the owner's place.
+`ApprovalPrompt`, `StepUpDialog` and the command palette already behaved this
+way; VIS2-17 asks for one overlay vocabulary, and this is the part of it a
+keyboard user depends on.
+
+**User-interface outcome.** Escape closes the dialog in front of you, on the
+Models page as everywhere else.
+
+**Tests.** `ModelsView.test.ts` — "Models modals answer to Escape".
+
+---
+
+## FIXED-457 — Rows that offered Raiker's own placeholder as a model's name
+
+**Severity: Low. Area: models. Status: Fixed 2026-09-07. Found in the live round
+of 2026-09-07.**
+
+**Observed.** A provider profile that has not been given a model carries the
+registry's `<model>` placeholder. The new Models inventory printed it, so the
+most prominent column of six rows read `‹model›` — Raiker's internal notation,
+offered to the owner as the name of a thing. The Overview's "Ready alternatives"
+listed the same profiles as models that could be chosen, which is a choice that
+cannot be made: they name no model at all.
+
+**Fixed.** A row with no model is titled by its provider — the account or
+runtime the owner actually connected — and the state beside it already says a
+model has still to be chosen. The alternatives list excludes profiles that name
+no model, and its heading claims what the list can support: "Other models you
+can use" rather than "Ready alternatives", because a model nobody has checked is
+choosable, not proven ready.
+
+**User-interface outcome.** Every row in the inventory names something real.
+Live evidence: `live-models-inventory.png`.
+

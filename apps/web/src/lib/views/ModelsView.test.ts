@@ -1740,3 +1740,52 @@ describe("ModelsView provider test feedback", () => {
     expect(result.closest(".local-row")).not.toBeNull();
   });
 });
+
+// Found live, 2026-09-07. The model picker could be dismissed by clicking its
+// backdrop or its Done button and by nothing else, so an owner who opened a
+// provider's catalogue and reached for the key every other dialog in the
+// product answers to was left holding a modal that would not go. VIS2-17 asks
+// for one overlay vocabulary, and this is the part of it a keyboard user
+// actually depends on.
+describe("Models modals answer to Escape", () => {
+  it("closes the provider catalogue", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "<model>",
+          }),
+        ],
+      }),
+      "GET /api/models/ollama-local-openai-compatible/provider-models": {
+        profile_id: "ollama-local-openai-compatible",
+        provider: "ollama",
+        status: "available",
+        reason_code: null,
+        models: ["qwen2.5"],
+      },
+    });
+    render(ModelsView, { tab: "add" });
+    await rowAction("Select models…");
+    expect(await screen.findByRole("dialog", { name: /models/i })).toBeInTheDocument();
+
+    await fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: /models/i })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("closes the details panel", async () => {
+    stubFetch({ "GET /api/models": models({}) });
+    render(ModelsView, { tab: "add" });
+    await rowAction("Details");
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    await fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+});

@@ -35,7 +35,14 @@
 
   async function load() {
     try {
-      items = (await api.modelOperations()).items;
+      // The list, or an empty one. A 200 whose body has no `items` — a
+      // truncated response, a proxy's error page served as JSON, a host older
+      // than this build — used to assign `undefined` here, and the adaptive
+      // poll below then called `.some` on it every two seconds. An unhandled
+      // rejection in a status loop is the worst place for one: it repeats, and
+      // the panel it is about looks fine.
+      const body = await api.modelOperations();
+      items = Array.isArray(body?.items) ? body.items : [];
       error = null;
       readFailed = false;
     } catch {

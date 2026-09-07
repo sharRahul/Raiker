@@ -8,26 +8,74 @@ they live in **Sessions**, **Approvals**, and **Observability**.
 
 ## The composer
 
+At rest the composer carries four things, and nothing else:
+
+```text
+[ + ]  [ Tools ]        Project Raiker · 2 files · 8%   Claude Sonnet 4.5  [ Send ]
+```
+
+`+` brings something *into* this turn. **Tools** asks Raiker to do a kind of
+thing. Between them is one line saying what this turn will see. On the right is
+the model that will answer, then **Send**.
+
+Everything Raiker can do is still there; what changed is that it is not all on
+screen at once. The same composer appears in Build and Design, so learning it
+once is enough.
+
+### `+` — add to this turn
+
+| Item | What it does |
+|---|---|
+| **Upload a file** | `png`, `jpeg`, `webp`, `gif` for vision-capable models; `txt`, `md`, `csv`, `pdf`, `docx`, `xlsx` with text extracted server-side |
+| **Work in a project** | Organises the chat and supplies bounded project context. It does not grant filesystem or tool access. |
+| **Dictate** | Starts speech recognition and writes the result into the ordinary editable draft. It never sends. |
+
+Dropping a file on the composer does the same import as **Upload a file**, with
+the same checks — on the Chat and Build composers, the task composer, the
+document library and a project's files.
+
+### Tools — what Raiker can be asked to do
+
+The menu is built from the capabilities this workspace actually has. A
+capability that is turned off is still listed, with the reason and a way to
+change it: hiding it would teach you that Raiker cannot do the thing at all,
+which is both worse and less true. **Nothing in this menu grants anything** —
+the runtime still judges each action when it is invoked.
+
+| Item | What it does |
+|---|---|
+| **Search the web** | Reads pages this turn needs. The request leaves this machine. |
+| **Use an MCP tool** | Tools from the servers you have connected |
+| **Use a connected app** | The accounts you have connected under Extensions |
+| **Generate an image** | Opens Design, which is where an image is made |
+| **Create a task** | Hands the instruction to an agent task instead of answering now |
+| **Schedule it** | Runs on a cadence, with the model chosen now |
+| **Recall from memory** | Approved memories this turn may draw on |
+
+### The rest of the bar
+
 | Control | `aria-label` | What it does |
 |---|---|---|
-| **Attach → Image…** | `Add attachment` | Upload `png`, `jpeg`, `webp`, `gif` for vision-capable models |
-| **Attach → Document…** | `Add attachment` | Upload `txt`, `md`, `csv`, `pdf`, `docx`, `xlsx`; text is extracted server-side |
-| **Attach → Browse…** | `Attachment path` | Pick a workspace file or folder instead of typing its path |
-| *(drop a file on the composer)* | — | Same import as the buttons, with the same checks. Works on the Chat and Build composers, the task composer, the document library, and a project's files |
+| **Context** | `Context for this turn: …` | One line — project, attachments, and how much of the model's window is in play. Opening it gives the token counts, the window and any compaction. It never compacts the conversation. |
+| **Model** | `Model for this turn: <name>` | Only *configured* profiles. No free-text model ids. The menu carries **Effort** when the model publishes thinking levels, names a model that is selected but cannot serve rather than hiding it, and ends in one link to **Manage models**. |
+| **Send** | `Send` | The one primary action. |
+
+Outside the composer, on the page itself:
+
+| Control | `aria-label` | What it does |
+|---|---|---|
 | **New chat** | — | Start a fresh conversation. Disabled while the current chat is still empty. |
 | **⋯** | `Conversation actions` | **Export conversation…** and **Print / Save as PDF**. Both are also in Build. |
-| **Model** | `Model for this turn: <name>` | Only *configured* profiles. No free-text model ids. The menu also carries **Effort** — this model's own thinking levels and a **Thinking** switch — when the model publishes any. |
-| **Context** | `Context window` | Opens a read-only popover. It never compacts the conversation. |
 | **⋯ on your own message** | `More actions for this message` | **Branch**, **Summarise up to here**, and **Rewind to before this**. Copy, Edit and Retry stay on the row itself. |
 | **Background work** | `Background work` | Hands the turn to the background queue instead of waiting on it |
-| **Project or folder** | — | Organises the chat and supplies bounded project context. It does not grant filesystem or tool access. |
-| **Approval** | `Approval mode: …` | **Manually approve**, **Automatically approve**, or **Skip all approvals** for otherwise eligible governed actions. |
-| **Dictate** | `Dictate` | Starts browser speech recognition and writes the result into the ordinary editable draft. It never sends. The same control ships in Build. |
 
-Every control lives on one bar under the prompt: `+` and the scope controls on
-the left, the model chip and **Send** on the right. The bar is deliberately
-short: Chat is the knowledge-work surface, so it carries no way to switch into
-Build and no capacity chip repeating what **Context** already reports.
+### Approval policy
+
+There is no approval control on the bar while the posture is the careful default
+— you are typing, and the policy system is not what you came to think about. The
+moment the posture stops being cautious, a chip appears saying so, because that
+is a fact about the next thing you press. It is inspectable at any time from
+**Permissions**, which the Tools menu links to.
 
 There is no planning chip in Chat. While dictation is listening, **Done** or the
 first `Enter` stops listening and keeps focus in the draft; **Cancel** restores

@@ -1,5 +1,45 @@
 # Raiker Unified Composer Redesign — 2026-09-06
 
+## Implementation status — 2026-09-07
+
+Waves 1 to 4 are implemented and verified against a live runtime holding real
+Anthropic, OpenAI and OpenRouter credentials. Recorded as
+[FIXED-454](FIXED_ITEMS.md#fixed-454--the-composer-grew-one-permanent-button-at-a-time),
+with the two defects the work surfaced as
+[FIXED-455](FIXED_ITEMS.md#fixed-455--two-reads-whose-shape-nothing-checked-took-the-page-down).
+
+| Item | State |
+|---|---|
+| COMPOSER-01 shared shell | Done — `Composer.svelte` plus `ComposerActionMenu`, `ComposerContext` |
+| COMPOSER-02 minimal default state | Done — `[+] [Tools] … model … Send` |
+| COMPOSER-03 one Add menu | Done |
+| COMPOSER-04 one Tools menu | Done, derived from the typed registry |
+| COMPOSER-05 model identity, hidden management | Done — picker ends in one link to Models |
+| COMPOSER-06 one context line | Done — the meter is composed into its inspector |
+| COMPOSER-07/08/09 per-surface composition | Done; Design's Tools control is deliberately absent, see below |
+| COMPOSER-10 Tasks/Schedule composer | Partial — Tasks keeps its own model picker; the shared shell is not applied there yet |
+| COMPOSER-11 Project continuity | Partial — the Project is carried and shown per surface; a shared draft across modes is not implemented |
+| COMPOSER-12 governance near the action | Done — the posture chip renders only as an exception |
+| COMPOSER-13 slash and `@` accelerators | Already satisfied; `+` now makes the same actions discoverable without the syntax |
+| COMPOSER-14 paste/drop intelligence | Partial — drag/drop and paste attach as before; large-paste-to-attachment is not implemented |
+| COMPOSER-15 adaptive primary action | Done for Chat, Build and Design's single actions; Build's `Run ▾` intents are not implemented |
+| COMPOSER-16 mobile bottom sheet | Done |
+| COMPOSER-17 keyboard behaviour | Done — Escape closes a menu, the composer's own bindings are unchanged |
+| COMPOSER-18 no duplicated page actions | Done |
+| COMPOSER-19 typed capability registry | Done — `composerCapabilities.ts` |
+| COMPOSER-20 visual quality rules | Done; rules 3 and 12 are pinned by `visualRubric.test.ts` |
+
+**What is deliberately not built, and why.** COMPOSER-09 describes edit,
+variations, outpaint, reference images and version compare. Raiker's governed
+image endpoint takes a prompt, a size and a model and returns one picture, so
+those controls have no runtime to reach. This document's own acceptance test 19
+settles what to do about that — *every exposed composer action reaches an actual
+backend/runtime path or is omitted* — so they are absent rather than present and
+inert, and the missing runtime is recorded in
+[`TO_BE_FIXED.md`](TO_BE_FIXED.md).
+
+---
+
 ## Goal
 
 Create one coherent composer system across Raiker that feels as visually simple as the strongest current AI products while supporting substantially more governed capability underneath.

@@ -45,6 +45,7 @@
     disabled = false,
     detail,
     onopen,
+    open = $bindable(false),
   }: {
     facts: ContextFact[];
     usedPercent?: number | null;
@@ -59,9 +60,13 @@
     detail?: Snippet;
     /** Called when the inspector opens, so a surface can refresh a live read. */
     onopen?: () => void;
+    /**
+     * Bindable so the composer's `/context` command opens this rather than a
+     * second inspector of its own. The slash command is an accelerator to a
+     * control, not a parallel way of showing the same facts.
+     */
+    open?: boolean;
   } = $props();
-
-  let open = $state(false);
   let root = $state<HTMLDivElement>();
   let trigger = $state<HTMLButtonElement>();
 

@@ -687,6 +687,32 @@
    * run commands has to say which tree it is pointed at, and that was carried
    * by a separate header control the composer could not see.
    */
+  /**
+   * The token count this turn carries, provider-reported once a turn has run
+   * and locally estimated before that. The same precedence the context meter
+   * uses, so the line and the panel it opens cannot disagree.
+   */
+  const usedTokens = $derived(
+    contextUsage?.usage_source === "provider" && contextUsage.used_tokens !== null
+      ? contextUsage.used_tokens
+      : estimatedContextTokens,
+  );
+
+  /** "12.4k" rather than "12,431" — a summary line has one line of room. */
+  function compactTokens(count: number): string {
+    if (count < 1000) return String(count);
+    if (count < 1_000_000) return `${(count / 1000).toFixed(count < 10_000 ? 1 : 0)}k`;
+    return `${(count / 1_000_000).toFixed(1)}M`;
+  }
+
+  const contextPercent = $derived.by(() => {
+    const window_ =
+      contextUsage?.context_window_tokens ?? activeProfile?.context_window_tokens ?? null;
+    if (!window_) return null;
+    const used = contextUsage?.used_tokens ?? estimatedContextTokens;
+    return Math.min(100, (used / window_) * 100);
+  });
+
   const contextFacts = $derived([
     ...(selectedProject !== null
       ? [
@@ -717,15 +743,21 @@
           },
         ]
       : []),
+    // The conversation's own size, once there is one. Without this the line
+    // disappears entirely on a model that reports no context window — which is
+    // a real state, and one the ring this replaces at least said out loud
+    // ("capacity unknown"). How much is in play is true and useful whether or
+    // not the window it is measured against is known.
+    ...(usedTokens > 0
+      ? [
+          {
+            label: "Conversation",
+            value: `${usedTokens.toLocaleString()} tokens so far`,
+            short: contextPercent === null ? `${compactTokens(usedTokens)} tokens` : undefined,
+          },
+        ]
+      : []),
   ]);
-
-  const contextPercent = $derived.by(() => {
-    const window_ =
-      contextUsage?.context_window_tokens ?? activeProfile?.context_window_tokens ?? null;
-    if (!window_) return null;
-    const used = contextUsage?.used_tokens ?? estimatedContextTokens;
-    return Math.min(100, (used / window_) * 100);
-  });
   let pendingProjectId: string | null = null;
   let projectNotice = $state<string | null>(null);
 
@@ -1241,7 +1273,7 @@
             // C6 — the citation markers this answer just wrote need the ledger
             // they resolve against, so it is refreshed with the turn.
             void refreshTurnSources(event.response.session_id);
-            if (contextOpen) void refreshContextUsage();
+            void refreshContextUsage();
             if (plan === null) void loadPlan();
             window.dispatchEvent(new Event("raiker:chats-changed"));
             void applyPendingProject();
@@ -1351,7 +1383,7 @@
           turn.resumeState = null;
           turn.resumeNote = null;
           void refreshTurnSources(event.response.session_id);
-          if (contextOpen) void refreshContextUsage();
+          void refreshContextUsage();
           void loadApprovals();
         } else {
           turn.events = [...turn.events, event];
@@ -2379,7 +2411,8 @@
               facts={contextFacts}
               usedPercent={contextPercent}
               disabled={streaming}
-              onopen={() => void refreshContextUsage()}
+              bind:open={contextOpen}
+            onopen={() => void refreshContextUsage()}
             >
             {#snippet detail()}
               <!-- COMPOSER-06 — the token counts, the window and the
@@ -3006,6 +3039,19 @@
   /* Deliberately not `--danger`: nothing has failed, the owner simply has not
      chosen yet. Red here competes with real problems on the same screen. */
   .project-required { color: var(--text-2); font-weight: 600; }
+  /* The offer is part of the sentence, not a second control beside it. Without
+     this it inherits the shell's button chrome and reads as an action bar under
+     the composer, which is the density COMPOSER-02 just removed. */
+  .project-required .link-button {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+  }
   .project-boundary strong { color: var(--text-1); }
 
 

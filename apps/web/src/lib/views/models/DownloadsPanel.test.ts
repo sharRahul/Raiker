@@ -268,3 +268,18 @@ describe("DownloadsPanel", () => {
     expect(whileRunning).toBeGreaterThanOrEqual(2);
   });
 });
+
+// Found by CI, 2026-09-07. A 200 whose body has no `items` — a truncated
+// response, a proxy's error page served as JSON, a host older than this build —
+// assigned `undefined` to the list, and the adaptive poll then called `.some`
+// on it every two seconds. An unhandled rejection in a status loop is the worst
+// kind: it repeats, and the panel it is about looks perfectly fine.
+describe("a body of the wrong shape", () => {
+  it("renders the empty state instead of throwing", async () => {
+    stubFetch({ "GET /api/model-operations": {} });
+
+    render(DownloadsPanel);
+
+    expect(await screen.findByText("No model activity yet")).toBeInTheDocument();
+  });
+});

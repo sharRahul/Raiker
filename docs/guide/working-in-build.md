@@ -23,11 +23,12 @@ in Build, it would be refused in Chat too, and the control that opens it is on
    off. Nothing is broken — you have not opened anything yet. Open only what the
    work needs, on [Permissions](permissions-and-runtime-modes.md).
 4. **Choose a project.** Build reads and writes inside one project and refuses
-   to send without one, so the project picker sits in the composer next to the
-   mode. A turn run in a project may use **that project's files, that project's
-   memory, and your account memory** — nothing from another project. The
-   composer names the project it will run in; this is what that name means.
-   See [Tasks and projects](tasks-and-projects.md).
+   to send without one. Pick one from `+` → **Work in a project**, or from the
+   **Choose one** offer in the line under the composer that says a project is
+   still needed. A turn run in a project may use **that project's files, that
+   project's memory, and your account memory** — nothing from another project.
+   The composer's context line names the project it will run in; this is what
+   that name means. See [Tasks and projects](tasks-and-projects.md).
 
 ## The three modes
 
@@ -76,6 +77,27 @@ with what it is allowed to do rather than stopping. Its refusals are recorded as
 come back to the record.
 
 ## The composer
+
+Build uses the same composer as Chat and Design, with one control Chat does not
+have:
+
+```text
+[ + ]  [ Tools ]  [ Auto ▾ ]     Project Raiker · Raiker/main · 12%   Sonnet 4.5  [ Send ]
+```
+
+The **mode** stays on the bar because it decides how much the next press is
+allowed to do and it changes from turn to turn. The repository and the project
+are in the context line, because a turn that may edit files or run a command has
+to say where — and that is a fact to read, not a control to operate.
+
+`+` adds to this turn: **Upload a file**, **Choose from the project**, **Mention
+a file from the code map**, **Work in a project**, **Dictate**.
+
+**Tools** carries what Build can be asked to do, including two Chat does not
+have — **Run a command** in the governed terminal, and the code-map mention
+above. A capability that is turned off is listed with the reason and a way to
+change it; nothing in the menu grants anything, and the runtime still judges
+each action when it is invoked.
 
 `/` opens the commands Build really has:
 

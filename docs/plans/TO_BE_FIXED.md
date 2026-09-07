@@ -1296,3 +1296,105 @@ inventing a second scheduler beside them.
 either states the cadence it is delivered on, or states that it is delivered only
 on demand. It must never be possible to read the card and believe events are
 flowing when nothing has run since the owner last pressed the button.
+
+---
+
+## BUG-277 — Design is a one-shot generator, so most of its composer has nothing to reach
+
+**Severity: Medium. Area: Design / image runtime. Raised while implementing
+[COMPOSER-09](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md) and
+[VIS2-19](VISUAL_UI_UX_REVIEW_2026-09-06.md).**
+
+**Observed.** The composer redesign asks Design to understand create, edit,
+edit-selection, variations, extend/outpaint, remove/replace, reference image and
+version compare, with the primary action changing from **Generate** to **Edit**
+when something is selected. VIS2-19 asks for the canvas workspace those actions
+belong to.
+
+Raiker's governed image endpoint takes a prompt, a size and a model and returns
+one picture. There is no asset selection, no edit request, no variation request
+and no version lineage for any of that to act on.
+
+**What was built instead, and why.** Design uses the same composer shell as Chat
+and Build — the same `+`, the same context line, the same model control — and
+nothing else. The composer redesign's own acceptance test 19 settles it: *every
+exposed composer action reaches an actual backend/runtime path or is omitted*. A
+`Generate ▾` offering Edit and Variations against an endpoint that cannot do
+either is the permanent-toolbar problem wearing a menu, and it would be worse
+than the toolbar because it looks like a promise.
+
+Design's Tools control is therefore absent rather than empty, which is visible
+in the live capture `live-composer-design.png`.
+
+**Proposed fix.** The runtime first, the interface second:
+
+1. an image request that names a prior generation as its subject, so "edit this"
+   has something to be about;
+2. a variation request, which is the same call with a seed or a count;
+3. a lineage on the stored generation, so a version picker has versions.
+
+Only then does the canvas composition in VIS2-19 have anything to compose, and
+only then does `Generate → Edit` describe a real state change.
+
+**Interface outcome that has to be true before this closes.** Selecting a
+generation in Design changes the primary action to **Edit**, and pressing it
+produces a new version that names the one it came from. Until then Design says
+what it can do and offers nothing it cannot.
+
+---
+
+## BUG-278 — Two Work surfaces still keep their own composer
+
+**Severity: Low. Area: composer. Raised while implementing
+[COMPOSER-10 and COMPOSER-11](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md).**
+
+**Observed.** Chat, Build and Design share one composer shell, one Add menu, one
+Tools menu, one context line and one model control. Tasks and Schedule do not:
+task creation still carries its own model picker, its own environment badge and
+its own capacity chip, in the layout it had before.
+
+The consequence is small but real, and it is the one the redesign exists to
+prevent: a person who has learned the composer in Chat meets a different
+arrangement of the same controls when they schedule the same work.
+
+**Why it was left.** The task form is not only a composer — it also collects a
+cadence, a recurrence and a notification rule, and COMPOSER-10 describes those
+as progressive disclosure behind `Schedule ▾`. That is a redesign of the task
+surface rather than an application of the composer, and doing it badly would
+trade a consistent composer for a worse scheduling flow.
+
+**Proposed fix.** Apply `Composer.svelte` with `+` and Tools to Tasks, and move
+the cadence and notification rules behind the primary action's own disclosure,
+as COMPOSER-10 sets out. The typed registry already declares `tasks` as a
+surface, so the menus exist the moment a handler is supplied.
+
+**Interface outcome that has to be true before this closes.** Creating a task
+uses the same composer grammar as asking a question, and the timing details
+appear only once the owner asks for them.
+
+---
+
+## BUG-279 — A long paste still becomes a very tall composer
+
+**Severity: Low. Area: composer. Raised while implementing
+[COMPOSER-14](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md).**
+
+**Observed.** Dragging a file onto the composer attaches it, and pasting an
+image attaches it. Pasting several thousand words of text puts several thousand
+words in the textarea, which grows until the transcript above it is gone.
+
+**Why it was left.** Turning a paste into an attachment is a transformation of
+what the owner just did, and COMPOSER-14's own rule is that every such
+transformation must be transparent and reversible. That needs a visible
+"pasted text" attachment the owner can expand back inline and remove, which is a
+small feature rather than a threshold.
+
+**Proposed fix.** Above a threshold, a paste becomes a text attachment carrying
+its first line as a label, with **show inline** restoring it to the prompt
+exactly as pasted. The attachment store already carries documents, so the
+storage half exists.
+
+**Interface outcome that has to be true before this closes.** A large paste
+never pushes the prompt or the send control out of the viewport, and the owner
+can always get the text back into the prompt.
+

@@ -592,8 +592,14 @@ test("Models opens on what is running the work, not on a filing system", async (
     "Usage",
   ]);
   await expect(page.getByRole("heading", { name: "What powers your work" })).toBeVisible();
+  // Scoped to the section that answers the question. MODEL-13's "Needs
+  // attention" names the same surfaces when one of them cannot run, which is
+  // the design working rather than a duplicate to disambiguate around.
+  const powers = page.getByLabel("What powers your work");
   for (const surface of ["Chat", "Build", "Design"]) {
-    await expect(page.getByRole("tabpanel").getByText(surface, { exact: true })).toBeVisible();
+    await expect(
+      powers.getByText(surface, { exact: true }),
+    ).toBeVisible();
   }
   await capture(page, join(shots, "models-overview.png"));
 

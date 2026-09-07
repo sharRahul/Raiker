@@ -373,7 +373,12 @@
             {/each}
           </select>
         {:else}
-          <a class="bar-select bar-empty" href="#/models">No image model — connect one</a>
+          <a
+            class="bar-select bar-empty"
+            href="#/models"
+            title="No image model is connected. Connect one on the Models page."
+            >No image model — connect one</a
+          >
         {/if}
       </label>
       <button
@@ -484,6 +489,22 @@
   .bar-empty:hover {
     color: var(--accent);
     border-color: var(--accent-border);
+  }
+  /* Found in the live round: with no image model connected this sentence is
+     longer than the space beside Generate, and `white-space: nowrap` pushed it
+     straight through the button. It truncates and keeps its full text in the
+     tooltip, because the sentence is an explanation and the button is the
+     thing that must stay reachable. */
+  .model-scope {
+    min-width: 0;
+    max-width: min(16rem, 40vw);
+  }
+  .model-scope .bar-empty,
+  .model-scope .bar-select {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .notice { color: var(--text-2); }
   .notice a { margin-left: 0.35rem; }

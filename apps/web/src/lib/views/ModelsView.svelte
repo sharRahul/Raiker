@@ -1147,6 +1147,36 @@
     }
   }
 
+
+  /**
+   * Escape closes whichever of this page's three modals is open.
+   *
+   * Found live, 2026-09-07: the model picker could be dismissed by clicking its
+   * backdrop or its Done button and by nothing else, so an owner who opened a
+   * provider's catalogue and reached for the key every other dialog in the
+   * product answers to was left holding a modal that would not go. The sign-in
+   * dialog and the details panel had the same gap.
+   *
+   * VIS2-17 asks for one overlay vocabulary; this is the part of that vocabulary
+   * a keyboard user actually depends on, and `ApprovalPrompt`, `StepUpDialog`
+   * and the command palette all already had it. Innermost first, so Escape
+   * unwinds one layer at a time rather than clearing the stack: the picker can
+   * be opened from the details panel, and closing both at once would lose the
+   * owner's place.
+   */
+  $effect(() => {
+    if (pickerFor === null && signInFor === null && detailsFor === null) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      if (pickerFor !== null) closePicker();
+      else if (signInFor !== null) closeSignIn();
+      else detailsFor = null;
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   onMount(load);
 </script>
 

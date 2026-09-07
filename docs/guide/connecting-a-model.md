@@ -100,8 +100,8 @@ for offers no button rather than one that cannot work.
   licence and gated status; GGUF variants are preferred. Confirming a download
   writes a collision-safe snapshot beneath an approved library. It runs as a
   durable background job, so a multi-gigabyte pull keeps going if you navigate
-  away — the panel shows its progress and a **Cancel download**, and **Models →
-  Activity** is the same job under a different heading. Gated
+  away — the panel shows its progress and a **Cancel download**, and
+  **Models → Runtime & routing** is the same job under a different heading. Gated
   repositories require your own Hub token and accepted upstream terms. On a
   machine with no route to `huggingface.co` the tab says so where the results
   would be, with a **Try again** — rather than showing an empty list you would
@@ -114,10 +114,17 @@ for offers no button rather than one that cannot work.
 
 ### Downloads, conversions and other long jobs
 
-**Models → Activity** is where every durable model job lives: downloads,
-conversions, runtime installs, Ollama pulls, and local deployments. They survive
-navigation and an interrupted app session, and none of them is ever silently
-retried.
+**Models → Runtime & routing** is where every durable model job lives:
+downloads, conversions, runtime installs, Ollama pulls, and local deployments.
+They survive navigation and an interrupted app session, and none of them is ever
+silently retried.
+
+The list is ordered by what still wants attention: running work first, then what
+failed, then history. Each job carries one action — **Cancel** while it runs,
+**Retry** once it has failed in a way that can be started again — and the rest,
+including **Clear record**, sit in its overflow. There is no permanent refresh:
+the panel re-reads itself every two seconds while anything is running, and a
+**Retry status** appears only if one of those reads fails.
 
 - **Cancel** asks a running job to stop at its next safe point. A job that had
   not started yet stops immediately. Once you have asked, nothing the worker
@@ -138,14 +145,52 @@ retried.
 
 ---
 
+## What is running your work
+
+**Models → Overview** is the first thing the page says, and it answers four
+questions in order:
+
+1. **Needs attention** — only what a person has to do something about, with the
+   one action that resolves each. When there is nothing, the section is absent;
+   that absence is the report.
+2. **What powers your work** — the model Chat, Build and Design each start on,
+   where that choice came from, and whether it is ready.
+3. **Effective now** — if a model cannot serve, the one that will answer instead
+   is named beside it. Your choice is never quietly replaced by the fallback:
+   they are two different facts and the page states both.
+4. **Other models you can use** — what else is set up and not already in use.
+
+Tasks and Schedule are not on that list because they do not hold a live default.
+They capture the model chosen when the work is created, so a run that fires next
+week uses the model it was scheduled with rather than whatever you have selected
+by then.
+
+**Models → Runtime & routing** holds the same facts as a table, with **Default**
+and **Effective now** as separate columns, above the fallback sequence that
+produces the difference between them.
+
+---
+
 ## Connect a hosted provider
 
-**Models → Hosted** → the provider's card → **Connect** → paste the key →
-**Connect**. (The Models page is split by what you came to do: **Local** for
-on-device runtimes, **Hosted** for accounts and advanced endpoints, **Hugging
-Face** for discovery, **Activity** for usage, **Routing** for fallback and the
-advisor, and **Pricing** for rates. The off-machine gate status reads at the
-top of **Hosted**, above the cards it explains.)
+**Models → Add model** → the provider's card → **Connect** → paste the key →
+**Connect**. Then give it a model: **Select models…** on the card, or the same
+item in its **⋯** menu once it has one.
+
+The Models page has five tabs, named for the questions you arrive with rather
+than for where a row is stored:
+
+| Tab | What it answers |
+|---|---|
+| **Overview** | What is powering Chat, Build and Design, and what needs you |
+| **My models** | Every model you have set up, wherever it runs |
+| **Add model** | Connect an account, install a runtime, or fetch from the Hub |
+| **Runtime & routing** | What is serving, what a turn falls back to, and long jobs |
+| **Usage** | What you have spent, and the rates that produced it |
+
+The off-machine gate status reads at the top of **Add model**, before you
+connect anything, because "the hosted gate is off" is what you need to know
+*before* a provider refuses rather than after.
 
 That is the whole flow. Behind it:
 
@@ -275,7 +320,7 @@ or shipped price.
 
 ### Rolling seven-day usage
 
-Models → **Activity** shows one row for every connected provider and no row for
+Models → **Usage** shows one row for every connected provider and no row for
 an unconnected one. **Raiker observed** is the rolling seven-day total from the
 local ledger: input/output/cache tokens, owner turns, all model requests,
 automatic compactions, and cost where the exact recorded models have known
@@ -361,8 +406,8 @@ keeping either side of it.
 
 ## Off-machine provider posture
 
-**Models → Hosted** opens with four read-only facts about everything that would
-leave this machine: the hosted model gate, the private-network gate, whether an
+**Models → Add model** opens with four read-only facts about everything that
+would leave this machine: the hosted model gate, the private-network gate, whether an
 egress allowlist is configured, and how many off-machine profiles exist. It is
 status, not a control — allowlist values and API keys are never displayed
 anywhere in the product, including here.

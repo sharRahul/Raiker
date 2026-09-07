@@ -152,6 +152,12 @@
       .filter(
         (profile) =>
           isChoosableModel(profile) &&
+          // A profile still carrying its shipped placeholder names no model, so
+          // there is nothing here to pick. Found in the live round: a fresh
+          // instance listed "LM Studio" and "OpenAI-compatible" here, which are
+          // provider profiles waiting for a model rather than models.
+          profile.model !== "" &&
+          !profile.model.includes("<") &&
           !inUse.has(`${profile.profile_id}\u0000${profile.model}`),
       )
       .slice(0, 6);
@@ -261,7 +267,7 @@
     {#if alternatives.length > 0}
       <section class="card alternatives" aria-labelledby="alternatives-h">
         <div class="card-head">
-          <h3 id="alternatives-h">Ready alternatives</h3>
+          <h3 id="alternatives-h">Other models you can use</h3>
           <button type="button" class="btn btn-ghost btn-sm" onclick={() => onopen("models")}>
             All models
           </button>
@@ -279,7 +285,7 @@
     {:else if models !== null && models.profiles.length > 0}
       <p class="none-spare">
         <Icon name="info" size="sm" />
-        Every model you have set up is already in use above.
+        Every model that names one is already in use above.
       </p>
     {/if}
   {/if}

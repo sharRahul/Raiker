@@ -26,7 +26,15 @@
 
   async function load() {
     try {
-      library = await api.modelLibrary();
+      const body = await api.modelLibrary();
+      // Same reasoning as `DownloadsPanel`: a body without `roots` reached
+      // `library?.roots.length` in the markup, where the optional chain guards
+      // the *library* and not the field under it.
+      library = {
+        ...body,
+        roots: Array.isArray(body?.roots) ? body.roots : [],
+        models: Array.isArray(body?.models) ? body.models : [],
+      };
       error = null;
     } catch (e) {
       error =

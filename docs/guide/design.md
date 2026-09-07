@@ -3,8 +3,32 @@
 **Design** generates images from a prompt using a hosted image model you have
 connected, and keeps what it made in this workspace.
 
-It is deliberately a small page: a prompt, a provider, a size, and a gallery of
-what you have generated. What it does not do is hide the path underneath it.
+It is deliberately a small page: a prompt, a model, a size, and a thread of what
+you have asked for and what came back. What it does not do is hide the path
+underneath it.
+
+## The composer
+
+Design uses the same composer as Chat and Build, so the shape is one you already
+know:
+
+```text
+[ + ]  1024x1024                          OpenAI · GPT Image  [ Generate ]
+```
+
+`+` adds to this turn; the size stays on the bar because it is the one visual
+parameter changed often enough to earn the room; the model that will draw is on
+the right, next to the one action.
+
+Design draws no **Tools** control, and that is deliberate rather than
+unfinished. Raiker's governed image endpoint takes a prompt, a size and a model
+and returns one picture — there is no edit, no variation and no reference-image
+request for a menu to invoke. A control that named those anyway would be a
+promise the runtime cannot keep. What is missing is recorded as **BUG-277** in
+[`docs/plans/TO_BE_FIXED.md`](../plans/TO_BE_FIXED.md).
+
+Design remembers the model you chose for it, separately from Chat's and Build's.
+Putting Chat on a small local model does not move your image prompts onto it.
 
 ## What it needs before it can generate anything
 

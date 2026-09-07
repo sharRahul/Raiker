@@ -61,6 +61,22 @@
 
   const key = (profile: ModelProfile) => `${profile.profile_id}\u0000${profile.model}`;
 
+  /**
+   * What to call a row.
+   *
+   * A profile that has not been given a model still carries the registry's
+   * `<model>` placeholder, and printing it turned the inventory's most
+   * prominent column into a row of `‹model›` — Raiker's own internal notation,
+   * offered to the owner as the name of a thing. The provider is the true
+   * answer to "what is this row": it is the account or runtime they connected,
+   * and the state beside it already says a model has still to be chosen.
+   */
+  function rowName(profile: ModelProfile): string {
+    return !profile.model || profile.model === UNPINNED_MODEL
+      ? providerName(profile.provider)
+      : modelName(profile.model);
+  }
+
   const SURFACE_LABEL: Record<string, string> = {
     chat: "Chat",
     build: "Build",
@@ -209,10 +225,11 @@
           <div class="identity">
             <ProviderLogo provider={profile.provider} />
             <div class="names">
-              <span class="model">{modelName(profile.model)}</span>
+              <span class="model">{rowName(profile)}</span>
               <span class="where">
-                {providerName(profile.provider)} ·
-                {profile.off_machine ? "Hosted" : "Local"}
+                {profile.model && profile.model !== UNPINNED_MODEL
+                  ? `${providerName(profile.provider)} · `
+                  : ""}{profile.off_machine ? "Hosted" : "Local"}
               </span>
             </div>
           </div>
@@ -244,7 +261,7 @@
                 class="btn btn-ghost btn-sm row-more"
                 aria-haspopup="menu"
                 aria-expanded={openMenu === key(profile)}
-                aria-label={`More actions for ${modelName(profile.model)}`}
+                aria-label={`More actions for ${rowName(profile)}`}
                 onclick={() => toggleMenu(key(profile))}
               ><Icon name="more" size="sm" /></button>
               {#if openMenu === key(profile)}

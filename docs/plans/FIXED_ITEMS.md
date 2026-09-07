@@ -20435,6 +20435,12 @@ step, and the absence of one is the point: deriving a persistent precise
 location from the host's IP address is not a fallback, it is a surveillance
 decision nobody made.
 
+The last-reading cache is in-process and keyed by principal as well as by
+coordinates. The values are public weather; *which places somebody looks up* is
+not, and Raiker's accounts are isolated from each other on the device — a shared
+key would let one account's failed refresh report a reading only another account
+had ever asked for.
+
 The request goes out through the existing `web_fetch` boundary — the same gate,
 decision mode, blocklist and address guard — so *discoverable everywhere* never
 becomes *reachable regardless*.

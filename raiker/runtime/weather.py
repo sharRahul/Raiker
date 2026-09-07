@@ -411,20 +411,31 @@ class WeatherService:
 
     # ── freshness cache ──────────────────────────────────────────────────
     #
-    # In-process and per-service on purpose. This is a *courtesy* on a failed
-    # refresh, not a store of record: persisting weather would create a second
-    # place the product could be wrong about the world, and the only thing this
-    # has to do is let a failed refresh say "here is what I last saw, and it is
-    # this old" instead of nothing.
-    _CACHE: dict[tuple[float, float], WeatherResult] = {}
+    # In-process on purpose. This is a *courtesy* on a failed refresh, not a
+    # store of record: persisting weather would create a second place the
+    # product could be wrong about the world, and the only thing this has to do
+    # is let a failed refresh say "here is what I last saw, and it is this old"
+    # instead of nothing.
+    #
+    # Keyed by principal as well as by coordinates, because Raiker's accounts
+    # are isolated from each other on the device and a shared key would leak the
+    # *fact of a lookup* across them — one account's failed refresh reporting a
+    # reading only another account had ever asked for. The values are public
+    # weather; which places somebody looks up is not.
+    _CACHE: dict[tuple[str, float, float], WeatherResult] = {}
+
+    def _cache_key(self, place: WeatherLocation) -> tuple[str, float, float]:
+        return (
+            self._principal_id or "",
+            round(place.latitude, 3),
+            round(place.longitude, 3),
+        )
 
     def _remember(self, result: WeatherResult) -> None:
-        key = (round(result.location.latitude, 3), round(result.location.longitude, 3))
-        WeatherService._CACHE[key] = result
+        WeatherService._CACHE[self._cache_key(result.location)] = result
 
     def _cached(self, place: WeatherLocation) -> dict[str, Any] | None:
-        key = (round(place.latitude, 3), round(place.longitude, 3))
-        previous = WeatherService._CACHE.get(key)
+        previous = WeatherService._CACHE.get(self._cache_key(place))
         if previous is None:
             return None
         try:

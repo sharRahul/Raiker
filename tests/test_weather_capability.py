@@ -281,6 +281,41 @@ class TestFreshness:
         assert stale["age_seconds"] is not None
         assert "not current conditions" in stale["note"]
 
+    def test_one_account_s_reading_is_not_offered_to_another(
+        self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Accounts on one device are isolated, and a lookup is a fact about someone.
+
+        The values are public weather; *which places somebody looks up* is not.
+        A cache keyed by coordinates alone would let one account's failed refresh
+        report a reading only another account had ever asked for — which is both
+        a leak and a false statement about what this account has seen.
+        """
+        _enable_gate(workspace, store)
+        WeatherService(
+            workspace, store, principal_id="principal_owner", fetch_fn=_provider()
+        ).lookup(location="Edinburgh")
+
+        def _fail_forecast(url: str, rules: Any, headers: dict[str, str]) -> dict[str, Any]:
+            if "geocoding-api" in url:
+                return _provider()(url, rules, headers)
+            raise OSError("provider unreachable")
+
+        other = WeatherService(
+            workspace, store, principal_id="principal_other", fetch_fn=_fail_forecast
+        ).lookup(location="Edinburgh")
+
+        assert other["status"] == "failed"
+        assert other["freshness"] == UNAVAILABLE
+        assert "current" not in other
+
+        # The account that did take the reading still gets it back.
+        same = WeatherService(
+            workspace, store, principal_id="principal_owner", fetch_fn=_fail_forecast
+        ).lookup(location="Edinburgh")
+        assert same["status"] == "success"
+        assert same["age_seconds"] is not None
+
     def test_a_first_failure_with_nothing_cached_is_typed_unavailable(
         self, workspace: Path, store: SQLiteStore
     ) -> None:

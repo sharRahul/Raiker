@@ -2999,6 +2999,37 @@ export interface CodeRepoDiagnosticsView {
 // B13 — one bounded text file for the read-only viewer. A file that cannot be
 // shown says why rather than rendering as empty: `readable` false with the
 // reason the server gave (`binary_file`, `file_too_large`, `not_found`).
+/** VIS2-12 — one uncommitted change in the repository's working tree. */
+export interface CodeRepoChangeEntry {
+  path: string;
+  /** The old name of a rename; "" otherwise. Both ends of a rename matter. */
+  previous_path: string;
+  /** git's own word for it: modified, added, deleted, renamed, untracked. */
+  state: string;
+  /** Whether the working tree still differs from the index for this path. */
+  unstaged: boolean;
+}
+
+/**
+ * The working tree's uncommitted state, as Build's `Changes` tab reads it.
+ *
+ * Built from the same two helpers the commit proposal is assembled from, so
+ * what the pane shows and what a commit would record are one change set. The
+ * two absences are kept apart on purpose: a repository with no checkout and a
+ * folder under no version control are different answers, and "no changes" must
+ * not stand in for either.
+ */
+export interface CodeRepoChangesView {
+  entries: CodeRepoChangeEntry[];
+  diff: string;
+  /** More changed files than the read carries. */
+  truncated: boolean;
+  /** The diff was longer than the pane will render. */
+  diff_truncated: boolean;
+  root_missing: boolean;
+  reason_code: string | null;
+}
+
 export interface CodeRepoFileView {
   path: string;
   text: string;

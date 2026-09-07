@@ -32,7 +32,7 @@
   import PostureControl from "../components/PostureControl.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
   import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
-  import BuildSidePanel from "../components/BuildSidePanel.svelte";
+  import BuildArtifactPane from "../components/BuildArtifactPane.svelte";
   import CodeExplorer from "../components/CodeExplorer.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
@@ -103,6 +103,7 @@
   import BuildModePicker from "../components/BuildModePicker.svelte";
   import TurnControl from "../components/TurnControl.svelte";
   import CommandOutputPane from "../components/CommandOutputPane.svelte";
+  import { focusFor, type ArtifactTab } from "../buildArtifacts";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { createFileDrop } from "../fileDrop.svelte";
   import ComposerMenu, { type MenuItem } from "../components/ComposerMenu.svelte";
@@ -539,8 +540,39 @@
 
   function toggleRail(event: MouseEvent) {
     railTrigger = event.currentTarget as HTMLElement;
-    if (railOpen) closeRail(true);
-    else railOpen = true;
+    if (runsShowing) {
+      closeRail(true);
+      return;
+    }
+    // The control says "Background work", so that is the view it opens on —
+    // and if the pane is already open on something else, it switches rather
+    // than closing a pane the owner opened for another reason.
+    railOpen = true;
+    focusArtifact("background-work");
+  }
+
+  /**
+   * VIS2-12 — the terminal control opens the workbench on the terminal.
+   *
+   * It used to toggle a pane of its own. Now it names a view: pressing it opens
+   * the workbench there, and pressing it again closes the terminal rather than
+   * the workbench, because the owner asked about the terminal and not about the
+   * column it happens to live in.
+   */
+  function toggleTerminal(event: MouseEvent) {
+    railTrigger = event.currentTarget as HTMLElement;
+    if (terminalShowing) {
+      // The control is named for the terminal, so pressing it again puts the
+      // terminal away — including the column it was the only thing in. Leaving
+      // an empty workbench behind would be the button doing something other
+      // than what it says.
+      commandPaneOpen = false;
+      closeRail(true);
+      return;
+    }
+    commandPaneOpen = true;
+    if (!compactRail) railOpen = true;
+    focusArtifact("command-started");
   }
 
   $effect(() => {
@@ -929,6 +961,51 @@
   // claims it only on a window wide enough to hold three; narrow, there is no
   // third column and the pane stays under the transcript where it was.
   const artifactZone = $derived(commandPaneOpen && !compactRail);
+
+  /**
+   * VIS2-12 — which of the workbench's four views is showing, and what it is of.
+   *
+   * The tab lives here rather than in the pane because this view is the only
+   * thing that knows *what just happened*: a file was opened, a command was
+   * started, a turn finished having changed something. `focusFor` turns each of
+   * those into the tab to bring forward, and returns null where pulling the
+   * owner away would interrupt them.
+   */
+  let artifactTab = $state<ArtifactTab>("changes");
+  let previewPath = $state<string | null>(null);
+  /** Bumped when a turn ends, so the Changes tab re-reads without a button. */
+  let workingTreeRevision = $state(0);
+
+  /**
+   * VIS2-12 — each header control answers about its own view, not the column.
+   *
+   * With two panels sharing a column, "open" was a property of the column and
+   * both toggles could read it. With one pane it is not: opening the terminal
+   * made the background-work control say **Hide background work** about a pane
+   * showing the terminal, so two controls claimed to put away the same thing
+   * and neither of them was describing what it would do.
+   */
+  const runsShowing = $derived(railOpen && artifactTab === "runs");
+  const terminalShowing = $derived(railOpen && artifactTab === "terminal" && commandPaneOpen);
+
+  function focusArtifact(event: Parameters<typeof focusFor>[0]) {
+    const next = focusFor(event, artifactTab);
+    if (next !== null) artifactTab = next;
+  }
+
+  /**
+   * A turn ended, so what the repository holds may no longer be what the pane
+   * last read.
+   *
+   * It re-reads and, when the pane is already open, brings Changes forward —
+   * but it does **not** open a closed pane. A turn finishing is not a request
+   * to look at anything; taking a third of the width for an answer nobody asked
+   * for is the permanent-panel problem in a different place.
+   */
+  function noteWorkingTreeMayHaveChanged() {
+    workingTreeRevision += 1;
+    if (railOpen) focusArtifact("turn-changed-files");
+  }
   let menuKind = $state<"none" | "slash" | "mention">("none");
   let menuActive = $state(0);
   let mentionItems = $state<MenuItem[]>([]);
@@ -1083,6 +1160,21 @@
    * happening. It writes the same `@path ` token the completion menu writes, so
    * the turn sees no difference between the two ways of naming a file.
    */
+  /**
+   * VIS2-12 — reading a file in the explorer puts it in the workbench too.
+   *
+   * The explorer shows a file inside itself, in a column sized for a tree. The
+   * pane is where a file is actually read, so opening one selects Preview
+   * there — and opens the pane if it was closed, because the owner has just
+   * named the object they want to look at.
+   */
+  function previewFile(path: string) {
+    if (path === "") return;
+    previewPath = path;
+    if (!railOpen && !compactRail) railOpen = true;
+    focusArtifact("file-opened");
+  }
+
   function mentionPath(path: string) {
     if (path === "") return;
     const separator = promptText === "" || promptText.endsWith(" ") ? "" : " ";
@@ -1326,6 +1418,12 @@
       // BUG-24 — see ChatView: a turn is only genuinely parked once its stream
       // ends, so that is where it asks whether a decision already exists.
       if (turn.response?.status === "needs_approval") resumeWatcher?.checkNow();
+      // VIS2-12 — a turn that ran has probably changed the working tree, so the
+      // pane re-reads it. Bumped unconditionally rather than gated on a tool
+      // name: the pane's read is the thing that knows whether anything actually
+      // changed, and guessing from the tools a turn called would be a second,
+      // worse answer to a question the read already settles.
+      noteWorkingTreeMayHaveChanged();
       void scrollToEnd();
     }
   }
@@ -1808,6 +1906,7 @@
         repoLabel={activeRepo?.label ?? ""}
         onclose={() => closeFiles(true)}
         onmention={mentionPath}
+        onopen={previewFile}
       />
       {#if !compactRail}
         <!-- Separator, not decoration: it carries the value it sets, so the
@@ -1907,35 +2006,34 @@
           <Icon name="folder" size="sm" />
           <span class="rail-label">{filesOpen ? "Hide files" : "Files"}</span>
         </button>
+        <!-- VIS2-12 — two toggles where there were three, because there is one
+             pane now rather than two panels sharing a column. Each still opens
+             the thing it names: the difference is that the pane it opens has
+             the other views a keystroke away instead of behind a second
+             control in the header. -->
         <button
           type="button"
           class="btn btn-ghost btn-sm rail-toggle"
           onclick={toggleRail}
-          aria-expanded={railOpen}
+          aria-expanded={runsShowing}
           aria-controls="build-rail"
-          aria-label={railOpen ? "Hide background work" : "Show background work"}
-          title={railOpen ? "Hide background work" : "Background work"}
+          aria-label={runsShowing ? "Hide background work" : "Show background work"}
+          title={runsShowing ? "Hide background work" : "Background work"}
         >
           <Icon name="panel" size="sm" />
-          <span class="rail-label">{railOpen ? "Hide background work" : "Background work"}</span>
+          <span class="rail-label">{runsShowing ? "Hide background work" : "Background work"}</span>
         </button>
-        <!-- VIS-10 — the terminal is a zone now rather than a block stacked
-             under the transcript, so it needs a control that exists whether or
-             not the zone is open. It used to be reachable only by its own
-             collapsed header, which meant moving the pane would have stranded
-             it behind the `/terminal` command. Beside Files and Background
-             work, because the three open the same kind of thing. -->
         <button
           type="button"
           class="btn btn-ghost btn-sm rail-toggle"
-          onclick={() => (commandPaneOpen = !commandPaneOpen)}
-          aria-expanded={commandPaneOpen}
+          onclick={toggleTerminal}
+          aria-expanded={terminalShowing}
           aria-controls="build-rail"
-          aria-label={commandPaneOpen ? "Hide the governed terminal" : "Show the governed terminal"}
-          title={commandPaneOpen ? "Hide the governed terminal" : "Governed terminal"}
+          aria-label={terminalShowing ? "Hide the governed terminal" : "Show the governed terminal"}
+          title={terminalShowing ? "Hide terminal" : "Governed terminal"}
         >
           <Icon name="terminal" size="sm" />
-          <span class="rail-label">{commandPaneOpen ? "Hide terminal" : "Terminal"}</span>
+          <span class="rail-label">{terminalShowing ? "Hide terminal" : "Terminal"}</span>
         </button>
       </div>
     </header>
@@ -2523,16 +2621,22 @@
       aria-label={compactRail && railOpen ? "Background work" : undefined}
       bind:this={railElement}
     >
-      {#if railOpen}
-        <BuildSidePanel
-          projectId={projectId || null}
-          {projects}
-          onclose={() => closeRail(true)}
-        />
-      {/if}
-      {#if artifactZone}
-        <CommandOutputPane {sessionId} {visible} bind:open={commandPaneOpen} />
-      {/if}
+      <!-- VIS2-12 — one pane over four views of one workspace, rather than two
+           unrelated panels stacked in a column that meant "whatever you last
+           switched on". -->
+      <BuildArtifactPane
+        bind:tab={artifactTab}
+        bind:terminalOpen={commandPaneOpen}
+        repoId={activeRepo?.repo_id ?? null}
+        repoLabel={activeRepo?.label ?? ""}
+        {previewPath}
+        {sessionId}
+        {visible}
+        projectId={projectId || null}
+        {projects}
+        revision={workingTreeRevision}
+        onclose={() => closeRail(true)}
+      />
     </div>
   {/if}
 

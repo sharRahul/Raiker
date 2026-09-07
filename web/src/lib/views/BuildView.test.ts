@@ -241,6 +241,130 @@ describe("Build's artifact zone", () => {
     expect(screen.queryByText("Governed terminal")).toBeNull();
   });
 
+  it("is one pane over four views, not two panels sharing a column", async () => {
+    // VIS2-12 — the column used to mean "whatever you last switched on".
+    stubFetch(baseRoutes());
+    await renderBuildWithProject();
+
+    await fireEvent.click(
+      await screen.findByRole("button", { name: "Show the governed terminal" }),
+    );
+
+    const tabs = await screen.findByRole("tablist", { name: "Workbench views" });
+    for (const label of ["Changes", "Preview", "Terminal", "Runs"]) {
+      expect(within(tabs).getByRole("tab", { name: new RegExp(`^${label}`) })).toBeInTheDocument();
+    }
+    // The control that opened it named the terminal, so that is the view.
+    expect(within(tabs).getByRole("tab", { name: "Terminal" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("opens on Runs when the control that opened it said background work", async () => {
+    stubFetch(baseRoutes());
+    await renderBuildWithProject();
+
+    await fireEvent.click(await screen.findByRole("button", { name: /background work/i }));
+
+    const tabs = await screen.findByRole("tablist", { name: "Workbench views" });
+    expect(within(tabs).getByRole("tab", { name: "Runs" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("says a folder under no version control is not the same as no changes", async () => {
+    // Two different answers, and the pane has to give the right one: "no
+    // changes" about a folder git has never seen is a claim nothing measured.
+    stubFetch(
+      baseRoutes({
+        "GET /api/code/repos": reposView({
+          repos: [LOCAL_REPO],
+          selected_repo_id: "repo_local",
+        }),
+        "GET /api/code/repos/repo_local/changes": {
+          entries: [],
+          diff: "",
+          truncated: false,
+          diff_truncated: false,
+          root_missing: false,
+          reason_code: "not_a_git_repository",
+        },
+      }),
+    );
+    await renderBuildWithProject();
+
+    await fireEvent.click(await screen.findByRole("button", { name: /background work/i }));
+    const tabs = await screen.findByRole("tablist", { name: "Workbench views" });
+    await fireEvent.click(within(tabs).getByRole("tab", { name: /^Changes/ }));
+
+    expect(await screen.findByText(/is not a git repository/)).toBeInTheDocument();
+  });
+
+  it("lists what a commit would record, and counts it once on the tab", async () => {
+    stubFetch(
+      baseRoutes({
+        "GET /api/code/repos": reposView({
+          repos: [LOCAL_REPO],
+          selected_repo_id: "repo_local",
+        }),
+        "GET /api/code/repos/repo_local/changes": {
+          entries: [
+            { path: "src/main.ts", previous_path: "", state: "modified", unstaged: true },
+            { path: "NEW.md", previous_path: "", state: "untracked", unstaged: true },
+          ],
+          diff: "--- a/src/main.ts\n+++ b/src/main.ts\n@@ -1 +1 @@\n-old\n+new\n",
+          truncated: false,
+          diff_truncated: false,
+          root_missing: false,
+          reason_code: null,
+        },
+      }),
+    );
+    await renderBuildWithProject();
+
+    await fireEvent.click(await screen.findByRole("button", { name: /background work/i }));
+    const tabs = await screen.findByRole("tablist", { name: "Workbench views" });
+    await fireEvent.click(within(tabs).getByRole("tab", { name: /^Changes/ }));
+
+    expect(await screen.findByText("2 files changed and not committed.")).toBeInTheDocument();
+    // Scoped to the file list, because the diff below it names the same path —
+    // and it is the *list* that has to be complete, not the diff.
+    const listed = await screen.findByRole("list", { name: "Changed files" });
+    expect(within(listed).getByText("src/main.ts")).toBeInTheDocument();
+    expect(within(listed).getByText("NEW.md")).toBeInTheDocument();
+    // VIS2-13 — one token, and only because it is not the ordinary state.
+    expect(within(tabs).getByRole("tab", { name: /^Changes/ })).toHaveTextContent("2");
+  });
+
+  it("lets each header control answer about its own view, not the column", async () => {
+    // With two panels sharing a column, "open" was a property of the column and
+    // both toggles read it — so opening the terminal made the other control say
+    // "Hide background work" about a pane showing the terminal.
+    stubFetch(baseRoutes());
+    await renderBuildWithProject();
+
+    await fireEvent.click(
+      await screen.findByRole("button", { name: "Show the governed terminal" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Show background work" }),
+    ).toBeInTheDocument();
+
+    // And it switches the view rather than closing a pane opened for something
+    // else: the owner asked for background work, so they get it.
+    await fireEvent.click(screen.getByRole("button", { name: "Show background work" }));
+    const tabs = await screen.findByRole("tablist", { name: "Workbench views" });
+    expect(within(tabs).getByRole("tab", { name: "Runs" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      screen.getByRole("button", { name: "Show the governed terminal" }),
+    ).toBeInTheDocument();
+  });
+
   // The narrow case — no third column, so the pane renders in place with its
   // own collapsed header — is a media-query branch (`compactRail`) that this
   // harness cannot set from props. It is covered by the width sweep.

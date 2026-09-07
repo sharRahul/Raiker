@@ -34,6 +34,7 @@ import type {
   CodeMapPaths,
   CodeMapStatus,
   CodeRepoBrowseView,
+  CodeRepoChangesView,
   CodeRepoDiagnosticsView,
   CodeRepoFileView,
   CodeReposView,
@@ -1930,6 +1931,13 @@ export const api = {
   readCodeRepoFile: (repoId: string, path: string) =>
     request<CodeRepoFileView>(
       `/api/code/repos/${encodeURIComponent(repoId)}/file?path=${encodeURIComponent(path)}`,
+    ),
+  // VIS2-12 — what has changed in the working tree and not yet been committed.
+  // The `Changes` tab of Build's artifact pane reads this; it is the same change
+  // set a commit would record, because it comes from the same two helpers.
+  readCodeRepoChanges: (repoId: string) =>
+    request<CodeRepoChangesView>(
+      `/api/code/repos/${encodeURIComponent(repoId)}/changes`,
     ),
   // B10 — what a parser sees in the file the owner just opened.
   readCodeRepoDiagnostics: (repoId: string, path: string) =>

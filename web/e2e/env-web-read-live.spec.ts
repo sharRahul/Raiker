@@ -178,6 +178,38 @@ test("the Hugging Face flow states its steps and hides the token behind a reason
   await capture(page, `${SHOTS}/env-04-huggingface-step-rail.png`, rail);
 });
 
+test("Build's workbench is one pane over four views, and focuses itself", async ({ page }) => {
+  test.setTimeout(150_000);
+  await signInAsOwner(page, BASE);
+  await page.goto(`${BASE}/#/build`);
+
+  // VIS2-12 — the column used to mean "whatever you last switched on". The
+  // control that opens it names the view it opens on, and the other three are a
+  // tab away rather than behind a second control in the header.
+  const terminal = page.getByRole("button", { name: "Show the governed terminal" });
+  await expect(terminal).toBeVisible({ timeout: 60_000 });
+  await terminal.click();
+
+  const tabs = page.getByRole("tablist", { name: "Workbench views" });
+  await expect(tabs).toBeVisible({ timeout: 30_000 });
+  for (const label of ["Changes", "Preview", "Terminal", "Runs"]) {
+    await expect(tabs.getByRole("tab", { name: new RegExp(`^${label}`) })).toBeVisible();
+  }
+  await expect(tabs.getByRole("tab", { name: "Terminal" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+
+  // Changes is a real read of the working tree, and says which absence it found
+  // rather than reporting an empty tree as "no changes".
+  await tabs.getByRole("tab", { name: /^Changes/ }).click();
+  await expect(
+    page.getByText(/No repository connected|not a git repository|uncommitted|No uncommitted changes/),
+  ).toBeVisible({ timeout: 30_000 });
+
+  await capture(page, `${SHOTS}/env-06-build-workbench-pane.png`, tabs);
+});
+
 test("connecting the supplied Anthropic key through the product's own flow", async ({ page }) => {
   test.skip(KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is unset");
   test.setTimeout(240_000);

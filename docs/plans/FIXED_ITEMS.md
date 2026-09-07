@@ -479,6 +479,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-455](#fixed-455--two-reads-whose-shape-nothing-checked-took-the-page-down) | High | Web resilience | Fixed 2026-09-07 (found live) |
 | [FIXED-456](#fixed-456--three-models-modals-that-escape-could-not-close) | Medium | Models / accessibility | Fixed 2026-09-07 (found live) |
 | [FIXED-457](#fixed-457--rows-that-offered-raikers-own-placeholder-as-a-models-name) | Low | Models | Fixed 2026-09-07 (found live) |
+| [FIXED-458](#fixed-458--a-mobile-sheet-that-was-32px-short-of-being-one) | Low | Composer / mobile | Fixed 2026-09-07 |
 
 ---
 
@@ -20308,3 +20309,32 @@ choosable, not proven ready.
 **User-interface outcome.** Every row in the inventory names something real.
 Live evidence: `live-models-inventory.png`.
 
+---
+
+## FIXED-458 — A mobile sheet that was 32px short of being one
+
+**Severity: Low. Area: composer / mobile. Status: Fixed 2026-09-07. Raised as
+part of
+[COMPOSER-16](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md#composer-16--mobile-behavior).**
+
+**Observed.** The composer's `+` and Tools menus are bottom sheets below the
+split, because a dropdown anchored to a 44px control at the bottom of a phone
+opens upward into the transcript and is thumb-hostile. The media query said
+`inset: auto 0 0 0`, so it read as a full-width sheet and was not one:
+`.menu-surface` caps every menu at `min(24rem, calc(100vw - 2rem))`, which is
+correct for a popover and wrong for a sheet. At 390px it rendered 358px wide and
+anchored to the left, 32px short of the right edge — which reads as a panel that
+failed to lay out rather than as a sheet.
+
+**Fixed.** The sheet rule lifts the cap it inherits.
+
+**Why it survived a green suite.** The rule lives behind a media query, so every
+unit test passes whether or not it applies, and the CSS itself looked right. The
+new spec measures the rendered box at an iPhone viewport — full width, sitting on
+the floor of the viewport, every item at least 44px tall — and checks that
+Escape returns the owner to the prompt. A layout rule is only as true as the
+last time something measured it.
+
+**User-interface outcome.** `composer-mobile-sheet.png`: the sheet spans the
+screen, over a scrim, with the three Work modes still legible as icons in the
+top bar above it.

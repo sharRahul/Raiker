@@ -256,6 +256,11 @@
       inset: auto 0 0 0;
       z-index: 100;
       width: auto;
+      /* `.menu-surface` caps every menu at `min(24rem, 100vw - 2rem)`, which is
+         right for a popover and wrong for a sheet: at 390px it left the sheet
+         32px short of the right edge, anchored to the left, which reads as a
+         panel that failed to lay out rather than as a sheet. */
+      max-width: none;
       max-height: 70vh;
       overflow-y: auto;
       border-radius: var(--r-lg) var(--r-lg) 0 0;

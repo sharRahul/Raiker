@@ -473,6 +473,37 @@ test("every Work mode composes the same way, simple at rest", async ({ page }) =
   await page.keyboard.press("Escape");
 });
 
+test("on a phone the composer's menus are bottom sheets, not upward dropdowns", async ({ page }) => {
+  // COMPOSER-16. A dropdown anchored to a 44px control at the bottom of a phone
+  // opens upwards into the transcript and is thumb-hostile; the same items in a
+  // sheet are one reach away. Measured rather than asserted from the CSS: the
+  // rule lives behind a media query, and a media query that stopped applying
+  // would leave every unit test passing.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("http://raiker.test/#/new-chat");
+  await expect(page.getByLabel("Prompt", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add to this turn" }).click();
+  const menu = page.getByRole("menu", { name: "Add to this turn" });
+  await expect(menu).toBeVisible();
+
+  const box = (await menu.boundingBox())!;
+  // Full width, and sitting on the floor of the viewport.
+  expect(box.x, "the sheet is inset from the left edge").toBeLessThanOrEqual(1);
+  expect(box.width, "the sheet is not full width").toBeGreaterThanOrEqual(388);
+  expect(box.y + box.height, "the sheet does not reach the bottom").toBeGreaterThanOrEqual(843);
+  // Every item is a comfortable target.
+  for (const item of await menu.getByRole("menuitem").all()) {
+    expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+  await capture(page, join(shots, "composer-mobile-sheet.png"));
+
+  // Escape closes it, and the prompt is reachable again.
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByLabel("Prompt", { exact: true })).toBeVisible();
+});
+
 test("the Hooks tab tells an enforcing rule from a dead one and a broken file", async ({ page }) => {
   await page.goto("http://raiker.test/#/extensions?tab=hooks");
 

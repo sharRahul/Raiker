@@ -116,6 +116,17 @@ INTERACTIVE_CAPABILITIES: tuple[str, ...] = ("browser_automation",)
 
 
 #: Typed readiness states. A surface renders these; it never invents a state.
+#:
+#: Two of the five are declared and not currently emitted, and both are
+#: deliberate rather than unfinished. `needs_provider` is what `web_search`
+#: would report on a build that shipped no search endpoint; Raiker ships a
+#: keyless default, so the honest answer today is `ready` naming that default,
+#: and a state nothing can produce is better than a state produced wrongly.
+#: `transient_failure` belongs to a readiness *check* that has run and failed —
+#: this function reads configuration rather than probing, because a probe on
+#: every menu open is an egress request the owner did not ask for. Both are
+#: named here so a surface written against the contract handles them when a
+#: later build does emit them.
 READY = "ready"
 NEEDS_PROVIDER = "needs_provider"
 BLOCKED = "blocked"

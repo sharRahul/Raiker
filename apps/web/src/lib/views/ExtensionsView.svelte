@@ -291,11 +291,13 @@
         <PageState state="loading" title="Reading extension readiness…" />
       {:else}
         <div class="tiles">
+          <!-- VIS2-16 — "some extensions work" is the resting state of any
+               install that has been set up, so it is plain metadata beside the
+               three counts next to it. -->
           <StatTile
             label="Usable now"
             value={overview.counts.usable}
             detail="Every condition confirmed by the server."
-            tone={overview.counts.usable > 0 ? "ok" : "neutral"}
           />
           <StatTile
             label="Installed"
@@ -313,7 +315,7 @@
             detail={overview.vault_configured
               ? "Credentials can be encrypted at rest."
               : "Linking an account fails closed until the vault key is set."}
-            tone={overview.vault_configured ? "ok" : "warn"}
+            tone={overview.vault_configured ? "neutral" : "warn"}
           />
         </div>
 

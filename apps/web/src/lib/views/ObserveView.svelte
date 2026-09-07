@@ -190,13 +190,17 @@
       <section aria-labelledby="ready-h">
         <h2 id="ready-h" class="section-h">Is Raiker ready?</h2>
         <div class="tiles">
+          <!-- VIS2-16 — the healthy half of this pair is the resting state of a
+               working install, so it is plain metadata. The colour is spent on
+               the half that needs a person, which is what makes it mean
+               anything the one time it appears. -->
           <StatTile
             label="Runtime"
             value={ready ? "Ready" : "Not ready"}
             detail={ready
               ? `Running in ${humanize(diagnostics.runtime_mode)} mode with its readiness checks met.`
               : `Running in ${humanize(diagnostics.runtime_mode)} mode with unmet readiness checks.`}
-            tone={ready ? "ok" : "warn"}
+            tone={ready ? "neutral" : "warn"}
           />
           <StatTile
             label="Closed capability gates"
@@ -208,7 +212,7 @@
                     ? ` ${gatesWithNoExecutor} more have no executor and stay closed.`
                     : ""
                 }`}
-            tone={openableGates.length === 0 ? "ok" : "neutral"}
+            tone="neutral"
             href="#/capabilities"
             linkLabel="Review capabilities"
           />
@@ -218,7 +222,7 @@
             detail={diagnostics.missing_config.length === 0
               ? "Nothing required is unset."
               : diagnostics.missing_config.join(", ")}
-            tone={diagnostics.missing_config.length === 0 ? "ok" : "warn"}
+            tone={diagnostics.missing_config.length === 0 ? "neutral" : "warn"}
             href="#/settings"
             linkLabel="Open settings"
           />

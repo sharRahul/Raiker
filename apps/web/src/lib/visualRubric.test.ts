@@ -287,6 +287,19 @@ describe("visual rubric", () => {
       ["views/McpView.svelte", ".status.connected"],
       ["views/WorkbenchView.svelte", ".notice"],
     ];
+    // The stat tiles are the other half of the same sweep. A tile's tone comes
+    // from its call site rather than its stylesheet, so this reads the call
+    // sites: no tile may claim success for a state that is simply the way a
+    // working install always looks.
+    for (const view of ["ObserveView.svelte", "ExtensionsView.svelte"]) {
+      const text = readFileSync(resolve(VIEWS, view), "utf8");
+      expect(text, `${view} tones a resting stat tile as success`).not.toMatch(
+        /tone=\{[^}]*\?\s*"ok"/,
+      );
+      expect(text, `${view} hard-codes a success tone on a stat tile`).not.toMatch(
+        /tone="ok"/,
+      );
+    }
     for (const [file, selector] of resting) {
       const text = readFileSync(resolve(process.cwd(), "src", "lib", file), "utf8");
       const rule = new RegExp(

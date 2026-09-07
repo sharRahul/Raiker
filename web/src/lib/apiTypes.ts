@@ -4,6 +4,55 @@ import type { ApprovalMode } from "./approvalMode";
 // raiker/control/dtos.py). These mirror the backend DTOs; the backend remains the source of truth.
 // tests/test_api_contract_schemas.py guards the backend against dropping keys the UI reads.
 
+/**
+ * WEB-04 — whether a read capability can answer *now*, said separately from
+ * whether the owner has permitted it.
+ *
+ * `available` is projection — the build has the tool and every agentic surface
+ * lists it. `ready` is operational — a provider is configured and the request
+ * would reach something. `state` says which one failed, so a menu can offer the
+ * setup path for `needs_provider` and the Permissions route for `blocked`
+ * instead of one grey row that could mean either.
+ */
+export interface ToolReadiness {
+  tool: string;
+  available: boolean;
+  ready: boolean;
+  state: "ready" | "needs_provider" | "blocked" | "unavailable" | "transient_failure";
+  reason_code?: string;
+  reason_text?: string;
+  provider?: string;
+  remediation_route?: string;
+  checked_at: string;
+}
+
+/** WEB-01 — the one global read catalogue every agentic surface derives from. */
+export interface ReadCapabilities {
+  capabilities: string[];
+  external: string[];
+  interactive: string[];
+  surfaces: Record<string, string[]>;
+  administrative_surfaces: string[];
+  readiness: ToolReadiness[];
+}
+
+/** ENV-01 — the runtime clock bundle a model turn receives, as the UI reads it. */
+export interface EnvironmentContext {
+  generated_at_utc: string;
+  timezone: string;
+  timezone_source: string;
+  local_datetime: string;
+  local_date: string;
+  local_time: string;
+  day_of_week: string;
+  utc_offset: string;
+  display_date: string;
+  freshness: string;
+  locale?: string;
+  location?: string;
+  timezone_error?: string;
+}
+
 export interface CapabilityGate {
   capability: string;
   phase: number;
@@ -1922,9 +1971,10 @@ export interface PromptRequestBody {
   // Client-reported provenance; no audio or transcript metadata crosses this boundary.
   input_mode?: "typed" | "dictated" | "mixed";
   // Which composer sent this prompt. It selects the operating protocol the turn
-  // runs under — Build adds the engineering protocol, Chat does not — and grants
-  // nothing: gates, capabilities and approvals are identical either way.
-  surface?: "chat" | "build";
+  // runs under — Build adds the engineering protocol, Design adds the research
+  // one, Chat adds neither — and grants nothing: gates, capabilities and
+  // approvals are identical whichever it is.
+  surface?: "chat" | "build" | "design";
   // The project this turn may retrieve inside. Required by Build and rejected
   // for Chat: the two surfaces have genuinely different boundaries, and the
   // server refuses a turn that leaves the boundary for it to guess.

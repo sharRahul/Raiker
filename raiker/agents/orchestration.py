@@ -13,6 +13,7 @@ from raiker.models.tool_call_validation import risk_for_tool
 from raiker.models.tool_registry import DELEGABLE_TOOL_NAMES
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
+from raiker.runtime.environment import environment_context
 from raiker.runtime.identity.lifecycle import (
     TrustedTurnIdentity,
     TurnMachineIdentityLifecycle,
@@ -318,6 +319,14 @@ class SubagentRunner:
                         "max_runtime_seconds": budget.max_runtime_seconds,
                         "max_tokens": budget.max_tokens,
                     },
+                    # ENV-04 — the subagent's own clock, derived when it
+                    # finished rather than inherited from the parent turn that
+                    # delegated it. A delegated search that runs across
+                    # midnight, or that was queued behind an approval, has a
+                    # different "now" than the turn that asked for it, and a
+                    # copied parent timestamp would state the wrong one with the
+                    # same confidence as the right one.
+                    "environment": environment_context(self._store, owner_id).to_dict(),
                 },
             )
 

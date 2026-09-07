@@ -65,3 +65,60 @@ def web_search(
         workspace_root, store or SQLiteStore(workspace_root), principal_id=principal_id
     )
     return service.search(query, max_results=limit)
+
+
+def web_extract(
+    workspace_root: str | Path,
+    url: str,
+    mode: str = "main_content",
+    *,
+    store: SQLiteStore | None = None,
+    principal_id: str | None = None,
+) -> dict[str, Any]:
+    """Read one page's structure, brokered as the ``web_extract`` tool (WEB-05).
+
+    The same governed boundary as :func:`web_fetch` — the same capability gate,
+    the same decision mode, the same owner blocklist, the same HTTPS-only public-
+    address guard, the same re-governed redirects — with a parser on the end of
+    it instead of a prose reduction. It opens no connection of its own, which is
+    what makes "extraction cannot widen egress" a property of the code.
+    """
+    from raiker.runtime.web_access import WebAccessService
+    from raiker.storage.sqlite import SQLiteStore
+
+    service = WebAccessService(
+        workspace_root, store or SQLiteStore(workspace_root), principal_id=principal_id
+    )
+    return service.extract(url, mode=mode)
+
+
+def weather_lookup(
+    workspace_root: str | Path,
+    location: Any = None,
+    days: Any = 3,
+    *,
+    store: SQLiteStore | None = None,
+    principal_id: str | None = None,
+) -> dict[str, Any]:
+    """Structured current conditions and forecast (WEATHER-01).
+
+    Governed by the same ``web_fetch`` gate as the reads above, because it is
+    one: a request to a third party carrying the owner's IP. Availability is not
+    egress, so an owner who turned web access off gets that refusal here, by
+    name, rather than a weather-shaped paraphrase of it.
+
+    The result distinguishes *observed at*, *forecast valid for* and *fetched
+    at*, and carries an explicit ``fresh`` / ``stale`` / ``unavailable`` state.
+    """
+    from raiker.runtime.weather import WeatherService
+    from raiker.storage.sqlite import SQLiteStore
+
+    service = WeatherService(
+        workspace_root, store or SQLiteStore(workspace_root), principal_id=principal_id
+    )
+    place = str(location).strip() if isinstance(location, str) else None
+    try:
+        span = int(days)
+    except (TypeError, ValueError):
+        span = 3
+    return service.lookup(location=place, days=span)

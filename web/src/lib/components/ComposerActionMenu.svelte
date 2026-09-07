@@ -21,7 +21,7 @@
    * are one reach away.
    */
   import Icon from "./Icon.svelte";
-  import type { ComposerMenuItem } from "../composerCapabilities";
+  import { READINESS_LABELS, type ComposerMenuItem } from "../composerCapabilities";
 
   let {
     kind,
@@ -112,8 +112,19 @@
               <Icon name={item.icon} size="sm" />
               <span class="entry-copy">
                 <span class="entry-label">{item.label}</span>
-                <span class="entry-hint" id={`${kind}-${item.id}-hint`}>{item.hint}</span>
+                <span class="entry-hint" id={`${kind}-${item.id}-hint`}>
+                  {item.readiness !== null && item.readiness.state !== "ready"
+                    ? (item.readiness.reason_text ?? item.hint)
+                    : item.hint}
+                </span>
               </span>
+              <!-- WEB-04 — readiness, printed only when it is not the plain
+                   `Ready` state. A row that says Ready on every entry is a row
+                   nobody reads, and the one entry that is *not* ready then
+                   reads as one more identical chip. -->
+              {#if item.readiness !== null && item.readiness.state !== "ready"}
+                <span class="entry-state">{READINESS_LABELS[item.readiness.state]}</span>
+              {/if}
             </button>
           {:else}
             <!-- COMPOSER-04 — a capability that is off stays listed, with the
@@ -145,6 +156,16 @@
 {/if}
 
 <style>
+  .entry-state {
+    flex: none;
+    align-self: center;
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    color: var(--text-3);
+    font-size: var(--text-2xs);
+    white-space: nowrap;
+  }
   .action-menu {
     position: relative;
     display: inline-flex;

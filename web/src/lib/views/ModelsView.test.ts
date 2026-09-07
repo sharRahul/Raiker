@@ -175,8 +175,68 @@ describe("BUG-270 — a card never claims a runtime that is not here", () => {
       ),
     );
     // Not "installed": Raiker opened a download, and whether it was run is the
-    // owner's to say.
-    expect(await screen.findByText(/Install it, then choose Look again/)).toBeTruthy();
+    // owner's to say. MODEL-14 changed *who does the asking* — the owner comes
+    // back and Raiker looks again on its own, rather than telling them to press
+    // a button — but the claim is still bounded to what was actually observed.
+    expect(
+      await screen.findByText(/Install it and come back — Raiker will look again/),
+    ).toBeTruthy();
+  });
+
+  it("looks again by itself when the owner comes back from the vendor page", async () => {
+    // MODEL-14 — the trip to a vendor site is unavoidable for a local runtime;
+    // "come back and press Look again" is not. The owner's part ends at
+    // installing the thing, and Raiker asks itself the rest.
+    const mock = stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "gemma4:31b-cloud",
+            configured: false,
+            provider_detected: false,
+          }),
+        ],
+        usable_provider_count: 0,
+      }),
+      "POST /api/model-operations/preview": {
+        runtime: "ollama",
+        action: "download_official_installer",
+        source_url: "https://ollama.com/download",
+        argv: [],
+        requires_elevation: false,
+        terms_url: "https://github.com/ollama/ollama/blob/main/LICENSE",
+        redistribution: false,
+      },
+      "POST /api/local-runtimes/detect": {
+        runtimes: [
+          {
+            runtime: "ollama",
+            present: true,
+            executable: "/usr/local/bin/ollama",
+            detected_at: "2026-09-07T09:00:00Z",
+          },
+        ],
+      },
+    });
+    vi.stubGlobal("open", vi.fn());
+    render(ModelsView, { tab: "add" });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Set up Ollama" }));
+    await screen.findByText(/Raiker will look again/);
+
+    // The owner comes back to the tab. Nothing is pressed.
+    window.dispatchEvent(new Event("focus"));
+
+    await waitFor(() =>
+      expect(mock).toHaveBeenCalledWith(
+        "/api/local-runtimes/detect",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    // And what it reports is what detection found, not that a tab regained focus.
+    expect(await screen.findByText(/is now installed on this machine/)).toBeTruthy();
   });
 
   it("refuses a plan that does not name an https source", async () => {

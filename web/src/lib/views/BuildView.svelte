@@ -120,6 +120,7 @@
     type SlashCommand,
   } from "../composerCommands";
   import { composerMenu } from "../composerCapabilities";
+  import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
   import { collectReasoning, hasRunningTool, toolActivity } from "../chatPresentation";
   import {
@@ -628,6 +629,9 @@
     "set-project",
     "dictate",
     "web-search",
+    "web-read",
+    "web-extract",
+    "weather",
     "run-command",
     "use-mcp",
     "use-connector",
@@ -635,11 +639,19 @@
     "schedule",
     "use-memory",
   ]);
-  const addItems = $derived(composerMenu("add", "build", composerGates, HANDLED));
-  const toolItems = $derived(composerMenu("tools", "build", composerGates, HANDLED));
+  // WEB-04/WEB-07 — as in Chat: readiness from the one shared snapshot, so
+  // Build and Chat cannot describe the same capability differently.
+  const readiness = $derived(readReadiness());
+  const addItems = $derived(composerMenu("add", "build", composerGates, HANDLED, readiness));
+  const toolItems = $derived(
+    composerMenu("tools", "build", composerGates, HANDLED, readiness),
+  );
 
   const TOOL_ROUTES: Record<string, string> = {
     "web-search": "#/capabilities",
+    "web-read": "#/capabilities",
+    "web-extract": "#/capabilities",
+    weather: "#/settings?tab=general",
     "use-mcp": "#/extensions?tab=mcp",
     "use-connector": "#/extensions?tab=connectors",
     "create-task": "#/tasks",
@@ -881,6 +893,7 @@
       // lets the runtime judge each action when it is actually invoked, which
       // is better evidence than a status call that did not answer.
       composerGates = gates;
+      void refreshReadCapabilities();
       const observed: Record<string, string> = {};
       for (const gate of gates) {
         if ((BUILD_WRITE_CAPABILITIES as readonly string[]).includes(gate.capability)) {

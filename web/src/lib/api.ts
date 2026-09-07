@@ -23,6 +23,8 @@ import type {
   OwnerQuestionAnswered,
   ConversationBranchOrigin,
   ConversationBranchPlan,
+  EnvironmentContext,
+  ReadCapabilities,
   Checkpoint,
   CommandChunkView,
   CommandReceiptView,
@@ -582,6 +584,14 @@ export const api = {
   sessionPlan: (sessionId: string) =>
     request<AgentPlan>(`/api/sessions/${encodeURIComponent(sessionId)}/plan`),
   capabilityGates: () => request<CapabilityGate[]>("/api/capability-gates"),
+  // WEB-01/WEB-04 — one read for the whole contract: the catalogue, its
+  // per-surface parity, and typed readiness. Every composer answers from this
+  // rather than deriving a list of its own, which is the drift the contract
+  // exists to remove.
+  readCapabilities: () => request<ReadCapabilities>("/api/read-capabilities"),
+  // ENV-05 — the same bundle a model turn is given. Read rather than
+  // recomputed, so a page and a turn cannot disagree about what time it is.
+  environment: () => request<EnvironmentContext>("/api/environment"),
   capabilityGate: (capability: string) =>
     request<CapabilityGate>(
       `/api/capability-gates/${encodeURIComponent(capability)}`,

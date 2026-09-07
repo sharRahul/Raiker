@@ -67,6 +67,7 @@
     type SlashCommand,
   } from "../composerCommands";
   import { composerMenu } from "../composerCapabilities";
+  import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
   import { collectText } from "../turnPhases";
   import { relativeTime } from "../format";
   import {
@@ -309,6 +310,9 @@
     "set-project",
     "dictate",
     "web-search",
+    "web-read",
+    "web-extract",
+    "weather",
     "use-mcp",
     "use-connector",
     "generate-image",
@@ -316,8 +320,15 @@
     "schedule",
     "use-memory",
   ]);
-  const addItems = $derived(composerMenu("add", "chat", composerGates, HANDLED));
-  const toolItems = $derived(composerMenu("tools", "chat", composerGates, HANDLED));
+  // WEB-04/WEB-07 — the readiness half comes from the shared snapshot, so a
+  // search provider configured on another page reaches this still-mounted view
+  // without a reload, and the menu never prints `Ready` for a call the runtime
+  // is about to refuse.
+  const readiness = $derived(readReadiness());
+  const addItems = $derived(composerMenu("add", "chat", composerGates, HANDLED, readiness));
+  const toolItems = $derived(
+    composerMenu("tools", "chat", composerGates, HANDLED, readiness),
+  );
 
   /**
    * Where a Tools entry goes.
@@ -329,7 +340,14 @@
    * would be the permanent-toolbar problem again, only harder to notice.
    */
   const TOOL_ROUTES: Record<string, string> = {
+    // The three reads and the weather lookup are model-invoked mid-turn: the
+    // owner asks for something and the model reaches for the tool the gate then
+    // judges. So the honest destination for the menu entry is where that
+    // capability is governed and where its readiness is explained.
     "web-search": "#/capabilities",
+    "web-read": "#/capabilities",
+    "web-extract": "#/capabilities",
+    weather: "#/settings?tab=general",
     "use-mcp": "#/extensions?tab=mcp",
     "use-connector": "#/extensions?tab=connectors",
     "generate-image": "#/design",
@@ -781,6 +799,7 @@
       .capabilityGates()
       .then((view) => (composerGates = view))
       .catch(() => (composerGates = []));
+    void refreshReadCapabilities();
     void api.speechRuntime().then((view) => {
       speechRuntime = view.runtime.effective;
     }).catch(() => {});

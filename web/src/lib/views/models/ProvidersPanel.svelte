@@ -2,6 +2,7 @@
   import { onDestroy } from "svelte";
   import { api } from "../../api";
   import { openRuntimeInstaller } from "../../runtimeInstall";
+  import { detectionNotice, onReturnToApp } from "../../returnAndDetect";
   import ProviderLogo from "../../components/ProviderLogo.svelte";
   let {
     onCatalogueChanged,
@@ -17,6 +18,7 @@
 
   onDestroy(() => {
     watching = false;
+    cancelReturnDetect?.();
   });
 
   const terminal = (state: string) =>
@@ -45,14 +47,37 @@
       await new Promise<void>((resolve) => window.setTimeout(resolve, 2_000));
     }
   }
+  /** MODEL-14 — the return listener this panel armed, cancelled on unmount. */
+  let cancelReturnDetect: (() => void) | null = null;
+
   async function openInstaller(runtime: string) {
     busy = runtime;
     error = null;
+    const vendor = runtime === "ollama" ? "Ollama" : "LM Studio";
     try {
       // BUG-270 — the provider row offers this too, so the scheme check that
       // guards `window.open` lives in one place rather than in two that drift.
       await openRuntimeInstaller(runtime);
-      message = `Opened the official ${runtime === "ollama" ? "Ollama" : "LM Studio"} download. Return here after installation.`;
+      // MODEL-14 — "come back and press Refresh" is Raiker asking the owner to
+      // do a job Raiker can do itself. Install it; the detection is ours.
+      message = `Opened the official ${vendor} download. Install it and come back — Raiker will look again.`;
+      cancelReturnDetect?.();
+      cancelReturnDetect = onReturnToApp(() => {
+        cancelReturnDetect = null;
+        void (async () => {
+          try {
+            const result = await api.detectLocalRuntimes();
+            const row = result.runtimes.find((item) => item.runtime === runtime);
+            // Reported, never concluded: the sentence says what detection
+            // found, so a tab regaining focus can never read as an install.
+            message = detectionNotice({ vendor, detected: row?.present === true });
+            if (row?.present) onCatalogueChanged?.([]);
+          } catch {
+            // A failed look leaves the last message standing rather than
+            // replacing it with a claim this call did not establish.
+          }
+        })();
+      });
     } catch {
       error = "Could not open the reviewed vendor download.";
     } finally {

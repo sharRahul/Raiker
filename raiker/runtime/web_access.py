@@ -8,10 +8,13 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, urlparse
 from urllib.request import HTTPRedirectHandler
 
+from raiker.contracts.ids import utc_now
 from raiker.models.tool_registry import tool_risk_band
 from raiker.runtime.authority.admission import CapabilityAdmission, capability_admission
 from raiker.runtime.authority.decision_modes import DecisionMode
 from raiker.runtime.executors.sandbox import SandboxError
+from raiker.runtime.web_extract import EXTRACT_MODES
+from raiker.runtime.web_extract import extract as extract_from_body
 from raiker.runtime.web_policy import (
     BlocklistRule,
     EgressDecision,
@@ -281,6 +284,25 @@ class WebAccessService:
     def _mode(self) -> DecisionMode:
         return self._admission().decision_mode
 
+    def blocklist(self) -> tuple[BlocklistRule, ...]:
+        """The egress rules in force, for a caller that fetches through this boundary.
+
+        Public because :mod:`raiker.runtime.weather` reads through the same
+        boundary and reaching into a private attribute to do it would make that
+        sharing look accidental. It is not: one rule set, one guard, one place a
+        destination is judged.
+        """
+        return self._blocklist()
+
+    def governance_refusal(self, what: str) -> dict[str, Any] | None:
+        """The gate/decision-mode refusal for *what*, or ``None`` to proceed.
+
+        Exposed for the same reason as :meth:`blocklist`: a capability layered on
+        this one must be refused by *this* check rather than by a second copy of
+        it that could drift.
+        """
+        return self._governance_refusal(what)
+
     def _governance_refusal(self, what: str) -> dict[str, Any] | None:
         if not self._gate_enabled():
             return _denied(
@@ -355,6 +377,104 @@ class WebAccessService:
                 "notes": list(page.notes),
             },
         }
+
+    # ── extract ──────────────────────────────────────────────────────────
+    def extract(
+        self, url: str, *, mode: str = "main_content", enforce_modes: bool = True
+    ) -> dict[str, Any]:
+        """Read one page's *structure* — its main text, links, tables or metadata.
+
+        Deliberately a thin governed shell around :func:`raiker.runtime.
+        web_extract.extract`. Every check `fetch` makes is made here, in the same
+        order, by the same code: the gate, the decision mode, the owner's
+        blocklist, the address guard and the re-governed redirect chain. What
+        differs is only what happens to the bytes afterwards, which is exactly
+        the amount of difference a new extraction mode is allowed to introduce.
+
+        A page whose body carries too little readable content comes back as
+        ``static_content_insufficient``. That is a description of the page, not
+        a request: whether a browser capability may then be proposed is a
+        separate governed decision, and this result grants nothing towards it.
+        """
+        url = (url or "").strip()
+        if not url:
+            return _failed("missing_argument:url", "web_extract needs a url.")
+        if mode not in EXTRACT_MODES:
+            return _failed(
+                f"web_extract_unknown_mode:{mode}",
+                "web_extract mode must be one of: " + ", ".join(EXTRACT_MODES) + ".",
+            )
+        if enforce_modes:
+            refusal = self._governance_refusal("Web extract")
+            if refusal is not None:
+                return refusal
+        rules = self._blocklist()
+        decision = check_url(url, rules)
+        if not decision.allowed:
+            return _denied(decision.reason_code, refusal_message(decision.reason_code))
+        fetch_fn = self._fetch_fn or _fetch
+        fetched_at = utc_now()
+        try:
+            fetched = fetch_fn(
+                url,
+                rules,
+                {"User-Agent": "raiker-web-extract", "Accept": "text/html,text/plain"},
+            )
+        except SandboxError as exc:
+            return _denied(str(exc), "Web extract failed closed.")
+        except Exception:  # noqa: BLE001 — every transport failure fails closed
+            return _denied("web_extract_failed", "Web extract failed closed.")
+
+        final_url = str(fetched.get("final_url", url))
+        result = extract_from_body(
+            mode=mode,
+            body=str(fetched.get("body", "")),
+            content_type=str(fetched.get("content_type", "")),
+            final_url=final_url,
+            body_truncated=bool(fetched.get("truncated")),
+        )
+        payload: dict[str, Any] = {
+            "status": "success",
+            "mode": mode,
+            "requested_url": url,
+            "final_url": final_url,
+            "fetched_at": fetched_at,
+            "untrusted": True,
+            "title": result.title,
+            "truncation": {
+                "truncated": result.truncated,
+                "notes": list(result.truncation_notes),
+            },
+        }
+        if result.content:
+            payload["content"] = as_model_content(
+                sanitize_text(result.content), source=final_url
+            )
+            payload["content_length"] = len(result.content)
+        if mode == "links":
+            payload["links"] = result.links
+            payload["link_count"] = len(result.links)
+        if mode == "tables":
+            payload["tables"] = result.tables
+            payload["table_count"] = len(result.tables)
+        if mode == "metadata":
+            payload["metadata"] = result.metadata
+        if mode == "structured_data":
+            payload["structured_data"] = result.structured_data
+        if result.static_insufficient_reason is not None:
+            # Typed, and *beside* whatever was extracted rather than instead of
+            # it: a page that yielded three paragraphs and looks browser-rendered
+            # has produced three real paragraphs, and discarding them to report a
+            # limitation would be its own kind of dishonesty.
+            payload["static_content_insufficient"] = {
+                "reason_code": "static_content_insufficient",
+                "detail": result.static_insufficient_reason,
+                "browser_escalation": (
+                    "A browser capability is a separate governed decision. This "
+                    "result does not authorise one and does not request one."
+                ),
+            }
+        return payload
 
     # ── search ───────────────────────────────────────────────────────────
     @staticmethod

@@ -80,6 +80,8 @@ ALWAYS_PROJECTED: frozenset[str] = frozenset({
     # The outside world and the work it produces.
     "web_search",
     "web_fetch",
+    "web_extract",
+    "weather_lookup",
     "create_task",
     "create_document",
     # Where a coding turn starts.

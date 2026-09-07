@@ -12,6 +12,9 @@ on:
       - "web/**"
       - ".github/workflows/web.yml"
 
+permissions:
+  contents: read
+
 defaults:
   run:
     working-directory: web

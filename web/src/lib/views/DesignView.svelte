@@ -28,9 +28,20 @@
   import { runtimeBlock } from "../capabilityModel";
   import { composerMenu } from "../composerCapabilities";
   import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
+  import { setWorkProject, workProject } from "../workProject.svelte";
   import { imageCandidates, modelName } from "../modelPresentation";
   import { rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
-  import type { CapabilityGate, ImageGeneration, ModelsView } from "../apiTypes";
+  import type {
+    CapabilityGate,
+    ImageGeneration,
+    ModelsView,
+    ProjectsList,
+  } from "../apiTypes";
+
+  let {
+    /** The owner's projects, so the composer can name the one work runs in. */
+    projects = null,
+  }: { projects?: ProjectsList | null } = $props();
 
   let view = $state<{ sizes: string[]; generations: ImageGeneration[] } | null>(null);
   let loadError = $state<string | null>(null);
@@ -148,7 +159,32 @@
   const toolItems = $derived(composerMenu("tools", "design", gates, HANDLED, readiness));
 
   /** COMPOSER-06 — the parameters this press will use, as one inspectable line. */
+  /**
+   * VIS2-11 — the Work project, named here as it is in Chat and Build.
+   *
+   * Named, and honestly bounded. Design's research turns run inside this
+   * project like any other governed turn; the *image* endpoint takes a prompt,
+   * a size and a model and has no project field, so a generated picture does
+   * not yet belong to the project it was made in. The fact says which of the
+   * two it is rather than implying the stronger one — recorded in
+   * docs/plans/TO_BE_FIXED.md as the runtime half that is missing.
+   */
+  const project = $derived(
+    (projects?.projects ?? []).find((entry) => entry.project_id === workProject()) ?? null,
+  );
+
   const contextFacts = $derived([
+    ...(project !== null
+      ? [
+          {
+            label: "Project",
+            value: `${project.name} — research runs here; images are not filed to it yet`,
+            short: project.name,
+            href: "#/projects",
+            action: "Projects",
+          },
+        ]
+      : []),
     {
       label: "Size",
       value: size,
@@ -173,9 +209,15 @@
     weather: "What are the current conditions and light like in: ",
   };
 
+  /** Open state for the project chooser the `+` menu reveals, as in Chat. */
+  let projectPickerOpen = $state(false);
+
   function runComposerAction(id: string) {
     if (id === "set-project") {
-      window.location.hash = "#/projects";
+      // VIS2-11 — chosen here rather than on another page. Sending the owner to
+      // Projects to pick one and back again is the re-choosing this item exists
+      // to remove.
+      projectPickerOpen = !projectPickerOpen;
       return;
     }
     const ask = RESEARCH_ASKS[id];
@@ -465,6 +507,33 @@
       <ComposerContext facts={contextFacts} disabled={busy} />
     {/snippet}
 
+    {#snippet above()}
+      {#if projectPickerOpen}
+        <div class="project-choice" role="group" aria-label="Choose a project">
+          <label for="design-project-choice">Project for this work</label>
+          <select
+            id="design-project-choice"
+            class="bar-select"
+            value={workProject()}
+            onchange={(event) => {
+              projectPickerOpen = false;
+              setWorkProject((event.currentTarget as HTMLSelectElement).value);
+            }}
+          >
+            <option value="">No project — this work stands alone</option>
+            {#each projects?.projects ?? [] as entry (entry.project_id)}
+              <option value={entry.project_id}>{entry.name}</option>
+            {/each}
+          </select>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            onclick={() => (projectPickerOpen = false)}>Done</button
+          >
+        </div>
+      {/if}
+    {/snippet}
+
     {#snippet right()}
       <!-- COMPOSER-05 — model identity stays visible and model *management*
            does not. Always drawn, whatever is configured: hiding it made "no
@@ -547,6 +616,17 @@
   .research-body { margin: 0; color: var(--text-1); white-space: pre-wrap; }
   .research-body.error { color: var(--danger); }
   .research-note { margin: 0.4rem 0 0; color: var(--text-3); font-size: var(--text-xs); }
+  /* The same shape Chat's chooser uses, for the same reason: it opens in flow
+     between the prompt and the bar rather than as a popover over the text. */
+  .project-choice {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    margin: 0 0 var(--space-2);
+  }
+  .project-choice label { color: var(--text-2); font-size: var(--text-sm); }
+  .project-choice select { min-width: 12rem; }
 
   /* The same frame Chat uses: the thread takes the room the shell gives it and
      scrolls, the composer stays on the floor of the page. */

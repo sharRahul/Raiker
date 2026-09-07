@@ -17,7 +17,7 @@
    */
   import { onMount, tick, untrack } from "svelte";
   import { modelDecision, rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
-  import { readBuildProject, rememberBuildProject } from "../buildProject";
+  import { setWorkProject, workProject } from "../workProject.svelte";
   import {
     clampExplorerWidth,
     DEFAULT_EXPLORER_WIDTH,
@@ -628,7 +628,9 @@
   //
   // The choice is remembered locally so returning to Build resumes where the
   // owner left off, and it cannot change mid-turn.
-  let projectId = $state(readBuildProject());
+  // VIS2-11 — the shared Work project, so choosing one here reaches Chat and
+  // Design too rather than being re-chosen on each surface.
+  const projectId = $derived(workProject());
 
   // A remembered id that no longer names an owned project must not silently
   // stand as a boundary. Resolving it against the loaded list is what turns a
@@ -1637,8 +1639,9 @@
   // ── Projects ─────────────────────────────────────────────────────────
   async function onProjectPicked(value: string) {
     if (streaming) return;
-    projectId = value;
-    rememberBuildProject(value);
+    // The shared store *is* the value: assigning both would leave two answers
+    // to one question, and the local one would win until the next read.
+    setWorkProject(value);
     projectNotice = null;
     const target = value === "" ? null : value;
     if (sessionId === null) {

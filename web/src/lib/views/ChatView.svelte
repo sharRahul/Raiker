@@ -67,6 +67,7 @@
     type SlashCommand,
   } from "../composerCommands";
   import { composerMenu } from "../composerCapabilities";
+  import { setWorkProject, workProject } from "../workProject.svelte";
   import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
   import { collectText } from "../turnPhases";
   import { relativeTime } from "../format";
@@ -179,8 +180,20 @@
   // popover is opened at least once; the meter falls back to the labelled local
   // estimate until the server has something real to report.
   let contextUsage = $state<ContextUsage | null>(null);
-  let projectId = $state("");
-  let pendingProjectId: string | null = null;
+  /**
+   * VIS2-11 — the project this conversation is filed under.
+   *
+   * A conversation that already exists owns its own answer, and changing it
+   * moves the session. A conversation that does not exist yet has no answer of
+   * its own, so it starts in the shared Work project — which is what makes
+   * "choose a project in Build, switch to Chat, keep working in it" true rather
+   * than something the owner does twice.
+   *
+   * The shared value is never allowed to re-file an existing chat: it is read
+   * only while `sessionId` is null.
+   */
+  let projectId = $state(workProject());
+  let pendingProjectId: string | null = workProject() === "" ? null : workProject();
   let projectNotice = $state<string | null>(null);
   let backgroundWorkOpen = $state(false);
 
@@ -1520,6 +1533,9 @@
 
   async function onProjectPicked(value: string) {
     projectId = value;
+    // The owner chose a project for the work they are doing, so the next Build
+    // turn and the next Design generation start there too.
+    setWorkProject(value);
     projectNotice = null;
     const target = value === "" ? null : value;
     if (sessionId === null) {

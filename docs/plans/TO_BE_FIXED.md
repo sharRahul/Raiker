@@ -1472,3 +1472,34 @@ them into the canvas when VIS2-19 lands.
 **Interface outcome that has to be true before this closes.** Every claim in a
 Design research result can be opened at the page it came from, without leaving
 Design.
+
+---
+
+## BUG-282 — A generated image does not belong to the project it was made in
+
+**Severity: Medium. Area: Design / projects. Raised while implementing
+[VIS2-11](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-11--make-project-the-persistent-context-across-chat-build-and-design).**
+
+**Observed.** The Work project now persists across Chat, Build and Design, and
+Design names it in the composer's context line. What it names is deliberately
+narrow: *research runs here; images are not filed to it yet.*
+
+VIS2-11 asks for more — "generated images/assets belong to the Project
+automatically when created there", and "visual versions/iterations are project
+artifacts, not isolated chat attachments". They cannot be. `POST /api/images`
+takes a profile, a prompt, a size and a model; the stored generation row carries
+no project, so there is nothing to file an image *to*.
+
+**Why it was left.** Adding a project to the image row is a schema change plus a
+governed read path, and the surrounding question — what a Design *asset* is,
+versioned or not, and how a Build task references one — is VIS2-19's canvas
+workspace, which is still open. Filing images against a project shape that is
+about to be designed would be work done twice.
+
+**Proposed fix.** Carry `project_id` on the image generation and on its stored
+attachment, scope the gallery read by it, and show a project's images on the
+project page beside its files.
+
+**Interface outcome that has to be true before this closes.** An image generated
+while working in a project appears among that project's material, and the
+Design composer's context line can drop the words "not filed to it yet".

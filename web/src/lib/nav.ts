@@ -179,7 +179,11 @@ export const HUB_TABS: Record<string, string[]> = {
     "runtime",
     "usage",
   ],
-  extensions: ["connectors", "mcp", "skills", "hooks", "plugins"],
+  // VIS2-10 — Overview leads, for the same reason it does on Models. Five
+  // equal tabs named for *kinds of thing* is a filing system, and nobody
+  // arrives here wanting to look at the MCP category: they want to know what
+  // Raiker can reach and whether anything they installed is broken.
+  extensions: ["overview", "connectors", "mcp", "skills", "hooks", "plugins"],
   observe: ["overview", "sessions", "activity", "checkpoints", "work", "notifications"],
   // Every section the settings rail renders, in rail order. The two lists have
   // to agree: a section the rail shows but this list omits is a deep link that

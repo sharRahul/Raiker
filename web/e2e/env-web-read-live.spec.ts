@@ -210,6 +210,24 @@ test("Build's workbench is one pane over four views, and focuses itself", async 
   await capture(page, `${SHOTS}/env-06-build-workbench-pane.png`, tabs);
 });
 
+test("Extensions opens on what Raiker can reach, not on a category", async ({ page }) => {
+  test.setTimeout(120_000);
+  await signInAsOwner(page, BASE);
+  await page.goto(`${BASE}/#/extensions`);
+
+  // VIS2-10 — the page used to open on Connectors, which is a filing system by
+  // kind of thing rather than an answer to why anyone came.
+  const heading = page.getByRole("heading", { name: "What Raiker can reach" });
+  await expect(heading).toBeVisible({ timeout: 60_000 });
+  // Exception-led: on a workspace with nothing installed it says so once,
+  // rather than drawing a card per healthy row.
+  await expect(
+    page.getByText(/Everything installed is usable|Nothing installed yet, so nothing to check|needs attention/),
+  ).toBeVisible({ timeout: 30_000 });
+
+  await capture(page, `${SHOTS}/env-07-extensions-overview.png`, heading);
+});
+
 test("connecting the supplied Anthropic key through the product's own flow", async ({ page }) => {
   test.skip(KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is unset");
   test.setTimeout(240_000);

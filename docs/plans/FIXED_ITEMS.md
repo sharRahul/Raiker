@@ -20675,3 +20675,153 @@ it already asked for.
 one", truncating with an ellipsis when the bar is narrow, and still links to the
 Models page.
 
+
+---
+
+## FIXED-467 — Build's third pane showed tools, not the work
+
+**Severity: Medium. Area: build. Status: Fixed 2026-09-07. Found in
+[VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+(VIS2-12).**
+
+**Observed.** Build's right-hand pane carried a file tree and a terminal — two
+instruments — while the thing an owner actually comes back for, *what this turn
+changed*, was nowhere on the page. There was no way to see the working tree
+without leaving Build for a shell, so the surface that writes code could not
+show its own output.
+
+**Fixed.** The pane became the object of work with four views — **Changes**,
+**Preview**, **Terminal** and **Runs** — and a rule for which one to show:
+`focusFor(event, current)` in `web/src/lib/buildArtifacts.ts` moves the pane to
+the view the last event is about, and deliberately returns `null` for
+`turn-changed-files` while the terminal is open, because a command the owner is
+watching is not something to yank away from. The working tree is read through a
+new governed route, `GET /api/code/repos/{repo_id}/changes`, which reports
+`entries`, a bounded `diff`, and a `reason_code` when there is nothing to read
+(`repo_not_checked_out`, `repo_folder_missing`, `not_a_git_repository`) rather
+than an empty list that reads as "no changes".
+
+**User-interface outcome.** Opening a file previews it; running a command shows
+the terminal; a turn that writes files brings Changes forward with a count.
+Each header control now says what its own view will do, so two controls never
+both read "Hide".
+
+**Tests.** `buildArtifacts.test.ts` for the focus rule and the change summary,
+`BuildView.test.ts` for the pane's four views and their controls, and
+`tests/test_code_repo_files_api.py` for the route's limits and each reason
+code.
+
+---
+
+## FIXED-468 — Extensions opened on a category instead of on what Raiker can reach
+
+**Severity: Medium. Area: extensions. Status: Fixed 2026-09-07. Found in
+[VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+(VIS2-10).**
+
+**Observed.** Extensions opened on **Connectors** — one kind of extension out of
+five — so the page's first answer was an implementation category. The question
+an owner arrives with is *what can Raiker reach, and what did I allow that the
+default posture would not*, and no view answered it: the exceptions were spread
+across five tabs, each of which had to be visited to be sure.
+
+**Fixed.** An **Overview** hub, derived in `web/src/lib/extensionsOverview.ts`.
+`extensionReach()` counts what is connected per kind and `extensionExceptions()`
+lists every extension standing outside the default posture, in one place, with
+`tabForKind()` routing each entry to the kind that owns it. The tabs remain —
+they are where the work is done — but they are entered from the answer rather
+than guessed at.
+
+**User-interface outcome.** `#/extensions` lands on Overview with one sentence
+of reach and an exceptions list; every row opens the kind that owns it.
+
+**Tests.** `extensionsOverview.test.ts` and `ExtensionsView.test.ts`.
+
+---
+
+## FIXED-469 — The project was chosen again on every surface
+
+**Severity: Medium. Area: chat / build / design. Status: Fixed 2026-09-07. Found
+in [VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+(VIS2-11) and COMPOSER-11.**
+
+**Observed.** Chat, Build and Design each kept their own idea of the current
+project. Moving from a Chat about a project to a Build in the same project meant
+choosing it a second time, and a reload lost the choice entirely — so the one
+piece of context that decides what a turn may retrieve and where it may write
+was the piece most easily left wrong.
+
+**Fixed.** One store, `web/src/lib/workProject.svelte.ts`, holding the Work
+project for all three surfaces and persisting it under `raiker.build.project`
+(the key is unchanged, so an existing selection survives the upgrade).
+`startInBuild()` lets Home open a surface with the project already chosen.
+Because the store is module-level, `resetWorkProject()` is called from
+`web/src/test-setup.ts` — without it one test's selection leaked into the next.
+
+**User-interface outcome.** The project is chosen once and named in every Work
+composer's context line; switching surface or reloading keeps it.
+
+**Tests.** `workProject.test.ts`, plus the project assertions in
+`ChatView.test.ts` and `BuildView.test.ts`.
+
+---
+
+## FIXED-470 — Tasks asked to be filled in rather than instructed
+
+**Severity: Medium. Area: tasks. Status: Fixed 2026-09-07. Found in
+[UNIFIED_COMPOSER_REDESIGN_2026-09-06.md](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md)
+(COMPOSER-10).**
+
+**Observed.** Creating a task meant completing an admin form — a title field, a
+separate objective, its own model picker, recurrence and notification controls
+all permanently on screen — while every other surface in Raiker takes an
+instruction. Two of those fields asked the owner for the same thing twice: a
+task titled "Summarise security news" whose objective was "Summarise security
+news and surface important changes".
+
+**Fixed.** Tasks is written on the shared `Composer` shell around one question,
+*What should Raiker do?*, with `web/src/lib/taskComposer.ts` supplying the
+grammar: `deriveTitle()` names the task from its own instruction (overridable,
+bounded by `MAX_DERIVED_TITLE`), `primaryAction()` gives the cadence its verb,
+`wantsStartTime()` decides whether a start time is even a question, and
+`scheduleSummary()` states the resulting schedule in words. Schedule, project,
+model and notification details live behind a summary line that expands only when
+asked; the execution environment and model capacity are facts on the context
+line rather than two more badges.
+
+**User-interface outcome.** A task is created by typing what Raiker should do
+and pressing the cadence's own action. The details are still all there, one
+disclosure away, and the schedule is stated back in words before it is saved.
+
+**Tests.** `taskComposer.test.ts` (13 cases) and `TasksView.test.ts` (26).
+Live-verified in the round of 2026-09-07; screenshot
+`env-08-tasks-composer.png`.
+
+---
+
+## FIXED-471 — One primary action that did not say what it would do
+
+**Severity: Low. Area: composer. Status: Fixed 2026-09-07. Found in
+[UNIFIED_COMPOSER_REDESIGN_2026-09-06.md](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md)
+(COMPOSER-15).**
+
+**Observed.** Build's primary action read **Send** in every mode. In Plan mode
+it sends nothing to be applied; in Edit mode it does not apply either, because
+every write parks for a decision. So the one word an owner reads before
+committing to a turn described neither what the press does nor what the mode
+allows.
+
+**Fixed.** `buildPrimaryAction()` in `web/src/lib/buildModes.ts` names the act
+the press performs: `plan` → **Plan**, `edit` → **Propose**, `auto` → **Run**.
+Deliberately not "Apply": a write in Edit mode is proposed and waits for a
+decision, and a button that says Apply would promise the decision away. The
+accessible name is the visible label — no `aria-label` overriding it — so a
+screen reader hears the same promise the screen makes.
+
+**User-interface outcome.** Build reads Plan, Propose or Run per mode; Chat
+reads Send; Design reads Generate; Tasks reads its cadence's action. A running
+turn shows Stop and Steer in the composer instead, so Send and Stop are never
+offered at once.
+
+**Tests.** `buildModes.test.ts` covers each mode's word and pins that Edit never
+reads "Apply"; `BuildView.test.ts` asks for the action by what it does.

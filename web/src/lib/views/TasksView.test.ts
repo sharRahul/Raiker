@@ -9,6 +9,23 @@ afterEach(() => { vi.unstubAllGlobals(); resetModels(); takeScheduleRequest(); }
 
 const READY_MODEL = { profile_id: "test-ready", provider: "ollama", model: "test-model", selected: true, configured: true, ready: true, readiness_state: "ready" };
 
+/**
+ * COMPOSER-10 — planning work is one instruction now, with the rest behind
+ * Details. These two helpers are what changed for every case below: the form's
+ * Title/Instructions pair became a single field, and Priority, Repeat, First
+ * run and Parent work are opened rather than always on screen.
+ */
+async function instruct(text: string): Promise<void> {
+  await fireEvent.input(screen.getByLabelText("What should Raiker do?"), {
+    target: { value: text },
+  });
+}
+
+async function openDetails(): Promise<void> {
+  const toggle = screen.getByRole("button", { expanded: false, name: /Runs|Once|Daily|Hourly|Weekly|Every/ });
+  await fireEvent.click(toggle);
+}
+
 describe("TasksView", () => {
   it("opens on Once when Chat's /schedule asked for it, and creates nothing", async () => {
     const fetchMock = stubFetch({
@@ -120,12 +137,12 @@ describe("TasksView", () => {
     const stopped = { profile_id: "ollama", provider: "ollama", model: "qwen", selected: true, configured: true, ready: false, readiness_state: "runtime_stopped", readiness_summary: "Ollama is not reachable.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start Ollama, then check again." };
     stubFetch({ "GET /api/tasks": [], "GET /api/models": { profiles: [stopped], chat_profiles: [stopped] } });
     render(TasksView);
-    await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Keep title" } });
-    await fireEvent.input(screen.getByLabelText("Instructions"), { target: { value: "Keep instructions" } });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Create task" })).toBeDisabled());
+    await instruct("Keep instructions");
+    await waitFor(() => expect(screen.getByRole("button", { name: /Create task/ })).toBeDisabled());
     expect(screen.getByText("Ollama is not reachable.")).toBeInTheDocument();
-    expect(screen.getByLabelText("Task title")).toHaveValue("Keep title");
-    expect(screen.getByLabelText("Instructions")).toHaveValue("Keep instructions");
+    // The draft survives the refusal, which is the point: a model that is not
+    // ready must not cost the owner what they typed.
+    expect(screen.getByLabelText("What should Raiker do?")).toHaveValue("Keep instructions");
   });
   it("creates an immediate task with its own configured model pair", async () => {
     const fetchMock = stubFetch({
@@ -144,9 +161,8 @@ describe("TasksView", () => {
 
     await fireEvent.click(await screen.findByRole("button", { name: /model for this turn/i }));
     await fireEvent.click(screen.getByRole("menuitemradio", { name: /opus/i }));
-    await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Review release" } });
-    await fireEvent.input(screen.getByLabelText("Instructions"), { target: { value: "Check every change." } });
-    await fireEvent.click(screen.getByRole("button", { name: "Create task" }));
+    await instruct("Check every change.");
+    await fireEvent.click(screen.getByRole("button", { name: /Create task/ }));
 
     const post = await waitFor(() => fetchMock.mock.calls.find(([, init]) => init?.method === "POST"));
     expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({
@@ -173,11 +189,12 @@ describe("TasksView", () => {
     expect(attachment.closest(".task-attachments")).not.toBeNull();
     expect(attachment.closest(".task-title")).toBeNull();
 
-    await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Use source" } });
-    await fireEvent.input(screen.getByLabelText("Instructions"), { target: { value: "Read it." } });
-    await fireEvent.input(screen.getByLabelText("Attachment path"), { target: { value: "docs/plan.md" } });
+    await instruct("Read it.");
+    await fireEvent.click(screen.getByRole("button", { name: "Add to this turn" }));
+    await fireEvent.click(await screen.findByRole("menuitem", { name: "Upload a file" }));
+    await fireEvent.input(await screen.findByLabelText("Attachment path"), { target: { value: "docs/plan.md" } });
     await fireEvent.click(screen.getByRole("button", { name: "Attach" }));
-    await fireEvent.click(screen.getByRole("button", { name: "Create task" }));
+    await fireEvent.click(screen.getByRole("button", { name: /Create task/ }));
 
     const post = await waitFor(() => fetchMock.mock.calls.find(([, init]) => init?.method === "POST"));
     expect(JSON.parse(String(post?.[1]?.body)).attachments).toEqual([
@@ -192,8 +209,12 @@ describe("TasksView", () => {
     render(TasksView);
     await screen.findByText("No work queued");
     await fireEvent.click(screen.getByRole("button", { name: "Once" }));
-    expect(screen.getByText("Model for each run")).toBeInTheDocument();
+    // COMPOSER-10 — the model sits in the composer bar as it does on every
+    // other Work surface, rather than under a label of its own. What a schedule
+    // captures it *onto* is said by the primary action and the timing line.
     expect(screen.getByRole("button", { name: /model for this turn: haiku/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Schedule task/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { expanded: false, name: /Once — pick a time/ })).toBeInTheDocument();
   });
 
   it("shows a route-level loading state while tasks are fetched", async () => {
@@ -215,12 +236,13 @@ describe("TasksView", () => {
     render(TasksView);
 
     await waitFor(() => expect(screen.getByText("No work queued")).toBeInTheDocument());
-    await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Plan release" } });
-    await fireEvent.input(screen.getByLabelText("Instructions"), { target: { value: "   " } });
-    const submit = screen.getByRole("button", { name: "Create task" });
+    await instruct("   ");
+    const submit = screen.getByRole("button", { name: /Create task/ });
 
+    // One field, so one refusal: nothing to write means nothing to create, and
+    // the button says so by being disabled rather than by an error under a
+    // second field that no longer exists.
     expect(submit).toBeDisabled();
-    expect(screen.getByRole("alert")).toHaveTextContent(/instructions are required/i);
     await fireEvent.click(submit);
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
@@ -252,11 +274,12 @@ describe("TasksView", () => {
 
     await waitFor(() => expect(screen.getByText("No work queued")).toBeInTheDocument());
     await fireEvent.click(screen.getByRole("button", { name: "Routine" }));
+    await instruct("Prepare the release notes.");
+    await openDetails();
     await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Plan release" } });
-    await fireEvent.input(screen.getByLabelText("Instructions"), { target: { value: "Prepare the release notes." } });
     await fireEvent.change(screen.getByLabelText("Priority"), { target: { value: "high" } });
     await fireEvent.input(screen.getByLabelText("First run"), { target: { value: "2026-07-14T09:30" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Create routine" }));
+    await fireEvent.click(screen.getByRole("button", { name: /Create routine/ }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/tasks",
@@ -309,8 +332,9 @@ describe("TasksView", () => {
 
     await waitFor(() => expect(screen.getByText("No work queued")).toBeInTheDocument());
     await fireEvent.click(screen.getByRole("button", { name: "Routine" }));
+    await instruct("Report any failing job.");
+    await openDetails();
     await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Watch the build" } });
-    await fireEvent.input(screen.getByLabelText("Instructions"), { target: { value: "Report any failing job." } });
     await fireEvent.input(screen.getByLabelText("First run"), { target: { value: "2026-07-14T09:30" } });
     await fireEvent.change(screen.getByLabelText("Repeat"), { target: { value: "hourly" } });
     await fireEvent.click(screen.getByRole("button", { name: "Create routine" }));
@@ -482,16 +506,56 @@ describe("TasksView blocked-on-approval pointer", () => {
   });
 
   // The control is offered only where Build's method can work: a repository.
+  // COMPOSER-10 moved it into Details, so it is opened rather than always on
+  // screen — the offer is still conditional on the project.
   it("offers the working method only inside a project", async () => {
     stubFetch({ "GET /api/tasks": [], "GET /api/approvals": [] });
     const { unmount } = render(TasksView);
-    await waitFor(() => expect(screen.getByText("Plan work")).toBeInTheDocument());
+    await screen.findByLabelText("What should Raiker do?");
+    await openDetails();
     expect(screen.queryByRole("group", { name: "How to work" })).not.toBeInTheDocument();
     unmount();
 
     stubFetch({ "GET /api/tasks": [], "GET /api/approvals": [] });
     render(TasksView, { projectId: "proj_1" });
-    await waitFor(() => expect(screen.getByText("Plan work")).toBeInTheDocument());
+    await screen.findByLabelText("What should Raiker do?");
+    await openDetails();
     expect(screen.getByRole("group", { name: "How to work" })).toBeInTheDocument();
+  });
+
+  it("plans work with one instruction rather than a form of eight controls", async () => {
+    // COMPOSER-10 — asking Raiker to do something in Chat takes one field.
+    // Asking it to do the same thing later took ten, which taught the owner
+    // that scheduling is a more administrative act than asking. It is not.
+    stubFetch({ "GET /api/tasks": [], "GET /api/approvals": [] });
+    render(TasksView);
+
+    await screen.findByLabelText("What should Raiker do?");
+    for (const gone of ["Priority", "Parent work", "Repeat", "Task title"]) {
+      expect(screen.queryByLabelText(gone)).not.toBeInTheDocument();
+    }
+    // And the timing is still legible while the details are closed.
+    expect(screen.getByRole("button", { expanded: false, name: /Runs now/ })).toBeInTheDocument();
+  });
+
+  it("files the task under a title derived from the instruction", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/tasks": [],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+      "POST /api/tasks": {},
+    });
+    render(TasksView);
+
+    await screen.findByText("No work queued");
+    await instruct("Summarise security news. Flag anything urgent.");
+    await fireEvent.click(screen.getByRole("button", { name: /Create task/ }));
+
+    const post = await waitFor(() =>
+      fetchMock.mock.calls.find(([, init]) => init?.method === "POST"),
+    );
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({
+      title: "Summarise security news",
+      description: "Summarise security news. Flag anything urgent.",
+    });
   });
 });

@@ -73,6 +73,7 @@
     BUILD_WRITE_CAPABILITIES,
     buildMode,
     DEFAULT_BUILD_MODE,
+    buildPrimaryAction,
     nextBuildMode,
     repoPreamble,
     standingPostureNote,
@@ -2563,7 +2564,12 @@
               disabled={streaming || attachStore.uploading || promptText.trim() === "" || modelBlocked || !projectReady}
             >
               <Icon name={streaming ? "clock" : "send"} size="sm" />
-              <span class="send-label">{streaming ? "Working…" : "Send"}</span>
+              <!-- COMPOSER-15 — one state, one obvious next action. The word
+                   follows the posture this turn is already sending, so it can
+                   never promise more than the turn will do. -->
+              <span class="send-label"
+                >{streaming ? "Working…" : buildPrimaryAction(mode)}</span
+              >
             </button>
       {/snippet}
 

@@ -7,41 +7,85 @@
   import PageState from "../components/PageState.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
   import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
-  import ExecutionEnvironmentBadge from "../components/ExecutionEnvironmentBadge.svelte";
-  import ModelCapacityBadge from "../components/ModelCapacityBadge.svelte";
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
+  import Composer from "../components/Composer.svelte";
+  import ComposerActionMenu from "../components/ComposerActionMenu.svelte";
+  import ComposerContext from "../components/ComposerContext.svelte";
+  import { composerMenu } from "../composerCapabilities";
+  import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
+  import { setWorkProject, workProject } from "../workProject.svelte";
+  import {
+    TASK_CADENCES,
+    deriveTitle,
+    primaryAction,
+    scheduleSummary,
+    type TaskCadence,
+  } from "../taskComposer";
   import GuideLink from "../components/GuideLink.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { createFileDrop } from "../fileDrop.svelte";
   import { api, ApiError } from "../api";
   import { rememberSurfaceModel, surfaceModel, type Surface } from "../surfaceModel.svelte";
   import { takeScheduleRequest } from "../scheduleHandoff";
-  import type { ApprovalView, PromptAttachment, TaskView } from "../apiTypes";
+  import type {
+    ApprovalView,
+    CapabilityGate,
+    ExecutionEnvironment,
+    ProjectsList,
+    PromptAttachment,
+    TaskView,
+  } from "../apiTypes";
   import { relativeTime } from "../format";
   import { AGENT_CADENCES, cadenceLabel } from "../agentCadence";
   import { ACTIVE_TASK_STATES, isActiveTask, taskBadge, taskStatusLabel } from "../statusMaps";
   import { chatProfiles, refreshModels } from "../models.svelte";
   import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
 
-  let { projectId = null, sessionId = null }: { projectId?: string | null; sessionId?: string | null } = $props();
+  let {
+    projectId = null,
+    sessionId = null,
+    /** The owner's projects, so the composer can name and change the boundary. */
+    projects = null,
+  }: {
+    projectId?: string | null;
+    sessionId?: string | null;
+    projects?: ProjectsList | null;
+  } = $props();
   let tasks = $state<TaskView[] | null>(null);
   let loadError = $state<string | null>(null);
   let notice = $state<string | null>(null);
   let creating = $state(false);
   let busyTask = $state<string | null>(null);
-  let title = $state("");
+  /**
+   * COMPOSER-10 — one instruction, and a title derived from it.
+   *
+   * The form asked for a Title *and* Instructions, both required, at the top of
+   * a card of eight controls. Asking Raiker to do something in Chat takes one
+   * field; asking it to do the same thing later took ten, which teaches an
+   * owner that scheduling is a more administrative kind of act than asking. It
+   * is not: a scheduled cycle is one governed turn, the same as a typed prompt.
+   *
+   * So the title is derived from the instruction and shown in the details,
+   * where the owner can override it when the derived one is not what they would
+   * have called it. `titleOverride` is empty until they do.
+   */
+  let titleOverride = $state("");
   let objective = $state("");
+  const title = $derived(titleOverride.trim() || deriveTitle(objective));
   let priority = $state("normal");
   let parentTaskId = $state("");
-  let cadence = $state<"now" | "once" | "routine" | "background">("now");
+  let cadence = $state<TaskCadence>("now");
+  /** COMPOSER-10 — the timing details, opened only when asked for. */
+  let detailsOpen = $state(false);
+  let composerGates = $state<CapabilityGate[]>([]);
   // Backlog #10 — the composer offered "Daily" and nothing else, so an owner who
   // wanted hourly or weekly had to go to Build's side panel for it, and the four
   // cadences the runtime honours read as one. The chip now names the *shape* of
   // the work and this names the interval, which is the axis they actually vary
   // on. `continuous` is the shortest cadence the scheduler offers, not a loop.
   let routineEvery = $state("daily");
-  let titleEl: HTMLInputElement | undefined = $state();
+  let instructionEl: HTMLTextAreaElement | undefined = $state();
   let scheduledAt = $state("");
   let modelProfile = $state("");
   let model = $state("");
@@ -74,6 +118,59 @@
       model = remembered.model;
     });
   });
+  /** The timing, in one line, whether or not the details are open. */
+  const schedule = $derived(
+    scheduleSummary({
+      cadence,
+      every: routineEvery,
+      everyLabel: cadenceLabel(routineEvery),
+      startAt: scheduledAt,
+    }),
+  );
+
+  /** COMPOSER-10 — the same two menus every other Work composer carries. */
+  const readiness = $derived(readReadiness());
+  const HANDLED = new Set([
+    "attach-file",
+    "set-project",
+    "web-search",
+    "web-read",
+    "web-extract",
+    "weather",
+    "use-mcp",
+    "use-connector",
+  ]);
+  const addItems = $derived(composerMenu("add", "tasks", composerGates, HANDLED, readiness));
+  const toolItems = $derived(composerMenu("tools", "tasks", composerGates, HANDLED, readiness));
+
+  /** Where a Tools entry goes. Tasks invokes none of them itself: the model
+   *  reaches for one mid-run and the gate judges it then, so the honest thing
+   *  this menu can do is name the capability and open where it is governed. */
+  const TOOL_ROUTES: Record<string, string> = {
+    "web-search": "#/capabilities",
+    "web-read": "#/capabilities",
+    "web-extract": "#/capabilities",
+    weather: "#/settings?tab=general",
+    "use-mcp": "#/extensions?tab=mcp",
+    "use-connector": "#/extensions?tab=connectors",
+  };
+
+  let attachOpen = $state(false);
+  let projectPickerOpen = $state(false);
+
+  function runComposerAction(id: string) {
+    if (id === "attach-file") {
+      attachOpen = true;
+      return;
+    }
+    if (id === "set-project") {
+      projectPickerOpen = !projectPickerOpen;
+      return;
+    }
+    const route = TOOL_ROUTES[id];
+    if (route !== undefined) window.location.hash = route;
+  }
+
   const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
   const activeProfile = $derived(
     profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile,
@@ -187,6 +284,68 @@
   // refused.
   let workMethod = $state("chat");
   const buildAvailable = $derived(Boolean(projectId));
+  const activeProject = $derived(
+    (projects?.projects ?? []).find((entry) => entry.project_id === (projectId ?? workProject())) ??
+      null,
+  );
+
+  /** Where a run executes. Read once; a failed read says so rather than
+   *  claiming an environment nothing observed. */
+  let environment = $state<ExecutionEnvironment | null>(null);
+  let environmentUnavailable = $state(false);
+  const environmentLabel = $derived(
+    environmentUnavailable
+      ? "Environment unavailable"
+      : environment
+        ? `${environment.name}${environment.available ? "" : " — setup required"}`
+        : "Reading environment…",
+  );
+  const capacityLabel = $derived(
+    activeProfile?.context_window_tokens
+      ? `${new Intl.NumberFormat(undefined, { notation: "compact" }).format(activeProfile.context_window_tokens)} tokens`
+      : "Capacity unknown",
+  );
+
+  /** COMPOSER-06 — the boundary this work will run inside, as one line. */
+  const contextFacts = $derived([
+    ...(activeProject !== null
+      ? [
+          {
+            label: "Project",
+            value: activeProject.name,
+            short: activeProject.name,
+            href: "#/projects",
+            action: "Projects",
+          },
+        ]
+      : []),
+    {
+      label: "Method",
+      value: workMethod === "build" ? "Build — reads the project's repository" : "Chat",
+      short: workMethod === "build" ? "Build" : "Chat",
+    },
+    // VIS2-13 — these two were permanent chips beside the model picker, and
+    // they are facts rather than actions: where a run executes, and how much
+    // the chosen model can hold. In the context line they are still stated and
+    // still one click from the page that changes them, without spending two of
+    // the composer's tokens on the ordinary case.
+    {
+      label: "Runs in",
+      value: environmentLabel,
+      short: environmentLabel,
+      href: "#/settings?tab=runtime",
+      action: "Runtime",
+    },
+    {
+      label: "Context",
+      value: capacityLabel,
+      short: capacityLabel,
+      href: "#/models?tab=models",
+      action: "Models",
+    },
+  ]);
+
+
 
   async function createTask() {
     if (!title.trim() || !objective.trim() || modelBlocked || attachStore.uploading || (wantsStartTime && !scheduledAt)) return;
@@ -203,7 +362,7 @@
         ...(modelProfile && model ? { model_profile: modelProfile, model } : {}),
         ...(attachments ? { attachments } : {}),
       });
-      title = ""; objective = ""; parentTaskId = ""; priority = "normal"; cadence = "now"; routineEvery = "daily"; scheduledAt = ""; modelProfile = ""; model = ""; workMethod = "chat";
+      titleOverride = ""; objective = ""; parentTaskId = ""; priority = "normal"; cadence = "now"; routineEvery = "daily"; scheduledAt = ""; modelProfile = ""; model = ""; workMethod = "chat";
       notice = "Saved to your work queue.";
       attachStore.clear();
       await load();
@@ -284,9 +443,24 @@
     // arranges the form and stops: nothing is created and nothing is scheduled.
     if (takeScheduleRequest()) {
       cadence = "once";
-      queueMicrotask(() => titleEl?.focus());
+      queueMicrotask(() => instructionEl?.focus());
     }
     void refreshModels();
+    void refreshReadCapabilities();
+    void api
+      .capabilityGates()
+      .then((view) => (composerGates = view))
+      .catch(() => (composerGates = []));
+    void api
+      .executionEnvironments()
+      .then((view) => {
+        environment = view.environments.find((item) => item.selected) ?? null;
+        environmentUnavailable = false;
+      })
+      .catch(() => {
+        environment = null;
+        environmentUnavailable = true;
+      });
     const timer = window.setInterval(() => void load(), 15_000);
     return () => window.clearInterval(timer);
   });
@@ -296,35 +470,217 @@
   <header>  <GuideLink route="tasks" />
 <button type="button" class="btn btn-ghost btn-sm" onclick={load}><Icon name="refresh" size="sm" /> Refresh</button></header>
 
-  <form
-    class="card composer"
-    class:drop-active={composerDrop.over}
-    ondragenter={composerDrop.ondragenter}
-    ondragover={composerDrop.ondragover}
-    ondragleave={composerDrop.ondragleave}
-    ondrop={composerDrop.ondrop}
-    onsubmit={(event) => { event.preventDefault(); void createTask(); }}
+  <!-- COMPOSER-10 — the same shell Chat, Build and Design use. What differs is
+       the primary action and the one control that is specific to planning work:
+       when it should run. Everything else the form used to hold at all times —
+       title, parent, priority, repeat, start time, model — is either derived or
+       behind Details. -->
+  <Composer
+    ariaLabel="Plan work"
+    cardClass="composer-task"
+    inputId="task-instruction"
+    inputLabel="What should Raiker do?"
+    bind:value={objective}
+    bind:inputEl={instructionEl}
+    dropActive={composerDrop.over}
+    dropHandlers={{
+      ondragenter: composerDrop.ondragenter,
+      ondragover: composerDrop.ondragover,
+      ondragleave: composerDrop.ondragleave,
+      ondrop: composerDrop.ondrop,
+    }}
+    inputProps={{
+      placeholder:
+        cadence === "background"
+          ? "e.g. Research local AI news and tell me what changed"
+          : cadence === "routine"
+            ? "e.g. Review today's priorities and flag what slipped"
+            : "Describe the work, the outcome you want, and anything it must not do.",
+      disabled: creating,
+    }}
+    onsubmit={() => void createTask()}
   >
-    <div class="composer-heading"><div><h3>Plan work</h3></div><div class="cadence chip-row" role="group" aria-label="When to run"><button type="button" class="chip" aria-pressed={cadence === "now"} onclick={() => cadence = "now"}>Task</button><button type="button" class="chip" aria-pressed={cadence === "once"} onclick={() => cadence = "once"}>Once</button><button type="button" class="chip" aria-pressed={cadence === "routine"} onclick={() => cadence = "routine"}>Routine</button><button type="button" class="chip" aria-pressed={cadence === "background"} onclick={() => cadence = "background"}>Background</button></div></div>
-    <!-- Backlog #23 — the chip row above says *when*; this says *how*. Build's
-         method is a repository it can read, so it appears only inside a project. -->
-    {#if buildAvailable}
-      <div class="chip-row" role="group" aria-label="How to work">
-        <button type="button" class="chip" aria-pressed={workMethod === "chat"} onclick={() => workMethod = "chat"}>Chat</button>
-        <button type="button" class="chip" aria-pressed={workMethod === "build"} onclick={() => workMethod = "build"}>Build</button>
+    {#snippet above()}
+      <div class="cadence chip-row" role="group" aria-label="When to run">
+        {#each TASK_CADENCES as entry (entry.id)}
+          <button
+            type="button"
+            class="chip"
+            aria-pressed={cadence === entry.id}
+            onclick={() => (cadence = entry.id)}>{entry.label}</button
+          >
+        {/each}
       </div>
-    {/if}
-    <label>Title<input class="input" aria-label="Task title" bind:this={titleEl} bind:value={title} required maxlength="240" placeholder={cadence === "background" ? "e.g. Research local AI news" : cadence === "routine" ? "e.g. Review today’s priorities" : "What should Raiker work on?"} /></label>
-    <label>Instructions *<textarea class="textarea" aria-label="Instructions" aria-invalid={Boolean(title.trim() && !objective.trim())} aria-describedby={title.trim() && !objective.trim() ? "instructions-error" : undefined} bind:value={objective} required placeholder="Add the outcome, context, or constraints for this work."></textarea></label>
-    {#if title.trim() && !objective.trim()}<p id="instructions-error" class="field-error" role="alert">Instructions are required.</p>{/if}
-    {#if composerDrop.over}<p class="drop-note" role="status">Drop to attach</p>{/if}
-    <ComposerChips store={attachStore} disabled={creating} />
-    <ComposerAttachPanel store={attachStore} disabled={creating} idPrefix="task" />
-    <div class="fields"><label>Parent work<select class="select" aria-label="Parent work" bind:value={parentTaskId}><option value="">No parent — top-level work</option>{#each tasks ?? [] as task (task.task_id)}<option value={task.task_id}>{task.title}</option>{/each}</select></label><label>Priority<select class="select" aria-label="Priority" bind:value={priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label>{#if cadence === "routine"}<label>Repeat<select class="select" aria-label="Repeat" bind:value={routineEvery}>{#each AGENT_CADENCES.filter((option) => option.id !== "background") as option (option.id)}<option value={option.id}>{option.label}</option>{/each}</select></label>{/if}{#if wantsStartTime}<label>{cadence === "routine" ? "First run" : "Start time"}<input class="input" aria-label={cadence === "routine" ? "First run" : "Start time"} type="datetime-local" bind:value={scheduledAt} required /></label>{/if}</div>
-    <div class="task-model"><span>{cadence === "now" ? "Task model" : "Model for each run"}</span><ModelPicker {profiles} {selectedProfile} bind:profileId={modelProfile} bind:model onchosen={(profileId, chosen) => void rememberSurfaceModel(surface, profileId, chosen)} /><ExecutionEnvironmentBadge /><ModelCapacityBadge tokens={activeProfile?.context_window_tokens} source={activeProfile?.context_window_source} /></div>
-    <ModelReadinessStrip readiness={modelReadiness} draftPreserved={Boolean(title.trim() || objective.trim())} />
-    <button class="btn btn-primary" disabled={creating || attachStore.uploading || modelBlocked || !title.trim() || !objective.trim() || (wantsStartTime && !scheduledAt)}>{creating ? "Saving…" : attachStore.uploading ? "Uploading…" : cadence === "background" ? "Start background agent" : cadence === "routine" ? "Create routine" : cadence === "once" ? "Schedule task" : "Create task"}</button>
-  </form>
+      <ComposerChips store={attachStore} disabled={creating} />
+      {#if attachOpen}
+        <ComposerAttachPanel store={attachStore} disabled={creating} idPrefix="task" />
+      {/if}
+      {#if projectPickerOpen}
+        <div class="project-choice" role="group" aria-label="Choose a project">
+          <label for="task-project-choice">Project for this work</label>
+          <select
+            id="task-project-choice"
+            class="bar-select"
+            value={workProject()}
+            onchange={(event) => {
+              projectPickerOpen = false;
+              setWorkProject((event.currentTarget as HTMLSelectElement).value);
+            }}
+          >
+            <option value="">No project — this work stands alone</option>
+            {#each projects?.projects ?? [] as entry (entry.project_id)}
+              <option value={entry.project_id}>{entry.name}</option>
+            {/each}
+          </select>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            onclick={() => (projectPickerOpen = false)}>Done</button
+          >
+        </div>
+      {/if}
+    {/snippet}
+
+    {#snippet below()}
+      {#if detailsOpen}
+        <!-- COMPOSER-10 — "scheduling details expand only after requested". The
+             summary above stays visible while they are open, so opening the
+             details never becomes the only place the choice is legible. -->
+        <div class="task-details" role="group" aria-label="Work details">
+          <label>
+            Title
+            <input
+              class="input"
+              aria-label="Task title"
+              maxlength="240"
+              placeholder={title || "Derived from your instruction"}
+              bind:value={titleOverride}
+            />
+          </label>
+          {#if cadence === "routine"}
+            <label>
+              Repeat
+              <select class="select" aria-label="Repeat" bind:value={routineEvery}>
+                {#each AGENT_CADENCES.filter((option) => option.id !== "background") as option (option.id)}
+                  <option value={option.id}>{option.label}</option>
+                {/each}
+              </select>
+            </label>
+          {/if}
+          {#if wantsStartTime}
+            <label>
+              {cadence === "routine" ? "First run" : "Start time"}
+              <input
+                class="input"
+                aria-label={cadence === "routine" ? "First run" : "Start time"}
+                type="datetime-local"
+                bind:value={scheduledAt}
+                required
+              />
+            </label>
+          {/if}
+          <label>
+            Parent work
+            <select class="select" aria-label="Parent work" bind:value={parentTaskId}>
+              <option value="">No parent — top-level work</option>
+              {#each tasks ?? [] as task (task.task_id)}
+                <option value={task.task_id}>{task.title}</option>
+              {/each}
+            </select>
+          </label>
+          <label>
+            Priority
+            <select class="select" aria-label="Priority" bind:value={priority}>
+              <option value="low">Low</option>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          {#if buildAvailable}
+            <div class="chip-row" role="group" aria-label="How to work">
+              <button
+                type="button"
+                class="chip"
+                aria-pressed={workMethod === "chat"}
+                onclick={() => (workMethod = "chat")}>Chat</button
+              >
+              <button
+                type="button"
+                class="chip"
+                aria-pressed={workMethod === "build"}
+                onclick={() => (workMethod = "build")}>Build</button
+              >
+            </div>
+          {/if}
+        </div>
+      {/if}
+      <ModelReadinessStrip
+        readiness={modelReadiness}
+        draftPreserved={Boolean(objective.trim())}
+      />
+    {/snippet}
+
+    {#snippet left()}
+      <ComposerActionMenu
+        kind="add"
+        items={addItems}
+        disabled={creating}
+        onchoose={runComposerAction}
+      />
+      <ComposerActionMenu
+        kind="tools"
+        items={toolItems}
+        disabled={creating}
+        onchoose={runComposerAction}
+      />
+      <!-- The one control planning work needs that asking a question does not.
+           Collapsed it still says what was chosen, so the details being hidden
+           never means the timing is invisible. -->
+      <button
+        type="button"
+        class="composer-control schedule-toggle"
+        aria-expanded={detailsOpen}
+        aria-controls="task-details"
+        onclick={() => (detailsOpen = !detailsOpen)}
+      >
+        <Icon name="clock" size="sm" />
+        <span>{schedule}</span>
+      </button>
+      <ComposerContext facts={contextFacts} disabled={creating} />
+    {/snippet}
+
+    {#snippet right()}
+      <ModelPicker
+        {profiles}
+        {selectedProfile}
+        bind:profileId={modelProfile}
+        bind:model
+        onchosen={(profileId, chosen) => void rememberSurfaceModel(surface, profileId, chosen)}
+      />
+      <button
+        type="submit"
+        class="btn btn-primary send"
+        disabled={creating ||
+          attachStore.uploading ||
+          modelBlocked ||
+          !objective.trim() ||
+          (wantsStartTime && !scheduledAt)}
+      >
+        <Icon name={creating ? "clock" : "send"} size="sm" />
+        <span class="send-label"
+          >{creating
+            ? "Saving…"
+            : attachStore.uploading
+              ? "Uploading…"
+              : primaryAction(cadence)}</span
+        >
+      </button>
+    {/snippet}
+
+    {#snippet hint()}
+      {schedule} · {title ? `Filed as “${title}”` : "Write an instruction to begin"}
+    {/snippet}
+  </Composer>
 
   {#if notice}<p class="notice" role="status">{notice}</p>{/if}
   {#if loadError}<PageState state="error" title="Couldn't load tasks" detail={loadError} />
@@ -341,7 +697,7 @@
             <!-- VIS-12 — the plan form is already on this page, above the empty
                  state. Naming where it is would be worse than putting the
                  cursor in it. -->
-            <button type="button" class="btn btn-primary" onclick={() => titleEl?.focus()}>
+            <button type="button" class="btn btn-primary" onclick={() => instructionEl?.focus()}>
               Plan your first task
             </button>
           {/snippet}
@@ -464,5 +820,16 @@
 </section>
 
 <style>
-  .tasks{width:100%}.tasks header,.composer-heading,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.composer p,.task p{color:var(--text-2);font-size:var(--text-sm);margin:.35rem 0 0}.composer{display:grid;gap:var(--space-3);max-width:64rem}.composer label{color:var(--text-2);display:grid;font-size:var(--text-sm);gap:.35rem}.composer .field-error{color:var(--danger);font-size:var(--text-sm);margin:calc(var(--space-3) * -.5) 0 0}.fields{display:grid;gap:var(--space-3);grid-template-columns:repeat(3,minmax(0,1fr))}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:var(--text-sm)}.summary strong{color:var(--text-1);font-size:var(--text-base)}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:var(--text-base)}.task-attachments{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}.task-attachments span{align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-2);display:flex;font-size:var(--text-xs);gap:.3rem;max-width:100%;overflow-wrap:anywhere;padding:.35rem .5rem}.step{color:var(--accent)!important}.continuing{align-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.recovery{align-items:center;display:flex;flex-wrap:wrap;gap:.35rem;margin-left:auto}.recovery-note{color:var(--text-3);font-size:var(--text-xs)}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:var(--text-xs);margin-top:.8rem}.task-actions{align-items:center;display:flex;flex-wrap:wrap;gap:.4rem}.thread-link{align-items:center;display:inline-flex;gap:.3rem;text-decoration:none}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:var(--text-sm)}.history-main{display:grid;gap:.15rem;min-width:0}.history-title{color:var(--text-1)}.outcome{color:var(--text-2);font-size:var(--text-sm);margin:.4rem 0 0}.history-main .outcome{margin:0}.notice{color:var(--success);margin:var(--space-3) 0}@media(max-width:42rem){.tasks header,.composer-heading{flex-direction:column}.fields{grid-template-columns:1fr}.task{margin-left:0;max-width:none}}
+  .tasks{width:100%}.tasks header,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.task p{color:var(--text-2);font-size:var(--text-sm);margin:.35rem 0 0}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:var(--text-sm)}.summary strong{color:var(--text-1);font-size:var(--text-base)}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:var(--text-base)}.task-attachments{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}.task-attachments span{align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-2);display:flex;font-size:var(--text-xs);gap:.3rem;max-width:100%;overflow-wrap:anywhere;padding:.35rem .5rem}.step{color:var(--accent)!important}.continuing{align-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.recovery{align-items:center;display:flex;flex-wrap:wrap;gap:.35rem;margin-left:auto}.recovery-note{color:var(--text-3);font-size:var(--text-xs)}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:var(--text-xs);margin-top:.8rem}.task-actions{align-items:center;display:flex;flex-wrap:wrap;gap:.4rem}.thread-link{align-items:center;display:inline-flex;gap:.3rem;text-decoration:none}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:var(--text-sm)}.history-main{display:grid;gap:.15rem;min-width:0}.history-title{color:var(--text-1)}.outcome{color:var(--text-2);font-size:var(--text-sm);margin:.4rem 0 0}.history-main .outcome{margin:0}.notice{color:var(--success);margin:var(--space-3) 0}
+  /* COMPOSER-10 — the details, when asked for. A grid rather than a column so
+     four short fields do not become four full-width rows. */
+  .task-details{display:grid;gap:var(--space-3);grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));margin:var(--space-2) 0}
+  .task-details label{color:var(--text-2);display:grid;font-size:var(--text-sm);gap:.35rem}
+  /* The one control planning work needs that asking a question does not. It
+     reads as a composer control rather than as a form field, because that is
+     what it is. */
+  .schedule-toggle{display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap;max-width:16rem;overflow:hidden;text-overflow:ellipsis}
+  .project-choice{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin:0 0 var(--space-2)}
+  .project-choice label{color:var(--text-2);font-size:var(--text-sm)}
+  .project-choice select{min-width:12rem}@media(max-width:42rem){.tasks header{flex-direction:column}.task{margin-left:0;max-width:none}}
 </style>

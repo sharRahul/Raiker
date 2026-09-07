@@ -228,6 +228,28 @@ test("Extensions opens on what Raiker can reach, not on a category", async ({ pa
   await capture(page, `${SHOTS}/env-07-extensions-overview.png`, heading);
 });
 
+test("planning work reads as an instruction, not as an admin form", async ({ page }) => {
+  test.setTimeout(120_000);
+  await signInAsOwner(page, BASE);
+  await page.goto(`${BASE}/#/tasks`);
+
+  // COMPOSER-10 — asking Raiker to do something in Chat takes one field.
+  // Asking it to do the same thing later took ten.
+  const instruction = page.getByLabel("What should Raiker do?");
+  await expect(instruction).toBeVisible({ timeout: 60_000 });
+  for (const gone of ["Priority", "Parent work", "Task title"]) {
+    await expect(page.getByLabel(gone)).toHaveCount(0);
+  }
+
+  // The timing is legible while its details are closed, then opens on request.
+  const timing = page.getByRole("button", { name: /Runs now/ });
+  await expect(timing).toBeVisible();
+  await timing.click();
+  await expect(page.getByLabel("Priority")).toBeVisible({ timeout: 30_000 });
+
+  await capture(page, `${SHOTS}/env-08-tasks-composer.png`, instruction);
+});
+
 test("connecting the supplied Anthropic key through the product's own flow", async ({ page }) => {
   test.skip(KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is unset");
   test.setTimeout(240_000);

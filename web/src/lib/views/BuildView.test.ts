@@ -179,6 +179,13 @@ function modeTrigger() {
   return screen.getByRole("button", { name: /^How much Raiker may do this turn:/ });
 }
 
+// COMPOSER-15 — Build's primary action names the act the press performs, so it
+// reads "Run", "Plan" or "Propose" depending on the mode, never a generic
+// "Send". Tests ask for it by what it does, the same way the owner reads it.
+function sendButton() {
+  return screen.getByRole("button", { name: /^(Run|Plan|Propose)$/ });
+}
+
 // Build cannot start a turn without a project, so every test that sends one has
 // to choose one first. That is the product rule, not a test detail: the
 // selection is the retrieval and execution boundary the turn runs inside.
@@ -383,7 +390,7 @@ describe("Build composer modes", () => {
     await fireEvent.input(await screen.findByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     // Opening in Auto must widen nothing: no capability override and no planning
@@ -425,7 +432,7 @@ describe("Build composer modes", () => {
     await fireEvent.click(await screen.findByRole("button", { name: "Done dictating" }));
     expect(streamPromptMock).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Describe the change")).toHaveValue("check the repository");
-    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await fireEvent.click(sendButton());
     expect(streamPromptMock.mock.calls[0][0]).toMatchObject({ input_mode: "dictated" });
   });
 
@@ -439,7 +446,7 @@ describe("Build composer modes", () => {
     await startComposerDictation();
     FakeRecognition.instance.final("discard this");
     await fireEvent.click(screen.getByRole("button", { name: "Cancel dictation" }));
-    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await fireEvent.click(sendButton());
 
     expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
       text: expect.stringContaining("keep this"),
@@ -452,7 +459,7 @@ describe("Build composer modes", () => {
     respondWith("Build answer");
     await renderBuildWithProject();
     await fireEvent.input(await screen.findByLabelText("Describe the change"), { target: { value: "Plan it" } });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     expect(await screen.findByRole("button", { name: "Read aloud" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy response" })).toBeInTheDocument();
@@ -464,7 +471,7 @@ describe("Build composer modes", () => {
     await renderBuildWithProject();
     const box = screen.getByLabelText("Describe the change");
     await fireEvent.input(box, { target: { value: "keep this change" } });
-    await waitFor(() => expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled());
+    await waitFor(() => expect(sendButton()).toBeDisabled());
     expect(screen.getByText("The local runtime is stopped.")).toBeInTheDocument();
     expect(box).toHaveValue("keep this change");
   });
@@ -543,7 +550,7 @@ describe("Build composer modes", () => {
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
@@ -565,7 +572,7 @@ describe("Build composer modes", () => {
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0].capability_modes).toEqual({});
@@ -580,7 +587,7 @@ describe("Build composer modes", () => {
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0]).toMatchObject({ planning_mode: "always" });
@@ -622,7 +629,7 @@ describe("Build model picker", () => {
       "true",
     );
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Use effort" } });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
@@ -655,7 +662,7 @@ describe("Build repository context", () => {
     // edit files says where without the owner looking up at the header.
     await screen.findAllByRole("button", { name: /my-app/ });
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Rename the header" } });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0].attachments).toEqual([
@@ -676,7 +683,7 @@ describe("Build repository context", () => {
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Read the handoff" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(screen.getByText("HANDOFF.md").closest(".from-you")).toBeNull();
@@ -691,7 +698,7 @@ describe("Build repository context", () => {
 
     await screen.findAllByRole("button", { name: /octo\/app/ });
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Summarise the README" } });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0].text).toBe(
@@ -751,7 +758,7 @@ describe("Build project filing", () => {
     expect(await screen.findByText(/filed there as soon as it starts/i)).toBeInTheDocument();
 
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Start" } });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => {
       const moved = fetchMock.mock.calls.some(([url]) =>
@@ -771,7 +778,7 @@ describe("Build project requirement", () => {
       target: { value: "Add a settings page" },
     });
 
-    expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled();
+    expect(sendButton()).toBeDisabled();
     expect(screen.getByText(/select a project to start/i)).toBeVisible();
   });
 
@@ -780,7 +787,7 @@ describe("Build project requirement", () => {
     await renderBuildWithProject();
 
     expect(await screen.findByText(/working in/i)).toBeVisible();
-    expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled();
+    expect(sendButton()).toBeDisabled();
   });
 
   it("sends the selected project as the turn's boundary", async () => {
@@ -791,7 +798,7 @@ describe("Build project requirement", () => {
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0].surface).toBe("build");
@@ -806,7 +813,7 @@ describe("Build project requirement", () => {
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     // COMPOSER-03 — the select is behind `+` now. What must not change is that
     // a running turn cannot have its boundary moved out from under it.
@@ -913,7 +920,7 @@ describe("Build transcript rendering", () => {
     await fireEvent.input(await screen.findByLabelText("Describe the change"), {
       target: { value: "Plan the change" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     const answer = await waitFor(() => {
       const el = document.querySelector(".from-raiker .markdown");
@@ -1051,7 +1058,7 @@ describe("Build inline diff review", () => {
     await fireEvent.input(await screen.findByLabelText("Describe the change"), {
       target: { value: "Rename the entry point" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     // The diff, the file it touches, and the decision are one screen.
     expect(await screen.findByText("src/app.py")).toBeInTheDocument();
@@ -1083,7 +1090,7 @@ describe("Build inline diff review", () => {
     await fireEvent.input(await screen.findByLabelText("Describe the change"), {
       target: { value: "Rename the entry point" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     expect(await screen.findByRole("button", { name: "Accept" })).toBeInTheDocument();
     expect(screen.queryByText("src/app.py")).toBeNull();

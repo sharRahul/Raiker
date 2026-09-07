@@ -25,9 +25,9 @@ not a canvas.
 | VIS2-07 state-aware governance wording | Done — [FIXED-448](FIXED_ITEMS.md#fixed-448--the-posture-chip-said-protected-while-its-colour-said-otherwise) |
 | VIS2-08 sidebar active-state cues | Done — [FIXED-449](FIXED_ITEMS.md#fixed-449--five-ways-of-saying-which-row-you-are-on) |
 | VIS2-09 unique destination icons | Done — [FIXED-446](FIXED_ITEMS.md#fixed-446--design-was-a-work-mode-the-shell-did-not-draw) |
-| VIS2-10 composed secondary hubs | Partly — Models is a composed hub now; Extensions, Observability and Settings are still tab strips |
-| VIS2-11 Project as persistent context | Partly — the Project is named in every Work composer's context line; a shared workspace shell is not built |
-| VIS2-12 Build artifact pane | Open |
+| VIS2-10 composed secondary hubs | Done — Extensions opens on an Overview that answers what Raiker can reach and what stands outside the default posture (`extensionsOverview.ts`), and each kind is entered from there rather than from a tab strip ([FIXED-468](FIXED_ITEMS.md#fixed-468--extensions-opened-on-a-category-instead-of-on-what-raiker-can-reach)) |
+| VIS2-11 Project as persistent context | Done — one Work project is carried across Chat, Build and Design (`workProject.svelte.ts`), survives a surface switch and a reload, and Home can start work in a surface with it already chosen ([FIXED-469](FIXED_ITEMS.md#fixed-469--the-project-was-chosen-again-on-every-surface)) |
+| VIS2-12 Build artifact pane | Done — the third pane is the object of work: Changes, Preview, Terminal and Runs, focused by what just happened (`buildArtifacts.ts`, `BuildArtifactPane.svelte`), with the working tree read from `GET /api/code/repos/{id}/changes` ([FIXED-467](FIXED_ITEMS.md#fixed-467--builds-third-pane-showed-tools-not-the-work)) |
 | VIS2-13 badge/chip budget | Done for the Models inventory and the composer — a Tools entry prints a state chip only when its state is not the ordinary one; not swept product-wide |
 | VIS2-14 theme-specific optical passes | Open |
 | VIS2-15 4K/8K composition classes | Open |

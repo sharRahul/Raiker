@@ -322,7 +322,7 @@
           {:else if current === "tasks"}
             <LazyRoute
               route="tasks"
-              props={{ sessionId: continuedSessionId }}
+              props={{ sessionId: continuedSessionId, projects }}
             />
           {:else if current === "brain"}
             <LazyRoute route="brain" />

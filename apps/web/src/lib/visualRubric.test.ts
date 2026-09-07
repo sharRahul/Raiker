@@ -170,9 +170,20 @@ describe("visual rubric", () => {
     // Chat is a conversation, Build is a workbench. The gap is not decoration -
     // it is what tells a first-time owner which of the two they are in.
     //
-    // Counted from the composer's own left cluster, which is where a surface
-    // puts the controls that govern the turn.
-    const TURN_CONTROLS = ["<ModelPicker", "<PostureControl", "<ComposerAttach", "<BuildModePicker", "<select"];
+    // COMPOSER-02 changed what is being counted rather than the rule. The old
+    // list counted `<select` and `<ComposerAttach`, which are no longer on
+    // either bar: the attach control, the dictation trigger and the project
+    // select are entries in the `+` menu now. What is left on a bar is what a
+    // surface decided has to be legible without opening anything, which is
+    // exactly the thing this rule is about — and Build still keeps one control
+    // Chat does not, because the mode decides how much the next press may do.
+    const TURN_CONTROLS = [
+      "<ComposerActionMenu",
+      "<ComposerContext",
+      "<BuildModePicker",
+      "<ModelPicker",
+      "<select",
+    ];
 
     const controls = (view: string) => {
       const text = readFileSync(resolve(VIEWS, view), "utf8");
@@ -189,6 +200,24 @@ describe("visual rubric", () => {
     const build = controls("BuildView.svelte");
     expect(chat).toBeGreaterThan(0);
     expect(build).toBeGreaterThan(chat);
+  });
+
+  it("keeps every composer to two permanent entry points before the model", () => {
+    // COMPOSER-02/COMPOSER-20 rule 3: at most two utility entry points at rest.
+    // The rule exists because a permanent control is the cheapest thing to add
+    // and nothing used to say not to — Chat reached four and Build six, one
+    // reasonable addition at a time, and the review's count of what *could*
+    // have been there by the same logic runs to twenty.
+    for (const view of ["ChatView.svelte", "BuildView.svelte", "DesignView.svelte"]) {
+      const text = readFileSync(resolve(VIEWS, view), "utf8");
+      const from = text.indexOf("snippet left()");
+      expect(from, `${view} has no composer left cluster`).toBeGreaterThan(-1);
+      const cluster = text.slice(from, text.indexOf("{/snippet}", from));
+      expect(
+        cluster.split("<ComposerActionMenu").length - 1,
+        `${view} has more than the two agreed entry points`,
+      ).toBe(2);
+    }
   });
 
   it("does not send the owner to a file the product no longer reads", () => {

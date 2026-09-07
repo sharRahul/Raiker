@@ -7,7 +7,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, CodeReposView, ProjectsList, StreamEvent } from "../apiTypes";
-import { makeGate, stubFetch } from "../test-helpers";
+import { makeGate, stubFetch, openComposerAttach, openComposerProject, startComposerDictation } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 import { routeStateFromHash } from "../routeState";
 
@@ -199,7 +199,8 @@ const BUILD_PROJECTS: ProjectsList = {
 /** Render Build with a project already selected, ready to send. */
 async function renderBuildWithProject(props: Record<string, unknown> = {}) {
   const result = render(BuildView, { props: { projects: BUILD_PROJECTS, ...props } });
-  await fireEvent.change(await screen.findByLabelText("Project for this build"), {
+  await openComposerProject();
+    await fireEvent.change(await screen.findByLabelText("Project for this build"), {
     target: { value: "proj_1" },
   });
   return result;
@@ -274,10 +275,18 @@ describe("Build composer modes", () => {
     await screen.findByLabelText("Describe the change");
     expect(screen.queryByRole("group", { name: "Chat or Build" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Model context capacity")).not.toBeInTheDocument();
-    // VIS-08 — Build still says where the work runs, in the posture chip rather
-    // than as a second permanent badge beside the approval control.
-    expect(screen.getByRole("button", { name: /governance posture/i })).toBeInTheDocument();
+    // COMPOSER-12 — VIS-08 reduced two permanent governance surfaces to one
+    // chip; this removes the chip from the resting state as well. At the
+    // careful default the composer says nothing about policy, because nothing
+    // about policy is what the owner is doing. The posture stays inspectable
+    // through Permissions, which the Tools menu links to, and the chip returns
+    // the moment the posture stops being the cautious one — which is exactly
+    // when it is a fact about the next press.
+    expect(screen.queryByRole("button", { name: /governance posture/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Execution environment")).not.toBeInTheDocument();
+    // Still two ways in, and only two: what the bar carries at rest.
+    expect(screen.getByRole("button", { name: "Add to this turn" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tools" })).toBeInTheDocument();
   });
 
 
@@ -287,7 +296,7 @@ describe("Build composer modes", () => {
     streamPromptMock.mockResolvedValue(undefined);
     await renderBuildWithProject();
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Dictate" }));
+    await startComposerDictation();
     FakeRecognition.instance.final("check the repository");
     await fireEvent.click(await screen.findByRole("button", { name: "Done dictating" }));
     expect(streamPromptMock).not.toHaveBeenCalled();
@@ -303,7 +312,7 @@ describe("Build composer modes", () => {
     await renderBuildWithProject();
     const prompt = await screen.findByLabelText("Describe the change");
     await fireEvent.input(prompt, { target: { value: "keep this" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+    await startComposerDictation();
     FakeRecognition.instance.final("discard this");
     await fireEvent.click(screen.getByRole("button", { name: "Cancel dictation" }));
     await fireEvent.click(screen.getByRole("button", { name: "Send" }));
@@ -517,7 +526,10 @@ describe("Build repository context", () => {
     respondWith("Done.");
     await renderBuildWithProject();
 
-    await screen.findByRole("button", { name: /my-app/ });
+    // The repository is named twice now: by the header control that changes it
+    // and by the composer's context line, which is the point — a turn that may
+    // edit files says where without the owner looking up at the header.
+    await screen.findAllByRole("button", { name: /my-app/ });
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Rename the header" } });
     await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
 
@@ -532,7 +544,7 @@ describe("Build repository context", () => {
     respondWith("Done.");
     await renderBuildWithProject();
 
-    await fireEvent.click(screen.getByLabelText("Add attachment"));
+    await openComposerAttach();
     await fireEvent.input(screen.getByLabelText("Attachment path"), {
       target: { value: "docs/architecture/HANDOFF.md" },
     });
@@ -553,7 +565,7 @@ describe("Build repository context", () => {
     respondWith("Done.");
     await renderBuildWithProject();
 
-    await screen.findByRole("button", { name: /octo\/app/ });
+    await screen.findAllByRole("button", { name: /octo\/app/ });
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Summarise the README" } });
     await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
 
@@ -591,7 +603,7 @@ describe("Build repository context", () => {
     );
     await renderBuildWithProject();
 
-    await fireEvent.click(await screen.findByRole("button", { name: /octo\/app/ }));
+    await fireEvent.click((await screen.findAllByRole("button", { name: /octo\/app/ }))[0]);
     const panel = await screen.findByRole("region", { name: "Repositories" });
     expect(within(panel).getByText(/reads are closed/i)).toBeInTheDocument();
   });
@@ -608,6 +620,7 @@ describe("Build project filing", () => {
     respondWith("Done.");
     render(BuildView, { props: { projects: BUILD_PROJECTS } });
 
+    await openComposerProject();
     await fireEvent.change(await screen.findByLabelText("Project for this build"), {
       target: { value: "proj_1" },
     });
@@ -671,6 +684,9 @@ describe("Build project requirement", () => {
     });
     await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
 
+    // COMPOSER-03 — the select is behind `+` now. What must not change is that
+    // a running turn cannot have its boundary moved out from under it.
+    await openComposerProject();
     await waitFor(() =>
       expect(screen.getByLabelText("Project for this build")).toBeDisabled(),
     );

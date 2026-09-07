@@ -220,7 +220,7 @@ own reason:
 * **VIS-20** needed no change: every infinite animation in the product is a
   progress indicator, and the global `prefers-reduced-motion` guard already
   collapses all of them.
-**That leaves one genuinely open.** [VIS-19](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis-19--introduce-richer-inline-output-components)
+**That leaves one genuinely open.** [VIS-19](VISUAL_UI_UX_REVIEW_2026-09-06.md#pass-1-status-summary)
 — the typed output vocabulary. Nine of its ten blocks already exist as
 components and only a chart block is absent; what is missing is the typed
 channel that lets a turn address them, which is a backend contract (a block

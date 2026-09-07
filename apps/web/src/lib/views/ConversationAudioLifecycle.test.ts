@@ -9,9 +9,9 @@
 // These tests drive the real `visible` prop App.svelte passes, and assert
 // against the shared audio coordinator rather than against a mock, because the
 // property that matters is that the single audio owner is actually released.
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { makeGate, stubFetch } from "../test-helpers";
+import { makeGate, stubFetch, startComposerDictation } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 import { audioSessionCoordinator } from "../voice";
 
@@ -87,7 +87,7 @@ describe.each([
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const view = render(Component as any, { ...props, visible: true });
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Dictate" }));
+    await startComposerDictation();
     FakeRecognition.instance.final("keep these words");
     expect(await screen.findByRole("button", { name: "Cancel dictation" })).toBeInTheDocument();
 

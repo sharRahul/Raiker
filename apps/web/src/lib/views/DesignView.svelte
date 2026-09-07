@@ -18,12 +18,15 @@
    */
   import { onMount, tick } from "svelte";
   import Composer from "../components/Composer.svelte";
+  import ComposerActionMenu from "../components/ComposerActionMenu.svelte";
+  import ComposerContext from "../components/ComposerContext.svelte";
   import Icon from "../components/Icon.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import { providerName, relativeTime } from "../format";
   import { runtimeBlock } from "../capabilityModel";
+  import { composerMenu } from "../composerCapabilities";
   import { imageCandidates, modelName } from "../modelPresentation";
   import { rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import type { CapabilityGate, ImageGeneration, ModelsView } from "../apiTypes";
@@ -38,6 +41,7 @@
 
   let prompt = $state("");
   let size = $state("1024x1024");
+
 
   /** Said before the press, through the helper every other gated surface uses. */
   const block = $derived(
@@ -88,6 +92,51 @@
   const choice = $derived(
     imageChoices.find((item) => item.key === choiceKey) ?? imageChoices[0] ?? null,
   );
+
+  /**
+   * COMPOSER-09 — the same composer grammar as Chat and Build.
+   *
+   * Design's bar carried a model select and a size select permanently: two of
+   * the parameters an image request takes, with no route to the rest. The shell
+   * is shared now, and what stays at rest is the one visual parameter changed
+   * often enough to earn the room.
+   *
+   * The menus are deliberately short, and short *honestly*. COMPOSER-09
+   * describes edit, variations, outpaint, reference images and version compare;
+   * Raiker's governed image endpoint takes a prompt, a size and a model and
+   * returns one picture. The review's own acceptance test settles what to do
+   * about the gap — "every exposed composer action reaches an actual
+   * backend/runtime path or is omitted" — so those entries are absent rather
+   * than present and inert, and the missing runtime is recorded in
+   * docs/plans/TO_BE_FIXED.md instead of implied by a control that does
+   * nothing.
+   */
+  const HANDLED = new Set(["set-project"]);
+  const addItems = $derived(composerMenu("add", "design", gates, HANDLED));
+  const toolItems = $derived(composerMenu("tools", "design", gates, HANDLED));
+
+  /** COMPOSER-06 — the parameters this press will use, as one inspectable line. */
+  const contextFacts = $derived([
+    {
+      label: "Size",
+      value: size,
+      short: size,
+      href: "#/models?tab=models",
+      action: "Models",
+    },
+    ...(choice !== null
+      ? [
+          {
+            label: "Model",
+            value: `${providerName(choice.provider)} · ${modelName(choice.model)}`,
+          },
+        ]
+      : []),
+  ]);
+
+  function runComposerAction(id: string) {
+    if (id === "set-project") window.location.hash = "#/projects";
+  }
 
   /**
    * Oldest first, the way every other transcript in the product reads. The API
@@ -269,12 +318,44 @@
     onsubmit={() => void generate()}
   >
     {#snippet left()}
-      <!-- Always here, whatever is configured. Hiding it made "no image model is
-           connected" indistinguishable from "this page has no model control",
-           and the second reading is the one an owner actually reached. When
-           there is nothing to choose it says so in the control itself rather
-           than leaving a gap where a control belongs. -->
-      <label class="composer-scope">
+      <!-- COMPOSER-09 — the same two entry points Chat and Build carry, so a
+           person moving between the three Work modes finds the composer in the
+           same shape each time. -->
+      <ComposerActionMenu
+        kind="add"
+        items={addItems}
+        disabled={busy}
+        onchoose={runComposerAction}
+      />
+      <ComposerActionMenu
+        kind="tools"
+        items={toolItems}
+        disabled={busy}
+        onchoose={runComposerAction}
+      />
+      <!-- Size is the one visual parameter changed often enough to stay at
+           rest. Everything the review lists beside it — aspect, count, seed,
+           quality — belongs in Options, and none of them exist in the governed
+           image endpoint yet, so none of them are drawn. -->
+      {#if (view?.sizes ?? []).length > 0}
+        <label class="composer-scope">
+          <span class="sr-only">Size</span>
+          <select class="bar-select" bind:value={size} aria-label="Size" disabled={busy}>
+            {#each view!.sizes as option (option)}
+              <option value={option}>{option}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
+      <ComposerContext facts={contextFacts} disabled={busy} />
+    {/snippet}
+
+    {#snippet right()}
+      <!-- COMPOSER-05 — model identity stays visible and model *management*
+           does not. Always drawn, whatever is configured: hiding it made "no
+           image model is connected" indistinguishable from "this page has no
+           model control", and the second reading is the one an owner reached. -->
+      <label class="composer-scope model-scope">
         <span class="sr-only">Image model</span>
         <Icon name="models" size="sm" />
         {#if imageChoices.length > 0}
@@ -295,19 +376,6 @@
           <a class="bar-select bar-empty" href="#/models">No image model — connect one</a>
         {/if}
       </label>
-      {#if (view?.sizes ?? []).length > 0}
-        <label class="composer-scope">
-          <span class="sr-only">Size</span>
-          <select class="bar-select" bind:value={size} aria-label="Size" disabled={busy}>
-            {#each view!.sizes as option (option)}
-              <option value={option}>{option}</option>
-            {/each}
-          </select>
-        </label>
-      {/if}
-    {/snippet}
-
-    {#snippet right()}
       <button
         type="submit"
         class="btn btn-primary send"

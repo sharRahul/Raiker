@@ -37,8 +37,6 @@
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import Icon from "../components/Icon.svelte";
-  import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
-  import ContextRing from "../components/ContextRing.svelte";
   import Markdown from "../components/Markdown.svelte";
   import RepoConnector from "../components/RepoConnector.svelte";
   import PlanChecklist from "../components/PlanChecklist.svelte";
@@ -62,6 +60,7 @@
     ApprovalView,
     CodeRepo,
     CodeReposView,
+    CapabilityGate,
     ContextUsage,
     ModelDecision,
     ProjectsList,
@@ -95,6 +94,9 @@
   import AttachmentCard from "../components/AttachmentCard.svelte";
   import Composer from "../components/Composer.svelte";
   import ComposerAttach from "../components/ComposerAttach.svelte";
+  import ComposerActionMenu from "../components/ComposerActionMenu.svelte";
+  import ComposerContext from "../components/ComposerContext.svelte";
+  import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
@@ -117,6 +119,7 @@
     stripSlashToken,
     type SlashCommand,
   } from "../composerCommands";
+  import { composerMenu } from "../composerCapabilities";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
   import { collectReasoning, hasRunningTool, toolActivity } from "../chatPresentation";
   import {
@@ -601,6 +604,128 @@
     projects?.projects.find((project) => project.project_id === projectId) ?? null,
   );
   const projectReady = $derived(projectId !== "" && selectedProject !== null);
+
+  /**
+   * COMPOSER-02/03/04/08 — Build's two entry points.
+   *
+   * Build may carry more than Chat, and does: the object of work is code and
+   * execution, so the mode picker stays on the bar because it changes what the
+   * next press is allowed to do, and the repository and project are named in
+   * the context line because a turn that runs commands must say where. What
+   * left the bar is what Chat's left: the attach control, the dictation
+   * trigger, and a project select for a choice that changes every few days.
+   *
+   * Build's menus carry two entries Chat's do not — mentioning a file from the
+   * code map, and running a command in the governed terminal — because they are
+   * the two things that only mean something here. Both are gated, and a gate
+   * that is off is listed with its reason rather than hidden.
+   */
+  let composerGates = $state<CapabilityGate[]>([]);
+  const HANDLED = new Set([
+    "attach-file",
+    "project-files",
+    "mention-file",
+    "set-project",
+    "dictate",
+    "web-search",
+    "run-command",
+    "use-mcp",
+    "use-connector",
+    "create-task",
+    "schedule",
+    "use-memory",
+  ]);
+  const addItems = $derived(composerMenu("add", "build", composerGates, HANDLED));
+  const toolItems = $derived(composerMenu("tools", "build", composerGates, HANDLED));
+
+  const TOOL_ROUTES: Record<string, string> = {
+    "web-search": "#/capabilities",
+    "use-mcp": "#/extensions?tab=mcp",
+    "use-connector": "#/extensions?tab=connectors",
+    "create-task": "#/tasks",
+    schedule: "#/tasks",
+    "use-memory": "#/memory",
+  };
+
+  /** Open state for the project chooser the `+` menu reveals. */
+  let projectPickerOpen = $state(false);
+
+  function runComposerAction(id: string) {
+    if (id === "attach-file" || id === "project-files") {
+      attachOpen = true;
+      return;
+    }
+    if (id === "dictate") {
+      voiceControl?.begin();
+      return;
+    }
+    if (id === "set-project") {
+      projectPickerOpen = true;
+      return;
+    }
+    if (id === "mention-file") {
+      // The same menu `@` opens, reached without knowing the shortcut. The
+      // accelerator stays; COMPOSER-13's rule is that syntax is a shortcut to
+      // something discoverable, not the only way to reach it.
+      promptText = `${promptText}@`;
+      promptEl?.focus();
+      onPromptInput();
+      return;
+    }
+    if (id === "run-command") {
+      commandPaneOpen = true;
+      return;
+    }
+    const route = TOOL_ROUTES[id];
+    if (route !== undefined) window.location.hash = route;
+  }
+
+  /**
+   * COMPOSER-06/COMPOSER-08 — where this turn runs, as one line.
+   *
+   * Build's version names the repository, because a turn that may edit files or
+   * run commands has to say which tree it is pointed at, and that was carried
+   * by a separate header control the composer could not see.
+   */
+  const contextFacts = $derived([
+    ...(selectedProject !== null
+      ? [
+          {
+            label: "Project",
+            value: selectedProject.name,
+            short: selectedProject.name,
+            href: "#/projects",
+            action: "Manage",
+          },
+        ]
+      : []),
+    ...(activeRepo !== null
+      ? [
+          {
+            label: "Repository",
+            value: activeRepo.label,
+            short: activeRepo.label,
+          },
+        ]
+      : []),
+    ...(attachStore.items.length > 0
+      ? [
+          {
+            label: "Attached",
+            value: attachStore.items.map((item) => item.label).join(", "),
+            short: `${attachStore.items.length} file${attachStore.items.length === 1 ? "" : "s"}`,
+          },
+        ]
+      : []),
+  ]);
+
+  const contextPercent = $derived.by(() => {
+    const window_ =
+      contextUsage?.context_window_tokens ?? activeProfile?.context_window_tokens ?? null;
+    if (!window_) return null;
+    const used = contextUsage?.used_tokens ?? estimatedContextTokens;
+    return Math.min(100, (used / window_) * 100);
+  });
   let pendingProjectId: string | null = null;
   let projectNotice = $state<string | null>(null);
 
@@ -718,6 +843,12 @@
   async function readStandingModes() {
     try {
       const gates = await api.capabilityGates();
+      // COMPOSER-04 — the same read the composer's menus need, so the page
+      // asks once. A capability that is governed off is listed with its reason
+      // rather than hidden; an empty list (a failed read) offers everything and
+      // lets the runtime judge each action when it is actually invoked, which
+      // is better evidence than a status call that did not answer.
+      composerGates = gates;
       const observed: Record<string, string> = {};
       for (const gate of gates) {
         if ((BUILD_WRITE_CAPABILITIES as readonly string[]).includes(gate.capability)) {
@@ -727,6 +858,7 @@
       standingModes = observed;
     } catch {
       standingModes = null;
+      composerGates = [];
     }
   }
 
@@ -2172,6 +2304,35 @@
         {#if attachOpen}
           <ComposerAttachPanel store={attachStore} disabled={streaming} idPrefix="build" />
         {/if}
+        <!-- COMPOSER-03 — opened from `+`, in flow rather than as a popover
+             over the text being typed. Build still cannot send without one,
+             which the footer below says; what changed is that the control is
+             not on the bar for every turn after the first. -->
+        {#if projectPickerOpen}
+          <div class="project-choice" role="group" aria-label="Choose a project">
+            <label for="build-project-choice">Project for this build</label>
+            <select
+              id="build-project-choice"
+              class="bar-select"
+              value={projectId}
+              disabled={streaming}
+              onchange={(event) => {
+                projectPickerOpen = false;
+                void onProjectPicked((event.currentTarget as HTMLSelectElement).value);
+              }}
+            >
+              <option value="">Select a project</option>
+              {#each projects?.projects ?? [] as project (project.project_id)}
+                <option value={project.project_id}>{project.name}</option>
+              {/each}
+            </select>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              onclick={() => (projectPickerOpen = false)}>Done</button
+            >
+          </div>
+        {/if}
       {/snippet}
 
       {#snippet turn()}
@@ -2179,9 +2340,26 @@
       {/snippet}
 
       {#snippet left()}
-            <ComposerAttach bind:this={attachControl} bind:open={attachOpen} disabled={streaming} />
+            <!-- COMPOSER-02/08 — the same two entry points Chat has, plus the
+                 one control that genuinely belongs on a Build bar: the mode,
+                 because it decides how much this press is allowed to do and
+                 changes from turn to turn. -->
+            <ComposerActionMenu
+              kind="add"
+              items={addItems}
+              disabled={streaming}
+              onchoose={runComposerAction}
+            />
+            <ComposerActionMenu
+              kind="tools"
+              items={toolItems}
+              disabled={streaming}
+              onchoose={runComposerAction}
+            />
+            <BuildModePicker {mode} onchange={setMode} disabled={streaming} />
             <VoiceDictationControl
               bind:this={voiceControl}
+              showTrigger={false}
               draft={promptText}
               selectionStart={promptSelectionStart}
               selectionEnd={promptSelectionEnd}
@@ -2193,27 +2371,30 @@
               onrestored={restoreVoiceProvenance}
               onactivechange={onVoiceActive}
             />
-            <BuildModePicker {mode} onchange={setMode} disabled={streaming} />
-            <label class="project-picker" data-selected={projectReady}>
-              <Icon name="folder" size="sm" />
-              <span class="sr-only">Project for this build</span>
-              <select
-                class="bar-select"
-                value={projectId}
-                aria-label="Project for this build"
-                disabled={streaming}
-                onchange={(event) => void onProjectPicked((event.currentTarget as HTMLSelectElement).value)}
-              >
-                <option value="">Select a project</option>
-                {#each projects?.projects ?? [] as project (project.project_id)}
-                  <option value={project.project_id}>{project.name}</option>
-                {/each}
-              </select>
-            </label>
-            <!-- VIS-08 — the approval control and the environment badge were
-                 two permanent configuration surfaces under every message. One
-                 chip, and it opens both. -->
-            <PostureControl />
+            <!-- COMPOSER-06/08 — project, repository, attachments and context
+                 as one inspectable line. A turn that may edit files or run a
+                 command has to say which tree it is pointed at, and that was
+                 carried by a header control the composer could not see. -->
+            <ComposerContext
+              facts={contextFacts}
+              usedPercent={contextPercent}
+              disabled={streaming}
+              onopen={() => void refreshContextUsage()}
+            >
+            {#snippet detail()}
+              <!-- COMPOSER-06 — the token counts, the window and the
+                   compaction notice, unchanged. They did not become less true
+                   when the ring came off the bar; reading them is a deliberate
+                   act now rather than a permanent control. -->
+              <ContextMeterPopover
+                usedTokens={estimatedContextTokens}
+                contextWindowTokens={activeProfile?.context_window_tokens ?? null}
+                estimated={true}
+                usage={contextUsage}
+                inline={true}
+              />
+            {/snippet}
+            </ComposerContext>
       {/snippet}
 
       {#snippet right()}
@@ -2229,35 +2410,6 @@
               onchosen={(profileId, chosen) => void rememberSurfaceModel("build", profileId, chosen)}
               disabled={streaming}
             />
-            <div class="context-wrap" bind:this={contextControlEl}>
-              <button
-                type="button"
-                class="context-trigger"
-                aria-label={activeProfile?.context_window_tokens
-                  ? "Context window"
-                  : "Context window — capacity unknown"}
-                aria-expanded={contextOpen}
-                title={activeProfile?.context_window_tokens
-                  ? "Context window"
-                  : "Context window — capacity unknown"}
-                onclick={() => { contextOpen = !contextOpen; if (contextOpen) void refreshContextUsage(); }}
-              >
-                <ContextRing
-                  usedTokens={estimatedContextTokens}
-                  contextWindowTokens={activeProfile?.context_window_tokens ?? null}
-                  usage={contextUsage}
-                />
-              </button>
-              {#if contextOpen}
-                <ContextMeterPopover
-                  usedTokens={estimatedContextTokens}
-                  contextWindowTokens={activeProfile?.context_window_tokens ?? null}
-                  estimated={true}
-                  usage={contextUsage}
-                />
-              {/if}
-            </div>
-
             <button
               type="submit"
               class="btn btn-primary send"
@@ -2269,11 +2421,24 @@
       {/snippet}
 
       {#snippet footer()}
+        <!-- COMPOSER-12 — governance appears when it changes what the next
+             press will do. At the careful default this renders nothing; the
+             posture stays inspectable through Permissions, which Tools links
+             to, and the execution environment is a fact about *where* the turn
+             runs that the context line above already carries. -->
+        <PostureControl exceptionOnly={true} />
         <!-- The composer states the boundary, not the lesson: which project a
              turn will run in is what changes between turns, and what a project
              lets Build reach is explained once in the guide. -->
         {#if !projectReady}
-          <p class="project-required" role="status">Select a project to start.</p>
+          <p class="project-required" role="status">
+            Select a project to start.
+            <button
+              type="button"
+              class="link-button"
+              onclick={() => (projectPickerOpen = true)}>Choose one</button
+            >
+          </p>
         {:else}
           <p class="project-boundary" role="status">
             Working in <strong>{selectedProject?.name}</strong>
@@ -2587,10 +2752,23 @@
     background: var(--accent-soft);
   }
   .parked.continuing p { color: var(--accent); }
-  .project-picker {
-    display: inline-flex;
+  .project-choice {
+    display: flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    padding: 0.5rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--sunken);
+    font-size: var(--text-sm);
+  }
+  .project-choice label {
+    color: var(--text-2);
+    font-size: var(--text-xs);
+  }
+  .project-choice select {
+    flex: 1;
     min-width: 0;
   }
 
@@ -2830,22 +3008,6 @@
   .project-required { color: var(--text-2); font-weight: 600; }
   .project-boundary strong { color: var(--text-1); }
 
-  .context-wrap { position: relative; }
-  .context-trigger {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.7rem;
-    height: 1.7rem;
-    padding: 0;
-    border: 1px solid var(--neutral-border);
-    border-radius: 50%;
-    background: var(--surface);
-    color: var(--text-2);
-    cursor: pointer;
-  }
-  .context-trigger:hover { border-color: var(--accent-border); color: var(--accent); }
-  .context-trigger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
   /* Compact screens preserve the transcript width and float background work as
      an isolated right-side drawer. */
@@ -2895,12 +3057,15 @@
        bar used to hide the project picker below this width while still printing
        "Select a project to start." underneath and keeping Send disabled — an
        instruction pointing at a control that was not on the screen, with no
-       other route to it in Build. What a narrow window may lose is information
-       (the context ring, the environment badge); what gates sending stays. */
+       other route to it in Build.
+
+       COMPOSER-02/03 removed the problem rather than the symptom: the project
+       select is not on the bar at any width now, it is an entry in `+`, and the
+       "Select a project to start." line carries its own way to open it. What a
+       narrow window may still lose is information; what gates sending stays. */
     :global(.composer-build .bar-left) { flex-wrap: wrap; }
-    .project-picker { max-width: 10rem; }
-    .project-picker :global(.bar-select) { min-width: 0; }
-    .context-wrap, :global(.composer-build .environment-badge) { display: none; }
+    .project-choice { max-width: 100%; }
+    :global(.composer-build .environment-badge) { display: none; }
     .standing-wide { display: none; }
     .standing-compact { display: inline; }
     /* Build's mode picker has no equivalent in Chat, so its compact form lives

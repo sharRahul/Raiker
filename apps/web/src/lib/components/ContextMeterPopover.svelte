@@ -17,12 +17,23 @@
     estimated = false,
     usage = null,
     locale = undefined,
+    inline = false,
   }: {
     usedTokens?: number | null;
     contextWindowTokens?: number | null;
     estimated?: boolean;
     usage?: ContextUsage | null;
     locale?: string | undefined;
+    /**
+     * COMPOSER-06 — render inside another surface rather than as a popover of
+     * its own.
+     *
+     * The composer's context inspector holds these facts now, and a popover
+     * nested inside a popover positions against the wrong ancestor and paints
+     * its own shadow over the panel it is sitting in. The content is unchanged;
+     * only the frame is dropped.
+     */
+    inline?: boolean;
   } = $props();
 
   // Provider-reported prompt tokens beat the browser's transcript estimate; the
@@ -89,7 +100,11 @@
   const toolsDeferred = $derived(usage?.tools_deferred ?? 0);
 </script>
 
-<section class="context-popover" aria-label="Context window and cost details">
+<section
+  class="context-popover"
+  class:inline
+  aria-label="Context window and cost details"
+>
   <div class="context-heading"><strong>Context window</strong>{#if percentLabel}<span>{percentLabel}</span>{/if}</div>
   {#if display}
     <div class="usage-figure"><strong>{number.format(effectiveUsed ?? 0)} tokens used</strong><span>of {number.format(effectiveWindow ?? 0)} available</span></div>
@@ -194,6 +209,7 @@
 </section>
 
 <style>
+  .context-popover.inline { position: static; width: auto; max-width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
   .context-popover { position: absolute; right: 0; bottom: calc(100% + .55rem); width: min(35rem, calc(100vw - 2rem)); padding: 1.35rem 1.5rem; border: 1px solid var(--neutral-border); border-radius: .75rem; background: var(--surface); box-shadow: var(--shadow-2); z-index: 5; }
   .context-heading { display:flex; justify-content:space-between; gap:1rem; color:var(--text-1); } .context-heading span { color:var(--text-2); font-size:var(--text-sm); font-weight:650; }
   .usage-figure { display:grid; gap:.15rem; margin-top:1rem; } .usage-figure strong { font-size:var(--text-xl); color:var(--text-1); } .usage-figure span { color:var(--text-3); font-size:var(--text-sm); }

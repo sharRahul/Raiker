@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
-import { stubFetch } from "../test-helpers";
+import { stubFetch, openComposerProject, startComposerDictation } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 import { takeScheduleRequest } from "../scheduleHandoff";
 
@@ -99,15 +99,18 @@ const NON_REASONING_PROFILE = {
 describe("ChatView composer parity", () => {
   // FIXED-365 exposed this. With no model selected there is no capacity to
   // report, so the ring drew a bare grey circle beside Send — a control with no
-  // content and no explanation, which a fresh install now meets every time
-  // rather than almost never.
-  it("says the capacity is unknown rather than drawing an unexplained ring", async () => {
+  // content and no explanation, which a fresh install met every time.
+  //
+  // COMPOSER-06 answers it more directly than a label could: the context line
+  // states only what is true, so a composer with no window to report and
+  // nothing attached draws no line at all rather than a control apologising for
+  // having no content.
+  it("says nothing about capacity when there is no capacity to report", async () => {
     stubFetch({ ...routes(), "GET /api/models": { profiles: [], chat_profiles: [] } });
     render(ChatView, { projects });
 
-    expect(
-      await screen.findByRole("button", { name: "Context window — capacity unknown" }),
-    ).toBeInTheDocument();
+    await screen.findByLabelText("Prompt");
+    expect(screen.queryByRole("button", { name: /^Context for this turn/ })).toBeNull();
   });
 
   it("names the window plainly once a model reports one", async () => {
@@ -119,25 +122,37 @@ describe("ChatView composer parity", () => {
     stubFetch({ ...routes(), "GET /api/models": { profiles: [sized], chat_profiles: [sized] } });
     render(ChatView, { projects });
 
-    expect(
-      await screen.findByRole("button", { name: "Context window" }),
-    ).toBeInTheDocument();
+    const line = await screen.findByRole("button", { name: /^Context for this turn/ });
+    // A percentage at rest; the token counts one click in.
+    expect(line).toHaveTextContent("%");
+    await fireEvent.click(line);
+    expect(await screen.findByText(/of [\d,]+ available/)).toBeInTheDocument();
   });
 
-  it("is the Cowork-minimal composer: no Build switch, no duplicate capacity chip", async () => {
+  it("is the minimal composer: two entry points, model identity, and Send", async () => {
     stubFetch(routes());
     render(ChatView, { projects });
 
     await screen.findByLabelText("Prompt");
-    // Chat is not where code gets built, so the composer no longer offers a way
-    // to move the draft into Build; and the context ring already reports the
-    // window, so the capacity chip beside it was the same fact stated twice.
+    // Chat is not where code gets built, so the composer offers no way to move
+    // the draft into Build; the context line reports the window, so the
+    // capacity chip beside it was the same fact stated twice.
     expect(screen.queryByRole("group", { name: "Chat or Build" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Model context capacity")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Execution environment")).not.toBeInTheDocument();
-    // What a Cowork-shaped composer does keep.
-    expect(screen.getByRole("button", { name: "Dictate" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Context window/ })).toBeInTheDocument();
+
+    // COMPOSER-02 — what the bar carries at rest, and nothing else. The attach
+    // control, the dictation trigger, the project select and the posture chip
+    // are all still reachable; three of them are inside `+` and the fourth
+    // appears only when the posture stops being the careful default.
+    expect(screen.getByRole("button", { name: "Add to this turn" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tools" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Model for this turn/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
+    for (const gone of ["Add attachment", "Dictate"]) {
+      expect(screen.queryByRole("button", { name: gone })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole("button", { name: /governance posture/i })).toBeNull();
   });
 
   it("keeps dictated text editable and sends it only after explicit Send", async () => {
@@ -146,7 +161,7 @@ describe("ChatView composer parity", () => {
     streamPromptMock.mockResolvedValue(undefined);
     render(ChatView, { projects });
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Dictate" }));
+    await startComposerDictation();
     recognition().final("check the repository");
     await fireEvent.click(await screen.findByRole("button", { name: "Done dictating" }));
     expect(streamPromptMock).not.toHaveBeenCalled();
@@ -164,12 +179,15 @@ describe("ChatView composer parity", () => {
     streamPromptMock.mockResolvedValue(undefined);
     render(ChatView, { projects });
     const prompt = await screen.findByLabelText("Prompt");
-    await fireEvent.click(await screen.findByRole("button", { name: "Dictate" }));
+    await startComposerDictation();
     recognition().final("check this");
 
     await fireEvent.keyDown(prompt, { key: "Enter" });
     expect(streamPromptMock).not.toHaveBeenCalled();
-    expect(await screen.findByRole("button", { name: "Dictate" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Done dictating" })).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Listening…")).not.toBeInTheDocument();
     expect(prompt).toHaveFocus();
     await fireEvent.keyDown(prompt, { key: "Enter" });
     expect(streamPromptMock).toHaveBeenCalledOnce();
@@ -182,7 +200,7 @@ describe("ChatView composer parity", () => {
     render(ChatView, { projects });
     const prompt = await screen.findByLabelText("Prompt");
     await fireEvent.input(prompt, { target: { value: "Please " } });
-    await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+    await startComposerDictation();
     recognition().final("summarize this");
     await fireEvent.click(await screen.findByRole("button", { name: "Done dictating" }));
     await fireEvent.input(prompt, { target: { value: "Please summarize this carefully" } });
@@ -198,7 +216,7 @@ describe("ChatView composer parity", () => {
     render(ChatView, { projects });
     const prompt = await screen.findByLabelText("Prompt");
     await fireEvent.input(prompt, { target: { value: "keep this" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+    await startComposerDictation();
     recognition().final("discard this");
     await fireEvent.click(screen.getByRole("button", { name: "Cancel dictation" }));
     await fireEvent.click(screen.getByRole("button", { name: "Send" }));
@@ -241,12 +259,11 @@ describe("ChatView composer parity", () => {
     expect(rail.closest(".rail-slot")).toBeInTheDocument();
     expect(rail.closest(".chat")).toBeNull();
     expect(rail.closest(".chat-layout")).toHaveClass("with-rail");
+    // COMPOSER-03 — the project select is an entry in `+` rather than a
+    // permanent control. It still moves the conversation into a project, and
+    // this is still the surface that does it.
+    await openComposerProject();
     expect(screen.getByLabelText("Project for this chat")).toBeInTheDocument();
-    // VIS-08 — the approval control is behind the posture chip now. What the
-    // composer shows is one summary; what it still *offers* is the same
-    // control, one click away, which is where it always was.
-    expect(screen.getByRole("button", { name: /governance posture/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Context window/ })).toBeInTheDocument();
   });
 
   it("uses the persisted selected model and exposes only its supported thinking efforts", async () => {
@@ -346,6 +363,7 @@ describe("ChatView composer parity", () => {
     });
     render(ChatView, { projects });
 
+    await openComposerProject();
     await fireEvent.change(await screen.findByLabelText("Project for this chat"), {
       target: { value: "project-1" },
     });

@@ -47,9 +47,23 @@
 
   let {
     showEnvironment = true,
+    exceptionOnly = false,
   }: {
     /** Chat has no execution environment of its own; Build and Tasks do. */
     showEnvironment?: boolean;
+    /**
+     * COMPOSER-12 — render only when the posture is not the careful default.
+     *
+     * A composer at rest should not carry a governance control: the owner is
+     * typing, and the policy system is not what they came to think about. What
+     * a composer *must* do is say something the moment the posture stops being
+     * the cautious one — "approves automatically" is a fact about the next
+     * thing they press, and that is exactly when a chip earns its room.
+     *
+     * The posture stays inspectable either way: Tools carries a permanent entry
+     * to Permissions, so nothing is hidden, only quiet while it is ordinary.
+     */
+    exceptionOnly?: boolean;
   } = $props();
 
   let open = $state(false);
@@ -139,6 +153,7 @@
   });
 </script>
 
+{#if !exceptionOnly || relaxed}
 <div class="posture" bind:this={root}>
   <button
     type="button"
@@ -192,6 +207,7 @@
     </div>
   {/if}
 </div>
+{/if}
 
 <style>
   .posture {

@@ -111,7 +111,10 @@ export type IconName =
   // glyph that should mean the agent did something.
   | "home"
   | "design"
-  | "map";
+  | "map"
+  // COMPOSER-03 — the composer's one "bring something into this turn" control.
+  // It was a file glyph, which named one of the six things the menu offers.
+  | "plus";
 
 // Each icon is one or more SVG path `d` strings (stroke, round caps).
 export const ICON_PATHS: Record<IconName, string[]> = {
@@ -313,6 +316,7 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   ],
   // Three nodes and the edges between them. The Knowledge Map is a graph, and
   // the glyph says graph rather than "something clever happens here".
+  plus: ["M12 5v14", "M5 12h14"],
   map: [
     "M6 5.4a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2Z",
     "M18 4.4a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2Z",

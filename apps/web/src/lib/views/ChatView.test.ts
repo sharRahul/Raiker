@@ -5,7 +5,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
-import { stubFetch } from "../test-helpers";
+import { stubFetch, openComposerAttach } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
@@ -454,7 +454,7 @@ describe("ChatView streaming transcript", () => {
 
     render(ChatView);
     // The "+" button reveals the attachment path input.
-    await fireEvent.click(screen.getByLabelText("Add attachment"));
+    await openComposerAttach();
     const attach = screen.getByLabelText("Attachment path") as HTMLInputElement;
     await fireEvent.input(attach, { target: { value: "docs/architecture/HANDOFF.md" } });
     await fireEvent.click(screen.getByText("Attach"));
@@ -502,7 +502,7 @@ describe("ChatView streaming transcript", () => {
     );
 
     render(ChatView);
-    await fireEvent.click(screen.getByLabelText("Add attachment"));
+    await openComposerAttach();
     const fileInput = screen.getByLabelText("Upload image") as HTMLInputElement;
     const file = new File([new Uint8Array([137, 80, 78, 71])], "shot.png", {
       type: "image/png",
@@ -524,7 +524,7 @@ describe("ChatView streaming transcript", () => {
   it("rejects a non-image file client-side with an honest error", async () => {
     stubFetch(MODELS_ROUTE);
     render(ChatView);
-    await fireEvent.click(screen.getByLabelText("Add attachment"));
+    await openComposerAttach();
     const fileInput = screen.getByLabelText("Upload image") as HTMLInputElement;
     const file = new File(["#!/bin/sh"], "evil.sh", { type: "text/x-shellscript" });
     await fireEvent.change(fileInput, { target: { files: [file] } });
@@ -561,7 +561,7 @@ describe("ChatView streaming transcript", () => {
     );
 
     render(ChatView);
-    await fireEvent.click(screen.getByLabelText("Add attachment"));
+    await openComposerAttach();
     const fileInput = screen.getByLabelText("Upload document") as HTMLInputElement;
     const file = new File(["hello raiker"], "notes.txt", { type: "text/plain" });
     await fireEvent.change(fileInput, { target: { files: [file] } });
@@ -580,7 +580,7 @@ describe("ChatView streaming transcript", () => {
   it("rejects an unsupported document type client-side with an honest error", async () => {
     stubFetch(MODELS_ROUTE);
     render(ChatView);
-    await fireEvent.click(screen.getByLabelText("Add attachment"));
+    await openComposerAttach();
     const fileInput = screen.getByLabelText("Upload document") as HTMLInputElement;
     const file = new File(["binary"], "archive.zip", { type: "application/zip" });
     await fireEvent.change(fileInput, { target: { files: [file] } });
@@ -771,7 +771,7 @@ describe("ChatView streaming transcript", () => {
       },
     });
     render(ChatView);
-    await fireEvent.click(screen.getByRole("button", { name: /^Context window/ }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^Context for this turn/ }));
     expect(screen.getByText("0 tokens used")).toBeInTheDocument();
     expect(screen.getByText(/of [\d,]+ available/)).toBeInTheDocument();
     expect(screen.getByText(/[\d,]+ tokens remaining/)).toBeInTheDocument();
@@ -1159,7 +1159,7 @@ describe("ChatView file inspector", () => {
       },
     );
     render(ChatView);
-    await fireEvent.click(screen.getByRole("button", { name: "Add attachment" }));
+    await openComposerAttach();
     const pathInput = screen.getByLabelText("Attachment path");
     await fireEvent.input(pathInput, { target: { value: "docs/notes.md" } });
     await fireEvent.click(screen.getByRole("button", { name: "Attach" }));

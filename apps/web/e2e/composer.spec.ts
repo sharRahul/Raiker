@@ -131,6 +131,18 @@ test.beforeEach(async ({ page }) => {
           ]),
         ),
       };
+      // COMPOSER-04 — the composer's menus read these to say which capabilities
+      // are governed off. Answered here because the unrouted default below is
+      // an empty object, and a menu built from a body of the wrong shape is
+      // exactly the case the registry's own guard exists for; it must not be
+      // the case this suite silently runs in.
+      else if (path === "/api/capability-gates") body = [
+        { capability: "web_fetch", phase: 3, state: "enabled_policy_gated", default_state: "disabled", source: "owner", runtime_enabled: true, allowed_transitions: ["disabled"], can_current_principal_change: true, blocked_reason_code: null, readiness: {}, decision_mode: "ask" },
+        { capability: "image_generation", phase: 3, state: "enabled_runtime", default_state: "disabled", source: "owner", runtime_enabled: true, allowed_transitions: ["disabled"], can_current_principal_change: true, blocked_reason_code: null, readiness: {}, decision_mode: "ask" },
+        // Off, and enableable: the menu must list it with its reason rather
+        // than hide it, which is the claim the spec below checks.
+        { capability: "shell_execution", phase: 3, state: "disabled", default_state: "disabled", source: "static_default", runtime_enabled: false, allowed_transitions: ["enabled_policy_gated"], can_current_principal_change: true, blocked_reason_code: null, readiness: {}, decision_mode: "ask" },
+      ];
       else if (path === "/api/images") body = {
         sizes: ["1024x1024", "1024x1536", "1536x1024"],
         generations: [
@@ -197,6 +209,20 @@ test.beforeEach(async ({ page }) => {
 
 
 
+/**
+ * Start dictating from the composer's `+` menu.
+ *
+ * COMPOSER-02 took the microphone off the permanent bar along with the attach
+ * control and the project select. The session it starts is unchanged — the
+ * "Listening…" line, Done and Cancel still sit beside the prompt being filled,
+ * because they are the state of something in progress rather than a way to
+ * begin one.
+ */
+async function startDictation(page: import("@playwright/test").Page): Promise<void> {
+  await page.getByRole("button", { name: "Add to this turn" }).click();
+  await page.getByRole("menuitem", { name: "Dictate" }).click();
+}
+
 test("governed voice stays editable and visually consistent in Chat, Build, mobile, and Settings", async ({ page }) => {
   const promptPosts: string[] = [];
   page.on("request", (request) => {
@@ -206,7 +232,7 @@ test("governed voice stays editable and visually consistent in Chat, Build, mobi
   });
 
   const chat = page.getByLabel("Prompt", { exact: true });
-  await page.getByRole("button", { name: "Dictate" }).click();
+  await startDictation(page);
   await page.evaluate(() => (window as unknown as { __voiceRecognition: { emitFinal(text: string): void } }).__voiceRecognition.emitFinal("check the repository"));
   await expect(chat).toHaveValue("check the repository");
   expect(promptPosts).toHaveLength(0);
@@ -222,7 +248,7 @@ test("governed voice stays editable and visually consistent in Chat, Build, mobi
   await page.getByRole("navigation", { name: "All navigation" }).getByRole("link", { name: "Build" }).click();
   const build = page.getByLabel("Describe the change");
   await build.fill("keep this");
-  await page.getByRole("button", { name: "Dictate" }).click();
+  await startDictation(page);
   await page.evaluate(() => (window as unknown as { __voiceRecognition: { emitFinal(text: string): void } }).__voiceRecognition.emitFinal("discard this"));
   await page.getByRole("button", { name: "Cancel dictation" }).click();
   await expect(build).toHaveValue("keep this");
@@ -245,7 +271,11 @@ test("governed voice stays editable and visually consistent in Chat, Build, mobi
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("http://raiker.test/#/new-chat");
-  await expect(page.getByRole("button", { name: "Dictate" })).toBeVisible();
+  // COMPOSER-16 — on a phone the `+` menu is a bottom sheet, so dictation is
+  // one thumb reach rather than a control squeezed into a horizontal bar.
+  await page.getByRole("button", { name: "Add to this turn" }).click();
+  await expect(page.getByRole("menuitem", { name: "Dictate" })).toBeVisible();
+  await page.keyboard.press("Escape");
   const mobileDrawer = page.locator("#all-navigation");
   await expect(mobileDrawer).toHaveAttribute("aria-hidden", "true");
   await expect.poll(async () => (await mobileDrawer.boundingBox())?.x ?? 0).toBeLessThan(-200);
@@ -377,6 +407,70 @@ test("Chat and Build composers stay polished and usable", async ({ page }) => {
   await page.getByRole("button", { name: /Model for this turn/ }).click();
   await expect(page.getByRole("menu", { name: "Models" })).toBeVisible();
   await capture(page, join(shots, "bug15-build-composer.png"));
+});
+
+test("every Work mode composes the same way, simple at rest", async ({ page }) => {
+  // COMPOSER-01/02 — one composer system across Chat, Build and Design. The
+  // three surfaces used to carry four, six and two permanent controls; the
+  // review's count of what could have been there by the same logic runs to
+  // twenty. What is left is what changes per turn and has to be legible without
+  // opening anything.
+  for (const [route, label, tools] of [
+    ["new-chat", "Prompt", true],
+    ["build", "Describe the change", true],
+    // Design draws no Tools control, and that is the registry working rather
+    // than a gap in this test: Raiker's governed image endpoint takes a prompt,
+    // a size and a model, so there is no capability for the menu to invoke. An
+    // empty trigger would be the permanent-button problem in miniature — a
+    // control that exists because its neighbours do. The missing runtime is
+    // recorded in docs/plans/TO_BE_FIXED.md.
+    ["design", "Describe the image", false],
+  ] as const) {
+    await page.goto(`http://raiker.test/#/${route}`);
+    await expect(page.getByLabel(label, { exact: true })).toBeVisible();
+    const composer = page.locator("form.composer:visible");
+    await expect(composer.getByRole("button", { name: "Add to this turn" })).toBeVisible();
+    await expect(composer.getByRole("button", { name: "Tools" })).toHaveCount(tools ? 1 : 0);
+    // COMPOSER-02's list of what must not be a permanent button.
+    for (const gone of ["Add attachment", "Dictate"]) {
+      await expect(composer.getByRole("button", { name: gone })).toHaveCount(0);
+    }
+    // COMPOSER-12 — no governance control at the careful default.
+    await expect(composer.getByRole("button", { name: /governance posture/i })).toHaveCount(0);
+  }
+  await capture(page, join(shots, "composer-minimal-design.png"));
+
+  // COMPOSER-03 — `+` lists only ways of getting something into *this* turn,
+  // and only ones the surface can actually carry.
+  await page.goto("http://raiker.test/#/new-chat");
+  await page.getByRole("button", { name: "Add to this turn" }).click();
+  const add = page.getByRole("menu", { name: "Add to this turn" });
+  await expect(add.getByRole("menuitem", { name: "Upload a file" })).toBeVisible();
+  await expect(add.getByRole("menuitem", { name: "Dictate" })).toBeVisible();
+  await expect(add.getByRole("menuitem", { name: "Work in a project" })).toBeVisible();
+  // Build's only; Chat has no code map to mention a file from.
+  await expect(add.getByRole("menuitem", { name: /Mention a file/ })).toHaveCount(0);
+  await capture(page, join(shots, "composer-add-menu.png"));
+  await page.keyboard.press("Escape");
+
+  // COMPOSER-04 — Tools names capability, and a governed-off one is listed with
+  // its reason rather than hidden. Hiding it teaches the owner that Raiker
+  // cannot do the thing at all, which is worse and less true.
+  await page.getByRole("button", { name: "Tools" }).click();
+  const tools = page.getByRole("menu", { name: "Tools" });
+  await expect(tools.getByRole("menuitem", { name: "Search the web" })).toBeVisible();
+  await expect(tools.getByRole("menuitem", { name: "Run a command" })).toHaveCount(0);
+  await capture(page, join(shots, "composer-tools-menu.png"));
+  await page.keyboard.press("Escape");
+
+  // Build's two extra entries, because they are the two that only mean
+  // something where there is a repository and a governed terminal.
+  await page.goto("http://raiker.test/#/build");
+  await page.getByRole("button", { name: "Tools" }).click();
+  await expect(
+    page.getByRole("menu", { name: "Tools" }).getByRole("menuitem", { name: "Run a command" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
 });
 
 test("the Hooks tab tells an enforcing rule from a dead one and a broken file", async ({ page }) => {

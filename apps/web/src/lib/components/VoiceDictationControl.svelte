@@ -1,8 +1,12 @@
 <script module lang="ts">
   export interface VoiceDictationHandle {
+    /** Begin dictating. Returns false when this browser cannot. */
+    begin(): boolean;
     done(): boolean;
     cancel(): boolean;
     active(): boolean;
+    /** Whether dictation is possible at all here, for a menu that offers it. */
+    available(): boolean;
   }
 
   /**
@@ -46,6 +50,17 @@
   import Icon from "./Icon.svelte";
 
   let {
+    /**
+     * Whether this component draws its own "Dictate" button.
+     *
+     * False in Chat and Build, where COMPOSER-02 moved every occasional control
+     * out of the permanent bar and the Add menu starts dictation through
+     * `begin()` instead. The component still renders while dictation is running
+     * — "Listening…", Done and Cancel are the state of a session in progress
+     * and belong beside the prompt they are filling, not behind a menu that has
+     * already closed.
+     */
+    showTrigger = true,
     draft,
     selectionStart = draft.length,
     selectionEnd = selectionStart,
@@ -59,6 +74,7 @@
     onrestored = () => {},
     onactivechange = () => {},
   }: {
+    showTrigger?: boolean;
     draft: string;
     selectionStart?: number;
     selectionEnd?: number;
@@ -269,6 +285,27 @@
     return listening;
   }
 
+  /**
+   * COMPOSER-03 — start dictating from somewhere other than this component.
+   *
+   * The trigger moved into the composer's Add menu, where every other way of
+   * getting something into a turn now lives. The lifecycle did not move: the
+   * recognition session, the coordinator lease, the draft snapshot and the
+   * privacy disclosure all stay here, because they are this component's job and
+   * splitting them across a menu would put a governed audio session under two
+   * owners.
+   */
+  export function begin() {
+    if (disabled || !supported || listening) return false;
+    start();
+    return true;
+  }
+
+  /** Whether this browser can dictate at all. */
+  export function available() {
+    return supported;
+  }
+
   onMount(() => {
     const unsubscribe = coordinator.subscribe(ownerId, () => preserveFinalized());
     return () => {
@@ -298,7 +335,7 @@
     <button type="button" class="voice-button" aria-label="Cancel dictation" onclick={cancel}>
       <Icon name="x" size="sm" />
     </button>
-  {:else}
+  {:else if showTrigger}
     <button
       type="button"
       class="voice-button"
@@ -312,6 +349,7 @@
     </button>
   {/if}
 
+  {#if showTrigger || listening}
   <details class="voice-info" ontoggle={keepDisclosureOnScreen}>
     <summary aria-label="About dictation privacy"><Icon name="info" size="sm" /></summary>
     <p id={disclosureId}>{disclosure}</p>
@@ -319,6 +357,7 @@
       <p id={unavailableId}>{unavailableReason}</p>
     {/if}
   </details>
+  {/if}
 </div>
 
 {#if errorMessage}

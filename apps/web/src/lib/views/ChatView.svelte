@@ -4,7 +4,6 @@
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
-  import ContextRing from "../components/ContextRing.svelte";
   import Markdown from "../components/Markdown.svelte";
   import FileInspector from "../components/FileInspector.svelte";
   import RewindPanel from "../components/RewindPanel.svelte";
@@ -26,6 +25,7 @@
     AgentResponse,
     AttachmentPreview,
     ContextUsage,
+    CapabilityGate,
     ConversationBranchOrigin,
     ModelDecision,
     ProjectsList,
@@ -38,6 +38,8 @@
   import AttachmentCard from "../components/AttachmentCard.svelte";
   import Composer from "../components/Composer.svelte";
   import ComposerAttach from "../components/ComposerAttach.svelte";
+  import ComposerActionMenu from "../components/ComposerActionMenu.svelte";
+  import ComposerContext from "../components/ComposerContext.svelte";
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
   import PlanChecklist from "../components/PlanChecklist.svelte";
@@ -64,6 +66,7 @@
     stripSlashToken,
     type SlashCommand,
   } from "../composerCommands";
+  import { composerMenu } from "../composerCapabilities";
   import { collectText } from "../turnPhases";
   import { relativeTime } from "../format";
   import {
@@ -282,6 +285,123 @@
   });
   let attachControl = $state<ComposerAttach | undefined>();
   let attachOpen = $state(false);
+
+  /**
+   * COMPOSER-02/03/04 — two entry points instead of a row of permanent buttons.
+   *
+   * Chat's bar carried an attach control, a dictation control, a project select
+   * and a posture chip, permanently, under every message anyone ever typed.
+   * Every one of them is still reachable; they are behind `+` and Tools now,
+   * which is where a control belongs when it is used occasionally and
+   * understood immediately. What stays on the bar is what changes per turn and
+   * has to be legible without opening anything: which model will answer, what
+   * this turn can see, and Send.
+   *
+   * The lists come from the typed registry (COMPOSER-19), so what Chat offers
+   * is a fact about the surface rather than a decision re-made in this file,
+   * and `HANDLED` is the contract in the other direction — an id this view has
+   * no handler for is not drawn, so the menu cannot promise something Chat
+   * cannot do.
+   */
+  let composerGates = $state<CapabilityGate[]>([]);
+  const HANDLED = new Set([
+    "attach-file",
+    "set-project",
+    "dictate",
+    "web-search",
+    "use-mcp",
+    "use-connector",
+    "generate-image",
+    "create-task",
+    "schedule",
+    "use-memory",
+  ]);
+  const addItems = $derived(composerMenu("add", "chat", composerGates, HANDLED));
+  const toolItems = $derived(composerMenu("tools", "chat", composerGates, HANDLED));
+
+  /**
+   * Where a Tools entry goes.
+   *
+   * Chat cannot itself invoke an MCP tool or a connector on demand — the model
+   * asks for one mid-turn and the gate judges it then. So the honest thing this
+   * menu can do is name the capability and take the owner to where it is
+   * configured or where the work happens. A menu item that silently did nothing
+   * would be the permanent-toolbar problem again, only harder to notice.
+   */
+  const TOOL_ROUTES: Record<string, string> = {
+    "web-search": "#/capabilities",
+    "use-mcp": "#/extensions?tab=mcp",
+    "use-connector": "#/extensions?tab=connectors",
+    "generate-image": "#/design",
+    "create-task": "#/tasks",
+    schedule: "#/tasks",
+    "use-memory": "#/memory",
+  };
+
+  /** Open state for the project chooser the `+` menu reveals. */
+  let projectPickerOpen = $state(false);
+
+  function runComposerAction(id: string) {
+    if (id === "attach-file") {
+      attachOpen = true;
+      return;
+    }
+    if (id === "dictate") {
+      voiceControl?.begin();
+      return;
+    }
+    if (id === "set-project") {
+      projectPickerOpen = true;
+      return;
+    }
+    const route = TOOL_ROUTES[id];
+    if (route !== undefined) window.location.hash = route;
+  }
+
+  /**
+   * COMPOSER-06 — what this turn will see, as one line.
+   *
+   * Only facts that are true. A chat with no project and no attachments has
+   * nothing to say here and the control is absent, rather than reporting its
+   * own emptiness in a row that is on screen either way.
+   */
+  const selectedProject = $derived(
+    (projects?.projects ?? []).find((project) => project.project_id === projectId) ?? null,
+  );
+
+  const contextFacts = $derived([
+    ...(selectedProject !== null
+      ? [
+          {
+            label: "Project",
+            value: selectedProject.name,
+            short: selectedProject.name,
+            href: "#/projects",
+            action: "Manage",
+          },
+        ]
+      : []),
+    ...(attachStore.items.length > 0
+      ? [
+          {
+            label: "Attached",
+            value: attachStore.items.map((item) => item.label).join(", "),
+            short: `${attachStore.items.length} file${attachStore.items.length === 1 ? "" : "s"}`,
+          },
+        ]
+      : []),
+  ]);
+
+  const contextPercent = $derived.by(() => {
+    // The provider's own count once a turn has produced one, the local estimate
+    // until then. The ring this replaces drew the same distinction; losing it
+    // would turn a measured number into a guess without saying so.
+    const window =
+      contextUsage?.context_window_tokens ?? activeProfile?.context_window_tokens ?? null;
+    if (!window) return null;
+    const used = contextUsage?.used_tokens ?? estimatedContextTokens;
+    return Math.min(100, (used / window) * 100);
+  });
 
   // Thumbnails for images already in the transcript, keyed by attachment id.
   //
@@ -620,6 +740,15 @@
     // needs it to keep an unavailable selection visible instead of quietly
     // re-rendering as the fallback.
     void modelDecision("chat").then((answer) => (decision = answer));
+    // COMPOSER-04 — which capabilities are on. A failed read leaves the list
+    // empty, and an entry with no gate reported is offered rather than hidden:
+    // the runtime still judges the action when it is invoked, and refusing to
+    // show a capability because a status read failed would be Raiker deciding
+    // on worse evidence than it will have at the point of use.
+    void api
+      .capabilityGates()
+      .then((view) => (composerGates = view))
+      .catch(() => (composerGates = []));
     void api.speechRuntime().then((view) => {
       speechRuntime = view.runtime.effective;
     }).catch(() => {});
@@ -2003,6 +2132,35 @@
       {#if attachOpen}
         <ComposerAttachPanel store={attachStore} disabled={streaming} idPrefix="chat" />
       {/if}
+      <!-- COMPOSER-03 — the project select was a permanent control for a choice
+           that changes every few days. It opens from `+`, in flow between the
+           prompt and the bar rather than as a popover over the text being
+           typed, which is the same reasoning `ComposerAttachPanel` was built
+           on. -->
+      {#if projectPickerOpen}
+        <div class="project-choice" role="group" aria-label="Choose a project">
+          <label for="chat-project-choice">Project for this chat</label>
+          <select
+            id="chat-project-choice"
+            class="bar-select"
+            value={projectId}
+            onchange={(event) => {
+              projectPickerOpen = false;
+              void onProjectPicked((event.currentTarget as HTMLSelectElement).value);
+            }}
+          >
+            <option value="">No project — this chat stands alone</option>
+            {#each projects?.projects ?? [] as project (project.project_id)}
+              <option value={project.project_id}>{project.name}</option>
+            {/each}
+          </select>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            onclick={() => (projectPickerOpen = false)}>Done</button
+          >
+        </div>
+      {/if}
     {/snippet}
 
     {#snippet turn()}
@@ -2010,9 +2168,28 @@
     {/snippet}
 
     {#snippet left()}
-          <ComposerAttach bind:this={attachControl} bind:open={attachOpen} disabled={streaming} />
+          <!-- COMPOSER-02 — two controls at rest. Everything the four permanent
+               ones used to offer is inside them, and the row under the prompt
+               is quiet enough that the prompt is the thing on the screen. -->
+          <ComposerActionMenu
+            kind="add"
+            items={addItems}
+            disabled={streaming}
+            onchoose={runComposerAction}
+          />
+          <ComposerActionMenu
+            kind="tools"
+            items={toolItems}
+            disabled={streaming}
+            onchoose={runComposerAction}
+          />
+          <!-- The session, not the trigger: "Listening…", Done and Cancel are
+               the state of dictation in progress and belong beside the prompt
+               being filled, not behind a menu that has already closed. The
+               trigger is an entry in `+`. -->
           <VoiceDictationControl
             bind:this={voiceControl}
+            showTrigger={false}
             draft={promptText}
             selectionStart={promptSelectionStart}
             selectionEnd={promptSelectionEnd}
@@ -2024,26 +2201,28 @@
             onrestored={restoreVoiceProvenance}
             onactivechange={onVoiceActive}
           />
-          {#if projects && projects.projects.length > 0}
-            <label class="composer-scope">
-              <span class="sr-only">Project for this chat</span>
-              <Icon name="folder" size="sm" />
-              <select
-                class="bar-select"
-                value={projectId}
-                aria-label="Project for this chat"
-                onchange={(event) => void onProjectPicked((event.currentTarget as HTMLSelectElement).value)}
-              >
-                <option value="">Project or folder</option>
-                {#each projects.projects as project (project.project_id)}
-                  <option value={project.project_id}>{project.name}</option>
-                {/each}
-              </select>
-            </label>
-          {/if}
-          <!-- VIS-08 — one posture chip instead of a permanently open control.
-               It opens the same approval control, unchanged. -->
-          <PostureControl showEnvironment={false} />
+          <!-- COMPOSER-06 — one inspectable line where a project select, an
+               attachment count and a context ring used to sit apart. -->
+          <ComposerContext
+            facts={contextFacts}
+            usedPercent={contextPercent}
+            disabled={streaming}
+            onopen={() => void refreshContextUsage()}
+          >
+          {#snippet detail()}
+            <!-- COMPOSER-06 — the token counts, the window and the
+                 compaction notice, unchanged. They did not become less true
+                 when the ring came off the bar; reading them is a deliberate
+                 act now rather than a permanent control. -->
+            <ContextMeterPopover
+              usedTokens={estimatedContextTokens}
+              contextWindowTokens={activeProfile?.context_window_tokens ?? null}
+              estimated={true}
+              usage={contextUsage}
+              inline={true}
+            />
+          {/snippet}
+          </ComposerContext>
     {/snippet}
 
     {#snippet right()}
@@ -2059,35 +2238,6 @@
             onchosen={(profileId, chosen) => void rememberSurfaceModel("chat", profileId, chosen)}
             disabled={streaming}
           />
-          <div class="context-control" bind:this={contextControlEl}>
-            <button
-              type="button"
-              class="context-trigger"
-              aria-label={activeProfile?.context_window_tokens
-                ? "Context window"
-                : "Context window — capacity unknown"}
-              aria-expanded={contextOpen}
-              title={activeProfile?.context_window_tokens
-                ? "Context window"
-                : "Context window — capacity unknown"}
-              onclick={() => { contextOpen = !contextOpen; if (contextOpen) void refreshContextUsage(); }}
-            >
-              <ContextRing
-                usedTokens={estimatedContextTokens}
-                contextWindowTokens={activeProfile?.context_window_tokens ?? null}
-                usage={contextUsage}
-              />
-            </button>
-            {#if contextOpen}
-              <ContextMeterPopover
-                usedTokens={estimatedContextTokens}
-                contextWindowTokens={activeProfile?.context_window_tokens ?? null}
-                estimated={true}
-                usage={contextUsage}
-              />
-            {/if}
-          </div>
-
           <button
             type="submit"
             class="btn btn-primary send"
@@ -2097,6 +2247,14 @@
             <Icon name="send" size="sm" />
             <span class="send-label">{streaming ? "Running…" : "Send"}</span>
           </button>
+    {/snippet}
+
+    {#snippet footer()}
+      <!-- COMPOSER-12 — governance appears when it changes what the next press
+           will do, not permanently. At the careful default this renders
+           nothing; the posture stays inspectable through Permissions, which
+           Tools links to. -->
+      <PostureControl showEnvironment={false} exceptionOnly={true} />
     {/snippet}
 
     {#snippet hint()}
@@ -2511,28 +2669,31 @@
     color: var(--text-3);
     font-size: var(--text-xs);
   }
+  .project-choice {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    padding: 0.5rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--sunken);
+    font-size: var(--text-sm);
+  }
+  .project-choice label {
+    color: var(--text-2);
+    font-size: var(--text-xs);
+  }
+  .project-choice select {
+    flex: 1;
+    min-width: 0;
+  }
   .turn-attachments {
     margin: 0.5rem 0 0;
     display: flex;
     gap: 0.4rem;
     flex-wrap: wrap;
   }
-  .context-control { position: relative; }
-  .context-trigger {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.7rem;
-    height: 1.7rem;
-    padding: 0;
-    border: 1px solid var(--neutral-border);
-    border-radius: 50%;
-    background: var(--surface);
-    color: var(--text-2);
-    cursor: pointer;
-  }
-  .context-trigger:hover { border-color: var(--accent-border); color: var(--accent); }
-  .context-trigger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
   @media (max-width: 720px) {
     .message-group {
       max-width: 88%;
@@ -2551,3 +2712,4 @@
     :global(.turn.turn-anchored) { transition: none; }
   }
 </style>
+

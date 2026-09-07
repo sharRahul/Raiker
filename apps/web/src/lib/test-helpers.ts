@@ -135,3 +135,43 @@ export const BOOTSTRAP_ROUTES: Record<string, unknown> = {
     no_silent_hosted_fallback: true,
   },
 };
+
+/**
+ * COMPOSER-02 — driving a composer whose controls are behind its two menus.
+ *
+ * The bar used to carry an attach control, a dictation trigger and a project
+ * select as permanent buttons, and every spec that exercised one reached for it
+ * by name. They are all still there and all still do the same thing; what
+ * changed is that reaching them is two steps rather than one. These helpers are
+ * that second step, in one place, so a spec still says *what* it is exercising
+ * rather than where today's design happens to keep it.
+ *
+ * Imported lazily inside each helper because `@testing-library/svelte` pulls in
+ * a DOM, and this module is also imported by tests that run without one.
+ */
+async function composerMenuItem(trigger: string, item: string): Promise<void> {
+  const { fireEvent, screen, within } = await import("@testing-library/svelte");
+  await fireEvent.click(await screen.findByRole("button", { name: trigger }));
+  const menu = await screen.findByRole("menu", { name: trigger });
+  await fireEvent.click(within(menu).getByRole("menuitem", { name: item }));
+}
+
+/** Open the attachment panel, the way `+` does. */
+export async function openComposerAttach(): Promise<void> {
+  await composerMenuItem("Add to this turn", "Upload a file");
+}
+
+/** Start dictating, the way `+` does. */
+export async function startComposerDictation(): Promise<void> {
+  await composerMenuItem("Add to this turn", "Dictate");
+}
+
+/** Reveal the project chooser, the way `+` does. */
+export async function openComposerProject(): Promise<void> {
+  await composerMenuItem("Add to this turn", "Work in a project");
+}
+
+/** Choose an item from the composer's Tools menu. */
+export async function chooseComposerTool(label: string): Promise<void> {
+  await composerMenuItem("Tools", label);
+}

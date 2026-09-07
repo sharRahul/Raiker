@@ -20,7 +20,7 @@ import { signInAsOwner } from "./hosted-provider";
 const BASE = process.env.RAIKER_LIVE_BASE_URL ?? "http://127.0.0.1:8765";
 const LIVE_USER = process.env.RAIKER_LIVE_USER;
 const LIVE_PASSWORD = process.env.RAIKER_LIVE_PASSWORD;
-const SHOTS = "../../docs/screenshots/pages";
+const SHOTS = "../docs/screenshots/pages";
 
 const ROUTES = DESTINATIONS.map((d) => [d.name, d.route] as const);
 

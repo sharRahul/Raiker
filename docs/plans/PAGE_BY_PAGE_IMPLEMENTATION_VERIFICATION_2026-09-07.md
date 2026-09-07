@@ -1,5 +1,31 @@
 # Raiker Page-by-Page Implementation Verification — 2026-09-07
 
+## Re-verification — 2026-09-07 (later the same day)
+
+This document's first pass found eight conclusions. Five of them have since been
+acted on, and this section records which — a verification document that does not
+say when its own findings stopped being true is a snapshot pretending to be a
+status.
+
+| First-pass conclusion | Now |
+|---|---|
+| 7. current date/time/day/timezone is not proven as authoritative runtime context, and weather is not first-class | **Closed** — [FIXED-459](FIXED_ITEMS.md#fixed-459--nothing-in-raiker-told-a-model-what-day-it-was), [FIXED-460](FIXED_ITEMS.md#fixed-460--weather-was-a-page-to-interpret-rather-than-a-reading-to-report) |
+| 8. global surface parity, readiness semantics and bounded extraction still need explicit implementation/tests | **Closed** — [FIXED-461](FIXED_ITEMS.md#fixed-461--four-derivations-of-one-fact-about-what-a-turn-can-read) |
+| 3. Design is a real route but has no research layer of its own | **Partly closed** — Design is a prompt surface with a research protocol and the full read catalogue (WEB-06); the *canvas workspace* (VIS2-19) remains open |
+| Models: MODEL-09 and MODEL-14 partial | **Closed** — [FIXED-462](FIXED_ITEMS.md#fixed-462--the-hugging-face-flow-did-all-six-steps-at-once), [FIXED-463](FIXED_ITEMS.md#fixed-463--come-back-and-press-look-again); the Models review is now complete end to end |
+| 1, 2, 4, 5, 6 | Unchanged — Build's workbench pane, the global model catalogue, Permissions UX and First Launch remain as first recorded |
+
+Two findings this re-verification made on its own, both in the evidence harness
+rather than the product, and both silent by construction: every live round had
+been writing its captures outside the repository since the `apps/web` → `web`
+move ([FIXED-464](FIXED_ITEMS.md#fixed-464--every-live-round-had-been-writing-its-evidence-outside-the-repository)),
+and every live spec that connects a provider had been waiting for a tab the
+Models redesign removed
+([FIXED-465](FIXED_ITEMS.md#fixed-465--eighteen-live-specs-waiting-for-a-tab-the-redesign-removed)).
+A sweep that reports success while writing nothing is worse than one that fails.
+
+---
+
 ## Purpose
 
 This document is the explicit implementation-verification companion to:
@@ -65,7 +91,7 @@ The most important conclusions are:
 | Quiet/shared composer | **Correct** for Chat/Build and current Design generation flow |
 | Persistent Project context | **Partial** — Project identity/context is carried, but there is no complete Project workspace shell spanning Chat/Build/Design/Tasks/Files/History |
 | Build artifact pane | **Open/partial** — constituent views exist, final workbench composition remains open |
-| Design canvas workspace | **Open** — current Design remains primarily prompt → generated image rather than Assets/Canvas/Inspector/Variations |
+| Design canvas workspace | **Open** — the canvas remains prompt → generated image rather than Assets/Canvas/Inspector/Variations. Design's *research* layer landed 2026-09-07 (WEB-06): it is a prompt surface with the global read catalogue, and image generation gained no network authority from it |
 | Secondary hub composition | **Partial** — Models improved substantially; Extensions/Observability/Settings remain more tab/admin oriented |
 | Theme/4K/8K/overlay/badge sweep | **Partial/Open** according to existing review status |
 
@@ -894,7 +920,18 @@ Likewise, weather is not yet a first-class structured capability with explicit s
 
 These are platform-level requirements, not Chat-specific features.
 
-**Status: Open — see `ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md`.**
+**Status: Closed 2026-09-07.** Every model-backed turn now receives a
+runtime-derived bundle carrying current UTC, owner-local time, the IANA
+timezone and where it came from, the local date and the day of week — injected
+as trusted metadata separate from the untrusted workspace block, recorded as an
+`environment_context` event, and derived per turn so a scheduled run and a
+delegated subagent each read the clock rather than inherit one. Weather is a
+structured read with `observed_at`, forecast validity and `fetched_at` kept
+apart and a typed `fresh`/`stale`/`unavailable` state. See
+`ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md`,
+[FIXED-459](FIXED_ITEMS.md#fixed-459--nothing-in-raiker-told-a-model-what-day-it-was)
+and
+[FIXED-460](FIXED_ITEMS.md#fixed-460--weather-was-a-page-to-interpret-rather-than-a-reading-to-report).
 
 ---
 
@@ -912,7 +949,16 @@ What still needs explicit implementation/verification:
 - explicit static-fetch → interactive-browser escalation boundary;
 - parity and fail-closed regression tests.
 
-**Status: Foundation correct; global parity/readiness/extraction partial/open — see `GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md`.**
+**Status: Closed 2026-09-07.** One typed contract
+(`raiker/runtime/read_capabilities.py`) is what every agentic surface derives
+from; a subagent receives the delegable subset and administrative pages receive
+nothing. `web_extract` adds bounded structured extraction over the same safe
+fetch, with explicit truncation and a typed `static_content_insufficient` that
+authorises no browser. Readiness is a typed state separate from authority, from
+one shared snapshot so a still-mounted composer updates without a reload. The
+fail-closed half is asserted directly: every read still refuses when the gate is
+off. See `GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md` and
+[FIXED-461](FIXED_ITEMS.md#fixed-461--four-derivations-of-one-fact-about-what-a-turn-can-read).
 
 ---
 
@@ -922,13 +968,13 @@ Priority outranks effort. Within the same priority, lower effort comes first.
 
 ## P0
 
-1. **ENV-01** authoritative per-turn time/date/timezone context.
-2. **ENV-02** one owner-level timezone source of truth.
-3. **ENV-03** fresh environment context at scheduled execution time.
-4. **ENV-04** environment-context parity across all agentic surfaces.
-5. **WEB-01** canonical global read-tool contract.
-6. **WEB-02** surface parity regression coverage.
-7. **WEB-03** prove projection never bypasses authority/policy.
+1. ~~**ENV-01** authoritative per-turn time/date/timezone context.~~ Done 2026-09-07.
+2. ~~**ENV-02** one owner-level timezone source of truth.~~ Done 2026-09-07.
+3. ~~**ENV-03** fresh environment context at scheduled execution time.~~ Done 2026-09-07.
+4. ~~**ENV-04** environment-context parity across all agentic surfaces.~~ Done 2026-09-07.
+5. ~~**WEB-01** canonical global read-tool contract.~~ Done 2026-09-07.
+6. ~~**WEB-02** surface parity regression coverage.~~ Done 2026-09-07.
+7. ~~**WEB-03** prove projection never bypasses authority/policy.~~ Done 2026-09-07.
 8. **GLOBAL-MODEL-01/02** authoritative owner-level model catalogue consumed by all composers.
 9. **GLOBAL-MODEL-06** remove `Keep available` as a normal availability gate.
 
@@ -940,8 +986,8 @@ Priority outranks effort. Within the same priority, lower effort comes first.
 4. **VIS2-12** Build artifact/workbench pane.
 5. **VIS2-11** persistent Project workspace/context.
 6. **COMPOSER-10** Tasks/Schedule shared composer grammar.
-7. **WEATHER-01/02/03** structured weather + optional location + freshness.
-8. **WEB-04 through WEB-08** search readiness, `web_extract`, Design research integration, shared readiness update, browser escalation.
+7. ~~**WEATHER-01/02/03** structured weather + optional location + freshness.~~ Done 2026-09-07.
+8. ~~**WEB-04 through WEB-08** search readiness, `web_extract`, Design research integration, shared readiness update, browser escalation.~~ Done 2026-09-07.
 9. Home start-work parity for Chat/Build/Design.
 10. Extensions/Observability composed-hub pass.
 
@@ -951,7 +997,7 @@ Priority outranks effort. Within the same priority, lower effort comes first.
 2. product-wide badge/attention/overlay sweep.
 3. theme-specific optical passes.
 4. 4K/8K composition validation.
-5. provenance/diagnostic visibility for environment/web-read state.
+5. ~~provenance/diagnostic visibility for environment/web-read state.~~ Done 2026-09-07 — `GET /api/environment` and `GET /api/read-capabilities`.
 
 ---
 
@@ -972,9 +1018,9 @@ The following earlier labels should be interpreted carefully:
 | Permissions UX | **Needs focused redesign** |
 | First Launch security boundary | **Correct** |
 | First Launch onboarding flow | **Needs focused redesign** |
-| authoritative environment clock/date/day/timezone | **Open** |
-| structured weather | **Open** |
-| global web-read parity | **Partial/Open** |
+| authoritative environment clock/date/day/timezone | **Closed 2026-09-07** (FIXED-459) |
+| structured weather | **Closed 2026-09-07** (FIXED-460) |
+| global web-read parity | **Closed 2026-09-07** (FIXED-461) |
 
 ---
 

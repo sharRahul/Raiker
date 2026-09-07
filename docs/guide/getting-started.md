@@ -292,7 +292,7 @@ Four destinations are tabbed:
 
 | Destination | Tabs |
 |---|---|
-| Models | Local, Hosted, Hugging Face, Activity, Routing, Pricing |
+| Models | Overview, My models, Add model, Runtime & routing, Usage |
 | Extensions | Connectors, MCP servers, Skills, Hooks, Plugins |
 | Observability | Overview, Sessions, Activity, Checkpoints, Live work, Notifications |
 | Settings | General, Notifications, Personalisation, Security & sign-in, Privacy, Account, Web access, Git credential, Runtime configuration, Updates |

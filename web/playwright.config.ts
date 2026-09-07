@@ -27,7 +27,11 @@ const LIVE = /live/;
 
 export default defineConfig({
   testDir: "./e2e",
-  outputDir: "../../output/playwright/results",
+  // Anchored at the repository root, which is one level above this file.
+  // It said `../../` while the app lived at `apps/web`; the move to `web/`
+  // left it pointing outside the repository, next to the captures that went
+  // the same way (see `e2e/capture.ts`).
+  outputDir: "../output/playwright/results",
   use: {
     viewport: { width: 1440, height: 1000 },
     colorScheme: "light",

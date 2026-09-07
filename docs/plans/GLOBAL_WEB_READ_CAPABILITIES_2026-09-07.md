@@ -1,5 +1,30 @@
 # Raiker Global Web Read Capabilities — 2026-09-07
 
+## Implementation status — 2026-09-07
+
+Every item in this plan is implemented and verified against a live runtime.
+Recorded as
+[FIXED-461](FIXED_ITEMS.md#fixed-461--four-derivations-of-one-fact-about-what-a-turn-can-read).
+
+| Item | State |
+|---|---|
+| WEB-01 canonical global read-tool contract | Done — `raiker/runtime/read_capabilities.py`, `GET /api/read-capabilities` |
+| WEB-02 surface parity regression coverage | Done — `tests/test_global_read_capabilities.py` |
+| WEB-03 projection never bypasses authority | Done — every read fails closed on a disabled gate, and tool search grants nothing |
+| WEB-04 explicit search readiness | Done — typed `ToolReadiness`, rendered beside the entry it describes |
+| WEB-05 bounded structured `web_extract` | Done — six modes over the same safe fetch, with explicit truncation |
+| WEB-06 Design research-agent integration | Done — `design` is a prompt surface with its own research protocol; image generation keeps its own path |
+| WEB-07 shared readiness revision | Done — one snapshot in `readCapabilities.svelte.ts`, so a still-mounted composer updates without a reload |
+| WEB-08 browser escalation contract | Done — typed `static_content_insufficient` that authorises nothing |
+| WEB-09 search/extraction provenance | Done — final URL, fetched-at, mode and truncation on every result and turn source |
+
+All 38 required tests below are covered by
+`tests/test_global_read_capabilities.py`, `tests/test_web_access.py`,
+`tests/test_web_egress_blocklist.py`, `web/src/lib/composerCapabilities.test.ts`
+and the live round `web/e2e/env-web-read-live.spec.ts`.
+
+---
+
 ## Purpose
 
 This plan defines how web search, direct web fetch and bounded web extraction should be exposed across Raiker.

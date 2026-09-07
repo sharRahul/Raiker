@@ -1398,3 +1398,73 @@ storage half exists.
 never pushes the prompt or the send control out of the viewport, and the owner
 can always get the text back into the prompt.
 
+
+---
+
+## BUG-280 — Weather and the environment clock are unmeasured against a real provider and a real model
+
+**Severity: Low. Area: runtime / environment context, weather. Raised while
+implementing
+[ENV-01…05 and WEATHER-01…03](ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md).**
+
+**Observed.** The 2026-09-07 round proved the whole of the environment and
+weather contract against the runtime: the bundle a turn is given, the event it
+records, the precedence, the DST behaviour, the stale-refresh note, and every
+governed refusal. Two halves of it were not measured, and neither is a code gap.
+
+*No model reasoned from the bundle.* The round's key is identity-linked, as the
+previous six were, and this host has no local runtime, so no provider on it can
+complete a turn. The bundle is asserted against the messages the orchestrator
+builds — which is the right place, since it is derived before any provider is
+called — but "the model answered `tomorrow` correctly" is a claim only a real
+turn can support.
+
+*No weather request left the machine.* The provider path is asserted against a
+stand-in that answers as Open-Meteo does, and every governed refusal is asserted
+against the real gate, decision mode and blocklist. What is unmeasured is the
+real HTTP round trip: this host has no route to `api.open-meteo.com`.
+
+**Why it was left.** Both need something the round did not have — a working
+provider credential and outbound egress — rather than something Raiker is
+missing. Recording it here is what stops the plan's `Done` reading as a claim
+about evidence that was never taken.
+
+**Proposed check.** On a host with egress and a working model: ask *"what day is
+it, and what is the weather here?"* in Chat, and confirm the answer names today's
+real date in the owner's zone and cites the weather provider with its observation
+time. Then set the timezone to another continent and ask *"what time is it?"*
+again.
+
+**Interface outcome that has to be true before this closes.** A real turn
+answers a relative-time question from the runtime's clock rather than from
+training knowledge, and a real weather answer names its provider and how old the
+reading is.
+
+---
+
+## BUG-281 — Design's research findings are text, not sources
+
+**Severity: Low. Area: Design. Raised while implementing
+[WEB-06](GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md#web-06--design-research-agent-integration).**
+
+**Observed.** Design's Tools menu runs a real governed research turn on the
+`design` surface: it searches, reads and extracts through the global read
+catalogue, and the findings appear above the composer for the owner to write a
+prompt from. What comes back is the model's prose. The turn *records* its
+sources — every governed read enters the turn-source ledger, which is what
+Chat's citation chips are drawn from — but the Design panel does not render
+them, so the owner cannot open the page a reference came from without going to
+the conversation.
+
+**Why it was left.** The ledger and the reader both exist; what is missing is
+the panel that shows them here, and Design's own workspace shape is still open
+under [VIS2-19](VISUAL_UI_UX_REVIEW_2026-09-06.md). Building a source list into
+a panel that is about to be replaced by a canvas would be work done twice.
+
+**Proposed fix.** Render the research turn's sources as the same chips Chat
+uses, so a reference can be opened at the passage that produced it — and carry
+them into the canvas when VIS2-19 lands.
+
+**Interface outcome that has to be true before this closes.** Every claim in a
+Design research result can be opened at the page it came from, without leaving
+Design.

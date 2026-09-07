@@ -625,8 +625,13 @@
   /* The empty state of the model control: shaped like the select it replaces so
      the bar keeps its rhythm, and a link because the fix is on another page. */
   .bar-empty {
-    display: inline-flex;
-    align-items: center;
+    /* `inline-block`, not `inline-flex`. Found in the 2026-09-07 round: with no
+       image model connected the control drew as an *empty box*. A flex
+       container turns its text into an anonymous flex item, which
+       `text-overflow: ellipsis` cannot act on — so `overflow: hidden` below
+       clipped the whole sentence rather than truncating it, and the one control
+       whose entire job is to say "connect a model" said nothing at all. */
+    display: inline-block;
     color: var(--text-3);
     text-decoration: none;
     white-space: nowrap;

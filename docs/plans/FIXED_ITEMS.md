@@ -480,6 +480,14 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-456](#fixed-456--three-models-modals-that-escape-could-not-close) | Medium | Models / accessibility | Fixed 2026-09-07 (found live) |
 | [FIXED-457](#fixed-457--rows-that-offered-raikers-own-placeholder-as-a-models-name) | Low | Models | Fixed 2026-09-07 (found live) |
 | [FIXED-458](#fixed-458--a-mobile-sheet-that-was-32px-short-of-being-one) | Low | Composer / mobile | Fixed 2026-09-07 |
+| [FIXED-459](#fixed-459--nothing-in-raiker-told-a-model-what-day-it-was) | **Critical** | Runtime / environment context | Fixed 2026-09-07 (ENV-01…05) |
+| [FIXED-460](#fixed-460--weather-was-a-page-to-interpret-rather-than-a-reading-to-report) | High | Runtime / weather | Fixed 2026-09-07 (WEATHER-01…03) |
+| [FIXED-461](#fixed-461--four-derivations-of-one-fact-about-what-a-turn-can-read) | High | Runtime / read capabilities | Fixed 2026-09-07 (WEB-01…09) |
+| [FIXED-462](#fixed-462--the-hugging-face-flow-did-all-six-steps-at-once) | Medium | Models | Fixed 2026-09-07 (MODEL-09) |
+| [FIXED-463](#fixed-463--come-back-and-press-look-again) | Medium | Models | Fixed 2026-09-07 (MODEL-14) |
+| [FIXED-464](#fixed-464--every-live-round-had-been-writing-its-evidence-outside-the-repository) | High | Live test harness | Fixed 2026-09-07 (found live) |
+| [FIXED-465](#fixed-465--eighteen-live-specs-waiting-for-a-tab-the-redesign-removed) | High | Live test harness | Fixed 2026-09-07 (found live) |
+| [FIXED-466](#fixed-466--the-control-whose-job-was-to-say-connect-a-model-said-nothing) | Low | Design / composer | Fixed 2026-09-07 (found live) |
 
 ---
 
@@ -20340,3 +20348,324 @@ last time something measured it.
 **User-interface outcome.** `composer-mobile-sheet.png`: the sheet spans the
 screen, over a scrim, with the three Work modes still legible as icons in the
 top bar above it.
+
+---
+
+## FIXED-459 — Nothing in Raiker told a model what day it was
+
+**Severity: Critical. Area: runtime / environment context. Status: Fixed
+2026-09-07. Raised as
+[ENV-01 … ENV-05](ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md#implementation-findings).**
+
+**Observed.** No turn was ever given the current date, time, day or timezone.
+The model answered relative-time questions from whatever it could find: a
+provider's own hidden preamble, a stale sentence earlier in the conversation, or
+training knowledge months out of date. All three read exactly like a fact, and
+the third is the dangerous one because it does not look like a guess. `Remind me
+tomorrow at 9` therefore resolved against a date nobody had established, and
+nothing in the transcript said which one.
+
+Settings had a **Time zone** select. Nothing in the runtime read it. An owner
+could set `Europe/London`, watch it save, and have every turn continue to reason
+from nowhere in particular — a control that appears to decide something and
+decides nothing, which is the same shape as an inert switch.
+
+**Fixed.** `raiker/runtime/environment.py` derives one `EnvironmentContext` per
+turn: `generated_at_utc`, the IANA zone and where it came from, the owner-local
+datetime, date and time, the day of week, and the UTC offset. It is injected as
+its own system message — deliberately *not* inside the workspace block, because
+what follows that heading is data the turn must not obey and this is metadata
+the turn must not doubt — and recorded as an `environment_context` event.
+
+Four properties make it worth the name.
+
+* **Both clocks, always.** UTC alone cannot answer "tomorrow at 9"; local alone
+  cannot be audited across machines. Both are sent with the zone that relates
+  them, so nothing has to derive the missing half.
+* **Precedence is fixed and visible.** Explicit owner setting, then a device
+  zone the browser proposed, then the host, then UTC — and the bundle says which
+  one won. A browser may propose; it never overwrites a choice, because somebody
+  who sets `Europe/London` and opens Raiker from a hotel in Denver has said
+  something about their schedule.
+* **Derived, never remembered.** A scheduled run reads the clock when it runs,
+  so a daily routine created on Monday evening is told it is Tuesday morning. A
+  delegated subagent derives its own rather than inheriting the parent turn's.
+* **No network, no provider, no Project.** Turning off web access, changing
+  model or switching Project changes nothing here. A clock an unrelated setting
+  can switch off is not a clock a turn can rely on.
+
+**User-interface outcome.** Settings → General gains a **Time and place** card
+that states the zone in force, where it came from, and what the owner's clock
+reads in it right now — a select whose effect you cannot see is a select nobody
+trusts. Live evidence: `env-01-timezone-and-weather-location.png`.
+
+**Tests.** `tests/test_environment_context.py` (18 cases: precedence, DST,
+the UTC-versus-local date disagreement, unreadable settings, no account),
+`tests/test_environment_context_turns.py` (11 cases: the bundle reaching Chat,
+Build and Design turns, the trust boundary between the two system messages, the
+event record, two turns getting two clocks, a scheduled run and a subagent
+deriving their own), `web/src/lib/environment.test.ts` (12 cases).
+
+---
+
+## FIXED-460 — Weather was a page to interpret rather than a reading to report
+
+**Severity: High. Area: runtime / weather. Status: Fixed 2026-09-07. Raised as
+[WEATHER-01 … WEATHER-03](ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md#weather-contract).**
+
+**Observed.** Asking about the weather had two failure modes that are
+indistinguishable from the outside. The model answered from training knowledge —
+a confident sentence about a day months in the past — or it was pointed at a
+weather page and asked to read numbers out of a layout built for a human eye,
+which is a guess with a citation attached. Both produce "18°C and cloudy".
+Neither is an observation.
+
+**Fixed.** `weather_lookup` is a structured read. The result keeps three
+timestamps apart, because they are three different instants and a reader has to
+be able to tell which is which: `observed_at` is when a station measured it,
+`valid_from`/`valid_to` is what a forecast row claims to cover, and `fetched_at`
+is when Raiker asked. Freshness is a typed value — `fresh`, `stale`,
+`unavailable` — rather than an adjective in a sentence, so scheduling logic can
+branch on it. A failed refresh may show the last reading *with its age*; it may
+not present it as current.
+
+Location comes from the instruction, then the owner's configured default, then a
+typed `weather_location_required` — which is a question. There is no fourth
+step, and the absence of one is the point: deriving a persistent precise
+location from the host's IP address is not a fallback, it is a surveillance
+decision nobody made.
+
+The request goes out through the existing `web_fetch` boundary — the same gate,
+decision mode, blocklist and address guard — so *discoverable everywhere* never
+becomes *reachable regardless*.
+
+**User-interface outcome.** **Check the weather** appears in the Tools menu on
+every Work surface, with its readiness beside it. Settings → General gains an
+optional **Default weather location**, held separately from the timezone because
+"I schedule in Europe/London" and "when I say weather I mean London" are two
+statements a traveller changes at different times.
+
+**Tests.** `tests/test_weather_capability.py` — 12 cases covering the three
+timestamps, provider attribution, the location precedence, the stale-refresh
+note, and the gate, decision mode and blocklist each refusing it by name.
+
+---
+
+## FIXED-461 — Four derivations of one fact about what a turn can read
+
+**Severity: High. Area: runtime / read capabilities. Status: Fixed 2026-09-07.
+Raised as [WEB-01 … WEB-09](GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md#implementation-findings).**
+
+**Observed.** Whether Build had `web_search` was reconstructed from the
+projection list, the capability router, the gate map, and whichever view
+happened to render a menu. Four derivations of one fact drift, and the drift is
+invisible until an owner switches Project and watches a tool disappear. Nothing
+stated the contract in one place, so nothing could be held to it.
+
+Two smaller failures sat inside that one. The composer showed a single **Search
+the web** entry that was really three different capabilities with three
+different failure modes — search needs a provider, a URL read needs a reachable
+public address, extraction needs a page that is not built in the browser — so
+one row could only ever report the state of whichever it happened to check. And
+there was no way to read a page's *structure*: a turn that needed the rows of a
+pricing table had to ask the model to find them in prose, which is a guess
+dressed as a read, or reach for a browser, which is a far larger grant of
+authority for a page that never needed one.
+
+**Fixed.** `raiker/runtime/read_capabilities.py` is the one typed contract.
+Every agentic surface derives from it; a subagent gets the delegable subset,
+because a bounded delegation that could reach the open internet on its own would
+be a wider grant than the parent turn made; and administrative pages get nothing
+rather than a composer invented to satisfy a parity table.
+
+* **`web_extract`** adds bounded structured extraction — main content, article,
+  links, tables, metadata, JSON-LD — as a parser over the *same* safe fetch,
+  never a second internet client. Every count is capped and truncation is stated
+  out loud, because a model handed 200 of 4,000 rows with no marker will reason
+  about the 200 as if they were all of them. A page that builds itself in the
+  browser returns a typed `static_content_insufficient`, which is a description
+  of that page and explicitly not a request: whether a browser capability may be
+  proposed is a separate governed decision this result grants nothing towards.
+* **Readiness is typed and separate from authority.** `Needs provider` is a
+  setup step; `Blocked by policy` is a decision the owner made. One greyed-out
+  row can only send them to one screen, and it will be the wrong one half the
+  time.
+* **Design became a real research surface.** `design` is a prompt surface with
+  its own protocol, so Design can find references through the global read set
+  while image generation keeps its own governed endpoint and gains no network
+  authority from it. The two never share a path, which is what makes the
+  separation structural rather than a promise.
+
+The invariant on the other side is asserted directly: **discovering, listing,
+projecting or searching for a tool never creates authority to execute it.**
+Every one of the four reads still fails closed when the gate is off.
+
+**User-interface outcome.** Chat, Build, Design and Tasks each offer **Search
+the web**, **Read a URL**, **Extract page content** and **Check the weather**,
+each carrying its own state. Readiness comes from one shared snapshot, so
+configuring a provider elsewhere reaches a still-mounted composer without a
+reload. Live evidence: `env-02-chat-tools-research-reads.png`,
+`env-03-design-research-tools.png`.
+
+**Tests.** `tests/test_global_read_capabilities.py` — 42 cases covering surface
+parity, the delegable subset, the administrative exclusion, every read failing
+closed on a disabled gate, the readiness states, the six extraction modes with
+their caps and truncation notes, the browser-escalation result, and the
+image-generation path never naming a web or browser capability.
+`web/src/lib/composerCapabilities.test.ts` adds 13.
+
+---
+
+## FIXED-462 — The Hugging Face flow did all six steps at once
+
+**Severity: Medium. Area: models. Status: Fixed 2026-09-07. Raised as
+[MODEL-09](MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md#model-09--reframe-hugging-face-as-add-local-model).**
+
+**Observed.** Adding a local model is a sequence — find something, pick the
+right build of it, look at what it costs in bytes and licence, fetch it, convert
+it if Raiker cannot run it as-is, add it to the library. The panel did all six,
+and did them all *at once*: a first-time owner met a search box, a token form, a
+curated card, a results list, a variants list, a download drawer and a
+conversion card, with nothing saying which was their next move.
+
+Beside the search box sat **Set access token** at equal weight, which told every
+owner that signing in to Hugging Face was a normal part of downloading a public
+model. It is not; it is needed for a gated or private repository and for nothing
+else.
+
+**Fixed.** A step rail states the sequence and where the owner is in it. Nothing
+is hidden — someone who already knows the flow still reaches every control — but
+the page now says which step is theirs. The rail is *derived* from the panel's
+own state rather than counted alongside it: a counter kept on the side is a
+second source of truth about the flow, and it disagrees with the flow the first
+time the owner goes back to the results list. Conversion appears only for a
+Safetensors download, because showing a GGUF a step it will never take makes the
+flow look longer and more fragile than it is.
+
+The token control appears when the repository in front of the owner is actually
+gated, and otherwise under its own disclosure for someone who came looking.
+
+**User-interface outcome.** `env-04-huggingface-step-rail.png`: five numbered
+steps with **Find model** current, and **Access token setup — only needed for
+private or gated repositories** at the foot of the panel.
+
+**Tests.** `web/src/lib/huggingFaceSteps.test.ts` — 14 cases, including the rail
+going *back* when the owner does, and the conversion step appearing only when
+this variant needs it.
+
+---
+
+## FIXED-463 — "Come back and press Look again"
+
+**Severity: Medium. Area: models. Status: Fixed 2026-09-07. Raised as
+[MODEL-14](MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md#model-14--do-not-use-backendvendor-links-as-the-normal-integration-contract).**
+
+**Observed.** Some setup genuinely happens outside Raiker: a local runtime is
+somebody else's installer, and Raiker will not download and execute one. What
+should not happen is for that one unavoidable trip to become the normal
+lifecycle — *open this website, come back, press Look again, read a stale
+status, press Refresh*. Each of those presses is Raiker asking the owner to do a
+job Raiker can do itself.
+
+**Fixed.** Opening a vendor download arms a one-shot listener. The moment the
+tab is looked at again, detection re-runs and the result is reported. The
+owner's part ends at installing the thing.
+
+Three properties are deliberate. It fires **once** and unsubscribes, because a
+listener that ran on every tab switch is a background poll wearing a different
+name. It is **cancelled on unmount**, so a view the owner navigated away from
+leaves nothing to fire against a destroyed component. And it **reports rather
+than concludes**: the sentence says what detection found, so a tab regaining
+focus can never read as an install that happened.
+
+**User-interface outcome.** "Opened the official Ollama download. Install it and
+come back — Raiker will look again." followed, on return, by either "Ollama is
+now installed on this machine." or a specific next thing to try.
+
+**Tests.** `web/src/lib/returnAndDetect.test.ts` (8 cases) and
+`ModelsView.test.ts` — "looks again by itself when the owner comes back from the
+vendor page", which returns to the tab without pressing anything.
+
+---
+
+## FIXED-464 — Every live round had been writing its evidence outside the repository
+
+**Severity: High. Area: live test harness. Status: Fixed 2026-09-07. Found in
+the live round of 2026-09-07.**
+
+**Observed.** Every live spec writes its captures to a path like
+`../../docs/plans/screenshots/pages/…`, which was exactly right while the web
+app lived at `apps/web`: two levels up from `apps/web/e2e` is the repository
+root. Moving it to `web/` made that one level too many — and because Playwright
+resolves a relative screenshot path against the *process* directory rather than
+the spec's, every capture since has been written to `/home/user/docs/plans/…`,
+outside the repository, where nothing looks for it and git cannot see it. The
+runner's own `outputDir` went the same way.
+
+The failure is silent by construction: the sweeps pass, they report having
+written their files, and the two *tracked* catalogues they exist to keep current
+— `screenshots/pages/` and `screenshots/widths/` — simply stop changing. A
+round's own `working/` captures are gitignored by design, so nothing about them
+looked wrong either. That is the same shape as an inert switch — not a missing
+control, but a wrong belief about one — which is why the fix belongs in the
+harness.
+
+**Fixed.** `capture()` and `captureElement()` anchor a relative path at
+`web/e2e`, which is what every one of those strings has always meant, and
+`outputDir` is corrected to the repository root. No spec needed editing.
+
+**User-interface outcome.** None; this is test infrastructure. Its outcome is
+that the evidence cited by this document lands where the document says it is.
+
+**Tests.** Proven by running the round: the 2026-09-07 captures land in
+`docs/plans/screenshots/working/` — the round's own evidence directory, which is
+gitignored like every round's before it — rather than outside the tree.
+
+---
+
+## FIXED-465 — Eighteen live specs waiting for a tab the redesign removed
+
+**Severity: High. Area: live test harness. Status: Fixed 2026-09-07. Found in
+the live round of 2026-09-07.**
+
+**Observed.** `openHostedProviders` navigated to `#/models?tab=hosted` and
+waited for a **Hosted** tab. MODEL-03/MODEL-07 folded Local and Hosted into one
+**Add model** tab, and `?tab=hosted` became an alias that lands on the model
+*inventory* — a page with no provider cards on it at all. So every live spec
+that connects a provider timed out before its first assertion, and the failure
+read as a broken product rather than as a stale harness.
+
+**Fixed.** It waits for the section heading the redesign actually renders —
+**Your hosted providers** — on the tab that renders it. Unlike a tab name, a
+section heading is the thing the cards are under, so it cannot be true while the
+cards are elsewhere.
+
+**User-interface outcome.** None; this is test infrastructure.
+
+**Tests.** `env-web-read-live.spec.ts` connects the round's Anthropic key
+through the product's own dialog and reads "Connection saved" back.
+
+---
+
+## FIXED-466 — The control whose job was to say "connect a model" said nothing
+
+**Severity: Low. Area: design / composer. Status: Fixed 2026-09-07. Found in the
+live round of 2026-09-07.**
+
+**Observed.** With no image model available, Design's composer draws a link
+reading "No image model — connect one" in place of the model select. It rendered
+as an **empty box**. A previous round had capped the control's width and given
+it `overflow: hidden; text-overflow: ellipsis` so a long sentence could not push
+through the Generate button — correct — but the element was `display:
+inline-flex`, and a flex container turns its text into an anonymous flex item
+that `text-overflow` cannot act on. So the text was clipped in full rather than
+truncated, and the one control whose entire job is to say *connect a model* said
+nothing at all.
+
+**Fixed.** `display: inline-block`, which honours the truncation the rule beside
+it already asked for.
+
+**User-interface outcome.** The empty state reads "No image model — connect
+one", truncating with an ellipsis when the bar is narrow, and still links to the
+Models page.
+

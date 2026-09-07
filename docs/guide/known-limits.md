@@ -155,10 +155,21 @@ and approval requirements and are not escape hatches around local policy.
 
 ## Web and external services
 
-Web access is a sanitized text fetcher, not a general interactive browser. It
-enforces HTTPS, safe public addresses, and redirect re-checks. Hosted-model and
-connector availability remains subject to the external provider's network,
-quota, model catalogue, and account terms.
+Web access is a sanitized text fetcher and a bounded structured extractor, not a
+general interactive browser. It enforces HTTPS, safe public addresses, and
+redirect re-checks. Extraction reads what that fetch returned — main text,
+links, tables, metadata, structured data — with every count capped and any
+truncation stated. A page whose content is assembled by scripts in the browser
+comes back saying so rather than as invented content; Raiker will not run that
+page's scripts, click, fill a form or hold a session for you.
+
+Weather is a structured read from one provider, not a live station feed. It
+reports when a value was observed, what period a forecast covers, and when
+Raiker last asked. If a refresh fails, the previous reading may still be shown —
+always with its age, and never described as current.
+
+Hosted-model and connector availability remains subject to the external
+provider's network, quota, model catalogue, and account terms.
 
 ## Evidence and open defects
 

@@ -87,7 +87,7 @@
   </label>
   <label>
     <span>Country or region</span>
-    <small>Used for regional formatting. Scheduled work uses the time zone below.</small>
+    <small>Used for regional formatting only. Scheduling is decided under Time and place.</small>
     <select value={region} onchange={(e) => save({ "general.region": e.currentTarget.value })}>
       <option value="GB">United Kingdom</option>
       <option value="US">United States</option>
@@ -130,11 +130,11 @@
   </p>
   {#if proposal}
     <p class="proposal" data-testid="timezone-proposal">
-      This device reports <strong>{proposal}</strong>.
+      This device reports <strong>{proposal}</strong>. Raiker will not change your
+      choice on its own.
       <button type="button" class="link" onclick={() => save({ [TIMEZONE_KEY]: proposal })}>
-        Use it
+        Use {proposal}
       </button>
-      Raiker will not change your choice on its own.
     </p>
   {/if}
   <label>

@@ -5,6 +5,15 @@
 Wave 1 is complete, and the parts of Wave 2 that the composer redesign carries
 are complete with it. Waves 2 (remainder) and 3 are open.
 
+**Updated 2026-09-07 (later the same day).** Three rows moved. VIS2-06 and
+VIS2-18 gained the composer's research entries, which report readiness where the
+capability is offered rather than failing silently at the point of use; VIS2-13's
+badge budget now covers those entries, which print a state chip only when the
+state is *not* the ordinary one. VIS2-19 is unchanged and remains the largest
+open item — Design gained a research layer
+([WEB-06](GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md#web-06--design-research-agent-integration)),
+not a canvas.
+
 | Item | State |
 |---|---|
 | VIS2-01 dead type-scale step | Done — [FIXED-444](FIXED_ITEMS.md#fixed-444--a-named-type-step-that-resolved-to-its-neighbour) |
@@ -12,20 +21,20 @@ are complete with it. Waves 2 (remainder) and 3 are open.
 | VIS2-03 Chat \| Build \| Design as Work modes | Done — [FIXED-446](FIXED_ITEMS.md#fixed-446--design-was-a-work-mode-the-shell-did-not-draw) |
 | VIS2-04 platform shortcut labels | Done — [FIXED-447](FIXED_ITEMS.md#fixed-447--ctrl-k-printed-to-a-keyboard-that-has-no-ctrl-there) |
 | VIS2-05 model and context on compact layouts | Done for Chat, Build and Design through the composer's context line |
-| VIS2-06 quieter composer primitives | Done — [FIXED-454](FIXED_ITEMS.md#fixed-454--the-composer-grew-one-permanent-button-at-a-time) |
+| VIS2-06 quieter composer primitives | Done — [FIXED-454](FIXED_ITEMS.md#fixed-454--the-composer-grew-one-permanent-button-at-a-time); the research reads joined the Tools menu rather than the bar ([FIXED-461](FIXED_ITEMS.md#fixed-461--four-derivations-of-one-fact-about-what-a-turn-can-read)) |
 | VIS2-07 state-aware governance wording | Done — [FIXED-448](FIXED_ITEMS.md#fixed-448--the-posture-chip-said-protected-while-its-colour-said-otherwise) |
 | VIS2-08 sidebar active-state cues | Done — [FIXED-449](FIXED_ITEMS.md#fixed-449--five-ways-of-saying-which-row-you-are-on) |
 | VIS2-09 unique destination icons | Done — [FIXED-446](FIXED_ITEMS.md#fixed-446--design-was-a-work-mode-the-shell-did-not-draw) |
 | VIS2-10 composed secondary hubs | Partly — Models is a composed hub now; Extensions, Observability and Settings are still tab strips |
 | VIS2-11 Project as persistent context | Partly — the Project is named in every Work composer's context line; a shared workspace shell is not built |
 | VIS2-12 Build artifact pane | Open |
-| VIS2-13 badge/chip budget | Done for the Models inventory and the composer; not swept product-wide |
+| VIS2-13 badge/chip budget | Done for the Models inventory and the composer — a Tools entry prints a state chip only when its state is not the ordinary one; not swept product-wide |
 | VIS2-14 theme-specific optical passes | Open |
 | VIS2-15 4K/8K composition classes | Open |
 | VIS2-16 neutral persistent normal state | Done — [FIXED-450](FIXED_ITEMS.md#fixed-450--success-colour-as-the-standing-state-of-everything-that-is-merely-fine) |
 | VIS2-17 standardised overlay composition | Partly — `--shadow-3` is a real elevation tier and the Models modals answer to Escape ([FIXED-456](FIXED_ITEMS.md#fixed-456--three-models-modals-that-escape-could-not-close)); the full vocabulary is not defined |
 | VIS2-18 attention vs information | Done on the Models Overview and the composer; not swept product-wide |
-| VIS2-19 Design as a canvas workspace | Open — needs an image runtime beyond one-shot generation |
+| VIS2-19 Design as a canvas workspace | Open — needs an image runtime beyond one-shot generation. Design's *research* half landed 2026-09-07 (WEB-06); the canvas did not |
 | VIS2-20 component extraction in large views | Partly — `ModelsOverview`, `MyModels`, `WorkDefaults` and `RowOverflow` came out of `ModelsView` |
 | VIS2-21 shared Work-surface contract | Done for the composer; the surrounding page shells are still per-view |
 

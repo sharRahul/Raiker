@@ -2,13 +2,16 @@
 
 ## Implementation status — 2026-09-07
 
-Waves 0 to 4 are implemented and verified against a live runtime holding real
-Anthropic, OpenAI and OpenRouter credentials, each connected through the
-product's own flow rather than seeded into the store. Recorded as
+**Every item in this review is now implemented.** Waves 0 to 4 landed on
+2026-09-06 against a live runtime holding real Anthropic, OpenAI and OpenRouter
+credentials, each connected through the product's own flow rather than seeded
+into the store; the two remaining partials closed on 2026-09-07. Recorded as
 [FIXED-451](FIXED_ITEMS.md#fixed-451--five-stores-five-read-paths-and-no-way-to-say-which-was-wrong),
-[FIXED-452](FIXED_ITEMS.md#fixed-452--design-had-no-model-default-of-its-own)
+[FIXED-452](FIXED_ITEMS.md#fixed-452--design-had-no-model-default-of-its-own),
+[FIXED-453](FIXED_ITEMS.md#fixed-453--the-models-page-was-a-filing-system-for-its-own-rows),
+[FIXED-462](FIXED_ITEMS.md#fixed-462--the-hugging-face-flow-did-all-six-steps-at-once)
 and
-[FIXED-453](FIXED_ITEMS.md#fixed-453--the-models-page-was-a-filing-system-for-its-own-rows).
+[FIXED-463](FIXED_ITEMS.md#fixed-463--come-back-and-press-look-again).
 
 | Item | State |
 |---|---|
@@ -20,17 +23,20 @@ and
 | MODEL-06 simplified local library | Done — `Deploy` left the library |
 | MODEL-07 Hosted as connections | Done — Test moved to the row's overflow |
 | MODEL-08 one model picker per provider | Already satisfied by `AvailableModels`; the row no longer repeats `Use` beside it |
-| MODEL-09 Hugging Face as "Add local model" | Partial — it lives under Add model; its internal flow is not yet step-oriented |
+| MODEL-09 Hugging Face as "Add local model" | Done — a derived step rail states the sequence, and the access token appears for a gated repository or under its own disclosure |
 | MODEL-10 exception- and progress-led Activity | Done |
 | MODEL-11 combined routing, defaults and effective model | Done — Default and Effective are separate columns |
 | MODEL-12 Pricing merged with Usage | Done |
 | MODEL-13 health as exceptions | Done — the Overview shows only what needs a person |
-| MODEL-14 return-and-detect for vendor links | Partial — connect and validate happen inside Raiker; the runtime installers still open a vendor page |
+| MODEL-14 return-and-detect for vendor links | Done — the installer still opens the vendor page, and returning to Raiker re-runs detection by itself and reports what it found |
 | MODEL-15 page/action budget | Done — one primary action and one overflow per repeated row |
 
 The acceptance tests under *Backend/state acceptance tests* are covered by
 `tests/test_model_decision.py`, `tests/test_surface_model_defaults.py` and the
-live round in `apps/web/e2e/composer-models-redesign-live.spec.ts`.
+live rounds in `web/e2e/composer-models-redesign-live.spec.ts` and
+`web/e2e/env-web-read-live.spec.ts`. MODEL-09 and MODEL-14 are additionally
+covered by `web/src/lib/huggingFaceSteps.test.ts`,
+`web/src/lib/returnAndDetect.test.ts` and `web/src/lib/views/ModelsView.test.ts`.
 
 ---
 

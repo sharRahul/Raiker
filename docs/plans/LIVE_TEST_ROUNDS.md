@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-07 | Targeted | `env-01-` … `env-05-` | Anthropic, a **seventh** identity-linked key entered through the interface; no local runtime on the host | The clock, the weather and the global read catalogue as runtime facts — and two harness defects that had been silent since the `apps/web` → `web` move: every live round writing its captures outside the repository, and every provider spec waiting for a tab the Models redesign removed |
 | 2026-09-06 | Targeted | `gcr-01-`, `gcr-02-`, `models-posture-` | Anthropic, a **sixth** identity-linked key entered through the interface; no local runtime on the host | Provider validation that opens no client — measured against the host's own socket count — the connection and the pin both going through it, and one defect the evidence screenshot itself showed: the Models page calling the hosted gate **Off** above the provider it had just accepted a model for |
 | 2026-09-05 (second) | Targeted | `gcr-19-`, `gcr-38-`, `gcr-round-` | Anthropic, a fifth **identity-linked** key entered through the interface | The third-pass review's P0 proved on a real library — a failed conversion's cleanup naming its own files and leaving the model beside them intact — plus Retry refused on an unfinished job, the host's background passes reported on Observability, and one label the redactor had been eating |
 | 2026-09-05 | Targeted + derived four-width sweep + full page sweep | `pages/` | Anthropic, a fourth **identity-linked** key — blocked in two requests rather than a round | A stop switch that shouts on every page, a Hub failure nobody was told about, two kinds of deep link that opened the wrong page, and the nine guards that were supposed to catch them |
@@ -65,6 +66,82 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-09-07 — The clock, the read catalogue, and two silent harness defects
+
+**Tier: Targeted. Build: production `npm run build`. Providers: Anthropic, a
+seventh identity-linked key, entered through the Connect dialog. Owner: the
+shared `OWNER_CREDENTIALS`. Workspace: a fresh scratch directory. Spec:
+`web/e2e/env-web-read-live.spec.ts` (7 cases, all passing). Screenshots:
+`env-01-timezone-and-weather-location.png`,
+`env-02-chat-tools-research-reads.png`, `env-03-design-research-tools.png`,
+`env-04-huggingface-step-rail.png`, `env-05-anthropic-connection.png`.**
+
+The round proved the three claims made by
+`ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md`,
+`GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md` and the two remaining Models-review
+items.
+
+1. **Settings → General → Time and place** sets the owner's zone, states where
+   the zone in force came from, and shows what the owner's clock reads in it
+   right now — `Europe/London · You chose this. Right now that reads Monday
+   7 September 2026 at 13:45 BST.` A default weather location saves beside it,
+   separately.
+2. `GET /api/environment` — the same function the orchestrator calls — answers
+   with that zone, `owner_setting` as its source, both timestamps and the day.
+   The page and a turn cannot disagree about what time it is, because they ask
+   the same thing.
+3. `GET /api/read-capabilities` answers with the whole catalogue for Chat,
+   Build, Design, Tasks, Schedule and agents; the subagent row carries the
+   delegable subset and no external read; and every readiness row carries a
+   state and a `checked_at` rather than a bare boolean.
+4. Chat's **Tools** menu offers **Search the web**, **Read a URL**, **Extract
+   page content** and **Check the weather** as four entries, each with its own
+   state. Design's offers the same four.
+5. **Models → Add model** renders the Hugging Face step rail — *Find model,
+   Choose variant, Review download, Download, Add to My models* — with the first
+   step current, and no permanent access-token action beside the search box.
+6. The round's Anthropic key was connected through the product's own Connect
+   dialog and the card reads **Connection saved**.
+
+**What it found.** Two defects, both in the evidence harness rather than the
+product, and both silent by construction — which is the worst way for a test to
+fail, because it reports success.
+
+*Every live round had been writing its captures outside the repository.* The
+specs' paths were written for `apps/web/e2e`, two levels below the repository
+root. The move to `web/` made that one level too many, and Playwright resolves a
+relative screenshot path against the *process* directory rather than the spec's,
+so since the move every capture has landed in `/home/user/docs/plans/…`. The
+sweeps passed and reported writing their files; the `pages/` catalogue they
+exist to keep current simply stopped changing.
+[FIXED-464](FIXED_ITEMS.md#fixed-464--every-live-round-had-been-writing-its-evidence-outside-the-repository).
+
+*Every live spec that connects a provider had been waiting for a tab that no
+longer exists.* `openHostedProviders` waited for a **Hosted** tab;
+MODEL-03/MODEL-07 folded Local and Hosted into **Add model**, and `?tab=hosted`
+became an alias landing on the inventory — a page with no provider cards on it.
+Eighteen specs timed out before their first assertion, and the failure read as a
+broken product.
+[FIXED-465](FIXED_ITEMS.md#fixed-465--eighteen-live-specs-waiting-for-a-tab-the-redesign-removed).
+
+A third, in the product this time, came out of reading the Design capture:
+with no image model available the composer's model control drew as an **empty
+box**. The element was `display: inline-flex`, and `text-overflow: ellipsis`
+cannot act on a flex container's text — so the sentence *"No image model —
+connect one"* was clipped in full rather than truncated, and the one control
+whose whole job is to say *connect a model* said nothing.
+[FIXED-466](FIXED_ITEMS.md#fixed-466--the-control-whose-job-was-to-say-connect-a-model-said-nothing).
+
+**Still unrun.** This key is identity-linked, as the previous six were, and this
+host has no local runtime, so no provider on this machine can complete a turn.
+The environment context is asserted against the messages the orchestrator builds
+rather than against a provider's answer — which is the right place for it, since
+the bundle is derived before any provider is called — but a real model reasoning
+from it remains unmeasured, as does the weather provider request, which needs
+egress this host does not have.
 
 ---
 

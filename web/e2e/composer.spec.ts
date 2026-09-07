@@ -418,13 +418,14 @@ test("every Work mode composes the same way, simple at rest", async ({ page }) =
   for (const [route, label, tools] of [
     ["new-chat", "Prompt", true],
     ["build", "Describe the change", true],
-    // Design draws no Tools control, and that is the registry working rather
-    // than a gap in this test: Raiker's governed image endpoint takes a prompt,
-    // a size and a model, so there is no capability for the menu to invoke. An
-    // empty trigger would be the permanent-button problem in miniature — a
-    // control that exists because its neighbours do. The missing runtime is
-    // recorded in docs/plans/TO_BE_FIXED.md.
-    ["design", "Describe the image", false],
+    // Design draws a Tools control as of 2026-09-07, and it is the registry
+    // working rather than the rule loosening. It was absent because Raiker's
+    // governed image endpoint takes a prompt, a size and a model and there was
+    // no capability for the menu to invoke; WEB-06 gave Design a research layer,
+    // so the four reads behind it now run a real governed turn on the `design`
+    // surface. The *image* controls COMPOSER-09 lists are still absent for the
+    // original reason, and are still recorded in docs/plans/TO_BE_FIXED.md.
+    ["design", "Describe the image", true],
   ] as const) {
     await page.goto(`http://raiker.test/#/${route}`);
     await expect(page.getByLabel(label, { exact: true })).toBeVisible();

@@ -7,11 +7,11 @@
  * route-mocked; that suite is `composer.spec.ts`, and it is the one CI runs.
  *
  * Start the server first:
- *   npm --prefix apps/web run build
- *   python apps/api/main.py --workspace <ws> --port 8765 --no-browser \
+ *   npm --prefix web run build
+ *   python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser \
  *     --rate-limit-per-minute 6000
  *   RAIKER_LIVE_ANTHROPIC_KEY=… RAIKER_LIVE_WORKSPACE=<ws> \
- *     npm --prefix apps/web run test:e2e:live
+ *     npm --prefix web run test:e2e:live
  *
  * The raised rate limit is not a workaround for a defect. The visual audit below
  * loads every route at four widths in two themes — 136 page loads, each firing

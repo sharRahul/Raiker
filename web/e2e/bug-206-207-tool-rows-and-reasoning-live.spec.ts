@@ -15,7 +15,7 @@
  *             three fixed sentences chosen by lifecycle event type.
  *
  * Prerequisites:
- *   1. `python -m apps.api.main --workspace <ws> --port 8765 --no-browser`
+ *   1. `python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser`
  *   2. RAIKER_LIVE_ANTHROPIC_KEY in the environment (added through the UI below)
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";

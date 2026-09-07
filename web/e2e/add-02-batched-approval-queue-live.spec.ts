@@ -17,7 +17,7 @@
  *
  * Prerequisites:
  *   1. `python tests/fixtures/stub_model.py 8811` (the batching model)
- *   2. `python apps/api/main.py --workspace <ws> --port 8765 --no-browser`
+ *   2. `python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser`
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";

@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { guideSectionFor, mappedRoutes } from "./guideSections";
 
-const GUIDE = resolve(process.cwd(), "..", "..", "docs", "guide");
+const GUIDE = resolve(process.cwd(), "..", "docs", "guide");
 
 const slugs = new Set(
   readdirSync(GUIDE)

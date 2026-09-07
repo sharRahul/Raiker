@@ -6,7 +6,7 @@
  * screenshots record is the shipped product answering its own endpoints.
  *
  * Start the server first:
- *   python apps/api/main.py --workspace <ws> --port 8765 --no-browser
+ *   python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser
  */
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { capture } from "./capture";
@@ -15,7 +15,7 @@ import { OWNER_CREDENTIALS, signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 // Anchored to this file rather than to the working directory, so evidence lands
-// in the repository whether the runner is started from apps/web or the root.
+// in the repository whether the runner is started from web or the root.
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
 const PASSWORD = OWNER_CREDENTIALS.password;
 

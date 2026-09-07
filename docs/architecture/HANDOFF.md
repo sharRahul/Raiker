@@ -333,7 +333,7 @@ python scripts/validate_runtime_enablement_readiness.py   # PASSED
 python scripts/validate_local_single_user_runtime.py      # PASSED
 ```
 
-Web gates (from `apps/web`) on the Task 4b tree:
+Web gates (from `web`) on the Task 4b tree:
 
 ```text
 npm run check     # design tokens clean, then 0 errors, 0 warnings
@@ -810,7 +810,7 @@ Pick one gap and build one governed vertical slice at a time.
 ## Verification and handoff
 
 For a backend slice, run focused tests first, then `pytest`, `ruff check .`,
-and the relevant validation scripts. For web work run, from `apps/web`,
+and the relevant validation scripts. For web work run, from `web`,
 `npm run check`, `npm run lint`, `npm test -- --run`, and `npm run build`.
 Record only the commands actually run and their results in the commit/PR; do
 not copy old green counts into this file.

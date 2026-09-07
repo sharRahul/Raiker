@@ -9,7 +9,7 @@ used to distribute it for Windows, macOS, and Linux.
 What exists today (FIXED-88 and FIXED-92 in [to be fixed](../plans/TO_BE_FIXED.md)):
 
 - `raiker-app` starts Raiker with platform-appropriate data locations, a free
-  loopback port, and the default browser (`raiker/app/`, `apps/api/launcher.py`).
+  loopback port, and the default browser (`raiker/app/launcher.py`).
 - Background start is registered with each platform's own service manager —
   `launchd` LaunchAgent, `systemd --user`, Windows per-user Startup — through
   `raiker-app service install|status|uninstall`.

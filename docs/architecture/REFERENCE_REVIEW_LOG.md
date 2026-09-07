@@ -546,7 +546,7 @@ the Raiker column says so.
 Two composers, two reference bars, deliberately: **Chat** is measured against
 the Claude and ChatGPT assistant composer, **Build** against the Claude Code and
 Codex coding-agent composer. They share one implementation
-(`apps/web/src/lib/composerCommands.ts`) so the two keyboards cannot drift into
+(`web/src/lib/composerCommands.ts`) so the two keyboards cannot drift into
 two different products, and differ only where the surfaces genuinely differ.
 
 Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.

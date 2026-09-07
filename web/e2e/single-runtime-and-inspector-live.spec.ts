@@ -10,7 +10,7 @@
  * (BUG-26), and the download surface on generated artifacts (BUG-28).
  *
  * Start the server first:
- *   python apps/api/main.py --workspace <ws> --port 8765 --no-browser
+ *   python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser
  */
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { capture } from "./capture";

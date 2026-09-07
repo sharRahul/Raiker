@@ -1,6 +1,6 @@
 """The application lifecycle around the Raiker host.
 
-``raiker-app`` (``apps/api/launcher.py``) made Raiker *start* like an
+``raiker-app`` (:mod:`raiker.app.launcher`) made Raiker *start* like an
 application. This package is the rest of what "an application" means on a
 desktop: it stays running after the terminal that launched it is gone, it can be
 paused and quit deliberately with its in-flight work stated first, and it can be

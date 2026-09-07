@@ -7,10 +7,10 @@
  * Runs against a real `raiker-web` holding a real Anthropic credential entered
  * through the product's own dialog — not a route-mocked shell. Start it first:
  *
- *   npm --prefix apps/web run build
- *   python apps/api/main.py --workspace <ws> --port 8765 --no-browser \
+ *   npm --prefix web run build
+ *   python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser \
  *     --rate-limit-per-minute 6000
- *   RAIKER_LIVE_ANTHROPIC_KEY=… npm --prefix apps/web run test:e2e:live
+ *   RAIKER_LIVE_ANTHROPIC_KEY=… npm --prefix web run test:e2e:live
  *
  * The one exception is the store-unavailable screen. A store that will not open
  * cannot be produced by driving the product — the platform has to refuse to
@@ -142,7 +142,7 @@ test("FIXED-152 — the Knowledge Map picker opens on named places, not the inst
   await expect(dialog.getByRole("button", { name: /Approved memory/ })).toBeVisible();
   await expect(dialog.getByRole("button", { name: /Raiker database/ })).toBeVisible();
   await expect(dialog.getByText(/Chat, Build, Tasks, Schedules/)).toBeVisible();
-  for (const stray of ["raiker", "apps", "docs", "scripts", "pyproject.toml"]) {
+  for (const stray of ["raiker", "web", "docs", "scripts", "pyproject.toml"]) {
     await expect(dialog.getByRole("button", { name: new RegExp(`^\\s*(Folder|File)\\s*${stray}\\s*$`) }))
       .toHaveCount(0);
   }

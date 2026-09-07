@@ -15,16 +15,16 @@
  *   an **unsigned build** — which is the property BUG-44 is really about.
  *
  * Start them first:
- *   npm --prefix apps/web run build
- *   python apps/api/main.py --workspace <ws-a> --port 8765 --no-browser \
+ *   npm --prefix web run build
+ *   python -m raiker.api.serve --workspace <ws-a> --port 8765 --no-browser \
  *     --rate-limit-per-minute 6000
  *   raiker-release build --version 0.1.0 --target linux-x86_64 --out dist \
- *     --source-root . --web-assets apps/web/dist --wheel-dir <wheels>
+ *     --source-root . --web-assets web/dist --wheel-dir <wheels>
  *   # extract dist/raiker-0.1.0-linux-x86_64-unsigned.zip to <installed>
  *   RAIKER_INSTALL_ROOT=<installed> PYTHONPATH=<installed>/service \
- *     python <installed>/service/apps/api/main.py --workspace <ws-b> \
+ *     python <installed>/service/raiker/api/serve.py --workspace <ws-b> \
  *     --port 8766 --no-browser --ui-dir <installed>/web
- *   RAIKER_LIVE_ANTHROPIC_KEY=… npm --prefix apps/web run test:e2e:live
+ *   RAIKER_LIVE_ANTHROPIC_KEY=… npm --prefix web run test:e2e:live
  *
  * What each part proves:
  *

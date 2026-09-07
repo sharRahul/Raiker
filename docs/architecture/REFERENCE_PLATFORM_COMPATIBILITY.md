@@ -86,7 +86,7 @@ The same four words are used throughout this repository:
 
 | Surface | What it names |
 |---|---|
-| **Raiker Chat** | The assistant surface: `apps/web` Chat view, `surface: "chat"` on a prompt |
+| **Raiker Chat** | The assistant surface: `web` Chat view, `surface: "chat"` on a prompt |
 | **Raiker Build** | The coding-agent surface: Build view, `surface: "build"`, the Build operating protocol |
 | **Shared runtime** | Everything both surfaces route through — gateway, policy engine, `RuntimeAuthority`, tool broker, executors, storage, audit |
 | **Platform-wide** | Product-level concerns: install, host lifecycle, identity, settings, extensibility, observability |
@@ -476,7 +476,7 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
 | A terminal client | Claude Code, Codex, OpenClaw, Hermes | CLI | Implemented | `raiker`, 100+ governed inspection commands | No rich TUI; no resume/fork flags | PARITY |
-| A local web control surface | OpenClaw Control UI, Cowork | Web dashboard | Implemented | `apps/web`, loopback-bound | — | PARITY |
+| A local web control surface | OpenClaw Control UI, Cowork | Web dashboard | Implemented | `web`, loopback-bound | — | PARITY |
 | A desktop application | Cowork, ChatGPT, Claude Code Desktop | Desktop | Implemented | `raiker-app`, self-contained payload, tray, five-stage wizard | No signed public release yet | PARITY |
 | Slash commands in the composer | Claude Code, Codex, OpenClaw | Chat, Build | Implemented | `composerCommands.ts`; a test walks the whole set so no entry is inert | — | **YES — improvement** |
 | Owner-authored slash commands | Claude Code, Codex, OpenClaw | Chat, Build, Extensions → Skills | Implemented | Active owner-scoped skills carry an optional unique trigger; server-side expansion explicitly loads the skill | The handle grants no capability and changes no decision or approval mode | **YES — improvement** |

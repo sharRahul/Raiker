@@ -15,7 +15,7 @@ binding for implementation; everything else in the draft carries over.
 1. **Sources:** `docs/UI-implementation/*` no longer exists (deleted as superseded).
    The acceptance anchors are the living test suites: `tests/test_security_regression_ui.py`
    (M7 security regression), `tests/test_api_contract_schemas.py`,
-   `tests/test_api_m5_security_settings.py`, and `apps/web/src/a11y.test.ts`.
+   `tests/test_api_m5_security_settings.py`, and `web/src/a11y.test.ts`.
    Risk classes come from `RISK_LEVELS` (`raiker/contracts/models.py`) and
    [`SECURITY_ARCHITECTURE.md`](SECURITY_ARCHITECTURE.md).
 2. **The turn state machine has 19 states, not 16** (`raiker/runtime/state_machine.py`,
@@ -48,12 +48,12 @@ binding for implementation; everything else in the draft carries over.
    cannot do). Reconnect-with-replay is a backend addition (Section 9, optional);
    until then the UI reconciles a dropped stream by re-reading `GET /api/turns/{id}`.
 8. **Typography: Manrope + JetBrains Mono, bundled, offline-first.** The app ships its
-   fonts as local variable-weight woff2 assets under `apps/web/src/assets/fonts/`
+   fonts as local variable-weight woff2 assets under `web/src/assets/fonts/`
    (SIL OFL 1.1, license file alongside). **No external font, CSS, or CDN request of any
    kind** — a Google Fonts fetch would silently break "nothing leaves this machine".
    Manrope carries display and UI text (its geometric, engineered character suits the
    instrument-panel identity); JetBrains Mono carries machine-verbatim output.
-9. **Reuse the tested logic layer.** `apps/web/src/lib/` (api client, `apiTypes.ts`,
+9. **Reuse the tested logic layer.** `web/src/lib/` (api client, `apiTypes.ts`,
    `capabilityModel.ts`, `turnPhases.ts` — which already implements the four-phase
    gather→plan→act→verify grouping — `statusMaps.ts`, `reasonCodes.ts`, `theme.ts`,
    `nav.ts`) and the security/a11y/contract test suites are kept. The redesign replaces
@@ -64,7 +64,7 @@ binding for implementation; everything else in the draft carries over.
 ## 1. Purpose and sources
 
 This plan defines the target web UI/UX for Raiker's local single-user web surface
-(`raiker-web` + `apps/web`), designed to scale into the Phase 8 multi-surface vision
+(`raiker-web` + `web`), designed to scale into the Phase 8 multi-surface vision
 without redesign.
 
 Verified sources: `README.md`, `SECURITY.md`, `docs/architecture/HANDOFF.md`,
@@ -78,7 +78,7 @@ Verified sources: `README.md`, `SECURITY.md`, `docs/architecture/HANDOFF.md`,
 the code: `raiker/phase_gates.py` (53 capabilities), `raiker/runtime/executors/__init__.py`
 (`REAL_EXECUTOR_CAPABILITIES`, 29 integrated), `raiker/api/routes_*.py` (31 endpoints),
 `raiker/control/dtos.py` (gate DTO fields), `raiker/runtime/state_machine.py` (19 states),
-`raiker/cli/commands.py` (~80 slash commands), and `apps/web/src` (kept logic layer).
+`raiker/cli/commands.py` (~80 slash commands), and `web/src` (kept logic layer).
 
 ### The goal this design serves (from `docs/architecture/HANDOFF.md`)
 
@@ -167,7 +167,7 @@ One easing (`cubic-bezier(0.2, 0, 0, 1)`, 160–240 ms) and three moves only:
 
 ## 4. Design tokens
 
-Implemented in `apps/web/src/app.css`. Components consume tokens only — never raw
+Implemented in `web/src/app.css`. Components consume tokens only — never raw
 colours — so both themes stay in lockstep. Existing token *names* are kept so the
 component layer needs no changes.
 

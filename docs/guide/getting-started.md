@@ -85,8 +85,8 @@ python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
-npm --prefix apps/web ci
-npm --prefix apps/web run build
+npm --prefix web ci
+npm --prefix web run build
 raiker-app --print-paths
 raiker-app
 ```
@@ -117,8 +117,8 @@ $(brew --prefix python@3.11)/bin/python3.11 -m venv .venv
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 export PATH="$(brew --prefix node@20)/bin:$PATH"
-npm --prefix apps/web ci
-npm --prefix apps/web run build
+npm --prefix web ci
+npm --prefix web run build
 raiker-app --print-paths
 raiker-app
 ```
@@ -184,8 +184,8 @@ a consequence of the interrupted editable install, not a separate problem.
 Build the dashboard once (and again after any UI change):
 
 ```bash
-npm --prefix apps/web ci
-npm --prefix apps/web run build
+npm --prefix web ci
+npm --prefix web run build
 ```
 
 ## Run

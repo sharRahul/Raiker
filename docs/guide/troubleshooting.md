@@ -76,7 +76,7 @@ in the process environment.
 |---|---|
 | Reload returns you to the lock screen | Expected. The bearer token is in memory only, never `localStorage`. |
 | `Refusing to bind to non-loopback host … without --allow-public` | Add `--allow-public` **and** set `RAIKER_OWNER_TOKEN` |
-| Dashboard is blank or stale | `npm --prefix apps/web run build`, then restart `raiker-web` |
+| Dashboard is blank or stale | `npm --prefix web run build`, then restart `raiker-web` |
 | Backend change has no effect | Restart `raiker-web` — Python is not hot-reloaded |
 | Too many device sessions listed | Settings → Security & sign-in → revoke individually, or change your password to sign out all other devices |
 

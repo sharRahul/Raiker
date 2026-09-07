@@ -27,7 +27,7 @@ jobs:
           python -m pip install --upgrade pip build
           python -m pip install -e ".[dev]"
       - name: Install web dependencies from lockfile
-        run: npm --prefix apps/web ci
+        run: npm --prefix web ci
       - name: Validate licences and generate SPDX SBOM
         run: python scripts/licensing_check.py --sbom artifacts/licensing/raiker.spdx.json
       - name: Build and validate distributions

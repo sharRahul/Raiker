@@ -10,8 +10,8 @@ import uvicorn
 
 from raiker.api.app import create_app
 
-# apps/api/main.py -> repo root is two parents up; the built SPA lives at apps/web/dist.
-_DEFAULT_UI_DIR = Path(__file__).resolve().parents[2] / "apps" / "web" / "dist"
+# raiker/api/serve.py -> repo root is two parents up; the built SPA lives at web/dist.
+_DEFAULT_UI_DIR = Path(__file__).resolve().parents[2] / "web" / "dist"
 
 
 def _resolve_ui_dir(cli_value: str | None) -> Path:
@@ -54,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--ui-dir",
         default=None,
-        help="Built web dashboard directory (default: apps/web/dist; env RAIKER_WEB_UI_DIR).",
+        help="Built web dashboard directory (default: web/dist; env RAIKER_WEB_UI_DIR).",
     )
     parser.add_argument(
         "--no-browser",
@@ -87,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
     if not (resolved.is_dir() and (resolved / "index.html").is_file()):
         print(
             f"[raiker-web] No built web UI at {resolved}; serving API only. "
-            "Build it first: npm --prefix apps/web run build",
+            "Build it first: npm --prefix web run build",
         )
         ui_dir = None
 

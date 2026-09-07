@@ -186,8 +186,8 @@ def plan_uninstall(
 #: Directories a source install creates and can recreate. Removing one costs a
 #: rebuild and nothing else; none of them holds anything the owner wrote.
 BUILD_ARTEFACTS: tuple[tuple[str, str], ...] = (
-    ("the built dashboard", "apps/web/dist"),
-    ("the dashboard's downloaded packages", "apps/web/node_modules"),
+    ("the built dashboard", "web/dist"),
+    ("the dashboard's downloaded packages", "web/node_modules"),
     ("the Python build tree", "build"),
     ("the editable-install metadata", "raiker.egg-info"),
 )

@@ -25,8 +25,8 @@ Dependencies retain their own licences. Generated files and SBOMs are not
 project copyright notices. Vendored or copied material must retain its licence
 and attribution; the bundled fonts remain under the SIL OFL 1.1 with the
 copyright notices and full licence text in
-`apps/web/src/assets/fonts/OFL.txt`, summarised in
-`apps/web/src/assets/fonts/LICENSE.md`.
+`web/src/assets/fonts/OFL.txt`, summarised in
+`web/src/assets/fonts/LICENSE.md`.
 
 `LICENSE_POLICY.json` is the machine-readable dependency policy. Permissive
 licences in `permitted` pass. MPL and LGPL require review in context (for

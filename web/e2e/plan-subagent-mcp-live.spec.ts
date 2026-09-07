@@ -13,7 +13,7 @@
  *        and once the decision mode allows it, a real MCP tool call answers.
  *
  * Prerequisites:
- *   1. `python apps/api/main.py --workspace <ws> --port 8765 --no-browser`
+ *   1. `python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser`
  *      with RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com
  *   2. RAIKER_LIVE_ANTHROPIC_KEY in the environment (added through the UI below)
  */

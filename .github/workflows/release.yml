@@ -117,19 +117,19 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+          cache-dependency-path: web/package-lock.json
       - name: Install dependencies
         run: npm ci
-        working-directory: apps/web
+        working-directory: web
       - name: Build
         run: npm run build
-        working-directory: apps/web
+        working-directory: web
       - name: Upload
         # actions/upload-artifact v4
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: web-assets
-          path: apps/web/dist
+          path: web/dist
           retention-days: 7
 
   # ── 3. One artifact per target, built and tested on that target ────────

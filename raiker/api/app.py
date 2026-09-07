@@ -516,7 +516,7 @@ def create_app(
     app.include_router(language_router)
     app.include_router(egress_router)
     app.include_router(guide_router)
-    # Serve the built local web dashboard (apps/web/dist) from the same loopback origin, so the
+    # Serve the built local web dashboard (web/dist) from the same loopback origin, so the
     # dashboard launches with one command and the SPA's relative /api paths resolve directly.
     # Mounted LAST so the /api routes above keep precedence; skipped when no build is present
     # (API-only mode is unchanged). The SPA uses hash routing, so html=True at "/" is sufficient.

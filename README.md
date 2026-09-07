@@ -28,8 +28,8 @@ python -m venv .venv
 . .venv/bin/activate          # Windows: .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
-npm --prefix apps/web ci
-npm --prefix apps/web run build
+npm --prefix web ci
+npm --prefix web run build
 raiker-app
 ```
 
@@ -61,8 +61,8 @@ cd Raiker
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[dev]"
-npm --prefix apps/web ci
-npm --prefix apps/web run build
+npm --prefix web ci
+npm --prefix web run build
 raiker-app
 ```
 
@@ -84,8 +84,8 @@ $(brew --prefix python@3.11)/bin/python3.11 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[dev]"
 export PATH="$(brew --prefix node@20)/bin:$PATH"
-npm --prefix apps/web ci
-npm --prefix apps/web run build
+npm --prefix web ci
+npm --prefix web run build
 raiker-app
 ```
 

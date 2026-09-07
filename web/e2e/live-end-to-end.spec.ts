@@ -6,7 +6,7 @@
  * answering its own endpoints with a real answer in it.
  *
  * Prerequisites (see docs/plans/TO_BE_FIXED.md for the run recorded from this):
- *   1. `python apps/api/main.py --workspace <ws> --port 8765 --no-browser`
+ *   1. `python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser`
  *      with RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com
  *   2. the `hosted_model_runtime` capability enabled and a provider key stored
  *   3. a concrete model selected

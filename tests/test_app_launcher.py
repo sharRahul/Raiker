@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from apps.api.launcher import (
+from raiker.app.launcher import (
     DEFAULT_PORT,
     _ensure_standard_streams,
     _resolve_ui_dir,
@@ -89,7 +89,7 @@ def test_raiker_home_overrides_every_platform(
 
 
 def test_a_free_port_is_used_as_is(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("apps.api.launcher.port_is_free", lambda port, host="127.0.0.1": True)
+    monkeypatch.setattr("raiker.app.launcher.port_is_free", lambda port, host="127.0.0.1": True)
     assert choose_port(DEFAULT_PORT) == (DEFAULT_PORT, False)
 
 
@@ -98,9 +98,9 @@ def test_an_already_running_raiker_is_joined_rather_than_fought(
 ) -> None:
     """Two hosts over one encrypted workspace is a data-integrity problem, and
     the person who started the app wants the app — not a second copy of it."""
-    monkeypatch.setattr("apps.api.launcher.port_is_free", lambda port, host="127.0.0.1": False)
+    monkeypatch.setattr("raiker.app.launcher.port_is_free", lambda port, host="127.0.0.1": False)
     monkeypatch.setattr(
-        "apps.api.launcher.raiker_is_running", lambda port, host="127.0.0.1", timeout=1.0: True
+        "raiker.app.launcher.raiker_is_running", lambda port, host="127.0.0.1", timeout=1.0: True
     )
     assert choose_port(DEFAULT_PORT) == (DEFAULT_PORT, True)
 
@@ -110,19 +110,19 @@ def test_a_port_held_by_something_else_moves_to_the_next_free_one(
 ) -> None:
     """Never hand the owner a URL belonging to someone else's server."""
     monkeypatch.setattr(
-        "apps.api.launcher.port_is_free",
+        "raiker.app.launcher.port_is_free",
         lambda port, host="127.0.0.1": port != DEFAULT_PORT,
     )
     monkeypatch.setattr(
-        "apps.api.launcher.raiker_is_running", lambda port, host="127.0.0.1", timeout=1.0: False
+        "raiker.app.launcher.raiker_is_running", lambda port, host="127.0.0.1", timeout=1.0: False
     )
     assert choose_port(DEFAULT_PORT) == (DEFAULT_PORT + 1, False)
 
 
 def test_no_free_port_fails_loudly(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("apps.api.launcher.port_is_free", lambda port, host="127.0.0.1": False)
+    monkeypatch.setattr("raiker.app.launcher.port_is_free", lambda port, host="127.0.0.1": False)
     monkeypatch.setattr(
-        "apps.api.launcher.raiker_is_running", lambda port, host="127.0.0.1", timeout=1.0: False
+        "raiker.app.launcher.raiker_is_running", lambda port, host="127.0.0.1", timeout=1.0: False
     )
     with pytest.raises(OSError, match="No free port"):
         choose_port(DEFAULT_PORT)
@@ -196,8 +196,8 @@ def test_joining_a_running_host_opens_the_browser_and_exits_successfully(
         return True
 
     monkeypatch.setenv("RAIKER_HOME", str(tmp_path / "data"))
-    monkeypatch.setattr("apps.api.launcher.choose_port", lambda preferred: (preferred, True))
-    monkeypatch.setattr("apps.api.launcher.open_browser", record)
+    monkeypatch.setattr("raiker.app.launcher.choose_port", lambda preferred: (preferred, True))
+    monkeypatch.setattr("raiker.app.launcher.open_browser", record)
 
     assert main([]) == 0
     assert opened == [f"http://127.0.0.1:{DEFAULT_PORT}/"]

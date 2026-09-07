@@ -453,7 +453,7 @@ def test_a_stream_refused_for_its_thinking_spelling_is_retried_before_a_token_la
 
 
 def _web_source(relative: str) -> str:
-    root = Path(__file__).resolve().parents[1] / "apps" / "web" / "src" / "lib"
+    root = Path(__file__).resolve().parents[1] / "web" / "src" / "lib"
     return (root / relative).read_text(encoding="utf-8")
 
 

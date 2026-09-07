@@ -36,12 +36,12 @@
  * changes is below the model entirely.
  *
  * Prerequisites:
- *   npm --prefix apps/web run build
+ *   npm --prefix web run build
  *   RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com \
- *     python apps/api/main.py --workspace <ws> --port 8765 --no-browser \
+ *     python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser \
  *     --rate-limit-per-minute 6000
  *   RAIKER_LIVE_HOST_PID=<pid of that host> [RAIKER_LIVE_ANTHROPIC_KEY=…] \
- *     npm --prefix apps/web run test:e2e:live
+ *     npm --prefix web run test:e2e:live
  */
 import { readdirSync } from "node:fs";
 import { join } from "node:path";

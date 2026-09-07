@@ -245,18 +245,25 @@ def collect_payload(
 ) -> list[BundleEntry]:
     """The three things an artifact must carry, per the distribution design.
 
-    The service (``raiker`` and ``apps``), the built web assets, and the
-    platform-compatible native dependency wheels — ``sqlcipher3-wheels`` above
-    all, which is why the workflow resolves them on the target's own runner
-    rather than trusting a development machine's copy.
+    The service (``raiker``), the built web assets, and the platform-compatible
+    native dependency wheels — ``sqlcipher3-wheels`` above all, which is why the
+    workflow resolves them on the target's own runner rather than trusting a
+    development machine's copy.
+
+    ``apps`` used to be walked alongside ``raiker``. Only ``node_modules`` was
+    excluded, so an artifact carried 553 files and 13 MB from that tree — every
+    TypeScript source, all 92 Playwright specs, the public assets, and a second
+    copy of the built SPA already added below as ``web/`` — of which three files
+    were the Python service. The two Python modules live under ``raiker`` now
+    and the web project is not walked at all, so the bundle is right by
+    construction rather than by an exclusion list that has to keep up.
     """
     root = Path(source_root)
     entries: list[BundleEntry] = []
-    for package in ("raiker", "apps"):
-        package_root = root / package
-        if not package_root.is_dir():
-            raise ReleaseError("release_source_incomplete")
-        entries.extend(_iter_files(package_root, f"service/{package}"))
+    package_root = root / "raiker"
+    if not package_root.is_dir():
+        raise ReleaseError("release_source_incomplete")
+    entries.extend(_iter_files(package_root, "service/raiker"))
     for name in ("pyproject.toml", "README.md", "LICENSE", "NOTICE"):
         candidate = root / name
         if candidate.is_file():

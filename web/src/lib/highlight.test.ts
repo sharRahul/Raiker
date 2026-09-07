@@ -81,7 +81,7 @@ describe("highlight — BUG-23 local grammar path", () => {
 describe("languageForFilename", () => {
   it("reads a language off an extension the highlighter ships", () => {
     expect(languageForFilename("src/main.py")).toBe("py");
-    expect(languageForFilename("apps/web/src/lib/api.ts")).toBe("ts");
+    expect(languageForFilename("web/src/lib/api.ts")).toBe("ts");
     expect(languageForFilename("STYLE.CSS")).toBe("css");
   });
 

@@ -114,7 +114,7 @@ def launch_command(workspace: Path | None = None) -> list[str]:
     directory they happened to install from has moved.
     """
     executable = shutil.which("raiker-app")
-    base = [executable] if executable else [sys.executable, "-m", "apps.api.launcher"]
+    base = [executable] if executable else [sys.executable, "-m", "raiker.app.launcher"]
     return [*base, *(["--workspace", str(workspace)] if workspace is not None else [])]
 
 

@@ -74,7 +74,7 @@ def launcher_command() -> list[str]:
     """The installed launcher, without shell interpolation or user input."""
     if getattr(sys, "frozen", False):
         return [sys.executable]
-    return [sys.executable, "-m", "apps.api.launcher"]
+    return [sys.executable, "-m", "raiker.app.launcher"]
 
 
 def start_update_handoff(workspace: str | Path, *, parent_pid: int) -> None:

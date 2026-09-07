@@ -18,7 +18,7 @@ def test_windows_desktop_command_bundles_runtime_web_and_tray(tmp_path: Path) ->
     assert "PyInstaller" in joined
     assert "--onedir" in command
     assert "--windowed" in command
-    assert "apps" in joined and "launcher.py" in joined
+    assert "launcher.py" in joined
     assert str(tmp_path / "web") in joined
     assert "pystray" in joined
     assert "PIL" in joined

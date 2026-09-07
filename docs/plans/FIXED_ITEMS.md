@@ -3255,7 +3255,7 @@ its tone from the shared tokens, or two icons collide.
 **UI when closed.** A documented visual specification a contributor can build a
 new page from without inventing, and every existing page audited against it in
 both themes at 375 / 768 / 1024 / 1440 px — the audit is
-[`e2e/bug-37-39-40-41-live.spec.ts`](../../apps/web/e2e/bug-37-39-40-41-live.spec.ts),
+[`e2e/bug-37-39-40-41-live.spec.ts`](../../web/e2e/bug-37-39-40-41-live.spec.ts),
 which walks all 17 routes at all four widths in both themes and fails on any
 horizontal overflow of the shell or any console error.
 
@@ -3935,7 +3935,7 @@ conversation stating the refusal without spending budget on it, the symmetry the
 defect broke (the same refusal either side of a decision), and the two cases that
 must not change — an all-refused batch and a single refused call. The live
 scenario is
-[`e2e/bug-52-first-pass-denial-live.spec.ts`](../../apps/web/e2e/bug-52-first-pass-denial-live.spec.ts);
+[`e2e/bug-52-first-pass-denial-live.spec.ts`](../../web/e2e/bug-52-first-pass-denial-live.spec.ts);
 its screenshots are `working/bug-52-*`.
 
 **Closed subsequently.** The three follow-up defects this work surfaced are now
@@ -4091,7 +4091,7 @@ default `ask` forces approval for any AI-proposed action.
 **Live evidence.** Screenshots `working/b12-web-fetch-withheld.png`,
 `working/b12-web-fetch-capability.png`, `working/b12-web-fetch-live-page.png` and
 `working/b12-web-fetch-egress-denied.png`, from
-[`e2e/web-access-turn-control-live.spec.ts`](../../apps/web/e2e/web-access-turn-control-live.spec.ts).
+[`e2e/web-access-turn-control-live.spec.ts`](../../web/e2e/web-access-turn-control-live.spec.ts).
 The first attempt is refused with `gate_disabled` and the control that changes
 it; after the owner turns the capability on and sets it to Allow, the same
 request fetches `https://pypi.org/project/httpx/` and the model quotes the
@@ -4264,7 +4264,7 @@ one is not; and `ENABLED_GATE_STATES` is asserted equal to the frozensets in
 `web_access.py` and `connectors.py`, so the bundle and the tools cannot drift
 into two definitions of "on".
 
-**Live evidence.** [`e2e/bug-57-capability-context-live.spec.ts`](../../apps/web/e2e/bug-57-capability-context-live.spec.ts),
+**Live evidence.** [`e2e/bug-57-capability-context-live.spec.ts`](../../web/e2e/bug-57-capability-context-live.spec.ts),
 run against a `raiker-web` on a fresh workspace holding a real Anthropic
 credential entered through the product's own Models page —
 `claude-haiku-4-5-20251001` answering every turn.
@@ -4349,7 +4349,7 @@ the pass.
   deliberate boundaries with no such entry. It now says which, and names the
   entries that closed the ones this section used to list.
 
-**Live evidence.** [`e2e/bug-58-known-limits-live.spec.ts`](../../apps/web/e2e/bug-58-known-limits-live.spec.ts),
+**Live evidence.** [`e2e/bug-58-known-limits-live.spec.ts`](../../web/e2e/bug-58-known-limits-live.spec.ts),
 run against a `raiker-web` on a fresh workspace holding a real Anthropic
 credential entered through the product's own Models page —
 `claude-haiku-4-5-20251001` answering every turn, not a stub and not a
@@ -4458,7 +4458,7 @@ The guide's index page went with them: its "work in this order" list opened with
 a runtime mode and a vault key, neither of which an owner has to touch — a
 saved credential is the authorization, and the vault key provisions itself.
 
-**Live evidence.** [`e2e/bug-61-guide-accuracy-live.spec.ts`](../../apps/web/e2e/bug-61-guide-accuracy-live.spec.ts),
+**Live evidence.** [`e2e/bug-61-guide-accuracy-live.spec.ts`](../../web/e2e/bug-61-guide-accuracy-live.spec.ts),
 against a `raiker-web` on a fresh workspace holding a real Anthropic credential
 entered through the product's own Models page. Each test holds up a claim the
 rewritten guide now makes:
@@ -4568,7 +4568,7 @@ owner reads before deciding, the disabled gate returning it to record-only, the
 project assignment landing on the proposing conversation, and the two
 list-agreement invariants.
 
-**Live evidence.** [`e2e/bug-62-task-approval-executes-live.spec.ts`](../../apps/web/e2e/bug-62-task-approval-executes-live.spec.ts),
+**Live evidence.** [`e2e/bug-62-task-approval-executes-live.spec.ts`](../../web/e2e/bug-62-task-approval-executes-live.spec.ts),
 run against a `raiker-web` on a fresh workspace holding a real Anthropic
 credential entered through the product's own Models page —
 `claude-haiku-4-5-20251001` proposing every task.
@@ -4719,14 +4719,14 @@ derivation from real results, the tools that must never become sources, attachme
 inclusion, id ordering across batches, the per-turn bound, owner scoping, the
 client view never carrying a passage, every resolution status, the quote locator
 (including the paraphrase and short-fragment refusals), and retention.
-[`citations.test.ts`](../../apps/web/src/lib/citations.test.ts),
-[`markdown.test.ts`](../../apps/web/src/lib/markdown.test.ts) and
-[`SourceChips.test.ts`](../../apps/web/src/lib/components/SourceChips.test.ts)
+[`citations.test.ts`](../../web/src/lib/citations.test.ts),
+[`markdown.test.ts`](../../web/src/lib/markdown.test.ts) and
+[`SourceChips.test.ts`](../../web/src/lib/components/SourceChips.test.ts)
 cover the allowlist, the code-span and fence exclusions, the per-render reset, the
 sentence extraction on both sides of a full stop, and the cited/recorded
 distinction.
 
-**Live evidence.** [`e2e/c6-c4-source-citations-live.spec.ts`](../../apps/web/e2e/c6-c4-source-citations-live.spec.ts),
+**Live evidence.** [`e2e/c6-c4-source-citations-live.spec.ts`](../../web/e2e/c6-c4-source-citations-live.spec.ts),
 run against a `raiker-web` on a fresh workspace holding a real Anthropic
 credential entered through the product's own Models page —
 `claude-haiku-4-5-20251001`, seven scenarios, all passing.
@@ -8002,8 +8002,8 @@ Evidence:
 (as found) and
 `screenshots/working/fixed204-first-run-model-choice-labels.png`
 (after). Specs:
-[`review-first-run-honesty-live.spec.ts`](../../apps/web/e2e/review-first-run-honesty-live.spec.ts),
-[`review-provider-matrix-live.spec.ts`](../../apps/web/e2e/review-provider-matrix-live.spec.ts).
+[`review-first-run-honesty-live.spec.ts`](../../web/e2e/review-first-run-honesty-live.spec.ts),
+[`review-provider-matrix-live.spec.ts`](../../web/e2e/review-provider-matrix-live.spec.ts).
 
 **User-interface outcome.** No surface reports a backend as connected unless
 something was observed to answer. The first-run wizard is held to the same
@@ -8069,7 +8069,7 @@ describing *Getting started* as `git clone https://…`.
 as elements rather than source, `#/guide?section=troubleshooting` opening the
 section it names, 0 console errors. Evidence:
 `screenshots/working/fixed209-guide-in-product.png`.
-Spec: [`guide-surface-live.spec.ts`](../../apps/web/e2e/guide-surface-live.spec.ts).
+Spec: [`guide-surface-live.spec.ts`](../../web/e2e/guide-surface-live.spec.ts).
 
 **User-interface outcome.** The product can open its own guide, so an owner who
 wants to know what a project *is* has somewhere to go that is not a page header.
@@ -8412,8 +8412,8 @@ Evidence:
 `screenshots/working/bug-52-chat-refusal-does-not-end-the-turn.png`,
 `screenshots/working/bug-206-207-live-build-turn.png`.
 Specs:
-[`bug-206-207-tool-rows-and-reasoning-live.spec.ts`](../../apps/web/e2e/bug-206-207-tool-rows-and-reasoning-live.spec.ts),
-[`bug-52-first-pass-denial-live.spec.ts`](../../apps/web/e2e/bug-52-first-pass-denial-live.spec.ts),
+[`bug-206-207-tool-rows-and-reasoning-live.spec.ts`](../../web/e2e/bug-206-207-tool-rows-and-reasoning-live.spec.ts),
+[`bug-52-first-pass-denial-live.spec.ts`](../../web/e2e/bug-52-first-pass-denial-live.spec.ts),
 [`tests/test_bug_206_207_tool_rows_and_reasoning.py`](../../tests/test_bug_206_207_tool_rows_and_reasoning.py).
 
 **User-interface outcome.** A tool-using turn reads as a sequence of what
@@ -8564,7 +8564,7 @@ and `bug-207-live-no-reasoning.png` — **not retained in the repository**; the
 committed evidence for this round is under
 `screenshots/working/`.
 Specs:
-[`bug-206-207-tool-rows-and-reasoning-live.spec.ts`](../../apps/web/e2e/bug-206-207-tool-rows-and-reasoning-live.spec.ts),
+[`bug-206-207-tool-rows-and-reasoning-live.spec.ts`](../../web/e2e/bug-206-207-tool-rows-and-reasoning-live.spec.ts),
 [`tests/test_bug_206_207_tool_rows_and_reasoning.py`](../../tests/test_bug_206_207_tool_rows_and_reasoning.py).
 
 **Known limit, stated rather than implied.** Reasoning is a live-stream fact: it

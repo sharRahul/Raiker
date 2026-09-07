@@ -404,7 +404,7 @@ def test_measuring_a_directory_that_is_not_there_is_zero_not_an_error(tmp_path: 
 def test_status_reports_the_state_and_whether_it_starts_on_its_own(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from apps.api.launcher import main
+    from raiker.app.launcher import main
 
     assert main(["status", "--workspace", str(tmp_path)]) == 0
     out = capsys.readouterr().out
@@ -415,7 +415,7 @@ def test_status_reports_the_state_and_whether_it_starts_on_its_own(
 def test_pause_and_resume_are_visible_to_the_next_command(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from apps.api.launcher import main
+    from raiker.app.launcher import main
 
     assert main(["pause", "--workspace", str(tmp_path), "--reason", "lunch"]) == 0
     assert HostControl(tmp_path).pause_state().reason == "lunch"
@@ -426,7 +426,7 @@ def test_pause_and_resume_are_visible_to_the_next_command(
 def test_quit_refuses_while_work_is_in_flight_and_says_what(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from apps.api.launcher import main
+    from raiker.app.launcher import main
 
     store = SQLiteStore(tmp_path)
     store.create_session("sess_inbox_principal_owner", str(tmp_path))
@@ -446,7 +446,7 @@ def test_quit_refuses_while_work_is_in_flight_and_says_what(
 def test_quit_on_a_stopped_host_is_a_no_op(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from apps.api.launcher import main
+    from raiker.app.launcher import main
 
     assert main(["quit", "--workspace", str(tmp_path)]) == 0
     assert "No Raiker host is running" in capsys.readouterr().out
@@ -455,7 +455,7 @@ def test_quit_on_a_stopped_host_is_a_no_op(
 def test_uninstall_prints_the_plan_and_changes_nothing_without_yes(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from apps.api.launcher import main
+    from raiker.app.launcher import main
 
     (tmp_path / "data.bin").write_bytes(b"z" * 128)
     assert main(["uninstall", "--workspace", str(tmp_path)]) == 0
@@ -468,7 +468,7 @@ def test_uninstall_prints_the_plan_and_changes_nothing_without_yes(
 def test_uninstall_export_without_a_destination_is_refused(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from apps.api.launcher import main
+    from raiker.app.launcher import main
 
     assert main(["uninstall", "--workspace", str(tmp_path), "--data", "export"]) == 2
     assert "Pass --export-to" in capsys.readouterr().err
@@ -477,7 +477,7 @@ def test_uninstall_export_without_a_destination_is_refused(
 def test_service_status_names_the_platform_mechanism(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from apps.api.launcher import main
+    from raiker.app.launcher import main
 
     isolated_home = tmp_path / "home"
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: isolated_home))
@@ -489,7 +489,7 @@ def test_service_status_names_the_platform_mechanism(
 
 def test_running_raiker_app_with_no_command_still_means_start(tmp_path: Path) -> None:
     """The desktop icon runs `raiker-app`; adding subcommands must not change it."""
-    from apps.api.launcher import build_parser
+    from raiker.app.launcher import build_parser
 
     args = build_parser().parse_args([])
     assert getattr(args, "command", None) is None
@@ -498,7 +498,7 @@ def test_running_raiker_app_with_no_command_still_means_start(tmp_path: Path) ->
 
 def test_common_options_work_before_or_after_a_subcommand(tmp_path: Path) -> None:
     """A subparser must not erase a workspace already parsed by the root."""
-    from apps.api.launcher import build_parser
+    from raiker.app.launcher import build_parser
 
     before = build_parser().parse_args(
         ["--workspace", str(tmp_path), "--port", "8877", "service", "install"]

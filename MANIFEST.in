@@ -1,2 +1,2 @@
-prune apps/web/node_modules
-prune apps/web/dist
+prune web/node_modules
+prune web/dist

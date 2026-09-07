@@ -182,7 +182,7 @@ def _checkout(root: Path) -> Path:
     """A directory shaped like an editable install of Raiker."""
     (root / ".git").mkdir(parents=True)
     (root / "pyproject.toml").write_text("[project]\nname='raiker'\n", encoding="utf-8")
-    for relative in ("apps/web/dist", "apps/web/node_modules", "build", "raiker.egg-info"):
+    for relative in ("web/dist", "web/node_modules", "build", "raiker.egg-info"):
         directory = root / relative
         directory.mkdir(parents=True)
         (directory / "payload").write_bytes(b"x" * 4096)
@@ -228,7 +228,7 @@ def test_the_checkout_is_never_removed_and_neither_are_its_artefacts_by_default(
     assert "Kept: the dashboard's downloaded packages" in "\n".join(plan.describe())
 
     apply_uninstall(plan, tmp_path / "ws", os_name="linux", home=tmp_path / "home")
-    assert (checkout / "apps" / "web" / "node_modules").is_dir()
+    assert (checkout / "web" / "node_modules").is_dir()
     assert (checkout / ".git").is_dir()
     assert (checkout / ".venv").is_dir()
 
@@ -247,7 +247,7 @@ def test_asking_for_the_artefacts_removes_them_and_still_keeps_the_checkout(
     assert "Removed: the dashboard's downloaded packages" in "\n".join(plan.describe())
 
     apply_uninstall(plan, tmp_path / "ws", os_name="linux", home=tmp_path / "home")
-    assert not (checkout / "apps" / "web" / "node_modules").exists()
+    assert not (checkout / "web" / "node_modules").exists()
     assert not (checkout / "build").exists()
     # Still the owner's directory, and still their virtual environment.
     assert (checkout / ".git").is_dir()

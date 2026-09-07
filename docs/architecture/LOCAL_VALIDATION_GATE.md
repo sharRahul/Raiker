@@ -19,16 +19,16 @@ python scripts/validate_runtime_enablement_readiness.py
 python scripts/validate_local_single_user_runtime.py
 ```
 
-Build the dashboard when `apps/web` changes:
+Build the dashboard when `web` changes:
 
 ```powershell
-npm --prefix apps/web ci
-npm --prefix apps/web run lint
-npm --prefix apps/web run check
-npm --prefix apps/web run test
-npm --prefix apps/web run build
-npx --prefix apps/web playwright install --with-deps chromium
-npm --prefix apps/web run test:e2e:mocked
+npm --prefix web ci
+npm --prefix web run lint
+npm --prefix web run check
+npm --prefix web run test
+npm --prefix web run build
+npx --prefix web playwright install --with-deps chromium
+npm --prefix web run test:e2e:mocked
 ```
 
 The mocked end-to-end suite runs against the build above and answers every API
@@ -38,9 +38,9 @@ The `live` suite is separate and deliberately not automated: it drives a running
 [fixed items](../plans/FIXED_ITEMS.md) are evidenced.
 
 ```powershell
-python apps/api/main.py --workspace <ws> --port 8765 --no-browser
+python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser
 $env:RAIKER_LIVE_ANTHROPIC_KEY = "<key>"; $env:RAIKER_LIVE_WORKSPACE = "<ws>"
-npm --prefix apps/web run test:e2e:live
+npm --prefix web run test:e2e:live
 ```
 
 Strict non-allow blocking, role revoke governed, and capability gate per action

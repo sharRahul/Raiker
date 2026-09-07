@@ -19,7 +19,7 @@
  *             everything the four permanent controls used to offer inside them.
  *
  * Prerequisites:
- *   1. `python apps/api/main.py --workspace <ws> --port 8765 --no-browser`
+ *   1. `python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser`
  *      with RAIKER_MODEL_EGRESS_ALLOWLIST covering the providers below.
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` / `RAIKER_LIVE_OPENAI_KEY` /
  *      `RAIKER_LIVE_OPENROUTER_KEY` in the environment. A provider whose key is

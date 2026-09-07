@@ -825,7 +825,7 @@ describe("Build conversation restore", () => {
         prompt_text: "Write the settings page",
         created_at: "2026-08-29T09:00:00Z",
         completed_at: "2026-08-29T09:01:00Z",
-        summary: "Wrote apps/web/src/lib/views/SettingsView.svelte.",
+        summary: "Wrote web/src/lib/views/SettingsView.svelte.",
         reasoning: null,
         reasoning_chars: 0,
         tool_rows: [],
@@ -849,7 +849,7 @@ describe("Build conversation restore", () => {
 
     expect(await screen.findByText("Write the settings page")).toBeInTheDocument();
     expect(
-      await screen.findByText(/Wrote apps\/web\/src\/lib\/views\/SettingsView\.svelte\./),
+      await screen.findByText(/Wrote web\/src\/lib\/views\/SettingsView\.svelte\./),
     ).toBeInTheDocument();
   });
 

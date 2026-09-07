@@ -7,7 +7,7 @@
 // of it is on. CI has no provider, so this spec is deliberately local.
 //
 // Start the host first:
-//   python -m apps.api.main --workspace .tmp/live-skills --port 8799 --no-browser
+//   python -m raiker.api.serve --workspace .tmp/live-skills --port 8799 --no-browser
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import type { Page } from "@playwright/test";

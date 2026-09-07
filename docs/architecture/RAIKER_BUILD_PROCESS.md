@@ -268,7 +268,7 @@ checkpoints and boundaries are identical with or without it; it changes only how
 a Build turn is expected to work. Anything it asks for that the owner has not
 allowed is still refused by the runtime, and the composer's Plan / Edit / Auto
 mode still decides what the turn may touch (`docs/architecture/DECISION_MODES_SPEC.md`,
-`apps/web/src/lib/buildModes.ts`).
+`web/src/lib/buildModes.ts`).
 
 The longer per-domain material this protocol was distilled from — planning
 formats, per-domain verification checklists, failure-mode tables — is not

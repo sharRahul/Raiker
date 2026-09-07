@@ -1,8 +1,8 @@
 # Visual Design Specification — "Control Deck"
 
 > **Status:** adopted and implemented. The tokens described here live in
-> `apps/web/src/app.css`; the icon set in `apps/web/src/lib/icons.ts`; the shared
-> components in `apps/web/src/lib/components/`. Where this document and the code
+> `web/src/app.css`; the icon set in `web/src/lib/icons.ts`; the shared
+> components in `web/src/lib/components/`. Where this document and the code
 > disagree, the code wins and this document must be updated.
 >
 > `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md` decides *what each screen is for*. This
@@ -43,7 +43,7 @@ contributor is entitled to ignore.
 Headings used to sit at 1.45 / 1.08 / 0.95rem. The first interval was 14%, which
 reads as "the same size, only bolder": heading level was carried by weight alone,
 and a page of headings read as one long run of bold text. Every step is now a
-visible interval, and `apps/web/src/lib/appCss.test.ts` fails if any of them
+visible interval, and `web/src/lib/appCss.test.ts` fails if any of them
 falls below 1.15×.
 
 **The serif is a voice, not a decoration.** `Source Serif 4` appears where Raiker
@@ -313,15 +313,15 @@ pass over the stylesheet.
 
 | Rule | Enforced by |
 |---|---|
-| The scale exists, and the heading intervals are real | `apps/web/src/lib/appCss.test.ts` |
-| Density reaches control padding and row height | `apps/web/src/lib/appCss.test.ts` |
-| Motion names three intents and honours reduced motion | `apps/web/src/lib/appCss.test.ts` |
-| One meter, one bar, tabular figures, no zero-rounding | `apps/web/src/lib/appCss.test.ts` |
-| No two icons share a glyph; one optical size per role | `apps/web/src/lib/icons.test.ts` |
-| Primitives are token-only (no hex, no `rgb()`) | `apps/web/src/lib/appCss.test.ts` |
-| Every page renders in both themes at four widths | `apps/web/e2e/all-pages-theme-live.spec.ts`, `apps/web/e2e/visual-refresh-live.spec.ts` |
-| Contrast and focus order | `apps/web/src/a11y.test.ts`, the live axe scans |
-| The rail stays short, every route stays reachable, the header contract is declared once, every empty state offers a way out, the shared label marks are not restated per view | `apps/web/src/lib/visualRubric.test.ts` |
+| The scale exists, and the heading intervals are real | `web/src/lib/appCss.test.ts` |
+| Density reaches control padding and row height | `web/src/lib/appCss.test.ts` |
+| Motion names three intents and honours reduced motion | `web/src/lib/appCss.test.ts` |
+| One meter, one bar, tabular figures, no zero-rounding | `web/src/lib/appCss.test.ts` |
+| No two icons share a glyph; one optical size per role | `web/src/lib/icons.test.ts` |
+| Primitives are token-only (no hex, no `rgb()`) | `web/src/lib/appCss.test.ts` |
+| Every page renders in both themes at four widths | `web/e2e/all-pages-theme-live.spec.ts`, `web/e2e/visual-refresh-live.spec.ts` |
+| Contrast and focus order | `web/src/a11y.test.ts`, the live axe scans |
+| The rail stays short, every route stays reachable, the header contract is declared once, every empty state offers a way out, the shared label marks are not restated per view | `web/src/lib/visualRubric.test.ts` |
 
 ## The visual rubric
 

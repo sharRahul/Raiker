@@ -30,7 +30,7 @@ documents exist and still contain the markers that make their status claims
 falsifiable. **A documentation change that removes one of those phrases fails
 CI**, which is deliberate: the phrases are the claims.
 
-### `web.yml` — only when `apps/web/**` changes
+### `web.yml` — only when `web/**` changes
 
 Node 22: `npm ci`, lint, `check`, unit tests, build, then the **mocked**
 end-to-end suite against that build. Every API call is answered from a fixture,
@@ -87,7 +87,7 @@ asserts had actually broken:
 |---|---|
 | `test_required_docs_do_not_contain_stale_model_runtime_claims` | Eleven documents do not carry any of the retired model-runtime claims |
 | `test_every_real_executor_capability_has_a_threat_model` | Every name in `REAL_EXECUTOR_CAPABILITIES` appears in `docs/threat-models/README.md`. The step-up asks the owner to acknowledge a threat model; this is what stops a capability gaining an executor without one |
-| `test_documentation_links_and_anchors_resolve` | Every relative Markdown link in `README.md`, `docs/**` and `apps/web/README.md` resolves — **including its heading anchor**, using GitHub's slug algorithm |
+| `test_documentation_links_and_anchors_resolve` | Every relative Markdown link in `README.md`, `docs/**` and `web/README.md` resolves — **including its heading anchor**, using GitHub's slug algorithm |
 | `test_relayed_capability_count_is_stated_correctly` | `EXECUTABLE_ON_APPROVAL` still has twelve members, and `README.md` still says so. Changing the set without updating the documents that name the number fails here |
 
 `tests/test_governance_entry_paths.py` asserts the enumeration in

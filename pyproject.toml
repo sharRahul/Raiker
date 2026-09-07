@@ -82,10 +82,10 @@ dev = ["pytest>=8", "ruff>=0.15", "mypy>=1.10", "PyYAML>=6.0", "types-PyYAML>=6.
 raiker = "raiker.cli.main:main"
 # The application entry point: detects the OS, keeps data where that platform
 # expects it, finds a free loopback port, and opens the default browser.
-raiker-app = "apps.api.launcher:main"
+raiker-app = "raiker.app.launcher:main"
 # The service entry point, unchanged: explicit workspace, explicit port, and the
 # deliberate --allow-public path for reaching Raiker from another machine.
-raiker-web = "apps.api.main:main"
+raiker-web = "raiker.api.serve:main"
 # The release build (BUG-44). `.github/workflows/release.yml` calls this on each
 # target's own runner; keeping it a console script rather than `python -m` keeps
 # the import of `raiker.app` from happening twice.
@@ -93,7 +93,18 @@ raiker-release = "raiker.app.release:main"
 raiker-command-supervisor = "raiker.execution.commands.remote_supervisor:main"
 
 [tool.setuptools.packages.find]
-include = ["raiker*", "apps*"]
+# `raiker` only. `apps*` used to be here, which installed a top-level `apps`
+# package into site-packages — a generic name for one project to occupy, and
+# one that shipped the whole web source tree into the release artifact because
+# `raiker.app.release` walked the directory. The two Python modules that lived
+# there are `raiker.app.launcher` and `raiker.api.serve` now; the web app is a
+# Node project at `web/` and is not a Python package at all.
+#
+# `apps.api.launcher` survives as a deprecation shim (see the module docstring)
+# and is deliberately *not* packaged: it exists for a source checkout whose
+# service registration recorded the old `python -m` command, and a checkout
+# runs from the tree rather than from site-packages.
+include = ["raiker*"]
 
 [tool.setuptools.package-data]
 "raiker.config" = ["*.json"]
@@ -125,11 +136,12 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 no_implicit_optional = true
 check_untyped_defs = true
-# The top-level packages (raiker, apps, tests) all live at the repo root, so
-# cwd is the only package base needed. Listing the package dirs themselves as
-# path entries made the same __init__.py resolvable under two module names
-# (e.g. raiker/api/__init__.py as both "raiker.api" from cwd and "api" from
-# the "raiker" entry), triggering "Source file found twice". explicit_package_bases
-# makes mypy derive module names from the directory structure, which is what
-# lets the PEP-420 namespace packages "apps" and "tests" resolve correctly.
+# The top-level packages (raiker, tests, and the `apps` shim) all live at the
+# repo root, so cwd is the only package base needed. Listing the package dirs
+# themselves as path entries made the same __init__.py resolvable under two
+# module names (e.g. raiker/api/__init__.py as both "raiker.api" from cwd and
+# "api" from the "raiker" entry), triggering "Source file found twice".
+# explicit_package_bases makes mypy derive module names from the directory
+# structure, which is what lets the PEP-420 namespace package "tests" resolve
+# correctly.
 explicit_package_bases = true

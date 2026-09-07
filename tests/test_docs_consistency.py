@@ -9,8 +9,8 @@ REQUIRED_DOCS = [
     Path("docs/architecture/IMPLEMENTATION_STATUS.md"),
     Path("docs/architecture/EVENT_CATALOG.md"),
     Path("docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md"),
-    # docs/UI_UX_DESIGN_SPEC.md was deliberately removed (superseded by apps/web/README.md).
-    Path("apps/web/README.md"),
+    # docs/UI_UX_DESIGN_SPEC.md was deliberately removed (superseded by web/README.md).
+    Path("web/README.md"),
     Path("docs/architecture/API_AND_CONTRACT_SCHEMAS.md"),
     Path("docs/architecture/SECURITY_AND_POLICY.md"),
     Path("docs/architecture/RUNTIME_ORCHESTRATION_SPEC.md"),
@@ -68,7 +68,7 @@ DOC_ROOTS = [
     Path("README.md"),
     Path("CONTRIBUTING.md"),
     Path("SECURITY.md"),
-    Path("apps/web/README.md"),
+    Path("web/README.md"),
 ]
 
 
@@ -136,7 +136,6 @@ def test_every_real_executor_capability_is_described_on_the_permissions_page() -
 
     model = (
         Path(__file__).resolve().parents[1]
-        / "apps"
         / "web"
         / "src"
         / "lib"

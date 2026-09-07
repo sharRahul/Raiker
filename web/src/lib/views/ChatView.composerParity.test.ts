@@ -457,7 +457,7 @@ describe("ChatView composer — commands, mentions and message actions", () => {
         status: "success",
         repository: "raiker",
         count: 1,
-        paths: [{ path: "apps/web/src/main.ts", language: "typescript" }],
+        paths: [{ path: "web/src/main.ts", language: "typescript" }],
       },
     });
     render(ChatView, { projects });
@@ -466,10 +466,10 @@ describe("ChatView composer — commands, mentions and message actions", () => {
     await fireEvent.input(prompt, { target: { value: "look at @main" } });
 
     const menu = await screen.findByRole("listbox", { name: "Files in the code map" });
-    await fireEvent.mouseDown(within(menu).getByText("apps/web/src/main.ts"));
+    await fireEvent.mouseDown(within(menu).getByText("web/src/main.ts"));
 
     await waitFor(() =>
-      expect((prompt as HTMLTextAreaElement).value).toBe("look at @apps/web/src/main.ts "),
+      expect((prompt as HTMLTextAreaElement).value).toBe("look at @web/src/main.ts "),
     );
   });
 

@@ -55,15 +55,15 @@ any turn was sent. No credential appears in these results, the specs, or the
 screenshots.
 
 Specs:
-[`bug-221-225-plugin-skills-mcp-channels-live.spec.ts`](../../apps/web/e2e/bug-221-225-plugin-skills-mcp-channels-live.spec.ts)
+[`bug-221-225-plugin-skills-mcp-channels-live.spec.ts`](../../web/e2e/bug-221-225-plugin-skills-mcp-channels-live.spec.ts)
 (9 tests),
-[`plugin-contributions-provider-live.spec.ts`](../../apps/web/e2e/plugin-contributions-provider-live.spec.ts)
+[`plugin-contributions-provider-live.spec.ts`](../../web/e2e/plugin-contributions-provider-live.spec.ts)
 (3 tests),
-[`ui-sweep-responsive-live.spec.ts`](../../apps/web/e2e/ui-sweep-responsive-live.spec.ts)
+[`ui-sweep-responsive-live.spec.ts`](../../web/e2e/ui-sweep-responsive-live.spec.ts)
 (3 tests),
-[`bug-219-decline-mode-live.spec.ts`](../../apps/web/e2e/bug-219-decline-mode-live.spec.ts)
+[`bug-219-decline-mode-live.spec.ts`](../../web/e2e/bug-219-decline-mode-live.spec.ts)
 (3 tests),
-[`bug-225-channels-live.spec.ts`](../../apps/web/e2e/bug-225-channels-live.spec.ts)
+[`bug-225-channels-live.spec.ts`](../../web/e2e/bug-225-channels-live.spec.ts)
 (6 tests). 24 tests, 24 passed.
 
 | Check | Result |
@@ -154,7 +154,7 @@ Fresh workspace, owner registered through the browser, **every credential typed
 into the wizard's own field** — never given to the server as environment — so what
 this round proves is the product's store-key → catalogue → pin → readiness → turn
 chain from the very first screen. Spec:
-[`apps/web/e2e/wizard-workbench-composer-live.spec.ts`](../../apps/web/e2e/wizard-workbench-composer-live.spec.ts)
+[`web/e2e/wizard-workbench-composer-live.spec.ts`](../../web/e2e/wizard-workbench-composer-live.spec.ts)
 (3 tests, 3 passed). Ollama was running locally; LM Studio was not installed, which
 is a *result* the rows are required to state.
 
@@ -203,7 +203,7 @@ Fresh workspace, owner registered through the browser, every credential typed
 into the Models connect dialog — never given to the server as environment — so
 what this round proves is the product's connect → catalogue → readiness → turn
 chain rather than a fixture. Spec:
-[`apps/web/e2e/review-provider-matrix-live.spec.ts`](../../apps/web/e2e/review-provider-matrix-live.spec.ts).
+[`web/e2e/review-provider-matrix-live.spec.ts`](../../web/e2e/review-provider-matrix-live.spec.ts).
 
 | Check | Result |
 |---|---|
@@ -567,7 +567,7 @@ Evidence:
 through `207-ADD-03-ollama-approval-attribution-live.png`.
 
 The repeatable command shape is
-`RAIKER_LIVE_ANTHROPIC_KEY=<ephemeral> RAIKER_LIVE_OPENROUTER_KEY=<ephemeral> npm --prefix apps/web run test:e2e:live -- e2e/add-03-machine-identity-providers-live.spec.ts`.
+`RAIKER_LIVE_ANTHROPIC_KEY=<ephemeral> RAIKER_LIVE_OPENROUTER_KEY=<ephemeral> npm --prefix web run test:e2e:live -- e2e/add-03-machine-identity-providers-live.spec.ts`.
 Values are supplied only to the Playwright process and entered into password
 fields; they are never written to source, docs, screenshots, or test fixtures.
 
@@ -580,7 +580,7 @@ fields; they are never written to source, docs, screenshots, or test fixtures.
    `RAIKER_MODEL_EGRESS_ALLOWLIST=<host>` and the provider key env (see matrix).
 3. **Select the model:** `/model use …` (CLI), or persist a `ModelSessionState`
    for `TERMINAL_MODEL_SESSION_ID` with the profile id and a concrete model.
-4. **Run:** `python apps/api/main.py --workspace <ws> --port 8765`, then mint a
+4. **Run:** `python -m raiker.api.serve --workspace <ws> --port 8765`, then mint a
    session and `POST /api/prompts/stream`. Confirm the answer, and read
    `GET /api/events?session_id=…` (or the store) for the
    `model_request_started` (bound model) and `model_request_completed`

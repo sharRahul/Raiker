@@ -10,7 +10,7 @@ def pyinstaller_command(
     *, source_root: Path, web_assets: Path, out_dir: Path, platform_name: str = sys.platform
 ) -> list[str]:
     separator = ";" if platform_name == "win32" else ":"
-    entry = source_root / "apps" / "api" / "launcher.py"
+    entry = source_root / "raiker" / "app" / "launcher.py"
     return [
         sys.executable,
         "-m",
@@ -42,14 +42,14 @@ def pyinstaller_command(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build Raiker as a self-contained desktop app.")
     parser.add_argument("--source-root", default=".")
-    parser.add_argument("--web-assets", default="apps/web/dist")
+    parser.add_argument("--web-assets", default="web/dist")
     parser.add_argument("--out", default="desktop-dist")
     args = parser.parse_args(argv)
     source_root = Path(args.source_root).resolve()
     web_assets = Path(args.web_assets).resolve()
     out_dir = Path(args.out).resolve()
-    if not (source_root / "apps" / "api" / "launcher.py").is_file():
-        parser.error("source root does not contain apps/api/launcher.py")
+    if not (source_root / "raiker" / "app" / "launcher.py").is_file():
+        parser.error("source root does not contain raiker/app/launcher.py")
     if not (web_assets / "index.html").is_file():
         parser.error("web assets do not contain index.html")
     out_dir.mkdir(parents=True, exist_ok=True)

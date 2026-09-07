@@ -27,7 +27,7 @@
  *
  * Prerequisites:
  *   1. `python tests/fixtures/stub_model.py 8811` (the batching model, as ADD-02)
- *   2. `python apps/api/main.py --workspace <ws> --port 8765 --no-browser`
+ *   2. `python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser`
  *      with `RAIKER_MODEL_EGRESS_ALLOWLIST=127.0.0.1`
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";

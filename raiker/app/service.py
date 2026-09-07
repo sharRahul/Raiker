@@ -116,7 +116,7 @@ def launch_command(workspace: Path, port: int) -> list[str]:
     service nobody keeps enabled.
     """
     executable = shutil.which("raiker-app")
-    base = [executable] if executable else [sys.executable, "-m", "apps.api.launcher"]
+    base = [executable] if executable else [sys.executable, "-m", "raiker.app.launcher"]
     return [*base, "--no-browser", "--workspace", str(workspace), "--port", str(port)]
 
 

@@ -237,7 +237,7 @@ prompt. A denial reaches the model as a per-call refusal and the batch carries o
 ordering, the kept pre-boundary results, draining, per-call re-governance, the
 rejection and policy-refusal paths, and the migration defaults for rows written
 before the queue existed. The live scenario is
-[`e2e/add-02-batched-approval-queue-live.spec.ts`](../../apps/web/e2e/add-02-batched-approval-queue-live.spec.ts),
+[`e2e/add-02-batched-approval-queue-live.spec.ts`](../../web/e2e/add-02-batched-approval-queue-live.spec.ts),
 whose screenshots are `working/add-02-*`. It drives a running `raiker-web` — its
 own orchestrator, broker, policy engine, approvals inbox, suspended-turn store
 and resume endpoints — with a **local OpenAI-compatible stub as the model**, not

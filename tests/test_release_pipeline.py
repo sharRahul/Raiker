@@ -36,10 +36,10 @@ from raiker.app.update import UpdateError, read_channel_index, select_update
 def source_root(tmp_path: Path) -> Path:
     root = tmp_path / "src"
     (root / "raiker" / "app").mkdir(parents=True)
-    (root / "apps" / "api").mkdir(parents=True)
+    (root / "raiker" / "api").mkdir(parents=True)
     (root / "raiker" / "__init__.py").write_text("", encoding="utf-8")
     (root / "raiker" / "app" / "host.py").write_text("host", encoding="utf-8")
-    (root / "apps" / "api" / "main.py").write_text("main", encoding="utf-8")
+    (root / "raiker" / "api" / "serve.py").write_text("serve", encoding="utf-8")
     (root / "pyproject.toml").write_text("[project]\nname='raiker'\n", encoding="utf-8")
     # Two things an artifact must never carry: build caches, and another
     # platform's compiled leftovers. Both would differ between two builds.
@@ -139,7 +139,7 @@ def test_a_bundle_carries_the_service_the_web_assets_and_the_native_wheels(
     with zipfile.ZipFile(artifact.path) as archive:
         names = set(archive.namelist())
     assert "service/raiker/app/host.py" in names
-    assert "service/apps/api/main.py" in names
+    assert "service/raiker/api/serve.py" in names
     assert "web/index.html" in names
     assert "wheels/sqlcipher3_wheels-0.5.0-cp311-cp311-manylinux.whl" in names
     assert "version.txt" in names and "installation.json" in names

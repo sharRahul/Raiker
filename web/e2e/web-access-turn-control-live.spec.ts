@@ -19,7 +19,7 @@
  *            had already produced.
  *
  * Prerequisites:
- *   1. `python apps/api/main.py --workspace <ws> --port 8765 --no-browser` with
+ *   1. `python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser` with
  *      `RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com` and
  *      `RAIKER_WEB_EGRESS_ALLOWLIST=pypi.org`
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment (added through the UI below)

@@ -62,7 +62,7 @@ licences or notices.
   found. This does not establish that no copied material exists.
 - The web app bundles Manrope, JetBrains Mono, and Source Serif 4 font subsets.
   Their attribution and SIL Open Font License 1.1 status are recorded in
-  `apps/web/src/assets/fonts/LICENSE.md`; those notices must be preserved and
+  `web/src/assets/fonts/LICENSE.md`; those notices must be preserved and
   the fonts must not be relicensed as Raiker code.
 - Raiker icon and web image assets are tracked and materially touched by the
   `Claude` commits above. No external asset provenance or relicensing grant was

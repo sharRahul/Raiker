@@ -291,7 +291,7 @@ def test_raiker_app_update_reports_the_build_without_asking_anything(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """The default is a report. A check is something you ask for."""
-    from apps.api.launcher import main
+    from raiker.app.launcher import main
 
     assert main(["update", "--workspace", str(tmp_path)]) == 0
     out = capsys.readouterr().out
@@ -302,7 +302,7 @@ def test_raiker_app_update_reports_the_build_without_asking_anything(
 def test_raiker_app_update_pins_a_channel_and_refuses_a_half_pin(
     tmp_path: Path, signing_key: bytes, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from apps.api.launcher import main
+    from raiker.app.launcher import main
 
     assert (
         main(
@@ -338,8 +338,8 @@ def test_raiker_app_update_pins_a_channel_and_refuses_a_half_pin(
 def test_raiker_app_update_rollback_names_what_is_available(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from apps.api.launcher import main
     from raiker.app.installation import recovery_root
+    from raiker.app.launcher import main
 
     point = recovery_root(tmp_path) / "1.0.0"
     point.mkdir(parents=True)

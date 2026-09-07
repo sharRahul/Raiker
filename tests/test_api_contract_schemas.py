@@ -1,4 +1,4 @@
-"""Contract guard: every field the typed web client (apps/web/src/lib/apiTypes.ts) reads must
+"""Contract guard: every field the typed web client (web/src/lib/apiTypes.ts) reads must
 exist in the corresponding backend response. The check is directional — the backend may include
 extra fields (e.g. schema_version) — but it must never drop a key the UI depends on. If this fails,
 the frontend interface and the backend DTO have drifted and must be reconciled.
@@ -17,7 +17,7 @@ from raiker.contracts.models import ToolAction
 from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.storage.sqlite import SQLiteStore
 
-# Key sets transcribed from apps/web/src/lib/apiTypes.ts (required, client-read fields).
+# Key sets transcribed from web/src/lib/apiTypes.ts (required, client-read fields).
 AUTH_SESSION = {"token", "session_id", "principal_id", "expires_at"}
 CAPABILITY_GATE = {
     "capability",

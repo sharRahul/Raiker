@@ -10,8 +10,8 @@ evidence those write-ups point at.
 |---|---|
 | `working/` | **Removed 2026-09-06.** Verified behaviour — every surface that did what it claims. Round-stamped: a file here was evidence of what was true on the day its prefix names. The filenames survive in the write-ups; the images do not |
 | `not-working/` | **Removed 2026-09-06.** Reproduced defects, one per file, named for its entry in [To be fixed](../TO_BE_FIXED.md) |
-| [`pages/`](pages) | The **current** state of every application page. Unlike the two above this folder is not an archive — it is re-captured in full by [`ui-sweep-responsive-live.spec.ts`](../../../apps/web/e2e/ui-sweep-responsive-live.spec.ts), so a file here is always the latest version and a stale one is a bug in the sweep |
-| [`widths/`](widths) | The **current** state of every route at 390 and 1920, written by [`ui-sweep-widths-live.spec.ts`](../../../apps/web/e2e/ui-sweep-widths-live.spec.ts). That spec's captures are the visible half of a run whose real output is four *assertions* per route per width — no sideways scroll, nothing bleeding out of a `visible` box, every control named, and no control that draws nothing. Like `pages/` it is re-captured rather than archived |
+| [`pages/`](pages) | The **current** state of every application page. Unlike the two above this folder is not an archive — it is re-captured in full by [`ui-sweep-responsive-live.spec.ts`](../../../web/e2e/ui-sweep-responsive-live.spec.ts), so a file here is always the latest version and a stale one is a bug in the sweep |
+| [`widths/`](widths) | The **current** state of every route at 390 and 1920, written by [`ui-sweep-widths-live.spec.ts`](../../../web/e2e/ui-sweep-widths-live.spec.ts). That spec's captures are the visible half of a run whose real output is four *assertions* per route per width — no sideways scroll, nothing bleeding out of a `visible` box, every control named, and no control that draws nothing. Like `pages/` it is re-captured rather than archived |
 
 ## Current adaptive-shell catalogue — 2026-09-05
 
@@ -26,13 +26,13 @@ sweeps each carried a hand-copied route list; all five swept two routes that no
 longer exist and missed twenty that do — Design, Messaging, the Guide, all six
 Models tabs and all ten Settings sections. Every route list is derived from the
 app's own nav registry now
-([`e2e/destinations.ts`](../../../apps/web/e2e/destinations.ts)), so a
+([`e2e/destinations.ts`](../../../web/e2e/destinations.ts)), so a
 destination added to the navigation is swept by all five from the next run. The
 record is
 [FIXED-416](../FIXED_ITEMS.md#fixed-416--both-every-page-sweeps-had-stopped-covering-every-page).
 
 Beside them sit 40 unprefixed captures (`home.png`, `settings-privacy.png`, …)
-written by [`all-pages-live.spec.ts`](../../../apps/web/e2e/all-pages-live.spec.ts),
+written by [`all-pages-live.spec.ts`](../../../web/e2e/all-pages-live.spec.ts),
 which is a different sweep with a different question: one width, every route, and
 whether the console stayed clean. They are named for their destination, matching
 the prefixed set's own convention — the ordinal names (`01-workbench.png` …
@@ -147,7 +147,7 @@ whose gates were all still at their per-account fail-closed defaults.
 ## The 2026-08-17 round, second pass
 
 Two screenshots, prefix `r0817b-`, from
-[`apps/web/e2e/mem04-bug194-observations-live.spec.ts`](../../../apps/web/e2e/mem04-bug194-observations-live.spec.ts),
+[`apps/web/e2e/mem04-bug194-observations-live.spec.ts`](../../../web/e2e/mem04-bug194-observations-live.spec.ts),
 against a fresh workspace with the Anthropic credential entered through
 Raiker's own connect dialog.
 
@@ -178,12 +178,12 @@ was photographed.
 
 Five screenshots, prefix `r0817-`, captured against fresh workspaces. The first
 three come from
-[`apps/web/e2e/fts5-mem03-bug194-live.spec.ts`](../../../apps/web/e2e/fts5-mem03-bug194-live.spec.ts),
+[`apps/web/e2e/fts5-mem03-bug194-live.spec.ts`](../../../web/e2e/fts5-mem03-bug194-live.spec.ts),
 with the Anthropic credential entered through Raiker's own connect dialog rather
 than an environment variable; the last two are the Knowledge Map, from
-[`knowledge-map-work-live.spec.ts`](../../../apps/web/e2e/knowledge-map-work-live.spec.ts)
+[`knowledge-map-work-live.spec.ts`](../../../web/e2e/knowledge-map-work-live.spec.ts)
 and
-[`reference-graph-live.spec.ts`](../../../apps/web/e2e/reference-graph-live.spec.ts).
+[`reference-graph-live.spec.ts`](../../../web/e2e/reference-graph-live.spec.ts).
 
 | File | Shows |
 |---|---|
@@ -207,7 +207,7 @@ fixed cannot be re-photographed.
 ## The 2026-08-10 round
 
 Ten screenshots, prefix `r0810-`, captured by
-[`apps/web/e2e/bug-68-71-73-82-live.spec.ts`](../../../apps/web/e2e/bug-68-71-73-82-live.spec.ts)
+[`apps/web/e2e/bug-68-71-73-82-live.spec.ts`](../../../web/e2e/bug-68-71-73-82-live.spec.ts)
 against a fresh workspace. Each one is the "after" for a defect the 2026-08-08
 round left open; the "before" is named beside it in
 [To be fixed](../TO_BE_FIXED.md).
@@ -314,7 +314,7 @@ model labels, and the per-model effort control.
 
 `120`–`127` are the live evidence for FIXED-53 through FIXED-56, captured on
 **2026-07-31** by
-[`apps/web/e2e/chat-build-composer-bugs-live.spec.ts`](../../../apps/web/e2e/chat-build-composer-bugs-live.spec.ts)
+[`apps/web/e2e/chat-build-composer-bugs-live.spec.ts`](../../../web/e2e/chat-build-composer-bugs-live.spec.ts)
 against a real `raiker-web` on `127.0.0.1:8765` — the actual FastAPI runtime
 serving the built SPA, not a route-mocked shell. No model provider was connected,
 so every figure shown is the honest-gap path rather than a live model turn.
@@ -341,7 +341,7 @@ Posture — so each panel is one errand and a shareable location
 
 `197`–`200` are the live evidence for FIXED-92 and FIXED-93, captured on
 **2026-08-02** by
-[`apps/web/e2e/bug-44-47-live.spec.ts`](../../../apps/web/e2e/bug-44-47-live.spec.ts)
+[`apps/web/e2e/bug-44-47-live.spec.ts`](../../../web/e2e/bug-44-47-live.spec.ts)
 against two real `raiker-web` hosts. `197` and `198` come from a source checkout
 holding an owner-entered Anthropic credential that answered a live
 `claude-haiku-4-5-20251001` turn in the same run. `200` comes from a host started
@@ -357,7 +357,7 @@ answering is the artifact's own copy.
 | `200-BUG-44-packaged-unsigned-build-live.png` | The same panel on a host running from a real release artifact: `0.1.0 · linux-x86_64`, reported as an **unsigned build** because that build did not run platform signing |
 
 `bug-50-*` are the live evidence for FIXED-100, captured on **2026-08-03** by
-[`apps/web/e2e/bug-50-connection-cache-live.spec.ts`](../../../apps/web/e2e/bug-50-connection-cache-live.spec.ts)
+[`apps/web/e2e/bug-50-connection-cache-live.spec.ts`](../../../web/e2e/bug-50-connection-cache-live.spec.ts)
 against a running `raiker-web` made to serve 30 further instance workspaces
 through `POST /api/instances` — the endpoint behind the login screen's instance
 form. FIXED-100 bounds a connection cache, so its real measurement is the host
@@ -376,7 +376,7 @@ re-captured on **2026-08-10** as the evidence for FIXED-142 and FIXED-143 — th
 same six scenarios, run again once a tool call stopped occupying the event loop
 and once the spec could reach the provider cards again. Originally captured on
 **2026-08-04** by
-[`apps/web/e2e/web-access-turn-control-live.spec.ts`](../../../apps/web/e2e/web-access-turn-control-live.spec.ts)
+[`apps/web/e2e/web-access-turn-control-live.spec.ts`](../../../web/e2e/web-access-turn-control-live.spec.ts)
 against a running `raiker-web` holding an owner-entered Anthropic credential and
 answering live `claude-haiku-4-5-20251001` turns. The page the agent reads is
 fetched from the real internet; that host was started with
@@ -401,7 +401,7 @@ record of what was observed on the day, not as current instructions.
 
 `b9-*` is the live evidence for **FIXED-113** (GAP-BUILD B9 — the repository code
 map), captured on **2026-08-08** by
-[`apps/web/e2e/b9-repository-code-map-live.spec.ts`](../../../apps/web/e2e/b9-repository-code-map-live.spec.ts)
+[`apps/web/e2e/b9-repository-code-map-live.spec.ts`](../../../web/e2e/b9-repository-code-map-live.spec.ts)
 against a running `raiker-web` holding an owner-entered Anthropic credential and
 answering live `claude-haiku-4-5-20251001` turns. Nothing here reaches the
 network on the agent's behalf: the repository is a folder inside the workspace,
@@ -418,7 +418,7 @@ and the index is derived from it locally.
 
 `201`–`207` are the live evidence for **ADD-03** per-turn machine identity,
 captured on **2026-08-08** by
-[`apps/web/e2e/add-03-machine-identity-providers-live.spec.ts`](../../../apps/web/e2e/add-03-machine-identity-providers-live.spec.ts)
+[`apps/web/e2e/add-03-machine-identity-providers-live.spec.ts`](../../../web/e2e/add-03-machine-identity-providers-live.spec.ts)
 against an isolated real `raiker-web` on `127.0.0.1:8765`. Anthropic and
 OpenRouter credentials were entered through the Models UI and closed before
 screenshots; Ollama used the local `gemma4:31b-cloud` catalogue entry. All seven

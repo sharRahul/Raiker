@@ -2709,7 +2709,7 @@
     position: absolute;
     right: 0;
     top: calc(100% + 4px);
-    z-index: 40;
+    z-index: var(--z-popover);
     min-width: 13rem;
     display: grid;
     gap: var(--space-1);

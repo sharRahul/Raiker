@@ -124,7 +124,7 @@
      puts the whole menu on screen at every height. `left: 0` keeps it inside the
      viewport at 390px, where the trigger sits near the left edge and a
      right-anchored menu ran off the other side. */
-  .approval-menu { position: absolute; z-index: 2; bottom: calc(100% + .3rem); left: 0; min-width: 17rem; max-width: min(22rem, calc(100vw - 2rem)); padding: .25rem; border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); box-shadow: 0 -.4rem 1.2rem color-mix(in srgb, var(--text-1) 14%, transparent); }
+  .approval-menu { position: absolute; z-index: var(--z-popover); bottom: calc(100% + .3rem); left: 0; min-width: 17rem; max-width: min(22rem, calc(100vw - 2rem)); padding: .25rem; border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); box-shadow: 0 -.4rem 1.2rem color-mix(in srgb, var(--text-1) 14%, transparent); }
   .approval-choice { width: 100%; display: grid; grid-template-columns: 1rem 1fr 1rem; align-items: start; gap: .45rem; padding: .4rem .45rem; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-2); text-align: left; cursor: pointer; }
   .choice-copy { display: grid; gap: .1rem; min-width: 0; }
   .choice-label { font-weight: 600; }

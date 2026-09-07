@@ -2801,7 +2801,7 @@
   .rail-scrim {
     position: fixed;
     inset: 0;
-    z-index: 90;
+    z-index: var(--z-scrim);
     border: 0;
     background: var(--overlay);
   }
@@ -2862,7 +2862,7 @@
     position: absolute;
     right: 0;
     top: calc(100% + 4px);
-    z-index: 40;
+    z-index: var(--z-popover);
     min-width: 13rem;
     display: grid;
     gap: var(--space-1);
@@ -3198,7 +3198,7 @@
     .files-slot.drawer {
       position: fixed;
       inset: 0 auto 0 0;
-      z-index: 100;
+      z-index: var(--z-modal);
       width: min(20rem, 88vw);
       padding: var(--space-3);
       background: var(--surface);
@@ -3209,7 +3209,7 @@
     .rail-slot.drawer {
       position: fixed;
       inset: 0 0 0 auto;
-      z-index: 100;
+      z-index: var(--z-modal);
       width: min(21rem, 90vw);
       padding: var(--space-3);
       background: var(--surface);

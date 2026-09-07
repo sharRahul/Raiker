@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
-const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
+const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 
 const IMAGE = process.env.RAIKER_E2E_IMAGE ?? "";
 const PDF = process.env.RAIKER_E2E_PDF ?? "";

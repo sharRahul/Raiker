@@ -243,7 +243,7 @@
     position: absolute;
     bottom: calc(100% + 6px);
     left: 0;
-    z-index: 70;
+    z-index: var(--z-popover);
     width: min(22rem, 78vw);
     display: grid;
     gap: var(--space-3);

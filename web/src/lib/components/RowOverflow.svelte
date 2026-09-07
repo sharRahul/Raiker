@@ -133,7 +133,7 @@
     position: absolute;
     right: 0;
     top: calc(100% + 4px);
-    z-index: 45;
+    z-index: var(--z-popover);
     width: max-content;
     min-width: 12rem;
     display: grid;

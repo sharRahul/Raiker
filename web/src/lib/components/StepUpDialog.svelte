@@ -128,7 +128,7 @@
     background: var(--overlay);
     display: grid;
     place-items: center;
-    z-index: 60;
+    z-index: var(--z-scrim);
   }
   .modal {
     background: var(--raised);

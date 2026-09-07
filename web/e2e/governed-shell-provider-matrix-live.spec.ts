@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { OWNER_CREDENTIALS, dismissFirstRunModelSetup, hostedProviderCard, keepModelAvailable, useHostedModel } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
-const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
 const PASSWORD = OWNER_CREDENTIALS.password;
 
 interface ProviderLeg {

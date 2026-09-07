@@ -301,9 +301,9 @@
   .dot.tone-ok { background: var(--ok); }
   .dot.tone-warn { background: var(--warn); }
   .dot.tone-danger { background: var(--danger); }
-  .panel-backdrop { position: fixed; inset: 0; z-index: 55; border: 0; background: transparent; cursor: default; }
+  .panel-backdrop { position: fixed; inset: 0; z-index: var(--z-popover); border: 0; background: transparent; cursor: default; }
   .panel {
-    position: absolute; right: 0; top: calc(100% + 6px); z-index: 60;
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: var(--z-popover-panel);
     width: min(23rem, 88vw);
     border: 1px solid var(--border); border-radius: var(--r-md);
     background: var(--raised); box-shadow: var(--shadow-2);

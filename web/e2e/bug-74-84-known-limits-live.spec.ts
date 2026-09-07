@@ -12,7 +12,7 @@ import { connectHostedProvider, keepOffered, offeredModelIds, openModelDialog, s
  */
 
 const BASE = "http://127.0.0.1:8765";
-const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 
 /**

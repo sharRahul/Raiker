@@ -245,7 +245,7 @@
     position: absolute;
     top: calc(100% + 0.2rem);
     left: 0;
-    z-index: 30;
+    z-index: var(--z-popover);
     min-width: 15rem;
     max-width: min(20rem, calc(100vw - 2rem));
     display: grid;

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { OWNER_CREDENTIALS, hostedProviderCard, keepModelAvailable } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
-const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
+const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const PASSWORD = OWNER_CREDENTIALS.password;
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const OPENROUTER_KEY = process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "";

@@ -59,7 +59,7 @@
     position: fixed;
     right: 20px;
     bottom: 18px;
-    z-index: 45;
+    z-index: var(--z-docked);
     width: min(390px, calc(100vw - 32px));
     border: 1px solid var(--accent-border);
     border-radius: 12px;

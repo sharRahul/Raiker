@@ -214,7 +214,7 @@
     position: absolute;
     left: 0;
     bottom: calc(100% + 6px);
-    z-index: 70;
+    z-index: var(--z-popover);
     width: min(21rem, calc(100vw - 2rem));
     display: grid;
     gap: 1px;
@@ -269,13 +269,13 @@
       display: block;
       position: fixed;
       inset: 0;
-      z-index: 95;
+      z-index: var(--z-scrim);
       background: var(--overlay);
     }
     .menu {
       position: fixed;
       inset: auto 0 0 0;
-      z-index: 100;
+      z-index: var(--z-modal);
       width: auto;
       /* `.menu-surface` caps every menu at `min(24rem, 100vw - 2rem)`, which is
          right for a popover and wrong for a sheet: at 390px it left the sheet

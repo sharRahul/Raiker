@@ -2859,7 +2859,7 @@
     justify-content: center;
     padding: var(--space-4);
     position: fixed;
-    z-index: 40;
+    z-index: var(--z-scrim);
   }
   .signin-dialog {
     position: relative;
@@ -3033,7 +3033,7 @@
     justify-content: center;
     padding: var(--space-4);
     position: fixed;
-    z-index: 30;
+    z-index: var(--z-scrim);
   }
   .details-dialog {
     max-width: 42rem;

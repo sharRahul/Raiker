@@ -488,6 +488,14 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-464](#fixed-464--every-live-round-had-been-writing-its-evidence-outside-the-repository) | High | Live test harness | Fixed 2026-09-07 (found live) |
 | [FIXED-465](#fixed-465--eighteen-live-specs-waiting-for-a-tab-the-redesign-removed) | High | Live test harness | Fixed 2026-09-07 (found live) |
 | [FIXED-466](#fixed-466--the-control-whose-job-was-to-say-connect-a-model-said-nothing) | Low | Design / composer | Fixed 2026-09-07 (found live) |
+| [FIXED-467](#fixed-467--builds-third-pane-showed-tools-not-the-work) | Medium | Build | Fixed 2026-09-07 (VIS2-12) |
+| [FIXED-468](#fixed-468--extensions-opened-on-a-category-instead-of-on-what-raiker-can-reach) | Medium | Extensions | Fixed 2026-09-07 (VIS2-10) |
+| [FIXED-469](#fixed-469--the-project-was-chosen-again-on-every-surface) | Medium | Chat / Build / Design | Fixed 2026-09-07 (VIS2-11) |
+| [FIXED-470](#fixed-470--tasks-asked-to-be-filled-in-rather-than-instructed) | Medium | Tasks | Fixed 2026-09-07 (COMPOSER-10) |
+| [FIXED-471](#fixed-471--one-primary-action-that-did-not-say-what-it-would-do) | Low | Composer | Fixed 2026-09-07 (COMPOSER-15) |
+| [FIXED-472](#fixed-472--every-row-wore-the-same-weight-as-the-row-that-needed-you) | Medium | Skills / sessions / approvals | Fixed 2026-09-07 (VIS2-13, VIS2-18) |
+| [FIXED-473](#fixed-473--fifty-three-specs-wrote-their-evidence-one-directory-above-the-repository) | High | Live test harness | Fixed 2026-09-07 (found live) |
+| [FIXED-474](#fixed-474--thirteen-z-index-numbers-and-no-way-to-say-what-was-above-what) | Medium | Shell / overlays | Fixed 2026-09-07 (VIS2-17) |
 
 ---
 
@@ -20825,3 +20833,146 @@ offered at once.
 
 **Tests.** `buildModes.test.ts` covers each mode's word and pins that Edit never
 reads "Apply"; `BuildView.test.ts` asks for the action by what it does.
+
+---
+
+## FIXED-472 — Every row wore the same weight as the row that needed you
+
+**Severity: Medium. Area: skills / sessions / approvals. Status: Fixed
+2026-09-07. Found in
+[VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md) (VIS2-13,
+VIS2-18).**
+
+**Observed.** Each list that repeats an entity argued the badge question in its
+own markup, and the answers had drifted apart:
+
+- a skill row drew three badges of equal weight — a lifecycle state, a
+  `/command` trigger and a conformance measurement — so the one that meant
+  *this needs you* looked exactly like the two that did not;
+- the approvals queue toned **every** row, `low` and `medium` in an info colour
+  beside `high` and `critical` in a danger one, which made a page of routine
+  decisions read as uniformly urgent and left the genuinely dangerous row
+  indistinct;
+- a session list badged `idle` — the state of nearly every row on the page.
+
+Scanning a list only works when an ordinary row looks ordinary. These lists had
+spent that difference on facts that were never exceptions.
+
+**Fixed.** One rule, in `web/src/lib/rowTokens.ts`, applied wherever a row
+repeats. `rowTokens()` takes the row's candidate facts and returns at most
+`ROW_TOKEN_BUDGET` (two) badges — attention first, then declaration order — with
+everything else returned as plain metadata the row still shows. A candidate
+whose `variant` is `null` is *that fact in its ordinary state* (a skill switched
+on, an approval at routine risk) and can never become a badge. The per-domain
+builders `skillCandidates()`, `sessionCandidates()` and `approvalCandidates()`
+say which state is ordinary for each entity, and `elevatedRisk()` answers the
+same question for a table cell. Nothing was removed from any row: the weight
+moved, the facts stayed.
+
+`visualRubric.test.ts` pins it product-wide — a listed view must ask
+`rowTokens.ts` and must not pick a badge variant inline from a `status` or
+`risk_level` field — so the next list cannot quietly re-argue the question.
+
+**User-interface outcome.** A working skill shows `active · v1.0.0 · /command`
+as quiet metadata and no badge at all; a skill that would not validate shows one.
+The approvals queue tones only elevated risk beside the decision's own status.
+The sessions list badges the session that is running and leaves the idle ones
+plain.
+
+**Tests.** `rowTokens.test.ts` (11 cases, including that nothing is dropped when
+the budget is spent), the new VIS2-13 cases in `SkillsView.test.ts` and
+`ApprovalsView.test.ts`, and the rubric rule in `visualRubric.test.ts`.
+Live-verified against a real host on 2026-09-07: the Skills case passed —
+`web/e2e/row-tokens-live.spec.ts`, screenshot
+`docs/plans/screenshots/working/vis2-13-skills-row-tokens.png`. The sessions and
+approvals cases skip on that host because it has no session and no queued
+decision to check the rule against, and they say so rather than passing on an
+empty page; the multi-row version of the approvals rule runs in the mocked CI
+suite (`composer.spec.ts`), where four fixture decisions prove that exactly one
+of them — the critical one — is toned.
+
+---
+
+## FIXED-473 — Fifty-three specs wrote their evidence one directory above the repository
+
+**Severity: High. Area: live test harness. Status: Fixed 2026-09-07. Found in
+the live round of 2026-09-07, while adding the VIS2-13 evidence.**
+
+**Observed.** [FIXED-464](#fixed-464--every-live-round-had-been-writing-its-evidence-outside-the-repository)
+fixed the *relative* form of this: `capturePath()` now anchors a path like
+`../../docs/plans/screenshots/...` at `web/e2e` rather than at the process
+directory. It could not fix the other form, and the other form is the majority.
+Fifty-three specs build an **absolute** path themselves —
+
+```ts
+const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
+```
+
+— which `capturePath()` passes through untouched, correctly, because an absolute
+path is an explicit instruction. Three `..` from `web/e2e` was the repository
+root while the app lived at `apps/web`; since the move to `web/` it is
+`/home/user`, one level *above* the repository. So the mocked suite's captures —
+the ones CI is meant to be able to look at — and every absolute-path live
+capture have been landing outside the working tree, where git cannot see them
+and no reviewer will find them. Every one of those runs reported success.
+
+**Fixed.** Two `..`, in all fifty-three specs. `web/e2e` is two levels below the
+repository root and the strings now say so. The relative-path anchoring from
+FIXED-464 is unchanged and still covers the specs written that way.
+
+**User-interface outcome.** None; this is test infrastructure.
+
+**Tests.** The mocked suite's own capture is the check: `composer.spec.ts` now
+writes `output/playwright/approvals-row-tokens.png` inside the repository, which
+is where `.gitignore`'s `output/` rule expects the evidence to be.
+
+---
+
+## FIXED-474 — Thirteen z-index numbers and no way to say what was above what
+
+**Severity: Medium. Area: shell / overlays. Status: Fixed 2026-09-07. Found in
+[VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+(VIS2-17).**
+
+**Observed.** Thirty-odd overlay surfaces each picked their own stacking number,
+and thirteen distinct values were in use: 30, 40, 45, 46, 55, 60, 70, 80, 90,
+95, 100, 120, 200. Every one had been chosen locally, to sit above whatever its
+author happened to be looking at, which means none of them encoded intent. Two
+consequences, both real:
+
+- the only way to know whether a menu could cover a docked tray was to open both
+  and look, and two surfaces that landed on the same number stacked in DOM order
+  rather than in any order that means something to an owner;
+- the Knowledge Map's right-click menu sat at **120**, the same layer as the
+  STOP switch — the one control that must stay reachable from every state the
+  product can be in.
+
+**Fixed.** `app.css` declares the ladder, and each rung is named for what a
+surface *is* rather than for where it happened to need to be: `--z-raised`
+(lifted inside its own card), `--z-popover` and `--z-popover-panel` (a menu
+anchored to the control that opened it, and its dismiss layer one step below),
+`--z-docked` (a tray fixed to a corner), `--z-panel` (a drawer sharing the page
+with its content), `--z-scrim` and `--z-modal` (the dimming layer and the
+surface it makes modal, adjacent by construction), `--z-palette` (reachable from
+inside a modal) and `--z-alert` (the STOP switch; nothing above it).
+
+Every overlay in `views/` and `components/` now names its layer. The Knowledge
+Map keeps its own single-digit ladder for surfaces local to the canvas — a
+vignette under a stage under a pill is not an overlay over the application — and
+the two surfaces that do leave the canvas name a shared layer like everything
+else.
+
+`visualRubric.test.ts` refuses a raw z-index of 10 or more anywhere in `views/`
+or `components/`, so the next surface has to choose a layer rather than a
+number.
+
+**User-interface outcome.** No visible change in the ordinary case, which is the
+point: the same surfaces stack the same way, for a stated reason. The one
+behavioural change is the Knowledge Map's context menu, which no longer competes
+with the STOP switch.
+
+**Tests.** The VIS2-17 rule in `visualRubric.test.ts` (every layer declared, no
+raw overlay-scale z-index), and `web/e2e/overlay-layers-live.spec.ts`, which
+reads the ladder back out of a real browser — every rung declared, the ladder
+rising, scrim and modal adjacent, nothing above `--z-alert` — and checks an open
+composer menu computes to `--z-popover`.

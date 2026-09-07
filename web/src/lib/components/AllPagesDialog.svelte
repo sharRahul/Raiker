@@ -170,9 +170,9 @@
 {/if}
 
 <style>
-  .scrim { position:fixed; inset:0; z-index:110; border:0; background:var(--overlay); }
+  .scrim { position:fixed; inset:0; z-index:var(--z-scrim); border:0; background:var(--overlay); }
   .panel {
-    position:fixed; z-index:120; right:var(--space-4); top:calc(var(--topbar-h) + var(--space-2));
+    position:fixed; z-index:var(--z-modal); right:var(--space-4); top:calc(var(--topbar-h) + var(--space-2));
     width:min(34rem, calc(100vw - 2 * var(--space-4))); max-height:calc(100vh - var(--topbar-h) - 2 * var(--space-4));
     display:flex; flex-direction:column; gap:var(--space-3);
     padding:var(--space-4); border:1px solid var(--border-strong); border-radius:var(--r-lg);

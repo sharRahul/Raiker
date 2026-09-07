@@ -317,7 +317,7 @@
     background: var(--overlay);
     display: grid;
     place-items: center;
-    z-index: 60;
+    z-index: var(--z-alert);
   }
   .modal {
     background: var(--raised);

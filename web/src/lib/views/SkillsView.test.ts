@@ -55,6 +55,24 @@ describe("SkillsView", () => {
     expect(await screen.findByText(/No skills installed yet/i)).toBeInTheDocument();
   });
 
+  it("does not badge a working skill's own facts (VIS2-13)", async () => {
+    // A row carried a lifecycle badge, a `/command` badge and a conformance
+    // badge at once. On a skill with nothing wrong, none of those is a state to
+    // act on, so the row now spends no badge at all and says the same facts
+    // quietly.
+    stubFetch({
+      "GET /api/skills": {
+        skills: [skill({ active: true, version: "1.0.0", command_trigger: "algo" })],
+      },
+    });
+    render(SkillsView);
+    expect(await screen.findByText("algorithm-creator")).toBeInTheDocument();
+    expect(screen.getByText("active")).toBeInTheDocument();
+    expect(screen.getByText("v1.0.0")).toBeInTheDocument();
+    expect(screen.getByText("/algo")).toBeInTheDocument();
+    expect(document.querySelectorAll(".badge")).toHaveLength(0);
+  });
+
   it("shows an inactive skill as inactive and offers to activate it", async () => {
     stubFetch({ "GET /api/skills": { skills: [skill({ active: false })] } });
     render(SkillsView);

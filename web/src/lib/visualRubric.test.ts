@@ -310,4 +310,65 @@ describe("visual rubric", () => {
         .not.toMatch(/var\(--ok\)/);
     }
   });
+  it("decides a repeated row's token budget once, not once per list (VIS2-13)", () => {
+    // Each list that repeats an entity used to argue the badge question in its
+    // own markup — an inline ternary on a status or a risk level, deciding both
+    // *which* badge and *whether* one is warranted. The answers drifted: a
+    // switched-on skill was toned, a routine approval was toned, and the row
+    // that actually needed the owner looked like the rest of the page.
+    //
+    // `rowTokens.ts` holds the rule now. A view on this list asks it rather
+    // than deciding again.
+    const lists: [string, RegExp][] = [
+      ["SkillsView.svelte", /skillCandidates/],
+      ["SessionsView.svelte", /sessionCandidates/],
+      ["ApprovalsView.svelte", /elevatedRisk/],
+    ];
+    for (const [view, uses] of lists) {
+      const text = readFileSync(resolve(VIEWS, view), "utf8");
+      expect(text, `${view} does not use the shared row-token rule`).toMatch(
+        /from "\.\.\/rowTokens"/,
+      );
+      expect(text, `${view} imports rowTokens but does not ask it about its rows`).toMatch(uses);
+      // The shape the sweep removed: a badge variant chosen inline from the
+      // row's own status or risk field.
+      expect(
+        text,
+        `${view} decides a badge variant inline instead of asking rowTokens`,
+      ).not.toMatch(/variant=\{[^}]*(risk_level|\.status)[^}]*\?/);
+    }
+  });
+  it("names the layer a surface is on, rather than picking a number (VIS2-17)", () => {
+    // Thirteen z-index values were in use across the views — 30, 40, 45, 46,
+    // 55, 60, 70, 80, 90, 95, 100, 120, 200 — each chosen locally to sit above
+    // whatever its author was looking at. A number picked that way encodes no
+    // intent: whether a menu may cover a docked tray could only be answered by
+    // opening both, and two surfaces at the same number stacked in DOM order.
+    //
+    // `app.css` declares the ladder (`--z-popover`, `--z-docked`, `--z-panel`,
+    // `--z-scrim`, `--z-modal`, `--z-palette`, `--z-alert`); a surface names the
+    // layer it is on. Small in-flow values stay allowed — a focus ring lifting a
+    // button above its neighbour is not an overlay.
+    const LAYERS = [
+      "--z-raised", "--z-popover", "--z-popover-panel", "--z-docked",
+      "--z-panel", "--z-scrim", "--z-modal", "--z-palette", "--z-alert",
+    ];
+    for (const layer of LAYERS) {
+      expect(stylesheet, `app.css does not declare ${layer}`).toContain(`${layer}:`);
+    }
+
+    const files = [
+      ...readdirSync(VIEWS).filter((name) => name.endsWith(".svelte")).map((name) => resolve(VIEWS, name)),
+      ...readdirSync(COMPONENTS).filter((name) => name.endsWith(".svelte")).map((name) => resolve(COMPONENTS, name)),
+    ];
+    for (const file of files) {
+      const text = readFileSync(file, "utf8");
+      for (const match of text.matchAll(/z-index:\s*(\d+)/g)) {
+        expect(
+          Number(match[1]),
+          `${file.split("/").pop()} picks the raw z-index ${match[1]}; name a layer from app.css instead`,
+        ).toBeLessThan(10);
+      }
+    }
+  });
 });

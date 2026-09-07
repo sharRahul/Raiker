@@ -33,7 +33,7 @@ import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
-const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
+const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 
 /**
  * The model to name when a provider's catalogue cannot be listed.

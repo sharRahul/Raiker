@@ -24,7 +24,7 @@ import { join } from "node:path";
 import { setThinkingEffort, signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
-const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
+const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 // Haiku 4.5 refuses `thinking.type.adaptive` and names the budgeted spelling in
 // the refusal, so this model is also what proves the negotiation in BUG-207

@@ -11,6 +11,7 @@
   import { alreadyResumedElsewhere, publishApprovalResolved } from "../approvalResume";
   import type { ApprovalDetailView, ApprovalView, OwnerQuestion } from "../apiTypes";
   import { approvalBadge } from "../statusMaps";
+  import { elevatedRisk } from "../rowTokens";
   import { capabilityLabel } from "../capabilityModel";
   import { formatTimestamp, humanize, relativeTime } from "../format";
   import { explainReasonCode } from "../reasonCodes";
@@ -524,7 +525,16 @@
             </td>
             <td><IdentityChip identity={a.proposed_by} /></td>
             <td>{capabilityLabel(a.capability)}</td>
-            <td><Badge variant={a.risk_level === "critical" || a.risk_level === "high" ? "blocked" : "metadata-only"} label={a.risk_level} /></td>
+            <!-- VIS2-13 — every row of this queue used to be toned, so the one
+                 dangerous decision looked like the twenty routine ones above
+                 it. Routine risk is metadata; `elevatedRisk` decides. -->
+            <td>
+              {#if elevatedRisk(a.risk_level)}
+                <Badge variant="blocked" label={a.risk_level} />
+              {:else}
+                <span class="row-fact">{a.risk_level}</span>
+              {/if}
+            </td>
             <td><Badge variant={approvalBadge(a.is_expired ? "expired" : a.status)} label={a.is_expired ? "expired" : a.status} /></td>
             <td title={a.created_at}>{relativeTime(a.created_at)}</td>
             <td>
@@ -575,12 +585,11 @@
          behind a summary. -->
     <p class="effect">
       <span class="effect-capability">{capabilityLabel(selected.approval.capability)}</span>
-      <Badge
-        variant={selected.approval.risk_level === "critical" || selected.approval.risk_level === "high"
-          ? "blocked"
-          : "metadata-only"}
-        label={`${selected.approval.risk_level} risk`}
-      />
+      {#if elevatedRisk(selected.approval.risk_level)}
+        <Badge variant="blocked" label={`${selected.approval.risk_level} risk`} />
+      {:else}
+        <span class="row-fact">{selected.approval.risk_level} risk</span>
+      {/if}
       <span class="effect-executes">
         {selected.executes_on_approval
           ? "Approving runs this action."
@@ -846,6 +855,9 @@
 {/if}
 
 <style>
+  /* VIS2-13 — a fact that did not earn a badge still reads on the row, at one
+     quiet weight, so the badges beside it keep meaning something. */
+  .row-fact { color: var(--text-3); font-size: var(--text-xs); white-space: nowrap; }
   /* ADD-22 — a question reads as a question, not as a softer approval. */
   .question {
     border: 1px solid var(--border);
@@ -1039,7 +1051,7 @@
     display: grid;
     place-items: center;
     background: var(--overlay);
-    z-index: 60;
+    z-index: var(--z-scrim);
   }
   .step-up {
     width: min(34rem, calc(100% - 2rem));

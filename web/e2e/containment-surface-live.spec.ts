@@ -25,8 +25,8 @@ import { signInAsOwner } from "./hosted-provider";
  */
 
 const BASE = "http://127.0.0.1:8765";
-const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
-const REPO = join(import.meta.dirname, "..", "..", "..");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
+const REPO = join(import.meta.dirname, "..", "..");
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 
 /**

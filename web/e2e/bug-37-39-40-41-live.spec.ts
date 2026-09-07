@@ -51,8 +51,8 @@ import { join } from "node:path";
 import { OWNER_CREDENTIALS, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
-const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const REPO = join(import.meta.dirname, "..", "..", "..");
+const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
+const REPO = join(import.meta.dirname, "..", "..");
 const PASSWORD = OWNER_CREDENTIALS.password;
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";

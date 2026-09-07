@@ -982,7 +982,7 @@
   .picker-dialog {
     position: fixed;
     inset: 0;
-    z-index: 60;
+    z-index: var(--z-scrim);
     width: min(28rem, calc(100vw - 2rem));
     max-height: min(80vh, 34rem);
     margin: auto;

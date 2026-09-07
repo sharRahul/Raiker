@@ -381,7 +381,7 @@
   summary { display: inline-flex; color: var(--text-3); cursor: pointer; list-style: none; }
   summary::-webkit-details-marker { display: none; }
   .voice-info p {
-    position: absolute; z-index: 6; left: 0; bottom: calc(100% + 0.45rem); width: min(19rem, calc(100vw - 2rem));
+    position: absolute; z-index: var(--z-popover); left: 0; bottom: calc(100% + 0.45rem); width: min(19rem, calc(100vw - 2rem));
     margin: 0; padding: 0.55rem 0.65rem; border: 1px solid var(--neutral-border); border-radius: var(--r-sm);
     background: var(--surface); box-shadow: var(--shadow-2); color: var(--text-2); font-size: var(--text-2xs); line-height: 1.4;
   }

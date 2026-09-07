@@ -419,7 +419,7 @@
   }
   .model-menu {
     position: absolute;
-    z-index: 4;
+    z-index: var(--z-popover);
     right: 0;
     bottom: calc(100% + 0.38rem);
     width: max-content;

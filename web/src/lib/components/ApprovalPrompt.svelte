@@ -216,7 +216,7 @@
     position: fixed;
     right: 20px;
     bottom: 18px;
-    z-index: 46;
+    z-index: var(--z-docked);
     width: min(21rem, calc(100vw - 40px));
     display: grid;
     gap: 0.5rem;

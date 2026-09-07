@@ -1,5 +1,6 @@
 <script lang="ts">
   import Badge from "../components/Badge.svelte";
+  import { rowTokens, sessionCandidates } from "../rowTokens";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
@@ -355,6 +356,7 @@
         </thead>
         <tbody>
           {#each ordered as s (s.session_id)}
+            {@const tokens = rowTokens(sessionCandidates(s))}
             <tr
               class="row-btn"
               class:selected={detail?.session.session_id === s.session_id}
@@ -382,8 +384,15 @@
                 </span>
               </td>
               <td onclick={() => openSession(s.session_id)}>
-                <Badge variant={s.status === "active" ? "active" : "idle"} label={s.status} />
-                {#if s.archived}<Badge variant="disabled" label="archived" />{/if}
+                <!-- VIS2-13 — a running session is what an owner scans this
+                     list for; idle is every other row, and archiving is
+                     reversible organisation rather than a state to act on. -->
+                {#each tokens.badges as token (token.label)}
+                  <Badge variant={token.variant} label={token.label} />
+                {/each}
+                {#each tokens.facts as fact (fact)}
+                  <span class="row-fact">{fact}</span>
+                {/each}
               </td>
               <td onclick={() => openSession(s.session_id)}>{s.turn_count}</td>
               <td class="tags-col" onclick={(e) => e.stopPropagation()}>
@@ -531,6 +540,8 @@
 {/if}
 
 <style>
+  /* VIS2-13 — the row's remaining facts, at one quiet weight. */
+  .row-fact { color: var(--text-3); font-size: var(--text-xs); white-space: nowrap; }
   @media (max-width: 720px) {
   }
   .head-actions {

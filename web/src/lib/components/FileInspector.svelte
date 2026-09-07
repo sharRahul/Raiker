@@ -441,7 +441,7 @@
     .file-inspector {
       position: fixed;
       inset: auto 0 0 0;
-      z-index: 80;
+      z-index: var(--z-panel);
       max-height: 82vh;
       border-radius: var(--r-lg) var(--r-lg) 0 0;
       box-shadow: var(--shadow-2);

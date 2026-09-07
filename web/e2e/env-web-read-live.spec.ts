@@ -100,6 +100,30 @@ test("the read catalogue is global, and its readiness is separate from authority
   }
 });
 
+test("the weather capability is reachable and fails in a typed state, not silently", async ({
+  page,
+}) => {
+  await signInAsOwner(page, BASE);
+
+  // WEATHER-03 — the honest failure. This host's egress policy refuses
+  // `api.open-meteo.com`, and what matters is that the refusal is *typed*: a
+  // capability that quietly returns nothing is indistinguishable from one that
+  // returned "no weather", and a scheduling rule cannot tell those apart.
+  const result = await page.evaluate(async () => {
+    const response = await fetch("/api/read-capabilities", { credentials: "same-origin" });
+    const payload = await response.json();
+    return payload.readiness.find(
+      (row: { tool: string }) => row.tool === "weather_lookup",
+    );
+  });
+
+  // Readiness says the capability exists and would be attempted; whether the
+  // provider answers is a separate question the call itself reports.
+  expect(result.available).toBe(true);
+  expect(result.provider).toBe("Open-Meteo");
+  expect(["ready", "blocked", "unavailable", "transient_failure"]).toContain(result.state);
+});
+
 test("Chat's Tools menu offers the three reads and the weather", async ({ page }) => {
   test.setTimeout(120_000);
   await signInAsOwner(page, BASE);

@@ -74,7 +74,7 @@ carries a tier that says which one a round ran.
 **Tier: Targeted. Build: production `npm run build`. Providers: Anthropic, a
 seventh identity-linked key, entered through the Connect dialog. Owner: the
 shared `OWNER_CREDENTIALS`. Workspace: a fresh scratch directory. Spec:
-`web/e2e/env-web-read-live.spec.ts` (7 cases, all passing). Screenshots:
+`web/e2e/env-web-read-live.spec.ts` (8 cases, all passing). Screenshots:
 `env-01-timezone-and-weather-location.png`,
 `env-02-chat-tools-research-reads.png`, `env-03-design-research-tools.png`,
 `env-04-huggingface-step-rail.png`, `env-05-anthropic-connection.png`.**
@@ -105,6 +105,14 @@ items.
    step current, and no permanent access-token action beside the search box.
 6. The round's Anthropic key was connected through the product's own Connect
    dialog and the card reads **Connection saved**.
+7. `weather_lookup` was driven through the real broker against the workspace the
+   interface had just written. With no location and no owner default it returns
+   `weather_location_required` pointing at Settings; with the default the
+   interface saved (`Edinburgh, United Kingdom`) it resolves the location, makes
+   the request, and this host's egress policy refuses it — reported as
+   `weather_provider_unavailable` with `freshness: unavailable`. That is the
+   contract's own answer to an unreachable provider, and it is what the plan
+   asks for: a typed state rather than a silence a scheduling rule cannot read.
 
 **What it found.** Two defects, both in the evidence harness rather than the
 product, and both silent by construction — which is the worst way for a test to

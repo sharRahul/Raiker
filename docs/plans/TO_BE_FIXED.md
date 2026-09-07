@@ -1422,7 +1422,11 @@ turn can support.
 *No weather request left the machine.* The provider path is asserted against a
 stand-in that answers as Open-Meteo does, and every governed refusal is asserted
 against the real gate, decision mode and blocklist. What is unmeasured is the
-real HTTP round trip: this host has no route to `api.open-meteo.com`.
+real HTTP round trip. `api.open-meteo.com` resolves from this host and every
+attempt to reach it — with or without the environment's proxy — is refused with
+`403` by that environment's own egress policy, so the tool returns
+`weather_provider_unavailable`. That is the correct typed answer to an
+unreachable provider; it is not evidence that a reachable one is read correctly.
 
 **Why it was left.** Both need something the round did not have — a working
 provider credential and outbound egress — rather than something Raiker is

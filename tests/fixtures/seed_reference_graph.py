@@ -9,14 +9,14 @@ files, one of which is still on disk and one of which has been deleted since.
 Everything else about the map is already covered by the seeded unit tests; this
 exists so the *rendering* of an unresolved reference can be photographed.
 
-    python seed_reference_graph.py <workspace-root>
+    python tests/fixtures/seed_reference_graph.py <workspace-root>
 """
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
 from raiker.storage.sqlite import SQLiteStore  # noqa: E402

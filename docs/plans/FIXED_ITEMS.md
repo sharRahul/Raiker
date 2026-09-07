@@ -7291,8 +7291,10 @@ the visible seam in Chat and Build.
 `stub_model.py`; neither the exact response sequence nor their claimed evidence
 could be reproduced from a clone.
 
-**Fix.** `apps/web/e2e/fixtures/stub_model.py` is a checked-in, loopback-only,
-OpenAI-compatible deterministic server. It implements the exact multi-read,
+**Fix.** `tests/fixtures/stub_model.py` — added here as
+`apps/web/e2e/fixtures/stub_model.py`, moved when the Python fixtures left the
+web app — is a checked-in, loopback-only, OpenAI-compatible deterministic
+server. It implements the exact multi-read,
 write-batch, approval-queue and policy-refusal continuations used by both specs,
 with bounded request bodies and no credential or external network.
 

@@ -9,7 +9,7 @@ from contextlib import contextmanager
 
 import httpx
 
-from apps.web.e2e.fixtures.stub_model import MODEL_ID, serve
+from tests.fixtures.stub_model import MODEL_ID, serve
 
 TOOL_SPECS = [
     {

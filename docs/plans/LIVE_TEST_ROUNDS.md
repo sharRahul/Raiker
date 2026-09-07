@@ -1268,7 +1268,7 @@ unambiguous.
 
 1. Run the checked-in loopback fixture and both deterministic batch specs.
    Confirm the refusal scenario renders successive model passes as separate
-   paragraphs, and both specs use `e2e/fixtures/stub_model.py`.
+   paragraphs, and both specs use `tests/fixtures/stub_model.py`.
 2. Connect Anthropic in Models, choose a live catalog model, complete readiness,
    and send a bounded marker prompt in Chat.
 3. Connect OpenRouter the same way and complete a live turn. Refresh Models →

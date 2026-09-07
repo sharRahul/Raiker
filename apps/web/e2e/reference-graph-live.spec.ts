@@ -43,7 +43,10 @@ test("a cited file that no longer exists is drawn as Missing", async ({ page }) 
   // one cited file deleted since.
   const seeded = execFileSync(
     "python",
-    [fileURLToPath(new URL("./seed_reference_graph.py", import.meta.url)), WORKSPACE],
+    [
+      fileURLToPath(new URL("../../../tests/fixtures/seed_reference_graph.py", import.meta.url)),
+      WORKSPACE,
+    ],
     { encoding: "utf8" },
   );
   expect(seeded).toContain("seeded");

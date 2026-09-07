@@ -67,6 +67,8 @@
     type SlashCommand,
   } from "../composerCommands";
   import { composerMenu } from "../composerCapabilities";
+  import { setWorkProject, workProject } from "../workProject.svelte";
+  import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
   import { collectText } from "../turnPhases";
   import { relativeTime } from "../format";
   import {
@@ -178,8 +180,20 @@
   // popover is opened at least once; the meter falls back to the labelled local
   // estimate until the server has something real to report.
   let contextUsage = $state<ContextUsage | null>(null);
-  let projectId = $state("");
-  let pendingProjectId: string | null = null;
+  /**
+   * VIS2-11 — the project this conversation is filed under.
+   *
+   * A conversation that already exists owns its own answer, and changing it
+   * moves the session. A conversation that does not exist yet has no answer of
+   * its own, so it starts in the shared Work project — which is what makes
+   * "choose a project in Build, switch to Chat, keep working in it" true rather
+   * than something the owner does twice.
+   *
+   * The shared value is never allowed to re-file an existing chat: it is read
+   * only while `sessionId` is null.
+   */
+  let projectId = $state(workProject());
+  let pendingProjectId: string | null = workProject() === "" ? null : workProject();
   let projectNotice = $state<string | null>(null);
   let backgroundWorkOpen = $state(false);
 
@@ -309,6 +323,9 @@
     "set-project",
     "dictate",
     "web-search",
+    "web-read",
+    "web-extract",
+    "weather",
     "use-mcp",
     "use-connector",
     "generate-image",
@@ -316,8 +333,15 @@
     "schedule",
     "use-memory",
   ]);
-  const addItems = $derived(composerMenu("add", "chat", composerGates, HANDLED));
-  const toolItems = $derived(composerMenu("tools", "chat", composerGates, HANDLED));
+  // WEB-04/WEB-07 — the readiness half comes from the shared snapshot, so a
+  // search provider configured on another page reaches this still-mounted view
+  // without a reload, and the menu never prints `Ready` for a call the runtime
+  // is about to refuse.
+  const readiness = $derived(readReadiness());
+  const addItems = $derived(composerMenu("add", "chat", composerGates, HANDLED, readiness));
+  const toolItems = $derived(
+    composerMenu("tools", "chat", composerGates, HANDLED, readiness),
+  );
 
   /**
    * Where a Tools entry goes.
@@ -329,7 +353,14 @@
    * would be the permanent-toolbar problem again, only harder to notice.
    */
   const TOOL_ROUTES: Record<string, string> = {
+    // The three reads and the weather lookup are model-invoked mid-turn: the
+    // owner asks for something and the model reaches for the tool the gate then
+    // judges. So the honest destination for the menu entry is where that
+    // capability is governed and where its readiness is explained.
     "web-search": "#/capabilities",
+    "web-read": "#/capabilities",
+    "web-extract": "#/capabilities",
+    weather: "#/settings?tab=general",
     "use-mcp": "#/extensions?tab=mcp",
     "use-connector": "#/extensions?tab=connectors",
     "generate-image": "#/design",
@@ -781,6 +812,7 @@
       .capabilityGates()
       .then((view) => (composerGates = view))
       .catch(() => (composerGates = []));
+    void refreshReadCapabilities();
     void api.speechRuntime().then((view) => {
       speechRuntime = view.runtime.effective;
     }).catch(() => {});
@@ -1501,6 +1533,9 @@
 
   async function onProjectPicked(value: string) {
     projectId = value;
+    // The owner chose a project for the work they are doing, so the next Build
+    // turn and the next Design generation start there too.
+    setWorkProject(value);
     projectNotice = null;
     const target = value === "" ? null : value;
     if (sessionId === null) {
@@ -2674,7 +2709,7 @@
     position: absolute;
     right: 0;
     top: calc(100% + 4px);
-    z-index: 40;
+    z-index: var(--z-popover);
     min-width: 13rem;
     display: grid;
     gap: var(--space-1);

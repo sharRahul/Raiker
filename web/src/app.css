@@ -308,6 +308,43 @@
   --shadow-3: 0 4px 8px -2px rgba(27, 28, 30, 0.08), 0 24px 56px -12px rgba(27, 28, 30, 0.24);
   --overlay: rgba(15, 23, 42, 0.48);
   --focus-ring: #365F7D;
+
+  /* VIS2-17 — the overlay vocabulary, as a stacking ladder.
+     ------------------------------------------------------
+     Thirteen different z-index numbers were in use across the views — 30, 40,
+     45, 46, 55, 60, 70, 80, 90, 95, 100, 120, 200 — each chosen locally to sit
+     above whatever the author happened to be looking at. Numbers picked that
+     way encode no intent, so the only way to know whether a menu may cover a
+     tray was to open both and look, and two surfaces at the same number stacked
+     in DOM order rather than in the order that means anything to an owner.
+
+     These are the layers Raiker actually has. A surface picks the one that
+     names what it *is*, and the arithmetic between them is settled here:
+
+       raised    lifted inside its own card or row — an overflow, a sticky head
+       popover   a menu or inspector anchored to the control that opened it
+       docked    a tray or prompt fixed to a corner of the viewport
+       panel     a drawer or sheet that shares the page with its content
+       scrim     the dimming layer that makes the surface above it modal
+       modal     the modal surface itself, directly above its own scrim
+       palette   the command palette, reachable from inside a modal
+       alert     the STOP switch and its confirmation: nothing may cover it
+
+     Two rules follow from the ladder and are worth stating: a scrim and the
+     surface it dims are adjacent, never separated by another layer; and nothing
+     is allowed above `--z-alert`, because the control that stops a running turn
+     must remain reachable from every state the product can be in. */
+  --z-raised: 10;
+  --z-popover: 40;
+  /* A popover's own dismiss layer sits at `--z-popover`; the panel it dismisses
+     is one step above it, the same relationship a scrim has with its modal. */
+  --z-popover-panel: 41;
+  --z-docked: 50;
+  --z-panel: 60;
+  --z-scrim: 70;
+  --z-modal: 71;
+  --z-palette: 90;
+  --z-alert: 120;
 }
 
 /* ── Dark theme tokens ("deck") ──

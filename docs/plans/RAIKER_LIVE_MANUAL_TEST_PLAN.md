@@ -52,8 +52,8 @@ what the step *expects*, not to append what you saw. Observations go in
 
 ```bash
 python -m venv .venv && .venv/bin/python -m pip install -e ".[dev]"
-npm --prefix apps/web ci
-npm --prefix apps/web run build
+npm --prefix web ci
+npm --prefix web run build
 
 # Model egress is process configuration by design — it is the last boundary
 # before bytes leave the machine and is deliberately NOT editable from a browser
@@ -98,7 +98,7 @@ Prepare these before you start, so no step stalls waiting for them:
 ## 2. Coverage ledger
 
 **This table is the definition of "everything".** It is derived from
-`apps/web/src/lib/nav.ts` — `NAV_GROUPS` for routes, `HUB_TABS` for tabs — so a
+`web/src/lib/nav.ts` — `NAV_GROUPS` for routes, `HUB_TABS` for tabs — so a
 route or tab added to the product without a row here is a gap you can see rather
 than one you have to remember.
 
@@ -135,7 +135,7 @@ top bar, the Host control, notifications, the shortcut sheet — is
 
 **[S]** Paste each into the address bar. Each **MUST** open its hub with the
 matching tab already selected, never the hub's first tab and never the Workbench.
-*Automated: `apps/web/src/lib/nav.test.ts`.*
+*Automated: `web/src/lib/nav.test.ts`.*
 
 ---
 ## 3. Models — all seven tabs
@@ -313,7 +313,7 @@ Click each, and confirm each does what its label says:
 **[S]** `/` at the start of the prompt **MUST** open a filtered menu, and **every
 entry MUST run a control that exists** — there is no "coming soon" row. Chat
 carries `/export`, `/schedule`, `/tasks`, `/shortcuts`, `/stop`.
-*Automated: `apps/web/src/lib/composerCommands.test.ts`.*
+*Automated: `web/src/lib/composerCommands.test.ts`.*
 
 `/shortcuts` **MUST** list only bindings the handlers implement.
 

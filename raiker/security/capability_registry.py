@@ -45,7 +45,8 @@ __all__ = [
 # digest, and anything an owner-registered MCP server returned.
 UNTRUSTED_CONTENT_TOOLS = frozenset(
     {
-        "web_fetch", "web_search", "github_read", "gmail_read", "gcal_read",
+        "web_fetch", "web_search", "web_extract", "weather_lookup",
+        "github_read", "gmail_read", "gcal_read",
         "slack_read", "connector_read", "spawn_subagent",
     }
 )
@@ -60,6 +61,8 @@ _CONNECTOR_SUBJECTS: dict[str, str] = {
     "slack_read": "slack",
     "web_fetch": "web",
     "web_search": "web",
+    "web_extract": "web",
+    "weather_lookup": "web",
 }
 
 # Local-execution-family tools, keyed by the executor whose blast radius they

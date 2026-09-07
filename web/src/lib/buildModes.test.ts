@@ -3,6 +3,7 @@ import {
   BUILD_MODES,
   BUILD_WRITE_CAPABILITIES,
   buildMode,
+  buildPrimaryAction,
   DEFAULT_BUILD_MODE,
   nextBuildMode,
   repoPreamble,
@@ -141,5 +142,23 @@ describe("repository preamble", () => {
 
   it("says nothing for an incomplete GitHub reference rather than inventing one", () => {
     expect(repoPreamble({ kind: "github", github_owner: "octo", github_repo: null })).toBe("");
+  });
+});
+
+describe("the primary action's word (COMPOSER-15)", () => {
+  it("says what pressing it will do, per mode", () => {
+    // "Send" is true of the keystroke and useless about the consequence. The
+    // three modes are three different promises.
+    expect(buildPrimaryAction("plan")).toBe("Plan");
+    expect(buildPrimaryAction("edit")).toBe("Propose");
+    expect(buildPrimaryAction("auto")).toBe("Run");
+  });
+
+  it("never names an act the press does not perform", () => {
+    // In Edit every write is parked for a decision, so the word is Propose
+    // rather than Apply — the turn really does not apply anything.
+    expect(buildPrimaryAction("edit")).not.toBe("Apply");
+    // And Plan touches nothing at all.
+    expect(buildPrimaryAction("plan")).not.toBe("Run");
   });
 });

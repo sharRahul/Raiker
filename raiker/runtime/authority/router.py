@@ -110,6 +110,12 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     # B12/C7 — search is the same capability pointed at an owner-configured
     # endpoint, so it answers to the same gate and the same decision mode.
     "web_search": "web_fetch",
+    # WEB-05/WEATHER-01 — structured extraction and weather are the same
+    # request leaving the same machine, so they answer to the same gate. A
+    # separate gate would let an owner who turned web access off still send
+    # a request to a third party, which is the opposite of a switch.
+    "web_extract": "web_fetch",
+    "weather_lookup": "web_fetch",
     "graph_indexing": "graph_indexing_runtime",
     # B9 — the repository code map. `code_map_search` is a *read* of a local,
     # derived index, so it is read-shaped in the policy engine; naming it here is

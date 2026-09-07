@@ -64,7 +64,7 @@ def repo_id(workspace: Path) -> str:
 
 
 class TestAuthentication:
-    def test_both_routes_require_authentication(
+    def test_every_route_requires_authentication(
         self, client: TestClient, repo_id: str
     ) -> None:
         assert client.get(f"/api/code/repos/{repo_id}/browse").status_code == 401
@@ -73,6 +73,11 @@ class TestAuthentication:
             .status_code
             == 401
         )
+        # VIS2-12's working-tree read is the third, and it answers about a
+        # repository's uncommitted state — which is exactly as private as its
+        # files. This client has never opened a session, which is what makes the
+        # assertion mean anything: a fixture that had would carry its cookie.
+        assert client.get(f"/api/code/repos/{repo_id}/changes").status_code == 401
 
 
 class TestBrowse:
@@ -300,5 +305,118 @@ class TestDiagnostics:
                 params={"path": "src/nope.py"},
                 headers=headers,
             ).status_code
+            == 404
+        )
+
+
+class TestWorkingTreeChanges:
+    """VIS2-12 — the third pane's `Changes` tab, and what it must never claim.
+
+    The property that matters is not "it lists files". It is that this read and
+    the commit proposal describe **one** change set: they call the same two
+    helpers, so a pane cannot show a change the commit would not record, or miss
+    one it would. A second `git status` written for the browser could disagree
+    with the proposal, and nothing in the interface would say which was right.
+    """
+
+    def _git(self, root: Path, *args: str) -> None:
+        import subprocess
+
+        subprocess.run(
+            ["git", *args],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            env={
+                "GIT_AUTHOR_NAME": "T",
+                "GIT_AUTHOR_EMAIL": "t@example.test",
+                "GIT_COMMITTER_NAME": "T",
+                "GIT_COMMITTER_EMAIL": "t@example.test",
+                "PATH": __import__("os").environ.get("PATH", ""),
+                "HOME": str(root),
+            },
+        )
+
+    def test_a_folder_with_no_history_says_so_rather_than_no_changes(
+        self, client: TestClient, headers: dict[str, str], repo_id: str
+    ) -> None:
+        """"No changes" and "no version control" are different answers."""
+        response = client.get(f"/api/code/repos/{repo_id}/changes", headers=headers)
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["entries"] == []
+        assert body["reason_code"] == "not_a_git_repository"
+        assert body["root_missing"] is False
+
+    def test_it_reports_the_same_change_set_a_commit_would_record(
+        self, client: TestClient, headers: dict[str, str], repo_id: str, workspace: Path
+    ) -> None:
+        from raiker.tools.git import working_tree_changes, working_tree_diff
+
+        root = workspace / "project"
+        self._git(root, "init", "--quiet")
+        self._git(root, "add", "README.md")
+        self._git(root, "commit", "--quiet", "-m", "first")
+        (root / "README.md").write_text("# Alpha\nnow with a line\n", encoding="utf-8", newline="")
+        (root / "NEW.md").write_text("brand new\n", encoding="utf-8", newline="")
+
+        response = client.get(f"/api/code/repos/{repo_id}/changes", headers=headers)
+        assert response.status_code == 200, response.text
+        body = response.json()
+
+        paths = {entry["path"] for entry in body["entries"]}
+        assert "README.md" in paths
+        assert "NEW.md" in paths
+        assert body["reason_code"] is None
+
+        # The same functions the commit proposal is built from, so the pane and
+        # the commit cannot describe different change sets.
+        expected = working_tree_changes(root)
+        assert paths == {entry["path"] for entry in expected}
+        assert body["diff"] == working_tree_diff(root, expected)
+        # A tracked edit and an untracked addition both reach the diff — the
+        # second is the one a plain `git diff` would silently omit.
+        assert "now with a line" in body["diff"]
+        assert "brand new" in body["diff"]
+
+    def test_both_kinds_of_truncation_are_stated(
+        self, client: TestClient, headers: dict[str, str], repo_id: str,
+        workspace: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A pane nobody can scroll to the end of hides the change it exists to show."""
+        import raiker.api.routes_code_files as routes
+
+        root = workspace / "project"
+        self._git(root, "init", "--quiet")
+        for index in range(4):
+            (root / f"f{index}.txt").write_text(f"line {index}\n", encoding="utf-8", newline="")
+        monkeypatch.setattr(routes, "MAX_CHANGED_FILES", 2)
+        monkeypatch.setattr(routes, "MAX_CHANGES_DIFF_CHARS", 10)
+
+        body = client.get(f"/api/code/repos/{repo_id}/changes", headers=headers).json()
+        assert len(body["entries"]) == 2
+        assert body["truncated"] is True
+        assert len(body["diff"]) == 10
+        assert body["diff_truncated"] is True
+
+    def test_a_repository_with_no_checkout_says_which_absence_it_is(
+        self, client: TestClient, headers: dict[str, str], workspace: Path
+    ) -> None:
+        result = DashboardService(workspace).connect_github_repo(
+            "octo", "widget", None, owner_principal_id=OWNER
+        )
+        assert result.ok, result.reason_code
+        body = client.get(
+            f"/api/code/repos/{result.data['repo_id']}/changes", headers=headers
+        ).json()
+        assert body["root_missing"] is True
+        assert body["reason_code"] == "repo_not_checked_out"
+
+    def test_an_unknown_id_is_hidden_rather_than_refused(
+        self, client: TestClient, headers: dict[str, str]
+    ) -> None:
+        # 404 rather than 403, so an id cannot be probed for existence.
+        assert (
+            client.get("/api/code/repos/repo_nope/changes", headers=headers).status_code
             == 404
         )

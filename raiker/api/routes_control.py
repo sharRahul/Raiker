@@ -136,6 +136,72 @@ async def list_capability_gates(
     return serialize_dto(gates)
 
 
+@router.get("/api/read-capabilities")
+async def list_read_capabilities(
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """The global read catalogue, its per-surface parity, and typed readiness.
+
+    One read for the whole contract (WEB-01/WEB-04). The composer's Tools menu,
+    the diagnostics page and a parity test all answer from this rather than each
+    deriving a catalogue of their own — which is the drift the contract exists to
+    remove.
+
+    ``readiness`` is separate from authority on purpose: ``needs_provider`` is a
+    setup step and ``blocked`` is a decision the owner made, and a surface that
+    collapses them into one grey row cannot offer the right next action for
+    either.
+    """
+    _session, principal = _auth_data
+    from raiker.runtime.read_capabilities import (
+        ADMINISTRATIVE_SURFACES,
+        AGENTIC_SURFACES,
+        EXTERNAL_READ_CAPABILITIES,
+        GLOBAL_READ_CAPABILITIES,
+        INTERACTIVE_CAPABILITIES,
+        read_capabilities_for,
+        web_read_readiness,
+    )
+    from raiker.storage.sqlite import SQLiteStore
+
+    ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
+    store = SQLiteStore(ws)
+    return {
+        "capabilities": list(GLOBAL_READ_CAPABILITIES),
+        "external": list(EXTERNAL_READ_CAPABILITIES),
+        "interactive": list(INTERACTIVE_CAPABILITIES),
+        "surfaces": {
+            surface: list(read_capabilities_for(surface)) for surface in AGENTIC_SURFACES
+        },
+        "administrative_surfaces": list(ADMINISTRATIVE_SURFACES),
+        "readiness": [
+            row.to_dict()
+            for row in web_read_readiness(ws, store, principal.principal_id)
+        ],
+    }
+
+
+@router.get("/api/environment")
+async def get_environment(
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """The same runtime environment bundle a model turn receives (ENV-05).
+
+    Not a second clock. This calls the function the orchestrator calls, so the
+    Settings screen and the turn cannot disagree about what time it is or which
+    timezone source won — the failure this whole contract exists to make
+    impossible.
+    """
+    _session, principal = _auth_data
+    from raiker.runtime.environment import environment_context
+    from raiker.storage.sqlite import SQLiteStore
+
+    ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
+    return environment_context(SQLiteStore(ws), principal.principal_id).to_dict()
+
+
 @router.get("/api/capability-gates/{capability}")
 async def get_capability_gate(
     capability: str,

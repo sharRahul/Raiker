@@ -137,8 +137,8 @@
      labels: the tinted row, and the filled glyph. */
   .nav-link.active { background:var(--accent-soft); color:var(--text-1); }
   @media (max-width:1023px) {
-    .drawer-scrim { display:block; position:fixed; inset:0; z-index:90; border:0; background:var(--overlay); }
-    .sidebar,.sidebar.desktop-hidden { position:fixed; inset:0 auto 0 0; z-index:100; width:min(19rem,84vw); padding:var(--space-4) var(--space-3); border-right-width:1px; transform:translateX(-105%); box-shadow:var(--shadow-2); }
+    .drawer-scrim { display:block; position:fixed; inset:0; z-index:var(--z-scrim); border:0; background:var(--overlay); }
+    .sidebar,.sidebar.desktop-hidden { position:fixed; inset:0 auto 0 0; z-index:var(--z-modal); width:min(19rem,84vw); padding:var(--space-4) var(--space-3); border-right-width:1px; transform:translateX(-105%); box-shadow:var(--shadow-2); }
     .sidebar.open { transform:translateX(0); }
     .drawer-close { display:inline-flex; align-self:flex-end; }
   }

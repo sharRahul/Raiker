@@ -11,6 +11,10 @@ These are the two reads that fix it, and they are deliberately only reads:
   shape ``/api/projects/{id}/browse`` answers, so the explorer component does not
   care which kind of root it is over.
 * ``GET /api/code/repos/{repo_id}/file`` — one bounded text file.
+* ``GET /api/code/repos/{repo_id}/changes`` — the working tree's own uncommitted
+  changes (VIS2-12), read through the *same* helpers the commit proposal is
+  built from, so what Build shows as "Changes" and what a commit would record
+  cannot describe different change sets.
 
 **Nothing here writes, and nothing here is a new boundary.** Every path is
 resolved through the very :class:`~raiker.tools.path_authority.PathAuthority` a
@@ -46,6 +50,14 @@ router = APIRouter()
 #: Largest number of children one browse answers with, matching the project
 #: explorer's cap so the two roots behave identically at scale.
 MAX_BROWSE_ENTRIES = 500
+
+#: How many changed files one `changes` read answers with, and how much diff it
+#: carries. A working tree with a regenerated lockfile in it can produce tens of
+#: thousands of diff lines, and a pane nobody can scroll to the end of is a pane
+#: that hides the change it exists to show. Past either cap the answer says it
+#: stopped rather than growing.
+MAX_CHANGED_FILES = 200
+MAX_CHANGES_DIFF_CHARS = 200_000
 
 #: Largest file the viewer will render. Above this the answer states the size
 #: rather than streaming a megabyte into a read-only pane nobody will scroll.
@@ -266,6 +278,85 @@ async def read_code_repo_file(
         "size_bytes": size,
         "readable": True,
         "reason_code": "",
+    }
+
+
+@router.get("/api/code/repos/{repo_id}/changes")
+async def read_code_repo_changes(
+    repo_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """What has changed in this repository's working tree, and not yet been committed.
+
+    VIS2-12 asks Build's third pane to be *the object of work*. For a coding
+    turn that object is the change: which files moved, and what the diff says.
+    Until now the only diff Build could show was a *proposed* one, attached to
+    an approval — so once a change was applied, the workspace had nothing to
+    show for it, and the owner went to a terminal to find out what the turn had
+    actually done.
+
+    Built from :func:`raiker.tools.git.working_tree_changes` and
+    :func:`raiker.tools.git.working_tree_diff` rather than from a second git
+    invocation of its own. That is the point: those two functions are what a
+    commit proposal is assembled from, so this pane and the commit it leads to
+    describe one change set. A pane that ran its own `git diff` could disagree
+    with the commit, and the owner would have no way to tell which was right.
+
+    Read-only, and bounded in both directions: at most
+    :data:`MAX_CHANGED_FILES` entries, at most
+    :data:`MAX_CHANGES_DIFF_CHARS` of diff, each truncation stated.
+    """
+    from raiker.tools.git import working_tree_changes, working_tree_diff  # noqa: PLC0415
+
+    repo = _owned_repo(request, repo_id, auth_data[0].principal_id)
+    root = _repo_root(request, repo)
+    if root is None:
+        return {
+            "entries": [],
+            "diff": "",
+            "truncated": False,
+            "diff_truncated": False,
+            "root_missing": True,
+            "reason_code": (
+                "repo_not_checked_out"
+                if str(repo.get("kind")) == "github"
+                else "repo_folder_missing"
+            ),
+        }
+    if not (root / ".git").exists():
+        # Not a failure: a plain folder is a perfectly good place to work, it
+        # just has no history to compare against. Saying which of the two it is
+        # keeps "no changes" from meaning "no version control".
+        return {
+            "entries": [],
+            "diff": "",
+            "truncated": False,
+            "diff_truncated": False,
+            "root_missing": False,
+            "reason_code": "not_a_git_repository",
+        }
+
+    entries = working_tree_changes(root)
+    truncated = len(entries) > MAX_CHANGED_FILES
+    entries = entries[:MAX_CHANGED_FILES]
+    diff = working_tree_diff(root, entries) if entries else ""
+    diff_truncated = len(diff) > MAX_CHANGES_DIFF_CHARS
+    return {
+        "entries": [
+            {
+                "path": entry["path"],
+                "previous_path": entry.get("previous_path", ""),
+                "state": entry["state"],
+                "unstaged": bool(entry.get("unstaged")),
+            }
+            for entry in entries
+        ],
+        "diff": diff[:MAX_CHANGES_DIFF_CHARS],
+        "truncated": truncated,
+        "diff_truncated": diff_truncated,
+        "root_missing": False,
+        "reason_code": None,
     }
 
 

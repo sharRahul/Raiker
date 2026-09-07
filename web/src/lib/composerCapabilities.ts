@@ -32,7 +32,7 @@
  * lists capability it cannot invoke is the same lie as a toolbar of buttons
  * that do nothing, only tidier.
  */
-import type { CapabilityGate } from "./apiTypes";
+import type { CapabilityGate, ToolReadiness } from "./apiTypes";
 import { isDisabled, isDeferred } from "./capabilityModel";
 import type { IconName } from "./icons";
 
@@ -62,6 +62,14 @@ export interface ComposerCapability {
    * disabled entry says why and stops, which is a dead end.
    */
   enableHref?: string;
+  /**
+   * WEB-04 — the runtime tool whose readiness this entry reports, when it has
+   * one. Readiness is a *different question* from the gate above: a search tool
+   * the owner has permitted and has not configured a provider for is `Ready` by
+   * the gate and `Needs provider` in fact, and a menu that shows one grey row
+   * for both sends the owner to the wrong screen.
+   */
+  readinessTool?: string;
   /** Presentation order within its group. Lower is earlier. */
   priority: number;
 }
@@ -138,16 +146,58 @@ export const COMPOSER_CAPABILITIES: readonly ComposerCapability[] = [
   },
 
   // ── Tools: ask Raiker to do a kind of thing ──────────────────────────────
+  // WEB-DECISION-04/05 — research is three reads, not one button. They are
+  // listed rather than collapsed because they fail differently: search needs a
+  // provider, a URL read needs a reachable public address, and extraction needs
+  // a page that is not built in the browser. One "Web" row could only report
+  // the state of whichever it happened to check.
   {
     id: "web-search",
     label: "Search the web",
-    hint: "Reads pages this turn needs. The request leaves this machine.",
+    hint: "Finds pages this turn needs. The request leaves this machine.",
     icon: "globe",
     group: "tools",
-    surfaces: ["chat", "build", "tasks"],
+    surfaces: ["chat", "build", "design", "tasks"],
     gate: "web_fetch",
+    readinessTool: "web_search",
     enableHref: "#/capabilities",
     priority: 10,
+  },
+  {
+    id: "web-read",
+    label: "Read a URL",
+    hint: "Fetches one page as text. HTTPS only, and every redirect is re-checked.",
+    icon: "globe",
+    group: "tools",
+    surfaces: ["chat", "build", "design", "tasks"],
+    gate: "web_fetch",
+    readinessTool: "web_fetch",
+    enableHref: "#/capabilities",
+    priority: 11,
+  },
+  {
+    id: "web-extract",
+    label: "Extract page content",
+    hint: "Pulls the main text, links, tables or metadata out of one page.",
+    icon: "file",
+    group: "tools",
+    surfaces: ["chat", "build", "design", "tasks"],
+    gate: "web_fetch",
+    readinessTool: "web_extract",
+    enableHref: "#/capabilities",
+    priority: 12,
+  },
+  {
+    id: "weather",
+    label: "Check the weather",
+    hint: "Structured conditions and forecast, with the source and its age stated.",
+    icon: "globe",
+    group: "tools",
+    surfaces: ["chat", "build", "design", "tasks"],
+    gate: "web_fetch",
+    readinessTool: "weather_lookup",
+    enableHref: "#/capabilities",
+    priority: 13,
   },
   {
     id: "run-command",
@@ -233,12 +283,28 @@ export interface CapabilityBlock {
   href: string | null;
 }
 
+/** The short words a menu row prints beside a capability that has readiness. */
+export const READINESS_LABELS: Record<ToolReadiness["state"], string> = {
+  ready: "Ready",
+  needs_provider: "Needs provider",
+  blocked: "Blocked by policy",
+  unavailable: "Unavailable",
+  transient_failure: "Temporarily failed",
+};
+
 /**
  * An entry as the menu will draw it: the record, plus whether it is available
  * and why not.
  */
 export interface ComposerMenuItem extends ComposerCapability {
   blocked: CapabilityBlock | null;
+  /**
+   * WEB-04 — the operational state, when the entry names a runtime tool. Kept
+   * beside `blocked` rather than folded into it: an entry can be permitted and
+   * not ready, and the row has to be able to say so without claiming the owner
+   * turned something off.
+   */
+  readiness: ToolReadiness | null;
 }
 
 /**
@@ -258,6 +324,7 @@ export function composerMenu(
   surface: ComposerSurface,
   gates: readonly CapabilityGate[],
   handled: ReadonlySet<string>,
+  readiness: readonly ToolReadiness[] = [],
 ): ComposerMenuItem[] {
   // A gate list that is not a list is no evidence about anything. This is not
   // defensive habit: `/api/capability-gates` answering with an object rather
@@ -272,7 +339,11 @@ export function composerMenu(
       capability.surfaces.includes(surface) &&
       handled.has(capability.id),
   )
-    .map((capability) => ({ ...capability, blocked: blockFor(capability, known) }))
+    .map((capability) => ({
+      ...capability,
+      blocked: blockFor(capability, known),
+      readiness: readinessFor(capability, readiness),
+    }))
     // A capability with no executor in this build is not "off", it is absent;
     // offering it with a route that cannot turn it on is the dead end this
     // whole list exists to avoid.
@@ -297,4 +368,21 @@ function blockFor(
     reason: "Turned off in Permissions",
     href: capability.enableHref ?? "#/capabilities",
   };
+}
+
+/**
+ * The readiness row for *capability*, or null.
+ *
+ * Null for an entry that names no runtime tool, and null for a tool the host
+ * said nothing about — a missing row is not evidence of a problem, and printing
+ * "Unavailable" because a payload was short would be inventing the one thing
+ * this field exists to stop being invented.
+ */
+function readinessFor(
+  capability: ComposerCapability,
+  rows: readonly ToolReadiness[],
+): ToolReadiness | null {
+  if (capability.readinessTool === undefined) return null;
+  const known: readonly ToolReadiness[] = Array.isArray(rows) ? rows : [];
+  return known.find((row) => row.tool === capability.readinessTool) ?? null;
 }

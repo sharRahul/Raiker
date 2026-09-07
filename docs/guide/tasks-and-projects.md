@@ -30,6 +30,24 @@ forty exactly as they did to cycle one, and a schedule only fires while Raiker i
 running on this device — a closed laptop is a missed slot, and an elapsed slot is
 skipped rather than run late.
 
+### The time a schedule is written in
+
+Raiker tells every turn what the current date, day and time are, in the time
+zone you set under **Settings → General → Time and place**. Nothing is left to
+the model to remember, and no web connection is needed for it — turning web
+access off does not cost a turn its calendar.
+
+That is what makes "remind me tomorrow at 9" and "every Friday at 16:00" mean
+what you meant. A recurring schedule keeps your zone rather than a fixed offset,
+so `08:00 Europe/London` stays 08:00 local across the GMT/BST change. And each
+cycle reads the clock **when it runs**: a routine you created on Monday evening
+is told it is Tuesday morning, not Monday.
+
+If you have not set a zone, Raiker offers the one your browser reports and says
+so — it will not apply it for you. Setting `Europe/London` and then opening
+Raiker from another country is a statement about your schedule, and Raiker does
+not treat it as a mistake to correct.
+
 **Every task has a conversation of its own.** Each cycle runs in it, so a routine
 builds up a readable history instead of overwriting a one-line summary. The card
 carries **Thread · N** once there is something to read; it opens in Chat, where

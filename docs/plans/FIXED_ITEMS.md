@@ -480,6 +480,22 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-456](#fixed-456--three-models-modals-that-escape-could-not-close) | Medium | Models / accessibility | Fixed 2026-09-07 (found live) |
 | [FIXED-457](#fixed-457--rows-that-offered-raikers-own-placeholder-as-a-models-name) | Low | Models | Fixed 2026-09-07 (found live) |
 | [FIXED-458](#fixed-458--a-mobile-sheet-that-was-32px-short-of-being-one) | Low | Composer / mobile | Fixed 2026-09-07 |
+| [FIXED-459](#fixed-459--nothing-in-raiker-told-a-model-what-day-it-was) | **Critical** | Runtime / environment context | Fixed 2026-09-07 (ENV-01…05) |
+| [FIXED-460](#fixed-460--weather-was-a-page-to-interpret-rather-than-a-reading-to-report) | High | Runtime / weather | Fixed 2026-09-07 (WEATHER-01…03) |
+| [FIXED-461](#fixed-461--four-derivations-of-one-fact-about-what-a-turn-can-read) | High | Runtime / read capabilities | Fixed 2026-09-07 (WEB-01…09) |
+| [FIXED-462](#fixed-462--the-hugging-face-flow-did-all-six-steps-at-once) | Medium | Models | Fixed 2026-09-07 (MODEL-09) |
+| [FIXED-463](#fixed-463--come-back-and-press-look-again) | Medium | Models | Fixed 2026-09-07 (MODEL-14) |
+| [FIXED-464](#fixed-464--every-live-round-had-been-writing-its-evidence-outside-the-repository) | High | Live test harness | Fixed 2026-09-07 (found live) |
+| [FIXED-465](#fixed-465--eighteen-live-specs-waiting-for-a-tab-the-redesign-removed) | High | Live test harness | Fixed 2026-09-07 (found live) |
+| [FIXED-466](#fixed-466--the-control-whose-job-was-to-say-connect-a-model-said-nothing) | Low | Design / composer | Fixed 2026-09-07 (found live) |
+| [FIXED-467](#fixed-467--builds-third-pane-showed-tools-not-the-work) | Medium | Build | Fixed 2026-09-07 (VIS2-12) |
+| [FIXED-468](#fixed-468--extensions-opened-on-a-category-instead-of-on-what-raiker-can-reach) | Medium | Extensions | Fixed 2026-09-07 (VIS2-10) |
+| [FIXED-469](#fixed-469--the-project-was-chosen-again-on-every-surface) | Medium | Chat / Build / Design | Fixed 2026-09-07 (VIS2-11) |
+| [FIXED-470](#fixed-470--tasks-asked-to-be-filled-in-rather-than-instructed) | Medium | Tasks | Fixed 2026-09-07 (COMPOSER-10) |
+| [FIXED-471](#fixed-471--one-primary-action-that-did-not-say-what-it-would-do) | Low | Composer | Fixed 2026-09-07 (COMPOSER-15) |
+| [FIXED-472](#fixed-472--every-row-wore-the-same-weight-as-the-row-that-needed-you) | Medium | Skills / sessions / approvals | Fixed 2026-09-07 (VIS2-13, VIS2-18) |
+| [FIXED-473](#fixed-473--fifty-three-specs-wrote-their-evidence-one-directory-above-the-repository) | High | Live test harness | Fixed 2026-09-07 (found live) |
+| [FIXED-474](#fixed-474--thirteen-z-index-numbers-and-no-way-to-say-what-was-above-what) | Medium | Shell / overlays | Fixed 2026-09-07 (VIS2-17) |
 
 ---
 
@@ -20340,3 +20356,623 @@ last time something measured it.
 **User-interface outcome.** `composer-mobile-sheet.png`: the sheet spans the
 screen, over a scrim, with the three Work modes still legible as icons in the
 top bar above it.
+
+---
+
+## FIXED-459 — Nothing in Raiker told a model what day it was
+
+**Severity: Critical. Area: runtime / environment context. Status: Fixed
+2026-09-07. Raised as
+[ENV-01 … ENV-05](ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md#implementation-findings).**
+
+**Observed.** No turn was ever given the current date, time, day or timezone.
+The model answered relative-time questions from whatever it could find: a
+provider's own hidden preamble, a stale sentence earlier in the conversation, or
+training knowledge months out of date. All three read exactly like a fact, and
+the third is the dangerous one because it does not look like a guess. `Remind me
+tomorrow at 9` therefore resolved against a date nobody had established, and
+nothing in the transcript said which one.
+
+Settings had a **Time zone** select. Nothing in the runtime read it. An owner
+could set `Europe/London`, watch it save, and have every turn continue to reason
+from nowhere in particular — a control that appears to decide something and
+decides nothing, which is the same shape as an inert switch.
+
+**Fixed.** `raiker/runtime/environment.py` derives one `EnvironmentContext` per
+turn: `generated_at_utc`, the IANA zone and where it came from, the owner-local
+datetime, date and time, the day of week, and the UTC offset. It is injected as
+its own system message — deliberately *not* inside the workspace block, because
+what follows that heading is data the turn must not obey and this is metadata
+the turn must not doubt — and recorded as an `environment_context` event.
+
+Four properties make it worth the name.
+
+* **Both clocks, always.** UTC alone cannot answer "tomorrow at 9"; local alone
+  cannot be audited across machines. Both are sent with the zone that relates
+  them, so nothing has to derive the missing half.
+* **Precedence is fixed and visible.** Explicit owner setting, then a device
+  zone the browser proposed, then the host, then UTC — and the bundle says which
+  one won. A browser may propose; it never overwrites a choice, because somebody
+  who sets `Europe/London` and opens Raiker from a hotel in Denver has said
+  something about their schedule.
+* **Derived, never remembered.** A scheduled run reads the clock when it runs,
+  so a daily routine created on Monday evening is told it is Tuesday morning. A
+  delegated subagent derives its own rather than inheriting the parent turn's.
+* **No network, no provider, no Project.** Turning off web access, changing
+  model or switching Project changes nothing here. A clock an unrelated setting
+  can switch off is not a clock a turn can rely on.
+
+**User-interface outcome.** Settings → General gains a **Time and place** card
+that states the zone in force, where it came from, and what the owner's clock
+reads in it right now — a select whose effect you cannot see is a select nobody
+trusts. Live evidence: `env-01-timezone-and-weather-location.png`.
+
+**Tests.** `tests/test_environment_context.py` (18 cases: precedence, DST,
+the UTC-versus-local date disagreement, unreadable settings, no account),
+`tests/test_environment_context_turns.py` (11 cases: the bundle reaching Chat,
+Build and Design turns, the trust boundary between the two system messages, the
+event record, two turns getting two clocks, a scheduled run and a subagent
+deriving their own), `web/src/lib/environment.test.ts` (12 cases).
+
+---
+
+## FIXED-460 — Weather was a page to interpret rather than a reading to report
+
+**Severity: High. Area: runtime / weather. Status: Fixed 2026-09-07. Raised as
+[WEATHER-01 … WEATHER-03](ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md#weather-contract).**
+
+**Observed.** Asking about the weather had two failure modes that are
+indistinguishable from the outside. The model answered from training knowledge —
+a confident sentence about a day months in the past — or it was pointed at a
+weather page and asked to read numbers out of a layout built for a human eye,
+which is a guess with a citation attached. Both produce "18°C and cloudy".
+Neither is an observation.
+
+**Fixed.** `weather_lookup` is a structured read. The result keeps three
+timestamps apart, because they are three different instants and a reader has to
+be able to tell which is which: `observed_at` is when a station measured it,
+`valid_from`/`valid_to` is what a forecast row claims to cover, and `fetched_at`
+is when Raiker asked. Freshness is a typed value — `fresh`, `stale`,
+`unavailable` — rather than an adjective in a sentence, so scheduling logic can
+branch on it. A failed refresh may show the last reading *with its age*; it may
+not present it as current.
+
+Location comes from the instruction, then the owner's configured default, then a
+typed `weather_location_required` — which is a question. There is no fourth
+step, and the absence of one is the point: deriving a persistent precise
+location from the host's IP address is not a fallback, it is a surveillance
+decision nobody made.
+
+The last-reading cache is in-process and keyed by principal as well as by
+coordinates. The values are public weather; *which places somebody looks up* is
+not, and Raiker's accounts are isolated from each other on the device — a shared
+key would let one account's failed refresh report a reading only another account
+had ever asked for.
+
+The request goes out through the existing `web_fetch` boundary — the same gate,
+decision mode, blocklist and address guard — so *discoverable everywhere* never
+becomes *reachable regardless*.
+
+**User-interface outcome.** **Check the weather** appears in the Tools menu on
+every Work surface, with its readiness beside it. Settings → General gains an
+optional **Default weather location**, held separately from the timezone because
+"I schedule in Europe/London" and "when I say weather I mean London" are two
+statements a traveller changes at different times.
+
+**Tests.** `tests/test_weather_capability.py` — 12 cases covering the three
+timestamps, provider attribution, the location precedence, the stale-refresh
+note, and the gate, decision mode and blocklist each refusing it by name.
+
+---
+
+## FIXED-461 — Four derivations of one fact about what a turn can read
+
+**Severity: High. Area: runtime / read capabilities. Status: Fixed 2026-09-07.
+Raised as [WEB-01 … WEB-09](GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md#implementation-findings).**
+
+**Observed.** Whether Build had `web_search` was reconstructed from the
+projection list, the capability router, the gate map, and whichever view
+happened to render a menu. Four derivations of one fact drift, and the drift is
+invisible until an owner switches Project and watches a tool disappear. Nothing
+stated the contract in one place, so nothing could be held to it.
+
+Two smaller failures sat inside that one. The composer showed a single **Search
+the web** entry that was really three different capabilities with three
+different failure modes — search needs a provider, a URL read needs a reachable
+public address, extraction needs a page that is not built in the browser — so
+one row could only ever report the state of whichever it happened to check. And
+there was no way to read a page's *structure*: a turn that needed the rows of a
+pricing table had to ask the model to find them in prose, which is a guess
+dressed as a read, or reach for a browser, which is a far larger grant of
+authority for a page that never needed one.
+
+**Fixed.** `raiker/runtime/read_capabilities.py` is the one typed contract.
+Every agentic surface derives from it; a subagent gets the delegable subset,
+because a bounded delegation that could reach the open internet on its own would
+be a wider grant than the parent turn made; and administrative pages get nothing
+rather than a composer invented to satisfy a parity table.
+
+* **`web_extract`** adds bounded structured extraction — main content, article,
+  links, tables, metadata, JSON-LD — as a parser over the *same* safe fetch,
+  never a second internet client. Every count is capped and truncation is stated
+  out loud, because a model handed 200 of 4,000 rows with no marker will reason
+  about the 200 as if they were all of them. A page that builds itself in the
+  browser returns a typed `static_content_insufficient`, which is a description
+  of that page and explicitly not a request: whether a browser capability may be
+  proposed is a separate governed decision this result grants nothing towards.
+* **Readiness is typed and separate from authority.** `Needs provider` is a
+  setup step; `Blocked by policy` is a decision the owner made. One greyed-out
+  row can only send them to one screen, and it will be the wrong one half the
+  time.
+* **Design became a real research surface.** `design` is a prompt surface with
+  its own protocol, so Design can find references through the global read set
+  while image generation keeps its own governed endpoint and gains no network
+  authority from it. The two never share a path, which is what makes the
+  separation structural rather than a promise.
+
+The invariant on the other side is asserted directly: **discovering, listing,
+projecting or searching for a tool never creates authority to execute it.**
+Every one of the four reads still fails closed when the gate is off.
+
+**User-interface outcome.** Chat, Build, Design and Tasks each offer **Search
+the web**, **Read a URL**, **Extract page content** and **Check the weather**,
+each carrying its own state. Readiness comes from one shared snapshot, so
+configuring a provider elsewhere reaches a still-mounted composer without a
+reload. Live evidence: `env-02-chat-tools-research-reads.png`,
+`env-03-design-research-tools.png`.
+
+**Tests.** `tests/test_global_read_capabilities.py` — 42 cases covering surface
+parity, the delegable subset, the administrative exclusion, every read failing
+closed on a disabled gate, the readiness states, the six extraction modes with
+their caps and truncation notes, the browser-escalation result, and the
+image-generation path never naming a web or browser capability.
+`web/src/lib/composerCapabilities.test.ts` adds 13.
+
+---
+
+## FIXED-462 — The Hugging Face flow did all six steps at once
+
+**Severity: Medium. Area: models. Status: Fixed 2026-09-07. Raised as
+[MODEL-09](MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md#model-09--reframe-hugging-face-as-add-local-model).**
+
+**Observed.** Adding a local model is a sequence — find something, pick the
+right build of it, look at what it costs in bytes and licence, fetch it, convert
+it if Raiker cannot run it as-is, add it to the library. The panel did all six,
+and did them all *at once*: a first-time owner met a search box, a token form, a
+curated card, a results list, a variants list, a download drawer and a
+conversion card, with nothing saying which was their next move.
+
+Beside the search box sat **Set access token** at equal weight, which told every
+owner that signing in to Hugging Face was a normal part of downloading a public
+model. It is not; it is needed for a gated or private repository and for nothing
+else.
+
+**Fixed.** A step rail states the sequence and where the owner is in it. Nothing
+is hidden — someone who already knows the flow still reaches every control — but
+the page now says which step is theirs. The rail is *derived* from the panel's
+own state rather than counted alongside it: a counter kept on the side is a
+second source of truth about the flow, and it disagrees with the flow the first
+time the owner goes back to the results list. Conversion appears only for a
+Safetensors download, because showing a GGUF a step it will never take makes the
+flow look longer and more fragile than it is.
+
+The token control appears when the repository in front of the owner is actually
+gated, and otherwise under its own disclosure for someone who came looking.
+
+**User-interface outcome.** `env-04-huggingface-step-rail.png`: five numbered
+steps with **Find model** current, and **Access token setup — only needed for
+private or gated repositories** at the foot of the panel.
+
+**Tests.** `web/src/lib/huggingFaceSteps.test.ts` — 14 cases, including the rail
+going *back* when the owner does, and the conversion step appearing only when
+this variant needs it.
+
+---
+
+## FIXED-463 — "Come back and press Look again"
+
+**Severity: Medium. Area: models. Status: Fixed 2026-09-07. Raised as
+[MODEL-14](MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md#model-14--do-not-use-backendvendor-links-as-the-normal-integration-contract).**
+
+**Observed.** Some setup genuinely happens outside Raiker: a local runtime is
+somebody else's installer, and Raiker will not download and execute one. What
+should not happen is for that one unavoidable trip to become the normal
+lifecycle — *open this website, come back, press Look again, read a stale
+status, press Refresh*. Each of those presses is Raiker asking the owner to do a
+job Raiker can do itself.
+
+**Fixed.** Opening a vendor download arms a one-shot listener. The moment the
+tab is looked at again, detection re-runs and the result is reported. The
+owner's part ends at installing the thing.
+
+Three properties are deliberate. It fires **once** and unsubscribes, because a
+listener that ran on every tab switch is a background poll wearing a different
+name. It is **cancelled on unmount**, so a view the owner navigated away from
+leaves nothing to fire against a destroyed component. And it **reports rather
+than concludes**: the sentence says what detection found, so a tab regaining
+focus can never read as an install that happened.
+
+**User-interface outcome.** "Opened the official Ollama download. Install it and
+come back — Raiker will look again." followed, on return, by either "Ollama is
+now installed on this machine." or a specific next thing to try.
+
+**Tests.** `web/src/lib/returnAndDetect.test.ts` (8 cases) and
+`ModelsView.test.ts` — "looks again by itself when the owner comes back from the
+vendor page", which returns to the tab without pressing anything.
+
+---
+
+## FIXED-464 — Every live round had been writing its evidence outside the repository
+
+**Severity: High. Area: live test harness. Status: Fixed 2026-09-07. Found in
+the live round of 2026-09-07.**
+
+**Observed.** Every live spec writes its captures to a path like
+`../../docs/plans/screenshots/pages/…`, which was exactly right while the web
+app lived at `apps/web`: two levels up from `apps/web/e2e` is the repository
+root. Moving it to `web/` made that one level too many — and because Playwright
+resolves a relative screenshot path against the *process* directory rather than
+the spec's, every capture since has been written to `/home/user/docs/plans/…`,
+outside the repository, where nothing looks for it and git cannot see it. The
+runner's own `outputDir` went the same way.
+
+The failure is silent by construction: the sweeps pass, they report having
+written their files, and the two *tracked* catalogues they exist to keep current
+— `screenshots/pages/` and `screenshots/widths/` — simply stop changing. A
+round's own `working/` captures are gitignored by design, so nothing about them
+looked wrong either. That is the same shape as an inert switch — not a missing
+control, but a wrong belief about one — which is why the fix belongs in the
+harness.
+
+**Fixed.** `capture()` and `captureElement()` anchor a relative path at
+`web/e2e`, which is what every one of those strings has always meant, and
+`outputDir` is corrected to the repository root. No spec needed editing.
+
+**User-interface outcome.** None; this is test infrastructure. Its outcome is
+that the evidence cited by this document lands where the document says it is.
+
+**Tests.** Proven by running the round: the 2026-09-07 captures land in
+`docs/plans/screenshots/working/` — the round's own evidence directory, which is
+gitignored like every round's before it — rather than outside the tree.
+
+---
+
+## FIXED-465 — Eighteen live specs waiting for a tab the redesign removed
+
+**Severity: High. Area: live test harness. Status: Fixed 2026-09-07. Found in
+the live round of 2026-09-07.**
+
+**Observed.** `openHostedProviders` navigated to `#/models?tab=hosted` and
+waited for a **Hosted** tab. MODEL-03/MODEL-07 folded Local and Hosted into one
+**Add model** tab, and `?tab=hosted` became an alias that lands on the model
+*inventory* — a page with no provider cards on it at all. So every live spec
+that connects a provider timed out before its first assertion, and the failure
+read as a broken product rather than as a stale harness.
+
+**Fixed.** It waits for the section heading the redesign actually renders —
+**Your hosted providers** — on the tab that renders it. Unlike a tab name, a
+section heading is the thing the cards are under, so it cannot be true while the
+cards are elsewhere.
+
+**User-interface outcome.** None; this is test infrastructure.
+
+**Tests.** `env-web-read-live.spec.ts` connects the round's Anthropic key
+through the product's own dialog and reads "Connection saved" back.
+
+---
+
+## FIXED-466 — The control whose job was to say "connect a model" said nothing
+
+**Severity: Low. Area: design / composer. Status: Fixed 2026-09-07. Found in the
+live round of 2026-09-07.**
+
+**Observed.** With no image model available, Design's composer draws a link
+reading "No image model — connect one" in place of the model select. It rendered
+as an **empty box**. A previous round had capped the control's width and given
+it `overflow: hidden; text-overflow: ellipsis` so a long sentence could not push
+through the Generate button — correct — but the element was `display:
+inline-flex`, and a flex container turns its text into an anonymous flex item
+that `text-overflow` cannot act on. So the text was clipped in full rather than
+truncated, and the one control whose entire job is to say *connect a model* said
+nothing at all.
+
+**Fixed.** `display: inline-block`, which honours the truncation the rule beside
+it already asked for.
+
+**User-interface outcome.** The empty state reads "No image model — connect
+one", truncating with an ellipsis when the bar is narrow, and still links to the
+Models page.
+
+
+---
+
+## FIXED-467 — Build's third pane showed tools, not the work
+
+**Severity: Medium. Area: build. Status: Fixed 2026-09-07. Found in
+[VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+(VIS2-12).**
+
+**Observed.** Build's right-hand pane carried a file tree and a terminal — two
+instruments — while the thing an owner actually comes back for, *what this turn
+changed*, was nowhere on the page. There was no way to see the working tree
+without leaving Build for a shell, so the surface that writes code could not
+show its own output.
+
+**Fixed.** The pane became the object of work with four views — **Changes**,
+**Preview**, **Terminal** and **Runs** — and a rule for which one to show:
+`focusFor(event, current)` in `web/src/lib/buildArtifacts.ts` moves the pane to
+the view the last event is about, and deliberately returns `null` for
+`turn-changed-files` while the terminal is open, because a command the owner is
+watching is not something to yank away from. The working tree is read through a
+new governed route, `GET /api/code/repos/{repo_id}/changes`, which reports
+`entries`, a bounded `diff`, and a `reason_code` when there is nothing to read
+(`repo_not_checked_out`, `repo_folder_missing`, `not_a_git_repository`) rather
+than an empty list that reads as "no changes".
+
+**User-interface outcome.** Opening a file previews it; running a command shows
+the terminal; a turn that writes files brings Changes forward with a count.
+Each header control now says what its own view will do, so two controls never
+both read "Hide".
+
+**Tests.** `buildArtifacts.test.ts` for the focus rule and the change summary,
+`BuildView.test.ts` for the pane's four views and their controls, and
+`tests/test_code_repo_files_api.py` for the route's limits and each reason
+code.
+
+---
+
+## FIXED-468 — Extensions opened on a category instead of on what Raiker can reach
+
+**Severity: Medium. Area: extensions. Status: Fixed 2026-09-07. Found in
+[VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+(VIS2-10).**
+
+**Observed.** Extensions opened on **Connectors** — one kind of extension out of
+five — so the page's first answer was an implementation category. The question
+an owner arrives with is *what can Raiker reach, and what did I allow that the
+default posture would not*, and no view answered it: the exceptions were spread
+across five tabs, each of which had to be visited to be sure.
+
+**Fixed.** An **Overview** hub, derived in `web/src/lib/extensionsOverview.ts`.
+`extensionReach()` counts what is connected per kind and `extensionExceptions()`
+lists every extension standing outside the default posture, in one place, with
+`tabForKind()` routing each entry to the kind that owns it. The tabs remain —
+they are where the work is done — but they are entered from the answer rather
+than guessed at.
+
+**User-interface outcome.** `#/extensions` lands on Overview with one sentence
+of reach and an exceptions list; every row opens the kind that owns it.
+
+**Tests.** `extensionsOverview.test.ts` and `ExtensionsView.test.ts`.
+
+---
+
+## FIXED-469 — The project was chosen again on every surface
+
+**Severity: Medium. Area: chat / build / design. Status: Fixed 2026-09-07. Found
+in [VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+(VIS2-11) and COMPOSER-11.**
+
+**Observed.** Chat, Build and Design each kept their own idea of the current
+project. Moving from a Chat about a project to a Build in the same project meant
+choosing it a second time, and a reload lost the choice entirely — so the one
+piece of context that decides what a turn may retrieve and where it may write
+was the piece most easily left wrong.
+
+**Fixed.** One store, `web/src/lib/workProject.svelte.ts`, holding the Work
+project for all three surfaces and persisting it under `raiker.build.project`
+(the key is unchanged, so an existing selection survives the upgrade).
+`startInBuild()` lets Home open a surface with the project already chosen.
+Because the store is module-level, `resetWorkProject()` is called from
+`web/src/test-setup.ts` — without it one test's selection leaked into the next.
+
+**User-interface outcome.** The project is chosen once and named in every Work
+composer's context line; switching surface or reloading keeps it.
+
+**Tests.** `workProject.test.ts`, plus the project assertions in
+`ChatView.test.ts` and `BuildView.test.ts`.
+
+---
+
+## FIXED-470 — Tasks asked to be filled in rather than instructed
+
+**Severity: Medium. Area: tasks. Status: Fixed 2026-09-07. Found in
+[UNIFIED_COMPOSER_REDESIGN_2026-09-06.md](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md)
+(COMPOSER-10).**
+
+**Observed.** Creating a task meant completing an admin form — a title field, a
+separate objective, its own model picker, recurrence and notification controls
+all permanently on screen — while every other surface in Raiker takes an
+instruction. Two of those fields asked the owner for the same thing twice: a
+task titled "Summarise security news" whose objective was "Summarise security
+news and surface important changes".
+
+**Fixed.** Tasks is written on the shared `Composer` shell around one question,
+*What should Raiker do?*, with `web/src/lib/taskComposer.ts` supplying the
+grammar: `deriveTitle()` names the task from its own instruction (overridable,
+bounded by `MAX_DERIVED_TITLE`), `primaryAction()` gives the cadence its verb,
+`wantsStartTime()` decides whether a start time is even a question, and
+`scheduleSummary()` states the resulting schedule in words. Schedule, project,
+model and notification details live behind a summary line that expands only when
+asked; the execution environment and model capacity are facts on the context
+line rather than two more badges.
+
+**User-interface outcome.** A task is created by typing what Raiker should do
+and pressing the cadence's own action. The details are still all there, one
+disclosure away, and the schedule is stated back in words before it is saved.
+
+**Tests.** `taskComposer.test.ts` (13 cases) and `TasksView.test.ts` (26).
+Live-verified in the round of 2026-09-07; screenshot
+`env-08-tasks-composer.png`.
+
+---
+
+## FIXED-471 — One primary action that did not say what it would do
+
+**Severity: Low. Area: composer. Status: Fixed 2026-09-07. Found in
+[UNIFIED_COMPOSER_REDESIGN_2026-09-06.md](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md)
+(COMPOSER-15).**
+
+**Observed.** Build's primary action read **Send** in every mode. In Plan mode
+it sends nothing to be applied; in Edit mode it does not apply either, because
+every write parks for a decision. So the one word an owner reads before
+committing to a turn described neither what the press does nor what the mode
+allows.
+
+**Fixed.** `buildPrimaryAction()` in `web/src/lib/buildModes.ts` names the act
+the press performs: `plan` → **Plan**, `edit` → **Propose**, `auto` → **Run**.
+Deliberately not "Apply": a write in Edit mode is proposed and waits for a
+decision, and a button that says Apply would promise the decision away. The
+accessible name is the visible label — no `aria-label` overriding it — so a
+screen reader hears the same promise the screen makes.
+
+**User-interface outcome.** Build reads Plan, Propose or Run per mode; Chat
+reads Send; Design reads Generate; Tasks reads its cadence's action. A running
+turn shows Stop and Steer in the composer instead, so Send and Stop are never
+offered at once.
+
+**Tests.** `buildModes.test.ts` covers each mode's word and pins that Edit never
+reads "Apply"; `BuildView.test.ts` asks for the action by what it does.
+
+---
+
+## FIXED-472 — Every row wore the same weight as the row that needed you
+
+**Severity: Medium. Area: skills / sessions / approvals. Status: Fixed
+2026-09-07. Found in
+[VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md) (VIS2-13,
+VIS2-18).**
+
+**Observed.** Each list that repeats an entity argued the badge question in its
+own markup, and the answers had drifted apart:
+
+- a skill row drew three badges of equal weight — a lifecycle state, a
+  `/command` trigger and a conformance measurement — so the one that meant
+  *this needs you* looked exactly like the two that did not;
+- the approvals queue toned **every** row, `low` and `medium` in an info colour
+  beside `high` and `critical` in a danger one, which made a page of routine
+  decisions read as uniformly urgent and left the genuinely dangerous row
+  indistinct;
+- a session list badged `idle` — the state of nearly every row on the page.
+
+Scanning a list only works when an ordinary row looks ordinary. These lists had
+spent that difference on facts that were never exceptions.
+
+**Fixed.** One rule, in `web/src/lib/rowTokens.ts`, applied wherever a row
+repeats. `rowTokens()` takes the row's candidate facts and returns at most
+`ROW_TOKEN_BUDGET` (two) badges — attention first, then declaration order — with
+everything else returned as plain metadata the row still shows. A candidate
+whose `variant` is `null` is *that fact in its ordinary state* (a skill switched
+on, an approval at routine risk) and can never become a badge. The per-domain
+builders `skillCandidates()`, `sessionCandidates()` and `approvalCandidates()`
+say which state is ordinary for each entity, and `elevatedRisk()` answers the
+same question for a table cell. Nothing was removed from any row: the weight
+moved, the facts stayed.
+
+`visualRubric.test.ts` pins it product-wide — a listed view must ask
+`rowTokens.ts` and must not pick a badge variant inline from a `status` or
+`risk_level` field — so the next list cannot quietly re-argue the question.
+
+**User-interface outcome.** A working skill shows `active · v1.0.0 · /command`
+as quiet metadata and no badge at all; a skill that would not validate shows one.
+The approvals queue tones only elevated risk beside the decision's own status.
+The sessions list badges the session that is running and leaves the idle ones
+plain.
+
+**Tests.** `rowTokens.test.ts` (11 cases, including that nothing is dropped when
+the budget is spent), the new VIS2-13 cases in `SkillsView.test.ts` and
+`ApprovalsView.test.ts`, and the rubric rule in `visualRubric.test.ts`.
+Live-verified against a real host on 2026-09-07: the Skills case passed —
+`web/e2e/row-tokens-live.spec.ts`, screenshot
+`docs/plans/screenshots/working/vis2-13-skills-row-tokens.png`. The sessions and
+approvals cases skip on that host because it has no session and no queued
+decision to check the rule against, and they say so rather than passing on an
+empty page; the multi-row version of the approvals rule runs in the mocked CI
+suite (`composer.spec.ts`), where four fixture decisions prove that exactly one
+of them — the critical one — is toned.
+
+---
+
+## FIXED-473 — Fifty-three specs wrote their evidence one directory above the repository
+
+**Severity: High. Area: live test harness. Status: Fixed 2026-09-07. Found in
+the live round of 2026-09-07, while adding the VIS2-13 evidence.**
+
+**Observed.** [FIXED-464](#fixed-464--every-live-round-had-been-writing-its-evidence-outside-the-repository)
+fixed the *relative* form of this: `capturePath()` now anchors a path like
+`../../docs/plans/screenshots/...` at `web/e2e` rather than at the process
+directory. It could not fix the other form, and the other form is the majority.
+Fifty-three specs build an **absolute** path themselves —
+
+```ts
+const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
+```
+
+— which `capturePath()` passes through untouched, correctly, because an absolute
+path is an explicit instruction. Three `..` from `web/e2e` was the repository
+root while the app lived at `apps/web`; since the move to `web/` it is
+`/home/user`, one level *above* the repository. So the mocked suite's captures —
+the ones CI is meant to be able to look at — and every absolute-path live
+capture have been landing outside the working tree, where git cannot see them
+and no reviewer will find them. Every one of those runs reported success.
+
+**Fixed.** Two `..`, in all fifty-three specs. `web/e2e` is two levels below the
+repository root and the strings now say so. The relative-path anchoring from
+FIXED-464 is unchanged and still covers the specs written that way.
+
+**User-interface outcome.** None; this is test infrastructure.
+
+**Tests.** The mocked suite's own capture is the check: `composer.spec.ts` now
+writes `output/playwright/approvals-row-tokens.png` inside the repository, which
+is where `.gitignore`'s `output/` rule expects the evidence to be.
+
+---
+
+## FIXED-474 — Thirteen z-index numbers and no way to say what was above what
+
+**Severity: Medium. Area: shell / overlays. Status: Fixed 2026-09-07. Found in
+[VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+(VIS2-17).**
+
+**Observed.** Thirty-odd overlay surfaces each picked their own stacking number,
+and thirteen distinct values were in use: 30, 40, 45, 46, 55, 60, 70, 80, 90,
+95, 100, 120, 200. Every one had been chosen locally, to sit above whatever its
+author happened to be looking at, which means none of them encoded intent. Two
+consequences, both real:
+
+- the only way to know whether a menu could cover a docked tray was to open both
+  and look, and two surfaces that landed on the same number stacked in DOM order
+  rather than in any order that means something to an owner;
+- the Knowledge Map's right-click menu sat at **120**, the same layer as the
+  STOP switch — the one control that must stay reachable from every state the
+  product can be in.
+
+**Fixed.** `app.css` declares the ladder, and each rung is named for what a
+surface *is* rather than for where it happened to need to be: `--z-raised`
+(lifted inside its own card), `--z-popover` and `--z-popover-panel` (a menu
+anchored to the control that opened it, and its dismiss layer one step below),
+`--z-docked` (a tray fixed to a corner), `--z-panel` (a drawer sharing the page
+with its content), `--z-scrim` and `--z-modal` (the dimming layer and the
+surface it makes modal, adjacent by construction), `--z-palette` (reachable from
+inside a modal) and `--z-alert` (the STOP switch; nothing above it).
+
+Every overlay in `views/` and `components/` now names its layer. The Knowledge
+Map keeps its own single-digit ladder for surfaces local to the canvas — a
+vignette under a stage under a pill is not an overlay over the application — and
+the two surfaces that do leave the canvas name a shared layer like everything
+else.
+
+`visualRubric.test.ts` refuses a raw z-index of 10 or more anywhere in `views/`
+or `components/`, so the next surface has to choose a layer rather than a
+number.
+
+**User-interface outcome.** No visible change in the ordinary case, which is the
+point: the same surfaces stack the same way, for a stated reason. The one
+behavioural change is the Knowledge Map's context menu, which no longer competes
+with the STOP switch.
+
+**Tests.** The VIS2-17 rule in `visualRubric.test.ts` (every layer declared, no
+raw overlay-scale z-index), and `web/e2e/overlay-layers-live.spec.ts`, which
+reads the ladder back out of a real browser — every rung declared, the ladder
+rising, scrim and modal adjacent, nothing above `--z-alert` — and checks an open
+composer menu computes to `--z-popover`.

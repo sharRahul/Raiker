@@ -13,7 +13,7 @@ import { signInAsOwner } from "./hosted-provider";
  */
 
 const BASE = "http://127.0.0.1:8765";
-const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
+const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 
 /** Every route in the rail, so a sweep cannot quietly skip one. */
 const ROUTES = [

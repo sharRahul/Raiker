@@ -16,7 +16,7 @@ import { OWNER_CREDENTIALS, signInAsOwner } from "./hosted-provider";
 const BASE = "http://127.0.0.1:8765";
 // Anchored to this file rather than to the working directory, so evidence lands
 // in the repository whether the runner is started from web or the root.
-const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
+const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const PASSWORD = OWNER_CREDENTIALS.password;
 
 /** Create (or reuse) the owner account and land on the workbench. */

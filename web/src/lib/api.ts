@@ -23,6 +23,8 @@ import type {
   OwnerQuestionAnswered,
   ConversationBranchOrigin,
   ConversationBranchPlan,
+  EnvironmentContext,
+  ReadCapabilities,
   Checkpoint,
   CommandChunkView,
   CommandReceiptView,
@@ -32,6 +34,7 @@ import type {
   CodeMapPaths,
   CodeMapStatus,
   CodeRepoBrowseView,
+  CodeRepoChangesView,
   CodeRepoDiagnosticsView,
   CodeRepoFileView,
   CodeReposView,
@@ -582,6 +585,14 @@ export const api = {
   sessionPlan: (sessionId: string) =>
     request<AgentPlan>(`/api/sessions/${encodeURIComponent(sessionId)}/plan`),
   capabilityGates: () => request<CapabilityGate[]>("/api/capability-gates"),
+  // WEB-01/WEB-04 — one read for the whole contract: the catalogue, its
+  // per-surface parity, and typed readiness. Every composer answers from this
+  // rather than deriving a list of its own, which is the drift the contract
+  // exists to remove.
+  readCapabilities: () => request<ReadCapabilities>("/api/read-capabilities"),
+  // ENV-05 — the same bundle a model turn is given. Read rather than
+  // recomputed, so a page and a turn cannot disagree about what time it is.
+  environment: () => request<EnvironmentContext>("/api/environment"),
   capabilityGate: (capability: string) =>
     request<CapabilityGate>(
       `/api/capability-gates/${encodeURIComponent(capability)}`,
@@ -1920,6 +1931,13 @@ export const api = {
   readCodeRepoFile: (repoId: string, path: string) =>
     request<CodeRepoFileView>(
       `/api/code/repos/${encodeURIComponent(repoId)}/file?path=${encodeURIComponent(path)}`,
+    ),
+  // VIS2-12 — what has changed in the working tree and not yet been committed.
+  // The `Changes` tab of Build's artifact pane reads this; it is the same change
+  // set a commit would record, because it comes from the same two helpers.
+  readCodeRepoChanges: (repoId: string) =>
+    request<CodeRepoChangesView>(
+      `/api/code/repos/${encodeURIComponent(repoId)}/changes`,
     ),
   // B10 — what a parser sees in the file the owner just opened.
   readCodeRepoDiagnostics: (repoId: string, path: string) =>

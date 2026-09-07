@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
@@ -28,6 +28,7 @@
   import { readinessLabel, UNPINNED_MODEL } from "../modelReadinessLabels";
   import { isChoosableModel } from "../modelReadiness.svelte";
   import { installerRuntimeFor, openRuntimeInstaller } from "../runtimeInstall";
+  import { detectionNotice, onReturnToApp } from "../returnAndDetect";
   import { setModels } from "../models.svelte";
   import { modelDecisions } from "../surfaceModel.svelte";
   import LocalLibraryPanel from "./models/LocalLibraryPanel.svelte";
@@ -542,14 +543,50 @@
     try {
       await openRuntimeInstaller(runtime);
       // Deliberately not "installed". Raiker opened a download; whether the
-      // owner ran it is theirs to say, and **Look again** is how they say it.
-      installNotice = `Opened the official ${providerName(provider)} download. Install it, then choose Look again.`;
+      // owner ran it is theirs to say — and MODEL-14 is that Raiker should ask
+      // itself rather than asking them to press Look again.
+      installNotice = `Opened the official ${providerName(provider)} download. Install it and come back — Raiker will look again.`;
+      armReturnDetect(providerName(provider));
     } catch {
       installNotice = `Could not open the ${providerName(provider)} download.`;
     } finally {
       installing = null;
     }
   }
+
+  /**
+   * MODEL-14 — re-run detection the moment the owner comes back.
+   *
+   * One shot, cancelled on unmount, and honest about the outcome: it reports
+   * what detection *found*, so a tab regaining focus can never be mistaken for
+   * an install that happened.
+   */
+  let cancelReturnDetect: (() => void) | null = null;
+
+  function armReturnDetect(vendor: string) {
+    cancelReturnDetect?.();
+    cancelReturnDetect = onReturnToApp(() => {
+      cancelReturnDetect = null;
+      void (async () => {
+        detecting = true;
+        try {
+          const result = await api.detectLocalRuntimes();
+          await load();
+          installNotice = detectionNotice({
+            vendor,
+            detected: result.runtimes.some((row) => row.present),
+          });
+        } catch {
+          // A failed look leaves the last answer standing rather than replacing
+          // it with a claim this call did not establish.
+        } finally {
+          detecting = false;
+        }
+      })();
+    });
+  }
+
+  onDestroy(() => cancelReturnDetect?.());
 
   async function redetectRuntimes() {
     detecting = true;
@@ -2822,7 +2859,7 @@
     justify-content: center;
     padding: var(--space-4);
     position: fixed;
-    z-index: 40;
+    z-index: var(--z-scrim);
   }
   .signin-dialog {
     position: relative;
@@ -2996,7 +3033,7 @@
     justify-content: center;
     padding: var(--space-4);
     position: fixed;
-    z-index: 30;
+    z-index: var(--z-scrim);
   }
   .details-dialog {
     max-width: 42rem;

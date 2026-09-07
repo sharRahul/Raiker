@@ -79,7 +79,14 @@ class TestATaskCarriesItsWorkingMethod:
         assert store.load_task(task.task_id).surface == "build"  # type: ignore[union-attr]
 
     def test_it_is_the_same_set_a_composer_is_validated_against(self) -> None:
-        assert {"chat", "build"} == PROMPT_SURFACES
+        # WEB-06 added `design`: a third *working method*, not a third product.
+        # A Design turn researches references through the same governed read
+        # catalogue as any other turn; the picture is made by a separate
+        # endpoint this surface cannot reach. The set has to stay identical to
+        # the composer's, which is the whole point of the assertion — a task
+        # that could name a method no composer validates would run under
+        # standing instructions nothing checked.
+        assert {"chat", "build", "design"} == PROMPT_SURFACES
         with pytest.raises(ContractValidationError):
             TaskRecord(
                 task_id="task_1", session_id="s", title="t", objective="o",

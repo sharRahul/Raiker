@@ -641,7 +641,7 @@
   .overlay {
     position: fixed;
     inset: 0;
-    z-index: 100;
+    z-index: var(--z-scrim);
     display: grid;
     place-items: center;
     padding: var(--space-4);

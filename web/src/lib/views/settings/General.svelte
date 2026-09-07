@@ -1,4 +1,14 @@
 <script lang="ts">
+  import {
+    TIMEZONE_KEY,
+    WEATHER_LOCATION_KEY,
+    localTimeIn,
+    resolvedTimezone,
+    timezoneOptions,
+    timezoneProposal,
+    timezoneSourceLabel,
+  } from "../../environment";
+
   let { settings, save }: {
     settings: Record<string, unknown>;
     save: (p: Record<string, unknown>) => void;
@@ -6,9 +16,32 @@
 
   const language = $derived((settings["general.language"] as string) ?? "en-GB");
   const region = $derived((settings["general.region"] as string) ?? "GB");
-  const timezone = $derived((settings["general.timezone"] as string) ?? "Europe/London");
   const startupRoute = $derived((settings["general.startup_route"] as string) ?? "workbench");
   const speechLanguage = $derived((settings["general.speech_language"] as string) ?? "auto");
+
+  // ENV-02 — the time zone is not a formatting preference here. It is the one
+  // owner-level value every model turn reasons from, so the control shows what
+  // is actually in force, where that came from, and what the owner's clock reads
+  // in it right now. A select whose effect you cannot see is a select nobody
+  // trusts.
+  const zones = timezoneOptions();
+  const resolved = $derived(resolvedTimezone(settings));
+  const explicit = $derived((settings[TIMEZONE_KEY] as string) ?? "");
+  // A device zone is *offered*, never applied. Somebody who set Europe/London
+  // and opened Raiker from a hotel in Denver has said something about their
+  // schedule; rewriting it silently would move every recurring task to fix a
+  // problem they do not have.
+  const proposal = $derived(timezoneProposal(settings));
+  const weatherLocation = $derived((settings[WEATHER_LOCATION_KEY] as string) ?? "");
+
+  // Ticks so the sample clock stays true while the page is open. A frozen
+  // timestamp under a control that claims to set the clock is worse than none.
+  let now = $state(new Date());
+  $effect(() => {
+    const timer = setInterval(() => (now = new Date()), 30_000);
+    return () => clearInterval(timer);
+  });
+  const sample = $derived(localTimeIn(resolved.zone, now));
 </script>
 
 <header class="section-heading">
@@ -54,7 +87,7 @@
   </label>
   <label>
     <span>Country or region</span>
-    <small>Used for regional formatting. Scheduled work also uses the time zone below.</small>
+    <small>Used for regional formatting only. Scheduling is decided under Time and place.</small>
     <select value={region} onchange={(e) => save({ "general.region": e.currentTarget.value })}>
       <option value="GB">United Kingdom</option>
       <option value="US">United States</option>
@@ -64,17 +97,59 @@
       <option value="ES">Spain</option>
     </select>
   </label>
+</section>
+
+<section class="settings-card" aria-labelledby="time-and-place">
+  <div class="card-heading">
+    <h3 id="time-and-place">Time and place</h3>
+    <p>
+      Raiker tells every model turn the current date, day and time in this zone. Nothing
+      is left to the model to remember, and no web connection is needed to know it.
+    </p>
+  </div>
   <label>
     <span>Time zone</span>
-    <small>Used for task schedules and activity timestamps.</small>
-    <select value={timezone} onchange={(e) => save({ "general.timezone": e.currentTarget.value })}>
-      <option value="Europe/London">Europe/London</option>
-      <option value="America/New_York">America/New_York</option>
-      <option value="America/Los_Angeles">America/Los_Angeles</option>
-      <option value="Asia/Kolkata">Asia/Kolkata</option>
-      <option value="Europe/Berlin">Europe/Berlin</option>
-      <option value="UTC">UTC</option>
+    <small>
+      Used for schedules, recurring tasks and every relative instruction — tomorrow,
+      tonight, this Friday.
+    </small>
+    <select
+      aria-label="Time zone"
+      value={explicit}
+      onchange={(e) => save({ [TIMEZONE_KEY]: e.currentTarget.value })}
+    >
+      <option value="">Not set — Raiker falls back to UTC</option>
+      {#each zones as zone (zone)}
+        <option value={zone}>{zone}</option>
+      {/each}
     </select>
+  </label>
+  <p class="resolved" data-testid="timezone-resolved">
+    <strong>{resolved.zone}</strong> · {timezoneSourceLabel(resolved.source)}
+    {#if sample}<br /><span class="clock">Right now that reads {sample}.</span>{/if}
+  </p>
+  {#if proposal}
+    <p class="proposal" data-testid="timezone-proposal">
+      This device reports <strong>{proposal}</strong>. Raiker will not change your
+      choice on its own.
+      <button type="button" class="link" onclick={() => save({ [TIMEZONE_KEY]: proposal })}>
+        Use {proposal}
+      </button>
+    </p>
+  {/if}
+  <label>
+    <span>Default weather location</span>
+    <small>
+      Optional. Used only when you ask about the weather without naming a place. Raiker
+      never works one out from your network address.
+    </small>
+    <input
+      type="text"
+      aria-label="Default weather location"
+      placeholder="London, United Kingdom"
+      value={weatherLocation}
+      onchange={(e) => save({ [WEATHER_LOCATION_KEY]: e.currentTarget.value.trim() })}
+    />
   </label>
 </section>
 
@@ -103,5 +178,14 @@
   .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--card-pad-y) var(--card-pad-x); margin-bottom: var(--space-4); }
   label { display: grid; gap: .3rem; max-width: 34rem; margin-top: var(--space-5); font-weight: 650; }
   label small { color: var(--text-2); font-weight: 400; }
-  select { width: 100%; }
+  select, input[type="text"] { width: 100%; }
+  .resolved { color: var(--text-2); margin: var(--space-3) 0 0; max-width: 34rem; }
+  .resolved strong { color: var(--text-1); }
+  .clock { font-variant-numeric: tabular-nums; }
+  .proposal { color: var(--text-2); margin: var(--space-2) 0 0; max-width: 34rem; }
+  .proposal strong { color: var(--text-1); }
+  .link {
+    background: none; border: 0; padding: 0; font: inherit; font-weight: 650;
+    color: var(--accent); cursor: pointer; text-decoration: underline;
+  }
 </style>

@@ -193,7 +193,7 @@
     position: absolute;
     left: 0;
     bottom: calc(100% + 6px);
-    z-index: 70;
+    z-index: var(--z-popover);
     width: min(23rem, calc(100vw - 2rem));
     display: grid;
     gap: var(--space-2);

@@ -13,20 +13,20 @@ with the two defects the work surfaced as
 | COMPOSER-01 shared shell | Done — `Composer.svelte` plus `ComposerActionMenu`, `ComposerContext` |
 | COMPOSER-02 minimal default state | Done — `[+] [Tools] … model … Send` |
 | COMPOSER-03 one Add menu | Done |
-| COMPOSER-04 one Tools menu | Done, derived from the typed registry |
+| COMPOSER-04 one Tools menu | Done, derived from the typed registry. The single **Search the web** entry became four — search, read a URL, extract page content, weather — because they fail differently and one row could only report the state of whichever it happened to check |
 | COMPOSER-05 model identity, hidden management | Done — picker ends in one link to Models |
 | COMPOSER-06 one context line | Done — the meter is composed into its inspector |
-| COMPOSER-07/08/09 per-surface composition | Done; Design's Tools control is deliberately absent, see below |
-| COMPOSER-10 Tasks/Schedule composer | Partial — Tasks keeps its own model picker; the shared shell is not applied there yet |
+| COMPOSER-07/08/09 per-surface composition | Done. Design's Tools control is present as of 2026-09-07 and reaches something real: the four research reads run a governed research turn on the `design` surface (WEB-06). The *image* controls COMPOSER-09 lists are still absent, for the reason stated below |
+| COMPOSER-10 Tasks/Schedule composer | Done — Tasks is written on the shared shell as an instruction (`taskComposer.ts`); cadence chooses the primary action, and the schedule, project, model and notification details expand only when asked ([FIXED-470](FIXED_ITEMS.md#fixed-470--tasks-asked-to-be-filled-in-rather-than-instructed)) |
 | COMPOSER-11 Project continuity | Partial — the Project is carried and shown per surface; a shared draft across modes is not implemented |
 | COMPOSER-12 governance near the action | Done — the posture chip renders only as an exception |
 | COMPOSER-13 slash and `@` accelerators | Already satisfied; `+` now makes the same actions discoverable without the syntax |
 | COMPOSER-14 paste/drop intelligence | Partial — drag/drop and paste attach as before; large-paste-to-attachment is not implemented |
-| COMPOSER-15 adaptive primary action | Done for Chat, Build and Design's single actions; Build's `Run ▾` intents are not implemented |
+| COMPOSER-15 adaptive primary action | Done — the word names the act the press performs on every surface: Chat `Send`, Build `Run`/`Plan`/`Propose` per mode (`buildPrimaryAction`), Design `Generate`, Tasks `Create task`/`Schedule task`/`Create routine`/`Start background agent` per cadence, and a running turn offers Stop instead ([FIXED-471](FIXED_ITEMS.md#fixed-471--one-primary-action-that-did-not-say-what-it-would-do)) |
 | COMPOSER-16 mobile bottom sheet | Done |
 | COMPOSER-17 keyboard behaviour | Done — Escape closes a menu, the composer's own bindings are unchanged |
 | COMPOSER-18 no duplicated page actions | Done |
-| COMPOSER-19 typed capability registry | Done — `composerCapabilities.ts` |
+| COMPOSER-19 typed capability registry | Done — `composerCapabilities.ts`; entries now also carry typed readiness, so a permitted-but-unready capability reads as `Needs provider` rather than as one more grey row ([FIXED-461](FIXED_ITEMS.md#fixed-461--four-derivations-of-one-fact-about-what-a-turn-can-read)) |
 | COMPOSER-20 visual quality rules | Done; rules 3 and 12 are pinned by `visualRubric.test.ts` |
 
 **What is deliberately not built, and why.** COMPOSER-09 describes edit,

@@ -83,6 +83,18 @@ describe("ApprovalsView", () => {
     expect(screen.getByText("medium")).toBeInTheDocument();
   });
 
+  it("tones the dangerous decision, not every decision in the queue (VIS2-13)", async () => {
+    // Every row used to carry a toned risk pill, which made a queue of routine
+    // decisions look uniformly urgent and left the one critical row indistinct.
+    const critical = { ...PENDING, approval_id: "appr_critical", risk_level: "critical" };
+    stubFetch({ "GET /api/approvals": [PENDING, critical] });
+    render(ApprovalsView);
+
+    await waitFor(() => expect(screen.getByText("critical")).toBeInTheDocument());
+    expect(screen.getByText("critical").closest(".badge")).not.toBeNull();
+    expect(screen.getByText("medium").closest(".badge")).toBeNull();
+  });
+
   it("names the machine proposer separately from the human authorizer", async () => {
     const proposed = {
       principal_id: "principal_turn_agent_1",

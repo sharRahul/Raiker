@@ -2,6 +2,7 @@
   import { onDestroy } from "svelte";
   import { api, ApiError } from "../../api";
   import ProviderLogo from "../../components/ProviderLogo.svelte";
+  import { huggingFaceSteps, tokenControlVisible } from "../../huggingFaceSteps";
   import type {
     HuggingFaceDownloadPreview,
     HuggingFaceSearchResult,
@@ -106,6 +107,11 @@
   async function chooseVariant(variant: HuggingFaceVariant) {
     selected = variant;
     preview = null;
+    // A different variant is a different download. Leaving the previous one's
+    // completion in place would show a rail on "Add to My models" for a file
+    // that has not been fetched.
+    downloadComplete = false;
+    conversionDone = false;
     try {
       preview = await api.previewHuggingFaceDownload(variant, destination);
     } catch (e) {
@@ -124,6 +130,46 @@
   let downloadState = $state<string | null>(null);
   let downloadPercent = $state<number | null>(null);
   let followTimer: number | undefined;
+
+  let advancedOpen = $state(false);
+  let downloadComplete = $state(false);
+  let conversionDone = $state(false);
+
+  /**
+   * MODEL-09 — where the owner is in the six-step flow.
+   *
+   * Derived from the state above rather than counted alongside it. A counter
+   * kept on the side is a second source of truth about the flow, and it will
+   * disagree with the flow the first time the owner goes back to the results
+   * list — leaving the page asserting "step 4" about something they can plainly
+   * see is not happening.
+   */
+  const steps = $derived(
+    huggingFaceSteps({
+      repoSelected: selectedRepo !== null,
+      variantSelected: selected !== null,
+      previewReady: preview !== null,
+      downloading: downloadingOperationId !== null,
+      downloaded: downloadComplete,
+      // Only Safetensors needs the conversion step. A GGUF is ready to run, and
+      // showing it a step it will never take makes the flow look longer and
+      // more fragile than it is.
+      needsConversion: selected?.format === "safetensors",
+      converted: conversionDone,
+    }),
+  );
+
+  /** MODEL-09 — the token control is for gated repositories, not for everyone. */
+  const selectedResult = $derived(
+    results.find((item) => item.repo_id === selectedRepo) ?? null,
+  );
+  const showToken = $derived(
+    tokenControlVisible({
+      selectedRepoGated:
+        (selectedResult?.gated ?? false) || (selected?.gated ?? false),
+      advancedOpen,
+    }),
+  );
 
   function stopFollowing() {
     if (followTimer !== undefined) window.clearTimeout(followTimer);
@@ -156,6 +202,9 @@
     if (item.state === "complete") {
       stopFollowing();
       downloadingOperationId = null;
+      // MODEL-09 — the rail advances off the same fact the notice below is
+      // written from, so the step shown and the sentence read cannot disagree.
+      downloadComplete = true;
       notice =
         format === "safetensors"
           ? "Safetensors downloaded. Review the isolated conversion below."
@@ -252,6 +301,7 @@
         selected.revision,
         quantization,
       );
+      conversionDone = true;
       notice = "Conversion queued. Follow it in Activity.";
     } catch (e) {
       error =
@@ -284,13 +334,19 @@
         for an optional isolated conversion when no suitable GGUF exists.
       </p>
     </div>
-    <button
-      class="btn btn-ghost btn-sm"
-      type="button"
-      onclick={() => (tokenOpen = !tokenOpen)}
-      >{tokenOpen ? "Close token setup" : "Set access token"}</button
-    >
   </section>
+
+  <!-- MODEL-09 — the flow, said out loud. Six controls on one screen with
+       nothing naming the sequence is what made this panel hard to start: the
+       rail does not hide anything, it says which of them is your next move. -->
+  <ol class="step-rail" aria-label="Adding a local model">
+    {#each steps as step, index (step.id)}
+      <li class="step" data-state={step.state} aria-current={step.state === "active"}>
+        <span class="step-number" aria-hidden="true">{index + 1}</span>
+        <span class="step-label">{step.label}</span>
+      </li>
+    {/each}
+  </ol>
   <section class="card curated-embedding" aria-label="Curated local embedding model">
     <div>
       <p class="eyebrow">Curated for semantic recall</p>
@@ -306,7 +362,24 @@
       onclick={() => void chooseRepo("nomic-ai/nomic-embed-text-v1.5-GGUF")}
     >Review variants</button>
   </section>
-  {#if tokenOpen}<form
+  <!-- MODEL-09 — this appears when the repository in front of the owner
+       actually needs it. As a permanent hero button beside the search box it
+       told every owner that signing in to Hugging Face was a normal part of
+       downloading a public model, which it is not. -->
+  {#if showToken}
+    <p class="token-prompt">
+      {#if selectedResult?.gated || selected?.gated}
+        <strong>{selectedRepo}</strong> is gated. Accept its terms on Hugging Face,
+        then save an access token here.
+      {:else}
+        A token is only needed for private or gated repositories.
+      {/if}
+      <button class="btn btn-ghost btn-sm" type="button" onclick={() => (tokenOpen = !tokenOpen)}>
+        {tokenOpen ? "Close token setup" : "Set access token"}
+      </button>
+    </p>
+  {/if}
+  {#if showToken && tokenOpen}<form
       class="token-card card"
       onsubmit={(e) => {
         e.preventDefault();
@@ -514,9 +587,83 @@
         onclick={() => void convert()}>Convert in isolation</button
       >
     </section>{/if}
+  <p class="advanced">
+    <button
+      type="button"
+      class="link-button"
+      aria-expanded={advancedOpen}
+      onclick={() => (advancedOpen = !advancedOpen)}
+      >{advancedOpen ? "Hide access token setup" : "Access token setup"}</button
+    >
+    <span>Only needed for private or gated repositories.</span>
+  </p>
 </div>
 
 <style>
+  /* MODEL-09 — a rail, not a wizard. It states the sequence and where the owner
+     is in it; every control stays reachable, which is what keeps a person who
+     already knows the flow from having to click through it. */
+  .step-rail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    list-style: none;
+    margin: 0 0 var(--space-4);
+    padding: 0;
+  }
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--text-3);
+    font-size: var(--text-xs);
+  }
+  .step-number {
+    display: grid;
+    place-items: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    font-variant-numeric: tabular-nums;
+  }
+  .step[data-state="done"] { color: var(--text-2); }
+  .step[data-state="done"] .step-number {
+    border-color: var(--border-strong);
+    color: var(--text-2);
+  }
+  .step[data-state="active"] { color: var(--text-1); font-weight: 650; }
+  .step[data-state="active"] .step-number {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .token-prompt {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 var(--space-3);
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+  .advanced {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: var(--space-4) 0 0;
+    color: var(--text-3);
+    font-size: var(--text-xs);
+  }
+  .link-button {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+  }
   .hf-shell {
     --text-muted: var(--text-2);
     display: grid;
@@ -754,9 +901,6 @@
     }
     .search-hero {
       grid-template-columns: 52px 1fr;
-    }
-    .search-hero button {
-      grid-column: 2;
     }
     .token-card {
       grid-template-columns: 1fr;

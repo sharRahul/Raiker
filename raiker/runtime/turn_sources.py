@@ -504,6 +504,37 @@ def source_from_tool_result(
             kind=kind, title=_text(output.get("title")) or url or "Web page",
             locator=url, tool_name=tool_name, passage=passage,
         )
+    if tool_name == "web_extract":
+        url = _text(output.get("final_url") or output.get("requested_url") or args.get("url"), 500)
+        mode = _text(args.get("mode") or output.get("mode") or "main_content", 40)
+        return SourceDraft(
+            kind=kind,
+            title=_text(output.get("title")) or url or "Web page",
+            locator=url, tool_name=tool_name,
+            # The mode is the difference between two reads of the same URL, so
+            # it belongs on the row: "the links of this page" and "the prose of
+            # this page" are different material and citing one as the other
+            # would point a reader at text that never contained the claim.
+            detail=f"{mode} extraction",
+            passage=passage,
+        )
+    if tool_name == "weather_lookup":
+        location = output.get("location")
+        place = _text(
+            (location or {}).get("display_name") if isinstance(location, dict) else None,
+            120,
+        ) or _text(args.get("location"), 120)
+        return SourceDraft(
+            kind=kind,
+            title=f"Weather: {place}" if place else "Weather",
+            locator=_text(output.get("provider"), 80),
+            tool_name=tool_name,
+            # Freshness is the whole point of the row. A citation to a stale
+            # reading has to say so where the reader looks, not only inside the
+            # payload the model saw.
+            detail=_text(output.get("freshness"), 40),
+            passage=passage,
+        )
     if tool_name == "web_search":
         query = _text(args.get("query"))
         return SourceDraft(

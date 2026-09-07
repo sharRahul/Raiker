@@ -62,6 +62,8 @@ SOURCE_TYPES: Mapping[str, str] = {
     "background_run": "command_output",
     "web_fetch": "external_web",
     "web_search": "external_web",
+    "web_extract": "external_web",
+    "weather_lookup": "external_web",
     "github_read": "connector",
     "gmail_read": "connector",
     "gcal_read": "connector",

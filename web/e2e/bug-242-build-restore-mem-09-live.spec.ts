@@ -8,7 +8,7 @@ import { capture } from "./capture";
 import { dismissFirstRunModelSetup, OWNER_CREDENTIALS, refreshHostedReadiness, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
-const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
+const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const PASSWORD = OWNER_CREDENTIALS.password;
 
 test.describe.configure({ mode: "serial" });

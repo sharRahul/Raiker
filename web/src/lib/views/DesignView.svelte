@@ -27,9 +27,21 @@
   import { providerName, relativeTime } from "../format";
   import { runtimeBlock } from "../capabilityModel";
   import { composerMenu } from "../composerCapabilities";
+  import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
+  import { setWorkProject, workProject } from "../workProject.svelte";
   import { imageCandidates, modelName } from "../modelPresentation";
   import { rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
-  import type { CapabilityGate, ImageGeneration, ModelsView } from "../apiTypes";
+  import type {
+    CapabilityGate,
+    ImageGeneration,
+    ModelsView,
+    ProjectsList,
+  } from "../apiTypes";
+
+  let {
+    /** The owner's projects, so the composer can name the one work runs in. */
+    projects = null,
+  }: { projects?: ProjectsList | null } = $props();
 
   let view = $state<{ sizes: string[]; generations: ImageGeneration[] } | null>(null);
   let loadError = $state<string | null>(null);
@@ -41,6 +53,28 @@
 
   let prompt = $state("");
   let size = $state("1024x1024");
+
+  /**
+   * WEB-06 — Design's research layer.
+   *
+   * The architecture the plan asks for is `Design composer → planning/research
+   * agent → global read capabilities → image model`, and the important word in
+   * it is the arrow that *is not there*: nothing goes from the read
+   * capabilities straight into image generation. A research turn is an ordinary
+   * governed turn on the `design` surface with the ordinary catalogue; the
+   * picture is made by a separate endpoint that reaches one image provider and
+   * has no idea this exists. So "find me references" cannot become "the image
+   * model may browse", because the two never share a path.
+   *
+   * What comes back is the model's own words about pages it read. It is shown
+   * as research, above the composer, for the owner to write a prompt from — not
+   * spliced into the prompt on their behalf.
+   */
+  let research = $state<{ question: string; answer: string } | null>(null);
+  let researching = $state(false);
+  let researchError = $state<string | null>(null);
+  let researchSession = $state<string | null>(null);
+  const readiness = $derived(readReadiness());
 
 
   /** Said before the press, through the helper every other gated surface uses. */
@@ -111,12 +145,46 @@
    * docs/plans/TO_BE_FIXED.md instead of implied by a control that does
    * nothing.
    */
-  const HANDLED = new Set(["set-project"]);
-  const addItems = $derived(composerMenu("add", "design", gates, HANDLED));
-  const toolItems = $derived(composerMenu("tools", "design", gates, HANDLED));
+  const HANDLED = new Set([
+    "set-project",
+    // The research reads. They are handled here — not routed away to another
+    // page — because this view really runs them, which is the test the composer
+    // registry applies to every entry it draws.
+    "web-search",
+    "web-read",
+    "web-extract",
+    "weather",
+  ]);
+  const addItems = $derived(composerMenu("add", "design", gates, HANDLED, readiness));
+  const toolItems = $derived(composerMenu("tools", "design", gates, HANDLED, readiness));
 
   /** COMPOSER-06 — the parameters this press will use, as one inspectable line. */
+  /**
+   * VIS2-11 — the Work project, named here as it is in Chat and Build.
+   *
+   * Named, and honestly bounded. Design's research turns run inside this
+   * project like any other governed turn; the *image* endpoint takes a prompt,
+   * a size and a model and has no project field, so a generated picture does
+   * not yet belong to the project it was made in. The fact says which of the
+   * two it is rather than implying the stronger one — recorded in
+   * docs/plans/TO_BE_FIXED.md as the runtime half that is missing.
+   */
+  const project = $derived(
+    (projects?.projects ?? []).find((entry) => entry.project_id === workProject()) ?? null,
+  );
+
   const contextFacts = $derived([
+    ...(project !== null
+      ? [
+          {
+            label: "Project",
+            value: `${project.name} — research runs here; images are not filed to it yet`,
+            short: project.name,
+            href: "#/projects",
+            action: "Projects",
+          },
+        ]
+      : []),
     {
       label: "Size",
       value: size,
@@ -134,8 +202,62 @@
       : []),
   ]);
 
+  const RESEARCH_ASKS: Record<string, string> = {
+    "web-search": "Find public visual references for: ",
+    "web-read": "Read this page and describe what it shows: ",
+    "web-extract": "Extract the reference details from this page: ",
+    weather: "What are the current conditions and light like in: ",
+  };
+
+  /** Open state for the project chooser the `+` menu reveals, as in Chat. */
+  let projectPickerOpen = $state(false);
+
   function runComposerAction(id: string) {
-    if (id === "set-project") window.location.hash = "#/projects";
+    if (id === "set-project") {
+      // VIS2-11 — chosen here rather than on another page. Sending the owner to
+      // Projects to pick one and back again is the re-choosing this item exists
+      // to remove.
+      projectPickerOpen = !projectPickerOpen;
+      return;
+    }
+    const ask = RESEARCH_ASKS[id];
+    if (ask !== undefined) void runResearch(ask);
+  }
+
+  /**
+   * Run one research turn on the `design` surface.
+   *
+   * The composer's text is the subject; an empty composer is not a question, so
+   * it asks for one rather than sending a bare verb to a model. The turn keeps
+   * its own session so a second question continues the first — research is
+   * iterative, and a fresh session each time would throw away what was just
+   * established.
+   */
+  async function runResearch(ask: string) {
+    const subject = prompt.trim();
+    if (!subject) {
+      researchError = "Describe what to research in the composer first.";
+      research = null;
+      return;
+    }
+    if (researching) return;
+    researching = true;
+    researchError = null;
+    try {
+      const response = await api.submitPrompt({
+        text: ask + subject,
+        surface: "design",
+        ...(researchSession ? { session_id: researchSession } : {}),
+      });
+      researchSession = response.session_id ?? researchSession;
+      research = { question: subject, answer: response.message ?? "" };
+    } catch (error) {
+      research = null;
+      researchError =
+        error instanceof ApiError ? error.message : "That research turn failed.";
+    } finally {
+      researching = false;
+    }
   }
 
   /**
@@ -195,6 +317,9 @@
     } catch {
       gates = [];
     }
+    // WEB-07 — from the shared snapshot, so configuring a search provider
+    // elsewhere reaches this still-mounted view without a reload.
+    await refreshReadCapabilities();
     try {
       models = await api.models();
       if (!choiceKey && imageChoices.length) {
@@ -304,6 +429,38 @@
     {/if}
   </div>
 
+  {#if researching || research !== null || researchError !== null}
+    <section class="research" aria-label="Design research" data-testid="design-research">
+      <p class="research-head">
+        <Icon name="globe" size="sm" />
+        <span
+          >Research{#if research !== null}: {research.question}{/if}</span
+        >
+        {#if research !== null || researchError !== null}
+          <button
+            type="button"
+            class="research-close"
+            onclick={() => {
+              research = null;
+              researchError = null;
+            }}>Dismiss</button
+          >
+        {/if}
+      </p>
+      {#if researching}
+        <p class="research-body">Reading sources…</p>
+      {:else if researchError}
+        <p class="research-body error" role="alert">{researchError}</p>
+      {:else if research !== null}
+        <p class="research-body">{research.answer}</p>
+        <p class="research-note">
+          Gathered by a governed research turn. It read pages; it did not draw
+          anything, and image generation gained no network access from it.
+        </p>
+      {/if}
+    </section>
+  {/if}
+
   <Composer
     ariaLabel="Image composer"
     inputId="design-prompt"
@@ -348,6 +505,33 @@
         </label>
       {/if}
       <ComposerContext facts={contextFacts} disabled={busy} />
+    {/snippet}
+
+    {#snippet above()}
+      {#if projectPickerOpen}
+        <div class="project-choice" role="group" aria-label="Choose a project">
+          <label for="design-project-choice">Project for this work</label>
+          <select
+            id="design-project-choice"
+            class="bar-select"
+            value={workProject()}
+            onchange={(event) => {
+              projectPickerOpen = false;
+              setWorkProject((event.currentTarget as HTMLSelectElement).value);
+            }}
+          >
+            <option value="">No project — this work stands alone</option>
+            {#each projects?.projects ?? [] as entry (entry.project_id)}
+              <option value={entry.project_id}>{entry.name}</option>
+            {/each}
+          </select>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            onclick={() => (projectPickerOpen = false)}>Done</button
+          >
+        </div>
+      {/if}
     {/snippet}
 
     {#snippet right()}
@@ -403,6 +587,47 @@
 </div>
 
 <style>
+  .research {
+    margin: 0 0 var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--sunken);
+  }
+  .research-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0 0 0.35rem;
+    color: var(--text-2);
+    font-size: var(--text-xs);
+    font-weight: 650;
+  }
+  .research-close {
+    margin-left: auto;
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .research-body { margin: 0; color: var(--text-1); white-space: pre-wrap; }
+  .research-body.error { color: var(--danger); }
+  .research-note { margin: 0.4rem 0 0; color: var(--text-3); font-size: var(--text-xs); }
+  /* The same shape Chat's chooser uses, for the same reason: it opens in flow
+     between the prompt and the bar rather than as a popover over the text. */
+  .project-choice {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    margin: 0 0 var(--space-2);
+  }
+  .project-choice label { color: var(--text-2); font-size: var(--text-sm); }
+  .project-choice select { min-width: 12rem; }
+
   /* The same frame Chat uses: the thread takes the room the shell gives it and
      scrolls, the composer stays on the floor of the page. */
   .design {
@@ -480,8 +705,13 @@
   /* The empty state of the model control: shaped like the select it replaces so
      the bar keeps its rhythm, and a link because the fix is on another page. */
   .bar-empty {
-    display: inline-flex;
-    align-items: center;
+    /* `inline-block`, not `inline-flex`. Found in the 2026-09-07 round: with no
+       image model connected the control drew as an *empty box*. A flex
+       container turns its text into an anonymous flex item, which
+       `text-overflow: ellipsis` cannot act on — so `overflow: hidden` below
+       clipped the whole sentence rather than truncating it, and the one control
+       whose entire job is to say "connect a model" said nothing at all. */
+    display: inline-block;
     color: var(--text-3);
     text-decoration: none;
     white-space: nowrap;

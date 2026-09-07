@@ -97,6 +97,10 @@ describe("nav model", () => {
     // a hook is something the owner installs, and it can only ever tighten what
     // Permissions already allows.
     expect(HUB_TABS.extensions).toEqual([
+      // VIS2-10 — Overview leads, as it does on Models. Five tabs named for
+      // kinds of thing is a filing system; nobody arrives wanting to look at
+      // the MCP category.
+      "overview",
       "connectors",
       "mcp",
       "skills",
@@ -264,7 +268,9 @@ describe("a hub tab addressed as a path segment", () => {
 
   it("falls back to the hub's first panel for a segment it does not have", () => {
     expect(routeFromHash("#/extensions/nonsense")).toBe("extensions");
-    expect(tabFromHash("#/extensions/nonsense")).toBe("connectors");
+    // The hub's first panel, which is Overview since VIS2-10 — and a better
+    // landing for a link nobody can resolve than a category chosen at random.
+    expect(tabFromHash("#/extensions/nonsense")).toBe("overview");
   });
 
   it("lets the query win when a hash somehow carries both", () => {

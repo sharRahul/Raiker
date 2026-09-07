@@ -219,7 +219,7 @@
   .scrim {
     position: fixed;
     inset: 0;
-    z-index: 120;
+    z-index: var(--z-palette);
     display: flex;
     justify-content: center;
     align-items: flex-start;

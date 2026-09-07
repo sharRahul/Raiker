@@ -72,6 +72,12 @@ LOCAL_GATE_CHECK_MODULES = {
     # MEM-10 reads admission first so Ask can degrade a passive read without
     # parking it, then routes allowed/auto execution through chokepoint B.
     "raiker/memory/query_embedding.py",
+    # WEB-04 — the readiness rows a composer renders. A third describing module,
+    # here for the same reason as `context/gatherer.py` and `control/service.py`:
+    # `web_search · Ready` has to be the enforcing path's own answer, or the
+    # Tools menu offers a capability the runtime is about to refuse. It decides
+    # nothing.
+    "raiker/runtime/read_capabilities.py",
     # BUG-239 — the same shape as `context/gatherer.py` above, for the owner
     # rather than for the model. The gate *view* is a description, and it used
     # to resolve an empty gate table its own way: Permissions said `web_fetch`

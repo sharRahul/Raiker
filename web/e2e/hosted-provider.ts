@@ -195,18 +195,27 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
  * The Models page, on the tab that actually holds the hosted provider cards.
  *
  * The wizard is re-asserted on every *load* until setup is finished, so the
- * first real navigation meets it again. Waiting for "either the tab or the
- * wizard" rather than polling for the wizard immediately is what makes this
+ * first real navigation meets it again. Waiting for "either the destination or
+ * the wizard" rather than polling for the wizard immediately is what makes this
  * deterministic: the wizard mounts only once the bootstrap reads have resolved,
  * which is after `goto` returns. It is identified by its own heading rather
  * than by a control on one of its stages, because a workspace resumed part-way
  * shows a stage that has neither of the buttons this used to wait for.
+ *
+ * **Found live on 2026-09-07, and it had taken every live spec down with it.**
+ * MODEL-03/MODEL-07 folded Local and Hosted into one **Add model** tab, and
+ * `?tab=hosted` became an alias that lands on the *inventory* — a page with no
+ * provider cards on it at all. This helper still waited for a `Hosted` tab, so
+ * eighteen specs timed out before their first assertion, and the failure looked
+ * like a broken product rather than a stale harness. It waits for the section
+ * heading now: `Your hosted providers` is what the redesign actually renders,
+ * and unlike a tab name it is the thing the cards are under.
  */
 export async function openHostedProviders(page: Page, base: string): Promise<void> {
-  const hosted = page.getByRole("tab", { name: "Hosted" });
+  const hosted = page.getByRole("heading", { name: "Your hosted providers" });
   const wizard = page.locator("#setup-title");
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    await page.goto(`${base}/#/models?tab=hosted`);
+    await page.goto(`${base}/#/models?tab=add`);
     await expect(hosted.or(wizard).first()).toBeVisible({ timeout: 30_000 });
     if (!(await dismissFirstRunModelSetup(page))) break;
   }

@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
 import { resetModels } from "./lib/models.svelte";
+import { resetWorkProject } from "./lib/workProject.svelte";
 
 // Node 25 ships a built-in `localStorage` global. It shadows the one jsdom
 // installs and is inert unless the process was started with a valid
@@ -40,4 +41,12 @@ installStorage("sessionStorage");
 // reset it leaks the previous test's snapshot into the next case (a picker would
 // briefly show a stale "selected" model until its own refresh resolves). Clear
 // it after every test so each case starts from the empty default.
-afterEach(() => resetModels());
+//
+// The shared Work project (VIS2-11) is the same shape of thing and leaks the
+// same way: a case that chose a project left Build already inside one, so the
+// case asserting that Build refuses to send *without* a project passed or
+// failed depending on what ran before it.
+afterEach(() => {
+  resetModels();
+  resetWorkProject();
+});

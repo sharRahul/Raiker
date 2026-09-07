@@ -663,7 +663,10 @@
      on top of them. Painted in tokens, the base is already right in both
      themes, and all three override blocks are gone. */
   .knowledge-shell { height:calc(100vh - 58px); min-height:650px; display:grid; grid-template-rows:64px 1fr; background:var(--bg); color:var(--text-1); }
-  .graph-toolbar { display:flex; gap:10px; align-items:center; padding:0 18px; border-bottom:1px solid var(--border); background:color-mix(in srgb, var(--surface) 96%, transparent); box-shadow:var(--shadow-1); z-index:20; }
+  /* VIS2-17 — the map's own ladder (vignette, stage, pills, popover, panels)
+     is local to the canvas and stays in single digits; the toolbar sits above
+     all of it, and the two surfaces that leave the canvas name a shared layer. */
+  .graph-toolbar { display:flex; gap:10px; align-items:center; padding:0 18px; border-bottom:1px solid var(--border); background:color-mix(in srgb, var(--surface) 96%, transparent); box-shadow:var(--shadow-1); z-index:var(--z-raised); }
   .title-block { min-width:190px; margin-right:auto; } .title-block h2 { overflow-wrap:anywhere; } .title-block h2 { margin:1px 0 0; color:var(--text-1); font-size:var(--text-base); letter-spacing:-.01em; } /* Shared `.eyebrow` sets the type; muted here because the graph toolbar
      already carries the accent. */ .eyebrow { color:var(--text-2); }
   .search { flex:0 1 min(380px, 42vw); display:flex; align-items:center; gap:8px; height:36px; padding:0 11px; border:1px solid var(--border-strong); border-radius:7px; background:var(--surface); color:var(--text-2); } .search:focus-within { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); } .search input { width:100%; border:0; outline:0; background:transparent; color:var(--text-1); font:inherit; font-size:var(--text-sm); }
@@ -695,7 +698,7 @@
     .depth-control { left:16px; right:16px; bottom:104px; transform:none; justify-content:space-between; }
     .depth-control input { width:auto; flex:1; }
   }
-  .settings-panel,.inspector { position:absolute; z-index:10; top:14px; right:14px; bottom:58px; width:300px; overflow:auto; border:1px solid var(--border-strong); border-radius:11px; background:color-mix(in srgb, var(--surface) 96%, transparent); backdrop-filter:blur(18px); box-shadow:var(--shadow-2); cursor:default; }
+  .settings-panel,.inspector { position:absolute; z-index:9; top:14px; right:14px; bottom:58px; width:300px; overflow:auto; border:1px solid var(--border-strong); border-radius:11px; background:color-mix(in srgb, var(--surface) 96%, transparent); backdrop-filter:blur(18px); box-shadow:var(--shadow-2); cursor:default; }
   /* VIS-06 — "Graph settings" is the heading of the panel it sits on, not a
      status marker. At 2xs in caps with .1em tracking it was the smallest and
      hardest-to-read text in a panel it is supposed to title. */
@@ -717,7 +720,7 @@
   .source-browser button.revoke { justify-content:flex-end; padding:5px 9px 9px; color:var(--danger); font-size:var(--text-2xs); }
   .from-computer { margin-top:16px; padding-top:14px; border-top:1px solid var(--border); } .from-computer h3 { margin:0 0 8px; font-size:var(--text-sm); } .from-computer form button { width:100%; margin-top:8px; border:1px solid var(--border); border-radius:6px; padding:8px; background:transparent; color:var(--text-2); cursor:pointer; } .upload { margin-top:14px; display:grid; gap:8px; color:var(--text-2); font-size:var(--text-2xs); } .upload input[type="file"] { color:var(--text-2); font-size:var(--text-2xs); } .consent { display:flex !important; align-items:flex-start; gap:8px; line-height:1.45; }
   .source-browser { display:grid; max-height:280px; overflow:auto; margin:0 0 12px; border:1px solid var(--border); border-radius:7px; } .source-browser button { display:flex; gap:8px; border:0; border-bottom:1px solid var(--border); padding:7px 9px; background:transparent; color:var(--text-2); text-align:left; cursor:pointer; } .source-browser button:hover,.source-browser button.selected { background:var(--accent-soft); } .source-browser button span { width:42px; color:var(--text-3); font-size:var(--text-2xs); } .source-browser button b { font-size:var(--text-2xs); } .source-browser small { padding:8px; color:var(--text-3); } .source-review { margin-top:12px; padding:12px; border:1px solid var(--border); border-radius:7px; background:var(--sunken); } .source-review h3 { margin:0 0 6px; } .source-review p { font-size:var(--text-2xs); } .source-review .warning { color:var(--warn); }
-  .context-menu { position:fixed; z-index:120; display:grid; min-width:160px; padding:5px; border:1px solid var(--border-strong); border-radius:7px; background:var(--raised); box-shadow:var(--shadow-2); } .context-menu button { border:0; border-radius:4px; padding:7px 9px; background:transparent; color:var(--text-1); text-align:left; cursor:pointer; font-size:var(--text-2xs); } .context-menu button:hover { background:var(--accent-soft); }
+  .context-menu { position:fixed; z-index:var(--z-popover); display:grid; min-width:160px; padding:5px; border:1px solid var(--border-strong); border-radius:7px; background:var(--raised); box-shadow:var(--shadow-2); } .context-menu button { border:0; border-radius:4px; padding:7px 9px; background:transparent; color:var(--text-1); text-align:left; cursor:pointer; font-size:var(--text-2xs); } .context-menu button:hover { background:var(--accent-soft); }
   @media (prefers-reduced-motion: reduce) { .particle { display:none; } }
   @media (max-width:800px) { .graph-toolbar { flex-wrap:wrap; } .search { flex:1 0 100%; order:2; margin-bottom:8px; } .knowledge-shell { grid-template-rows:auto 1fr; } .title-block { min-width:0; } .settings-panel,.inspector { width:min(300px, calc(100% - 28px)); } }
 </style>

@@ -21,7 +21,7 @@
    * are one reach away.
    */
   import Icon from "./Icon.svelte";
-  import type { ComposerMenuItem } from "../composerCapabilities";
+  import { READINESS_LABELS, type ComposerMenuItem } from "../composerCapabilities";
 
   let {
     kind,
@@ -112,8 +112,19 @@
               <Icon name={item.icon} size="sm" />
               <span class="entry-copy">
                 <span class="entry-label">{item.label}</span>
-                <span class="entry-hint" id={`${kind}-${item.id}-hint`}>{item.hint}</span>
+                <span class="entry-hint" id={`${kind}-${item.id}-hint`}>
+                  {item.readiness !== null && item.readiness.state !== "ready"
+                    ? (item.readiness.reason_text ?? item.hint)
+                    : item.hint}
+                </span>
               </span>
+              <!-- WEB-04 — readiness, printed only when it is not the plain
+                   `Ready` state. A row that says Ready on every entry is a row
+                   nobody reads, and the one entry that is *not* ready then
+                   reads as one more identical chip. -->
+              {#if item.readiness !== null && item.readiness.state !== "ready"}
+                <span class="entry-state">{READINESS_LABELS[item.readiness.state]}</span>
+              {/if}
             </button>
           {:else}
             <!-- COMPOSER-04 — a capability that is off stays listed, with the
@@ -145,6 +156,16 @@
 {/if}
 
 <style>
+  .entry-state {
+    flex: none;
+    align-self: center;
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    color: var(--text-3);
+    font-size: var(--text-2xs);
+    white-space: nowrap;
+  }
   .action-menu {
     position: relative;
     display: inline-flex;
@@ -193,7 +214,7 @@
     position: absolute;
     left: 0;
     bottom: calc(100% + 6px);
-    z-index: 70;
+    z-index: var(--z-popover);
     width: min(21rem, calc(100vw - 2rem));
     display: grid;
     gap: 1px;
@@ -248,13 +269,13 @@
       display: block;
       position: fixed;
       inset: 0;
-      z-index: 95;
+      z-index: var(--z-scrim);
       background: var(--overlay);
     }
     .menu {
       position: fixed;
       inset: auto 0 0 0;
-      z-index: 100;
+      z-index: var(--z-modal);
       width: auto;
       /* `.menu-surface` caps every menu at `min(24rem, 100vw - 2rem)`, which is
          right for a popover and wrong for a sheet: at 390px it left the sheet

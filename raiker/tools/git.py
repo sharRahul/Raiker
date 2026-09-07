@@ -261,6 +261,27 @@ def _porcelain(root: Path, paths: list[str] | None) -> list[dict[str, str]]:
     return entries
 
 
+def working_tree_changes(root: Path) -> list[dict[str, str]]:
+    """Every uncommitted change in *root*, as the commit proposal sees them.
+
+    A public name for :func:`_porcelain`, added when Build's artifact pane
+    needed the same list (VIS2-12). It delegates rather than reimplementing for
+    one reason: the pane that shows "Changes" and the commit that records them
+    have to describe one change set. A second `git status` written for the
+    browser could disagree with the proposal, and nothing in the interface would
+    say which of the two was right.
+    """
+    return _porcelain(root, None)
+
+
+def working_tree_diff(root: Path, entries: list[dict[str, str]]) -> str:
+    """The complete diff those *entries* represent, tracked and untracked alike.
+
+    The public half of :func:`_commit_diff`, for the same reason as above.
+    """
+    return _commit_diff(root, entries)
+
+
 def _entry_paths(entries: list[dict[str, str]]) -> list[str]:
     """Every path a commit of *entries* records, renames counted at both ends."""
     paths: list[str] = []

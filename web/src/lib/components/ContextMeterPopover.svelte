@@ -210,7 +210,7 @@
 
 <style>
   .context-popover.inline { position: static; width: auto; max-width: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-  .context-popover { position: absolute; right: 0; bottom: calc(100% + .55rem); width: min(35rem, calc(100vw - 2rem)); padding: 1.35rem 1.5rem; border: 1px solid var(--neutral-border); border-radius: .75rem; background: var(--surface); box-shadow: var(--shadow-2); z-index: 5; }
+  .context-popover { position: absolute; right: 0; bottom: calc(100% + .55rem); width: min(35rem, calc(100vw - 2rem)); padding: 1.35rem 1.5rem; border: 1px solid var(--neutral-border); border-radius: .75rem; background: var(--surface); box-shadow: var(--shadow-2); z-index: var(--z-popover); }
   .context-heading { display:flex; justify-content:space-between; gap:1rem; color:var(--text-1); } .context-heading span { color:var(--text-2); font-size:var(--text-sm); font-weight:650; }
   .usage-figure { display:grid; gap:.15rem; margin-top:1rem; } .usage-figure strong { font-size:var(--text-xl); color:var(--text-1); } .usage-figure span { color:var(--text-3); font-size:var(--text-sm); }
   p { color:var(--text-3); margin:.75rem 0 0; font-size:var(--text-sm); }

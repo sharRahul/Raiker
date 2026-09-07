@@ -38,12 +38,18 @@
     repoLabel,
     onclose,
     onmention,
+    onopen,
   }: {
     repoId: string;
     repoLabel: string;
     onclose: () => void;
     /** Put the open file's path in the composer, so reading leads to asking. */
     onmention?: (path: string) => void;
+    /**
+     * VIS2-12 — say which file is now open, so the workbench can read it in a
+     * column sized for reading rather than for a tree.
+     */
+    onopen?: (path: string) => void;
   } = $props();
 
   let listings = $state<Record<string, CodeRepoBrowseView>>({});
@@ -117,6 +123,9 @@
 
   async function openFile(entry: ProjectBrowseEntry): Promise<void> {
     openPath = entry.relative_path;
+    // Announced before the read, not after: the workbench does its own, and
+    // waiting would leave the pane a beat behind the tree.
+    onopen?.(entry.relative_path);
     fileLoading = true;
     fileNotice = null;
     fileText = "";

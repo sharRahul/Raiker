@@ -21,12 +21,8 @@
   import { api, ApiError } from "../api";
   import type { SkillView } from "../apiTypes";
   import { relativeTime } from "../format";
-  import {
-    conformanceBadge,
-    conformanceLabel,
-    conformanceSummary,
-    needsAttention,
-  } from "../skillConformance";
+  import { conformanceSummary } from "../skillConformance";
+  import { rowTokens, skillCandidates } from "../rowTokens";
 
   let skills = $state<SkillView[] | null>(null);
   let error = $state<string | null>(null);
@@ -467,32 +463,19 @@
                 <button type="button" class="btn btn-sm" onclick={() => (renamingId = null)}>Cancel</button>
               {:else}
                 <span class="name">{skill.name}</span>
-                {#if skill.active}
-                  <Badge variant="active" label="active" />
-                {:else}
-                  <Badge variant="idle" label="inactive" />
-                {/if}
-                {#if skill.version}<span class="version">v{skill.version}</span>{/if}
-                {#if skill.command_trigger}<Badge variant="metadata-only" label={`/${skill.command_trigger}`} />{/if}
-                {#if skill.conformance}
-                  <!-- Conformance is a property of the document, not a
-                       lifecycle state. A quiet tag unless there is something to
-                       act on, so it does not compete with the active/inactive
-                       badge beside it. -->
-                  {#if needsAttention(skill.conformance)}
-                    <Badge
-                      variant={conformanceBadge(skill.conformance)}
-                      label={conformanceLabel(skill.conformance)}
-                    />
-                  {:else}
-                    <span class="standard-tag" title="Measured against the Agent Skills standard">
-                      {conformanceLabel(skill.conformance)}
-                    </span>
-                  {/if}
-                {/if}
-                {#if isPluginSkill(skill)}
-                  <span class="provenance" title="Contributed by an installed plugin">from plugin</span>
-                {/if}
+                <!-- VIS2-13 — the row carried three badges of equal weight: a
+                     lifecycle state, a command trigger and a conformance
+                     measurement. `rowTokens.ts` decides which of a row's facts
+                     is worth a badge, so switched-on, a version, a trigger and
+                     a conformant document read as metadata and the eye is left
+                     free for the row that needs something. -->
+                {@const tokens = rowTokens(skillCandidates(skill, isPluginSkill(skill)))}
+                {#each tokens.badges as token (token.label)}
+                  <Badge variant={token.variant} label={token.label} />
+                {/each}
+                {#each tokens.facts as fact (fact)}
+                  <span class="row-fact" title={fact === "from plugin" ? "Contributed by an installed plugin" : null}>{fact}</span>
+                {/each}
               {/if}
             </div>
             {#if renamingId !== skill.skill_id}
@@ -637,17 +620,6 @@
 </section>
 
 <style>
-  .standard-tag {
-    font-size: var(--text-2xs);
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--text-3);
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    padding: 0.05rem 0.35rem;
-    white-space: nowrap;
-  }
   /* ADD-21 — the standard-conformance block. Severity is carried by a text
      label as well as by colour, so the row reads the same to a screen reader
      and in a high-contrast theme. */
@@ -780,21 +752,10 @@
   }
   .name-block { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .name { font-weight: 650; }
-  .version { color: var(--text-3); font-size: var(--text-xs); }
-  /* Provenance, not status: a plugin's skill is neither better nor worse than an
-     uploaded one, so this is a quiet chip rather than a coloured badge — the
-     active/inactive badge beside it is the one carrying state. */
-  .provenance {
-    font-size: var(--text-xs);
-    font-weight: 650;
-    letter-spacing: 0.01em;
-    color: var(--text-2);
-    background: var(--sunken);
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    padding: 0.08rem 0.4rem;
-    white-space: nowrap;
-  }
+  /* VIS2-13 — every fact on a row that did not earn a badge. One weight, so a
+     version, a trigger and a provenance note cannot compete with each other or
+     with the state beside them. */
+  .row-fact { color: var(--text-3); font-size: var(--text-xs); white-space: nowrap; }
   .actions { display: flex; gap: 0.3rem; flex-wrap: wrap; }
   .rename { max-width: 16rem; }
   .command-editor {

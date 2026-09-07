@@ -15,7 +15,7 @@ import { requireFirstRunWorkspace } from "./hosted-provider";
  */
 
 const BASE = process.env.RAIKER_LIVE_FIRSTRUN_BASE ?? "http://127.0.0.1:8766";
-const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
+const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
 const PASSWORD = "First-run-honesty-1!";
 
 test("stage 02 labels every offered backend", async ({ page }) => {

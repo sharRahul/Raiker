@@ -179,6 +179,13 @@ function modeTrigger() {
   return screen.getByRole("button", { name: /^How much Raiker may do this turn:/ });
 }
 
+// COMPOSER-15 — Build's primary action names the act the press performs, so it
+// reads "Run", "Plan" or "Propose" depending on the mode, never a generic
+// "Send". Tests ask for it by what it does, the same way the owner reads it.
+function sendButton() {
+  return screen.getByRole("button", { name: /^(Run|Plan|Propose)$/ });
+}
+
 // Build cannot start a turn without a project, so every test that sends one has
 // to choose one first. That is the product rule, not a test detail: the
 // selection is the retrieval and execution boundary the turn runs inside.
@@ -241,6 +248,130 @@ describe("Build's artifact zone", () => {
     expect(screen.queryByText("Governed terminal")).toBeNull();
   });
 
+  it("is one pane over four views, not two panels sharing a column", async () => {
+    // VIS2-12 — the column used to mean "whatever you last switched on".
+    stubFetch(baseRoutes());
+    await renderBuildWithProject();
+
+    await fireEvent.click(
+      await screen.findByRole("button", { name: "Show the governed terminal" }),
+    );
+
+    const tabs = await screen.findByRole("tablist", { name: "Workbench views" });
+    for (const label of ["Changes", "Preview", "Terminal", "Runs"]) {
+      expect(within(tabs).getByRole("tab", { name: new RegExp(`^${label}`) })).toBeInTheDocument();
+    }
+    // The control that opened it named the terminal, so that is the view.
+    expect(within(tabs).getByRole("tab", { name: "Terminal" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("opens on Runs when the control that opened it said background work", async () => {
+    stubFetch(baseRoutes());
+    await renderBuildWithProject();
+
+    await fireEvent.click(await screen.findByRole("button", { name: /background work/i }));
+
+    const tabs = await screen.findByRole("tablist", { name: "Workbench views" });
+    expect(within(tabs).getByRole("tab", { name: "Runs" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("says a folder under no version control is not the same as no changes", async () => {
+    // Two different answers, and the pane has to give the right one: "no
+    // changes" about a folder git has never seen is a claim nothing measured.
+    stubFetch(
+      baseRoutes({
+        "GET /api/code/repos": reposView({
+          repos: [LOCAL_REPO],
+          selected_repo_id: "repo_local",
+        }),
+        "GET /api/code/repos/repo_local/changes": {
+          entries: [],
+          diff: "",
+          truncated: false,
+          diff_truncated: false,
+          root_missing: false,
+          reason_code: "not_a_git_repository",
+        },
+      }),
+    );
+    await renderBuildWithProject();
+
+    await fireEvent.click(await screen.findByRole("button", { name: /background work/i }));
+    const tabs = await screen.findByRole("tablist", { name: "Workbench views" });
+    await fireEvent.click(within(tabs).getByRole("tab", { name: /^Changes/ }));
+
+    expect(await screen.findByText(/is not a git repository/)).toBeInTheDocument();
+  });
+
+  it("lists what a commit would record, and counts it once on the tab", async () => {
+    stubFetch(
+      baseRoutes({
+        "GET /api/code/repos": reposView({
+          repos: [LOCAL_REPO],
+          selected_repo_id: "repo_local",
+        }),
+        "GET /api/code/repos/repo_local/changes": {
+          entries: [
+            { path: "src/main.ts", previous_path: "", state: "modified", unstaged: true },
+            { path: "NEW.md", previous_path: "", state: "untracked", unstaged: true },
+          ],
+          diff: "--- a/src/main.ts\n+++ b/src/main.ts\n@@ -1 +1 @@\n-old\n+new\n",
+          truncated: false,
+          diff_truncated: false,
+          root_missing: false,
+          reason_code: null,
+        },
+      }),
+    );
+    await renderBuildWithProject();
+
+    await fireEvent.click(await screen.findByRole("button", { name: /background work/i }));
+    const tabs = await screen.findByRole("tablist", { name: "Workbench views" });
+    await fireEvent.click(within(tabs).getByRole("tab", { name: /^Changes/ }));
+
+    expect(await screen.findByText("2 files changed and not committed.")).toBeInTheDocument();
+    // Scoped to the file list, because the diff below it names the same path —
+    // and it is the *list* that has to be complete, not the diff.
+    const listed = await screen.findByRole("list", { name: "Changed files" });
+    expect(within(listed).getByText("src/main.ts")).toBeInTheDocument();
+    expect(within(listed).getByText("NEW.md")).toBeInTheDocument();
+    // VIS2-13 — one token, and only because it is not the ordinary state.
+    expect(within(tabs).getByRole("tab", { name: /^Changes/ })).toHaveTextContent("2");
+  });
+
+  it("lets each header control answer about its own view, not the column", async () => {
+    // With two panels sharing a column, "open" was a property of the column and
+    // both toggles read it — so opening the terminal made the other control say
+    // "Hide background work" about a pane showing the terminal.
+    stubFetch(baseRoutes());
+    await renderBuildWithProject();
+
+    await fireEvent.click(
+      await screen.findByRole("button", { name: "Show the governed terminal" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Show background work" }),
+    ).toBeInTheDocument();
+
+    // And it switches the view rather than closing a pane opened for something
+    // else: the owner asked for background work, so they get it.
+    await fireEvent.click(screen.getByRole("button", { name: "Show background work" }));
+    const tabs = await screen.findByRole("tablist", { name: "Workbench views" });
+    expect(within(tabs).getByRole("tab", { name: "Runs" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      screen.getByRole("button", { name: "Show the governed terminal" }),
+    ).toBeInTheDocument();
+  });
+
   // The narrow case — no third column, so the pane renders in place with its
   // own collapsed header — is a media-query branch (`compactRail`) that this
   // harness cannot set from props. It is covered by the width sweep.
@@ -259,7 +390,7 @@ describe("Build composer modes", () => {
     await fireEvent.input(await screen.findByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     // Opening in Auto must widen nothing: no capability override and no planning
@@ -301,7 +432,7 @@ describe("Build composer modes", () => {
     await fireEvent.click(await screen.findByRole("button", { name: "Done dictating" }));
     expect(streamPromptMock).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Describe the change")).toHaveValue("check the repository");
-    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await fireEvent.click(sendButton());
     expect(streamPromptMock.mock.calls[0][0]).toMatchObject({ input_mode: "dictated" });
   });
 
@@ -315,7 +446,7 @@ describe("Build composer modes", () => {
     await startComposerDictation();
     FakeRecognition.instance.final("discard this");
     await fireEvent.click(screen.getByRole("button", { name: "Cancel dictation" }));
-    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await fireEvent.click(sendButton());
 
     expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
       text: expect.stringContaining("keep this"),
@@ -328,7 +459,7 @@ describe("Build composer modes", () => {
     respondWith("Build answer");
     await renderBuildWithProject();
     await fireEvent.input(await screen.findByLabelText("Describe the change"), { target: { value: "Plan it" } });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     expect(await screen.findByRole("button", { name: "Read aloud" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy response" })).toBeInTheDocument();
@@ -340,7 +471,7 @@ describe("Build composer modes", () => {
     await renderBuildWithProject();
     const box = screen.getByLabelText("Describe the change");
     await fireEvent.input(box, { target: { value: "keep this change" } });
-    await waitFor(() => expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled());
+    await waitFor(() => expect(sendButton()).toBeDisabled());
     expect(screen.getByText("The local runtime is stopped.")).toBeInTheDocument();
     expect(box).toHaveValue("keep this change");
   });
@@ -419,7 +550,7 @@ describe("Build composer modes", () => {
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
@@ -441,7 +572,7 @@ describe("Build composer modes", () => {
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0].capability_modes).toEqual({});
@@ -456,7 +587,7 @@ describe("Build composer modes", () => {
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0]).toMatchObject({ planning_mode: "always" });
@@ -498,7 +629,7 @@ describe("Build model picker", () => {
       "true",
     );
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Use effort" } });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
@@ -531,7 +662,7 @@ describe("Build repository context", () => {
     // edit files says where without the owner looking up at the header.
     await screen.findAllByRole("button", { name: /my-app/ });
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Rename the header" } });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0].attachments).toEqual([
@@ -552,7 +683,7 @@ describe("Build repository context", () => {
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Read the handoff" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(screen.getByText("HANDOFF.md").closest(".from-you")).toBeNull();
@@ -567,7 +698,7 @@ describe("Build repository context", () => {
 
     await screen.findAllByRole("button", { name: /octo\/app/ });
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Summarise the README" } });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0].text).toBe(
@@ -627,7 +758,7 @@ describe("Build project filing", () => {
     expect(await screen.findByText(/filed there as soon as it starts/i)).toBeInTheDocument();
 
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Start" } });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => {
       const moved = fetchMock.mock.calls.some(([url]) =>
@@ -647,7 +778,7 @@ describe("Build project requirement", () => {
       target: { value: "Add a settings page" },
     });
 
-    expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled();
+    expect(sendButton()).toBeDisabled();
     expect(screen.getByText(/select a project to start/i)).toBeVisible();
   });
 
@@ -656,7 +787,7 @@ describe("Build project requirement", () => {
     await renderBuildWithProject();
 
     expect(await screen.findByText(/working in/i)).toBeVisible();
-    expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled();
+    expect(sendButton()).toBeDisabled();
   });
 
   it("sends the selected project as the turn's boundary", async () => {
@@ -667,7 +798,7 @@ describe("Build project requirement", () => {
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0].surface).toBe("build");
@@ -682,7 +813,7 @@ describe("Build project requirement", () => {
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     // COMPOSER-03 — the select is behind `+` now. What must not change is that
     // a running turn cannot have its boundary moved out from under it.
@@ -789,7 +920,7 @@ describe("Build transcript rendering", () => {
     await fireEvent.input(await screen.findByLabelText("Describe the change"), {
       target: { value: "Plan the change" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     const answer = await waitFor(() => {
       const el = document.querySelector(".from-raiker .markdown");
@@ -927,7 +1058,7 @@ describe("Build inline diff review", () => {
     await fireEvent.input(await screen.findByLabelText("Describe the change"), {
       target: { value: "Rename the entry point" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     // The diff, the file it touches, and the decision are one screen.
     expect(await screen.findByText("src/app.py")).toBeInTheDocument();
@@ -959,7 +1090,7 @@ describe("Build inline diff review", () => {
     await fireEvent.input(await screen.findByLabelText("Describe the change"), {
       target: { value: "Rename the entry point" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await fireEvent.click(sendButton());
 
     expect(await screen.findByRole("button", { name: "Accept" })).toBeInTheDocument();
     expect(screen.queryByText("src/app.py")).toBeNull();

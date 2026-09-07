@@ -17,7 +17,12 @@ import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 
 const dist = join(import.meta.dirname, "..", "dist");
-const shots = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
+// FIXED-464's sibling, found the same way. `web/e2e` is two levels below the
+// repository root, not three: the third `..` was correct while the app lived at
+// `apps/web` and has since pointed one directory above the repository, so every
+// capture this suite has taken was written to `/home/user/output/playwright`
+// where nothing looks for it and git cannot see it.
+const shots = join(import.meta.dirname, "..", "..", "output", "playwright");
 const model = {
   profile_id: "anthropic-hosted", provider: "anthropic", model: "claude-sonnet-4-5",
   default_state: "enabled_runtime", local_only: false, requires_network: true,
@@ -418,13 +423,14 @@ test("every Work mode composes the same way, simple at rest", async ({ page }) =
   for (const [route, label, tools] of [
     ["new-chat", "Prompt", true],
     ["build", "Describe the change", true],
-    // Design draws no Tools control, and that is the registry working rather
-    // than a gap in this test: Raiker's governed image endpoint takes a prompt,
-    // a size and a model, so there is no capability for the menu to invoke. An
-    // empty trigger would be the permanent-button problem in miniature — a
-    // control that exists because its neighbours do. The missing runtime is
-    // recorded in docs/plans/TO_BE_FIXED.md.
-    ["design", "Describe the image", false],
+    // Design draws a Tools control as of 2026-09-07, and it is the registry
+    // working rather than the rule loosening. It was absent because Raiker's
+    // governed image endpoint takes a prompt, a size and a model and there was
+    // no capability for the menu to invoke; WEB-06 gave Design a research layer,
+    // so the four reads behind it now run a real governed turn on the `design`
+    // surface. The *image* controls COMPOSER-09 lists are still absent for the
+    // original reason, and are still recorded in docs/plans/TO_BE_FIXED.md.
+    ["design", "Describe the image", true],
   ] as const) {
     await page.goto(`http://raiker.test/#/${route}`);
     await expect(page.getByLabel(label, { exact: true })).toBeVisible();
@@ -526,6 +532,54 @@ test("the Hooks tab tells an enforcing rule from a dead one and a broken file", 
 
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await capture(page, join(shots, "hooks-tab.png"));
+});
+
+test("a list badges the row that needs you, not the rows that are ordinary", async ({ page }) => {
+  // VIS2-13 / VIS2-18 — the rule this checks is about *scanning*, so it needs a
+  // list with more than one row on it, which is what a fixture can give and a
+  // unit test cannot. Four decisions: three at routine risk, one critical.
+  const approval = (id: string, risk: string) => ({
+    approval_id: id,
+    tool_name: "write_file",
+    capability: "file_write",
+    risk_level: risk,
+    status: "pending",
+    is_expired: false,
+    created_at: "2026-09-07T09:00:00Z",
+    expires_at: null,
+    session_id: "sess_1",
+    proposed_by: { principal_id: "principal_turn_agent_1", principal_type: "ai_agent", display_name: "Raiker agent" },
+    arguments: {},
+    queue_position: null,
+    queue_total: null,
+  });
+  await page.route("http://raiker.test/api/approvals*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        approval("appr_1", "low"),
+        approval("appr_2", "medium"),
+        approval("appr_3", "critical"),
+        approval("appr_4", "low"),
+      ]),
+    });
+  });
+  await page.goto("http://raiker.test/#/approvals");
+
+  await expect(page.getByRole("columnheader", { name: "Risk" })).toBeVisible();
+  // One toned risk on the page: the critical one. Three routine rows say their
+  // risk in plain metadata, which is what leaves the fourth findable.
+  // A badge's own text includes its shape glyph, so the label span is what a
+  // risk level is matched against.
+  const risks = page.locator("tbody .badge .badge-label", { hasText: /^(low|medium|critical)$/ });
+  await expect(risks).toHaveCount(1);
+  await expect(risks.first()).toHaveText("critical");
+  await expect(page.locator("tbody .row-fact").first()).toBeVisible();
+  await expect(page.locator("tbody").getByText("low", { exact: true }).first()).toBeVisible();
+
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await capture(page, join(shots, "approvals-row-tokens.png"));
 });
 
 test("a dismiss scrim stays a scrim when the pointer is on it", async ({ page }) => {

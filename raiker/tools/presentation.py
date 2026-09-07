@@ -88,6 +88,8 @@ _FAMILY_BY_TOOL: dict[str, str] = {
     # Leaving the machine for the open web.
     "web_fetch": FAMILY_WEB,
     "web_search": FAMILY_WEB,
+    "web_extract": FAMILY_WEB,
+    "weather_lookup": FAMILY_WEB,
     # The repository and what Raiker knows about it.
     "git_status": FAMILY_REPOSITORY,
     "git_diff": FAMILY_REPOSITORY,
@@ -153,6 +155,8 @@ _LABEL_BY_TOOL: dict[str, str] = {
     "cloud_execute": "Run command in the cloud",
     "web_fetch": "Fetch page",
     "web_search": "Search the web",
+    "web_extract": "Read part of a page",
+    "weather_lookup": "Check the weather",
     "git_status": "Check repository status",
     "git_diff": "Read repository changes",
     "git_log": "Read repository history",

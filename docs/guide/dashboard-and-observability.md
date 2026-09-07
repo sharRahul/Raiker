@@ -157,10 +157,37 @@ finding it repairs. See [Memory](memory.md#checking-the-indexes).
 
 ## Web access and Git credentials
 
+Raiker has four ways of reading the world outside this machine, and they are
+offered on every Work surface — Chat, Build, Design and Tasks — from the
+composer's **Tools** menu:
+
+| Read | What it does |
+|---|---|
+| **Search the web** | Finds pages this turn needs |
+| **Read a URL** | Fetches one page as sanitized text |
+| **Extract page content** | Pulls the main text, links, tables, metadata or structured data out of one page |
+| **Check the weather** | Structured conditions and forecast, with the source and how old the reading is |
+
+They are listed separately because they fail differently: search needs a
+provider, a URL read needs an address that resolves to the public internet, and
+extraction needs a page that is not built entirely in the browser. Each says
+which of those is true for it right now — **Ready**, **Needs provider**,
+**Blocked by policy** or **Unavailable** — and takes you to the place that
+changes it. A capability being listed never means it is permitted; the
+permission is a separate decision you make under **Permissions**, and every one
+of these still asks it at the moment of use.
+
 Web reads use HTTPS and reject credentials embedded in URLs. Resolved addresses
 must be public and are checked again on redirects. The fetched page is converted
 to sanitized text, with removed content reported. You control a blocklist; the
-address-safety guard cannot be disabled.
+address-safety guard cannot be disabled. Extraction opens no connection of its
+own — it reads what that same bounded fetch returned — so nothing it does can
+widen what leaves this machine.
+
+A page that builds itself in the browser is reported as such rather than
+guessed at. Interactive browsing — running a page's scripts, filling a form,
+holding a session — is a different kind of authority and is not granted by web
+reading being on.
 
 The Git credential used for pushes is encrypted at rest and loaned to one
 command at a time under a grant you make once or for a session. It is redacted

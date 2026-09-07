@@ -31,6 +31,11 @@
   } from "../apiTypes";
   import { relativeTime } from "../format";
   import { HUB_TABS } from "../nav";
+  import {
+    extensionExceptions,
+    extensionReach,
+    reachSentence,
+  } from "../extensionsOverview";
 
   let { tab = "connectors" }: { tab?: string } = $props();
 
@@ -165,6 +170,7 @@
   const tabs = HUB_TABS.extensions.map((id) => ({
     id,
     label: {
+      overview: "Overview",
       connectors: "Connectors",
       mcp: "MCP servers",
       skills: "Skills",
@@ -172,6 +178,12 @@
       plugins: "Plugins",
     }[id] as string,
   }));
+
+  // VIS2-10 — what Raiker can reach, and what is installed and broken. Derived
+  // from the same readiness the tabs render, so the overview cannot disagree
+  // with the row underneath it.
+  const reach = $derived(extensionReach(overview?.extensions));
+  const exceptions = $derived(extensionExceptions(overview?.extensions));
 
   const visible = $derived(
     (overview?.extensions ?? []).filter((extension) =>
@@ -272,7 +284,80 @@
 
 <TabStrip {tabs} selected={tab} onselect={selectTab} label="Extension categories" />
 
-{#if tab === "connectors"}
+{#if tab === "overview"}
+  <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
+    <section class="hub-overview" aria-labelledby="extensions-reach">
+      <div class="overview-head">
+        <div>
+          <h2 id="extensions-reach">What Raiker can reach</h2>
+          <p class="lead">{reachSentence(reach)}</p>
+        </div>
+        <GuideLink route="extensions" />
+      </div>
+
+      {#if loadError}
+        <PageState state="error" title="Couldn't load extension readiness" detail={loadError} />
+      {:else if overview === null}
+        <PageState state="loading" title="Reading what is installed…" />
+      {:else if exceptions.length === 0 && reach.installed > 0}
+        <!-- VIS2-18 — nothing needs a person, said once. A card per working
+             extension would report "nothing is wrong" in the most expensive way
+             available, and train the owner to skim past the one that is not.
+             And only when there is something to say it about: with nothing
+             installed the lead above has already said so, and repeating it in
+             a second line with a tick is the same sentence twice. -->
+        <p class="all-well">
+          <Icon name="check" size="sm" />
+          <span>Everything installed is usable.</span>
+        </p>
+      {:else}
+        <h3 class="exceptions-title">
+          {exceptions.length === 1
+            ? "One extension needs attention"
+            : `${exceptions.length} extensions need attention`}
+        </h3>
+        <ul class="exceptions">
+          {#each exceptions as item (item.extensionId)}
+            <li>
+              <div class="exception-copy">
+                <strong>{item.name}</strong>
+                <span>{item.reason}</span>
+              </div>
+              <button
+                type="button"
+                class="btn btn-sm"
+                onclick={() => selectTab(item.tab)}
+              >
+                Open {tabs.find((entry) => entry.id === item.tab)?.label ?? item.tab}
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </section>
+
+    <section class="hub-overview" aria-labelledby="extensions-add">
+      <div class="overview-head">
+        <div>
+          <h2 id="extensions-add">Add something</h2>
+          <p class="lead">
+            Each of these is governed the same way: connecting one stores a
+            credential and grants nothing until a capability says so.
+          </p>
+        </div>
+      </div>
+      <ul class="add-routes">
+        {#each tabs.filter((entry) => entry.id !== "overview") as entry (entry.id)}
+          <li>
+            <button type="button" class="btn btn-ghost" onclick={() => selectTab(entry.id)}>
+              {entry.label}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  </div>
+{:else if tab === "connectors"}
   <div id="panel-connectors" role="tabpanel" aria-labelledby="tab-connectors">
     <section class="overview" aria-labelledby="lifecycle-h">
       <div class="overview-head">
@@ -764,6 +849,59 @@
 {/if}
 
 <style>
+  /* VIS2-10 — the composed lead. It shares the page's card language rather
+     than inventing a second one: what differs is that it answers a question
+     instead of listing a category. */
+  .hub-overview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: var(--card-pad-y) var(--card-pad-x);
+    margin-bottom: var(--space-4);
+  }
+  .hub-overview .overview-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .hub-overview h2 { margin: 0; }
+  .hub-overview h3.exceptions-title {
+    margin: var(--space-4) 0 var(--space-2);
+    font-size: var(--text-sm);
+  }
+  .hub-overview .lead { margin: .3rem 0 0; color: var(--text-2); max-width: 46rem; }
+  .all-well {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    margin: var(--space-3) 0 0;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+  .exceptions { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+  .exceptions li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--sunken);
+  }
+  .exception-copy { display: grid; gap: .15rem; min-width: 0; }
+  .exception-copy strong { color: var(--text-1); }
+  .exception-copy span { color: var(--text-2); font-size: var(--text-sm); }
+  .add-routes {
+    list-style: none;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
   .hook-list,
   .event-list,
   .activity-list,

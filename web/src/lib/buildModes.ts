@@ -185,3 +185,30 @@ export function repoPreamble(
   const branch = repo.branch ? ` (branch ${repo.branch})` : "";
   return `Repository: ${repo.github_owner}/${repo.github_repo}${branch}.`;
 }
+
+/**
+ * COMPOSER-15 — what pressing the primary action will actually do, in this mode.
+ *
+ * The button said **Send** in all three modes, which is true of the keystroke
+ * and useless about the consequence. The three modes are three different
+ * promises — Plan proposes and touches nothing, Edit parks every change for a
+ * decision, Auto runs under whatever the owner has standing — and the control
+ * that commits to one of them should say which.
+ *
+ * It never invents authority: the word follows the posture the turn is already
+ * sending, so a mode that tightens produces a smaller-sounding verb because the
+ * turn really will do less.
+ */
+export function buildPrimaryAction(mode: BuildMode): string {
+  switch (mode) {
+    case "plan":
+      return "Plan";
+    case "edit":
+      // "Propose", not "Apply": in Edit every write is parked for a decision,
+      // so a button that said Apply would name an act the press does not
+      // perform.
+      return "Propose";
+    default:
+      return "Run";
+  }
+}

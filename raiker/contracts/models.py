@@ -48,7 +48,20 @@ VOICE_INPUT_MODES = {"typed", "dictated", "mixed"}
 #: protocol the turn is run under and nothing else: a surface can never widen
 #: what a turn may do, and every capability, gate and approval is unchanged by
 #: it. An unknown value is refused rather than silently treated as "chat".
-PROMPT_SURFACES = {"chat", "build"}
+# WEB-06 — `design` is a third *working method*, not a third product.
+#
+# Design's picture-making is a separate governed endpoint that takes a prompt, a
+# size and a model; it reaches one image provider and nothing else. What was
+# missing was the layer in front of it: a way to *research* before generating —
+# find public references, read a page about a building's façade, check what a
+# term of art actually looks like — without handing the image model a browser.
+#
+# Making `design` a prompt surface is what separates those two. A Design
+# research turn is an ordinary governed turn with the ordinary global read
+# catalogue and the ordinary gates; the image request stays on its own path with
+# its own executor. Neither can borrow the other's authority, because they never
+# share one.
+PROMPT_SURFACES = {"chat", "build", "design"}
 _LEGACY_APPROVAL_MODE_ALIASES = {
     "interactive": "manual",
     "allow_safe_only": "auto",
@@ -71,6 +84,12 @@ EVENT_TYPES = {
     "prompt_normalised",
     "intent_classified",
     "risk_classified",
+    # ENV-01 — the clock, date, day and timezone this turn actually ran with,
+    # and where the timezone came from. Recorded because "the model was told the
+    # right date" is the sort of claim that has to be checkable after the fact:
+    # a schedule that landed on the wrong day is diagnosed from this row rather
+    # than from a re-derivation that reads today's clock.
+    "environment_context",
     "context_gathered",
     # Prior turns of this conversation replayed to the model. Counts only —
     # message count and character total — never the transcript itself.

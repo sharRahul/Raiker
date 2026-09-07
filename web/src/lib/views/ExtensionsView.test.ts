@@ -58,6 +58,77 @@ function overview(extensions: ExtensionView[], counts: Partial<Record<string, nu
   };
 }
 
+describe("the Extensions overview (VIS2-10)", () => {
+  it("leads with what Raiker can reach, not with a category", async () => {
+    // Five equal tabs named for kinds of thing is a filing system. Nobody
+    // arrives here wanting to look at the MCP category.
+    stubFetch(
+      overview([
+        extension({ extension_id: "a", installed: true, connected: true, enabled: true, usable: true, tool_count: 3 }),
+        extension({ extension_id: "b", installed: true, connected: true, enabled: true, usable: true, tool_count: 2 }),
+      ]),
+    );
+    render(ExtensionsView, { props: { tab: "overview" } });
+
+    expect(
+      await screen.findByText("2 of 2 installed extensions can be used, offering 5 tools."),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing needs a person once, rather than a card per healthy row", async () => {
+    // VIS2-18 — a wall of green cards reports "nothing is wrong" in the most
+    // expensive way available, and trains the owner to skim past the one that
+    // is not green.
+    stubFetch(
+      overview([
+        extension({ installed: true, connected: true, enabled: true, usable: true }),
+      ]),
+    );
+    render(ExtensionsView, { props: { tab: "overview" } });
+
+    expect(await screen.findByText("Everything installed is usable.")).toBeInTheDocument();
+    expect(screen.queryByText(/needs attention/)).not.toBeInTheDocument();
+  });
+
+  it("names what is broken, in the runtime's words, beside the tab that fixes it", async () => {
+    stubFetch(
+      overview([
+        extension({ extension_id: "ok", installed: true, connected: true, enabled: true, usable: true }),
+        extension({
+          extension_id: "mcp:widget",
+          kind: "mcp_server",
+          display_name: "Widget server",
+          installed: true,
+          usable: false,
+          blocked_reason: "Server exited at start.",
+        }),
+      ]),
+    );
+    render(ExtensionsView, { props: { tab: "overview" } });
+
+    expect(await screen.findByText("One extension needs attention")).toBeInTheDocument();
+    expect(screen.getByText("Widget server")).toBeInTheDocument();
+    expect(screen.getByText("Server exited at start.")).toBeInTheDocument();
+    // A remedy that is a dead end is not a remedy.
+    expect(screen.getByRole("button", { name: "Open MCP servers" })).toBeInTheDocument();
+  });
+
+  it("does not report a thing the owner has not installed as a fault", async () => {
+    stubFetch(overview([extension({ installed: false, usable: false })]));
+    render(ExtensionsView, { props: { tab: "overview" } });
+
+    expect(
+      await screen.findByText(
+        "Nothing is installed yet. Connect an account, add an MCP server, or install a skill.",
+      ),
+    ).toBeInTheDocument();
+    // And it says it once. Found in the live capture: the lead sentence and a
+    // second ticked line underneath were the same sentence twice, which is the
+    // duplication VIS2-18 exists to remove.
+    expect(screen.queryByText(/Everything installed is usable/)).not.toBeInTheDocument();
+  });
+});
+
 describe("ExtensionsView", () => {
   it("shows a loading state while readiness is fetched", async () => {
     stubFetchPending();

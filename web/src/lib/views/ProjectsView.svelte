@@ -9,7 +9,7 @@
   import ProjectTreeNode from "../components/ProjectTreeNode.svelte";
   import SidePanel from "../components/SidePanel.svelte";
   import GuideLink from "../components/GuideLink.svelte";
-  import { startInBuild } from "../buildProject";
+  import { startInBuild } from "../workProject.svelte";
   import ProjectExplorer from "../components/ProjectExplorer.svelte";
   import { api, ApiError } from "../api";
   import type {

@@ -1409,6 +1409,8 @@ TOOL_LABELS: dict[str, str] = {
     "background_run": "Background run",
     "web_fetch": "Fetch page",
     "web_search": "Web search",
+    "web_extract": "Read part of a page",
+    "weather_lookup": "Weather",
     "memory_search": "Search memory",
     "memory_write": "Remember",
     "knowledge_graph": "Explore graph",

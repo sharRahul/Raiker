@@ -1,5 +1,32 @@
 # Raiker Environment Context: Time, Date, Timezone and Weather — 2026-09-07
 
+## Implementation status — 2026-09-07
+
+Every item in this plan is implemented and verified against a live runtime
+holding a real Anthropic credential connected through the product's own flow.
+Recorded as
+[FIXED-459](FIXED_ITEMS.md#fixed-459--nothing-in-raiker-told-a-model-what-day-it-was)
+and
+[FIXED-460](FIXED_ITEMS.md#fixed-460--weather-was-a-page-to-interpret-rather-than-a-reading-to-report).
+
+| Item | State |
+|---|---|
+| ENV-01 authoritative per-turn clock bundle | Done — `raiker/runtime/environment.py`, injected as its own trusted system message |
+| ENV-02 one owner-level timezone source of truth | Done — `general.timezone`, with the documented four-step precedence |
+| ENV-03 fresh context at scheduled execution | Done — derived per turn, so a scheduled run cannot replay its creation time |
+| ENV-04 surface parity | Done — Chat, Build, Design, Tasks, Schedule, agents; a subagent derives its own rather than inheriting |
+| ENV-05 provenance/diagnostic visibility | Done — an `environment_context` event per turn, and `GET /api/environment` |
+| WEATHER-01 structured `weather_lookup` | Done — Open-Meteo through the existing egress boundary |
+| WEATHER-02 owner weather location preference | Done — `general.weather_location`, held separately from the timezone |
+| WEATHER-03 freshness and stale-state semantics | Done — typed `fresh` / `stale` / `unavailable`, with the age of a stale reading |
+
+All 28 required tests below are covered by `tests/test_environment_context.py`,
+`tests/test_environment_context_turns.py`, `tests/test_weather_capability.py`,
+`web/src/lib/environment.test.ts` and the live round
+`web/e2e/env-web-read-live.spec.ts`.
+
+---
+
 ## Purpose
 
 This plan closes a foundational context gap: a model must never have to guess the current time, date, day of week, timezone or freshness of weather data from training knowledge, conversation history or a provider-specific system prompt.

@@ -17,7 +17,35 @@
  * takes an optional locator, which is scrolled into view first — the cheapest
  * way to be certain the section a capture is named for is in it.
  */
+import { dirname, isAbsolute, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import type { Locator, Page } from "@playwright/test";
+
+/**
+ * Where a relative capture path is anchored: this directory, `web/e2e`.
+ *
+ * **Found live on 2026-09-07.** Every spec writes its evidence to a path like
+ * `../../docs/plans/screenshots/pages/...`, which was correct while the web app
+ * lived at `apps/web` — two levels up from `apps/web/e2e` is the repository
+ * root. Moving it to `web/` made that one level too many, and because Playwright
+ * resolves a relative screenshot path against the *process* directory rather
+ * than the spec's, every capture in every live round has since been written to
+ * `/home/user/docs/plans/screenshots/…` — outside the repository, where nothing
+ * looks for it and git cannot see it. The sweeps reported success; the
+ * `pages/` catalogue they are supposed to keep current simply stopped changing.
+ *
+ * Anchoring here rather than at the process directory is the fix, and it is the
+ * one that needs no spec to be edited: `../../docs` from `web/e2e` is the
+ * repository's `docs` again, which is what every one of those strings has always
+ * meant.
+ */
+const E2E_DIR = dirname(fileURLToPath(import.meta.url));
+
+/** A capture path as an absolute one, anchored at `web/e2e` when relative. */
+export function capturePath(path: string): string {
+  return isAbsolute(path) ? path : resolve(E2E_DIR, path);
+}
 
 /** Beyond this a capture is a wall of pixels nobody reads. */
 const MAX_CAPTURE_HEIGHT = 6000;
@@ -47,8 +75,9 @@ async function contentHeight(page: Page): Promise<number> {
 export async function capture(page: Page, path: string, target?: Locator): Promise<void> {
   if (target !== undefined) await target.scrollIntoViewIfNeeded();
   const viewport = page.viewportSize();
+  const capturedTo = capturePath(path);
   if (viewport === null) {
-    await page.screenshot({ path, fullPage: true });
+    await page.screenshot({ path: capturedTo, fullPage: true });
     return;
   }
   const needed = Math.min(await contentHeight(page), MAX_CAPTURE_HEIGHT);
@@ -57,7 +86,7 @@ export async function capture(page: Page, path: string, target?: Locator): Promi
     await page.setViewportSize({ width: viewport.width, height });
   }
   try {
-    await page.screenshot({ path, fullPage: true });
+    await page.screenshot({ path: capturedTo, fullPage: true });
   } finally {
     if (height !== viewport.height) await page.setViewportSize(viewport);
   }
@@ -71,5 +100,5 @@ export async function capture(page: Page, path: string, target?: Locator): Promi
  */
 export async function captureElement(target: Locator, path: string): Promise<void> {
   await target.scrollIntoViewIfNeeded();
-  await target.screenshot({ path });
+  await target.screenshot({ path: capturePath(path) });
 }

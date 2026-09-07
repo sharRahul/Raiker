@@ -25,7 +25,7 @@ import { capture } from "./capture";
 import { signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
-const REPO = join(import.meta.dirname, "..", "..", "..");
+const REPO = join(import.meta.dirname, "..", "..");
 const SHOTS = join(REPO, "docs", "plans", "screenshots", "working");
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";

@@ -61,6 +61,39 @@ describe("MemoryView", () => {
     expect(screen.getByText(/confidence: 0.90/i)).toBeInTheDocument();
   });
 
+  it("shows a memory written directly under the owner's standing Allow", async () => {
+    stubFetch({
+      "GET /api/memory": [
+        {
+          memory_id: "mem_allowed",
+          text: "A directly allowed durable fact.",
+          scope: "global",
+          sensitivity: "normal",
+          memory_type: "preference",
+          created_at: "2026-09-08T00:00:00Z",
+          tags: [],
+          source: "agent",
+          provenance: {},
+          confidence: 0.9,
+          trust_score: 0.9,
+          retention: "until_forget",
+          approval_state: "policy_allowed",
+          pinned: false,
+          search_enabled: true,
+          expires_at: null,
+        },
+      ],
+      "GET /api/memory/settings": { incognito: false },
+    });
+    render(MemoryView);
+
+    expect(await screen.findByText("A directly allowed durable fact.")).toBeInTheDocument();
+    await fireEvent.change(screen.getByLabelText("Memory status"), {
+      target: { value: "approved" },
+    });
+    expect(screen.getByText("A directly allowed durable fact.")).toBeInTheDocument();
+  });
+
   it("shows an empty state when there are no memories", async () => {
     stubFetch({
       "GET /api/memory": [],

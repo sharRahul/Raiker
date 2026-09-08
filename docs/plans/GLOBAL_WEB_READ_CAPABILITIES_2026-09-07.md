@@ -1,6 +1,6 @@
 # Raiker Global Web Read Capabilities — 2026-09-07
 
-## Implementation status — 2026-09-07
+## Implementation status — 2026-09-08
 
 Every item in this plan is implemented and verified against a live runtime.
 Recorded as
@@ -22,6 +22,10 @@ All 38 required tests below are covered by
 `tests/test_global_read_capabilities.py`, `tests/test_web_access.py`,
 `tests/test_web_egress_blocklist.py`, `web/src/lib/composerCapabilities.test.ts`
 and the live round `web/e2e/env-web-read-live.spec.ts`.
+
+Reverified on 2026-09-08 against the shared capability snapshot and the
+built-in keyless search fallback. No remaining implementation item from this
+plan was found; browser automation remains its separately governed capability.
 
 ---
 
@@ -45,7 +49,17 @@ This plan complements `ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md`, which de
 
 ---
 
-## Current-state conclusion
+## Historical pre-implementation conclusion
+
+The following assessment records the gaps when this plan was written. It does
+not override the implementation-status table above. Product contracts and
+acceptance criteria below remain applicable to the delivered implementation.
+
+Current search uses a built-in keyless endpoint when no owner endpoint is
+configured. Therefore the historical unconfigured-provider case (required test
+23) is satisfied by the built-in provider path rather than emitting
+`needs_provider`. Readiness currently describes configuration and policy, not
+a live connectivity probe; provider failures are reported on execution.
 
 Raiker already has a strong architectural foundation for this requirement.
 
@@ -53,7 +67,7 @@ Raiker already has a strong architectural foundation for this requirement.
 
 The current Permissions implementation also recognises that `web_fetch` may resolve to its shipped default when no account override has been stored, so the UI can represent the enforcing state instead of incorrectly displaying `Off`.
 
-However, the current implementation should not yet be described as proving all of the following:
+At the initial baseline, the implementation did not yet prove all of the following:
 
 - every agentic surface uses the same global read-tool contract;
 - every surface has the same readiness semantics;
@@ -62,7 +76,8 @@ However, the current implementation should not yet be described as proving all o
 - current Design directly inherits the same research agent/tool path;
 - interactive browser automation is enabled by default.
 
-Those are the gaps addressed here.
+Those were the gaps assessed here. Interactive browser automation remains a
+separate governed capability; this plan does not enable it by default.
 
 ---
 

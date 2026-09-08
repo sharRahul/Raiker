@@ -19,6 +19,9 @@ browser overwriting an owner's explicit choice — and pins it shut.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -36,6 +39,22 @@ from raiker.runtime.environment import (
     resolve_timezone,
 )
 from raiker.storage.sqlite import SQLiteStore
+
+
+def test_timezone_data_is_available_without_a_host_database() -> None:
+    """Windows has no system IANA database; installed Raiker must supply it."""
+    result = subprocess.run(
+        [sys.executable, "-c", (
+            "from datetime import datetime; from zoneinfo import ZoneInfo; "
+            "print(datetime(2026, 7, 1, tzinfo=ZoneInfo('Europe/London')).strftime('%z'))"
+        )],
+        env={**os.environ, "PYTHONTZPATH": ""},
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=True,
+    )
+    assert result.stdout.strip() == "+0100"
 
 
 @pytest.fixture

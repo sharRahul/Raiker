@@ -105,6 +105,7 @@ names.
 | [BUG-282](FIXED_ITEMS.md#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier) | Medium | Documentation / memory | **Closed 2026-09-04 ([FIXED-393](FIXED_ITEMS.md#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier))** — the guide told owners semantic recall was half-built, nine days after FIXED-292 finished it |
 | [BUG-283](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others) | Low | Web UI / information architecture | **Closed 2026-09-04 ([FIXED-394](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others))** — 244 words of explanation to the guide, one contract that was stated twice, and two tabs that were copies of other surfaces |
 | [BUG-284](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything) | Medium | Web UI / responsive layout | **Closed 2026-09-04 ([FIXED-395](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything))** — found by running the width sweep against a workspace that had been worked in; reproduced on unmodified `main` |
+| [BUG-285](#bug-285--an-ollama-cloud-model-tests-and-runs-in-ollama-but-chat-cannot-use-it) | Medium | Models / Ollama cloud chat | Open — raised 2026-09-08 during the provider restart round |
 | [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — **a fifth round blocked on the same value, 2026-09-06**; confirmed in two requests again, and this host has no local runtime either. Raiker's half holds under a fifth key: the refusal reads as itself in the picker, not as *Provider unreachable*. The attempt found [FIXED-435](FIXED_ITEMS.md#fixed-435--the-models-page-said-a-gate-was-on-above-providers-it-would-refuse) |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
@@ -1374,33 +1375,6 @@ appear only once the owner asks for them.
 
 ---
 
-## BUG-279 — A long paste still becomes a very tall composer
-
-**Severity: Low. Area: composer. Raised while implementing
-[COMPOSER-14](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md).**
-
-**Observed.** Dragging a file onto the composer attaches it, and pasting an
-image attaches it. Pasting several thousand words of text puts several thousand
-words in the textarea, which grows until the transcript above it is gone.
-
-**Why it was left.** Turning a paste into an attachment is a transformation of
-what the owner just did, and COMPOSER-14's own rule is that every such
-transformation must be transparent and reversible. That needs a visible
-"pasted text" attachment the owner can expand back inline and remove, which is a
-small feature rather than a threshold.
-
-**Proposed fix.** Above a threshold, a paste becomes a text attachment carrying
-its first line as a label, with **show inline** restoring it to the prompt
-exactly as pasted. The attachment store already carries documents, so the
-storage half exists.
-
-**Interface outcome that has to be true before this closes.** A large paste
-never pushes the prompt or the send control out of the viewport, and the owner
-can always get the text back into the prompt.
-
-
----
-
 ## BUG-280 — Weather and the environment clock are unmeasured against a real provider and a real model
 
 **Severity: Low. Area: runtime / environment context, weather. Raised while
@@ -1503,3 +1477,29 @@ project page beside its files.
 **Interface outcome that has to be true before this closes.** An image generated
 while working in a project appears among that project's material, and the
 Design composer's context line can drop the words "not filed to it yet".
+
+---
+
+## BUG-285 — An Ollama Cloud model tests and runs in Ollama but Chat cannot use it
+
+**Severity: Medium. Area: Models / Ollama cloud chat. Status: Open — raised
+2026-09-08.**
+
+**Observed.** The Models page discovers `gemma4:31b-cloud` and its **Test
+connection** action succeeds. `ollama run gemma4:31b-cloud` also returned the
+requested answer on this host. Selecting the same profile in Raiker Chat ended
+with **Could not reach the local runtime** instead of a model response.
+
+**Why it remains.** The connection probe and direct Ollama invocation prove the
+runtime and model are reachable, while the Chat path fails later in the adapter
+or stream. The memory capability fix does not own that provider path. OpenAI
+completed the same live memory-write scenario, isolating this as an Ollama
+cloud-chat defect.
+
+**Proposed fix.** Trace the Ollama provider request and streaming response for
+cloud-tagged models, retain the provider's typed error in the turn, and add a
+live regression using an available `-cloud` profile.
+
+**Interface outcome that has to be true before this closes.** A model that
+passes Ollama's provider test can complete a Chat turn, or Chat reports the
+specific provider/runtime refusal rather than a generic reachability message.

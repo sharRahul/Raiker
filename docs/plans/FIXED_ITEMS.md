@@ -496,6 +496,12 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-472](#fixed-472--every-row-wore-the-same-weight-as-the-row-that-needed-you) | Medium | Skills / sessions / approvals | Fixed 2026-09-07 (VIS2-13, VIS2-18) |
 | [FIXED-473](#fixed-473--fifty-three-specs-wrote-their-evidence-one-directory-above-the-repository) | High | Live test harness | Fixed 2026-09-07 (found live) |
 | [FIXED-474](#fixed-474--thirteen-z-index-numbers-and-no-way-to-say-what-was-above-what) | Medium | Shell / overlays | Fixed 2026-09-07 (VIS2-17) |
+| [FIXED-475](#fixed-475--memory-allow-stopped-at-a-second-approval-gate) | High | Memory / capability authority | Fixed 2026-09-08 |
+| [FIXED-476](#fixed-476--a-valid-owner-timezone-became-utc-on-windows) | High | Runtime / environment context | Fixed 2026-09-08 |
+| [FIXED-477](#fixed-477--ollama-cloud-was-labelled-local-only-and-free) | Medium | Models / provider honesty | Fixed 2026-09-08 |
+| [FIXED-478](#fixed-478--a-work-draft-was-lost-at-every-mode-switch) | Medium | Chat / Build / Design | Fixed 2026-09-08 (COMPOSER-11) |
+| [FIXED-479](#fixed-479--a-large-paste-could-hide-the-conversation-it-belonged-to) | Low | Chat / Build composer | Fixed 2026-09-08 (COMPOSER-14) |
+| [FIXED-480](#fixed-480--directly-allowed-memories-were-recallable-and-invisible) | High | Memory / web UI | Fixed 2026-09-08 (found live) |
 
 ---
 
@@ -20976,3 +20982,106 @@ raw overlay-scale z-index), and `web/e2e/overlay-layers-live.spec.ts`, which
 reads the ladder back out of a real browser — every rung declared, the ladder
 rising, scrim and modal adjacent, nothing above `--z-alert` — and checks an open
 composer menu computes to `--z-popover`.
+
+---
+
+## FIXED-475 — Memory Allow stopped at a second approval gate
+
+**Severity: High. Area: memory / capability authority. Status: Fixed
+2026-09-08.**
+
+**Observed.** Permissions persisted **Memory store: On / Allow**, yet a real
+model `memory_write` was parked in the generic ToolBroker approval queue. The
+capability screen and runtime status described a direct path that did not exist.
+
+**Fixed.** ToolBroker now reads the shared `memory_write_execution` admission
+before it queues an ordinary memory write. A standing owner Allow carries the
+action to the existing governed executor, which rechecks the same gate and
+mode. Turn-scoped Ask/Deny, critical actions, hooks and managed constraints
+remain stricter. The decision and audit stream record `capability_mode:allow`
+and `capability_allow_executed`.
+
+**Verification.** A unit regression proves the write reaches approved memory
+without a second approval. A live OpenAI turn called `memory_write`, completed
+directly, and the Memory page recalled the resulting approved record. Restart
+coverage constructs the app twice over the same workspace and proves the owner,
+settings, session, model and memory authority survive.
+
+---
+
+## FIXED-476 — A valid owner timezone became UTC on Windows
+
+**Severity: High. Area: runtime / environment context. Status: Fixed
+2026-09-08.**
+
+**Observed.** On Windows Python installations without a system IANA database,
+`ZoneInfo("Europe/London")` failed and the trusted environment bundle silently
+fell back to UTC.
+
+**Fixed.** `tzdata` is a runtime dependency, so the owner's IANA timezone is
+available consistently across supported platforms. The Windows/no-system-data
+regression test proves the configured zone and offset survive resolution.
+
+---
+
+## FIXED-477 — Ollama Cloud was labelled local-only and free
+
+**Severity: Medium. Area: Models / provider honesty. Status: Fixed 2026-09-08.**
+
+**Observed.** An Ollama profile for `gemma4:31b-cloud` inherited the local
+runtime row's **Local-only** and **No API cost** labels even though inference can
+leave the machine and provider charges may apply.
+
+**Fixed.** Ollama names ending in `-cloud` now show **Local endpoint**, **Cloud
+inference** and **Provider pricing may apply**. Unit and live Playwright checks
+pin all three statements.
+
+---
+
+## FIXED-478 — A Work draft was lost at every mode switch
+
+**Severity: Medium. Area: Chat / Build / Design. Status: Fixed 2026-09-08.
+Raised as COMPOSER-11.**
+
+**Observed.** Project identity followed the owner across Work modes, but the
+unfinished prompt did not. Switching Chat → Build → Design discarded work.
+
+**Fixed.** One browser-session draft registry is keyed by Project, with a
+separate unscoped draft. All three Work surfaces use it. Tests prove surface
+continuity and Project isolation; live Playwright proves the three-mode path.
+
+---
+
+## FIXED-479 — A large paste could hide the conversation it belonged to
+
+**Severity: Low. Area: Chat / Build composer. Status: Fixed 2026-09-08.
+Raised as COMPOSER-14.**
+
+**Observed.** Pasting thousands of characters expanded the textarea until the
+conversation and action controls were displaced.
+
+**Fixed.** Plain text of 4,000 characters or more becomes a compact
+`pasted-text.txt` attachment. **Show inline** removes the attachment and restores
+the exact text; attachment failure also restores it. Unit tests cover the
+threshold, exact content and fallback, and live Playwright captures the compact
+state before restoring it.
+
+---
+
+## FIXED-480 — Directly allowed memories were recallable and invisible
+
+**Severity: High. Area: Memory / web UI. Status: Fixed 2026-09-08. Found while
+strengthening the live memory-write assertion.**
+
+**Observed.** A standing-Allow write is stored with the explicit
+`policy_allowed` approval state and enters recall, but MemoryView only rendered
+rows whose state was the literal `approved`. The summary and filtered list hid
+the records that Allow created.
+
+**Fixed.** MemoryView treats `approved` and `policy_allowed` as the two approved
+states for its summary, list and Approved filter. It continues to display the
+plain owner-facing status **Approved** for both.
+
+**Verification.** `MemoryView.test.ts` covers display and the Approved filter.
+The live scenario asserts a new record id and unique marker through the API,
+then filters to and captures that exact record in the Memory page.

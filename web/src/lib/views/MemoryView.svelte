@@ -334,14 +334,18 @@
     return title ? `${m.source} — ${String(title)}` : m.source || "Source not available";
   }
 
-  const approved = $derived((memories ?? []).filter((m) => m.approval_state === "approved"));
+  function isApproved(m: MemoryControlView): boolean {
+    return m.approval_state === "approved" || m.approval_state === "policy_allowed";
+  }
+
+  const approved = $derived((memories ?? []).filter(isApproved));
   const pending = $derived(proposals);
   const expired = $derived((memories ?? []).filter((m) => m.expires_at && new Date(m.expires_at) <= new Date()));
   const scopes = $derived([...new Set((memories ?? []).map((m) => m.scope))]);
   const sensitivities = $derived([...new Set((memories ?? []).map((m) => m.sensitivity))]);
   const filtered = $derived(
     approved.filter((m) => {
-      const matchStatus = statusFilter === "all" || m.approval_state === statusFilter || (statusFilter === "expired" && !!m.expires_at && new Date(m.expires_at) <= new Date());
+      const matchStatus = statusFilter === "all" || (statusFilter === "approved" && isApproved(m)) || (statusFilter === "expired" && !!m.expires_at && new Date(m.expires_at) <= new Date());
       return matchStatus && (scopeFilter === "all" || m.scope === scopeFilter) && (sensitivityFilter === "all" || m.sensitivity === sensitivityFilter) && (!pinnedOnly || m.pinned) && `${m.text} ${provenanceLabel(m)} ${m.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase());
     }).sort((a, b) => sort === "review-date" ? (a.expires_at ?? "9999").localeCompare(b.expires_at ?? "9999") : b.created_at.localeCompare(a.created_at)),
   );

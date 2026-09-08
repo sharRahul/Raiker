@@ -1,6 +1,6 @@
 # Raiker Environment Context: Time, Date, Timezone and Weather — 2026-09-07
 
-## Implementation status — 2026-09-07
+## Implementation status — 2026-09-08
 
 Every item in this plan is implemented and verified against a live runtime
 holding a real Anthropic credential connected through the product's own flow.
@@ -25,6 +25,11 @@ All 28 required tests below are covered by `tests/test_environment_context.py`,
 `web/src/lib/environment.test.ts` and the live round
 `web/e2e/env-web-read-live.spec.ts`.
 
+The 2026-09-08 Windows verification added `tzdata` as a runtime dependency.
+This keeps an IANA setting such as `Europe/London` authoritative on hosts whose
+Python installation has no system timezone database, instead of silently
+falling back to UTC ([FIXED-476](FIXED_ITEMS.md#fixed-476--a-valid-owner-timezone-became-utc-on-windows)).
+
 ---
 
 ## Purpose
@@ -39,11 +44,20 @@ This document defines the owner/account-level environment context contract share
 
 ---
 
-## Current-state conclusion
+## Historical pre-implementation conclusion
 
-The current repository has mature model/tool projection and authority controls, but there is no dedicated, deterministic contract that proves every model-backed turn receives an authoritative current clock/date/day/timezone bundle. Weather is also not a first-class structured capability; it is currently expected to be obtained indirectly through web capabilities when available.
+This assessment describes the initial baseline before ENV-01 through ENV-05
+and WEATHER-01 through WEATHER-03 were delivered. It is retained to explain
+the work and does not describe an outstanding gap. The product contracts and
+acceptance criteria below continue to apply.
 
-Therefore Raiker must **not** currently claim that current clock/date/day or weather are always configured for every agentic surface.
+The initial repository had mature model/tool projection and authority controls,
+but lacked a dedicated deterministic per-turn clock/date/day/timezone contract.
+Weather was expected to be obtained indirectly through web capabilities.
+
+That baseline could not claim authoritative environment context on every
+agentic surface. The implementation above supplies it; weather still requires
+resolvable location and permitted provider access.
 
 This is a product correctness issue rather than a cosmetic enhancement. Relative-time requests such as `tomorrow`, `this Friday`, `tonight`, `in two hours`, `yesterday`, recurring schedules and weather-sensitive tasks all depend on fresh deterministic context.
 

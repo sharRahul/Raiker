@@ -1,5 +1,14 @@
 # Raiker Page-by-Page Implementation Verification — 2026-09-07
 
+## Follow-up — 2026-09-08
+
+The Models, global web-read and environment/time/weather plans were reverified
+end to end. Windows timezone data, Ollama cloud-label honesty, Project-scoped
+draft continuity and reversible large pastes were corrected. The memory
+capability's standing Allow now reaches the executor before the generic
+approval queue, and survives a same-workspace server restart. Remaining page
+findings below retain their prior status.
+
 ## Re-verification — 2026-09-07 (later the same day)
 
 This document's first pass found eight conclusions. Five of them have since been

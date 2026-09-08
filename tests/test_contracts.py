@@ -68,7 +68,11 @@ def test_agent_event_requires_timestamp() -> None:
 
 
 def test_approval_policy_audit_events_are_registered() -> None:
-    assert {"approval_auto_executed", "approval_preview_skipped"} <= EVENT_TYPES
+    assert {
+        "approval_auto_executed",
+        "approval_preview_skipped",
+        "capability_allow_executed",
+    } <= EVENT_TYPES
 
 
 def test_ids_and_timestamps() -> None:

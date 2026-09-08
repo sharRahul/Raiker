@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { LARGE_PASTE_CHARS } from "../composerAttachments.svelte";
+  import { workDraft } from "../workDraft.svelte";
   import { onMount, tick, untrack } from "svelte";
   import Icon from "../components/Icon.svelte";
   import EmptyState from "../components/EmptyState.svelte";
@@ -152,7 +154,8 @@
   $effect(() => {
     if (!visible) audioSessionCoordinator.stopAll("route");
   });
-  let promptText = $state("");
+  let projectId = $state(workProject());
+  const draft = $derived(workDraft(projectId));
   let speechLanguage = $state<SpeechLanguage>("auto");
   // BUG-256 — which speech runtime dictation will use. Read once on mount and
   // defaulted to the browser, so a composer that cannot reach the host still
@@ -192,7 +195,6 @@
    * The shared value is never allowed to re-file an existing chat: it is read
    * only while `sessionId` is null.
    */
-  let projectId = $state(workProject());
   let pendingProjectId: string | null = workProject() === "" ? null : workProject();
   let projectNotice = $state<string | null>(null);
   let backgroundWorkOpen = $state(false);
@@ -297,6 +299,27 @@
     onFiles: (files) => void attachStore.acceptFiles(files),
     enabled: () => !(streaming) && !attachStore.full,
   });
+  async function onComposerPaste(event: ClipboardEvent) {
+    if (streaming || attachStore.uploading || attachStore.full) return;
+    const files = event.clipboardData?.files;
+    if (files?.length) {
+      event.preventDefault();
+      await attachStore.acceptFiles(files);
+      return;
+    }
+    const text = event.clipboardData?.getData("text/plain") ?? "";
+    if (text.length < LARGE_PASTE_CHARS) return;
+    event.preventDefault();
+    const targetDraft = draft;
+    const original = targetDraft.text;
+    const start = promptEl?.selectionStart ?? original.length;
+    const end = promptEl?.selectionEnd ?? start;
+    if (!(await attachStore.attachPastedText(text))) {
+      targetDraft.text = targetDraft.text === original
+        ? original.slice(0, start) + text + original.slice(end)
+        : targetDraft.text + text;
+    }
+  }
   let attachControl = $state<ComposerAttach | undefined>();
   let attachOpen = $state(false);
 
@@ -844,7 +867,7 @@
       // reduced version of it. They are already uploaded and governed; only
       // their references cross.
       if (detail.attachments?.length) attachStore.set([...detail.attachments]);
-      promptText = detail.text;
+      draft.text = detail.text;
       void submit();
     };
     window.addEventListener("raiker:compose", onCompose);
@@ -931,7 +954,8 @@
       promptEl?.focus();
       return;
     }
-    const text = promptText.trim();
+    const sentDraft = draft;
+    const text = sentDraft.text.trim();
     if (text === "" || modelBlocked || streaming || attachStore.uploading) return;
     const voiceState = {
       dictated: voiceDictated,
@@ -956,7 +980,7 @@
     // Mutate the $state-proxied instance, not the raw literal: raw-object writes
     // bypass Svelte 5's signals and the transcript would never re-render.
     const turn = turns[turns.length - 1];
-    promptText = "";
+    draft.text = "";
     resetVoiceProvenance();
     // B19 — a box that grew to hold a long prompt has to shrink back when the
     // prompt leaves it, or the composer keeps the height of the longest thing
@@ -1025,7 +1049,7 @@
     } catch (e) {
       if (e instanceof ApiError && e.reasonCode === "model_not_ready") {
         turns = turns.filter((candidate) => candidate !== turn);
-        promptText = text;
+        if (sentDraft.text === "") sentDraft.text = text;
         voiceDictated = voiceState.dictated;
         voiceTypedBefore = voiceState.typedBefore;
         voiceEditedAfter = voiceState.editedAfter;
@@ -1106,7 +1130,7 @@
   let mentionRequest = 0;
 
   const slashItems = $derived.by<MenuItem[]>(() => {
-    const fragment = menuKind === "slash" ? slashFragment(promptText, caret()) : null;
+    const fragment = menuKind === "slash" ? slashFragment(draft.text, caret()) : null;
     if (fragment === null) return [];
     return matchCommands("chat", fragment, ownerSlashCommands).map((command) => ({
       id: command.name,
@@ -1117,7 +1141,7 @@
   const menuItems = $derived(menuKind === "slash" ? slashItems : mentionItems);
 
   function caret(): number {
-    return promptEl?.selectionStart ?? promptText.length;
+    return promptEl?.selectionStart ?? draft.text.length;
   }
 
   async function loadOwnerSlashCommands() {
@@ -1137,12 +1161,12 @@
   onMount(loadOwnerSlashCommands);
 
   function trackPromptSelection() {
-    promptSelectionStart = promptEl?.selectionStart ?? promptText.length;
+    promptSelectionStart = promptEl?.selectionStart ?? draft.text.length;
     promptSelectionEnd = promptEl?.selectionEnd ?? promptSelectionStart;
   }
 
   function onVoiceDraft(next: string, cursor: number) {
-    promptText = next;
+    draft.text = next;
     promptSelectionStart = cursor;
     promptSelectionEnd = cursor;
     queueMicrotask(() => {
@@ -1159,7 +1183,7 @@
       typedBefore: voiceTypedBefore,
       editedAfter: voiceEditedAfter,
     };
-    if (!voiceDictated) voiceTypedBefore = promptText.trim() !== "";
+    if (!voiceDictated) voiceTypedBefore = draft.text.trim() !== "";
   }
 
   function restoreVoiceProvenance() {
@@ -1181,11 +1205,11 @@
     autoGrow(promptEl ?? null);
     menuActive = 0;
     const position = caret();
-    if (slashFragment(promptText, position) !== null) {
+    if (slashFragment(draft.text, position) !== null) {
       menuKind = "slash";
       return;
     }
-    const mention = mentionAt(promptText, position);
+    const mention = mentionAt(draft.text, position);
     if (mention !== null) {
       menuKind = "mention";
       void loadMentions(mention.fragment);
@@ -1227,15 +1251,15 @@
 
   function chooseMenuItem(item: MenuItem) {
     if (menuKind === "slash") {
-      promptText = stripSlashToken(promptText);
+      draft.text = stripSlashToken(draft.text);
       menuKind = "none";
       runSlashCommand(item.id);
       return;
     }
-    const mention = mentionAt(promptText, caret());
+    const mention = mentionAt(draft.text, caret());
     if (mention === null) return;
-    const applied = applyMention(promptText, mention, item.id);
-    promptText = applied.text;
+    const applied = applyMention(draft.text, mention, item.id);
+    draft.text = applied.text;
     menuKind = "none";
     queueMicrotask(() => {
       promptEl?.focus();
@@ -1247,8 +1271,8 @@
   /** Run one command. Each of these is a control the owner already has. */
   function runSlashCommand(name: string) {
     if (ownerSlashCommands.some((command) => command.name === name)) {
-      const args = promptText.trim();
-      promptText = `/${name}${args ? ` ${args}` : ""}`;
+      const args = draft.text.trim();
+      draft.text = `/${name}${args ? ` ${args}` : ""}`;
       void submit();
       return;
     }
@@ -1287,7 +1311,7 @@
    */
   function editPrompt(text: string) {
     if (streaming) return;
-    promptText = text;
+    draft.text = text;
     menuKind = "none";
     queueMicrotask(() => {
       promptEl?.focus();
@@ -1299,7 +1323,7 @@
   /** Send the same prompt again, unchanged, as a new turn. */
   function retryPrompt(text: string) {
     if (streaming || text.trim() === "") return;
-    promptText = text;
+    draft.text = text;
     void submit();
   }
 
@@ -2153,12 +2177,13 @@
   <Composer
     ariaLabel="Message composer"
     inputId="prompt-input"
-    bind:value={promptText}
+    bind:value={draft.text}
     bind:inputEl={promptEl}
     inputProps={{
       placeholder: "How can I help you today?",
       title: "Enter to send, Shift+Enter for a new line, / for commands, @ to mention a file",
       disabled: streaming,
+      onpaste: onComposerPaste,
       oninput: onPromptInput,
       onselect: trackPromptSelection,
       onclick: trackPromptSelection,
@@ -2177,9 +2202,9 @@
     turnActive={streaming}
   >
     {#snippet above()}
-      <ComposerChips store={attachStore} disabled={streaming} />
-      <ModelReadinessStrip readiness={modelReadiness} draftPreserved={promptText.trim() !== ""} />
-      <SkillLinkNotice text={promptText} />
+      <ComposerChips store={attachStore} disabled={streaming} oninline={(text) => { draft.text += text; }} />
+      <ModelReadinessStrip readiness={modelReadiness} draftPreserved={draft.text.trim() !== ""} />
+      <SkillLinkNotice text={draft.text} />
 
       {#if shortcutsOpen}
         <ShortcutSheet surface="chat" onclose={() => (shortcutsOpen = false)} />
@@ -2257,7 +2282,7 @@
           <VoiceDictationControl
             bind:this={voiceControl}
             showTrigger={false}
-            draft={promptText}
+            draft={draft.text}
             selectionStart={promptSelectionStart}
             selectionEnd={promptSelectionEnd}
             language={speechLanguage}
@@ -2309,7 +2334,7 @@
           <button
             type="submit"
             class="btn btn-primary send"
-            disabled={streaming || attachStore.uploading || promptText.trim() === "" || modelBlocked}
+            disabled={streaming || attachStore.uploading || draft.text.trim() === "" || modelBlocked}
             aria-label={streaming ? "Running" : "Send"}
           >
             <Icon name="send" size="sm" />

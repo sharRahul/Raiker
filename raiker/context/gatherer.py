@@ -1252,6 +1252,10 @@ class ContextGatherer:
             f"durable_writes_enabled: {governed['durable_writes_enabled']}",
             f"memory_write_decision_mode: {governed['write_decision_mode']}",
             f"memory_forget_decision_mode: {governed['forget_decision_mode']}",
+            "memory_controls: Permissions > Memory store. Turn the capability on to enable "
+            "durable writes; Ask requires approval for each proposed memory, while Allow "
+            "permits governed writes without asking each time. Setting Allow alone does "
+            "not turn a disabled capability on.",
             f"candidate_count: {governed['candidate_count']}",
             f"semantic_writes_enabled: {semantic['semantic_writes_enabled']}",
             f"vector_writes_enabled: {semantic['vector_writes_enabled']}",

@@ -156,11 +156,12 @@ Two things worth knowing about how these rows behave elsewhere:
 
 - **Memory store and Memory forget are reachable from Chat and Build.** With the
   gate on, a turn can propose remembering a durable fact or deleting a stored
-  one; you see the exact text before deciding, approving really stores or
-  removes the record, and text that looks like a credential is refused before
-  you are asked. With the gate off — the shipped default — no turn can propose
-  either, and the Memory page says so rather than promising proposals it cannot
-  produce.
+  one. **Ask** shows the exact text before you decide; **Allow** sends an
+  ordinary memory write directly through the governed executor without a
+  second approval prompt; **Deny** refuses it. Text that looks like a credential
+  is refused before any of those paths can store it. With the gate off — the
+  shipped default — no turn can propose either, and the Memory page says so
+  rather than promising proposals it cannot produce.
 - **Build's Mode menu — Plan / Edit / Auto — does not change anything on this
   page.** It is the posture of one conversation, sent with each prompt and applied
   to that turn: Plan refuses file writes, patches and commands, Edit turns each one

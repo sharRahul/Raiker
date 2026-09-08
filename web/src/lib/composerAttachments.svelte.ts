@@ -47,6 +47,8 @@ export interface ComposerAttachment {
    * Never a remote URL, and never used for anything but display.
    */
   previewUrl?: string;
+  /** Original clipboard text, retained locally for reversible inline display. */
+  pastedText?: string;
 }
 
 /** A human file size. Bytes for the tiny cases, then KB, then MB. */
@@ -69,6 +71,7 @@ export function typeLabel(attachment: ComposerAttachment): string {
 }
 
 export const MAX_ATTACHMENTS = 8;
+export const LARGE_PASTE_CHARS = 4000;
 export const IMAGE_MEDIA_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 export const MAX_IMAGE_BYTES = 5_000_000;
 
@@ -154,6 +157,7 @@ export interface AttachmentStore {
   take(): ComposerAttachment[];
   uploadImage(file: File): Promise<void>;
   uploadDocument(file: File): Promise<void>;
+  attachPastedText(text: string): Promise<boolean>;
   /**
    * Take files the owner dropped rather than picked (BUG-252). Each one goes to
    * the same validator its button would have used; a drop is a shortcut past
@@ -172,6 +176,7 @@ export function createAttachmentStore(): AttachmentStore {
     file: File,
     kind: "image" | "document",
     mediaType: string,
+    pastedText?: string,
   ): Promise<void> {
     uploading = true;
     try {
@@ -184,6 +189,7 @@ export function createAttachmentStore(): AttachmentStore {
         ...items,
         {
           kind,
+          pastedText,
           label: file.name,
           detail: `${file.name} (${stored.media_type}, ${stored.byte_size} bytes)`,
           attachmentId: stored.attachment_id,
@@ -269,6 +275,15 @@ export function createAttachmentStore(): AttachmentStore {
     },
     uploadImage,
     uploadDocument,
+    async attachPastedText(text: string) {
+      if (text.length < LARGE_PASTE_CHARS || items.length >= MAX_ATTACHMENTS || uploading) return false;
+      const file = new File([text], "pasted-text.txt", { type: "text/plain" });
+      if (file.size > MAX_DOCUMENT_BYTES) return false;
+      error = null;
+      const count = items.length;
+      await upload(file, "document", "text/plain", text);
+      return items.length > count;
+    },
     async acceptFiles(files: Iterable<File>) {
       for (const file of files) {
         if (items.length >= MAX_ATTACHMENTS) {

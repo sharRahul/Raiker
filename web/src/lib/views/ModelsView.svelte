@@ -1039,7 +1039,12 @@
     return parts.join(" · ");
   }
 
+  function usesCloudInference(profile: ModelProfile): boolean {
+    return profile.provider === "ollama" && profile.model.trim().toLowerCase().endsWith("-cloud");
+  }
+
   function usageLine(profile: ModelProfile): string {
+    if (usesCloudInference(profile)) return "Provider pricing may apply";
     if (!profile.billable) return "No API cost — runs on this machine";
     const used = profile.models_used ?? 0;
     if (used === 0) return "Not used yet";
@@ -1437,7 +1442,7 @@
                 </div>
                 <p>
                   {section === "Local"
-                    ? "Private by default; nothing leaves this device."
+                    ? "Local endpoints. Cloud-tagged Ollama models may run off-device."
                     : section === "Hosted"
                       ? "Sign in with your own account and opt in to network access."
                       : "Custom endpoints and provider routers for power users."}
@@ -1515,9 +1520,10 @@
                         {/if}
                         <div class="chips">
                           <span class="chip"
-                            >{endpointLabel(p.endpoint_kind)}</span
+                            >{usesCloudInference(p) ? "Local endpoint" : endpointLabel(p.endpoint_kind)}</span
                           >
-                          {#if p.local_only}<span class="chip chip-ok"
+                          {#if usesCloudInference(p)}<span class="chip chip-warn">Cloud inference</span>{/if}
+                          {#if p.local_only && !usesCloudInference(p)}<span class="chip chip-ok"
                               >Local-only</span
                             >{/if}
                           {#if p.connection_configured}<span

@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
 import { resetModels } from "./lib/models.svelte";
 import { resetWorkProject } from "./lib/workProject.svelte";
+import { resetWorkDrafts } from "./lib/workDraft.svelte";
 
 // Node 25 ships a built-in `localStorage` global. It shadows the one jsdom
 // installs and is inert unless the process was started with a valid
@@ -49,4 +50,5 @@ installStorage("sessionStorage");
 afterEach(() => {
   resetModels();
   resetWorkProject();
+  resetWorkDrafts();
 });

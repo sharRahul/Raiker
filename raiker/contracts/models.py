@@ -164,6 +164,9 @@ EVENT_TYPES = {
     # otherwise ordinary, governed action was executed under the owner's
     # persisted setting; they do not relax runtime gates or critical holds.
     "approval_auto_executed",
+    # A capability-specific standing Allow reached its governed executor. The
+    # policy decision records which capability supplied the authority.
+    "capability_allow_executed",
     # BUG-218 — `auto` promises a review, so it records when the review said no.
     # The action falls back to the ordinary approval queue; this event is the
     # evidence that Auto declined to grant it, with the path that did not match.

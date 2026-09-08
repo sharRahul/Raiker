@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { workDraft } from "../workDraft.svelte";
   /**
    * Design — describe an image, and it answers with one.
    *
@@ -51,7 +52,7 @@
   let failure = $state<string | null>(null);
   let threadEl = $state<HTMLDivElement | undefined>();
 
-  let prompt = $state("");
+  const draft = $derived(workDraft(workProject()));
   let size = $state("1024x1024");
 
   /**
@@ -234,7 +235,7 @@
    * established.
    */
   async function runResearch(ask: string) {
-    const subject = prompt.trim();
+    const subject = draft.text.trim();
     if (!subject) {
       researchError = "Describe what to research in the composer first.";
       research = null;
@@ -343,17 +344,19 @@
   }
 
   async function generate() {
-    if (!prompt.trim() || choice === null || busy || block.kind !== "none") return;
+    if (!draft.text.trim() || choice === null || busy || block.kind !== "none") return;
+    const sentDraft = draft;
+    const sentText = sentDraft.text;
     busy = true;
     failure = null;
     try {
       await api.generateImage({
         profile_id: choice.profileId,
-        prompt: prompt.trim(),
+        prompt: draft.text.trim(),
         size,
         model: choice.model,
       });
-      prompt = "";
+      if (sentDraft.text === sentText) sentDraft.text = "";
     } catch (error) {
       failure =
         error instanceof ApiError ? readable(error.reasonCode ?? null) : "That request failed.";
@@ -465,7 +468,7 @@
     ariaLabel="Image composer"
     inputId="design-prompt"
     inputLabel="Describe the image"
-    bind:value={prompt}
+    bind:value={draft.text}
     inputProps={{
       placeholder: "Describe the image you want…",
       title: "Enter to generate, Shift+Enter for a new line",
@@ -568,7 +571,7 @@
       <button
         type="submit"
         class="btn btn-primary send"
-        disabled={busy || !prompt.trim() || choice === null || block.kind !== "none"}
+        disabled={busy || !draft.text.trim() || choice === null || block.kind !== "none"}
         aria-label={busy ? "Generating" : "Generate"}
       >
         <Icon name={busy ? "clock" : "send"} size="sm" />

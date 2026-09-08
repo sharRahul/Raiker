@@ -2,6 +2,11 @@
 
 ## Pass-2 implementation status — 2026-09-07
 
+**Follow-up 2026-09-08.** Work-mode continuity now includes the unfinished
+Project draft, and large text pastes use a compact reversible attachment. This
+closes the composer remainder without changing the still-open theme, large
+display, canvas and component-extraction work below.
+
 Wave 1 is complete, and the parts of Wave 2 that the composer redesign carries
 are complete with it. Waves 2 (remainder) and 3 are open.
 

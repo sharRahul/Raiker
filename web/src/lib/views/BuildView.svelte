@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { LARGE_PASTE_CHARS } from "../composerAttachments.svelte";
+  import { workDraft } from "../workDraft.svelte";
   /**
    * Build — Raiker's coding workspace.
    *
@@ -221,10 +223,32 @@
     onFiles: (files) => void attachStore.acceptFiles(files),
     enabled: () => !streaming && !attachStore.full,
   });
+  async function onComposerPaste(event: ClipboardEvent) {
+    if (streaming || attachStore.uploading || attachStore.full) return;
+    const files = event.clipboardData?.files;
+    if (files?.length) {
+      event.preventDefault();
+      await attachStore.acceptFiles(files);
+      return;
+    }
+    const text = event.clipboardData?.getData("text/plain") ?? "";
+    if (text.length < LARGE_PASTE_CHARS) return;
+    event.preventDefault();
+    const targetDraft = draft;
+    const original = targetDraft.text;
+    const start = promptEl?.selectionStart ?? original.length;
+    const end = promptEl?.selectionEnd ?? start;
+    if (!(await attachStore.attachPastedText(text))) {
+      targetDraft.text = targetDraft.text === original
+        ? original.slice(0, start) + text + original.slice(end)
+        : targetDraft.text + text;
+    }
+  }
   let attachControl = $state<ComposerAttach | undefined>();
   let attachOpen = $state(false);
 
-  let promptText = $state("");
+  const projectId = $derived(workProject());
+  const draft = $derived(workDraft(projectId));
   let speechLanguage = $state<SpeechLanguage>("auto");
   // BUG-256 — which speech runtime dictation will use. Read once on mount and
   // defaulted to the browser, so a composer that cannot reach the host still
@@ -252,7 +276,7 @@
   // provider usage for this session.
   const estimatedContextTokens = $derived(
     Math.ceil(
-      (promptText.length +
+      (draft.text.length +
         turns.reduce(
           (total, turn) => total + turn.prompt.length + (turn.response?.message?.length ?? 0),
           0,
@@ -631,7 +655,6 @@
   // owner left off, and it cannot change mid-turn.
   // VIS2-11 — the shared Work project, so choosing one here reaches Chat and
   // Design too rather than being re-chosen on each surface.
-  const projectId = $derived(workProject());
 
   // A remembered id that no longer names an owned project must not silently
   // stand as a boundary. Resolving it against the loaded list is what turns a
@@ -714,7 +737,7 @@
       // The same menu `@` opens, reached without knowing the shortcut. The
       // accelerator stays; COMPOSER-13's rule is that syntax is a shortcut to
       // something discoverable, not the only way to reach it.
-      promptText = `${promptText}@`;
+      draft.text = `${draft.text}@`;
       promptEl?.focus();
       onPromptInput();
       return;
@@ -889,7 +912,7 @@
         attachments?: ComposerAttachment[];
       }>).detail;
       if (!detail?.text.trim()) return;
-      promptText = detail.text;
+      draft.text = detail.text;
       modelProfile = detail.profileId ?? "";
       model = detail.model ?? "";
       // Same handoff contract as Chat: files picked in the Workbench composer
@@ -1018,7 +1041,7 @@
   let mentionRequest = 0;
 
   const slashItems = $derived.by<MenuItem[]>(() => {
-    const fragment = menuKind === "slash" ? slashFragment(promptText, caret()) : null;
+    const fragment = menuKind === "slash" ? slashFragment(draft.text, caret()) : null;
     if (fragment === null) return [];
     return matchCommands("build", fragment, ownerSlashCommands).map((command) => ({
       id: command.name,
@@ -1029,7 +1052,7 @@
   const menuItems = $derived(menuKind === "slash" ? slashItems : mentionItems);
 
   function caret(): number {
-    return promptEl?.selectionStart ?? promptText.length;
+    return promptEl?.selectionStart ?? draft.text.length;
   }
 
   async function loadOwnerSlashCommands() {
@@ -1049,12 +1072,12 @@
   onMount(loadOwnerSlashCommands);
 
   function trackPromptSelection() {
-    promptSelectionStart = promptEl?.selectionStart ?? promptText.length;
+    promptSelectionStart = promptEl?.selectionStart ?? draft.text.length;
     promptSelectionEnd = promptEl?.selectionEnd ?? promptSelectionStart;
   }
 
   function onVoiceDraft(next: string, cursor: number) {
-    promptText = next;
+    draft.text = next;
     promptSelectionStart = cursor;
     promptSelectionEnd = cursor;
     queueMicrotask(() => {
@@ -1071,7 +1094,7 @@
       typedBefore: voiceTypedBefore,
       editedAfter: voiceEditedAfter,
     };
-    if (!voiceDictated) voiceTypedBefore = promptText.trim() !== "";
+    if (!voiceDictated) voiceTypedBefore = draft.text.trim() !== "";
   }
 
   function restoreVoiceProvenance() {
@@ -1092,11 +1115,11 @@
     autoGrow(promptEl ?? null);
     menuActive = 0;
     const position = caret();
-    if (slashFragment(promptText, position) !== null) {
+    if (slashFragment(draft.text, position) !== null) {
       menuKind = "slash";
       return;
     }
-    const mention = mentionAt(promptText, position);
+    const mention = mentionAt(draft.text, position);
     if (mention !== null) {
       menuKind = "mention";
       void loadMentions(mention.fragment);
@@ -1138,15 +1161,15 @@
 
   function chooseMenuItem(item: MenuItem) {
     if (menuKind === "slash") {
-      promptText = stripSlashToken(promptText);
+      draft.text = stripSlashToken(draft.text);
       menuKind = "none";
       runSlashCommand(item.id);
       return;
     }
-    const mention = mentionAt(promptText, caret());
+    const mention = mentionAt(draft.text, caret());
     if (mention === null) return;
-    const applied = applyMention(promptText, mention, item.id);
-    promptText = applied.text;
+    const applied = applyMention(draft.text, mention, item.id);
+    draft.text = applied.text;
     menuKind = "none";
     queueMicrotask(() => {
       promptEl?.focus();
@@ -1180,9 +1203,9 @@
 
   function mentionPath(path: string) {
     if (path === "") return;
-    const separator = promptText === "" || promptText.endsWith(" ") ? "" : " ";
-    promptText = `${promptText}${separator}@${path} `;
-    const caretAt = promptText.length;
+    const separator = draft.text === "" || draft.text.endsWith(" ") ? "" : " ";
+    draft.text = `${draft.text}${separator}@${path} `;
+    const caretAt = draft.text.length;
     queueMicrotask(() => {
       promptEl?.focus();
       promptEl?.setSelectionRange(caretAt, caretAt);
@@ -1193,8 +1216,8 @@
   /** Run one command. Each is a control this surface already has. */
   function runSlashCommand(name: string) {
     if (ownerSlashCommands.some((command) => command.name === name)) {
-      const args = promptText.trim();
-      promptText = `/${name}${args ? ` ${args}` : ""}`;
+      const args = draft.text.trim();
+      draft.text = `/${name}${args ? ` ${args}` : ""}`;
       void submit();
       return;
     }
@@ -1218,7 +1241,7 @@
   /** C14 — a past prompt back in the composer, leaving the transcript intact. */
   function editPrompt(text: string) {
     if (streaming) return;
-    promptText = text;
+    draft.text = text;
     menuKind = "none";
     queueMicrotask(() => {
       promptEl?.focus();
@@ -1230,7 +1253,7 @@
   /** Send the same prompt again, under the mode that is selected now. */
   function retryPrompt(text: string) {
     if (streaming || text.trim() === "") return;
-    promptText = text;
+    draft.text = text;
     void submit();
   }
 
@@ -1317,7 +1340,8 @@
       promptEl?.focus();
       return;
     }
-    const text = promptText.trim();
+    const sentDraft = draft;
+    const text = sentDraft.text.trim();
     if (text === "" || modelBlocked || streaming || attachStore.uploading) return;
     const voiceState = {
       dictated: voiceDictated,
@@ -1340,7 +1364,7 @@
       },
     ];
     const turn = turns[turns.length - 1];
-    promptText = "";
+    draft.text = "";
     resetVoiceProvenance();
     // B19 — shrink the box back with the prompt that grew it.
     menuKind = "none";
@@ -1402,7 +1426,7 @@
     } catch (error) {
       if (error instanceof ApiError && error.reasonCode === "model_not_ready") {
         turns = turns.filter((candidate) => candidate !== turn);
-        promptText = text;
+        if (sentDraft.text === "") sentDraft.text = text;
         voiceDictated = voiceState.dictated;
         voiceTypedBefore = voiceState.typedBefore;
         voiceEditedAfter = voiceState.editedAfter;
@@ -2392,7 +2416,7 @@
       cardClass="composer-build"
       inputId="build-prompt"
       inputLabel="Describe the change"
-      bind:value={promptText}
+      bind:value={draft.text}
       bind:inputEl={promptEl}
       inputProps={{
         placeholder: activeRepo === null
@@ -2400,6 +2424,7 @@
           : `Describe the change in ${activeRepo.label}…`,
         title: "Enter to send, Shift+Enter for a new line, Shift+Tab to change mode, / for commands, @ to mention a file",
         disabled: streaming,
+        onpaste: onComposerPaste,
         oninput: onPromptInput,
         onselect: trackPromptSelection,
         onclick: trackPromptSelection,
@@ -2418,9 +2443,9 @@
       turnActive={streaming}
     >
       {#snippet above()}
-        <ComposerChips store={attachStore} disabled={streaming} />
-        <ModelReadinessStrip readiness={modelReadiness} draftPreserved={promptText.trim() !== ""} />
-        <SkillLinkNotice text={promptText} />
+        <ComposerChips store={attachStore} disabled={streaming} oninline={(text) => { draft.text += text; }} />
+        <ModelReadinessStrip readiness={modelReadiness} draftPreserved={draft.text.trim() !== ""} />
+        <SkillLinkNotice text={draft.text} />
 
         {#if shortcutsOpen}
           <ShortcutSheet surface="build" onclose={() => (shortcutsOpen = false)} />
@@ -2507,7 +2532,7 @@
             <VoiceDictationControl
               bind:this={voiceControl}
               showTrigger={false}
-              draft={promptText}
+              draft={draft.text}
               selectionStart={promptSelectionStart}
               selectionEnd={promptSelectionEnd}
               language={speechLanguage}
@@ -2561,7 +2586,7 @@
             <button
               type="submit"
               class="btn btn-primary send"
-              disabled={streaming || attachStore.uploading || promptText.trim() === "" || modelBlocked || !projectReady}
+              disabled={streaming || attachStore.uploading || draft.text.trim() === "" || modelBlocked || !projectReady}
             >
               <Icon name={streaming ? "clock" : "send"} size="sm" />
               <!-- COMPOSER-15 — one state, one obvious next action. The word

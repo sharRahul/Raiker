@@ -1,6 +1,6 @@
 # Raiker Models Page UI + Backend Review — 2026-09-06
 
-## Implementation status — 2026-09-07
+## Implementation status — 2026-09-08
 
 **Every item in this review is now implemented.** Waves 0 to 4 landed on
 2026-09-06 against a live runtime holding real Anthropic, OpenAI and OpenRouter
@@ -38,9 +38,22 @@ live rounds in `web/e2e/composer-models-redesign-live.spec.ts` and
 covered by `web/src/lib/huggingFaceSteps.test.ts`,
 `web/src/lib/returnAndDetect.test.ts` and `web/src/lib/views/ModelsView.test.ts`.
 
+The 2026-09-08 live restart round rechecked saved Anthropic, OpenAI,
+OpenRouter and Ollama paths. It also corrected Ollama models whose names end in
+`-cloud`: the row now says **Local endpoint**, **Cloud inference** and
+**Provider pricing may apply**, rather than claiming local-only execution and
+no API cost ([FIXED-477](FIXED_ITEMS.md#fixed-477--ollama-cloud-was-labelled-local-only-and-free)).
+
 ---
 
 ## Scope
+
+**Historical review:** the assessment, observations, proposed layouts and
+implementation waves below describe the initial 2026-09-06 baseline. Their
+present-tense findings are retained as the rationale for the work; they are not
+open defects in the current implementation. The implementation-status table
+above records the delivered state. Wireframes are illustrative, not exact
+screenshots or additional unimplemented requirements.
 
 This is a focused review of the Models experience at `main` commit `ac32915101de6b6562b09b1e09c4f76a24b00878`.
 
@@ -58,7 +71,8 @@ It reviews the Models page as one end-to-end product flow, not just as a collect
 - the API/state contract that determines which model is selected, available, running and effective;
 - how this should work across the first-class Work surfaces: **Chat | Build | Design**.
 
-This is a review/plan only. No production code is changed here.
+The original review changed no production code; the implementation recorded
+above followed it.
 
 ---
 
@@ -89,7 +103,7 @@ Everything else is management detail.
 
 ---
 
-# Verified implementation observations
+# Historical baseline observations
 
 ## 1. The page has six top-level tabs
 

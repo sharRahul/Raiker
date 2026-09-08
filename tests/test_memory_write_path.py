@@ -282,6 +282,38 @@ class TestGovernedMemoryStatus:
         assert status["durable_writes_enabled"] is True
         assert status["mode"] == "governed_write"
 
+    def test_standing_allow_reaches_the_executor_without_a_second_approval(
+        self, workspace: Path
+    ) -> None:
+        store = SQLiteStore(workspace)
+        self._set(store, _WRITE_CAP, state="enabled_runtime", mode="always_allow")
+        broker = ToolBroker(
+            workspace_root=workspace,
+            policy_engine=PolicyEngine(StaticPolicyConfig(workspace)),
+            store=store,
+            principal_id="principal_owner",
+        )
+        text = "The owner's standing memory decision is respected."
+
+        result, decision = broker.execute(
+            ToolAction(
+                new_id("act_"),
+                "memory_write",
+                {"text": text, "scope": "global"},
+                "medium",
+                True,
+                proposed_by="principal_owner",
+            ),
+            session_id="sess_standing_allow",
+            turn_id="turn_standing_allow",
+            approval_mode="manual",
+        )
+
+        assert result.status == "success"
+        assert decision.decision == "allow"
+        assert "capability_mode:allow" in decision.reasons
+        assert [row["text"] for row in store.search_approved_memory(text)] == [text]
+
     def test_deny_is_reported_as_denied_not_as_read_only(self, workspace: Path) -> None:
         store = SQLiteStore(workspace)
         self._set(store, _WRITE_CAP, state="enabled_runtime", mode="deny")

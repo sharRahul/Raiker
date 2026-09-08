@@ -726,6 +726,25 @@ describe("ModelsView state grammar", () => {
     expect(screen.queryByText("selected")).not.toBeInTheDocument();
   });
 
+  it("distinguishes Ollama cloud inference from its local endpoint", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [profile({
+          profile_id: "ollama", provider: "ollama", model: "gemma4:31b-cloud",
+          local_only: true, endpoint_kind: "local_machine", billable: false,
+          configured: true,
+        })],
+      }),
+    });
+    render(ModelsView, { tab: "add" });
+    await screen.findAllByRole("heading", { name: "Ollama" });
+    expect(screen.getByText("Cloud inference")).toBeInTheDocument();
+    expect(screen.getByText("Local endpoint")).toBeInTheDocument();
+    expect(screen.queryByText("Local-only")).toBeNull();
+    expect(screen.queryByText("No API cost — runs on this machine")).toBeNull();
+    expect(screen.queryByText("Private by default; nothing leaves this device.")).toBeNull();
+  });
+
   it("shows the discovered local context capacity and its source", async () => {
     stubFetch({
       "GET /api/models": models({

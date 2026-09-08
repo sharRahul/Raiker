@@ -2,6 +2,12 @@
 
 ## Status and authority
 
+**Follow-up 2026-09-08.** The focused continuation closed the Models,
+global-web-read, environment and composer items recorded in the linked plans,
+plus the memory-write capability regression found live. The broader audit's
+remaining installer, canvas and architecture work retains the status recorded
+below; the newly observed Ollama cloud-chat failure is tracked as BUG-285.
+
 This is the **current-status audit** for Raiker at `main` commit
 `ea2f48e70bfa7e68685f9865e9face17d820a61c`.
 

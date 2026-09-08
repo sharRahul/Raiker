@@ -1370,6 +1370,41 @@ class ToolBroker:
         # caller that reaches the broker directly cannot loosen a turn either.
         return mode if mode in {"ask", "deny"} else None
 
+    def _memory_write_has_standing_allow(self, action: ToolAction) -> bool:
+        """Whether the owner already authorised this ordinary memory write.
+
+        ``memory_write`` enters the broker as an approval-bound action. Without
+        this bridge, the broker parked it before RuntimeAuthority could read the
+        capability's persisted Allow mode, so Permissions said Direct while a
+        real turn still asked every time. The gate and mode are read through
+        RuntimeAuthority, and only this capability-specific Allow is widened;
+        hooks, critical actions and turn-scoped Ask remain stricter.
+        """
+        if action.tool_name != "memory_write" or self.store is None:
+            return False
+        from raiker.runtime.authority.router import RuntimeAuthority
+
+        authority = RuntimeAuthority(
+            self.store,
+            self.writer or EventLogWriter(self.store),
+        )
+        # A real account resolves to its owner scope. Direct/test callers have
+        # no account scope and therefore use the workspace-wide gate table.
+        principal_id = self.owner_scope
+        return (
+            authority.check_capability_gate(
+                action.tool_name,
+                action.tool_name,
+                principal_id,
+            )
+            is None
+            and authority.get_capability_decision_mode(
+                "memory_write_execution",
+                principal_id,
+            )
+            == "allow"
+        )
+
     def _turn_posture_deny_decision(
         self, action: ToolAction, base: PolicyDecision
     ) -> PolicyDecision:
@@ -1507,7 +1542,11 @@ class ToolBroker:
         path/hunk validation, and executor transaction boundaries. Returning
         ``None`` intentionally falls back to the normal paused workflow.
         """
-        if approval_mode not in {"auto", "skip"} or not self._is_ordinary_approval_decision(action, decision):
+        if approval_mode not in {
+            "auto",
+            "skip",
+            "standing_allow",
+        } or not self._is_ordinary_approval_decision(action, decision):
             return None
         # ADD-22 — a question is not an approval, and no composer mode may answer
         # one. `auto` and `skip` are the owner saying "grant the permissions I
@@ -1631,7 +1670,12 @@ class ToolBroker:
             decision_id=new_id("pol_"),
             action_id=action.action_id,
             decision="allow",
-            reasons=[*decision.reasons, f"approval_mode:{approval_mode}"],
+            reasons=[
+                *decision.reasons,
+                "capability_mode:allow"
+                if approval_mode == "standing_allow"
+                else f"approval_mode:{approval_mode}",
+            ],
             requires_user_approval=False,
             risk_level=decision.risk_level,
             timestamp=utc_now(),
@@ -1648,7 +1692,13 @@ class ToolBroker:
         if self.store is not None:
             self.store.insert_tool_action(sanitized_action, session_id, turn_id, result.status)
             self.store.insert_policy_decision(executed_decision)
-        event_type = "approval_auto_executed" if approval_mode == "auto" else "approval_preview_skipped"
+        event_type = (
+            "approval_auto_executed"
+            if approval_mode == "auto"
+            else "capability_allow_executed"
+            if approval_mode == "standing_allow"
+            else "approval_preview_skipped"
+        )
         self._event(
             session_id=session_id,
             turn_id=turn_id,
@@ -1849,6 +1899,12 @@ class ToolBroker:
             # that is never read, which is the outcome the mode exists to avoid.
             if approval_mode != "dont_ask":
                 approval_mode = "manual"
+        elif decision.decision == "needs_approval" and self._memory_write_has_standing_allow(action):
+            # The owner made the durable, capability-specific decision in
+            # Permissions. Carry it into the broker before the approval queue;
+            # RuntimeAuthority still rechecks the same gate and mode before the
+            # executor writes anything.
+            approval_mode = "standing_allow"
         # BUG-219 — resolved before the decision is recorded, because this *is*
         # the decision. Recording `needs_approval` and then refusing would leave
         # the audit log describing a queue entry that never existed.

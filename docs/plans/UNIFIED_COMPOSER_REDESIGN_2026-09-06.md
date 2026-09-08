@@ -1,6 +1,6 @@
 # Raiker Unified Composer Redesign — 2026-09-06
 
-## Implementation status — 2026-09-07
+## Implementation status — 2026-09-08
 
 Waves 1 to 4 are implemented and verified against a live runtime holding real
 Anthropic, OpenAI and OpenRouter credentials. Recorded as
@@ -18,10 +18,10 @@ with the two defects the work surfaced as
 | COMPOSER-06 one context line | Done — the meter is composed into its inspector |
 | COMPOSER-07/08/09 per-surface composition | Done. Design's Tools control is present as of 2026-09-07 and reaches something real: the four research reads run a governed research turn on the `design` surface (WEB-06). The *image* controls COMPOSER-09 lists are still absent, for the reason stated below |
 | COMPOSER-10 Tasks/Schedule composer | Done — Tasks is written on the shared shell as an instruction (`taskComposer.ts`); cadence chooses the primary action, and the schedule, project, model and notification details expand only when asked ([FIXED-470](FIXED_ITEMS.md#fixed-470--tasks-asked-to-be-filled-in-rather-than-instructed)) |
-| COMPOSER-11 Project continuity | Partial — the Project is carried and shown per surface; a shared draft across modes is not implemented |
+| COMPOSER-11 Project continuity | Done — one browser-session draft is keyed by Project and follows the owner across Chat, Build and Design ([FIXED-478](FIXED_ITEMS.md#fixed-478--a-work-draft-was-lost-at-every-mode-switch)) |
 | COMPOSER-12 governance near the action | Done — the posture chip renders only as an exception |
 | COMPOSER-13 slash and `@` accelerators | Already satisfied; `+` now makes the same actions discoverable without the syntax |
-| COMPOSER-14 paste/drop intelligence | Partial — drag/drop and paste attach as before; large-paste-to-attachment is not implemented |
+| COMPOSER-14 paste/drop intelligence | Done for the supported Chat/Build attachment surfaces — text at or above 4,000 characters becomes `pasted-text.txt`, and **Show inline** restores the exact text ([FIXED-479](FIXED_ITEMS.md#fixed-479--a-large-paste-could-hide-the-conversation-it-belonged-to)) |
 | COMPOSER-15 adaptive primary action | Done — the word names the act the press performs on every surface: Chat `Send`, Build `Run`/`Plan`/`Propose` per mode (`buildPrimaryAction`), Design `Generate`, Tasks `Create task`/`Schedule task`/`Create routine`/`Start background agent` per cadence, and a running turn offers Stop instead ([FIXED-471](FIXED_ITEMS.md#fixed-471--one-primary-action-that-did-not-say-what-it-would-do)) |
 | COMPOSER-16 mobile bottom sheet | Done |
 | COMPOSER-17 keyboard behaviour | Done — Escape closes a menu, the composer's own bindings are unchanged |
@@ -501,6 +501,12 @@ Advanced recurrence syntax, exact backend identifiers and operation metadata sho
 
 **Priority: P1 — Effort: Medium — Impact: High**
 
+**Delivered 2026-09-08.** `workDraft.svelte.ts` owns a draft per Project (and
+one unscoped draft) for the browser session. Chat, Build and Design read and
+write that same value, while their model and capability defaults remain
+surface-specific. Unit tests cover unscoped and Project-keyed isolation; the
+live test switches Chat → Build → Design in the existing workspace.
+
 A composer inside a Project inherits Project context visibly but quietly.
 
 Switching:
@@ -583,6 +589,13 @@ Autocomplete should show only permitted/relevant entities.
 # COMPOSER-14 — Paste, drag/drop and attachment intelligence
 
 **Priority: P1/P2 — Effort: Medium — Impact: High**
+
+**Delivered 2026-09-08.** Chat and Build intercept plain-text pastes at or above
+4,000 characters and create an in-memory `pasted-text.txt` attachment carrying
+the exact UTF-8 text. The attachment chip exposes **Show inline**; restoring
+removes the attachment and puts the original text back in the draft byte for
+byte. If attachment creation fails, the paste is restored inline immediately.
+Design continues to share the draft but has no attachment upload contract.
 
 The composer should intelligently handle input without becoming visually huge.
 

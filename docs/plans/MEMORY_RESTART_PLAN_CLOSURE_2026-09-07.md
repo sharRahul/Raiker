@@ -18,7 +18,7 @@ Existing closure records are evidence to verify, not work to repeat.
 | 4 | P1 | Medium | Finish shared Work draft continuity and large-paste attachment handling | Done |
 | 5 | P1 | Medium | Live UI tests with Anthropic, OpenAI, OpenRouter and available Ollama cloud model; screenshots | Done; Ollama Chat defect recorded separately |
 | 6 | P1 | Low | Reconcile current plan status, fixed-item ledger and guide; record unresolved audit work | Done |
-| 7 | P1 | Medium | Run Python/web checks, review diff, commit and push origin/main; monitor workflows | Local checks done; push/CI pending |
+| 7 | P1 | Medium | Run Python/web checks, review diff, commit and push origin/main; monitor workflows | Done |
 
 ## Implementation and verification checklist
 
@@ -33,7 +33,7 @@ Existing closure records are evidence to verify, not work to repeat.
 - [x] Record provider outcomes separately; a rejected credential is not a passing provider test.
 - [x] Review screenshots, update documentation, and record open work in [TO_BE_FIXED](TO_BE_FIXED.md).
 - [x] Run Ruff, Mypy, pytest, web check/lint/tests/build and relevant Playwright scenarios.
-- [ ] Commit, push, and verify workflows for the pushed SHA.
+- [x] Commit, push, and verify workflows for the pushed SHA.
 
 ## Constraints
 
@@ -87,3 +87,14 @@ records that isolated adapter/stream issue.
   direct-memory scenario also passed once more after loading the exact broker
   implementation intended for the commit.
 - Documentation consistency and `git diff --check`: passed.
+
+## Published verification
+
+Implementation commit `e0bd2214ac0e2e465ef8a9ffa626b6a5afcb6a56` was
+pushed to `origin/main`. All workflows triggered for that SHA completed
+successfully on 2026-09-08:
+
+- [CI](https://github.com/sharRahul/Raiker/actions/runs/34284257937)
+- [Web UI](https://github.com/sharRahul/Raiker/actions/runs/34284257910)
+- [Licensing](https://github.com/sharRahul/Raiker/actions/runs/34284257964)
+- [Phase Status Validation](https://github.com/sharRahul/Raiker/actions/runs/34284257938)

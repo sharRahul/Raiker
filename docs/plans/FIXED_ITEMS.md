@@ -504,6 +504,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-480](#fixed-480--directly-allowed-memories-were-recallable-and-invisible) | High | Memory / web UI | Fixed 2026-09-08 (found live) |
 | [FIXED-481](#fixed-481--one-elevation-for-two-grounds-and-a-picture-inside-a-card) | Low | Theme / design / shell | Fixed 2026-09-07 (VIS2-14, VIS2-15) |
 | [FIXED-482](#fixed-482--designs-bar-printed-the-same-size-twice) | Low | Design / composer | Fixed 2026-09-07 (found live) |
+| [FIXED-483](#fixed-483--three-work-modes-agreeing-by-habit-rather-than-by-contract) | Medium | Chat / Build / Design | Fixed 2026-09-07 (VIS2-21, VIS2-20) |
 
 ---
 
@@ -21162,3 +21163,61 @@ changes it.
 
 **Tests.** `workProjectContinuity.test.ts` asserts exactly one occurrence of the
 size on the rendered bar; reverting the fix fails it with two.
+
+---
+
+## FIXED-483 — Three Work modes agreeing by habit rather than by contract
+
+**Severity: Medium. Area: chat / build / design. Status: Fixed 2026-09-07. Found
+in [VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+(VIS2-21, VIS2-20).**
+
+**Observed.** Chat, Build and Design shared a composer and nothing else that was
+written down. Whether all three said which project a turn runs inside, which
+model will answer it, and what the page looks like while it is working was a
+matter of each view having been edited carefully — not of anything that would
+notice if the next edit dropped one. And the other half of the review's rule was
+unstated too: the three are *supposed* to differ in what they are about, but
+nothing said what each was about or stopped two of them drifting into the same
+shape. That drift is exactly how Design became a third chat screen before it was
+promoted to a Work mode.
+
+**Fixed.** `web/src/lib/workSurface.ts` states both halves, deliberately as two
+different kinds of thing.
+
+`SHARED_WORK_CONTRACT` is what every mode owes whatever it is about — project,
+model, posture, attachments, turn control, palette, and one language for
+loading, error and approval. A mode that drops one of these has not specialised;
+it has lost an answer its owner needs.
+
+`WORK_SURFACES` is what each mode *is* about, and is where they are required to
+differ: Chat's object is a conversation at low density, Build's is a change at
+high density, Design's is an asset at spatial density. Density is a real
+dimension rather than a label — `densityGap()` returns the spacing each surface
+puts between the things it holds, so a transcript keeps its air, a workbench
+packs, and a canvas takes the middle.
+
+Each shell declares its own half where it can be read off the page:
+`data-work-surface`, `data-primary-object`, `data-density`, and `--surface-gap`
+set from the contract rather than restated locally.
+
+VIS2-20's half: `DesignCanvasRegion.svelte` now owns how an asset is presented,
+so the surface's object has a component of its own. The other five regions the
+review names for Design describe a canvas runtime Raiker does not have
+([BUG-277](TO_BE_FIXED.md#bug-277--design-is-a-one-shot-generator-so-most-of-its-composer-has-nothing-to-reach));
+they are left unbuilt rather than extracted as empty shells, which is the same
+rule the composer applies to controls with no runtime behind them.
+
+**User-interface outcome.** No redesign — the three surfaces look as they did,
+with Design's asset list spaced by its own declared density. What changed is
+that the agreement is now enforceable.
+
+**Tests.** `workSurface.test.ts` — the contract's terms, that no two modes claim
+the same object or density, that the three densities resolve to different
+spacing, and that each shell declares its half from the module rather than
+hard-coding it. Live-verified 2026-09-07 in `web/e2e/work-surface-live.spec.ts`:
+all three surfaces opened, their declarations read back from the running page
+(three distinct objects, three distinct densities, three distinct computed
+gaps), and the shared half — add, tools, and the model that will answer —
+present on each. Screenshots `vis2-21-chat-surface.png`,
+`vis2-21-build-surface.png`, `vis2-21-design-surface.png`.

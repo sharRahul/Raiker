@@ -410,8 +410,10 @@ describe("visual rubric", () => {
       ).toBe(3);
       expect(new Set(declarations).size, `${token} is the same in both themes`).toBeGreaterThan(1);
     }
-    // Design's asset carries the boundary; the card around it is gone.
-    const design = readFileSync(resolve(VIEWS, "DesignView.svelte"), "utf8");
+    // Design's asset carries the boundary; the card around it is gone. The
+    // rule lives with the region that presents the asset (VIS2-20), not in the
+    // view that hosts the region.
+    const design = readFileSync(resolve(COMPONENTS, "DesignCanvasRegion.svelte"), "utf8");
     expect(design, "Design's image has no boundary of its own").toMatch(
       /\.shot \{[^}]*var\(--canvas-edge\)/,
     );

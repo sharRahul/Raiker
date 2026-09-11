@@ -1003,20 +1003,20 @@ Priority outranks effort. Within the same priority, lower effort comes first.
 1. **Permissions UX redesign** — Availability + Behaviour with progressive disclosure; preserve backend semantics.
 2. **FIRST-02 through FIRST-10** simplified first launch/onboarding.
 3. **VIS2-19** Design canvas/workspace.
-4. **VIS2-12** Build artifact/workbench pane.
-5. **VIS2-11** persistent Project workspace/context.
-6. **COMPOSER-10** Tasks/Schedule shared composer grammar.
+4. ~~**VIS2-12** Build artifact/workbench pane.~~ Done 2026-09-07 ([FIXED-467](FIXED_ITEMS.md#fixed-467--builds-third-pane-showed-tools-not-the-work)).
+5. ~~**VIS2-11** persistent Project workspace/context.~~ Done 2026-09-07 ([FIXED-469](FIXED_ITEMS.md#fixed-469--the-project-was-chosen-again-on-every-surface)).
+6. ~~**COMPOSER-10** Tasks/Schedule shared composer grammar.~~ Done 2026-09-07 ([FIXED-470](FIXED_ITEMS.md#fixed-470--tasks-asked-to-be-filled-in-rather-than-instructed)).
 7. ~~**WEATHER-01/02/03** structured weather + optional location + freshness.~~ Done 2026-09-07.
 8. ~~**WEB-04 through WEB-08** search readiness, `web_extract`, Design research integration, shared readiness update, browser escalation.~~ Done 2026-09-07.
-9. Home start-work parity for Chat/Build/Design.
-10. Extensions/Observability composed-hub pass.
+9. ~~Home start-work parity for Chat/Build/Design.~~ Done 2026-09-07 ([FIXED-484](FIXED_ITEMS.md#fixed-484--home-offered-two-of-the-three-work-modes)).
+10. ~~Extensions/Observability composed-hub pass.~~ Done 2026-09-07 ([FIXED-468](FIXED_ITEMS.md#fixed-468--extensions-opened-on-a-category-instead-of-on-what-raiker-can-reach)); Memory joined them ([FIXED-485](FIXED_ITEMS.md#fixed-485--memory-kept-settings-records-and-decisions-at-one-visual-level)).
 
 ## P2
 
-1. Memory hub composition.
-2. product-wide badge/attention/overlay sweep.
-3. theme-specific optical passes.
-4. 4K/8K composition validation.
+1. ~~Memory hub composition.~~ Done 2026-09-07 ([FIXED-485](FIXED_ITEMS.md#fixed-485--memory-kept-settings-records-and-decisions-at-one-visual-level)).
+2. ~~product-wide badge/attention/overlay sweep.~~ Done 2026-09-07 ([FIXED-472](FIXED_ITEMS.md#fixed-472--every-row-wore-the-same-weight-as-the-row-that-needed-you), [FIXED-474](FIXED_ITEMS.md#fixed-474--thirteen-z-index-numbers-and-no-way-to-say-what-was-above-what)).
+3. ~~theme-specific optical passes.~~ Done 2026-09-07 ([FIXED-481](FIXED_ITEMS.md#fixed-481--one-elevation-for-two-grounds-and-a-picture-inside-a-card)).
+4. ~~4K/8K composition validation.~~ Done 2026-09-07 — verified at 3840×2160 ([FIXED-481](FIXED_ITEMS.md#fixed-481--one-elevation-for-two-grounds-and-a-picture-inside-a-card)).
 5. ~~provenance/diagnostic visibility for environment/web-read state.~~ Done 2026-09-07 — `GET /api/environment` and `GET /api/read-capabilities`.
 
 ---

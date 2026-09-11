@@ -712,7 +712,15 @@ The UI may become clearer, but the backend must preserve:
 
 > No model, agent, subagent, memory, retrieved document, plugin, MCP server, connector, tool result, scheduled task or external message may create, expand, transfer or exercise authority. Authority may only originate from authenticated human policy or explicitly delegated bounded auditable runtime grant.
 
-**Permissions status: Security model correct; UX should be redesigned for clarity.**
+**Permissions status: Done 2026-09-07.** The page asks the two questions in the
+order their answers depend on — *Can Raiker use this?* then *When Raiker wants
+to use it* — and speaks the owner's vocabulary for the second (`Ask me`,
+`Allow`, `Automatic`, `Never`), while the store keeps `deny` and every other
+mode exactly as it was. A closed row states both facts, so the list can be
+scanned; the handful an owner comes to change sits above the registry; and
+"not permitted for your principal" is now a sentence about their account.
+Nothing in the authority model moved. Recorded as
+[FIXED-486](FIXED_ITEMS.md#fixed-486--two-parallel-systems-where-there-were-two-questions).
 
 ---
 
@@ -1000,7 +1008,7 @@ Priority outranks effort. Within the same priority, lower effort comes first.
 
 ## P1
 
-1. **Permissions UX redesign** — Availability + Behaviour with progressive disclosure; preserve backend semantics.
+1. ~~**Permissions UX redesign** — Availability + Behaviour with progressive disclosure; preserve backend semantics.~~ Done 2026-09-07 ([FIXED-486](FIXED_ITEMS.md#fixed-486--two-parallel-systems-where-there-were-two-questions)).
 2. **FIRST-02 through FIRST-10** simplified first launch/onboarding.
 3. **VIS2-19** Design canvas/workspace.
 4. ~~**VIS2-12** Build artifact/workbench pane.~~ Done 2026-09-07 ([FIXED-467](FIXED_ITEMS.md#fixed-467--builds-third-pane-showed-tools-not-the-work)).

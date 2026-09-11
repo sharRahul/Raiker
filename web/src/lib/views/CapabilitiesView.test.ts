@@ -56,6 +56,34 @@ afterEach(() => {
 // GEP-04 — a switch beside a running feature that it does not govern tells the
 // owner something untrue about their own control. The card has to say so.
 describe("CapabilitiesView — what each switch actually decides", () => {
+  it("asks two questions instead of showing two parallel systems", async () => {
+    // The page showed availability and decision mode side by side at nearly
+    // equal weight, which left an owner asking how a capability can be On and
+    // Deny. They are not parallel: one is whether Raiker may use this at all,
+    // the other is what happens when it wants to — so the card asks them in
+    // that order, and `deny` reads as "Never".
+    stubFetch({ "GET /api/capability-gates": GATES });
+    render(CapabilitiesView);
+
+    const shell = await screen.findByRole("button", { name: /Shell commands/i });
+    await fireEvent.click(shell);
+
+    expect(screen.getByText("Can Raiker use this?")).toBeInTheDocument();
+    expect(screen.getByText("When Raiker wants to use it")).toBeInTheDocument();
+    const group = screen.getAllByRole("group", { name: /when Raiker wants to use/i })[0];
+    expect(within(group).getByRole("button", { name: "Never" })).toBeInTheDocument();
+    expect(within(group).queryByRole("button", { name: "Deny" })).not.toBeInTheDocument();
+  });
+
+  it("says what is on and what happens, on a row that is still closed", async () => {
+    stubFetch({ "GET /api/capability-gates": GATES });
+    render(CapabilitiesView);
+
+    // A permission list that has to be opened row by row to learn what is on
+    // cannot be scanned, and scanning is the reason to have the list.
+    await waitFor(() => expect(screen.getAllByText(/^(On|Off) · /).length).toBeGreaterThan(0));
+  });
+
   it("marks a gate whose work is governed by a different control, and names it", async () => {
     stubFetch({
       "GET /api/capability-gates": [
@@ -124,42 +152,51 @@ describe("CapabilitiesView — what each switch actually decides", () => {
   });
 });
 
+/**
+ * The registry list, as opposed to the short "Common permissions" section above
+ * it. A capability an owner commonly changes appears in both by design, so a
+ * test about the grouped list has to say which one it means.
+ */
+function registry() {
+  return within(screen.getByRole("region", { name: "All permissions" }));
+}
+
 describe("CapabilitiesView", () => {
   it("groups executable tools by domain and omits non-executors entirely", async () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView, { principal: "prin_owner" });
     await waitFor(() => {
-      expect(screen.getByText("Shell commands")).toBeInTheDocument();
+      expect(registry().getByText("Shell commands")).toBeInTheDocument();
     });
 
     // Domain headings replace backend phase numbers.
-    expect(screen.getByText("Local execution")).toBeInTheDocument();
-    expect(screen.getByText("Network")).toBeInTheDocument();
-    expect(screen.queryByText(/^Phase \d/)).not.toBeInTheDocument();
+    expect(registry().getByText("Local execution")).toBeInTheDocument();
+    expect(registry().getByText("Network")).toBeInTheDocument();
+    expect(registry().queryByText(/^Phase \d/)).not.toBeInTheDocument();
 
     // A capability with no executor is a future, not a tool: no row, no selector.
-    expect(screen.queryByText("Finance")).not.toBeInTheDocument();
+    expect(registry().queryByText("Finance")).not.toBeInTheDocument();
     // Same for a fail-closed domain that reports no reason code but offers no
     // enable path (the live runtime's shape for sensitive domains).
-    expect(screen.queryByText("Medical")).not.toBeInTheDocument();
+    expect(registry().queryByText("Medical")).not.toBeInTheDocument();
     // Inherent read-only contract surfaces are omitted too.
-    expect(screen.queryByText("Web dashboard")).not.toBeInTheDocument();
+    expect(registry().queryByText("Web dashboard")).not.toBeInTheDocument();
 
     // Only the two real tools expose the Ask/Allow/Auto/Deny control.
-    expect(screen.getAllByRole("group", { name: /decision mode/i })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "Ask", pressed: true })).toHaveLength(2);
+    expect(registry().getAllByRole("group", { name: /when Raiker wants to use/i })).toHaveLength(2);
+    expect(registry().getAllByRole("button", { name: "Ask me", pressed: true })).toHaveLength(2);
 
     // The implementation-status badges (Implemented / Deferred / Disabled) are gone.
-    expect(screen.queryByText("Implemented")).not.toBeInTheDocument();
-    expect(screen.queryByText("Deferred")).not.toBeInTheDocument();
-    expect(screen.queryByText("Disabled")).not.toBeInTheDocument();
+    expect(registry().queryByText("Implemented")).not.toBeInTheDocument();
+    expect(registry().queryByText("Deferred")).not.toBeInTheDocument();
+    expect(registry().queryByText("Disabled")).not.toBeInTheDocument();
   });
 
   it("loads the whole matrix in a single gates request (no per-capability fan-out)", async () => {
     const mock = stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView, { principal: "prin_owner" });
     await waitFor(() => {
-      expect(screen.getAllByRole("group", { name: /decision mode/i })).toHaveLength(2);
+      expect(registry().getAllByRole("group", { name: /when Raiker wants to use/i })).toHaveLength(2);
     });
     // No GET to the per-capability decision-mode endpoint.
     expect(
@@ -178,22 +215,22 @@ describe("CapabilitiesView", () => {
     });
     render(CapabilitiesView, { principal: "prin_owner" });
     const shellGroup = await waitFor(() =>
-      screen.getByRole("group", { name: /shell commands/i }),
+      registry().getByRole("group", { name: /shell commands/i }),
     );
-    await fireEvent.click(within(shellGroup).getByRole("button", { name: "Deny" }));
+    await fireEvent.click(within(shellGroup).getByRole("button", { name: "Never" }));
     await waitFor(() => {
-      expect(screen.getByText(/is now set to “Deny”/i)).toBeInTheDocument();
+      expect(screen.getByText(/is now set to “Never”/i)).toBeInTheDocument();
     });
-    expect(within(shellGroup).getByRole("button", { name: "Deny", pressed: true })).toBeInTheDocument();
+    expect(within(shellGroup).getByRole("button", { name: "Never", pressed: true })).toBeInTheDocument();
     // No step-up dialog for a tightening change.
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(registry().queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("requires the step-up dialog to loosen a mode (allow)", async () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView, { principal: "prin_owner" });
     const shellGroup = await waitFor(() =>
-      screen.getByRole("group", { name: /shell commands/i }),
+      registry().getByRole("group", { name: /shell commands/i }),
     );
     await fireEvent.click(within(shellGroup).getByRole("button", { name: "Allow" }));
     await waitFor(() => {
@@ -206,13 +243,13 @@ describe("CapabilitiesView", () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView, { principal: "prin_owner" });
     await waitFor(() => {
-      expect(screen.getByText("Shell commands")).toBeInTheDocument();
+      expect(registry().getByText("Shell commands")).toBeInTheDocument();
     });
     await fireEvent.input(screen.getByLabelText(/search capabilities/i), {
       target: { value: "web fetch" },
     });
-    expect(screen.queryByText("Shell commands")).not.toBeInTheDocument();
-    expect(screen.getByText("Web fetch")).toBeInTheDocument();
+    expect(registry().queryByText("Shell commands")).not.toBeInTheDocument();
+    expect(registry().getByText("Web fetch")).toBeInTheDocument();
   });
 
   // 66 gates across a dozen domains all rendered expanded, so reaching the one
@@ -220,7 +257,7 @@ describe("CapabilitiesView", () => {
   it("folds a domain group away and brings it back", async () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView, { principal: "prin_owner" });
-    await waitFor(() => expect(screen.getByText("Shell commands")).toBeInTheDocument());
+    await waitFor(() => expect(registry().getByText("Shell commands")).toBeInTheDocument());
 
     const fold = screen
       .getAllByRole("button", { expanded: true })
@@ -228,12 +265,12 @@ describe("CapabilitiesView", () => {
     expect(fold).toBeDefined();
     await fireEvent.click(fold!);
 
-    expect(screen.queryByText("Shell commands")).not.toBeInTheDocument();
+    expect(registry().queryByText("Shell commands")).not.toBeInTheDocument();
     // The heading and the count stay, so a folded group still says what is in it.
     expect(fold).toHaveAttribute("aria-expanded", "false");
 
     await fireEvent.click(fold!);
-    expect(screen.getByText("Shell commands")).toBeInTheDocument();
+    expect(registry().getByText("Shell commands")).toBeInTheDocument();
   });
 
   // A search is a request to see matches; answering it with a folded group would
@@ -241,17 +278,17 @@ describe("CapabilitiesView", () => {
   it("overrides a fold while a search is active", async () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView, { principal: "prin_owner" });
-    await waitFor(() => expect(screen.getByText("Shell commands")).toBeInTheDocument());
+    await waitFor(() => expect(registry().getByText("Shell commands")).toBeInTheDocument());
 
     const fold = screen
       .getAllByRole("button", { expanded: true })
       .find((b) => b.className.includes("phase-fold"));
     await fireEvent.click(fold!);
-    expect(screen.queryByText("Shell commands")).not.toBeInTheDocument();
+    expect(registry().queryByText("Shell commands")).not.toBeInTheDocument();
 
     await fireEvent.input(screen.getByLabelText(/search capabilities/i), {
       target: { value: "shell" },
     });
-    expect(screen.getByText("Shell commands")).toBeInTheDocument();
+    expect(registry().getByText("Shell commands")).toBeInTheDocument();
   });
 });

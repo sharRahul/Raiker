@@ -507,6 +507,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-483](#fixed-483--three-work-modes-agreeing-by-habit-rather-than-by-contract) | Medium | Chat / Build / Design | Fixed 2026-09-07 (VIS2-21, VIS2-20) |
 | [FIXED-484](#fixed-484--home-offered-two-of-the-three-work-modes) | Medium | Home | Fixed 2026-09-07 (page-by-page §1) |
 | [FIXED-485](#fixed-485--memory-kept-settings-records-and-decisions-at-one-visual-level) | Medium | Memory | Fixed 2026-09-07 (page-by-page §10) |
+| [FIXED-486](#fixed-486--two-parallel-systems-where-there-were-two-questions) | Medium | Permissions | Fixed 2026-09-07 (page-by-page) |
 
 ---
 
@@ -21300,3 +21301,67 @@ than merely scrolled away. Live-verified 2026-09-07 in
 `web/e2e/home-and-memory-live.spec.ts`: each tab opened on the running product,
 `?tab=suggestions` landing on the panel it names. Screenshots
 `memory-hub-overview.png`, `memory-hub-suggestions.png`.
+
+---
+
+## FIXED-486 — Two parallel systems where there were two questions
+
+**Severity: Medium. Area: permissions. Status: Fixed 2026-09-07. Found in
+[PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md](PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md)
+— dedicated Permissions review.**
+
+**Observed.** The page put availability (`On` / `Off`) and decision mode (`Ask` /
+`Allow` / `Auto` / `Deny`) side by side at nearly equal weight. Both are real
+and both had to stay, but presented as parallel control systems they left an
+owner with questions the page never answered: how can a capability be On and
+Deny, what does Off + Ask mean, is Allow another way of turning it on, what is
+the difference between On, Allow and Auto.
+
+They are not parallel. One asks whether Raiker may use this at all; the other
+asks what happens when it wants to, and only matters once the first is yes.
+
+**Fixed.** `web/src/lib/permissionLanguage.ts` holds the wording and the
+ordering — and only those: no gate, transition or check changed, and `deny` is
+still `deny` in the store.
+
+- The card asks **Can Raiker use this?** and then **When Raiker wants to use
+  it**, in that order.
+- The modes read `Ask me`, `Allow`, `Automatic`, `Never`. "Never" is what makes
+  On + Never intelligible rather than contradictory — the capability is
+  available and every attempt to use it is refused, which is what the hint says.
+- A closed row states both facts (`On · Ask me`), because a permission list that
+  has to be opened row by row to learn what is on cannot be scanned.
+- The handful an owner comes to change sits above the registry, and the registry
+  keeps everything under **All permissions**.
+- "On/off changes are not permitted for your principal" became "This setting
+  cannot be changed for this account."
+
+**Two defects of my own, found in the first live capture and fixed before this
+was committed.** The row printed its availability twice — a chip and the summary
+— and on a capability that is on by default the two *disagreed*, the chip
+reading "On by default" beside a summary reading "Off". And the attention
+section listed fifteen rows, because the first rule counted every capability the
+build cannot offer ("no route yet", "governed elsewhere"): facts about what
+ships, under a heading that says *needs your attention*, with no action for any
+of them. A second attempt added "switched on but the runtime is not running it",
+which cannot happen — `runtime_enabled` is derived from the gate's own state in
+`raiker/phase_gates.py` — and a rule that can never fire only looks like safety.
+What is left is the one state that genuinely wants a second look: a capability
+set to run automatically.
+
+**Security invariant.** Unchanged, and deliberately so: the UI is clearer and
+the authority model is identical. No model, agent, memory, document, plugin, MCP
+server, connector, tool result, scheduled task or message can create, expand,
+transfer or exercise authority; only authenticated human policy or an explicitly
+delegated, bounded, auditable runtime grant can.
+
+**Tests.** `permissionLanguage.test.ts` (8 cases), including that every mode has
+an owner-facing word, that On + Never is explained rather than merely displayed,
+that attention excludes a missing executor, and that the common list names
+capabilities the registry actually ships — the last pinned because the first
+version of that list used plausible names (`file_write`, `shell_exec`) the
+registry does not use, and rendered one row while looking finished.
+`CapabilitiesView.test.ts` (12) covers the two questions on a real card and the
+scannable closed row. Live-verified 2026-09-07 in
+`web/e2e/permissions-language-live.spec.ts`; screenshot
+`permissions-two-questions.png`.

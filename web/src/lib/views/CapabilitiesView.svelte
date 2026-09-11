@@ -14,7 +14,6 @@
     canEnable,
     capabilityDescription,
     capabilityLabel,
-    DECISION_MODE_COPY,
     enableableTargets,
     groupByDomain,
     isDecisionMode,
@@ -30,6 +29,15 @@
     type DecisionMode,
   } from "../capabilityModel";
   import { explainReasonCode } from "../reasonCodes";
+  import {
+    AVAILABILITY_QUESTION,
+    BEHAVIOUR_COPY,
+    BEHAVIOUR_QUESTION,
+    CANNOT_CHANGE_HERE,
+    commonGates,
+    permissionAttention,
+    rowSummary,
+  } from "../permissionLanguage";
 
   let { principal = "—" }: { principal?: string } = $props();
 
@@ -52,6 +60,19 @@
    */
   let collapsedDomains = $state<string[]>([]);
   const searching = $derived(search.trim() !== "");
+
+  /**
+   * The two sections that come before the registry.
+   *
+   * Sixty-six equally weighted cards is a filing system: an owner arrives
+   * either because something needs them or because they want to change one of a
+   * handful of permissions, and the rest of the list is reference. Both are
+   * derived from the same gates the registry renders, so neither can claim a
+   * state the list below contradicts. A search is a request to see matches, so
+   * both fold away while one is running.
+   */
+  const attention = $derived(gates === null ? [] : permissionAttention(gates));
+  const common = $derived(gates === null ? [] : commonGates(gates));
   function isCollapsed(domain: string): boolean {
     return !searching && collapsedDomains.includes(domain);
   }
@@ -97,7 +118,7 @@
         await api.setCapabilityDecisionMode(cap, mode, "bulk-set via web UI");
         modeOverrides = { ...modeOverrides, [cap]: mode };
       }
-      notice = { kind: "ok", text: `${selectedCaps.size} capabilit${selectedCaps.size === 1 ? "y" : "ies"} set to "${DECISION_MODE_COPY[mode].label}".` };
+      notice = { kind: "ok", text: `${selectedCaps.size} capabilit${selectedCaps.size === 1 ? "y" : "ies"} set to "${BEHAVIOUR_COPY[mode].label}".` };
       selectedCaps = new Set();
     } catch (e) {
       const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
@@ -204,7 +225,7 @@
       modeOverrides = { ...modeOverrides, [capability]: mode };
       notice = {
         kind: "ok",
-        text: `${capabilityLabel(capability)} is now set to “${DECISION_MODE_COPY[mode].label}”.`,
+        text: `${capabilityLabel(capability)} is now set to “${BEHAVIOUR_COPY[mode].label}”.`,
       };
     } catch (e) {
       const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
@@ -259,7 +280,7 @@
         };
       case "set_mode":
         return {
-          title: `Set ${capabilityLabel(pending.capability)} to “${DECISION_MODE_COPY[pending.mode].label}”`,
+          title: `Set ${capabilityLabel(pending.capability)} to “${BEHAVIOUR_COPY[pending.mode].label}”`,
           requireToken: false,
           requireThreatAck: false,
         };
@@ -315,7 +336,7 @@
   function describeSuccess(p: Pending): string {
     if (p.kind === "enable") return `Enabled ${capabilityLabel(p.capability)}.`;
     if (p.kind === "disable_cap") return `Disabled ${capabilityLabel(p.capability)}.`;
-    return `${capabilityLabel(p.capability)} is now set to “${DECISION_MODE_COPY[p.mode].label}”.`;
+    return `${capabilityLabel(p.capability)} is now set to “${BEHAVIOUR_COPY[p.mode].label}”.`;
   }
 
   onMount(load);
@@ -378,6 +399,43 @@
 {:else if gates === null}
   <PageState state="loading" title="Loading capabilities…" />
 {:else}
+  {#if !searching && attention.length > 0}
+    <!-- VIS2-18's hierarchy, on this page: what needs a decision comes before
+         what is merely configured. Narrow on purpose — a capability sitting at
+         its default is not attention, and a page that calls everything
+         attention has said nothing. -->
+    <section class="cap-attention" aria-label="Needs your attention">
+      <h2>Needs your attention</h2>
+      <ul>
+        {#each attention as item (item.capability)}
+          <li><strong>{item.label}</strong> — {item.reason}</li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
+
+  {#if !searching && common.length > 0}
+    <!-- The handful people actually come to change, above the registry that
+         holds everything. Same gates, same controls: this is an ordering, not a
+         second copy of the page's state. -->
+    <section class="cap-common" aria-label="Common permissions">
+      <h2>Common permissions</h2>
+      <ul>
+        {#each common as gate (gate.capability)}
+          <li>
+            <span class="cap-label">{capabilityLabel(gate.capability)}</span>
+            <span class="cap-summary">{rowSummary(gate, !isDisabled(gate))}</span>
+          </li>
+        {/each}
+      </ul>
+      <p class="muted">Every permission, including these, is in the list below.</p>
+    </section>
+  {/if}
+
+  <!-- The registry: everything, grouped by domain. It keeps the full list an
+       owner may need to audit, and sits under the two sections that answer the
+       questions people actually arrive with. -->
+  <section class="cap-registry" aria-label="All permissions">
   {#each filtered as group (group.domain)}
     <div class="cap-list">
       <div class="phase-head">
@@ -432,14 +490,23 @@
                      the decision mode beside it showed on every row on or off.
                      A permission list that cannot be scanned for what is on is
                      not a permission list. -->
+                <!-- Availability and behaviour on the closed row, in the order
+                     the page asks them: a list that has to be opened row by row
+                     to learn what is on cannot be scanned.
+
+                     One statement of availability, not two. This row carried a
+                     separate "Off" chip beside the summary, which said the same
+                     thing twice — and on a capability that is on by default the
+                     two disagreed, the chip reading "On by default" next to a
+                     summary reading "Off". BUG-239's distinction is kept: being
+                     on because nothing is stored is a different fact from being
+                     switched on, and it is said here rather than contradicted. -->
                 {#if isOnByDefault(gate)}
-                  <!-- BUG-239 — nothing is stored and the enforcing path still
-                       says yes. Saying "Off" here was the page contradicting
-                       the tool it describes. -->
                   <span class="cap-reality cap-default-on">On by default</span>
-                {:else if isDisabled(gate)}
-                  <span class="cap-reality">Off</span>
                 {/if}
+                <span class="cap-summary">
+                  {rowSummary(gate, !isDisabled(gate) || isOnByDefault(gate))}
+                </span>
                 {#if realityLabel(gate)}
                   <span class="cap-reality">{realityLabel(gate)}</span>
                 {/if}
@@ -478,9 +545,11 @@
                 <p class="cap-reality-note">{unsetResolutionNote(gate)}</p>
               {/if}
               {#if isDecisionMode(mode)}
-                <p class="mode-hint">{DECISION_MODE_COPY[mode].hint}</p>
+                <p class="question">{BEHAVIOUR_QUESTION}</p>
+                <p class="mode-hint">{BEHAVIOUR_COPY[mode].hint}</p>
               {/if}
 
+              <p class="question">{AVAILABILITY_QUESTION}</p>
               <div class="cap-actions">
                 {#if canEnable(gate)}
                   <button type="button" class="btn btn-soft btn-sm" onclick={() => startEnable(gate)}>
@@ -500,7 +569,9 @@
                   </button>
                 {/if}
                 {#if !gate.can_current_principal_change}
-                  <span class="muted">On/off changes are not permitted for your principal.</span>
+                  <!-- The fact is unchanged; the sentence is about the owner's
+                       account rather than about our vocabulary. -->
+                  <span class="muted">{CANNOT_CHANGE_HERE}</span>
                 {/if}
               </div>
             </div>
@@ -509,6 +580,7 @@
       {/each}
     </div>
   {/each}
+  </section>
 {/if}
 
 {#if pending !== null}
@@ -674,6 +746,30 @@
     color: var(--text-3);
     margin: 0 0 var(--space-3);
   }
+  /* The two questions, as headings rather than as labels on controls: an owner
+     reading down the card meets "Can Raiker use this?" and then "When Raiker
+     wants to use it", which is the order the answers depend on. */
+  .cap-attention, .cap-common {
+    margin-bottom: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+  }
+  .cap-attention h2, .cap-common h2 { margin: 0 0 var(--space-2); font-size: var(--text-md); }
+  .cap-attention ul, .cap-common ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+  .cap-common li { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+  .cap-attention li { color: var(--text-2); font-size: var(--text-sm); }
+  .cap-common .muted { margin: var(--space-2) 0 0; font-size: var(--text-xs); }
+  .question {
+    margin: var(--space-3) 0 0.35rem;
+    color: var(--text-2);
+    font-size: var(--text-xs);
+    font-weight: 650;
+  }
+  /* Availability and behaviour on the closed row, at metadata weight: the row
+     is scanned, so this reads without competing with the capability's name. */
+  .cap-summary { color: var(--text-3); font-size: var(--text-xs); white-space: nowrap; }
   .cap-actions {
     display: flex;
     align-items: center;

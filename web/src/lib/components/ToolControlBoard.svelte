@@ -2,11 +2,11 @@
   import {
     capabilityLabel,
     DECISION_MODES,
-    DECISION_MODE_COPY,
     isDecisionMode,
     isDeferred,
     type DecisionMode,
   } from "../capabilityModel";
+  import { BEHAVIOUR_COPY } from "../permissionLanguage";
   import type { CapabilityGate } from "../apiTypes";
 
   let {
@@ -39,18 +39,26 @@
 {#each actionable as gate (gate.capability)}
   <section class="tool">
     {#if showLabel}<strong>{capabilityLabel(gate.capability)}</strong>{/if}
-    <div class="mode-seg" role="group" aria-label={`Decision mode for ${capabilityLabel(gate.capability)}`}>
+    <!-- The second of the page's two questions: not *whether* Raiker may use
+         this, but what happens when it wants to. The words are the owner's
+         (`permissionLanguage.ts`); the stored mode is unchanged, so `deny` is
+         still `deny` in the gate table and reads as "Never" here. -->
+    <div
+      class="mode-seg"
+      role="group"
+      aria-label={`When Raiker wants to use ${capabilityLabel(gate.capability)}`}
+    >
       {#each DECISION_MODES as mode (mode)}
         <button
           type="button"
           class="mode-btn"
           class:selected={modeFor(gate) === mode}
           aria-pressed={modeFor(gate) === mode}
-          title={DECISION_MODE_COPY[mode].hint}
+          title={BEHAVIOUR_COPY[mode].hint}
           disabled={busyCapability === gate.capability}
           onclick={() => onDecision(gate.capability, mode)}
         >
-          {DECISION_MODE_COPY[mode].label}
+          {BEHAVIOUR_COPY[mode].label}
         </button>
       {/each}
     </div>

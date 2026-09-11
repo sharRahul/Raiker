@@ -170,7 +170,12 @@ Chat      Build      Design
 
 Tasks/Agents/Projects can remain secondary workflow entries.
 
-**Status: Mostly correct.**
+**Status: Done 2026-09-07.** Home's start area is the three Work modes as
+peers, read from the same list the rest of the product reads (`workSurface.ts`,
+`START_WORK`), each described by the object that mode is about. Tasks and
+Projects follow on their own quieter row, which is what a workflow entry is.
+Recorded as
+[FIXED-484](FIXED_ITEMS.md#fixed-484--home-offered-two-of-the-three-work-modes).
 
 ---
 
@@ -426,7 +431,13 @@ Memory
 └ Recall & indexing
 ```
 
-**Status: Functionally correct; information architecture dense.**
+**Status: Done 2026-09-07.** Memory is a hub with exactly that composition —
+Overview, Memories, Suggestions, Sources, Recall & indexing — and Overview
+answers the two questions people arrive with: what Raiker can recall, and
+whether anything is waiting on a decision. `memoryHub.ts` derives both, so the
+Overview's counts and the tabs cannot disagree, and only decisions count as
+attention: an expired memory has already stopped being recalled. Recorded as
+[FIXED-485](FIXED_ITEMS.md#fixed-485--memory-kept-settings-records-and-decisions-at-one-visual-level).
 
 ---
 

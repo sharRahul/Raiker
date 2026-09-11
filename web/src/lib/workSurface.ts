@@ -25,6 +25,8 @@
  * what `workSurface.test.ts` refuses.
  */
 
+import type { IconName } from "./icons";
+
 export const WORK_MODES = ["chat", "build", "design"] as const;
 export type WorkMode = (typeof WORK_MODES)[number];
 
@@ -102,3 +104,44 @@ export function densityGap(density: WorkDensity): string {
       return "var(--space-5)";
   }
 }
+
+/**
+ * How a Work mode is offered as a place to start.
+ *
+ * Home listed Chat and Build beside Tasks and Projects, and left Design out
+ * entirely — so the shell said three peer Work modes and the first screen an
+ * owner sees said two. Both now read the same list, and each entry describes
+ * the mode by its *object*, which is the thing that actually tells an owner
+ * which of the three they want.
+ */
+export interface StartWorkEntry {
+  mode: WorkMode;
+  route: string;
+  icon: IconName;
+  title: string;
+  detail: string;
+}
+
+export const START_WORK: readonly StartWorkEntry[] = [
+  {
+    mode: "chat",
+    route: "#/new-chat",
+    icon: "chat",
+    title: "Start a conversation",
+    detail: "Ask, think, work with a file",
+  },
+  {
+    mode: "build",
+    route: "#/build",
+    icon: "code",
+    title: "Start a build",
+    detail: "Change a repository under governance",
+  },
+  {
+    mode: "design",
+    route: "#/design",
+    icon: "design",
+    title: "Start a design",
+    detail: "Describe an image a connected model draws",
+  },
+];

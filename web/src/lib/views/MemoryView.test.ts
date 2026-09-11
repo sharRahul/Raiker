@@ -1,7 +1,7 @@
 // Reliable memory controls (backlog item 3): the Memory view lists approved
 // memories with governance metadata, supports pin/bookmark, forget, and an
 // incognito opt-out toggle.
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import MemoryView from "./MemoryView.svelte";
 import { stubFetch, stubFetchPending } from "../test-helpers";
@@ -12,16 +12,89 @@ afterEach(() => {
 });
 
 describe("MemoryView", () => {
+  it("opens on what is waiting and what can be recalled, not on a category", async () => {
+    // Memory kept records, proposals, observations, a library and two settings
+    // at one visual level, so the proposal that needed a decision looked like
+    // the controls above it. Overview answers the two questions people arrive
+    // with, and routes each one to the tab that can act on it.
+    stubFetch({
+      "GET /api/memory": [
+        {
+          memory_id: "mem_1",
+          text: "remember this",
+          scope: "project:alpha",
+          sensitivity: "normal",
+          memory_type: "project",
+          created_at: "2026-07-12T00:00:00Z",
+          tags: [],
+          source: "agent",
+          provenance: {},
+          confidence: 0.5,
+          trust_score: 0.5,
+          retention: "until_forget",
+          approval_state: "approved",
+          pinned: true,
+          search_enabled: true,
+          expires_at: null,
+        },
+      ],
+      "GET /api/memory/settings": { incognito: false },
+      "GET /api/memory/proposals": [
+        {
+          candidate_id: "memcand_1",
+          source_event_id: "evt_1",
+          memory_type: "project",
+          scope: "project:alpha",
+          text: "Prefer concise answers",
+          sensitivity: "normal",
+          confidence: 0.8,
+          decision: "deferred",
+          created_at: "2026-07-12T00:00:00Z",
+        },
+      ],
+    });
+    render(MemoryView, { props: { tab: "overview" } });
+
+    await waitFor(() =>
+      expect(screen.getByText(/Raiker can recall 1 approved memory/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/1 pinned/i)).toBeInTheDocument();
+    // The decision waiting is named, with the tab that can take it. Proposals
+    // are read after the memories are, so this waits rather than reading a
+    // frame that has only half the answer.
+    const waiting = await screen.findByRole("region", { name: "Waiting on you" });
+    expect(within(waiting).getByText(/memory proposed/i)).toBeInTheDocument();
+    expect(
+      within(waiting).getByRole("button", { name: /Open Suggestions/i }),
+    ).toBeInTheDocument();
+    // … and the panels that are not open are not on the page at all.
+    expect(screen.queryByText(/advanced memory management/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Search memories")).not.toBeInTheDocument();
+  });
+
+  it("does not draw a board of zeroes on a fresh install", async () => {
+    // VIS-13's rule: a board that is empty is not a board. The sentence above
+    // already says Raiker remembers nothing; four tiles reading 0 restate it as
+    // four containers.
+    stubFetch({ "GET /api/memory": [], "GET /api/memory/settings": { incognito: false } });
+    render(MemoryView, { props: { tab: "overview" } });
+
+    await waitFor(() =>
+      expect(screen.getByText(/Raiker remembers nothing yet/i)).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("region", { name: "Memory summary" })).not.toBeInTheDocument();
+  });
+
   it("shows a route-level loading state while memories are fetched", async () => {
     stubFetchPending();
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "memories" } });
     const status = await screen.findByRole("status");
     expect(status).toHaveTextContent(/loading memories/i);
   });
 
   it("shows a route-level error state when memories cannot load", async () => {
     stubFetch({});
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "memories" } });
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/couldn't load memories/i);
     expect(alert).toHaveTextContent(/unavailable \(404\)/i);
@@ -51,7 +124,7 @@ describe("MemoryView", () => {
       ],
       "GET /api/memory/settings": { incognito: false },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "memories" } });
 
     await waitFor(() =>
       expect(screen.getByText("The user prefers tabs over spaces.")).toBeInTheDocument(),
@@ -85,7 +158,7 @@ describe("MemoryView", () => {
       ],
       "GET /api/memory/settings": { incognito: false },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "memories" } });
 
     expect(await screen.findByText("A directly allowed durable fact.")).toBeInTheDocument();
     await fireEvent.change(screen.getByLabelText("Memory status"), {
@@ -99,7 +172,7 @@ describe("MemoryView", () => {
       "GET /api/memory": [],
       "GET /api/memory/settings": { incognito: false },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "memories" } });
 
     await waitFor(() =>
       expect(screen.getByText(/no approved memories yet/i)).toBeInTheDocument(),
@@ -120,7 +193,7 @@ describe("MemoryView", () => {
         vector_search_exact_limit: 128,
       },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "recall" } });
 
     expect(await screen.findByText(/ranks 128 vectors exactly/i)).toBeInTheDocument();
   });
@@ -130,7 +203,7 @@ describe("MemoryView", () => {
       "GET /api/memory": [],
       "GET /api/memory/settings": { incognito: false, vector_search_strategy: "exact" },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "recall" } });
 
     await screen.findByRole("heading", { name: /recall backend/i });
     expect(screen.queryByText(/vectors exactly/i)).toBeNull();
@@ -146,7 +219,7 @@ describe("MemoryView", () => {
         decision_mode: "ask",
       }],
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "memories" } });
 
     expect(await screen.findByText(/memory store is off/i)).toBeInTheDocument();
     expect(screen.queryByText(/could not read your memory permissions/i)).not.toBeInTheDocument();
@@ -171,7 +244,7 @@ describe("MemoryView", () => {
         ok: true, candidate_id: "memcand_1", decision: "approved", memory_id: "mem_1",
       },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "suggestions" } });
     await waitFor(() => expect(screen.getByText("Prefer concise answers")).toBeInTheDocument());
     await fireEvent.click(screen.getByRole("button", { name: /^approve$/i }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
@@ -205,7 +278,7 @@ describe("MemoryView", () => {
         relationship_id: "rel_1",
       },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "suggestions" } });
 
     expect(await screen.findByText("Rahul works on Raiker.")).toBeInTheDocument();
     expect(screen.getByText(/97% confidence/i)).toBeInTheDocument();
@@ -222,7 +295,7 @@ describe("MemoryView", () => {
       "GET /api/memory/settings": { incognito: false },
       "PUT /api/memory/incognito": { ok: true, incognito: true },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "recall" } });
 
     await waitFor(() => expect(screen.getByRole("switch", { name: /incognito session/i })).toHaveAttribute("aria-checked", "false"));
     await fireEvent.click(screen.getByRole("switch", { name: /incognito session/i }));
@@ -265,7 +338,7 @@ describe("MemoryView", () => {
       "PUT /api/memory/mem_1/pin": { ok: true, memory_id: "mem_1", pinned: true },
       "DELETE /api/memory/mem_1": { ok: true, memory_id: "mem_1" },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "memories" } });
 
     await waitFor(() => expect(screen.getByText("remember this")).toBeInTheDocument());
     const pinBtn = screen.getByRole("button", { name: /pin memory/i });
@@ -287,7 +360,7 @@ describe("MemoryView", () => {
     );
   });
 
-  it("edits a memory and keeps import and export in advanced management", async () => {
+  it("edits a memory on the tab that lists memories", async () => {
     const fetchMock = stubFetch({
       "GET /api/memory": [
         {
@@ -316,7 +389,7 @@ describe("MemoryView", () => {
       "GET /api/memory/export": { ok: true, memories: [{ text: "remember this" }] },
       "POST /api/memory/import": { ok: true, count: 1 },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "memories" } });
 
     await waitFor(() => expect(screen.getByText("remember this")).toBeInTheDocument());
 
@@ -330,7 +403,22 @@ describe("MemoryView", () => {
       ),
     );
 
-    expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument();
+    // Import and export are administration, not content: they sit under
+    // Recall & indexing now rather than beside the records they would rewrite.
+    expect(screen.queryByText(/advanced memory management/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/memory export json/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps import and export under Recall & indexing", async () => {
+    stubFetch({
+      "GET /api/memory": [],
+      "GET /api/memory/settings": { incognito: false },
+    });
+    render(MemoryView, { props: { tab: "recall" } });
+
+    await waitFor(() =>
+      expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument(),
+    );
     expect(screen.queryByLabelText(/memory export json/i)).not.toBeInTheDocument();
   });
 });
@@ -376,7 +464,7 @@ describe("MemoryView import review (BUG-244)", () => {
         duplicates: [{ index: 1, text: "already", scope: "project", memory_id: "mem_9" }],
       },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "recall" } });
     await waitFor(() => expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument());
 
     await chooseFile([{ text: "a" }, { text: "b" }, { text: "c" }, { text: "d" }]);
@@ -402,7 +490,7 @@ describe("MemoryView import review (BUG-244)", () => {
         duplicates: [],
       },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "recall" } });
     await waitFor(() => expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument());
 
     await chooseFile([{ text: "a" }, { text: "b" }]);
@@ -435,7 +523,7 @@ describe("MemoryView import review (BUG-244)", () => {
         relationship_proposals: 0,
       },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "recall" } });
     await waitFor(() => expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument());
 
     await chooseFile([{ text: "a" }, { text: "b" }, { text: "c" }, { text: "d" }]);
@@ -497,7 +585,7 @@ describe("MemoryView observations (MEM-04)", () => {
         ],
       },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "suggestions" } });
 
     await waitFor(() =>
       expect(screen.getByText("read_file — docs/runbook.md")).toBeInTheDocument(),
@@ -542,7 +630,7 @@ describe("MemoryView observations (MEM-04)", () => {
         ],
       },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "suggestions" } });
 
     await waitFor(() => expect(screen.getByText("Not captured")).toBeInTheDocument());
     expect(screen.getByText(/refused on sensitivity \(credential like\)/i)).toBeInTheDocument();
@@ -551,7 +639,7 @@ describe("MemoryView observations (MEM-04)", () => {
 
   it("tells a failed observation read apart from having captured nothing", async () => {
     stubFetch(memoryFixtures);
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "suggestions" } });
 
     await waitFor(() =>
       expect(screen.getByText(/observation capture is not reporting/i)).toBeInTheDocument(),
@@ -570,7 +658,7 @@ describe("MemoryView observations (MEM-04)", () => {
         observations: [],
       },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "suggestions" } });
 
     await waitFor(() => expect(screen.getByText(/no observations yet/i)).toBeInTheDocument());
   });
@@ -611,7 +699,7 @@ describe("MemoryView observations (MEM-04)", () => {
       "POST /api/memory/observations/delete": { ok: true, deleted_observation_ids: ["obs_3"] },
     });
     vi.stubGlobal("confirm", () => true);
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "suggestions" } });
 
     await waitFor(() =>
       expect(screen.getByText(/gist proposed and pending review/i)).toBeInTheDocument(),
@@ -682,7 +770,7 @@ describe("MemoryView observations (MEM-04)", () => {
       },
     });
     vi.stubGlobal("confirm", () => true);
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "recall" } });
 
     const select = await screen.findByLabelText(/embedding model/i);
     expect(
@@ -725,7 +813,7 @@ describe("MemoryView observations (MEM-04)", () => {
         unindexed_memories: 0,
       },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "recall" } });
 
     await waitFor(() =>
       expect(screen.getByText(/recall still matches words/i)).toBeInTheDocument(),
@@ -766,7 +854,7 @@ describe("MemoryView observations (MEM-04)", () => {
         unindexed_file_chunks: 1,
       },
     });
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "recall" } });
 
     await waitFor(() => expect(screen.getByText(/matches meaning/i)).toBeInTheDocument());
     expect(screen.getByLabelText(/embedding model/i)).toBeInTheDocument();
@@ -812,7 +900,7 @@ describe("MemoryView observations (MEM-04)", () => {
       "POST /api/memory/eidetic/cleanup": { ok: true, deleted_observation_ids: ["obs_due"] },
     });
     vi.stubGlobal("confirm", () => true);
-    render(MemoryView);
+    render(MemoryView, { props: { tab: "suggestions" } });
 
     await waitFor(() =>
       expect(screen.getByText(/1 past their retention class/i)).toBeInTheDocument(),

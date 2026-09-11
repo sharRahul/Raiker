@@ -505,6 +505,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-481](#fixed-481--one-elevation-for-two-grounds-and-a-picture-inside-a-card) | Low | Theme / design / shell | Fixed 2026-09-07 (VIS2-14, VIS2-15) |
 | [FIXED-482](#fixed-482--designs-bar-printed-the-same-size-twice) | Low | Design / composer | Fixed 2026-09-07 (found live) |
 | [FIXED-483](#fixed-483--three-work-modes-agreeing-by-habit-rather-than-by-contract) | Medium | Chat / Build / Design | Fixed 2026-09-07 (VIS2-21, VIS2-20) |
+| [FIXED-484](#fixed-484--home-offered-two-of-the-three-work-modes) | Medium | Home | Fixed 2026-09-07 (page-by-page §1) |
+| [FIXED-485](#fixed-485--memory-kept-settings-records-and-decisions-at-one-visual-level) | Medium | Memory | Fixed 2026-09-07 (page-by-page §10) |
 
 ---
 
@@ -21221,3 +21223,80 @@ all three surfaces opened, their declarations read back from the running page
 gaps), and the shared half — add, tools, and the model that will answer —
 present on each. Screenshots `vis2-21-chat-surface.png`,
 `vis2-21-build-surface.png`, `vis2-21-design-surface.png`.
+
+---
+
+## FIXED-484 — Home offered two of the three Work modes
+
+**Severity: Medium. Area: home. Status: Fixed 2026-09-07. Found in
+[PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md](PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md)
+§1.**
+
+**Observed.** The shell calls Chat, Build and Design three peer Work modes. The
+first screen a session opens with offered *Start a conversation*, *Start a
+build*, *Plan a task or agent* and *Open a project* — two of the three modes,
+beside two workflow entries, with Design absent. So Home and the product it
+opens onto disagreed about what Raiker is, and the one mode a new owner is least
+likely to discover on their own was the one Home never mentioned.
+
+**Fixed.** The start area is the three modes, as peers, on their own row, read
+from `START_WORK` in `web/src/lib/workSurface.ts` — the same module that states
+the Work contract, so a fourth mode could not be added to the shell and left off
+Home. Each is described by the object that mode is about, which is what actually
+tells an owner which of the three they want. Tasks and Projects keep their
+entries on a second, quieter row: they organise work rather than being a place
+it happens.
+
+**User-interface outcome.** `#/home` opens on Chat, Build and Design; Design's
+card reads "Start a design — Describe an image a connected model draws" and
+lands on the Design surface.
+
+**Tests.** `WorkbenchView.test.ts` — exactly three links in the start
+navigation, in mode order, with Tasks and Projects in the second one.
+Live-verified 2026-09-07 in `web/e2e/home-and-memory-live.spec.ts`, including
+that the Design card reaches a page declaring `data-work-surface="design"`.
+Screenshot `home-start-work-parity.png`.
+
+---
+
+## FIXED-485 — Memory kept settings, records and decisions at one visual level
+
+**Severity: Medium. Area: memory. Status: Fixed 2026-09-07. Found in
+[PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md](PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md)
+§10.**
+
+**Observed.** Memory rendered approved records, proposals, relationship
+proposals, observations, a document library, an incognito switch, a recall
+backend control and an import/export drawer as one long column at one visual
+weight. Every one is a real capability — the page was never wrong, only
+undifferentiated — but an owner had to read all of it to tell administration
+from content, and a proposal waiting on a decision looked exactly like the
+settings above it.
+
+**Fixed.** Memory is a hub, in the composition the review asks for: **Overview**,
+**Memories**, **Suggestions**, **Sources**, **Recall & indexing**, with the open
+panel owned by the hash so a deep link and the strip agree. Overview leads
+because the questions people arrive with are *what can Raiker recall* and *is
+anything waiting on me*; `web/src/lib/memoryHub.ts` derives both, so the
+Overview's counts and the tabs cannot drift apart.
+
+Only decisions count as attention. An expired memory has already stopped being
+recalled — nobody is blocked on it — so it stays a fact in the summary rather
+than becoming a row that says "act on this" about something with nothing to act
+on. And VIS-13's rule applies here too: on a fresh install the four summary
+tiles all read 0, which is the lead sentence restated as four containers, so
+they appear only when there is something in them.
+
+**User-interface outcome.** `#/memory` opens on one sentence about what is
+recallable, plus anything waiting with a button to the tab that can decide it.
+Records, suggestions, documents and the recall controls each have a tab;
+import/export sits under Recall & indexing rather than beside the records it
+would rewrite.
+
+**Tests.** `memoryHub.test.ts` (5 cases) for the derivation, and
+`MemoryView.test.ts` (28) rewritten per panel, including that the Overview draws
+no board of zeroes and that the other panels are absent from the page rather
+than merely scrolled away. Live-verified 2026-09-07 in
+`web/e2e/home-and-memory-live.spec.ts`: each tab opened on the running product,
+`?tab=suggestions` landing on the panel it names. Screenshots
+`memory-hub-overview.png`, `memory-hub-suggestions.png`.

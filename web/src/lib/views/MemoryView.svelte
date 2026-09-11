@@ -8,6 +8,15 @@
   import { memoryWritePosture } from "../memoryPosture";
   import GuideLink from "../components/GuideLink.svelte";
   import FileLibrary from "../components/FileLibrary.svelte";
+  import TabStrip from "../components/TabStrip.svelte";
+  import { HUB_TABS } from "../nav";
+  import {
+    MEMORY_TAB_LABELS,
+    memoryAttention,
+    memorySentence,
+    type MemoryCounts,
+    type MemoryTab,
+  } from "../memoryHub";
 
   type MemoryImport = Array<Partial<MemoryControlView> & { text: string }>;
   let memories = $state<MemoryControlView[] | null>(null);
@@ -338,6 +347,18 @@
     return m.approval_state === "approved" || m.approval_state === "policy_allowed";
   }
 
+  let { tab = "overview" }: { tab?: string } = $props();
+
+  const tabs = HUB_TABS.memory.map((id) => ({
+    id,
+    label: MEMORY_TAB_LABELS[id as MemoryTab] ?? id,
+  }));
+
+  /** The hash owns which panel is open, so a deep link and the strip agree. */
+  function selectTab(next: string) {
+    window.location.hash = `#/memory?tab=${encodeURIComponent(next)}`;
+  }
+
   const approved = $derived((memories ?? []).filter(isApproved));
   const pending = $derived(proposals);
   const expired = $derived((memories ?? []).filter((m) => m.expires_at && new Date(m.expires_at) <= new Date()));
@@ -349,10 +370,30 @@
       return matchStatus && (scopeFilter === "all" || m.scope === scopeFilter) && (sensitivityFilter === "all" || m.sensitivity === sensitivityFilter) && (!pinnedOnly || m.pinned) && `${m.text} ${provenanceLabel(m)} ${m.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase());
     }).sort((a, b) => sort === "review-date" ? (a.expires_at ?? "9999").localeCompare(b.expires_at ?? "9999") : b.created_at.localeCompare(a.created_at)),
   );
+  /** One reading of what the hub holds, shared by the Overview and its tabs. */
+  const counts = $derived<MemoryCounts>({
+    approved: approved.length,
+    pinned: approved.filter((m) => m.pinned).length,
+    expired: expired.length,
+    proposals: pending.length,
+    relationshipProposals: relationshipProposals.length,
+    observations: observations?.observations?.length ?? 0,
+  });
+  const attention = $derived(memoryAttention(counts));
+
   $effect(() => { void load(); });
 </script>
 
 <header class="page-intro"><GuideLink route="memory" /><button class="btn btn-ghost btn-sm" type="button" onclick={load}><Icon name="refresh" size="sm" /> Refresh</button></header>
+
+<!-- Memory carried approved records, proposals, observations, a document
+     library, two recall controls and an import/export drawer at one visual
+     level, so telling administration from content meant reading all of it, and
+     the one proposal waiting on a decision looked exactly like the settings
+     above it. It is a hub now, and Overview leads for the same reason it does
+     on Extensions and Models: people arrive asking whether anything is waiting
+     on them and what Raiker can recall, not to look at a category. -->
+<TabStrip {tabs} selected={tab} onselect={selectTab} label="Memory sections" />
 
 <section class="posture-card posture-{posture.kind}" role="note" aria-label="Memory permission posture">
   <Icon name={posture.kind === "proposes" ? "check" : "info"} size="md" />
@@ -360,6 +401,200 @@
   {#if posture.action}<a class="posture-action" href="#/capabilities">{posture.action} →</a>{/if}
 </section>
 
+<!-- An action's failure belongs above the panels, not inside one: the action
+     that failed may have been taken on a tab the owner has since left. -->
+{#if actionError}<p class="notice notice-danger" role="alert">{actionError}</p>{/if}
+
+{#if loadError}<PageState state="error" title="Couldn't load memories" detail={loadError} />
+{:else if memories === null}<PageState state="loading" title="Loading memories…" />
+{:else if tab === "overview"}
+  <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
+    <p class="page-lead">{memorySentence(counts)}</p>
+
+  <!-- VIS-13's rule, applied here too: a board that is empty is not a board.
+       On a fresh install these four tiles all read 0, which is the sentence
+       above restated as four containers. They appear when there is something
+       in them. -->
+  {#if counts.approved + counts.proposals + counts.relationshipProposals + counts.expired > 0}
+  <section class="summary" aria-label="Memory summary">
+    <div><strong>{approved.length}</strong><span>Approved</span></div><div><strong>{pending.length + relationshipProposals.length}</strong><span>Pending review</span></div><div><strong>{approved.filter((m) => m.pinned).length}</strong><span>Pinned</span></div><div><strong>{expired.length}</strong><span>Withheld or expired</span></div>
+  </section>
+  {/if}
+
+    {#if attention.length > 0}
+      <!-- VIS2-18 — the attention half of the hub. Only decisions appear here:
+           an expired memory has already stopped being recalled, so it is a fact
+           in the summary above rather than a row saying "act on this" about
+           something with nothing to act on. -->
+      <section class="memory-section" aria-label="Waiting on you">
+        <div class="section-head"><h3>Waiting on you</h3></div>
+        <ul class="attention-list">
+          {#each attention as item (item.label)}
+            <li>
+              <span><strong>{item.count}</strong> {item.label}</span>
+              <button type="button" class="btn btn-sm" onclick={() => selectTab(item.tab)}>
+                Open {MEMORY_TAB_LABELS[item.tab]}
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+  </div>
+{:else if tab === "memories"}
+  <div id="panel-memories" role="tabpanel" aria-labelledby="tab-memories">
+  <section class="filters" aria-label="Filter memories">
+    <label class="search"><Icon name="search" size="md" /><input bind:value={query} aria-label="Search memories" placeholder="Search memories…" /></label>
+    <select bind:value={statusFilter} aria-label="Memory status"><option value="all">All statuses</option><option value="approved">Approved</option><option value="expired">Expired</option></select>
+    <select bind:value={scopeFilter} aria-label="Memory scope"><option value="all">All scopes</option>{#each scopes as scope}<option value={scope}>{scope}</option>{/each}</select>
+    <select bind:value={sensitivityFilter} aria-label="Memory sensitivity"><option value="all">All sensitivities</option>{#each sensitivities as sensitivity}<option value={sensitivity}>{sensitivity}</option>{/each}</select>
+    <select bind:value={sort} aria-label="Sort memories"><option value="recently-approved">Recently approved</option><option value="review-date">Review date</option></select>
+    <label class="pinned-filter"><input type="checkbox" bind:checked={pinnedOnly} /> Pinned only</label>
+  </section>
+
+  <section class="memory-section"><div class="section-head"><h3>Approved memories</h3><span>{filtered.length}</span></div>
+    <!-- The posture card at the top of the page already states *why* there are
+         none. Repeating its sentence here put the same line on screen twice;
+         the empty state keeps the action, which is the half that is not
+         already said. -->
+    {#if approved.length === 0}<div class="empty"><Icon name="spark" size="xl" /><h4>No approved memories yet</h4><a href={posture.action ? "#/capabilities" : "#/approvals"}>{posture.action ?? "Learn how governed review works"}</a></div>
+    {:else if filtered.length === 0}<div class="empty"><h4>No memories match these filters</h4><p>Clear or change the filters to see approved memories.</p></div>
+    {:else}<div class="memory-grid">{#each filtered as m (m.memory_id)}<article class="memory-card" class:pinned={m.pinned}>
+      <div class="memory-title">{#if editingId === m.memory_id}<textarea rows="3" bind:value={editDraft} aria-label="Memory text"></textarea>{:else}<h4>{m.text}</h4>{/if}{#if m.pinned}<span class="pin-label"><Icon name="check" size="sm" /> Pinned</span>{/if}</div>
+      <div class="meta"><span>Approved</span><span>{m.scope} scope</span><span>{m.sensitivity} sensitivity</span></div>
+      <dl><div><dt>Source</dt><dd>{provenanceLabel(m)}</dd></div><div><dt>Approved</dt><dd>{relativeTime(m.created_at)}</dd></div><div><dt>Review or expiry</dt><dd>{m.expires_at ? relativeTime(m.expires_at) : "No date set"}</dd></div></dl>
+      <div class="card-actions">{#if editingId === m.memory_id}<button class="btn btn-primary btn-sm" aria-label="Save memory" onclick={() => void saveEdit(m)}>Save</button><button class="btn btn-ghost btn-sm" onclick={() => editingId = null}>Cancel</button>{:else}<button class="btn btn-ghost btn-sm" aria-label={`View the source of “${m.text.slice(0, 40)}”`} onclick={() => void viewSource(m)}>View source</button><button class="btn btn-ghost btn-sm" aria-label="Edit memory" onclick={() => { editingId = m.memory_id; editDraft = m.text; }}>Edit</button><button class="btn btn-ghost btn-sm" onclick={() => void changeScope(m)}>Edit scope</button><button class="btn btn-ghost btn-sm" onclick={() => void reviewExpiry(m)}>Review expiry</button><button class="btn btn-ghost btn-sm" aria-label={m.pinned ? "Unpin memory" : "Pin memory"} onclick={() => void togglePin(m)}>{m.pinned ? "Unpin" : "Pin"}</button><button class="btn btn-ghost btn-sm" onclick={() => void viewHistory(m)}>View history</button><button class="btn btn-ghost btn-sm danger" aria-label="Forget memory" onclick={() => void forget(m)}>Forget</button>{/if}</div>
+      <details><summary>Advanced metadata and deletion</summary><p>Type: {m.memory_type} · Retention: {m.retention} · Confidence: {m.confidence.toFixed(2)} · Trust: {m.trust_score.toFixed(2)}</p><p>Last used: {m.last_used_at ? relativeTime(m.last_used_at) : "Never recalled"}. Source record details: {Object.keys(m.provenance).length ? Object.keys(m.provenance).join(", ") : "Source metadata unavailable"}</p><button class="btn btn-ghost btn-sm danger" onclick={() => void purge(m)}>Delete permanently</button></details>
+      {#if historyById[m.memory_id]}<ol class="history" aria-label="Memory history">{#each historyById[m.memory_id] as event}<li><strong>{event.action.replaceAll("_", " ")}</strong> <span>{relativeTime(event.created_at)}</span></li>{/each}</ol>{/if}
+    </article>{/each}</div>{/if}
+  </section>
+  </div>
+{:else if tab === "suggestions"}
+  <div id="panel-suggestions" role="tabpanel" aria-labelledby="tab-suggestions">
+  {#if pending.length}
+    <section class="memory-section"><div class="section-head"><h3>Pending review</h3><span>{pending.length}</span></div>
+      {#each pending as proposal (proposal.candidate_id)}<article class="memory-card pending">
+        {#if proposalEditingId === proposal.candidate_id}<textarea rows="3" bind:value={proposalDraft} aria-label="Edit proposed memory"></textarea>{:else}<h4>{proposal.text}</h4>{/if}
+        <p>Proposed from event: {proposal.source_event_id}</p>
+        <div class="meta"><span>{proposal.scope}</span><span>{proposal.sensitivity} sensitivity</span><span>{Math.round(proposal.confidence * 100)}% confidence</span></div>
+        <details><summary>View source details</summary><p>Source event: {proposal.source_event_id}. The original event remains governed by its session access.</p></details>
+        <div class="card-actions">
+          {#if proposalEditingId === proposal.candidate_id}<button class="btn btn-primary btn-sm" onclick={() => void decideProposal(proposal, "approved", proposalDraft)}>Approve edited proposal</button><button class="btn btn-ghost btn-sm" onclick={() => proposalEditingId = null}>Cancel</button>
+          {:else}<button class="btn btn-primary btn-sm" onclick={() => void decideProposal(proposal, "approved")}>Approve</button><button class="btn btn-ghost btn-sm" onclick={() => { proposalEditingId = proposal.candidate_id; proposalDraft = proposal.text; }}>Edit &amp; approve</button><button class="btn btn-ghost btn-sm danger" onclick={() => void decideProposal(proposal, "rejected")}>Reject</button>{/if}
+        </div>
+      </article>{/each}
+    </section>
+  {/if}
+
+  <section class="memory-section relationship-review">
+    <div class="section-head">
+      <div><h3>Relationship review</h3><p>Only approved relationships can enter recall and the Knowledge Map.</p></div>
+      <button class="btn btn-ghost btn-sm" type="button" disabled={busy} onclick={() => void scanRelationships()}>{busy ? "Scanning…" : "Scan approved memories"}</button>
+    </div>
+    {#if relationshipProposals.length}
+      {#each relationshipProposals as proposal (proposal.candidate_id)}
+        <article class="memory-card pending relationship-card">
+          <h4>{proposal.subject_name} <span>{proposal.predicate.replaceAll("_", " ")}</span> {proposal.object_name}</h4>
+          <blockquote>{proposal.evidence_text}</blockquote>
+          <div class="meta"><span>{proposal.subject_type} → {proposal.object_type}</span><span>{Math.round(proposal.confidence * 100)}% confidence</span><span>{proposal.extractor_version}</span></div>
+          <p>Evidence: {proposal.evidence_memory_id}. Approving adds the reviewed edge; denying leaves the evidence memory unchanged.</p>
+          <div class="card-actions"><button class="btn btn-primary btn-sm" onclick={() => void decideRelationship(proposal, "approved")}>Approve relationship</button><button class="btn btn-ghost btn-sm danger" onclick={() => void decideRelationship(proposal, "denied")}>Reject relationship</button></div>
+        </article>
+      {/each}
+    {:else}
+      <p class="muted">No relationship proposals are waiting for review.</p>
+    {/if}
+  </section>
+
+  <!-- MEM-04 — the capture half of eidetic memory, made visible. Every row
+       here is metadata about material the runtime saw; none of it is the
+       material. A row that reads "Not captured" is a refusal that happened,
+       which is the only thing that makes an empty list readable. -->
+  <section class="memory-section" aria-label="Observations">
+    <div class="section-head">
+      <div>
+        <h3>Observations</h3>
+        <p class="section-note">What Raiker recorded seeing while it worked — provenance, a checksum and a retention class, never the material itself.</p>
+      </div>
+      <span>{observations ? `${observations.captured} captured · ${observations.skipped} not captured` : "—"}</span>
+    </div>
+    {#if dueForExpiry.length}
+      <div class="due-row" role="note">
+        <Icon name="info" size="sm" />
+        <span>{dueForExpiry.length} past their retention class.</span>
+        <button class="btn btn-sm" type="button" disabled={busy} onclick={() => void sweepExpired()}>Remove</button>
+      </div>
+    {:else if sweepResult}
+      <div class="due-row" role="status"><Icon name="check" size="sm" /><span>{sweepResult}</span></div>
+    {/if}
+    {#if observations === null}
+      <div class="empty"><Icon name="info" size="xl" /><h4>Observation capture is not reporting</h4><p>The runtime could not be asked what it captured. This is not the same as having captured nothing.</p></div>
+    {:else}
+      {#if observations.observations.length}
+        <div class="filters">
+          <select bind:value={observationFilter} aria-label="Observation kind">
+            <option value="all">All observations</option>
+            <option value="skipped">Not captured (sensitivity)</option>
+            <option value="gist">Gist pending review</option>
+            {#each observationSources as source (source)}<option value={source}>{source.replaceAll("_", " ")}</option>{/each}
+          </select>
+        </div>
+      {/if}
+      {#if observations.observations.length === 0}
+        <div class="empty"><Icon name="spark" size="xl" /><h4>No observations yet</h4><p>Raiker records one observation each time a governed tool returns material. Run a turn that reads a file or searches the workspace and it will appear here.</p></div>
+      {:else if observationRows.length === 0}
+        <div class="empty"><h4>No observations match this filter</h4><p>Choose a different kind to see what was captured.</p></div>
+      {:else}
+        <div class="memory-grid">
+          {#each observationRows as o (o.observation_id)}
+            <article class="memory-card observation" class:refused={o.capture_status === "skipped"}>
+              <div class="memory-title"><h4>{o.summary}</h4>{#if o.capture_status === "skipped"}<span class="refused-label"><Icon name="info" size="sm" /> Not captured</span>{/if}</div>
+              <div class="meta">
+                <span>{o.source_type.replaceAll("_", " ")}</span>
+                <span>{retentionLabel(o.retention)}</span>
+                <span>{o.sensitivity} sensitivity</span>
+                {#if o.promotable_to_memory}<span>May be proposed as memory</span>{/if}
+              </div>
+              {#if o.capture_status === "skipped"}
+                <p class="refused-note">Refused on sensitivity ({o.skip_reason.replace("observation_sensitivity_", "").replaceAll("_", " ")}). No checksum of the material was kept either.</p>
+              {/if}
+              <dl>
+                <div><dt>Seen</dt><dd>{relativeTime(o.created_at)}</dd></div>
+                <div><dt>Expires</dt><dd>{o.expires_at ? relativeTime(o.expires_at) : "No automatic expiry"}</dd></div>
+                <div><dt>Checksum</dt><dd>{o.content_sha256 ? `${o.content_sha256.slice(0, 12)}… · ${o.content_bytes} bytes` : "None kept"}</dd></div>
+              </dl>
+              {#if o.gist_status === "pending_review"}
+                <p class="gist-note"><Icon name="spark" size="sm" /> Gist proposed and pending review: “{o.gist_summary}”. It becomes durable memory only through the same approval every other memory needs.</p>
+              {/if}
+              <div class="card-actions">
+                {#if o.gist_id}<button class="btn btn-ghost btn-sm" onclick={() => void discardGist(o.gist_id)}>Discard gist</button>{/if}
+                <button class="btn btn-ghost btn-sm danger" aria-label={`Delete observation ${o.observation_id}`} onclick={() => void deleteObservation(o.observation_id)}>Delete</button>
+              </div>
+            </article>
+          {/each}
+        </div>
+      {/if}
+    {/if}
+  </section>
+  </div>
+{:else if tab === "sources"}
+  <div id="panel-sources" role="tabpanel" aria-labelledby="tab-sources">
+    <!-- The document library was always kept apart from the atomic records and
+         outside their filters: an uploaded workbook and an approved remembered
+         sentence are different kinds of thing, and mixing them into one list
+         makes it impossible to tell which one answered a question. A tab of its
+         own is the same separation, stated by the page's structure. -->
+  <section class="memory-section library-section" aria-label="Memory document library">
+    <FileLibrary
+      scope="memory"
+      heading="Document library"
+      description="Files kept under Raiker's managed memory storage. Uploaded content is data, never instructions."
+      onLibraryChange={() => void load()}
+    />
+  </section>
+  </div>
+{:else}
+  <div id="panel-recall" role="tabpanel" aria-labelledby="tab-recall">
 {#if settings}
   <section class="control-card">
     <div><h3>Incognito session</h3><p>Do not use approved memories in new conversations and tasks. Stored memories are not deleted.</p></div>
@@ -455,159 +690,6 @@
   </section>
 {/if}
 
-{#if actionError}<p class="notice notice-danger" role="alert">{actionError}</p>{/if}
-{#if loadError}<PageState state="error" title="Couldn't load memories" detail={loadError} />
-{:else if memories === null}<PageState state="loading" title="Loading memories…" />
-{:else}
-  <section class="summary" aria-label="Memory summary">
-    <div><strong>{approved.length}</strong><span>Approved</span></div><div><strong>{pending.length + relationshipProposals.length}</strong><span>Pending review</span></div><div><strong>{approved.filter((m) => m.pinned).length}</strong><span>Pinned</span></div><div><strong>{expired.length}</strong><span>Withheld or expired</span></div>
-  </section>
-
-  <!-- The document library is deliberately its own section, above the atomic
-       records and outside their filters: an uploaded workbook and an approved
-       remembered sentence are different kinds of thing, and mixing them into
-       one list makes it impossible to tell which one answered a question. -->
-  <section class="memory-section library-section" aria-label="Memory document library">
-    <FileLibrary
-      scope="memory"
-      heading="Document library"
-      description="Files kept under Raiker's managed memory storage. Uploaded content is data, never instructions."
-      onLibraryChange={() => void load()}
-    />
-  </section>
-
-  <section class="filters" aria-label="Filter memories">
-    <label class="search"><Icon name="search" size="md" /><input bind:value={query} aria-label="Search memories" placeholder="Search memories…" /></label>
-    <select bind:value={statusFilter} aria-label="Memory status"><option value="all">All statuses</option><option value="approved">Approved</option><option value="expired">Expired</option></select>
-    <select bind:value={scopeFilter} aria-label="Memory scope"><option value="all">All scopes</option>{#each scopes as scope}<option value={scope}>{scope}</option>{/each}</select>
-    <select bind:value={sensitivityFilter} aria-label="Memory sensitivity"><option value="all">All sensitivities</option>{#each sensitivities as sensitivity}<option value={sensitivity}>{sensitivity}</option>{/each}</select>
-    <select bind:value={sort} aria-label="Sort memories"><option value="recently-approved">Recently approved</option><option value="review-date">Review date</option></select>
-    <label class="pinned-filter"><input type="checkbox" bind:checked={pinnedOnly} /> Pinned only</label>
-  </section>
-
-  {#if pending.length}
-    <section class="memory-section"><div class="section-head"><h3>Pending review</h3><span>{pending.length}</span></div>
-      {#each pending as proposal (proposal.candidate_id)}<article class="memory-card pending">
-        {#if proposalEditingId === proposal.candidate_id}<textarea rows="3" bind:value={proposalDraft} aria-label="Edit proposed memory"></textarea>{:else}<h4>{proposal.text}</h4>{/if}
-        <p>Proposed from event: {proposal.source_event_id}</p>
-        <div class="meta"><span>{proposal.scope}</span><span>{proposal.sensitivity} sensitivity</span><span>{Math.round(proposal.confidence * 100)}% confidence</span></div>
-        <details><summary>View source details</summary><p>Source event: {proposal.source_event_id}. The original event remains governed by its session access.</p></details>
-        <div class="card-actions">
-          {#if proposalEditingId === proposal.candidate_id}<button class="btn btn-primary btn-sm" onclick={() => void decideProposal(proposal, "approved", proposalDraft)}>Approve edited proposal</button><button class="btn btn-ghost btn-sm" onclick={() => proposalEditingId = null}>Cancel</button>
-          {:else}<button class="btn btn-primary btn-sm" onclick={() => void decideProposal(proposal, "approved")}>Approve</button><button class="btn btn-ghost btn-sm" onclick={() => { proposalEditingId = proposal.candidate_id; proposalDraft = proposal.text; }}>Edit &amp; approve</button><button class="btn btn-ghost btn-sm danger" onclick={() => void decideProposal(proposal, "rejected")}>Reject</button>{/if}
-        </div>
-      </article>{/each}
-    </section>
-  {/if}
-
-  <section class="memory-section relationship-review">
-    <div class="section-head">
-      <div><h3>Relationship review</h3><p>Only approved relationships can enter recall and the Knowledge Map.</p></div>
-      <button class="btn btn-ghost btn-sm" type="button" disabled={busy} onclick={() => void scanRelationships()}>{busy ? "Scanning…" : "Scan approved memories"}</button>
-    </div>
-    {#if relationshipProposals.length}
-      {#each relationshipProposals as proposal (proposal.candidate_id)}
-        <article class="memory-card pending relationship-card">
-          <h4>{proposal.subject_name} <span>{proposal.predicate.replaceAll("_", " ")}</span> {proposal.object_name}</h4>
-          <blockquote>{proposal.evidence_text}</blockquote>
-          <div class="meta"><span>{proposal.subject_type} → {proposal.object_type}</span><span>{Math.round(proposal.confidence * 100)}% confidence</span><span>{proposal.extractor_version}</span></div>
-          <p>Evidence: {proposal.evidence_memory_id}. Approving adds the reviewed edge; denying leaves the evidence memory unchanged.</p>
-          <div class="card-actions"><button class="btn btn-primary btn-sm" onclick={() => void decideRelationship(proposal, "approved")}>Approve relationship</button><button class="btn btn-ghost btn-sm danger" onclick={() => void decideRelationship(proposal, "denied")}>Reject relationship</button></div>
-        </article>
-      {/each}
-    {:else}
-      <p class="muted">No relationship proposals are waiting for review.</p>
-    {/if}
-  </section>
-
-  <section class="memory-section"><div class="section-head"><h3>Approved memories</h3><span>{filtered.length}</span></div>
-    <!-- The posture card at the top of the page already states *why* there are
-         none. Repeating its sentence here put the same line on screen twice;
-         the empty state keeps the action, which is the half that is not
-         already said. -->
-    {#if approved.length === 0}<div class="empty"><Icon name="spark" size="xl" /><h4>No approved memories yet</h4><a href={posture.action ? "#/capabilities" : "#/approvals"}>{posture.action ?? "Learn how governed review works"}</a></div>
-    {:else if filtered.length === 0}<div class="empty"><h4>No memories match these filters</h4><p>Clear or change the filters to see approved memories.</p></div>
-    {:else}<div class="memory-grid">{#each filtered as m (m.memory_id)}<article class="memory-card" class:pinned={m.pinned}>
-      <div class="memory-title">{#if editingId === m.memory_id}<textarea rows="3" bind:value={editDraft} aria-label="Memory text"></textarea>{:else}<h4>{m.text}</h4>{/if}{#if m.pinned}<span class="pin-label"><Icon name="check" size="sm" /> Pinned</span>{/if}</div>
-      <div class="meta"><span>Approved</span><span>{m.scope} scope</span><span>{m.sensitivity} sensitivity</span></div>
-      <dl><div><dt>Source</dt><dd>{provenanceLabel(m)}</dd></div><div><dt>Approved</dt><dd>{relativeTime(m.created_at)}</dd></div><div><dt>Review or expiry</dt><dd>{m.expires_at ? relativeTime(m.expires_at) : "No date set"}</dd></div></dl>
-      <div class="card-actions">{#if editingId === m.memory_id}<button class="btn btn-primary btn-sm" aria-label="Save memory" onclick={() => void saveEdit(m)}>Save</button><button class="btn btn-ghost btn-sm" onclick={() => editingId = null}>Cancel</button>{:else}<button class="btn btn-ghost btn-sm" aria-label={`View the source of “${m.text.slice(0, 40)}”`} onclick={() => void viewSource(m)}>View source</button><button class="btn btn-ghost btn-sm" aria-label="Edit memory" onclick={() => { editingId = m.memory_id; editDraft = m.text; }}>Edit</button><button class="btn btn-ghost btn-sm" onclick={() => void changeScope(m)}>Edit scope</button><button class="btn btn-ghost btn-sm" onclick={() => void reviewExpiry(m)}>Review expiry</button><button class="btn btn-ghost btn-sm" aria-label={m.pinned ? "Unpin memory" : "Pin memory"} onclick={() => void togglePin(m)}>{m.pinned ? "Unpin" : "Pin"}</button><button class="btn btn-ghost btn-sm" onclick={() => void viewHistory(m)}>View history</button><button class="btn btn-ghost btn-sm danger" aria-label="Forget memory" onclick={() => void forget(m)}>Forget</button>{/if}</div>
-      <details><summary>Advanced metadata and deletion</summary><p>Type: {m.memory_type} · Retention: {m.retention} · Confidence: {m.confidence.toFixed(2)} · Trust: {m.trust_score.toFixed(2)}</p><p>Last used: {m.last_used_at ? relativeTime(m.last_used_at) : "Never recalled"}. Source record details: {Object.keys(m.provenance).length ? Object.keys(m.provenance).join(", ") : "Source metadata unavailable"}</p><button class="btn btn-ghost btn-sm danger" onclick={() => void purge(m)}>Delete permanently</button></details>
-      {#if historyById[m.memory_id]}<ol class="history" aria-label="Memory history">{#each historyById[m.memory_id] as event}<li><strong>{event.action.replaceAll("_", " ")}</strong> <span>{relativeTime(event.created_at)}</span></li>{/each}</ol>{/if}
-    </article>{/each}</div>{/if}
-  </section>
-
-  <!-- MEM-04 — the capture half of eidetic memory, made visible. Every row
-       here is metadata about material the runtime saw; none of it is the
-       material. A row that reads "Not captured" is a refusal that happened,
-       which is the only thing that makes an empty list readable. -->
-  <section class="memory-section" aria-label="Observations">
-    <div class="section-head">
-      <div>
-        <h3>Observations</h3>
-        <p class="section-note">What Raiker recorded seeing while it worked — provenance, a checksum and a retention class, never the material itself.</p>
-      </div>
-      <span>{observations ? `${observations.captured} captured · ${observations.skipped} not captured` : "—"}</span>
-    </div>
-    {#if dueForExpiry.length}
-      <div class="due-row" role="note">
-        <Icon name="info" size="sm" />
-        <span>{dueForExpiry.length} past their retention class.</span>
-        <button class="btn btn-sm" type="button" disabled={busy} onclick={() => void sweepExpired()}>Remove</button>
-      </div>
-    {:else if sweepResult}
-      <div class="due-row" role="status"><Icon name="check" size="sm" /><span>{sweepResult}</span></div>
-    {/if}
-    {#if observations === null}
-      <div class="empty"><Icon name="info" size="xl" /><h4>Observation capture is not reporting</h4><p>The runtime could not be asked what it captured. This is not the same as having captured nothing.</p></div>
-    {:else}
-      {#if observations.observations.length}
-        <div class="filters">
-          <select bind:value={observationFilter} aria-label="Observation kind">
-            <option value="all">All observations</option>
-            <option value="skipped">Not captured (sensitivity)</option>
-            <option value="gist">Gist pending review</option>
-            {#each observationSources as source (source)}<option value={source}>{source.replaceAll("_", " ")}</option>{/each}
-          </select>
-        </div>
-      {/if}
-      {#if observations.observations.length === 0}
-        <div class="empty"><Icon name="spark" size="xl" /><h4>No observations yet</h4><p>Raiker records one observation each time a governed tool returns material. Run a turn that reads a file or searches the workspace and it will appear here.</p></div>
-      {:else if observationRows.length === 0}
-        <div class="empty"><h4>No observations match this filter</h4><p>Choose a different kind to see what was captured.</p></div>
-      {:else}
-        <div class="memory-grid">
-          {#each observationRows as o (o.observation_id)}
-            <article class="memory-card observation" class:refused={o.capture_status === "skipped"}>
-              <div class="memory-title"><h4>{o.summary}</h4>{#if o.capture_status === "skipped"}<span class="refused-label"><Icon name="info" size="sm" /> Not captured</span>{/if}</div>
-              <div class="meta">
-                <span>{o.source_type.replaceAll("_", " ")}</span>
-                <span>{retentionLabel(o.retention)}</span>
-                <span>{o.sensitivity} sensitivity</span>
-                {#if o.promotable_to_memory}<span>May be proposed as memory</span>{/if}
-              </div>
-              {#if o.capture_status === "skipped"}
-                <p class="refused-note">Refused on sensitivity ({o.skip_reason.replace("observation_sensitivity_", "").replaceAll("_", " ")}). No checksum of the material was kept either.</p>
-              {/if}
-              <dl>
-                <div><dt>Seen</dt><dd>{relativeTime(o.created_at)}</dd></div>
-                <div><dt>Expires</dt><dd>{o.expires_at ? relativeTime(o.expires_at) : "No automatic expiry"}</dd></div>
-                <div><dt>Checksum</dt><dd>{o.content_sha256 ? `${o.content_sha256.slice(0, 12)}… · ${o.content_bytes} bytes` : "None kept"}</dd></div>
-              </dl>
-              {#if o.gist_status === "pending_review"}
-                <p class="gist-note"><Icon name="spark" size="sm" /> Gist proposed and pending review: “{o.gist_summary}”. It becomes durable memory only through the same approval every other memory needs.</p>
-              {/if}
-              <div class="card-actions">
-                {#if o.gist_id}<button class="btn btn-ghost btn-sm" onclick={() => void discardGist(o.gist_id)}>Discard gist</button>{/if}
-                <button class="btn btn-ghost btn-sm danger" aria-label={`Delete observation ${o.observation_id}`} onclick={() => void deleteObservation(o.observation_id)}>Delete</button>
-              </div>
-            </article>
-          {/each}
-        </div>
-      {/if}
-    {/if}
-  </section>
-
   <details class="advanced"><summary><span><strong>Advanced memory management</strong><small>Import or export governed memory records.</small></span><Icon name="chevron-down" size="md" /></summary><div class="advanced-body"><button class="btn btn-ghost" onclick={() => void exportMemories()}>Export memories</button><label class="btn btn-ghost file-button">Review import<input type="file" accept="application/json,.json" onchange={(e) => void reviewImport(e)} /></label>{#if importPreview}
       <!-- BUG-244 — what this would change, before it changes anything. An
            import used to report the number of records in the file and write
@@ -638,6 +720,7 @@
       </div>
     {/if}
     {#if importNotice}<p class="import-notice" role="status">{importNotice}</p>{/if}</div></details>
+  </div>
 {/if}
 
 {#if sourceFor !== null}

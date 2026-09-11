@@ -36,6 +36,7 @@
   } from "../apiTypes";
   import Badge from "../components/Badge.svelte";
   import Icon from "../components/Icon.svelte";
+  import { START_WORK } from "../workSurface";
   import PageState from "../components/PageState.svelte";
   import StatTile from "../components/StatTile.svelte";
   import { relativeFuture, relativeTime } from "../format";
@@ -203,13 +204,21 @@
     </div>
   </div>
 
+  <!-- The shell calls Chat, Build and Design three peer Work modes; this row
+       listed two of them beside Tasks and Projects and left Design out, so the
+       first screen an owner sees disagreed with the product it opens onto. The
+       three modes come first, as peers, from the same list the rest of the
+       product reads (`workSurface.ts`); the two workflow entries follow, which
+       is what they are. -->
   <nav class="start-row" aria-label="Start work">
-    <a class="start-card" href="#/new-chat">
-      <Icon name="chat" size="md" /><span><strong>Start a conversation</strong><small>Ask, think, work with a file</small></span>
-    </a>
-    <a class="start-card" href="#/build">
-      <Icon name="code" size="md" /><span><strong>Start a build</strong><small>Change a repository under governance</small></span>
-    </a>
+    {#each START_WORK as entry (entry.mode)}
+      <a class="start-card" href={entry.route}>
+        <Icon name={entry.icon} size="md" />
+        <span><strong>{entry.title}</strong><small>{entry.detail}</small></span>
+      </a>
+    {/each}
+  </nav>
+  <nav class="start-row secondary" aria-label="Organise work">
     <a class="start-card" href="#/tasks">
       <Icon name="tasks" size="md" /><span><strong>Plan a task or agent</strong><small>Run once, on a cadence, or in the background</small></span>
     </a>
@@ -441,7 +450,13 @@
   .refresh-state { display: flex; align-items: center; gap: var(--space-3); color: var(--text-3); font-size: var(--text-sm); flex-wrap: wrap; justify-content: flex-end; }
   /* Starting work is a link to the surface that owns the composer, so the board
      never becomes a second send path. */
-  .start-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+  /* Three peer Work modes on the first row; the two workflow entries on a
+     second, quieter one. Peers share a row; a secondary thing does not sit in
+     the same rhythm as the thing it is secondary to. */
+  .start-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+  .start-row.secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: var(--space-3); }
+  .start-row.secondary .start-card { padding: var(--space-2) var(--space-3); }
+  .start-row.secondary strong { font-weight: 600; }
   .start-card {
     display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
     gap: var(--space-3); padding: var(--space-3) var(--space-4); color: var(--text-1);

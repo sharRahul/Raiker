@@ -313,7 +313,7 @@
           {:else if current === "search-chat"}
             <LazyRoute route="search-chat" />
           {:else if current === "memory"}
-            <LazyRoute route="memory" />
+            <LazyRoute route="memory" props={{ tab: currentTab ?? "overview" }} />
           {:else if current === "approvals"}
             <LazyRoute
               route="approvals"

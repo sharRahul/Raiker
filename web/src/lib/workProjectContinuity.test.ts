@@ -49,6 +49,18 @@ function routes(extra: Record<string, unknown> = {}) {
   };
 }
 
+describe("Design's composer bar (found live 2026-09-07)", () => {
+  it("does not print the size twice in one bar", async () => {
+    // The size select sits two elements from the context line, and the line
+    // carried a "Size 1024x1024" fact of its own — the same value, said twice,
+    // side by side. COMPOSER-18: a control's own value is not also a fact.
+    stubFetch(routes());
+    render(DesignView, { props: { projects } });
+    await waitFor(() => expect(screen.getByLabelText("Size")).toBeInTheDocument());
+    expect(screen.getAllByText("1024x1024")).toHaveLength(1);
+  });
+});
+
 describe("choosing a project in Chat", () => {
   it("makes it the project the next piece of work starts in", async () => {
     stubFetch(routes());

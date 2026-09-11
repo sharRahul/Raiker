@@ -186,13 +186,11 @@
           },
         ]
       : []),
-    {
-      label: "Size",
-      value: size,
-      short: size,
-      href: "#/models?tab=models",
-      action: "Models",
-    },
+    // Size is deliberately *not* a fact here. It has a control of its own two
+    // elements to the left, and a line that repeats the value of the control
+    // beside it printed "1024x1024" twice in one bar — the duplication
+    // COMPOSER-18 exists to prevent. The context line answers for what the turn
+    // will use that the bar does not already show. Found live 2026-09-07.
     ...(choice !== null
       ? [
           {
@@ -669,22 +667,30 @@
     font-size: var(--text-sm);
     overflow-wrap: anywhere;
   }
+  /* VIS2-14 — the asset is the object, so it is not put in a card. A returned
+     picture sits on the page with its own hairline boundary; only a *refusal*
+     draws a box, because a refusal is a message rather than an image and needs
+     somewhere to be said. */
   .answer {
     display: grid;
     gap: 0.35rem;
     max-width: min(32rem, 100%);
-    padding: var(--space-2);
-    border: 1px solid var(--border);
-    border-radius: var(--r-lg);
-    background: var(--surface);
   }
   .refused {
-    border-color: var(--warn-border);
+    padding: var(--space-2);
+    border: 1px solid var(--warn-border);
+    border-radius: var(--r-lg);
     background: var(--warn-soft);
   }
+  /* The boundary has to be obvious in both themes without being chrome: on a
+     light ground a hairline plus the first shadow tier; on a dark one a lighter
+     hairline and no shadow, because a shadow on near-black carries nothing.
+     `--canvas-edge` and `--canvas-lift` hold that difference. */
   .shot {
     display: block;
+    border: 1px solid var(--canvas-edge);
     border-radius: var(--r-sm);
+    box-shadow: var(--canvas-lift);
     overflow: hidden;
   }
   .shot img {

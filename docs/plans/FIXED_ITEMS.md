@@ -502,6 +502,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-478](#fixed-478--a-work-draft-was-lost-at-every-mode-switch) | Medium | Chat / Build / Design | Fixed 2026-09-08 (COMPOSER-11) |
 | [FIXED-479](#fixed-479--a-large-paste-could-hide-the-conversation-it-belonged-to) | Low | Chat / Build composer | Fixed 2026-09-08 (COMPOSER-14) |
 | [FIXED-480](#fixed-480--directly-allowed-memories-were-recallable-and-invisible) | High | Memory / web UI | Fixed 2026-09-08 (found live) |
+| [FIXED-481](#fixed-481--one-elevation-for-two-grounds-and-a-picture-inside-a-card) | Low | Theme / design / shell | Fixed 2026-09-07 (VIS2-14, VIS2-15) |
+| [FIXED-482](#fixed-482--designs-bar-printed-the-same-size-twice) | Low | Design / composer | Fixed 2026-09-07 (found live) |
 
 ---
 
@@ -21085,3 +21087,78 @@ plain owner-facing status **Approved** for both.
 **Verification.** `MemoryView.test.ts` covers display and the Approved filter.
 The live scenario asserts a new record id and unique marker through the API,
 then filters to and captures that exact record in the Memory page.
+
+---
+
+## FIXED-481 — One elevation for two grounds, and a picture inside a card
+
+**Severity: Low. Area: theme / design / shell. Status: Fixed 2026-09-07. Found
+in [VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+(VIS2-14, VIS2-15).**
+
+**Observed.** Two composition faults, both the same mistake in different
+directions — one set of decisions asked to serve two situations it cannot.
+
+*Theme (VIS2-14).* Light and dark shared one elevation model. A drop shadow is a
+real cue on a white ground and almost nothing on `#0B0D10`, so in dark the
+shadow tiers were spent on an effect nobody could see, leaving raised surfaces
+told apart by a border that had been tuned to be restrained *because the shadow
+was doing the work*. Design's generated picture sat inside a card — border,
+surface fill, padding — which is chrome around the one thing on the page that is
+the object rather than a container for it, and the boundary an image actually
+needs read differently in each theme.
+
+*Display (VIS2-15).* The canvas widths were a single 1080p–1440p composition. On
+a 4K or 8K monitor the operational tables and the Build workbench stopped at
+112rem and left the rest of the screen empty, which is the opposite of the
+review's rule: a big display should give a *spatial* surface more room to hold
+its object, and give prose and controls nothing at all.
+
+**Fixed.** `--elevation-edge`, `--canvas-edge` and `--canvas-lift` are declared
+per theme: light carries elevation in the shadow and keeps edges quiet; dark
+moves it to a stronger edge and spends no shadow, and the canvas hairline
+lightens so an image's boundary survives a near-black ground. Design's `.answer`
+lost its card — only a *refusal* draws a box now, because a refusal is a message
+and needs somewhere to be said — and `.shot` carries the hairline and the
+theme's own lift.
+
+Two `min-width` blocks (2200px, 3400px) move `--page-workspace` and
+`--page-operational` and nothing else; Build gives the extra room to the
+explorer and the artifact pane, which hold the object, rather than to the
+transcript, whose lines are bounded by their own measure.
+
+**User-interface outcome.** A generated image sits on the page with a hairline
+that reads in both themes instead of in a card. A 4K display shows more of a
+table, a tree and a diff; the type, the spacing and every control stay the size
+they are on a laptop.
+
+**Tests.** Two rules in `visualRubric.test.ts`: the wide blocks may touch only
+the two canvas tokens (prose measure, type scale, spacing and control dimensions
+fail the test if they appear), and every optical token must be declared for both
+themes with different values. Live-verified 2026-09-07 in
+`web/e2e/display-and-theme-live.spec.ts` — the composition read back at 1440×1000
+and 3840×2160, and the optical tokens read back under each theme — with
+screenshots `vis2-15-observe-4k.png`, `vis2-14-design-light.png` and
+`vis2-14-design-dark.png`.
+
+---
+
+## FIXED-482 — Design's bar printed the same size twice
+
+**Severity: Low. Area: design / composer. Status: Fixed 2026-09-07. Found in the
+live round of 2026-09-07, in a screenshot taken for something else.**
+
+**Observed.** Design's composer bar carried a size select and, two elements to
+its right, a context line whose facts included `Size 1024x1024` — the value of
+the control beside it, restated. The bar read `1024x1024  1024x1024`.
+
+**Fixed.** Size is no longer a context fact. The line answers for what the turn
+will use that the bar does not already show — the project and the model — which
+is the separation COMPOSER-18 asks for between a control and a summary of
+controls.
+
+**User-interface outcome.** The bar says the size once, in the control that
+changes it.
+
+**Tests.** `workProjectContinuity.test.ts` asserts exactly one occurrence of the
+size on the rendered bar; reverting the fix fails it with two.

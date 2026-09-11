@@ -2730,6 +2730,23 @@
   .build.with-files.with-rail {
     grid-template-columns: var(--explorer-w, 17.5rem) minmax(0, 1fr) 21rem;
   }
+  /* VIS2-15 — on a very wide display the extra room goes to the panes that hold
+     the *object* — the file tree and the artifact pane — rather than to the
+     transcript, whose lines are already bounded by their own measure. Nothing
+     here changes a control's size: the columns get wider, the buttons in them
+     do not. */
+  @media (min-width: 2200px) {
+    .build.with-rail {
+      grid-template-columns: minmax(0, 1fr) 28rem;
+    }
+    .build.with-files {
+      grid-template-columns: var(--explorer-w, 24rem) minmax(0, 1fr);
+    }
+    .build.with-files.with-rail {
+      grid-template-columns: var(--explorer-w, 24rem) minmax(0, 1fr) 28rem;
+    }
+  }
+
   /* B18 — the rewind preflight takes a column of its own, so the transcript it
      is about stays on screen behind it. */
   @media (min-width: 64rem) {

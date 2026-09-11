@@ -730,15 +730,18 @@ test("new-account Workbench is a board over the work, not a second composer", as
   }
 
   // Starting work is a link to the surface that owns a composer, so there is
-  // exactly one composer per kind of work.
+  // exactly one composer per kind of work. The three Work modes are peers and
+  // share a row; Tasks and Projects organise work rather than being a place it
+  // happens, so they have their own.
   const start = page.getByRole("navigation", { name: "Start work" });
-  for (const action of [
-    "Start a conversation",
-    "Start a build",
-    "Plan a task or agent",
-    "Open a project",
-  ]) {
+  for (const action of ["Start a conversation", "Start a build", "Start a design"]) {
     await expect(start.getByRole("link", { name: new RegExp(action) })).toBeVisible();
+  }
+  await expect(start.getByRole("link")).toHaveCount(3);
+
+  const organise = page.getByRole("navigation", { name: "Organise work" });
+  for (const action of ["Plan a task or agent", "Open a project"]) {
+    await expect(organise.getByRole("link", { name: new RegExp(action) })).toBeVisible();
   }
 
   await expect(page.getByRole("heading", { name: "Needs your attention" })).toBeVisible();

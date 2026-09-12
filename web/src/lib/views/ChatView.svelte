@@ -91,7 +91,7 @@
     sentenceAround,
     sourcesForTurn,
   } from "../citations";
-  import { chatProfiles, refreshModels } from "../models.svelte";
+  import { chatProfiles, refreshModels, modelCatalogues } from "../models.svelte";
   import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
   import {
     audioSessionCoordinator,
@@ -2339,6 +2339,7 @@
             bind:effort={reasoningEffort}
             efforts={reasoningEfforts}
             {profiles}
+            catalogues={modelCatalogues()}
             {selectedProfile}
             {decision}
             onchosen={(profileId, chosen) => void rememberSurfaceModel("chat", profileId, chosen)}

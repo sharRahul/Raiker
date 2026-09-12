@@ -1010,6 +1010,16 @@ export interface ResumableTurnsView {
 export interface ModelsView {
   profiles: ModelProfile[];
   chat_profiles?: ModelProfile[];
+  /**
+   * GLOBAL-MODEL-01/02 — what each provider last published, keyed by profile.
+   *
+   * One catalogue, in the read every Work surface already makes, so no composer
+   * reconstructs its own idea of what could be chosen. Read from the store
+   * rather than probed, so it costs no network; a profile nobody has listed
+   * successfully simply has no key, rather than an empty list that would read
+   * as "this provider serves nothing".
+   */
+  catalogues?: Record<string, string[]>;
   current_profile_id: string | null;
   current_model: string | null;
   advisor_profile_id: string | null;

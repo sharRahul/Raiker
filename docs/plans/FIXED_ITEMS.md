@@ -508,6 +508,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-484](#fixed-484--home-offered-two-of-the-three-work-modes) | Medium | Home | Fixed 2026-09-07 (page-by-page §1) |
 | [FIXED-485](#fixed-485--memory-kept-settings-records-and-decisions-at-one-visual-level) | Medium | Memory | Fixed 2026-09-07 (page-by-page §10) |
 | [FIXED-486](#fixed-486--two-parallel-systems-where-there-were-two-questions) | Medium | Permissions | Fixed 2026-09-07 (page-by-page) |
+| [FIXED-487](#fixed-487--a-catalogue-that-existed-only-as-long-as-the-response-carrying-it) | High | Models / composer | Fixed 2026-09-12 (GLOBAL-MODEL-01/02/06/08) |
 
 ---
 
@@ -21365,3 +21366,73 @@ registry does not use, and rendered one row while looking finished.
 scannable closed row. Live-verified 2026-09-07 in
 `web/e2e/permissions-language-live.spec.ts`; screenshot
 `permissions-two-questions.png`.
+
+---
+
+## FIXED-487 — A catalogue that existed only as long as the response carrying it
+
+**Severity: High. Area: models / composer. Status: Fixed 2026-09-12. Found in
+[GLOBAL_MODEL_CATALOGUE_AND_COMPOSER_PICKER_2026-09-06.md](GLOBAL_MODEL_CATALOGUE_AND_COMPOSER_PICKER_2026-09-06.md)
+(GLOBAL-MODEL-01, 02, 06, 08).**
+
+**Observed.** A provider's catalogue was probed on demand and never written
+down, so it lived exactly as long as the HTTP response that carried it. Two
+consequences followed, and an owner reads both as Raiker losing their models.
+
+*Curation was a prerequisite for existing.* A model reached a composer only by
+being "kept available". A provider serving four hundred offered whichever two
+dozen had been ticked on the Models page, and the rest may as well not have been
+published — so choosing a model you had not curated meant going to another page
+to make it exist first.
+
+*A blip emptied every picker.* Because the only copy of a catalogue was the one
+in flight, a provider that was briefly unreachable took its whole model list
+with it.
+
+**Fixed.** `principal_provider_catalogue` records what each provider last
+published — per owner, per profile, in the provider's own order, with the time
+it said so. It is written on every successful listing and read when the next one
+fails.
+
+Three honesty constraints shape it, and each is a test:
+
+- an **empty** listing never overwrites a known catalogue, because a provider
+  returning nothing is indistinguishable from one that failed in a way the
+  caller did not classify, and replacing a catalogue with emptiness is the
+  disappearance this store exists to prevent;
+- a **failed** listing returns the remembered models flagged `remembered` with
+  their `listed_at`, and the status and reason code are untouched — remembering
+  never turns a failure into a success;
+- a **policy-denied** provider carries no models at all. A remembered catalogue
+  for a provider the gate is currently refusing would project an authority the
+  owner does not have, which is the one thing this product never does.
+
+On the reading side, `catalogues` rides the single `GET /api/models` payload
+every Work surface already fetches (`modelCatalogues()` is the one accessor), so
+no composer reconstructs its own idea of what could be chosen. The kept list
+stays as the quick list a picker shows at rest — deliberately short, since
+BUG-260 recorded that scrolling four hundred names "is not choosing, it is
+hunting" — and `modelCatalogue.ts` gives the picker a search that reaches
+everything, pinned entries first, with a truncated result set that says it is
+truncated ("Showing 40 of 412 matches").
+
+**User-interface outcome.** A composer's model menu offers the owner's short
+list and, when there is more to reach, a search that finds any model their
+providers published. A provider that goes briefly unreachable keeps its models
+in the menu, described as remembered rather than current.
+
+**Not verified live, and deliberately said so.** This host has no model
+credential and no egress ([BUG-280](TO_BE_FIXED.md)), so no real provider
+catalogue could be listed here. The store, the remembering, the policy-denial
+rule and the picker's search are proven against fixtures and the mocked CI
+suite; watching a real four-hundred-model catalogue populate and survive a
+provider outage is left for a round on a host that has a key.
+
+**Tests.** `tests/test_provider_catalogue_memory.py` (6 cases: order, replace
+rather than accumulate, empty never erases, per-owner isolation, unknown
+profile, blank and duplicate names). `tests/test_api_model_selection.py` gains
+three: the one-payload catalogue, an unreachable provider offering what it last
+published, and a policy-denied provider offering nothing it once published.
+`modelCatalogue.test.ts` (10) and `ModelPicker.test.ts` cover reaching an
+uncurated model, keeping two providers' identical model names apart, and
+offering no search when the quick list already is the catalogue.

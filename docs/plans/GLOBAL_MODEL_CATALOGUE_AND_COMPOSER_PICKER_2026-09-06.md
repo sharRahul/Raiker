@@ -665,11 +665,20 @@ Retain last-known local inventory and layer stopped/unavailable state onto it.
 
 Create one owner-scoped catalogue that merges provider catalogues and local library models.
 
+**Done 2026-09-12.** `principal_provider_catalogue` holds what each provider
+last published, per owner and profile, written on every successful listing and
+read without touching the network. Exposed as `catalogues` on `GET /api/models`
+([FIXED-487](FIXED_ITEMS.md#fixed-487--a-catalogue-that-existed-only-as-long-as-the-response-carrying-it)).
+
 ## GLOBAL-MODEL-02 — Every composer reads the same catalogue
 
 **Priority: P0/P1 — Effort: Medium — Impact: Very high**
 
 Replace per-surface candidate reconstruction with one shared model store/read.
+
+**Done 2026-09-12.** `modelCatalogues()` in `models.svelte.ts` is the single
+accessor, fed by the one `/api/models` read all three Work composers and the
+Tasks picker already make.
 
 ## GLOBAL-MODEL-03 — Surface/Project defaults are selection only
 
@@ -695,6 +704,13 @@ API key/sign-in success should populate the global catalogue immediately and upd
 
 All discovered compatible models available by default. Optional favourites/hide are owner-level conveniences only.
 
+**Done 2026-09-12.** Curation no longer decides what exists. The kept list is
+the quick list a picker shows at rest — deliberately short, because BUG-260
+already recorded that scrolling four hundred names "is not choosing, it is
+hunting" — and `modelCatalogue.ts` gives the picker a search that reaches every
+model the owner's providers published, with pinned entries first and a truncated
+result set that says it is truncated.
+
 ## GLOBAL-MODEL-07 — Merge local library models into global catalogue
 
 **Priority: P1 — Effort: Medium — Impact: High**
@@ -706,6 +722,13 @@ GGUF/MLX become visible before serving, with accurate stopped/ready-to-serve sta
 **Priority: P1 — Effort: Medium — Impact: High**
 
 Temporary provider/runtime failure must not make model lists disappear.
+
+**Done 2026-09-12.** A failed listing now carries the models the provider last
+published, flagged `remembered` with the `listed_at` of that listing, so a stale
+answer is offered as stale. The failure itself is unchanged — remembering never
+turns one into a success — and a *policy-denied* provider carries no models at
+all, because a remembered catalogue for a provider the gate is refusing would
+project an authority the owner does not currently have.
 
 ## GLOBAL-MODEL-09 — Capability-aware picker, not workspace-aware picker
 

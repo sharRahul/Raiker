@@ -9,6 +9,7 @@
   } from "../modelReadiness.svelte";
   import ProviderLogo from "./ProviderLogo.svelte";
   import Icon from "./Icon.svelte";
+  import { catalogueChoices, searchCatalogue, searchSummary } from "../modelCatalogue";
 
   let {
     profiles,
@@ -22,8 +23,18 @@
     efforts = [],
     effort = $bindable(""),
     decision = null,
+    catalogues = {},
   }: {
     profiles: ModelProfile[];
+    /**
+     * GLOBAL-MODEL-06 — what each provider last published, keyed by profile.
+     *
+     * `profiles` above is the quick list: what the menu offers at rest, which
+     * stays short because a list nobody can scroll is not a choice. This is
+     * what search may *reach*, which is the distinction the plan draws —
+     * curation orders the quick list, it does not decide what exists.
+     */
+    catalogues?: Record<string, string[]>;
     selectedProfile?: ModelProfile | null;
     value?: string;
     profileId?: string;
@@ -109,6 +120,30 @@
           ),
         ],
   );
+  /**
+   * GLOBAL-MODEL-06 — the search that reaches past the quick list.
+   *
+   * Cleared whenever the menu opens: a query left over from the last time is a
+   * filter the owner did not type and cannot see the origin of, which is how
+   * BUG-263 made a provider look like it served three models.
+   */
+  let query = $state("");
+  $effect(() => {
+    if (open) query = "";
+  });
+  const reachable = $derived(catalogueChoices(choices, catalogues));
+  const searching = $derived(query.trim() !== "");
+  const found = $derived(searchCatalogue(reachable, query));
+  const foundSummary = $derived(searchSummary(reachable, query));
+  /** A catalogue row is selectable even though no `ModelProfile` describes it. */
+  function selectFound(choice: { profile_id: string; model: string }) {
+    value = choice.profile_id;
+    profileId = choice.profile_id;
+    model = choice.model;
+    open = false;
+    onchosen?.(choice.profile_id, choice.model);
+  }
+
   const providerGroups = $derived.by(() => {
     const groups = new Map<string, ModelProfile[]>();
     for (const profile of choices) {
@@ -262,6 +297,47 @@
         </div>
       {/if}
 
+      <!-- GLOBAL-MODEL-06 — "search must still be able to find the full
+           provider catalogue". The quick list below is what the owner works
+           with; this reaches everything their providers published, so a model
+           is no longer invisible for not having been curated. -->
+      {#if reachable.length > providerGroups.reduce((total, group) => total + group.profiles.length, 0)}
+        <label class="model-search">
+          <Icon name="search" size="sm" />
+          <span class="sr-only">Search models</span>
+          <input
+            type="search"
+            bind:value={query}
+            placeholder="Search all models…"
+            aria-label="Search models"
+            {disabled}
+          />
+        </label>
+      {/if}
+
+      {#if searching}
+        <div class="model-provider-group" role="group" aria-label="Search results">
+          {#each found as choice (`${choice.profile_id}::${choice.model}`)}
+            <button
+              type="button"
+              class="model-choice menu-item"
+              role="menuitemradio"
+              aria-checked={active?.profile_id === choice.profile_id &&
+                active?.model === choice.model}
+              {disabled}
+              onclick={() => selectFound(choice)}
+            >
+              <ProviderLogo provider={choice.provider} />
+              <span>{modelName(choice.model)}</span>
+              {#if choice.pinned}<span class="model-pinned">In your list</span>{/if}
+            </button>
+          {/each}
+          <!-- A truncated result set that does not say so reads as a small
+               catalogue; an empty one has to say that too, rather than looking
+               like a menu that failed to load. -->
+          <p class="model-search-summary" role="status">{foundSummary}</p>
+        </div>
+      {:else}
       {#each providerGroups as group (group.provider)}
         <div
           class="model-provider-group"
@@ -293,6 +369,7 @@
           {/each}
         </div>
       {/each}
+      {/if}
 
       {#if firstUnconfigured !== null}
         <div class="setup-choice">
@@ -371,6 +448,42 @@
 </div>
 
 <style>
+  /* The search that reaches the whole catalogue. Shown only when there is more
+     to reach than the quick list already offers, so a two-model install does
+     not get a search box for two models. */
+  .model-search {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0 var(--space-2) var(--space-2);
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--sunken);
+    color: var(--text-3);
+  }
+  .model-search input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text-1);
+    font: inherit;
+    font-size: var(--text-sm);
+  }
+  .model-pinned {
+    margin-left: auto;
+    color: var(--text-3);
+    font-size: var(--text-2xs);
+    white-space: nowrap;
+  }
+  .model-search-summary {
+    margin: 0;
+    padding: 0.35rem 0.6rem;
+    color: var(--text-3);
+    font-size: var(--text-xs);
+  }
   .model-picker {
     position: relative;
     /* The menu is positioned against this box, so the box has to be the

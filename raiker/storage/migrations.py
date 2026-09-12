@@ -2267,6 +2267,32 @@ CREATE INDEX IF NOT EXISTS idx_principal_configured_models_owner
 """
 
 
+# GLOBAL-MODEL-01/08 — the last catalogue a provider actually published.
+#
+# Provider catalogues were probed on demand and never written down, so two
+# things followed. A model only reached a composer by being "kept available",
+# which made curation a prerequisite for visibility rather than a convenience;
+# and a provider that was briefly unreachable made its models vanish from every
+# picker, because the only copy of the catalogue was the one in flight.
+#
+# One row per (principal, profile, model), written whenever a listing succeeds
+# and read when the next one does not. `listed_at` is when the provider said it,
+# so a stale answer can be presented as stale rather than as current.
+PROVIDER_CATALOGUE_MIGRATION_ID = "RAIKER-1044-provider-catalogue"
+PROVIDER_CATALOGUE_SQL = """
+CREATE TABLE IF NOT EXISTS principal_provider_catalogue (
+  principal_id TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  model TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  listed_at TEXT NOT NULL,
+  PRIMARY KEY (principal_id, profile_id, model)
+);
+CREATE INDEX IF NOT EXISTS idx_principal_provider_catalogue_owner
+  ON principal_provider_catalogue(principal_id, profile_id, position);
+"""
+
+
 TASK_MODEL_CHOICES_MIGRATION_ID = "RAIKER-1031-task-model-choices"
 TASK_MODEL_CHOICES_SQL = """
 ALTER TABLE tasks ADD COLUMN model_profile TEXT;

@@ -1003,8 +1003,8 @@ Priority outranks effort. Within the same priority, lower effort comes first.
 5. ~~**WEB-01** canonical global read-tool contract.~~ Done 2026-09-07.
 6. ~~**WEB-02** surface parity regression coverage.~~ Done 2026-09-07.
 7. ~~**WEB-03** prove projection never bypasses authority/policy.~~ Done 2026-09-07.
-8. **GLOBAL-MODEL-01/02** authoritative owner-level model catalogue consumed by all composers.
-9. **GLOBAL-MODEL-06** remove `Keep available` as a normal availability gate.
+8. ~~**GLOBAL-MODEL-01/02** authoritative owner-level model catalogue consumed by all composers.~~ Done 2026-09-12 ([FIXED-487](FIXED_ITEMS.md#fixed-487--a-catalogue-that-existed-only-as-long-as-the-response-carrying-it)).
+9. ~~**GLOBAL-MODEL-06** remove `Keep available` as a normal availability gate.~~ Done 2026-09-12 ([FIXED-487](FIXED_ITEMS.md#fixed-487--a-catalogue-that-existed-only-as-long-as-the-response-carrying-it)).
 
 ## P1
 

@@ -1027,9 +1027,9 @@ cost, evidence, and transactional publication are all inspectable together.
 **Status: implemented 2026-08-25. Tier 2 (experience).** The shared shell,
 accessible modal-drawer controller, low-saturation semantic tokens, bounded
 reading/workspace canvases, and the complete high-resolution evidence matrix
-ship together. The approved design and task-level implementation record are
-[`WEB_UI_ADAPTIVE_SHELL_DESIGN.md`](WEB_UI_ADAPTIVE_SHELL_DESIGN.md) and
-[`WEB_UI_ADAPTIVE_SHELL_IMPLEMENTATION_PLAN.md`](WEB_UI_ADAPTIVE_SHELL_IMPLEMENTATION_PLAN.md).
+ship together. The approved design and task-level implementation record were
+the adaptive-shell design and implementation plan, both removed once every item
+in them had closed.
 
 **What exists today.** Raiker has fifteen routes, a shared sidebar/top bar,
 mobile drawer navigation, theme tokens, independent application surfaces, and

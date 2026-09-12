@@ -64,11 +64,11 @@ A sweep that reports success while writing nothing is worse than one that fails.
 This document is the explicit implementation-verification companion to:
 
 - `VISUAL_UI_UX_REVIEW_2026-09-06.md`
-- `MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md`
+- the Models review
 - `UNIFIED_COMPOSER_REDESIGN_2026-09-06.md`
-- `GLOBAL_MODEL_CATALOGUE_AND_COMPOSER_PICKER_2026-09-06.md`
-- `ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md`
-- `GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md`
+- the global model-catalogue review
+- the environment-context plan
+- the global web-read plan
 
 It answers four questions directly:
 
@@ -980,7 +980,7 @@ as trusted metadata separate from the untrusted workspace block, recorded as an
 delegated subagent each read the clock rather than inherit one. Weather is a
 structured read with `observed_at`, forecast validity and `fetched_at` kept
 apart and a typed `fresh`/`stale`/`unavailable` state. See
-`ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md`,
+the environment-context plan,
 [FIXED-459](FIXED_ITEMS.md#fixed-459--nothing-in-raiker-told-a-model-what-day-it-was)
 and
 [FIXED-460](FIXED_ITEMS.md#fixed-460--weather-was-a-page-to-interpret-rather-than-a-reading-to-report).
@@ -1009,7 +1009,7 @@ fetch, with explicit truncation and a typed `static_content_insufficient` that
 authorises no browser. Readiness is a typed state separate from authority, from
 one shared snapshot so a still-mounted composer updates without a reload. The
 fail-closed half is asserted directly: every read still refuses when the gate is
-off. See `GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md` and
+off. See the global web-read plan and
 [FIXED-461](FIXED_ITEMS.md#fixed-461--four-derivations-of-one-fact-about-what-a-turn-can-read).
 
 ---

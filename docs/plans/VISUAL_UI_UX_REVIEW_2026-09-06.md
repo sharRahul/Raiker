@@ -16,7 +16,7 @@ capability is offered rather than failing silently at the point of use; VIS2-13'
 badge budget now covers those entries, which print a state chip only when the
 state is *not* the ordinary one. VIS2-19 is unchanged and remains the largest
 open item — Design gained a research layer
-([WEB-06](GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md#web-06--design-research-agent-integration)),
+(WEB-06),
 not a canvas.
 
 | Item | State |

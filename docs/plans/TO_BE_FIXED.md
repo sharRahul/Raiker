@@ -1378,8 +1378,7 @@ appear only once the owner asks for them.
 ## BUG-280 — Weather and the environment clock are unmeasured against a real provider and a real model
 
 **Severity: Low. Area: runtime / environment context, weather. Raised while
-implementing
-[ENV-01…05 and WEATHER-01…03](ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md).**
+implementing ENV-01…05 and WEATHER-01…03.**
 
 **Observed.** The 2026-09-07 round proved the whole of the environment and
 weather contract against the runtime: the bundle a turn is given, the event it
@@ -1422,8 +1421,7 @@ reading is.
 
 ## BUG-281 — Design's research findings are text, not sources
 
-**Severity: Low. Area: Design. Raised while implementing
-[WEB-06](GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md#web-06--design-research-agent-integration).**
+**Severity: Low. Area: Design. Raised while implementing WEB-06.**
 
 **Observed.** Design's Tools menu runs a real governed research turn on the
 `design` surface: it searches, reads and extracts through the global read

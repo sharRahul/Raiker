@@ -18734,7 +18734,7 @@ than by ordinal (`settings-privacy.png`, not `26-`), so adding a destination in
 the middle no longer renames the evidence after it and the catalogue matches the
 theme sweep's existing convention. The 25 ordinal files are replaced; that
 directory is documented as replaceable current-state evidence in
-[`WEB_UI_ADAPTIVE_SHELL_DESIGN.md`](WEB_UI_ADAPTIVE_SHELL_DESIGN.md), and no
+the adaptive-shell design, and no
 document cited one by name.
 
 **Green on this host:** all five sweeps pass against the derived list — the page
@@ -20085,8 +20085,7 @@ five that were changed.
 ## FIXED-451 — Five stores, five read paths, and no way to say which was wrong
 
 **Severity: Critical. Area: models / contract. Status: Fixed 2026-09-07. Raised
-as
-[MODEL-01](MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md#model-01--create-one-authoritative-selectioneffective-model-contract).**
+as MODEL-01.**
 
 **Observed.** Every part of the model decision was already persisted correctly:
 the global selection, the per-surface default, the readiness verdict, the
@@ -20135,7 +20134,7 @@ the revision token and the endpoint contract.
 ## FIXED-452 — Design had no model default of its own
 
 **Severity: High. Area: models / Design. Status: Fixed 2026-09-07. Raised as
-[MODEL-02](MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md#model-02--add-design-to-surface-model-defaults).**
+MODEL-02.**
 
 **Observed.** The backend's list of surfaces that may hold a model default was
 `chat, build, tasks, schedule`. The product model is Chat | Build | Design, so
@@ -20162,7 +20161,7 @@ through the API.
 
 **Severity: High. Area: models. Status: Fixed 2026-09-07. Raised as MODEL-03
 through MODEL-15 in
-[the Models review](MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md).**
+the Models review.**
 
 **Observed.** Six equal tabs — Local, Hosted, Hugging Face, Activity, Routing,
 Pricing. Three named *where a model is stored*, which is an attribute of the
@@ -20379,7 +20378,7 @@ top bar above it.
 
 **Severity: Critical. Area: runtime / environment context. Status: Fixed
 2026-09-07. Raised as
-[ENV-01 … ENV-05](ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md#implementation-findings).**
+ENV-01 … ENV-05.**
 
 **Observed.** No turn was ever given the current date, time, day or timezone.
 The model answered relative-time questions from whatever it could find: a
@@ -20435,7 +20434,7 @@ deriving their own), `web/src/lib/environment.test.ts` (12 cases).
 ## FIXED-460 — Weather was a page to interpret rather than a reading to report
 
 **Severity: High. Area: runtime / weather. Status: Fixed 2026-09-07. Raised as
-[WEATHER-01 … WEATHER-03](ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md#weather-contract).**
+WEATHER-01 … WEATHER-03.**
 
 **Observed.** Asking about the weather had two failure modes that are
 indistinguishable from the outside. The model answered from training knowledge —
@@ -20484,7 +20483,7 @@ note, and the gate, decision mode and blocklist each refusing it by name.
 ## FIXED-461 — Four derivations of one fact about what a turn can read
 
 **Severity: High. Area: runtime / read capabilities. Status: Fixed 2026-09-07.
-Raised as [WEB-01 … WEB-09](GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md#implementation-findings).**
+Raised as WEB-01 … WEB-09.**
 
 **Observed.** Whether Build had `web_search` was reconstructed from the
 projection list, the capability router, the gate map, and whichever view
@@ -20549,7 +20548,7 @@ image-generation path never naming a web or browser capability.
 ## FIXED-462 — The Hugging Face flow did all six steps at once
 
 **Severity: Medium. Area: models. Status: Fixed 2026-09-07. Raised as
-[MODEL-09](MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md#model-09--reframe-hugging-face-as-add-local-model).**
+MODEL-09.**
 
 **Observed.** Adding a local model is a sequence — find something, pick the
 right build of it, look at what it costs in bytes and licence, fetch it, convert
@@ -20588,7 +20587,7 @@ this variant needs it.
 ## FIXED-463 — "Come back and press Look again"
 
 **Severity: Medium. Area: models. Status: Fixed 2026-09-07. Raised as
-[MODEL-14](MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md#model-14--do-not-use-backendvendor-links-as-the-normal-integration-contract).**
+MODEL-14.**
 
 **Observed.** Some setup genuinely happens outside Raiker: a local runtime is
 somebody else's installer, and Raiker will not download and execute one. What
@@ -21375,7 +21374,7 @@ scannable closed row. Live-verified 2026-09-07 in
 ## FIXED-487 — A catalogue that existed only as long as the response carrying it
 
 **Severity: High. Area: models / composer. Status: Fixed 2026-09-12. Found in
-[GLOBAL_MODEL_CATALOGUE_AND_COMPOSER_PICKER_2026-09-06.md](GLOBAL_MODEL_CATALOGUE_AND_COMPOSER_PICKER_2026-09-06.md)
+the global model-catalogue review
 (GLOBAL-MODEL-01, 02, 06, 08).**
 
 **Observed.** A provider's catalogue was probed on demand and never written

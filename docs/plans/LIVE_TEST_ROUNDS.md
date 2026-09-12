@@ -79,10 +79,8 @@ shared `OWNER_CREDENTIALS`. Workspace: a fresh scratch directory. Spec:
 `env-02-chat-tools-research-reads.png`, `env-03-design-research-tools.png`,
 `env-04-huggingface-step-rail.png`, `env-05-anthropic-connection.png`.**
 
-The round proved the three claims made by
-`ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md`,
-`GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md` and the two remaining Models-review
-items.
+The round proved the three claims made by the environment-context plan, the
+global web-read plan and the two remaining Models-review items.
 
 1. **Settings → General → Time and place** sets the owner's zone, states where
    the zone in force came from, and shows what the owner's clock reads in it

@@ -76,10 +76,19 @@ class GenerateImageRequest:
     # if the profile declares it for images, and falls back to the profile's
     # default when it is empty. Without that check this field would be a
     # free-text string forwarded to a provider unread.
+    #
+    # BUG-277 — `source_generation_id` is what makes "edit this" possible, and
+    # it is the one field here that names something the owner already has. It is
+    # resolved owner-scoped in the executor rather than trusted: a generation id
+    # is short and guessable in shape, and an id belonging to another owner
+    # answers exactly as one that was never issued.
     profile_id: str
     prompt: str
     size: str = "1024x1024"
     model: str = ""
+    source_generation_id: str = ""
+    variations: int = 1
+    project_id: str = ""
 
 
 @dataclass

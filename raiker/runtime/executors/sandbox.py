@@ -309,6 +309,109 @@ def post_json(
     return parsed_body
 
 
+def post_multipart(
+    url: str,
+    fields: dict[str, str],
+    files: dict[str, tuple[str, str, bytes]],
+    *,
+    egress_allowlist: frozenset[str] | None = None,
+    headers: dict[str, str] | None = None,
+    max_bytes: int = 12_000_000,
+    timeout: float = 60.0,
+) -> dict:
+    """POST ``multipart/form-data`` to an allowlisted host, JSON response bounded.
+
+    The multipart analogue of :func:`post_json`, and it exists for one reason:
+    an image *edit* names an image, and OpenAI's ``/v1/images/edits`` takes that
+    image as a file part rather than as base64 in a JSON body. Gemini's
+    ``generateContent`` accepts inline data and needs none of this; without it
+    OpenAI could only ever generate, never edit.
+
+    **This widens no boundary.** Every check :func:`post_json` makes is made here
+    in the same order and with the same reason codes: the scheme must be http or
+    https, an absent allowlist denies everything, and the host must match
+    ``RAIKER_MODEL_EGRESS_ALLOWLIST``. What changes is the encoding of the
+    request body, not who may be reached — the caller still supplies the URL
+    built from the owner's configured profile, never from an action argument.
+
+    ``files`` maps a form field name to ``(filename, media_type, bytes)``. The
+    boundary is generated from :func:`secrets.token_hex` rather than a counter so
+    it cannot be predicted from a previous request, and a field whose value
+    contains it is refused rather than being allowed to terminate the body
+    early. Request headers (an API key among them) are sent verbatim and are
+    never returned or logged here.
+    """
+    import json as _json
+    import secrets
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise SandboxError(f"invalid_url:{parsed.scheme or 'none'}://{parsed.netloc or 'none'}")
+    if not egress_allowlist:
+        raise SandboxError("egress_denied:no_allowlist")
+    if not any(fnmatch.fnmatch(parsed.netloc, pattern) for pattern in egress_allowlist):
+        raise SandboxError(f"egress_denied:{parsed.netloc}")
+    import urllib.error
+    import urllib.request
+
+    boundary = f"----raiker{secrets.token_hex(16)}"
+    marker = boundary.encode("utf-8")
+    chunks: list[bytes] = []
+    for name, value in fields.items():
+        text = str(value)
+        # A part that contains the boundary would end the body early and let the
+        # rest be read as another part. Unpredictable boundaries make this
+        # practically unreachable; refusing anyway is what makes it impossible.
+        if boundary in text or boundary in name:
+            raise SandboxError("multipart_boundary_in_field")
+        chunks.append(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n'.encode()
+            + text.encode("utf-8")
+            + b"\r\n"
+        )
+    for name, (filename, media_type, blob) in files.items():
+        if marker in blob:
+            raise SandboxError("multipart_boundary_in_file")
+        chunks.append(
+            (
+                f"--{boundary}\r\n"
+                f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'
+                f"Content-Type: {media_type}\r\n\r\n"
+            ).encode()
+            + blob
+            + b"\r\n"
+        )
+    chunks.append(f"--{boundary}--\r\n".encode())
+    body = b"".join(chunks)
+
+    request = urllib.request.Request(  # noqa: S310 - scheme checked above
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            **(headers or {}),
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
+            data = resp.read(max_bytes + 1)
+    except urllib.error.HTTPError as exc:
+        raise SandboxError(f"http_error:{exc.code}") from None
+    except Exception as exc:
+        raise SandboxError(f"fetch_failed:{type(exc).__name__}") from None
+    if len(data) > max_bytes:
+        raise SandboxError("response_too_large")
+    try:
+        parsed_body = _json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        raise SandboxError("response_not_json") from None
+    if not isinstance(parsed_body, dict):
+        raise SandboxError("response_not_json_object")
+    return parsed_body
+
+
 def post_json_rpc(
     url: str,
     payload: dict[str, object],

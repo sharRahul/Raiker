@@ -3878,3 +3878,38 @@ CREATE TABLE IF NOT EXISTS background_worker_health (
   updated_at TEXT NOT NULL
 );
 """
+
+
+# ── Image lineage: what a generation was made from (BUG-277) ─────────────────
+#
+# The governed image endpoint took a prompt, a size and a model and returned one
+# picture. Nothing recorded what a picture was made *from*, so there was no
+# subject for "edit this" to be about, no relationship between a variation and
+# its original, and no versions for a version picker to show. VIS2-19's canvas
+# had nothing to compose because the runtime beneath it had nothing to say.
+#
+# `source_generation_id` is the generation this one came from, and it is the
+# whole of the lineage: a chain of single parents is a history, and that is what
+# a version strip draws. It is deliberately not a foreign key — a source can be
+# forgotten while the images made from it remain, and a row whose parent is gone
+# should read as "origin unknown", not vanish with it.
+#
+# `kind` says which of the three requests produced the row, because they are
+# different acts even when they share a subject: `create` made something from a
+# prompt alone, `edit` changed a named image, `variation` asked the same
+# question again. An owner reading a history needs to know which.
+#
+# `project_id` closes BUG-282. It was deferred once, on the grounds that filing
+# an image against a project shape that was about to be designed would be work
+# done twice; the shape is being designed now, so this is the time.
+IMAGE_LINEAGE_MIGRATION_ID = "RAIKER-2071-image-lineage"
+
+IMAGE_LINEAGE_SQL = """
+ALTER TABLE image_generations ADD COLUMN source_generation_id TEXT;
+ALTER TABLE image_generations ADD COLUMN kind TEXT NOT NULL DEFAULT 'create';
+ALTER TABLE image_generations ADD COLUMN project_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_image_generations_source
+  ON image_generations (owner_principal_id, source_generation_id);
+CREATE INDEX IF NOT EXISTS idx_image_generations_project
+  ON image_generations (owner_principal_id, project_id, created_at DESC);
+"""

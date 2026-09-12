@@ -509,6 +509,9 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-485](#fixed-485--memory-kept-settings-records-and-decisions-at-one-visual-level) | Medium | Memory | Fixed 2026-09-07 (page-by-page §10) |
 | [FIXED-486](#fixed-486--two-parallel-systems-where-there-were-two-questions) | Medium | Permissions | Fixed 2026-09-07 (page-by-page) |
 | [FIXED-487](#fixed-487--a-catalogue-that-existed-only-as-long-as-the-response-carrying-it) | High | Models / composer | Fixed 2026-09-12 (GLOBAL-MODEL-01/02/06/08) |
+| [FIXED-488](#fixed-488--first-launch-taught-infrastructure-before-it-taught-the-product) | Medium | First launch / onboarding | Fixed 2026-09-12 (FIRST-02…FIRST-10) |
+| [FIXED-489](#fixed-489--a-remembered-catalogue-outlived-the-connection-that-earned-it) | Medium | Models / provider catalogue | Fixed 2026-09-12 (found live) |
+| [FIXED-490](#fixed-490--a-composer-holding-eleven-choosable-models-said-none-was-set-up) | Low | Chat / Build / Tasks composer | Fixed 2026-09-12 (found live) |
 
 ---
 

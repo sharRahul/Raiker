@@ -132,7 +132,14 @@ export async function enableCapability(
  * modal: a spec that signs in and goes straight to Models is talking to a page
  * it cannot reach.
  *
- * **It is a five-stage wizard, and only `finish` closes it.** The old helper
+ * **FIRST-02 … FIRST-09 rewrote which stages exist**, and every heading below
+ * moved with them: `Account` and `Backup` are no longer stages, a `Welcome`
+ * screen opens the flow, the privacy question is about where content travels,
+ * and the last screen finishes into work rather than into "Open Workbench". The
+ * retired headings are still answered, because an instance created before that
+ * change can have one of them stored and resuming it must not throw.
+ *
+ * **Only the final stage closes it.** The old helper
  * knew one stage. It clicked "Skip for now" — a control that no longer exists
  * anywhere in the app — and otherwise clicked "Decide later" and then assumed
  * the next three stages in a fixed order. A workspace whose setup was *left*
@@ -167,11 +174,22 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
       await page.waitForTimeout(500);
       continue;
     }
-    if (heading.startsWith("Choose where Raiker thinks")) {
+    if (heading.startsWith("Meet Raiker")) {
+      await page.getByRole("button", { name: "Continue" }).click();
+    } else if (
+      heading.startsWith("Choose how Raiker should think") ||
+      // Retired heading, still answered: an instance created before FIRST-04.
+      heading.startsWith("Choose where Raiker thinks")
+    ) {
       // "Decide later" and "Continue" are the same button; which one it is
       // depends on whether a model was pinned on this screen, and either
       // advances. The model itself is connected through Models afterwards.
       await page.getByRole("button", { name: /^(Decide later|Continue)$/ }).click();
+    } else if (heading.startsWith("Where may Raiker send model requests")) {
+      // The connected-providers answer, because a live round connects a hosted
+      // provider and "Local only" would leave it refused for a reason the spec
+      // is not about.
+      await page.getByRole("button", { name: /Local, and the providers I connect/ }).click();
     } else if (heading.startsWith("Choose your privacy boundary")) {
       // Balanced, because a live round connects a hosted provider and
       // local-first would leave it refused for a reason the spec is not about.
@@ -179,7 +197,7 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
     } else if (heading.startsWith("Create your first backup")) {
       await page.getByRole("button", { name: "Set up later" }).click();
     } else if (heading.startsWith("Your Raiker is ready")) {
-      await page.getByRole("button", { name: "Open Workbench" }).click();
+      await page.getByRole("button", { name: "Start using Raiker" }).click();
       await expect(title).toBeHidden({ timeout: 30_000 });
       return true;
     } else {
@@ -235,6 +253,27 @@ export async function hostedProviderCard(
 }
 
 /**
+ * Open one provider's **Details**, wherever the row happens to keep it.
+ *
+ * A connected card offers one primary action and one overflow (MODEL-15), so
+ * Details is a menu item; an unconnected card has historically carried it
+ * directly. Both are tried, in that order, so a spec never has to know which
+ * shape of row it is looking at.
+ */
+export async function openProviderDetails(page: Page, card: Locator): Promise<void> {
+  const overflow = card.getByRole("button", { name: /More actions/ });
+  if (await overflow.isVisible().catch(() => false)) {
+    await overflow.click();
+    await page.getByRole("menuitem", { name: "Details" }).click();
+  } else {
+    await card.getByRole("button", { name: "Details", exact: true }).click();
+  }
+  await expect(page.getByRole("button", { name: "Close model details" })).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
+/**
  * Enter a provider credential through the product's own dialog and confirm the
  * card says it connected.
  */
@@ -249,11 +288,18 @@ export async function connectHostedProvider(
   // BUG-208 slice E moved Reconnect into Details — it is credential management,
   // not what the card is for. A provider with no connection still offers Connect
   // on the card, which is the path a fresh workspace takes.
+  //
+  // **Found live on 2026-09-12.** MODEL-15 then moved Details itself: a
+  // repeated row gets one primary action and one overflow, so a *connected*
+  // card offers `Select models…` and a `More actions` menu, and nothing named
+  // Details is on the card at all. This branch waited five minutes for a button
+  // that had become a menu item, and the failure read as a provider that could
+  // not be reconnected rather than as a helper looking in the wrong place.
   const connect = card.getByRole("button", { name: "Connect", exact: true });
   if (await connect.isVisible().catch(() => false)) {
     await connect.click();
   } else {
-    await card.getByRole("button", { name: "Details", exact: true }).click();
+    await openProviderDetails(page, card);
     await page.getByRole("button", { name: "Reconnect", exact: true }).click();
   }
   await page.getByLabel(keyLabel).fill(key);
@@ -503,7 +549,7 @@ export async function signInAsOwner(
     name: /Welcome (back|to your Work Dashboard)/,
   });
   // The wizard is identified by its own heading rather than by a button on one
-  // of its five stages: a workspace that left setup part-way resumes on the
+  // of its stages: a workspace that left setup part-way resumes on the
   // stage it stopped at, and "Decide later" lives on only one of them.
   await expect(
     page.locator("#setup-title").or(workbench).first(),

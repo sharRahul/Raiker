@@ -670,6 +670,12 @@ last published, per owner and profile, written on every successful listing and
 read without touching the network. Exposed as `catalogues` on `GET /api/models`
 ([FIXED-487](FIXED_ITEMS.md#fixed-487--a-catalogue-that-existed-only-as-long-as-the-response-carrying-it)).
 
+Verified against a live Anthropic account later the same day, which found one
+thing the fixtures could not: remembering is right for a provider that is
+briefly unreachable and wrong for one the owner has disconnected, and nothing
+said so. `clear_model_connection` now forgets that profile's catalogue
+([FIXED-489](FIXED_ITEMS.md#fixed-489--a-remembered-catalogue-outlived-the-connection-that-earned-it)).
+
 ## GLOBAL-MODEL-02 — Every composer reads the same catalogue
 
 **Priority: P0/P1 — Effort: Medium — Impact: Very high**
@@ -710,6 +716,13 @@ already recorded that scrolling four hundred names "is not choosing, it is
 hunting" — and `modelCatalogue.ts` gives the picker a search that reaches every
 model the owner's providers published, with pinned entries first and a truncated
 result set that says it is truncated.
+
+The live round also found what the change had left the composer saying: with a
+provider connected and its whole catalogue reachable, it still read *No model is
+set up. Open Models to connect a provider* — an instruction to do something the
+owner had already done. Reaching models and choosing one are now two different
+sentences, and the turn is blocked either way
+([FIXED-490](FIXED_ITEMS.md#fixed-490--a-composer-holding-eleven-choosable-models-said-none-was-set-up)).
 
 ## GLOBAL-MODEL-07 — Merge local library models into global catalogue
 

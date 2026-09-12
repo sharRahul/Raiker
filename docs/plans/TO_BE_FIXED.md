@@ -1503,3 +1503,32 @@ live regression using an available `-cloud` profile.
 **Interface outcome that has to be true before this closes.** A model that
 passes Ollama's provider test can complete a Chat turn, or Chat reports the
 specific provider/runtime refusal rather than a generic reachability message.
+
+---
+
+## BUG-286 — A fresh composer names an unreachable default it was never given
+
+**Severity: Low. Area: Chat/Build composer, model decision. Status: Open —
+raised 2026-09-12 during the global-catalogue live round.**
+
+**Observed.** On a workspace with Anthropic connected and no default chosen, the
+Chat picker's trigger reads **Not selected** — correct — while the menu above it
+opens with a decision note naming `Gemma 4:31B Cloud` as **Selected ·
+unavailable**. Nothing selected that model; it is the shipped Ollama profile's
+declared model, on a host with no Ollama. The two statements are in the same menu
+and disagree with each other.
+
+**Why it was left.** It predates the global catalogue and is not caused by it.
+`GET /api/model-decision` resolves a selection from the profile registry when the
+owner has stored none, and the picker reports that resolution honestly — the
+defect is in what the decision answers, not in what the menu draws. Changing it
+is a contract change with its own tests (`tests/test_model_decision.py`) and
+belongs with that contract rather than inside a picker change.
+
+**Proposed fix.** Have the decision report no selection when the owner has stored
+none, rather than a registry default, so the **Selected · unavailable** note
+appears only when a selection exists and cannot serve.
+
+**Interface outcome that has to be true before this closes.** A composer with no
+default chosen says only that, and no model the owner never chose is described as
+selected.

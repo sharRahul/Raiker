@@ -156,9 +156,9 @@ Two things worth knowing about how these rows behave elsewhere:
 
 - **Memory store and Memory forget are reachable from Chat and Build.** With the
   gate on, a turn can propose remembering a durable fact or deleting a stored
-  one. **Ask** shows the exact text before you decide; **Allow** sends an
+  one. **Ask me** shows the exact text before you decide; **Allow** sends an
   ordinary memory write directly through the governed executor without a
-  second approval prompt; **Deny** refuses it. Text that looks like a credential
+  second approval prompt; **Never** refuses it. Text that looks like a credential
   is refused before any of those paths can store it. With the gate off — the
   shipped default — no turn can propose either, and the Memory page says so
   rather than promising proposals it cannot produce.
@@ -290,10 +290,22 @@ Independently of whether a capability is on, each has a decision mode:
 
 | Mode | Behaviour |
 |---|---|
-| **Ask** *(default)* | Every AI-proposed action pauses for your approval. |
-| **Allow** | Permitted without prompting. |
-| **Auto** | Runs automatically. |
-| **Deny** | Always refused, whatever the gate says. |
+| **Ask me** *(default)* | Raiker stops and waits for your decision each time. |
+| **Allow** | Raiker goes ahead without asking, within policy. |
+| **Automatic** | Raiker goes ahead and keeps going, within policy. The most permissive answer. |
+| **Never** | Raiker refuses this, whatever asks for it. |
+
+These are the owner-facing words for the four modes the runtime enforces. The
+stored values, the API and the audit still read `ask`, `allow`, `auto` and
+`deny`: **Never** answers *what should happen*, and `deny` is the name of the
+mechanism that enforces it. Nothing about the authority model changed with the
+wording.
+
+A capability and its mode answer two different questions, and the page asks them
+in that order when a row is opened — **Can Raiker use this?**, then **When Raiker
+wants to use it**. That is what makes `On` + `Never` intelligible rather than
+contradictory: the capability is available, and every attempt to use it is
+refused.
 
 Expand a capability's row on **Permissions** to change its mode. A change is
 governed like any other: it asks for a reason and is recorded against your

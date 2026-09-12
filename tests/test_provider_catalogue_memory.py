@@ -92,3 +92,57 @@ def test_blank_and_duplicate_names_are_dropped_before_they_reach_a_picker(
     saved = store.save_provider_catalogue(OWNER, PROFILE, ["opus", " opus ", "  ", "sonnet"])
 
     assert saved == ["opus", "sonnet"]
+
+
+# ── Disconnecting is not an outage ───────────────────────────────────────────
+
+
+def test_disconnecting_a_provider_forgets_what_it_published(tmp_path: Path) -> None:
+    """The other direction of the disappearance defect.
+
+    Remembering a catalogue is right for a provider that is briefly unreachable
+    and wrong for one the owner has disconnected: leaving the rows behind offers
+    every picker a list of models Raiker can no longer reach, drawn exactly like
+    one it can.
+    """
+    from raiker.models.connections import clear_model_connection
+
+    root = tmp_path / "disconnect"
+    root.mkdir()
+    bootstrap_owner("owner", "Owner", workspace_root=root)
+    store = SQLiteStore(root)
+    store.save_provider_catalogue(OWNER, PROFILE, ["claude-opus-5", "claude-sonnet-5"])
+    assert store.list_provider_catalogue(OWNER, PROFILE) == [
+        "claude-opus-5",
+        "claude-sonnet-5",
+    ]
+
+    clear_model_connection(store, OWNER, PROFILE)
+
+    assert store.list_provider_catalogue(OWNER, PROFILE) == []
+    assert store.provider_catalogue_listed_at(OWNER, PROFILE) is None
+
+
+def test_disconnecting_one_provider_leaves_another_alone(tmp_path: Path) -> None:
+    from raiker.models.connections import clear_model_connection
+
+    root = tmp_path / "disconnect-scoped"
+    root.mkdir()
+    bootstrap_owner("owner", "Owner", workspace_root=root)
+    store = SQLiteStore(root)
+    store.save_provider_catalogue(OWNER, PROFILE, ["claude-opus-5"])
+    store.save_provider_catalogue(OWNER, "openai-hosted", ["gpt-5"])
+
+    clear_model_connection(store, OWNER, PROFILE)
+
+    assert store.list_provider_catalogue(OWNER, PROFILE) == []
+    assert store.list_provider_catalogue(OWNER, "openai-hosted") == ["gpt-5"]
+
+
+def test_forgetting_a_catalogue_that_is_not_there_is_not_an_error(tmp_path: Path) -> None:
+    root = tmp_path / "disconnect-empty"
+    root.mkdir()
+    bootstrap_owner("owner", "Owner", workspace_root=root)
+    store = SQLiteStore(root)
+
+    assert store.forget_provider_catalogue(OWNER, PROFILE) == 0

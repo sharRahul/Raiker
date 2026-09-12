@@ -50,11 +50,15 @@ or forgotten. The turn is refused rather than run on some other model, and you
 are deliberately not asked to pick again, because picking again would not fix a
 disk. Repair the workspace and the label clears on its own.
 
-**The first-run screen can do all of this on its own.** Stage 02 of setup shows one
-row per provider. The three local runtimes are *asked* what they are serving and
+**The first-run screen can do all of this on its own.** Setup's **Model** stage
+leads with the easiest working path — a runtime already running on this machine
+needs no account and no key — and keeps the full provider matrix behind **Other
+options**. That matrix shows one row per provider. The three local runtimes are *asked* what they are serving and
 offer the answer in a dropdown; a runtime that is not running says so. Every
 API-key provider takes its key inline and then lists **that provider's own**
 catalogue, so a model can be connected and chosen without leaving the wizard.
+**Advanced setup** opens this page when you want deeper configuration; you do not
+need it to finish setup.
 Choosing happens in the model picker, which has a search: there is no dropdown
 to scroll. A local runtime that is not installed offers to open the vendor's own
 download instead of a control that could not work.
@@ -354,12 +358,23 @@ provider is enough to work** — nothing requires you to connect more than one.
 including every scheduled run at the moment it begins. Chat and Build can pick
 per prompt; Tasks and Schedule cannot, so the default is what they use.
 
-**Which models are offered is a separate choice.** **Select models…** on a
-provider card opens a list of everything that provider publishes, with a switch
-against each. The ones you switch on stay in every picker, grouped under that
-provider; the default is one of them. A provider you have not connected offers
-nothing, and a model Raiker has measured as unavailable is not offered until it
-answers again.
+**Every model a connected provider serves is reachable.** Connect once, discover
+once, use everywhere: the listing that follows a connection is recorded, so the
+catalogue survives a provider that is briefly unreachable rather than vanishing
+with the response that carried it.
+
+**Select models…** on a provider card opens that catalogue with a switch against
+each. Those switches are the **quick list** — the handful a picker shows at rest,
+kept short because scrolling four hundred names is hunting rather than choosing.
+They are an ordering, never a gate: a model absent from the quick list is still
+selectable, and the picker's search reaches every model your providers have
+published.
+
+Three things still remove a model from a picker, and all three are measurements
+rather than preferences: a provider you have not connected offers nothing, a
+model Raiker has measured as unavailable is not offered until it answers again,
+and **disconnecting a provider takes its models with it** — a remembered
+catalogue is for an outage, not for an account Raiker may no longer reach.
 
 ---
 

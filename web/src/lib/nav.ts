@@ -351,7 +351,10 @@ const OFF_NAV_ITEMS: NavItem[] = [
     id: "model-setup",
     label: "Finish setup",
     icon: "models",
-    hint: "Confirm model, privacy and backup choices before your first turn",
+    // FIRST-08 — backup left the stages, so the hint stops naming it. Saying a
+    // stage exists that the screen does not show is the same defect as a
+    // control whose label contradicts what it does.
+    hint: "Meet Raiker, choose a model, and say where requests may travel",
   },
 ];
 

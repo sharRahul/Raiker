@@ -277,7 +277,10 @@ class SetupUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     status: Literal["required", "in_progress", "skipped", "complete"]
-    stage: Literal["account", "model", "privacy", "backup", "finish"]
+    # `welcome` is where first launch now starts; `account` and `backup` stay
+    # accepted because an instance part-way through the previous wizard has one
+    # of them stored, and a stored row must still round-trip.
+    stage: Literal["welcome", "account", "model", "privacy", "backup", "finish"]
     selected_profile_id: str | None = None
     selected_model: str | None = None
     model_deferred: bool = False

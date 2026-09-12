@@ -21436,3 +21436,127 @@ published, and a policy-denied provider offering nothing it once published.
 `modelCatalogue.test.ts` (10) and `ModelPicker.test.ts` cover reaching an
 uncurated model, keeping two providers' identical model names apart, and
 offering no search when the quick list already is the catalogue.
+
+---
+
+## FIXED-488 — First launch taught infrastructure before it taught the product
+
+**Severity: Medium. Area: First launch / onboarding. Status: Fixed 2026-09-12.
+Raised as FIRST-02 through FIRST-10, and the last P1 row left in the
+page-by-page verification's corrected backlog.**
+
+**Observed.** After the secure opening boundary — which is correct, is FIRST-01,
+and is unchanged here — onboarding ran `Account → Model → Privacy → Backup →
+Finish`. Five things were wrong with that sequence and none of them was a bug in
+any single screen:
+
+- an **Account** stage after the account had been created on the screen before
+  it, implying a second account to configure;
+- the full provider matrix as the opening move, put to an owner who had not yet
+  been told what Chat, Build and Design are;
+- a local/removable/NAS **backup path** asked for before the owner had used
+  Raiker once;
+- **Local-first** and **Balanced** as privacy modes, which read as a second
+  authority system standing beside Permissions rather than as a question about
+  where content travels;
+- **Open Workbench** as the final action, naming a destination the rest of the
+  product calls Home.
+
+**Fixed.** `firstRun.ts` holds the ordering and the wording, and
+`ModelSetupView` draws it. The stages are **Welcome → Model → Privacy → Ready**.
+
+- **Welcome** introduces Chat, Build and Design and states the posture in one
+  sentence — *Raiker starts conservatively and will ask you before it takes a
+  governed action* — instead of putting sixty-six gates in front of a first run
+  (FIRST-10).
+- **Model** leads with the easiest true path: a runtime already running on this
+  machine needs no account and no key, so it is the cheapest honest answer to
+  "where should Raiker think". The full matrix is behind **Other options**, and
+  opens by itself only when there is nothing to recommend — a screen that
+  recommended a provider the owner has no account with would be guessing on
+  their behalf. `Open the full Models page` became **Advanced setup**: everything
+  needed to connect a provider and choose a default is on the screen (FIRST-06).
+- **Privacy** asks *Where may Raiker send model requests?* and answers in terms
+  of data travel. The stored `local_first` / `balanced` values are untouched, so
+  an existing preference still means what it meant (FIRST-07).
+- **Ready** finishes into Chat, Build or Design, or **Start using Raiker** for
+  Home. Backup is offered there as optional setup beside *Review privacy* and
+  *Review permissions*, and nothing claims a backup exists until Raiker has
+  written and verified an encrypted snapshot (FIRST-08, FIRST-09).
+
+`account` and `backup` remain accepted stage values on the wire and resolve onto
+the new rail through `visibleStage`. An instance part-way through the previous
+wizard must not become unsavable, and a stored row must not render a blank
+screen.
+
+**The harness defect this surfaced.** `dismissFirstRunModelSetup` drove the
+wizard by reading its heading, and every heading it knew had been renamed — so
+every live spec that signs in would have failed at its first step rather than at
+the assertion it exists for. It answers the new stages and still answers the
+retired ones.
+
+**Verification.** `web/src/lib/firstRun.test.ts` (stage list, retired-stage
+mapping, what the model stage recommends and when it recommends nothing, and
+that no privacy choice mentions permissions),
+`web/src/lib/views/ModelSetupView.test.ts`, `tests/test_setup_state.py` including
+that a row stored under a retired stage still round-trips, and a live round
+driven stage by stage on an empty workspace
+(`web/e2e/first-launch-live.spec.ts`, captures under
+`docs/screenshots/2026-09-12-first-launch/`).
+
+---
+
+## FIXED-489 — A remembered catalogue outlived the connection that earned it
+
+**Severity: Medium. Area: Models / provider catalogue. Status: Fixed 2026-09-12.
+Found while verifying [FIXED-487](#fixed-487--a-catalogue-that-existed-only-as-long-as-the-response-carrying-it)
+against a live provider.**
+
+**Observed.** GLOBAL-MODEL-08 remembers what a provider last published so that a
+brief outage does not empty every picker. Disconnecting a provider is not an
+outage, and nothing said so: `clear_model_connection` removed the credential and
+left `principal_provider_catalogue` intact, so every composer went on offering
+that account's models — a list Raiker can no longer reach, drawn exactly like one
+it can. It is the disappearance defect pointing the other way, and the same
+symptom the remembering was added to prevent.
+
+**Fixed.** `forget_provider_catalogue` is the counterpart to
+`save_provider_catalogue`, and `clear_model_connection` calls it. Scoped to one
+profile, so disconnecting Anthropic leaves OpenAI's catalogue alone, and a
+profile with nothing stored is not an error.
+
+**Verification.** Three cases in `tests/test_provider_catalogue_memory.py`, and a
+live round that disconnects through the product's own control and watches
+`/api/models` stop carrying the eleven models it was carrying a moment earlier
+(`web/e2e/catalogue-lifecycle-live.spec.ts`).
+
+---
+
+## FIXED-490 — A composer holding eleven choosable models said none was set up
+
+**Severity: Low. Area: Chat / Build / Tasks composer. Status: Fixed 2026-09-12.
+Found in the same live round.**
+
+**Observed.** With Anthropic connected and its whole catalogue reachable from the
+picker, the composer read **No model is set up. Open Models to connect a provider
+or set up a local model.** Every word of that was true before GLOBAL-MODEL-06 and
+half of it stopped being true with it: the owner had connected a provider, and
+was being sent to the Models page to do it again.
+
+**Fixed.** `readinessForSelection` takes how many models the picker can actually
+reach, and the two situations get the two sentences they deserve: *No model is
+chosen. Choose one from the model menu beside Send.* when the catalogue has
+models in it, and the original when it does not. Nothing is loosened — no model
+is selected in either case, and `blocksSending` refuses the turn in both, which
+is asserted directly so the wording cannot drift into an authority change.
+
+**A harness defect found beside it.** `connectHostedProvider` reached **Details**
+as a button on the provider card. MODEL-15 had moved it into the row's overflow —
+one primary action per repeated row — so the helper spent a five-minute timeout
+waiting for a control that had become a menu item, and the failure read as a
+provider that could not be reconnected. `openProviderDetails` finds it in either
+shape.
+
+**Verification.** `web/src/lib/modelReadinessGating.test.ts` covers both
+sentences and asserts the turn is blocked either way; the live round reads the
+composer with a connected provider and no default chosen.

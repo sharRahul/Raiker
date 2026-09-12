@@ -410,7 +410,12 @@ export interface ModelSetupState {
 export interface SetupState {
   owner_principal_id: string;
   status: "required" | "in_progress" | "skipped" | "complete";
-  stage: "account" | "model" | "privacy" | "backup" | "finish";
+  /**
+   * `welcome` is where first launch opens. `account` and `backup` are retired
+   * stages that a stored row may still carry — `visibleStage` in `firstRun.ts`
+   * maps them onto the rail rather than rendering a blank screen.
+   */
+  stage: "welcome" | "account" | "model" | "privacy" | "backup" | "finish";
   selected_profile_id: string | null;
   selected_model: string | null;
   model_deferred: boolean;

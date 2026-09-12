@@ -371,4 +371,51 @@ describe("visual rubric", () => {
       }
     }
   });
+  it("gives a bigger monitor more room, not bigger controls (VIS2-15)", () => {
+    // A 4K display is a different composition, not the same one scaled up. The
+    // wide blocks are allowed to move the canvas widths and nothing else: prose
+    // measure, the type scale, the spacing scale and every control dimension
+    // stay exactly where they are, because a line that grows with the monitor is
+    // harder to read and a button that grows with it is further from the
+    // pointer.
+    const wide = [...stylesheet.matchAll(/@media \(min-width: (2200px|3400px)\)\s*\{([\s\S]*?)\n\}/g)];
+    expect(wide.length, "app.css declares no wide-display composition").toBe(2);
+    const ALLOWED = new Set(["--page-workspace", "--page-operational"]);
+    for (const [, width, body] of wide) {
+      const touched = [...body.matchAll(/(--[\w-]+):/g)].map((match) => match[1]);
+      expect(touched.length, `the ${width} block declares nothing`).toBeGreaterThan(0);
+      for (const token of touched) {
+        expect(
+          ALLOWED.has(token),
+          `the ${width} block moves ${token}; only the canvas widths may change with the display`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("composes the two themes separately rather than reusing one elevation (VIS2-14)", () => {
+    // Not a palette change — the same colours, composed for the ground they sit
+    // on. A drop shadow carries elevation on white and almost nothing on
+    // #0B0D10, so the dark theme moves that job to the edge; the canvas hairline
+    // inverts for the same reason. Both themes must declare both tokens, and
+    // they must not declare the same value, or one of the two grounds is
+    // borrowing the other's composition.
+    for (const token of ["--elevation-edge", "--canvas-edge", "--canvas-lift"]) {
+      const declarations = [...stylesheet.matchAll(new RegExp(`${token}:\\s*([^;]+);`, "g"))].map(
+        (match) => match[1].trim(),
+      );
+      expect(
+        declarations.length,
+        `${token} is not declared for the light theme and both dark ones`,
+      ).toBe(3);
+      expect(new Set(declarations).size, `${token} is the same in both themes`).toBeGreaterThan(1);
+    }
+    // Design's asset carries the boundary; the card around it is gone. The
+    // rule lives with the region that presents the asset (VIS2-20), not in the
+    // view that hosts the region.
+    const design = readFileSync(resolve(COMPONENTS, "DesignCanvasRegion.svelte"), "utf8");
+    expect(design, "Design's image has no boundary of its own").toMatch(
+      /\.shot \{[^}]*var\(--canvas-edge\)/,
+    );
+  });
 });

@@ -170,7 +170,12 @@ Chat      Build      Design
 
 Tasks/Agents/Projects can remain secondary workflow entries.
 
-**Status: Mostly correct.**
+**Status: Done 2026-09-07.** Home's start area is the three Work modes as
+peers, read from the same list the rest of the product reads (`workSurface.ts`,
+`START_WORK`), each described by the object that mode is about. Tasks and
+Projects follow on their own quieter row, which is what a workflow entry is.
+Recorded as
+[FIXED-484](FIXED_ITEMS.md#fixed-484--home-offered-two-of-the-three-work-modes).
 
 ---
 
@@ -426,7 +431,13 @@ Memory
 └ Recall & indexing
 ```
 
-**Status: Functionally correct; information architecture dense.**
+**Status: Done 2026-09-07.** Memory is a hub with exactly that composition —
+Overview, Memories, Suggestions, Sources, Recall & indexing — and Overview
+answers the two questions people arrive with: what Raiker can recall, and
+whether anything is waiting on a decision. `memoryHub.ts` derives both, so the
+Overview's counts and the tabs cannot disagree, and only decisions count as
+attention: an expired memory has already stopped being recalled. Recorded as
+[FIXED-485](FIXED_ITEMS.md#fixed-485--memory-kept-settings-records-and-decisions-at-one-visual-level).
 
 ---
 
@@ -701,7 +712,15 @@ The UI may become clearer, but the backend must preserve:
 
 > No model, agent, subagent, memory, retrieved document, plugin, MCP server, connector, tool result, scheduled task or external message may create, expand, transfer or exercise authority. Authority may only originate from authenticated human policy or explicitly delegated bounded auditable runtime grant.
 
-**Permissions status: Security model correct; UX should be redesigned for clarity.**
+**Permissions status: Done 2026-09-07.** The page asks the two questions in the
+order their answers depend on — *Can Raiker use this?* then *When Raiker wants
+to use it* — and speaks the owner's vocabulary for the second (`Ask me`,
+`Allow`, `Automatic`, `Never`), while the store keeps `deny` and every other
+mode exactly as it was. A closed row states both facts, so the list can be
+scanned; the handful an owner comes to change sits above the registry; and
+"not permitted for your principal" is now a sentence about their account.
+Nothing in the authority model moved. Recorded as
+[FIXED-486](FIXED_ITEMS.md#fixed-486--two-parallel-systems-where-there-were-two-questions).
 
 ---
 
@@ -984,28 +1003,28 @@ Priority outranks effort. Within the same priority, lower effort comes first.
 5. ~~**WEB-01** canonical global read-tool contract.~~ Done 2026-09-07.
 6. ~~**WEB-02** surface parity regression coverage.~~ Done 2026-09-07.
 7. ~~**WEB-03** prove projection never bypasses authority/policy.~~ Done 2026-09-07.
-8. **GLOBAL-MODEL-01/02** authoritative owner-level model catalogue consumed by all composers.
-9. **GLOBAL-MODEL-06** remove `Keep available` as a normal availability gate.
+8. ~~**GLOBAL-MODEL-01/02** authoritative owner-level model catalogue consumed by all composers.~~ Done 2026-09-12 ([FIXED-487](FIXED_ITEMS.md#fixed-487--a-catalogue-that-existed-only-as-long-as-the-response-carrying-it)).
+9. ~~**GLOBAL-MODEL-06** remove `Keep available` as a normal availability gate.~~ Done 2026-09-12 ([FIXED-487](FIXED_ITEMS.md#fixed-487--a-catalogue-that-existed-only-as-long-as-the-response-carrying-it)).
 
 ## P1
 
-1. **Permissions UX redesign** — Availability + Behaviour with progressive disclosure; preserve backend semantics.
+1. ~~**Permissions UX redesign** — Availability + Behaviour with progressive disclosure; preserve backend semantics.~~ Done 2026-09-07 ([FIXED-486](FIXED_ITEMS.md#fixed-486--two-parallel-systems-where-there-were-two-questions)).
 2. **FIRST-02 through FIRST-10** simplified first launch/onboarding.
 3. **VIS2-19** Design canvas/workspace.
-4. **VIS2-12** Build artifact/workbench pane.
-5. **VIS2-11** persistent Project workspace/context.
-6. **COMPOSER-10** Tasks/Schedule shared composer grammar.
+4. ~~**VIS2-12** Build artifact/workbench pane.~~ Done 2026-09-07 ([FIXED-467](FIXED_ITEMS.md#fixed-467--builds-third-pane-showed-tools-not-the-work)).
+5. ~~**VIS2-11** persistent Project workspace/context.~~ Done 2026-09-07 ([FIXED-469](FIXED_ITEMS.md#fixed-469--the-project-was-chosen-again-on-every-surface)).
+6. ~~**COMPOSER-10** Tasks/Schedule shared composer grammar.~~ Done 2026-09-07 ([FIXED-470](FIXED_ITEMS.md#fixed-470--tasks-asked-to-be-filled-in-rather-than-instructed)).
 7. ~~**WEATHER-01/02/03** structured weather + optional location + freshness.~~ Done 2026-09-07.
 8. ~~**WEB-04 through WEB-08** search readiness, `web_extract`, Design research integration, shared readiness update, browser escalation.~~ Done 2026-09-07.
-9. Home start-work parity for Chat/Build/Design.
-10. Extensions/Observability composed-hub pass.
+9. ~~Home start-work parity for Chat/Build/Design.~~ Done 2026-09-07 ([FIXED-484](FIXED_ITEMS.md#fixed-484--home-offered-two-of-the-three-work-modes)).
+10. ~~Extensions/Observability composed-hub pass.~~ Done 2026-09-07 ([FIXED-468](FIXED_ITEMS.md#fixed-468--extensions-opened-on-a-category-instead-of-on-what-raiker-can-reach)); Memory joined them ([FIXED-485](FIXED_ITEMS.md#fixed-485--memory-kept-settings-records-and-decisions-at-one-visual-level)).
 
 ## P2
 
-1. Memory hub composition.
-2. product-wide badge/attention/overlay sweep.
-3. theme-specific optical passes.
-4. 4K/8K composition validation.
+1. ~~Memory hub composition.~~ Done 2026-09-07 ([FIXED-485](FIXED_ITEMS.md#fixed-485--memory-kept-settings-records-and-decisions-at-one-visual-level)).
+2. ~~product-wide badge/attention/overlay sweep.~~ Done 2026-09-07 ([FIXED-472](FIXED_ITEMS.md#fixed-472--every-row-wore-the-same-weight-as-the-row-that-needed-you), [FIXED-474](FIXED_ITEMS.md#fixed-474--thirteen-z-index-numbers-and-no-way-to-say-what-was-above-what)).
+3. ~~theme-specific optical passes.~~ Done 2026-09-07 ([FIXED-481](FIXED_ITEMS.md#fixed-481--one-elevation-for-two-grounds-and-a-picture-inside-a-card)).
+4. ~~4K/8K composition validation.~~ Done 2026-09-07 — verified at 3840×2160 ([FIXED-481](FIXED_ITEMS.md#fixed-481--one-elevation-for-two-grounds-and-a-picture-inside-a-card)).
 5. ~~provenance/diagnostic visibility for environment/web-read state.~~ Done 2026-09-07 — `GET /api/environment` and `GET /api/read-capabilities`.
 
 ---

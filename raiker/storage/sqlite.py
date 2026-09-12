@@ -325,6 +325,8 @@ from raiker.storage.migrations import (
     PROJECTS_NESTING_MIGRATION_ID,
     PROJECTS_NESTING_SQL,
     PROJECTS_SQL,
+    PROVIDER_CATALOGUE_MIGRATION_ID,
+    PROVIDER_CATALOGUE_SQL,
     PROVIDER_USAGE_SNAPSHOTS_MIGRATION_ID,
     PROVIDER_USAGE_SNAPSHOTS_SQL,
     REMINDERS_MIGRATION_ID,
@@ -1440,6 +1442,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(SESSION_ORIGIN_MIGRATION_ID, SESSION_ORIGIN_SQL, connection)
             self._apply_migration(CONFIGURED_MODELS_MIGRATION_ID, CONFIGURED_MODELS_SQL, connection)
+            self._apply_migration(
+                PROVIDER_CATALOGUE_MIGRATION_ID, PROVIDER_CATALOGUE_SQL, connection
+            )
             self._apply_migration(
                 TASK_MODEL_CHOICES_MIGRATION_ID, TASK_MODEL_CHOICES_SQL, connection
             )
@@ -11464,6 +11469,71 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 [(principal_id, profile_id, model, now, now) for model in wanted],
             )
         return wanted
+
+    def save_provider_catalogue(
+        self, principal_id: str, profile_id: str, models: list[str]
+    ) -> list[str]:
+        """Record what a provider published, so the next failure is not a loss.
+
+        GLOBAL-MODEL-01/08. A catalogue was probed on demand and never written
+        down, so a provider that was briefly unreachable made its models vanish
+        from every picker — the only copy was the one in flight. This is the
+        last answer the provider actually gave, in the order it gave it.
+
+        An empty listing is *not* written. A provider returning nothing is
+        indistinguishable here from one that failed in a way the caller did not
+        classify, and replacing a known catalogue with emptiness is exactly the
+        disappearance this exists to prevent.
+        """
+        wanted: list[str] = []
+        for model in models:
+            trimmed = model.strip()
+            if trimmed and trimmed not in wanted:
+                wanted.append(trimmed)
+        if not wanted:
+            return self.list_provider_catalogue(principal_id, profile_id)
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM principal_provider_catalogue "
+                "WHERE principal_id = ? AND profile_id = ?",
+                (principal_id, profile_id),
+            )
+            connection.executemany(
+                """INSERT INTO principal_provider_catalogue
+                (principal_id, profile_id, model, position, listed_at)
+                VALUES (?, ?, ?, ?, ?)""",
+                [
+                    (principal_id, profile_id, model, position, now)
+                    for position, model in enumerate(wanted)
+                ],
+            )
+        return wanted
+
+    def list_provider_catalogue(self, principal_id: str, profile_id: str) -> list[str]:
+        """The last catalogue this provider published, in its own order."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT model FROM principal_provider_catalogue
+                WHERE principal_id = ? AND profile_id = ?
+                ORDER BY position""",
+                (principal_id, profile_id),
+            ).fetchall()
+        return [str(row[0]) for row in rows]
+
+    def provider_catalogue_listed_at(self, principal_id: str, profile_id: str) -> str | None:
+        """When the stored catalogue was published, or ``None`` when there is none.
+
+        The age is the point: a picker may offer a remembered catalogue, but it
+        must be able to say the answer is remembered rather than current.
+        """
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT listed_at FROM principal_provider_catalogue
+                WHERE principal_id = ? AND profile_id = ? LIMIT 1""",
+                (principal_id, profile_id),
+            ).fetchone()
+        return str(row[0]) if row is not None else None
 
     def is_configured_model(self, principal_id: str, profile_id: str, model: str) -> bool:
         with self.connect() as connection:

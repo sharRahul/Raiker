@@ -114,6 +114,10 @@
   --grid-gap: var(--space-4);
   --content-gutter: clamp(1.25rem, 2vw, 2.5rem);
 
+  /* VIS2-15 — the widths above are the 1080p–1440p composition. A 4K or 8K
+     monitor is a different composition, not the same one scaled up: see the
+     `min-width` blocks below, which move these two tokens and nothing else. */
+
   /* ── Type scale ──
      A modular scale at 1.22, anchored on the 15px body. The old headings sat at
      1.45 / 1.08 / 0.95rem — barely separated, so heading level was carried by
@@ -309,6 +313,15 @@
   --overlay: rgba(15, 23, 42, 0.48);
   --focus-ring: #365F7D;
 
+  /* VIS2-14 — the two themes are composed separately, without redesigning the
+     palette. On a light ground a shadow is a real cue and a border is cheap, so
+     elevation is carried by the shadow and edges stay restrained. `--canvas-edge`
+     is the hairline that keeps an image's boundary obvious *without* putting the
+     picture in a card: the asset is the object, the card was chrome around it. */
+  --elevation-edge: var(--border);
+  --canvas-edge: rgba(15, 23, 42, 0.14);
+  --canvas-lift: var(--shadow-1);
+
   /* VIS2-17 — the overlay vocabulary, as a stacking ladder.
      ------------------------------------------------------
      Thirteen different z-index numbers were in use across the views — 30, 40,
@@ -403,6 +416,16 @@
   --neutral-border: rgba(156, 156, 156, 0.3);
 
   --success: var(--ok);
+
+  /* VIS2-14 — the dark composition, same palette. A drop shadow on a near-black
+     ground carries almost nothing, so elevation moves to the edge: a raised
+     surface is told apart by a stronger border rather than by a shadow that is
+     not visible. The canvas hairline lightens for the same reason — against
+     #0B0D10 a dark edge disappears, and the boundary of an image is exactly
+     what must not. */
+  --elevation-edge: var(--border-strong);
+  --canvas-edge: rgba(226, 232, 240, 0.24);
+  --canvas-lift: none;
   --warning: var(--warn);
   --ok-text: var(--ok);
   --warn-text: var(--warn);
@@ -418,6 +441,33 @@
 }
 
 /* System preference drives the default when the user hasn't chosen. */
+/* ── VIS2-15 — 4K/8K as composition classes ──
+   A large monitor gives a *spatial* surface more room to hold its object: more
+   of a diff beside more of a file tree, more of a graph, more of an
+   operational table. It gives prose nothing — a 200-character line is harder
+   to read on a better screen, not easier — and it gives a control nothing at
+   all, because a button that grows with the monitor is the same button further
+   from the pointer.
+
+   So exactly two tokens move here: the workspace and operational canvases.
+   `--page-reading`, `--prose-measure`, the type scale, the spacing scale and
+   every control dimension are deliberately absent from these blocks, and
+   `visualRubric.test.ts` fails if one of them appears. Work surfaces (Chat,
+   Build, Design, the Knowledge Map) are already `width: 100%` and take the room
+   as it arrives; what they do with it is composed per surface. */
+@media (min-width: 2200px) {
+  :root {
+    --page-workspace: 108rem;
+    --page-operational: 140rem;
+  }
+}
+@media (min-width: 3400px) {
+  :root {
+    --page-workspace: 120rem;
+    --page-operational: 168rem;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
@@ -467,6 +517,16 @@
     --neutral-border: rgba(156, 156, 156, 0.3);
 
     --success: var(--ok);
+
+    /* VIS2-14 — the dark composition, same palette. A drop shadow on a near-black
+       ground carries almost nothing, so elevation moves to the edge: a raised
+       surface is told apart by a stronger border rather than by a shadow that is
+       not visible. The canvas hairline lightens for the same reason — against
+       #0B0D10 a dark edge disappears, and the boundary of an image is exactly
+       what must not. */
+    --elevation-edge: var(--border-strong);
+    --canvas-edge: rgba(226, 232, 240, 0.24);
+    --canvas-lift: none;
     --warning: var(--warn);
     --ok-text: var(--ok);
     --warn-text: var(--warn);

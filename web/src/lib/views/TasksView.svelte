@@ -39,7 +39,7 @@
   import { relativeTime } from "../format";
   import { AGENT_CADENCES, cadenceLabel } from "../agentCadence";
   import { ACTIVE_TASK_STATES, isActiveTask, taskBadge, taskStatusLabel } from "../statusMaps";
-  import { chatProfiles, refreshModels } from "../models.svelte";
+  import { chatProfiles, refreshModels, modelCatalogues } from "../models.svelte";
   import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
 
   let {
@@ -652,6 +652,7 @@
     {#snippet right()}
       <ModelPicker
         {profiles}
+        catalogues={modelCatalogues()}
         {selectedProfile}
         bind:profileId={modelProfile}
         bind:model

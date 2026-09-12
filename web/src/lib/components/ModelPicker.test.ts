@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/svelte";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ModelProfile } from "../apiTypes";
 import { resetModelSetup, setupDialog } from "../modelReadiness.svelte";
 import ModelPicker from "./ModelPicker.svelte";
@@ -71,6 +71,47 @@ describe("ModelPicker", () => {
 
     expect(screen.queryByRole("menu", { name: /model/i })).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
+  });
+
+  it("reaches a model the owner never curated (GLOBAL-MODEL-06)", async () => {
+    // "Keep available" decided whether a model appeared in any composer at all,
+    // so a provider serving forty offered whichever few were ticked and the
+    // rest may as well not have been published. The quick list is still short —
+    // a list nobody can scroll is not a choice — but search reaches the whole
+    // catalogue, which is what the plan asks for.
+    const onchosen = vi.fn();
+    render(ModelPicker, {
+      profiles,
+      selectedProfile: profiles[0],
+      value: profiles[0].profile_id,
+      catalogues: {
+        "anthropic-haiku": ["claude-haiku-4-5-20251001", "claude-opus-4-1-20250805"],
+      },
+      onchosen,
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /model for this turn/i }));
+
+    // Not offered at rest …
+    expect(screen.queryByText("Opus 4.1")).not.toBeInTheDocument();
+
+    // … and one search away.
+    await fireEvent.input(screen.getByLabelText("Search models"), {
+      target: { value: "opus" },
+    });
+    const results = screen.getByRole("group", { name: "Search results" });
+    expect(results).toHaveTextContent("Opus 4.1");
+
+    // Choosing it works, and reports the profile that actually serves it.
+    await fireEvent.click(screen.getByRole("menuitemradio", { name: /Opus 4.1/ }));
+    expect(onchosen).toHaveBeenCalledWith("anthropic-haiku", "claude-opus-4-1-20250805");
+  });
+
+  it("offers no search when the quick list already is the catalogue", async () => {
+    // A two-model install does not need a search box for two models.
+    render(ModelPicker, { profiles, selectedProfile: profiles[0], value: profiles[0].profile_id });
+    await fireEvent.click(screen.getByRole("button", { name: /model for this turn/i }));
+
+    expect(screen.queryByLabelText("Search models")).not.toBeInTheDocument();
   });
 
   it("groups models under a logo-and-name provider heading", async () => {

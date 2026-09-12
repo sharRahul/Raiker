@@ -23,9 +23,10 @@
   import ComposerContext from "../components/ComposerContext.svelte";
   import Icon from "../components/Icon.svelte";
   import GuideLink from "../components/GuideLink.svelte";
-  import PageState from "../components/PageState.svelte";
+  import DesignCanvasRegion from "../components/DesignCanvasRegion.svelte";
+  import { densityGap, workSurface } from "../workSurface";
   import { api, ApiError } from "../api";
-  import { providerName, relativeTime } from "../format";
+  import { providerName } from "../format";
   import { runtimeBlock } from "../capabilityModel";
   import { composerMenu } from "../composerCapabilities";
   import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
@@ -38,6 +39,10 @@
     ModelsView,
     ProjectsList,
   } from "../apiTypes";
+
+
+  /** VIS2-21 — what this mode is about, and how tightly it packs it. */
+  const surface = workSurface("design");
 
   let {
     /** The owner's projects, so the composer can name the one work runs in. */
@@ -186,13 +191,11 @@
           },
         ]
       : []),
-    {
-      label: "Size",
-      value: size,
-      short: size,
-      href: "#/models?tab=models",
-      action: "Models",
-    },
+    // Size is deliberately *not* a fact here. It has a control of its own two
+    // elements to the left, and a line that repeats the value of the control
+    // beside it printed "1024x1024" twice in one bar — the duplication
+    // COMPOSER-18 exists to prevent. The context line answers for what the turn
+    // will use that the bar does not already show. Found live 2026-09-07.
     ...(choice !== null
       ? [
           {
@@ -378,7 +381,16 @@
   onMount(load);
 </script>
 
-<div class="design">
+<!-- VIS2-21 — the Work contract. Design shares its terms with Chat and Build
+     and differs in its object: an asset is looked at, so it takes the middle
+     density rather than the transcript's air or the workbench's pack. -->
+<div
+  class="design"
+  data-work-surface={surface.mode}
+  data-primary-object={surface.primaryObject}
+  data-density={surface.density}
+  style={`--surface-gap:${densityGap(surface.density)}`}
+>
   <div class="thread" bind:this={threadEl}>
     <p class="page-lead">
       Describe an image and a connected image model draws it. The prompt leaves this
@@ -393,43 +405,10 @@
       </p>
     {/if}
 
-    {#if loadError}
-      <PageState state="error" title="Couldn't read your generations" detail={loadError} />
-    {:else if view === null}
-      <PageState state="loading" title="Reading your generations…" />
-    {:else if turns.length === 0}
-      <PageState
-        state="empty"
-        title="Nothing generated yet"
-        detail="Describe an image below. What you generate is stored in this workspace."
-      />
-    {:else}
-      <ol class="turns">
-        {#each turns as item (item.generation_id)}
-          <li class="turn">
-            <p class="asked">{item.prompt}</p>
-            <div class="answer" class:refused={item.status !== "ok"}>
-              {#if item.has_image}
-                <a
-                  class="shot"
-                  href={api.imageBytesUrl(item.generation_id)}
-                  target="_blank"
-                  rel="noopener"
-                >
-                  <img src={api.imageBytesUrl(item.generation_id)} alt={item.prompt} loading="lazy" />
-                </a>
-              {:else}
-                <p class="refusal">
-                  <Icon name="warning" size="sm" />
-                  {readable(item.reason_code)}
-                </p>
-              {/if}
-              <p class="sub">{item.model} · {item.size} · {relativeTime(item.created_at)}</p>
-            </div>
-          </li>
-        {/each}
-      </ol>
-    {/if}
+    <!-- VIS2-20 — the region that holds this surface's object, as its own
+         component. What Design shows *is* the asset, so how an asset is
+         presented lives in one file rather than in the middle of the view. -->
+    <DesignCanvasRegion turns={turns} loading={view === null} {loadError} {readable} />
   </div>
 
   {#if researching || research !== null || researchError !== null}
@@ -644,67 +623,8 @@
     min-height: 0;
     overflow-y: auto;
   }
-  .turns {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: var(--space-5);
-  }
-  .turn {
-    display: grid;
-    gap: var(--space-2);
-    justify-items: start;
-  }
   /* The prompt reads as the thing you said, in the same bubble grammar as a
      Chat message, so the pairing is legible without a label on either half. */
-  .asked {
-    margin: 0;
-    justify-self: end;
-    max-width: min(42rem, 85%);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--r-lg);
-    background: var(--accent-soft);
-    color: var(--text-1);
-    font-size: var(--text-sm);
-    overflow-wrap: anywhere;
-  }
-  .answer {
-    display: grid;
-    gap: 0.35rem;
-    max-width: min(32rem, 100%);
-    padding: var(--space-2);
-    border: 1px solid var(--border);
-    border-radius: var(--r-lg);
-    background: var(--surface);
-  }
-  .refused {
-    border-color: var(--warn-border);
-    background: var(--warn-soft);
-  }
-  .shot {
-    display: block;
-    border-radius: var(--r-sm);
-    overflow: hidden;
-  }
-  .shot img {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-  .refusal {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    color: var(--warn);
-    font-size: var(--text-sm);
-  }
-  .sub {
-    margin: 0;
-    color: var(--text-3);
-    font-size: var(--text-xs);
-  }
   /* The empty state of the model control: shaped like the select it replaces so
      the bar keeps its rhythm, and a link because the fix is on another page. */
   .bar-empty {

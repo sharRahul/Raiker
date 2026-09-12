@@ -1702,8 +1702,15 @@ class ProviderModelListView:
     """On-demand, user-initiated listing of the models a provider serves.
 
     ``status`` is honest: "available" only when the provider actually answered;
-    policy denials and unreachable/unsupported backends return an empty list —
-    the view never fabricates model names.
+    policy denials and unreachable/unsupported backends never fabricate model
+    names.
+
+    GLOBAL-MODEL-08 — a failed listing may still carry ``models``, but only ones
+    this provider published on a previous, successful call. ``remembered`` says
+    which of the two happened, and ``listed_at`` when the provider last spoke, so
+    a stale answer is offered as stale rather than as current. The status and
+    reason code are unchanged by remembering: a provider that is unreachable is
+    still reported unreachable.
     """
 
     profile_id: str
@@ -1711,6 +1718,8 @@ class ProviderModelListView:
     status: str  # "available" | "policy_denied" | "unsupported" | "unavailable"
     reason_code: str | None
     models: tuple[str, ...]
+    remembered: bool = False
+    listed_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -1719,6 +1728,8 @@ class ProviderModelListView:
             "status": self.status,
             "reason_code": self.reason_code,
             "models": list(self.models),
+            "remembered": self.remembered,
+            "listed_at": self.listed_at,
         }
 
 
@@ -1792,11 +1803,23 @@ class ModelsView:
     advisor_readiness_summary: str | None = None
     advisor_readiness_remediation: str | None = None
     advisor_readiness_checked_at: str | None = None
+    # GLOBAL-MODEL-01/02 — the one catalogue every composer reads, keyed by
+    # profile: the last models each provider published, from the store rather
+    # than from a probe, so this read stays free of the network.
+    #
+    # `chat_profiles` above is unchanged and still decides what a picker offers
+    # *at rest*. This is what search may reach, which is the distinction
+    # GLOBAL-MODEL-06 asks for: curation orders the quick list, it does not
+    # decide what exists.
+    catalogues: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "profiles": [p.to_dict() for p in self.profiles],
             "chat_profiles": [p.to_dict() for p in self.chat_profiles],
+            "catalogues": {
+                profile_id: list(models) for profile_id, models in self.catalogues.items()
+            },
             "current_profile_id": self.current_profile_id,
             "current_model": self.current_model,
             "advisor_profile_id": self.advisor_profile_id,
@@ -6829,9 +6852,23 @@ class DashboardService:
                         ),
                     )
                 )
+        # GLOBAL-MODEL-01/02 — the remembered catalogue for every profile the
+        # owner has listed, read from the store in one pass. No probe and no
+        # network: this is what each provider last published, which is exactly
+        # what a picker's search should be able to reach.
+        catalogues: dict[str, tuple[str, ...]] = {}
+        if acting_principal_id:
+            for profile in registry_profiles:
+                with contextlib.suppress(Exception):
+                    known = self.store.list_provider_catalogue(
+                        acting_principal_id, profile.profile_id
+                    )
+                    if known:
+                        catalogues[profile.profile_id] = tuple(known)
         return ModelsView(
             profiles=profiles,
             chat_profiles=tuple(chat_profiles),
+            catalogues=catalogues,
             current_profile_id=current,
             hosted_model_gate_state=hosted_gate.state if hosted_gate is not None else "unknown",
             private_network_model_gate_state=private_gate.state
@@ -7802,16 +7839,50 @@ class DashboardService:
                 else None
             ),
         )
-        try:
-            models = await router.alist_models_for_profile(profile)
-        except ProviderPolicyError as exc:
+        def _remembered(status: str, reason_code: str | None) -> ProviderModelListView:
+            """The failure, plus whatever this provider last published.
+
+            GLOBAL-MODEL-08. A provider that is briefly unreachable used to make
+            its whole catalogue vanish from every picker, because the only copy
+            was the one in flight. The failure is still reported exactly as it
+            happened; the models beside it are the remembered ones, flagged as
+            remembered so nothing presents them as current.
+
+            A policy denial carries no models at all: the owner has not been
+            granted this provider *now*, and offering a remembered catalogue for
+            it would be projecting an authority the gate is refusing.
+            """
+            if status == "policy_denied" or not acting_principal_id:
+                return ProviderModelListView(
+                    profile_id=profile.profile_id,
+                    provider=profile.provider,
+                    status=status,
+                    reason_code=reason_code,
+                    models=(),
+                )
+            known: list[str] = []
+            listed_at: str | None = None
+            with contextlib.suppress(Exception):  # remembering never fails a listing
+                known = self.store.list_provider_catalogue(
+                    acting_principal_id, profile.profile_id
+                )
+                listed_at = self.store.provider_catalogue_listed_at(
+                    acting_principal_id, profile.profile_id
+                )
             return ProviderModelListView(
                 profile_id=profile.profile_id,
                 provider=profile.provider,
-                status="policy_denied",
-                reason_code=safe_error(str(exc)),
-                models=(),
+                status=status,
+                reason_code=reason_code,
+                models=tuple(known),
+                remembered=bool(known),
+                listed_at=listed_at,
             )
+
+        try:
+            models = await router.alist_models_for_profile(profile)
+        except ProviderPolicyError as exc:
+            return _remembered("policy_denied", safe_error(str(exc)))
         except ModelProviderError as exc:
             # BUG-257 — every provider failure used to come back as
             # `provider_unreachable`, which the Models page states as "could not
@@ -7822,33 +7893,22 @@ class DashboardService:
             # one. The error classes already distinguish these; only this branch
             # was flattening them.
             if "unsupported" in str(exc):
-                return ProviderModelListView(
-                    profile_id=profile.profile_id,
-                    provider=profile.provider,
-                    status="unsupported",
-                    reason_code="model_listing_unsupported",
-                    models=(),
-                )
-            return ProviderModelListView(
-                profile_id=profile.profile_id,
-                provider=profile.provider,
-                status="unavailable",
-                reason_code=provider_error_code(exc),
-                models=(),
-            )
+                return _remembered("unsupported", "model_listing_unsupported")
+            return _remembered("unavailable", provider_error_code(exc))
         except Exception as exc:  # noqa: BLE001 — network/parse failures fail closed
-            return ProviderModelListView(
-                profile_id=profile.profile_id,
-                provider=profile.provider,
-                status="unavailable",
-                reason_code=safe_error(type(exc).__name__),
-                models=(),
-            )
+            return _remembered("unavailable", safe_error(type(exc).__name__))
         # A successful listing is the one moment Raiker legitimately hears from
         # the provider, so whatever it published about its models (Anthropic's
         # context window, OpenRouter's prices) is cached here for the meter and
         # the cost rows to read without a second round trip.
         if acting_principal_id:
+            # GLOBAL-MODEL-01 — the catalogue itself, written down. This is the
+            # only moment Raiker legitimately knows what a provider serves, and
+            # until now that knowledge lived exactly as long as the response.
+            with contextlib.suppress(Exception):  # remembering never fails a listing
+                self.store.save_provider_catalogue(
+                    acting_principal_id, profile.profile_id, [m.id for m in models]
+                )
             with contextlib.suppress(Exception):  # caching never fails a listing
                 ModelFactsStore(self.store).save_provider_facts(
                     acting_principal_id, profile.provider, list(models)

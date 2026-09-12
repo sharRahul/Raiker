@@ -91,6 +91,86 @@ class TestProviderModelListing:
         assert body["models"] == []
         assert body["reason_code"]
 
+    def test_every_composer_reads_one_catalogue_from_one_payload(
+        self, client: TestClient, workspace: Path, owner_token: str
+    ) -> None:
+        """GLOBAL-MODEL-01/02 — one catalogue, in the read every surface makes.
+
+        Each composer used to reconstruct what could be chosen from whatever it
+        happened to have, so the answer depended on which surface asked. The
+        models a provider published are in `GET /api/models` now, keyed by
+        profile, read from the store rather than probed — so the read costs no
+        network and every surface gets the same answer.
+        """
+        SQLiteStore(workspace).save_provider_catalogue(
+            "principal_owner", "anthropic-hosted", ["claude-opus-4-1", "claude-sonnet-4-5"]
+        )
+
+        body = client.get("/api/models", headers=_auth(owner_token)).json()
+
+        assert body["catalogues"]["anthropic-hosted"] == [
+            "claude-opus-4-1",
+            "claude-sonnet-4-5",
+        ]
+        # A profile nobody has listed contributes no key, rather than an empty
+        # list that would read as "this provider serves nothing".
+        assert "openai-hosted" not in body["catalogues"]
+
+    def test_an_unreachable_provider_offers_what_it_last_published(
+        self, client: TestClient, workspace: Path, owner_token: str
+    ) -> None:
+        """GLOBAL-MODEL-08 — a blip must not empty every picker.
+
+        The catalogue used to live exactly as long as the response that carried
+        it, so a provider that was briefly unreachable made its models vanish
+        from every composer. The failure is still reported as a failure; what
+        changes is that the models the provider last published come back with
+        it, marked as remembered so nothing presents them as current.
+        """
+        SQLiteStore(workspace).save_provider_catalogue(
+            "principal_owner", "raiker-local-llama-cpp", ["local-a", "local-b"]
+        )
+
+        resp = client.get(
+            "/api/models/raiker-local-llama-cpp/provider-models", headers=_auth(owner_token)
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        # The failure is unchanged: remembering never turns a failure into a
+        # success, and the reason code still says what went wrong.
+        assert body["status"] == "unavailable"
+        assert body["reason_code"]
+        # … and the owner's models are still there, honestly labelled.
+        assert body["models"] == ["local-a", "local-b"]
+        assert body["remembered"] is True
+        assert body["listed_at"]
+
+    def test_a_policy_denied_provider_offers_nothing_it_once_published(
+        self, client: TestClient, workspace: Path, owner_token: str
+    ) -> None:
+        """Remembering must not project an authority the gate is refusing.
+
+        The hosted gate is off by default. A remembered catalogue for a provider
+        the owner is not currently permitted to reach would be exactly the
+        projection-without-authority this product refuses everywhere else: the
+        list would imply a provider is available for work when the gate says it
+        is not.
+        """
+        SQLiteStore(workspace).save_provider_catalogue(
+            "principal_owner", "anthropic-hosted", ["claude-opus-4-1"]
+        )
+
+        resp = client.get(
+            "/api/models/anthropic-hosted/provider-models", headers=_auth(owner_token)
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "policy_denied"
+        assert body["models"] == []
+        assert body["remembered"] is False
+
     def test_owner_can_refresh_selected_connected_provider_catalogues(
         self, client: TestClient, workspace: Path, owner_token: str
     ) -> None:

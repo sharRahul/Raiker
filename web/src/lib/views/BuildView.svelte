@@ -49,6 +49,7 @@
   import DiffView from "../components/DiffView.svelte";
   import SourceChips from "../components/SourceChips.svelte";
   import SourceExcerptPanel from "../components/SourceExcerptPanel.svelte";
+  import { densityGap, workSurface } from "../workSurface";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
   import {
     classifyResumeFailure,
@@ -133,7 +134,7 @@
     sentenceAround,
     sourcesForTurn,
   } from "../citations";
-  import { chatProfiles, refreshModels } from "../models.svelte";
+  import { chatProfiles, refreshModels, modelCatalogues } from "../models.svelte";
   import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
   import {
     audioSessionCoordinator,
@@ -142,6 +143,10 @@
     type SpeechLanguage,
   } from "../voice";
   import { activateModalDrawer, type DeactivateModalDrawer } from "../modalDrawer";
+
+
+  /** VIS2-21 — what this mode is about, and how tightly it packs it. */
+  const surface = workSurface("build");
 
   let {
     // BUG-242 — the conversation this surface was opened on, from the URL. Build
@@ -1901,12 +1906,18 @@
 
 <svelte:window onclick={onWindowClick} />
 
+<!-- VIS2-21 — the Work contract. Build shares every term of it with Chat and
+     Design and differs in exactly one thing: its object is a change, which is
+     why it is the densest of the three. -->
 <div
   class="build"
+  data-work-surface={surface.mode}
+  data-primary-object={surface.primaryObject}
+  data-density={surface.density}
   class:with-files={filesOpen && !compactRail}
   class:with-rail={(railOpen || artifactZone) && !compactRail}
   class:with-panel={rewindCheckpointId !== null}
-  style={`--explorer-w:${filesWidth}px`}
+  style={`--explorer-w:${filesWidth}px; --surface-gap:${densityGap(surface.density)}`}
 >
   <!-- B13 — the repository, beside the conversation about it. First column on
        a wide window; a dismissible sheet below the split, exactly as the
@@ -2578,6 +2589,7 @@
               bind:effort={reasoningEffort}
               efforts={reasoningEfforts}
               {profiles}
+              catalogues={modelCatalogues()}
               {selectedProfile}
               {decision}
               onchosen={(profileId, chosen) => void rememberSurfaceModel("build", profileId, chosen)}
@@ -2712,7 +2724,9 @@
   .build {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-4);
+    /* VIS2-21 — density, from the Work contract. A workbench's panes are
+       scanned together, so they sit closer than a transcript's turns. */
+    gap: var(--surface-gap, var(--space-4));
     /* The room the shell gives a page, so the transcript scrolls inside the
        workspace instead of stretching it and taking the shell's scroll with it. */
     height: var(--content-h);
@@ -2730,6 +2744,23 @@
   .build.with-files.with-rail {
     grid-template-columns: var(--explorer-w, 17.5rem) minmax(0, 1fr) 21rem;
   }
+  /* VIS2-15 — on a very wide display the extra room goes to the panes that hold
+     the *object* — the file tree and the artifact pane — rather than to the
+     transcript, whose lines are already bounded by their own measure. Nothing
+     here changes a control's size: the columns get wider, the buttons in them
+     do not. */
+  @media (min-width: 2200px) {
+    .build.with-rail {
+      grid-template-columns: minmax(0, 1fr) 28rem;
+    }
+    .build.with-files {
+      grid-template-columns: var(--explorer-w, 24rem) minmax(0, 1fr);
+    }
+    .build.with-files.with-rail {
+      grid-template-columns: var(--explorer-w, 24rem) minmax(0, 1fr) 28rem;
+    }
+  }
+
   /* B18 — the rewind preflight takes a column of its own, so the transcript it
      is about stays on screen behind it. */
   @media (min-width: 64rem) {

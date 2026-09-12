@@ -185,6 +185,13 @@ export const HUB_TABS: Record<string, string[]> = {
   // Raiker can reach and whether anything they installed is broken.
   extensions: ["overview", "connectors", "mcp", "skills", "hooks", "plugins"],
   observe: ["overview", "sessions", "activity", "checkpoints", "work", "notifications"],
+  // Memory carried approved records, proposals, observations, a document
+  // library, two recall controls and an import/export drawer at one visual
+  // level, so the page asked an owner to tell administration from content by
+  // reading all of it. Overview leads for the same reason it does on Extensions
+  // and Models: the question people arrive with is "is anything waiting on me,
+  // and what does Raiker remember", not "show me the observations category".
+  memory: ["overview", "memories", "suggestions", "sources", "recall"],
   // Every section the settings rail renders, in rail order. The two lists have
   // to agree: a section the rail shows but this list omits is a deep link that
   // silently opens General instead, which reads as a working link to the wrong

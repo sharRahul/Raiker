@@ -502,6 +502,13 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-478](#fixed-478--a-work-draft-was-lost-at-every-mode-switch) | Medium | Chat / Build / Design | Fixed 2026-09-08 (COMPOSER-11) |
 | [FIXED-479](#fixed-479--a-large-paste-could-hide-the-conversation-it-belonged-to) | Low | Chat / Build composer | Fixed 2026-09-08 (COMPOSER-14) |
 | [FIXED-480](#fixed-480--directly-allowed-memories-were-recallable-and-invisible) | High | Memory / web UI | Fixed 2026-09-08 (found live) |
+| [FIXED-481](#fixed-481--one-elevation-for-two-grounds-and-a-picture-inside-a-card) | Low | Theme / design / shell | Fixed 2026-09-07 (VIS2-14, VIS2-15) |
+| [FIXED-482](#fixed-482--designs-bar-printed-the-same-size-twice) | Low | Design / composer | Fixed 2026-09-07 (found live) |
+| [FIXED-483](#fixed-483--three-work-modes-agreeing-by-habit-rather-than-by-contract) | Medium | Chat / Build / Design | Fixed 2026-09-07 (VIS2-21, VIS2-20) |
+| [FIXED-484](#fixed-484--home-offered-two-of-the-three-work-modes) | Medium | Home | Fixed 2026-09-07 (page-by-page §1) |
+| [FIXED-485](#fixed-485--memory-kept-settings-records-and-decisions-at-one-visual-level) | Medium | Memory | Fixed 2026-09-07 (page-by-page §10) |
+| [FIXED-486](#fixed-486--two-parallel-systems-where-there-were-two-questions) | Medium | Permissions | Fixed 2026-09-07 (page-by-page) |
+| [FIXED-487](#fixed-487--a-catalogue-that-existed-only-as-long-as-the-response-carrying-it) | High | Models / composer | Fixed 2026-09-12 (GLOBAL-MODEL-01/02/06/08) |
 
 ---
 
@@ -21085,3 +21092,347 @@ plain owner-facing status **Approved** for both.
 **Verification.** `MemoryView.test.ts` covers display and the Approved filter.
 The live scenario asserts a new record id and unique marker through the API,
 then filters to and captures that exact record in the Memory page.
+
+---
+
+## FIXED-481 — One elevation for two grounds, and a picture inside a card
+
+**Severity: Low. Area: theme / design / shell. Status: Fixed 2026-09-07. Found
+in [VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+(VIS2-14, VIS2-15).**
+
+**Observed.** Two composition faults, both the same mistake in different
+directions — one set of decisions asked to serve two situations it cannot.
+
+*Theme (VIS2-14).* Light and dark shared one elevation model. A drop shadow is a
+real cue on a white ground and almost nothing on `#0B0D10`, so in dark the
+shadow tiers were spent on an effect nobody could see, leaving raised surfaces
+told apart by a border that had been tuned to be restrained *because the shadow
+was doing the work*. Design's generated picture sat inside a card — border,
+surface fill, padding — which is chrome around the one thing on the page that is
+the object rather than a container for it, and the boundary an image actually
+needs read differently in each theme.
+
+*Display (VIS2-15).* The canvas widths were a single 1080p–1440p composition. On
+a 4K or 8K monitor the operational tables and the Build workbench stopped at
+112rem and left the rest of the screen empty, which is the opposite of the
+review's rule: a big display should give a *spatial* surface more room to hold
+its object, and give prose and controls nothing at all.
+
+**Fixed.** `--elevation-edge`, `--canvas-edge` and `--canvas-lift` are declared
+per theme: light carries elevation in the shadow and keeps edges quiet; dark
+moves it to a stronger edge and spends no shadow, and the canvas hairline
+lightens so an image's boundary survives a near-black ground. Design's `.answer`
+lost its card — only a *refusal* draws a box now, because a refusal is a message
+and needs somewhere to be said — and `.shot` carries the hairline and the
+theme's own lift.
+
+Two `min-width` blocks (2200px, 3400px) move `--page-workspace` and
+`--page-operational` and nothing else; Build gives the extra room to the
+explorer and the artifact pane, which hold the object, rather than to the
+transcript, whose lines are bounded by their own measure.
+
+**User-interface outcome.** A generated image sits on the page with a hairline
+that reads in both themes instead of in a card. A 4K display shows more of a
+table, a tree and a diff; the type, the spacing and every control stay the size
+they are on a laptop.
+
+**Tests.** Two rules in `visualRubric.test.ts`: the wide blocks may touch only
+the two canvas tokens (prose measure, type scale, spacing and control dimensions
+fail the test if they appear), and every optical token must be declared for both
+themes with different values. Live-verified 2026-09-07 in
+`web/e2e/display-and-theme-live.spec.ts` — the composition read back at 1440×1000
+and 3840×2160, and the optical tokens read back under each theme — with
+screenshots `vis2-15-observe-4k.png`, `vis2-14-design-light.png` and
+`vis2-14-design-dark.png`.
+
+---
+
+## FIXED-482 — Design's bar printed the same size twice
+
+**Severity: Low. Area: design / composer. Status: Fixed 2026-09-07. Found in the
+live round of 2026-09-07, in a screenshot taken for something else.**
+
+**Observed.** Design's composer bar carried a size select and, two elements to
+its right, a context line whose facts included `Size 1024x1024` — the value of
+the control beside it, restated. The bar read `1024x1024  1024x1024`.
+
+**Fixed.** Size is no longer a context fact. The line answers for what the turn
+will use that the bar does not already show — the project and the model — which
+is the separation COMPOSER-18 asks for between a control and a summary of
+controls.
+
+**User-interface outcome.** The bar says the size once, in the control that
+changes it.
+
+**Tests.** `workProjectContinuity.test.ts` asserts exactly one occurrence of the
+size on the rendered bar; reverting the fix fails it with two.
+
+---
+
+## FIXED-483 — Three Work modes agreeing by habit rather than by contract
+
+**Severity: Medium. Area: chat / build / design. Status: Fixed 2026-09-07. Found
+in [VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+(VIS2-21, VIS2-20).**
+
+**Observed.** Chat, Build and Design shared a composer and nothing else that was
+written down. Whether all three said which project a turn runs inside, which
+model will answer it, and what the page looks like while it is working was a
+matter of each view having been edited carefully — not of anything that would
+notice if the next edit dropped one. And the other half of the review's rule was
+unstated too: the three are *supposed* to differ in what they are about, but
+nothing said what each was about or stopped two of them drifting into the same
+shape. That drift is exactly how Design became a third chat screen before it was
+promoted to a Work mode.
+
+**Fixed.** `web/src/lib/workSurface.ts` states both halves, deliberately as two
+different kinds of thing.
+
+`SHARED_WORK_CONTRACT` is what every mode owes whatever it is about — project,
+model, posture, attachments, turn control, palette, and one language for
+loading, error and approval. A mode that drops one of these has not specialised;
+it has lost an answer its owner needs.
+
+`WORK_SURFACES` is what each mode *is* about, and is where they are required to
+differ: Chat's object is a conversation at low density, Build's is a change at
+high density, Design's is an asset at spatial density. Density is a real
+dimension rather than a label — `densityGap()` returns the spacing each surface
+puts between the things it holds, so a transcript keeps its air, a workbench
+packs, and a canvas takes the middle.
+
+Each shell declares its own half where it can be read off the page:
+`data-work-surface`, `data-primary-object`, `data-density`, and `--surface-gap`
+set from the contract rather than restated locally.
+
+VIS2-20's half: `DesignCanvasRegion.svelte` now owns how an asset is presented,
+so the surface's object has a component of its own. The other five regions the
+review names for Design describe a canvas runtime Raiker does not have
+([BUG-277](TO_BE_FIXED.md#bug-277--design-is-a-one-shot-generator-so-most-of-its-composer-has-nothing-to-reach));
+they are left unbuilt rather than extracted as empty shells, which is the same
+rule the composer applies to controls with no runtime behind them.
+
+**User-interface outcome.** No redesign — the three surfaces look as they did,
+with Design's asset list spaced by its own declared density. What changed is
+that the agreement is now enforceable.
+
+**Tests.** `workSurface.test.ts` — the contract's terms, that no two modes claim
+the same object or density, that the three densities resolve to different
+spacing, and that each shell declares its half from the module rather than
+hard-coding it. Live-verified 2026-09-07 in `web/e2e/work-surface-live.spec.ts`:
+all three surfaces opened, their declarations read back from the running page
+(three distinct objects, three distinct densities, three distinct computed
+gaps), and the shared half — add, tools, and the model that will answer —
+present on each. Screenshots `vis2-21-chat-surface.png`,
+`vis2-21-build-surface.png`, `vis2-21-design-surface.png`.
+
+---
+
+## FIXED-484 — Home offered two of the three Work modes
+
+**Severity: Medium. Area: home. Status: Fixed 2026-09-07. Found in
+[PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md](PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md)
+§1.**
+
+**Observed.** The shell calls Chat, Build and Design three peer Work modes. The
+first screen a session opens with offered *Start a conversation*, *Start a
+build*, *Plan a task or agent* and *Open a project* — two of the three modes,
+beside two workflow entries, with Design absent. So Home and the product it
+opens onto disagreed about what Raiker is, and the one mode a new owner is least
+likely to discover on their own was the one Home never mentioned.
+
+**Fixed.** The start area is the three modes, as peers, on their own row, read
+from `START_WORK` in `web/src/lib/workSurface.ts` — the same module that states
+the Work contract, so a fourth mode could not be added to the shell and left off
+Home. Each is described by the object that mode is about, which is what actually
+tells an owner which of the three they want. Tasks and Projects keep their
+entries on a second, quieter row: they organise work rather than being a place
+it happens.
+
+**User-interface outcome.** `#/home` opens on Chat, Build and Design; Design's
+card reads "Start a design — Describe an image a connected model draws" and
+lands on the Design surface.
+
+**Tests.** `WorkbenchView.test.ts` — exactly three links in the start
+navigation, in mode order, with Tasks and Projects in the second one.
+Live-verified 2026-09-07 in `web/e2e/home-and-memory-live.spec.ts`, including
+that the Design card reaches a page declaring `data-work-surface="design"`.
+Screenshot `home-start-work-parity.png`.
+
+---
+
+## FIXED-485 — Memory kept settings, records and decisions at one visual level
+
+**Severity: Medium. Area: memory. Status: Fixed 2026-09-07. Found in
+[PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md](PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md)
+§10.**
+
+**Observed.** Memory rendered approved records, proposals, relationship
+proposals, observations, a document library, an incognito switch, a recall
+backend control and an import/export drawer as one long column at one visual
+weight. Every one is a real capability — the page was never wrong, only
+undifferentiated — but an owner had to read all of it to tell administration
+from content, and a proposal waiting on a decision looked exactly like the
+settings above it.
+
+**Fixed.** Memory is a hub, in the composition the review asks for: **Overview**,
+**Memories**, **Suggestions**, **Sources**, **Recall & indexing**, with the open
+panel owned by the hash so a deep link and the strip agree. Overview leads
+because the questions people arrive with are *what can Raiker recall* and *is
+anything waiting on me*; `web/src/lib/memoryHub.ts` derives both, so the
+Overview's counts and the tabs cannot drift apart.
+
+Only decisions count as attention. An expired memory has already stopped being
+recalled — nobody is blocked on it — so it stays a fact in the summary rather
+than becoming a row that says "act on this" about something with nothing to act
+on. And VIS-13's rule applies here too: on a fresh install the four summary
+tiles all read 0, which is the lead sentence restated as four containers, so
+they appear only when there is something in them.
+
+**User-interface outcome.** `#/memory` opens on one sentence about what is
+recallable, plus anything waiting with a button to the tab that can decide it.
+Records, suggestions, documents and the recall controls each have a tab;
+import/export sits under Recall & indexing rather than beside the records it
+would rewrite.
+
+**Tests.** `memoryHub.test.ts` (5 cases) for the derivation, and
+`MemoryView.test.ts` (28) rewritten per panel, including that the Overview draws
+no board of zeroes and that the other panels are absent from the page rather
+than merely scrolled away. Live-verified 2026-09-07 in
+`web/e2e/home-and-memory-live.spec.ts`: each tab opened on the running product,
+`?tab=suggestions` landing on the panel it names. Screenshots
+`memory-hub-overview.png`, `memory-hub-suggestions.png`.
+
+---
+
+## FIXED-486 — Two parallel systems where there were two questions
+
+**Severity: Medium. Area: permissions. Status: Fixed 2026-09-07. Found in
+[PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md](PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md)
+— dedicated Permissions review.**
+
+**Observed.** The page put availability (`On` / `Off`) and decision mode (`Ask` /
+`Allow` / `Auto` / `Deny`) side by side at nearly equal weight. Both are real
+and both had to stay, but presented as parallel control systems they left an
+owner with questions the page never answered: how can a capability be On and
+Deny, what does Off + Ask mean, is Allow another way of turning it on, what is
+the difference between On, Allow and Auto.
+
+They are not parallel. One asks whether Raiker may use this at all; the other
+asks what happens when it wants to, and only matters once the first is yes.
+
+**Fixed.** `web/src/lib/permissionLanguage.ts` holds the wording and the
+ordering — and only those: no gate, transition or check changed, and `deny` is
+still `deny` in the store.
+
+- The card asks **Can Raiker use this?** and then **When Raiker wants to use
+  it**, in that order.
+- The modes read `Ask me`, `Allow`, `Automatic`, `Never`. "Never" is what makes
+  On + Never intelligible rather than contradictory — the capability is
+  available and every attempt to use it is refused, which is what the hint says.
+- A closed row states both facts (`On · Ask me`), because a permission list that
+  has to be opened row by row to learn what is on cannot be scanned.
+- The handful an owner comes to change sits above the registry, and the registry
+  keeps everything under **All permissions**.
+- "On/off changes are not permitted for your principal" became "This setting
+  cannot be changed for this account."
+
+**Two defects of my own, found in the first live capture and fixed before this
+was committed.** The row printed its availability twice — a chip and the summary
+— and on a capability that is on by default the two *disagreed*, the chip
+reading "On by default" beside a summary reading "Off". And the attention
+section listed fifteen rows, because the first rule counted every capability the
+build cannot offer ("no route yet", "governed elsewhere"): facts about what
+ships, under a heading that says *needs your attention*, with no action for any
+of them. A second attempt added "switched on but the runtime is not running it",
+which cannot happen — `runtime_enabled` is derived from the gate's own state in
+`raiker/phase_gates.py` — and a rule that can never fire only looks like safety.
+What is left is the one state that genuinely wants a second look: a capability
+set to run automatically.
+
+**Security invariant.** Unchanged, and deliberately so: the UI is clearer and
+the authority model is identical. No model, agent, memory, document, plugin, MCP
+server, connector, tool result, scheduled task or message can create, expand,
+transfer or exercise authority; only authenticated human policy or an explicitly
+delegated, bounded, auditable runtime grant can.
+
+**Tests.** `permissionLanguage.test.ts` (8 cases), including that every mode has
+an owner-facing word, that On + Never is explained rather than merely displayed,
+that attention excludes a missing executor, and that the common list names
+capabilities the registry actually ships — the last pinned because the first
+version of that list used plausible names (`file_write`, `shell_exec`) the
+registry does not use, and rendered one row while looking finished.
+`CapabilitiesView.test.ts` (12) covers the two questions on a real card and the
+scannable closed row. Live-verified 2026-09-07 in
+`web/e2e/permissions-language-live.spec.ts`; screenshot
+`permissions-two-questions.png`.
+
+---
+
+## FIXED-487 — A catalogue that existed only as long as the response carrying it
+
+**Severity: High. Area: models / composer. Status: Fixed 2026-09-12. Found in
+[GLOBAL_MODEL_CATALOGUE_AND_COMPOSER_PICKER_2026-09-06.md](GLOBAL_MODEL_CATALOGUE_AND_COMPOSER_PICKER_2026-09-06.md)
+(GLOBAL-MODEL-01, 02, 06, 08).**
+
+**Observed.** A provider's catalogue was probed on demand and never written
+down, so it lived exactly as long as the HTTP response that carried it. Two
+consequences followed, and an owner reads both as Raiker losing their models.
+
+*Curation was a prerequisite for existing.* A model reached a composer only by
+being "kept available". A provider serving four hundred offered whichever two
+dozen had been ticked on the Models page, and the rest may as well not have been
+published — so choosing a model you had not curated meant going to another page
+to make it exist first.
+
+*A blip emptied every picker.* Because the only copy of a catalogue was the one
+in flight, a provider that was briefly unreachable took its whole model list
+with it.
+
+**Fixed.** `principal_provider_catalogue` records what each provider last
+published — per owner, per profile, in the provider's own order, with the time
+it said so. It is written on every successful listing and read when the next one
+fails.
+
+Three honesty constraints shape it, and each is a test:
+
+- an **empty** listing never overwrites a known catalogue, because a provider
+  returning nothing is indistinguishable from one that failed in a way the
+  caller did not classify, and replacing a catalogue with emptiness is the
+  disappearance this store exists to prevent;
+- a **failed** listing returns the remembered models flagged `remembered` with
+  their `listed_at`, and the status and reason code are untouched — remembering
+  never turns a failure into a success;
+- a **policy-denied** provider carries no models at all. A remembered catalogue
+  for a provider the gate is currently refusing would project an authority the
+  owner does not have, which is the one thing this product never does.
+
+On the reading side, `catalogues` rides the single `GET /api/models` payload
+every Work surface already fetches (`modelCatalogues()` is the one accessor), so
+no composer reconstructs its own idea of what could be chosen. The kept list
+stays as the quick list a picker shows at rest — deliberately short, since
+BUG-260 recorded that scrolling four hundred names "is not choosing, it is
+hunting" — and `modelCatalogue.ts` gives the picker a search that reaches
+everything, pinned entries first, with a truncated result set that says it is
+truncated ("Showing 40 of 412 matches").
+
+**User-interface outcome.** A composer's model menu offers the owner's short
+list and, when there is more to reach, a search that finds any model their
+providers published. A provider that goes briefly unreachable keeps its models
+in the menu, described as remembered rather than current.
+
+**Not verified live, and deliberately said so.** This host has no model
+credential and no egress ([BUG-280](TO_BE_FIXED.md)), so no real provider
+catalogue could be listed here. The store, the remembering, the policy-denial
+rule and the picker's search are proven against fixtures and the mocked CI
+suite; watching a real four-hundred-model catalogue populate and survive a
+provider outage is left for a round on a host that has a key.
+
+**Tests.** `tests/test_provider_catalogue_memory.py` (6 cases: order, replace
+rather than accumulate, empty never erases, per-owner isolation, unknown
+profile, blank and duplicate names). `tests/test_api_model_selection.py` gains
+three: the one-payload catalogue, an unreachable provider offering what it last
+published, and a policy-denied provider offering nothing it once published.
+`modelCatalogue.test.ts` (10) and `ModelPicker.test.ts` cover reaching an
+uncurated model, keeping two providers' identical model names apart, and
+offering no search when the quick list already is the catalogue.

@@ -25,6 +25,18 @@ export function chatProfiles(): ModelProfile[] {
   );
 }
 
+/**
+ * GLOBAL-MODEL-01/02 — the one catalogue, read the same way by every composer.
+ *
+ * `chatProfiles()` above is the quick list: what a picker offers at rest. This
+ * is what each provider last published, which is what a picker's *search* may
+ * reach. Both come from the single `/api/models` read, so no surface can
+ * reconstruct a different idea of what exists.
+ */
+export function modelCatalogues(): Record<string, string[]> {
+  return store.data?.catalogues ?? {};
+}
+
 // Workbench's model summary covers every profile, configured or not.
 export function allProfiles(): ModelProfile[] {
   return store.data ? store.data.profiles : [];

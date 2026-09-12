@@ -14,6 +14,7 @@
   import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
+  import { densityGap, workSurface } from "../workSurface";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
   import { modelDecision, rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import {
@@ -90,7 +91,7 @@
     sentenceAround,
     sourcesForTurn,
   } from "../citations";
-  import { chatProfiles, refreshModels } from "../models.svelte";
+  import { chatProfiles, refreshModels, modelCatalogues } from "../models.svelte";
   import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
   import {
     audioSessionCoordinator,
@@ -121,6 +122,10 @@
     retainedReasoning?: string | null;
     reasoningChars?: number;
   }
+
+
+  /** VIS2-21 — what this mode is about, and how tightly it packs it. */
+  const surface = workSurface("chat");
 
   let {
     sessionId: continuedSessionId = null,
@@ -1777,8 +1782,16 @@
 <!-- One detail panel at a time: the inspector and the rewind preflight share
      the right-hand column, so opening either never stacks a second panel under
      the composer where nobody looks for it. -->
+<!-- VIS2-21 — the Work contract, declared where it can be seen. The mode and
+     its density are on the shell itself, so what this surface is *about* and how
+     tightly it packs are readable from the page rather than asserted in a
+     comment; `workSurface.ts` is the one place either can change. -->
 <div
   class="chat-layout"
+  data-work-surface={surface.mode}
+  data-primary-object={surface.primaryObject}
+  data-density={surface.density}
+  style={`--surface-gap:${densityGap(surface.density)}`}
   class:with-inspector={inspecting !== null || rewindCheckpointId !== null}
   class:with-rail={backgroundWorkOpen}
 >
@@ -2326,6 +2339,7 @@
             bind:effort={reasoningEffort}
             efforts={reasoningEfforts}
             {profiles}
+            catalogues={modelCatalogues()}
             {selectedProfile}
             {decision}
             onchosen={(profileId, chosen) => void rememberSurfaceModel("chat", profileId, chosen)}
@@ -2506,7 +2520,9 @@
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    /* VIS2-21 — density, from the Work contract rather than from this file. A
+       transcript is read in order and wants air between its turns. */
+    gap: var(--surface-gap, var(--space-4));
     padding-bottom: var(--space-4);
   }
   .export-notice {

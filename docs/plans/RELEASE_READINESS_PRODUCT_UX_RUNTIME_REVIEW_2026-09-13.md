@@ -33,6 +33,13 @@ audit with assistive technology, cross-platform visual run, or live-provider
 acceptance campaign. Recommendations are therefore marked separately from
 verified defects and verified implementation.
 
+**Final completeness review:** Every requested page is covered, but this is not
+a claim of exhaustive feature parity with two evolving external repositories or
+a completed live release certification. Section 13 records remaining evidence
+limits, decision conflicts resolved, and implementation contracts added in the
+final pass. Recommendations must not be interpreted as newly discovered
+exploits or as permission to implement them.
+
 ## Evidence vocabulary
 
 | Label | Meaning |
@@ -67,8 +74,8 @@ end contract.
 | Release label | Decision | Conditions |
 |---|---|---|
 | Private developer preview | **Ready with caveats** | One trusted owner, backed-up workspace, explicit unsupported-feature list, no assumption that all remote/runtime paths are production hardened. |
-| Public alpha | **Nearly, after P0 gates** | Identity leak fixed and regression-tested; MCP/process boundary tightened; clean install/update/uninstall passes on supported OSes; critical live paths re-run. |
-| Public beta | **Not yet** | Design and Projects continuity complete; guided Messaging/MCP onboarding; recovery and migration drills; accessibility and responsive evidence; provider matrix verified. |
+| Public alpha | **Not signed off** | Identity presentation regression closed; exposed MCP/process/ingress paths verified; clean install/update/uninstall passes on supported OSes; critical live paths re-run. |
+| Public beta | **Not yet** | All advertised Project/Design/Messaging/MCP journeys meet their contracts; recovery, accessibility and supported-provider evidence pass. Advanced features may be explicitly out of scope. |
 | Stable v1 | **Not yet** | All release gates below pass, security boundaries are mechanically universal, installers own their dependencies, and support/rollback/provenance contracts are documented and exercised. |
 
 ## What blocks a public first release
@@ -199,9 +206,11 @@ explicitly asks for them.
    client-supplied display name as authority.
 2. Populate `UserMetadata.display_name` on web, scheduled, resumed and messaging
    entry paths from that server-side record.
-3. Add a small trusted context item such as `User display name: Rahul`, with a
+3. Add a small server-resolved context item such as `User display name: Rahul`, with a
    strict length, Unicode normalization and control-character removal. Explicitly
-   tell the model that internal IDs are not names.
+   tell the model that internal IDs are not names. The field value is untrusted
+   user content, not an instruction: encode/delimit it as data and escape it for
+   each rendering target. Normalization alone does not prevent prompt injection.
 4. Keep authorization decisions keyed only by `principal_id`; display-name
    changes must not change ownership.
 5. Strip or replace internal IDs in ordinary tool summaries and generated prose.
@@ -919,8 +928,9 @@ change bundled into the extraction.
 
 # 9. Implementation decision records
 
-This section converts every material recommendation in the review into an
-implementation-ready decision. These are **recommended product decisions**, not
+This section defines implementation guidance for the primary recommendations;
+section 13 adds missing capability-family contracts and resolves ambiguities.
+These are **recommended product decisions**, not
 claims that the work has been approved or implemented. The owner can accept,
 amend or decline a record before engineering begins. Once accepted, its
 acceptance criteria become the closure contract.
@@ -964,6 +974,11 @@ vertically complete slice that has an honest UI and a fully enforcing backend.
 | DEC-18 | Adopt without behavior changes | P1/P2 | Large-view decomposition and contract generation |
 | DEC-19 | Adopt as release gate | P1 | Accessibility, responsive, empty/error and evidence coverage |
 | DEC-20 | Defer pending explicit owner decision | P3 | Multi-user/team mode and paired device expansion |
+| DEC-21 | Adopt incrementally; section 13.3 | P1/P2 | Detailed General, Notifications, Personalisation, Web access, Git and Updates contracts |
+| DEC-22 | Adopt in scoped slices; section 13.4 | P1/P2 | Session steering, compaction, search, TUI and delegation |
+| DEC-23 | Adopt after boundary verification; section 13.5 | P2/P3 | Extension lifecycle, learning, migration and contributed UI |
+| DEC-24 | Adopt; section 13.6 | P1 | Operational recovery, resource budgets, diagnostics and backup |
+| DEC-25 | Adopt for exposed ingress; section 13.7 | P0/P1 | Actual-byte request and response limits |
 
 ## DEC-01 — Separate presentation identity from authorization identity
 
@@ -984,9 +999,11 @@ hygiene rather than a new identity store.
    browser or channel display name as trusted input.
 2. Populate `UserMetadata.display_name` in web prompts, scheduled runs, channel
    ingress and approval continuation. Keep `UserMetadata.id` unchanged.
-3. Add a trusted, bounded `user_identity` context item containing only the
+3. Add a server-resolved, bounded `user_identity` context item containing only the
    normalized display name and actor kind. Do not include username, email,
    principal ID or channel identifiers unless a tool specifically needs them.
+   Encode the name as untrusted data, not executable instructions, even though
+   its association with the authenticated account is server-verified.
 4. Audit model-visible tool results, memory summaries, Project context,
    notifications and error text. Replace principal IDs with display labels; keep
    IDs in structured evidence.
@@ -1359,8 +1376,12 @@ and make each task open a durable occurrence/run timeline.
    foreground/background if that distinction remains meaningful.
 3. Store IANA timezone, local schedule expression, next occurrence, DST policy,
    start/end bounds and missed-run policy. Preview the next three occurrences.
-4. Claim with a single bounded lease and heartbeat. On restart, reconcile
-   expired claims and never execute one occurrence twice.
+4. Claim with a bounded lease, monotonically increasing fencing token and
+   heartbeat. Reject stale-worker writes after lease reassignment. Persist an
+   effect intent before execution and reuse its idempotency key where the
+   destination supports it. If a crash leaves an external effect's outcome
+   unknown, reconcile with the destination or request review; do not blindly
+   retry. A lease alone cannot guarantee exactly-once external effects.
 5. Record separate work and delivery states. A completed task with failed
    notification remains completed with Delivery failed.
 6. Add bounded retry/backoff, maximum runtime/tool/cost limits and a visible
@@ -1375,7 +1396,7 @@ and make each task open a durable occurrence/run timeline.
 with an explicit version. If conversion is ambiguous, preserve the old task as
 paused and request review; never guess a future time.
 
-**Verification:** DST forward/back, DST backward, host downtime, duplicate
+**Verification:** Spring-forward gaps, autumn repeated hours, host downtime, duplicate
 claim, approval pause, restart, retry exhaustion, parent/child settlement,
 delivery failure and owner cancellation.
 
@@ -1526,7 +1547,12 @@ services on that context, not utilities a caller can invoke independently.
    capability, policy, approval and containment checks.
 3. Bind the context to action hash, subject, scope, principal/actor, expiry,
    runtime profile, limits and audit correlation. It cannot be serialized and
-   replayed as a bearer token.
+   replayed as a bearer token. A private Python constructor or type check is an
+   API-discipline control, not a security boundary against malicious code in the
+   same interpreter. Run untrusted plugins/tools outside the trusted broker
+   process. For remote workers, use authenticated, audience-bound, short-lived,
+   replay-protected dispatch messages and worker-side scope enforcement; do not
+   attempt to send the in-process context itself.
 4. Change executor interfaces to require the context. Remove direct helpers that
    can cause the same side effect without it or make them private to the
    executor.
@@ -1684,7 +1710,7 @@ feature.
 | UX-CHAT-01..05 | DEC-01, DEC-02, DEC-04, DEC-05, DEC-18 |
 | UX-BUILD-01..05 | DEC-04, DEC-06, DEC-11, DEC-16, DEC-18 |
 | UX-MODEL-01..05 | DEC-08, DEC-18 |
-| UX-SETPOP-01..04 and all Settings-page recommendations | DEC-09, DEC-10, DEC-11 |
+| UX-SETPOP-01..04 and all Settings-page recommendations | DEC-09, DEC-10, DEC-11, DEC-21 |
 | UX-TASK-01..06 and automation reliability requirements | DEC-04, DEC-12, DEC-16 |
 | UX-MEM-01..08 and memory-age/usage recommendations | DEC-13 |
 | UX-MSG-01..06 and messaging security requirements | DEC-01, DEC-04, DEC-14, DEC-16 |
@@ -1760,6 +1786,340 @@ Each specification should contain state diagrams, API schemas, refusal codes,
 threat cases, migration rules, UI copy, telemetry constraints and executable
 acceptance tests. Close an item only from code plus passing evidence, not from a
 document status label.
+
+---
+
+# 13. Final-review addendum — coverage, decisions and remaining evidence
+
+This section resolves ambiguities in earlier recommendations. Where it narrows
+an earlier blanket rule, this section governs. All decisions remain proposed.
+
+## 13.1 Evidence and release-scope corrections
+
+| Topic | Final assessment / binding clarification |
+|---|---|
+| “All features” of external implementations | Section 5 is a capability-family catalogue, not a version-pinned inventory of every adapter, command, option and plugin. Full parity is **not verified**. Before claiming parity, inventory each reference at a pinned revision under anonymous source IDs; record supported/partial/deferred/not applicable plus source locator and test for each feature. Do not equate a README mention with correct implementation. |
+| Stable release versus roadmap | A narrow, honestly described v1 can omit canvas editing, team mode, device nodes, TUI and self-learning. They are not unconditional safety blockers. Features included in the release manifest must meet their gates; excluded features must not be advertised or accidentally reachable. The current review still cannot recommend stable release because boundary and acceptance evidence remains incomplete. |
+| Priority versus release gate | P0/P1 are risk/implementation priorities, not automatic calendar promises. Identity presentation is a proposed launch-quality gate, not evidence that an opaque identifier alone compromises an account. MCP isolation and streamed request bounds are security gates for exposed paths. Installer/runtime proof gates each advertised platform. |
+| Authority exclusivity | RR-AUTHORITY-01 is an assurance gap/recommendation, not a demonstrated bypass. Existing authority and turn-path tests must be assessed before redesign. Prove what is missing and extend the current broker rather than creating a competing authority service. |
+| MCP monitor | `_observe()` swallowing exceptions proves best-effort observation, not by itself a live containment bypass. Inject failures separately into telemetry and enforcing checks; block only when required enforcement cannot be established. |
+| Existing MCP capability work | `tests/test_mcp_content_blocks.py`, `tests/test_mcp_server_initiated.py` and `tests/test_mcp_event_stream.py` already cover important protocol behavior. DEC-15 requires a gap/conformance inventory first, not reimplementation of everything listed. |
+| Memory-use visibility | `MemoryView.svelte` already displays last-used time in Advanced. UX-MEM-05 means improve discoverability and turn-level explanation, not introduce last-used tracking from nothing. Inclusion in model context does not prove that the model relied on the memory; label “Included in context” separately from “Cited in answer”. |
+| SBOM | `.github/workflows/licensing.yml` already generates an SPDX SBOM. The remaining recommendation is retained, artifact-bound publication/provenance and verification, not first-time generation. |
+| Screenshots and installers | No new live screenshots, clean-machine runs or installer-page visual proofs were produced in this documentation-only review. Existing evidence remains historical unless its commit and scenario match the candidate. |
+| New schemas | Names such as `design_assets`, `WorkIntent` and `ExecutionBoundaryView` are proposed logical contracts. Map them to existing tables/types before adding storage or APIs; do not create duplicate records just to match this prose. |
+| Workspace metadata privacy | `ContextGatherer._workspace_summary` includes absolute workspace/database paths. Review whether each provider request actually needs them. Prefer logical/relative paths in ordinary model context, retain full paths only for authorized operations, and test hosted-provider projections for unnecessary local-account/path disclosure. This is a data-minimization recommendation under DEC-01/10, not proof of an external leak in this review. |
+
+### Source anchors for implementers
+
+All paths below are repository-relative at the reviewed base commit. Use named
+symbols and tests rather than relying on line numbers that drift after edits.
+
+| Decision family | Starting source and verification anchors |
+|---|---|
+| Identity | `raiker/contracts/models.py::UserMetadata`; `raiker/api/routes_prompts.py`; `raiker/api/routes_auth.py`; `raiker/tasks/scheduler.py`; `raiker/api/routes_channels.py`; `raiker/gateway/agent_gateway.py`; `tests/test_machine_identity_turns.py` |
+| Project continuity | `web/src/lib/views/ProjectsView.svelte::newChatInProject`; `web/src/lib/workProject.svelte.ts`; `raiker/context/gatherer.py::RetrievalScope`; `tests/test_project_scoping.py`; `tests/test_nested_projects.py` |
+| Runtime/MCP | `raiker/tools/broker.py`; `raiker/runtime/executors/mcp.py::_execute_http` and `_observe`; `raiker/runtime/authority/`; `tests/test_turn_path_authority.py`; `tests/test_mcp_containment.py` |
+| Request limits | `raiker/api/security.py` declared-Content-Length middleware; exercise the real ASGI receive path, not only request models |
+| Memory | `web/src/lib/views/MemoryView.svelte`; `raiker/api/routes_memory.py`; `raiker/memory/store.py`; `raiker/memory/retrieval.py`; `tests/test_memory_retrieval_hardening.py` |
+| Navigation/settings | `web/src/lib/nav.ts`; `web/src/lib/components/AllPagesDialog.svelte`; `web/src/lib/views/SettingsView.svelte`; `web/src/lib/views/settings/`; `raiker/api/routes_settings.py` |
+| CI/release | `.github/workflows/ci.yml`, `web.yml`, `licensing.yml`, `release.yml`; `raiker/app/release.py`; `tests/test_docs_consistency.py` |
+
+## 13.2 Cross-cutting decisions that must not remain ambiguous
+
+1. **Owner-authoritative network access:** Keep legitimate private/home-lab
+   endpoints available through explicit owner-scoped configuration. Classifying
+   private addresses is not a blanket ban. A grant names endpoint, ports,
+   credential audience, capability and expiry/revocation behavior; redirects do
+   not inherit broader authority. Prefer TLS; an insecure transport exception
+   requires an explicit reviewed policy, warning and limited scope. Never
+   silently replace a currently permitted deployment with a new restriction.
+2. **Display identity:** The account service authenticates who supplied the
+   field, not the truth or safety of its text. Treat names as data in prompts,
+   HTML and logs. Do not globally regex-rewrite user source code or an explicitly
+   requested audit excerpt containing `principal_`; prevent unintended leakage
+   at presentation/projection boundaries and preserve diagnostic fidelity.
+3. **Navigation:** Work / Review / Manage is the top-level model. Connect and
+   Settings are subgroups of Manage, not a competing four-area architecture.
+   Try revised labels and task tests before moving every specialist page.
+4. **Memory lifecycle:** Observation/proposal provenance, recall eligibility,
+   review freshness and erasure are separate dimensions, not one irreversible
+   linear enum. Direct owner-authored memory may skip observation/proposal.
+   Archive is reversible exclusion; expiry excludes according to an explicit
+   retention policy; Forget excludes immediately and records a suppression
+   tombstone so the same source does not silently re-create it; permanent delete
+   removes supported active content/index copies. Restore requires an explicit
+   owner action. Pin is not an exemption from explicit deletion or retention.
+5. **Deletion:** Remove vectors, FTS entries, caches, derived summaries and
+   relevant graph edges as well as the primary record. Invalidate in-flight
+   recall snapshots and document the boundary after provider submission.
+   Backups and already-sent provider/channel copies cannot be claimed erased
+   automatically. State backup expiry/restore suppression and external deletion
+   limits. Do not create a new backup containing content the user asks to erase.
+6. **Concurrency:** Every configuration/destructive mutation uses expected
+   revision or equivalent optimistic concurrency. Return a conflict instead of
+   overwriting newer state. Idempotency keys are owner-scoped and payload-bound;
+   a reused key with changed arguments is refused.
+7. **Recovery and effect uncertainty:** A crashed command/message may have
+   completed externally before its receipt was saved. Represent
+   `outcome_unknown`, reconcile, then obtain an explicit retry decision if
+   deduplication is unavailable. Fence stale workers and distinguish execution
+   retry from notification retry. Do not promise general exactly-once delivery.
+8. **Installer scope:** Base install supplies only Raiker's required runtime.
+   Docker, Git, speech models, ffmpeg, GPU stacks, browsers and model weights are
+   optional feature dependencies unless the release manifest proves otherwise.
+   Offer them on demand with size, license, source and consent. Offline launch
+   means the shell works; inference requires already-installed model assets.
+
+## 13.3 DEC-21 — Complete the smaller Settings-page contracts
+
+**Decision:** Retain the existing sections and keys where possible; add backed,
+testable behavior before adding controls. This supplements DEC-09..11 and covers
+the recommendations previously summarized only in the Settings table.
+
+| Page | Implementation sequence and rationale | Acceptance / rollback |
+|---|---|---|
+| General | Separate UI locale, speech language and model-context locale. Store IANA timezone; show a preview with local time and UTC offset. Make weather location opt-in and disclose location/provider egress. Startup options control the application/service, not model selection. | Locale changes do not shift stored UTC task instants; validate unavailable timezone/denied geolocation; failed save restores confirmed state. Existing keys remain readable. |
+| Notifications | Store per-event/per-channel delivery preferences and timezone-aware quiet hours. Approval records remain visible even if alerts are muted; configure emergency override explicitly. Route test and real delivery through the same outbox, preserving failures and retries. | Quiet-hour DST tests, permission-denied browser notifications, deduplication and delivery-failure timeline. Revoking notification permission never auto-approves work. |
+| Personalisation | Apply theme/density/font locally as a reversible preview; Save persists validated values, Cancel restores the prior appearance. System theme follows media changes. Explain that visual personalization does not change agent instructions/personality. | Keyboard, zoom/reflow, reduced motion and contrast tests; switching theme preserves drafts and focus. Invalid saved values fall back safely. |
+| Web access | Show effective rule source, destination, redirects and reason. Compile user rules to the shared egress policy without silently widening capability grants. Destination checking is itself a bounded authorized probe and must not become an SSRF oracle. | Test IPv4/IPv6, redirects, private endpoints, proxy DNS and rule conflicts; stale revision refuses save; display redacted URLs without query secrets. |
+| Git credential | Prefer supported OAuth/device flow or OS credential-manager integration; retain scoped-token fallback. Bind grants to repository/host/operation, show expiry and last use, and issue credentials only to the selected runtime. Review requested scopes before authorizing. | Invalid/expired credentials, OAuth state/PKCE where applicable, wrong-host redirect, revoked grant and process-output redaction tests. Disconnect revokes handles without deleting repositories. |
+| Updates | Show installed/candidate version, channel, platform, download size, signature verification, notes and schema compatibility. Use DEC-17's staged update; the UI offers rollback only when the server confirms it is supported. | Tampered download, offline check, interrupted swap, disk-full, incompatible downgrade and restored workspace tests. Failure leaves the last usable app/data pair intact. |
+
+**Owner decision:** Quiet-hour override defaults and supported OAuth providers
+must be chosen before implementation, not invented by the UI. Until chosen,
+retain current behavior and document the unavailable option.
+
+## 13.4 DEC-22 — Session steering, compaction and delegation
+
+**Decision:** Extend the existing session/task services; do not build a second
+agent loop. Covers TUI, steering, conversation actions, compaction, search,
+work profiles, parallel agents and board views from section 5.
+
+**Implementation steps:**
+
+1. Define a versioned client command envelope with authenticated actor,
+   session/turn, client sequence, idempotency key and command kind. Web, CLI/TUI
+   and channels use the same validation and refusal codes. TUI must not read
+   private credentials or bypass the web runtime contract.
+2. Queue appends to pending work; Add context attaches bounded data at the next
+   safe checkpoint; Redirect cancels/replans remaining work without undoing
+   completed effects; Stop requests cancellation and shows when it completes.
+   Serialize control decisions per session and reject stale commands.
+3. Retry creates a new attempt linked to its source; branch preserves the
+   original; restore previews checkpoint filesystem effects. Never describe
+   conversation deletion or rewind as undoing an email, payment or other
+   external effect.
+4. Keep immutable source transcript separate from model-context projection.
+   Compact old tool payloads/summaries within token budgets while preserving
+   user intent, unresolved constraints, source links and tool call/result pairs.
+   Persist summary version, source range, model, cost and provenance. On failed
+   compaction retain the previous projection; never corrupt history or promote
+   quoted hostile instructions into trusted policy.
+5. Index only authorized retained history. Recheck scope at search time; purge
+   derived indexes on deletion. Build FTS/embedding indexes as replaceable
+   generations, validate, then switch atomically. Unknown search health is not
+   an empty history.
+6. Child agents receive a strict subset of parent authority, context and
+   remaining budget; aggregate cost limits apply across the tree. Define
+   maximum depth/concurrency, file-write conflict ownership, cancel propagation,
+   typed result/artifact handoff and parent `waiting_for_children` settlement.
+7. Work profiles reference model/runtime/privacy/budget defaults, not an extra
+   permission system. Optional board views project the same task IDs and
+   transitions as Tasks; dragging a card cannot bypass a governed action.
+
+**Migration/rollback:** Add versioned projections alongside current sessions;
+never rewrite source history. Preserve old URLs and command aliases. Roll back
+by selecting the previous context/index generation; do not replay effects.
+
+**Acceptance:** Multi-client out-of-order commands, compaction failure,
+prompt injection in summaries, scope-isolated search, parent cancellation,
+child budget exhaustion and conflicting writes all have passing tests. Benchmark
+context quality/cost before enabling micro-compaction or cache optimization;
+defer those optimizations when benefit is unproven.
+
+## 13.5 DEC-23 — Govern extension learning, lifecycle and contributed UI
+
+**Decision:** Reuse Skills, Plugins, Hooks and MCP contracts. Self-improvement
+may propose a version, never approve its own authority. This covers remaining
+extension and learning catalogue entries.
+
+**Implementation steps:**
+
+1. Define versioned manifest fields for source digest, publisher identity,
+   compatibility, tool/command names, required capabilities, secret handles,
+   state namespace, dependencies and uninstall behavior. Reject collisions and
+   unsupported versions before loading executable code.
+2. A learning job proposes a skill from explicit eligible session evidence,
+   excluding secrets/private material. Stage it, scan, run isolated tests and
+   present the text/code diff, data sources, permissions and expected benefit.
+   Only an authorized owner decision promotes it to an active version.
+3. Namespaced plugin state uses scoped APIs and quotas, not unrestricted
+   database/filesystem access. Test transactional upgrade/downgrade or declare a
+   one-way migration. Suspend dependent work before removal and offer state
+   export/deletion separately.
+4. Hooks declare event stage, input schema, priority, timeout and failure
+   semantics. Untrusted hooks cannot change authority or run inside the trusted
+   broker. Optional observer failure can continue; required enforcement failure
+   stops. Reuse typed lifecycle events rather than arbitrary mutable callbacks.
+5. Contributed UI uses isolated origins/frames, narrow message schemas and
+   instance-bound nonces with origin/source checks. No ambient session cookie,
+   arbitrary navigation or raw-secret access. Every requested host action is
+   independently authorized; provide keyboard-accessible fallback views.
+6. Migration imports are dry-run first: parse supported versions, exclude
+   secrets by default, validate archive paths/symlinks/size, detect conflicts and
+   preview transformations. Never import external approval allowlists as active
+   grants. Apply to staged data with a receipt and rollback plan.
+7. Personality/user preferences are editable data with provenance, separate
+   from UI styling and authority. Inferred preferences enter Memory review;
+   user-authored instructions cannot override system/runtime policy.
+
+**Acceptance:** Malicious manifests, traversal, incompatible updates, denied
+permission expansion, self-approval attempts, namespace escape, hook timeout,
+cross-origin forged UI actions and partial import failures are tested. Preserve
+the prior active version until the replacement is verified.
+
+**Attribution decision:** Anonymous recommendations do not authorize removal of
+third-party license/NOTICE obligations. Prefer independently written adapters;
+before any reuse, record source/license provenance in the appropriate compliance
+record and retain legally required notices even if product-facing plans omit
+names. This review supplies neither legal clearance nor exhaustive parity proof.
+
+## 13.6 DEC-24 — Operational recovery, budgets and diagnostics
+
+**Decision:** Treat health and recovery as runtime features with content-minimal
+evidence. This closes the remaining operations catalogue entries.
+
+**Implementation steps:**
+
+1. Expose subsystem health with last successful tick, queue age/depth, resource
+   pressure, last error class and action link. Do not label missing observations
+   Healthy. Give each worker bounded queues, watchdogs and cancellation.
+2. Reserve budgets atomically across foreground turns, Tasks, child agents and
+   providers. Separate estimated from settled usage; account for cancelled calls
+   that a provider still bills. Enforce limits before dispatch and on runtime
+   consumption, with a documented bounded overrun if provider metering lags.
+3. Persist a recovery matrix per subsystem: source of truth, claim/lease,
+   reconciliation query, duplicate-effect policy, cleanup and owner intervention.
+   Clean-shutdown markers aid diagnosis but are not proof that effects settled.
+4. Doctor checks local prerequisites and indexes without sending owner content.
+   Network diagnostics require the relevant grant. Support export defaults to
+   allowlisted status/schema/version fields; preview and explicitly opt in to
+   any additional content. Secret scanning/redaction failure blocks export.
+5. Backup uses a consistent database snapshot plus referenced blobs, schema
+   version, manifest and integrity verification. Encrypt with documented recovery
+   key custody; retain no plaintext staging. Restore into a new location, verify
+   integrity/ownership, apply deletion tombstones and then switch atomically.
+6. FTS/vector corruption triggers a rebuildable degraded state; database
+   corruption never causes silent empty-workspace creation over existing data.
+   Quarantine damaged copies and offer read-only diagnosis/restore.
+7. Retain SBOMs already generated by Licensing and bind them to release artifact
+   digests. Add advisory/SAST/secret gates with triage owner, exceptions, expiry
+   and regression evidence; a scanner's success does not equal secure design.
+
+**Acceptance:** Disk full, database lock/corruption, missing key, interrupted
+backup/restore, memory pressure, queue saturation, lost provider response,
+revocation and restart drills. Proposed acceptance defaults: no silent data
+loss, no automatic retry of uncertain irreversible effects, and no unbounded
+queues. Numerical latency/cost/recovery targets require a measured baseline and
+owner-approved hardware profile before being called release SLOs.
+
+## 13.7 DEC-25 — Enforce streamed request bounds at ingress
+
+**Decision:** Carry forward the previous audit's actual-byte body-limit gap
+explicitly. The declared-Content-Length middleware in
+`raiker/api/security.py` is not sufficient for omitted/false lengths.
+
+**Implementation steps:** Count bytes on the ASGI receive path before JSON,
+multipart or webhook buffering. Reject declared oversize early and actual
+oversize with 413; bound route-specific uploads, decompressed payloads, multipart
+parts, temporary disk, concurrency and read duration. Clean up partial uploads
+on rejection/cancellation. Authenticate before expensive work where feasible;
+never log rejected bodies or signature secrets. Apply equivalent bounded reads
+to outgoing provider/MCP/channel responses through the shared egress service.
+Bound stdio MCP stdout/stderr incrementally too: `Popen.communicate()` can buffer
+output before a later size check. Concurrent bounded pipe readers must drain
+both streams, terminate the process tree on overflow and retain only a redacted,
+bounded diagnostic tail.
+
+**Compatibility:** Document each endpoint's supported limit and keep defaults
+compatible with legitimate existing attachments. Return a stable reason such as
+`request_too_large` and the safe permitted limit; the composer retains the draft
+and allows a smaller upload. Suggested names are contracts to implement, not
+claims that those errors already exist.
+
+**Acceptance:** Missing/false Content-Length, chunked transfer, decompression
+bomb, multipart flood, slow sender, disconnect and simultaneous uploads are
+tested through the real server/ASGI path. Verify rejection before unbounded
+allocation and no orphan files. Rollback cannot re-enable an unbounded path on
+an exposed deployment.
+
+## 13.8 Final traceability and dependency order
+
+DEC-21..25 supplement, rather than replace, DEC-01..20.
+
+| Catalogue / previously weak coverage | Implementation record |
+|---|---|
+| All smaller Settings pages | DEC-21 with DEC-09..11 and DEC-17 |
+| TUI, steering, retry/branch/restore, profiles, subagents and board | DEC-22 with DEC-05, DEC-06, DEC-08, DEC-12, DEC-16 |
+| Compaction, search, micro-compaction and cache optimization | DEC-22; optimization remains conditional on measured benefit |
+| User model, personality, proactive memory, self-authored skills | DEC-13, DEC-23 |
+| Rich channels, voice, presence, streaming, webhooks | DEC-14 adapter capability negotiation; DEC-25 bounds media |
+| Plugins, hooks, skills, MCP Apps and migration | DEC-15, DEC-23 |
+| Gateway/client contracts, health, restart, pressure, doctor, backup | DEC-22, DEC-24 |
+| Browser/computer use and paired nodes | DEC-20: explicit threat-model/scope decision before implementation; no shipped claim |
+| Installer, supply chain, dependency retention | DEC-17, DEC-24 |
+| Actual-byte request and response bounds | DEC-25, DEC-15, DEC-16 |
+
+**Effort guide:** S = localized change/test slice; M = one subsystem; L =
+cross-subsystem contract/migration; XL = new platform capability. These are
+relative planning estimates, not delivery dates. Within the same priority,
+prefer smaller effort, but do not bypass a dependency or safety gate.
+
+| Order | Slice | Priority / effort | Dependency / exit |
+|---|---|---|---|
+| 1 | Identity reproduction, presentation propagation and label consistency | P0/S–M | DEC-01 regression proves the actual symptom; no ownership changes |
+| 2 | MCP minimal environment and ingress actual-byte limits | P0/M | DEC-15/25 negative tests; broader process isolation remains required |
+| 3 | Executor gap inventory and enforcing broker/process isolation | P0/L | Existing authority tests mapped; DEC-16 cannot be satisfied by type checks alone |
+| 4 | App-owned runtime and clean-machine release proof | Launch gate/L | DEC-17 for each supported platform; unsupported platforms explicitly excluded |
+| 5 | Project handoff and smaller Settings/copy improvements | P1/S–M | DEC-04/21; server ownership checks and old links preserved |
+| 6 | MCP trust and Messaging setup/delivery | P1/L | DEC-15/14 depend on enforcing process/egress/credential services |
+| 7 | Task recovery, memory lifecycle and operational diagnostics | P1/L | DEC-12/13/24 plus fencing, tombstones and measured usage semantics |
+| 8 | Models/Chat/Build improvements and focused extraction | P1/M–L | Characterization tests first; DEC-22 sessions and DEC-16 authority |
+| 9 | Design asset/version foundation | P1/L if in release scope | DEC-04 and DEC-07; canvas/edit breadth may be deferred honestly |
+| 10 | Navigation, learning, rich extensions and optional TUI/board | P2/L | Stable underlying contracts; avoid changing all navigation before task testing |
+| 11 | Device/team/computer-use expansion and speculative optimization | P3/XL | DEC-20 owner decisions; DEC-22/23 measurements and isolation |
+
+Accessibility and evidence work runs alongside every slice, not only at the end.
+Release safety evidence can block a launch regardless of a lower roadmap label.
+
+## 13.9 Decision sign-off and definition of complete
+
+Track each record as Proposed → Accepted/Amended/Declined → Implementing →
+Verified. The product owner decides release scope, UX tradeoffs and supported
+platforms; the security reviewer signs off boundaries/exceptions; engineering
+owns contracts/migrations; QA owns independent acceptance evidence. One person
+may fill several roles, but record the role and decision explicitly.
+
+Before an implementation ticket starts, record existing source/test anchors,
+exact schema/API diff, migration/downgrade behavior, alternatives rejected,
+effort/dependencies and acceptance fixtures. When a migration is inapplicable,
+say why. For shared contracts, use versioned additive changes and expected
+revision checks; define `forbidden`, `conflict`, `not_ready`, `limit_exceeded`
+and `outcome_unknown` separately rather than a generic failure.
+
+The topic review is not a second master backlog: accepted defect work links to
+`TO_BE_FIXED.md`, future capabilities to the existing proposal/gap ledgers, and
+verified closure to `FIXED_ITEMS.md`. The eight suggested specification names in
+section 12 are **not files created by this review**. Create a separate spec only
+where an accepted migration/protocol requires more detail, and link it back.
+
+**Coverage conclusion:** All requested surfaces now have review coverage and
+implementation guidance; all section-5 capability families have an explicit
+implementation or deferred-decision path. Full external feature parity, every
+live UI state, production security assurance and release readiness are still
+unverified where evidence is missing. Do not mark those complete based on this
+document's length, passing Markdown tests or green CI.
 
 ---
 

@@ -917,7 +917,789 @@ change bundled into the extraction.
 
 ---
 
-# 9. Prioritized documentation backlog
+# 9. Implementation decision records
+
+This section converts every material recommendation in the review into an
+implementation-ready decision. These are **recommended product decisions**, not
+claims that the work has been approved or implemented. The owner can accept,
+amend or decline a record before engineering begins. Once accepted, its
+acceptance criteria become the closure contract.
+
+## 9.1 How to use these records
+
+Every implementation PR should name one or more decision IDs and must include:
+
+1. the user journey and failure states it changes;
+2. the server-side authority or data contract it changes;
+3. migration and rollback behavior;
+4. security and privacy effects;
+5. automated and live acceptance evidence;
+6. documentation and screenshot updates.
+
+Do not combine an unrelated visual redesign, database migration and runtime
+security change merely because they appear in the same record. Land the smallest
+vertically complete slice that has an honest UI and a fully enforcing backend.
+
+## 9.2 Decision register
+
+| Decision | Recommended disposition | Priority | Covers |
+|---|---|---:|---|
+| DEC-01 | Adopt | P0 | Owner display identity and internal principal isolation |
+| DEC-02 | Adopt incrementally | P1 | Navigation, Needs attention and progressive disclosure |
+| DEC-03 | Adopt | P1 | Permissions vocabulary and task-based presentation |
+| DEC-04 | Adopt | P1 | Project continuity, filing and retrieval boundaries |
+| DEC-05 | Adopt incrementally | P1/P2 | Chat simplification and module boundaries |
+| DEC-06 | Adopt | P0/P1 | Build closed loop and execution-boundary presentation |
+| DEC-07 | Adopt in stages | P1/P2 | Design asset, version, edit and canvas model |
+| DEC-08 | Adopt | P1 | Models setup, selection hierarchy and comparison |
+| DEC-09 | Adopt | P1/P2 | Settings popup and Settings information architecture |
+| DEC-10 | Adopt | P1 | Account, privacy, security and destructive-action UX |
+| DEC-11 | Adopt | P1 | Runtime setup wizard and authoritative runtime facts |
+| DEC-12 | Adopt | P1 | Task scheduling, recovery, lifecycle and delivery |
+| DEC-13 | Adopt | P1 | Memory lifecycle, age, review, usage and import |
+| DEC-14 | Adopt | P1 | Messaging onboarding, routing, delivery and channel safety |
+| DEC-15 | Adopt | P0/P1 | MCP onboarding, isolation, network trust and interoperability |
+| DEC-16 | Adopt | P0 | Common authority, process, egress and credential services |
+| DEC-17 | Adopt before public release | P0/P1 | Installer ownership, updates, rollback and provenance |
+| DEC-18 | Adopt without behavior changes | P1/P2 | Large-view decomposition and contract generation |
+| DEC-19 | Adopt as release gate | P1 | Accessibility, responsive, empty/error and evidence coverage |
+| DEC-20 | Defer pending explicit owner decision | P3 | Multi-user/team mode and paired device expansion |
+
+## DEC-01 — Separate presentation identity from authorization identity
+
+**Decision:** Keep `principal_id` as the immutable security key and use a
+server-resolved `display_name` for all ordinary UI and model-facing references
+to the owner. Do not rename principal IDs or use display names in authorization
+queries.
+
+**Why:** The reported sentence exposes an internal identifier and teaches the
+model that an authorization key is a human name. The account service already
+holds the correct display name, so the missing part is propagation and output
+hygiene rather than a new identity store.
+
+**Implementation sequence:**
+
+1. Add one server-side identity resolver that accepts an authenticated
+   `principal_id` and returns a typed presentation object. It must never accept a
+   browser or channel display name as trusted input.
+2. Populate `UserMetadata.display_name` in web prompts, scheduled runs, channel
+   ingress and approval continuation. Keep `UserMetadata.id` unchanged.
+3. Add a trusted, bounded `user_identity` context item containing only the
+   normalized display name and actor kind. Do not include username, email,
+   principal ID or channel identifiers unless a tool specifically needs them.
+4. Audit model-visible tool results, memory summaries, Project context,
+   notifications and error text. Replace principal IDs with display labels; keep
+   IDs in structured evidence.
+5. Add an advanced Account diagnostic that can copy the principal ID with an
+   explanation that it is an internal support/audit identifier.
+6. Trace the exact reported phrase live. Capture the provider request context,
+   tool result and rendered response with sensitive values redacted so closure
+   proves the real path, not only the likely one.
+
+**Contract and data decision:** Extend presentation DTOs rather than database
+ownership keys. A display-name update affects future rendering only. Historical
+audit events retain the principal ID and may retain the then-current display
+label as non-authoritative metadata.
+
+**Migration and rollback:** No ownership migration is required. Old records
+without a display label render “Owner” in normal UI and remain resolvable by
+principal ID internally. Rolling back presentation propagation must not alter
+accounts or data scope.
+
+**Verification:** Unit-test normalization and server-side resolution; contract-
+test all four envelope construction paths; search rendered UI/evidence fixtures
+for `principal_`; run the owner's reproduction through Chat, Build, Design
+research, Tasks and Messaging.
+
+**Done when:** No ordinary output exposes an internal ID, display-name changes
+are reflected without changing ownership, and the original live symptom is
+closed with captured evidence.
+
+## DEC-02 — Organize the product as Work, Review and Manage
+
+**Decision:** Preserve specialist pages but simplify first-level navigation into
+three concepts: Work, Review and Manage. Create one aggregated Needs attention
+view rather than placing every subsystem alert in permanent navigation.
+
+**Why:** Raiker's depth is valuable, but every feature currently competes for
+navigation weight. Users primarily need to start work, respond to something, or
+change configuration.
+
+**Implementation sequence:**
+
+1. Extend the route registry with a stable `product_area`, `attention_provider`
+   and `advanced` classification. Do not hard-code a second navigation list.
+2. Keep Chat, Build, Design, Tasks and Projects in Work. Place approvals,
+   proposed memories, failed/blocked tasks, disconnected services and security
+   findings in a server-backed Needs attention feed.
+3. Keep Models, Permissions, Memory, Messaging, Extensions and Settings under
+   Manage/More, with search and recent destinations.
+4. Define an attention-item contract with stable ID, severity, plain-language
+   title, reason, originating object, primary action, timestamp and resolved
+   state. It must contain references, not copied sensitive content.
+5. Make each item deep-link to the exact record and mark itself resolved only
+   from the authoritative subsystem state.
+6. Preserve existing route aliases and browser history during navigation
+   migration.
+
+**Non-goal:** Do not merge approval, memory, task and security records into one
+database lifecycle. Aggregate their projections while each subsystem remains
+authoritative.
+
+**Verification:** Registry tests ensure every route appears once; accessibility
+tests cover keyboard and mobile navigation; contract tests ensure stale
+attention items disappear after authoritative resolution.
+
+## DEC-03 — Simplify Permissions without weakening its two-control model
+
+**Decision:** Keep capability availability and decision mode separate. Present
+them as “Can Raiker use this?” and “When Raiker wants to use it”. Standardize
+decision words to `Ask me`, `Allow`, `Automatic` and `Never` throughout the
+product.
+
+**Why:** Combining the fields would weaken governance. Showing sixty-plus
+technical rows first makes a correct system difficult to understand.
+
+**Implementation sequence:**
+
+1. Create one shared copy/enum map used by Permissions, MCP, composers,
+   approvals, guides and tests. Remove local aliases such as `Ask` and `Deny`
+   from owner-facing copy while preserving wire values through adapters.
+2. Add registry metadata for user group, plain-language action, consequence,
+   common example, risk tier and advanced status.
+3. Default to Posture, Needs attention and Common task groups. Keep searchable
+   All permissions as the complete authoritative registry.
+4. Add non-authoritative presets that compile into a visible list of proposed
+   individual changes. Never store a preset name as the enforcing decision.
+5. Before applying bulk changes, show exact old/new effective state, which
+   changes loosen authority, which require step-up and which active work may be
+   interrupted.
+6. After save, read enforcing state back from the server and show a receipt or
+   partial failure per capability.
+
+**Migration:** Existing gate and decision values remain unchanged. UI adapters
+translate legacy labels. Deep links to a capability continue to open its row.
+
+**Verification:** Exhaustive registry test, copy consistency test, preset
+expansion test, step-up/bulk partial-failure tests, narrow-screen and screen-
+reader passes.
+
+## DEC-04 — Make Project continuity explicit and typed
+
+**Decision:** Every Project action that opens Chat, Build, Design or Tasks must
+send a typed work intent. Organizational filing and retrieval scope remain
+separate fields.
+
+**Why:** The current Project “New chat” action navigates without establishing
+the Project. Chat's account-wide retrieval can remain intentional while the new
+conversation is still filed to the Project.
+
+**Implementation sequence:**
+
+1. Define `WorkIntent { project_id, destination, action, object_id?, nonce }`.
+   Prefer a server-created short-lived intent or validated route state over a
+   freely trusted client object.
+2. Projects creates the intent for New Chat, Start Build, Start Design, Plan task
+   and Continue work.
+3. The destination verifies ownership, consumes or idempotently reuses the
+   intent, sets visible project context and files the new object on first
+   persistence.
+4. Store `project_id` as filing/ownership context. Store retrieval policy
+   separately as `account`, `project` or another explicit scope; never infer it
+   from whether a selector is visible.
+5. Add Project breadcrumbs/backlinks to Chat, Build, Design and Task detail.
+6. Replace raw attachment/session IDs with server-resolved display DTOs.
+7. Add Active/Archived filtering and restore. Move archive/move/delete into an
+   overflow menu.
+8. Implement hierarchy move validation on the server: owner scope, target
+   existence, no self-parent, no descendant cycle and one atomic update.
+9. For managed deletion, enumerate filesystem/database effects, require recent
+   step-up and typed project name, create a recoverable backup or state clearly
+   why deletion is irreversible. Attached-folder removal must not delete the
+   external folder.
+
+**Migration:** Existing sessions/tasks/projects remain filed as stored.
+Unassigned records stay unassigned. Do not silently infer projects from paths.
+Old links without an intent open the destination with no project and an honest
+label.
+
+**Verification:** Cross-product matrix for new/open/continue across four
+destinations; negative ownership and hierarchy tests; attached versus managed
+deletion tests; reload/deep-link and two-tab behavior.
+
+## DEC-05 — Simplify Chat and separate its state machines
+
+**Decision:** Keep the normal Chat surface to transcript, one context line and
+composer. Collapse evidence into a concise per-turn summary by default, while
+retaining full source, tool and governance inspection.
+
+**Implementation sequence:**
+
+1. Characterize current behavior with tests before extracting code from
+   `ChatView.svelte`.
+2. Extract a session controller for load/new/branch/rewind/export and URL state.
+3. Extract a turn-stream controller with explicit Idle, Submitting, Streaming,
+   WaitingForApproval, Stopping, Completed and Failed states.
+4. Extract turn rendering, source inspection, conversation actions, speech and
+   background-work rail into focused components/services.
+5. Render a settled evidence summary such as “3 tools · 2 sources · governed”;
+   expansion shows the existing ordered evidence.
+6. State Project filing and retrieval scope separately in the context summary.
+7. Add visible count/error state to the background-work control and a labelled
+   first-use affordance.
+8. Preserve draft, attachments, selected model override and Project context on
+   recoverable readiness failures.
+
+**Non-goal:** Do not remove governance evidence, source provenance, branching,
+memory correction or stopping behavior for visual simplicity.
+
+**Verification:** Snapshot/state-machine tests for every turn state; stream
+reconnect and cross-tab claim tests; keyboard/screen-reader flow; no regression
+in source anchors, approvals, copy, speech, export and Project filing.
+
+## DEC-06 — Make Build prove a closed governed coding loop
+
+**Decision:** Treat Build readiness as an end-to-end runtime outcome, not the
+presence of file, diff and terminal components. Present one authoritative Work
+boundary summary and prioritize one inspector at a time.
+
+**Implementation sequence:**
+
+1. Create a server-returned `ExecutionBoundaryView` containing Project,
+   repository, environment, model, writable roots, egress posture, credential
+   grants, budget and readiness/refusal reason.
+2. Render the view as Project → repository → environment → model. Client
+   selectors propose a change; they do not independently declare the boundary.
+3. Extract repository/file, conversation, approval review, artifact/preview,
+   command output and responsive layout domains from `BuildView.svelte` after
+   contract coverage exists.
+4. Define panel priority: approval review overrides normal inspector; selected
+   file/artifact/command occupies one inspector; switching preserves state.
+5. Define the completion contract: requested change, changed files, commands
+   run, tests and outcomes, unresolved failures, approvals used, checkpoint and
+   final verification statement.
+6. Ensure test failure returns to the model within the same bounded task until
+   green, explicit stop, budget exhaustion or a truthful blocked state.
+7. Add Project breadcrumb and persist the exact session/project/repository
+   coordinate in the URL and server record.
+
+**Verification:** Run representative repositories through read-only analysis,
+single-file edit, multi-file edit, failed test/retry, approval rejection,
+network-denied dependency attempt, stop and restart recovery. Evidence must show
+no silent host fallback.
+
+## DEC-07 — Build Design from durable assets upward
+
+**Decision:** Do not create a cosmetic canvas first. Implement durable,
+Project-owned asset/version lineage, then iteration/editing, then a canvas.
+
+**Implementation sequence:**
+
+1. Add `design_assets` with owner, optional Project, title, status, current
+   version, created/updated time and deletion state.
+2. Add immutable `design_asset_versions` with parent version, local blob/file
+   reference, prompt, provider/model, normalized options, input references,
+   provenance, safety/refusal metadata and generation receipt.
+3. Require an explicit Project or visibly labelled Unfiled destination before
+   generation. Store the destination server-side with the generation.
+4. Add asset detail, version history, compare, favorite, revert-as-new-version,
+   export and governed delete/restore.
+5. Add reference inputs with a disclosure of which content will leave the
+   device. Preserve research provenance and never silently feed research output
+   into a provider.
+6. Add variation and prompt reuse using the same immutable version contract.
+7. Add mask/selection operations as new version-producing actions with bounded
+   raster/vector payloads and exact parent lineage.
+8. Add canvas documents only after versions are stable; store placements,
+   layers and annotations separately from asset bytes.
+
+**Migration:** Existing generations should import as Unfiled assets with one
+version where the source record is complete. Records that cannot be resolved
+remain viewable legacy history and are not fabricated into Projects.
+
+**Verification:** Persistence across restart, Project filing, exact provider
+disclosure, version/revert lineage, export fidelity, delete/restore and failure
+without orphan blobs.
+
+## DEC-08 — Make model selection a readiness journey
+
+**Decision:** Ask where work may run before asking for a provider/model. Define
+one selection hierarchy: global default, optional work/project default, and
+explicit per-composer override.
+
+**Implementation sequence:**
+
+1. Split `ModelsView.svelte` along its existing Overview, My models, Add,
+   Runtime and Usage boundaries without changing behavior.
+2. Define a model readiness DTO separating connection configured, credentials
+   valid, catalogue known, model selected, runtime reachable, capability support
+   and current refusal.
+3. In Add, start with On this device, Private server or Hosted service, then
+   show compatible setup paths.
+4. Add a comparison projection for locality, context capacity, tools, vision,
+   image support, estimated cost, availability and privacy boundary. Unknown
+   facts render Unknown, never a guessed default.
+5. Label global selection “Default model”. Composer selection reads “This work
+   uses …” and offers Reset to default.
+6. Keep fallback order advanced. Validate each candidate's availability and
+   capability at execution time and record why fallback occurred.
+7. Use display labels everywhere; expose provider/profile IDs only in Advanced
+   diagnostics.
+
+**Migration:** Existing selected profile becomes the global default. Existing
+composer values remain explicit overrides. Unknown catalogue entries remain
+visible but unavailable until revalidated.
+
+**Verification:** State matrix for no provider, connected/no catalogue,
+catalogue/no selection, ready, outage, invalid credential, quota, unsupported
+tools/vision and fallback. Test draft preservation through every setup path.
+
+## DEC-09 — Clarify the Settings popup and Settings structure
+
+**Decision:** Rename the mixed page launcher to **More** and reserve Settings for
+configuration. Group routes as Work, Review, Connect and Settings. On mobile,
+render navigation as a full-height sheet.
+
+**Implementation sequence:**
+
+1. Change route metadata, labels and accessibility names from “Settings &
+   pages” to the agreed More/navigation term. Keep the gear only if it opens
+   Settings directly; otherwise use a menu/grid icon and text tooltip.
+2. Decide whether global command search owns page discovery. If yes, More shows
+   stable groups and recent destinations; if no, More keeps search but uses the
+   shared route index.
+3. Mark current location, preserve keyboard focus/trap/return and support Escape
+   and browser Back consistently.
+4. On mobile, use a sheet with Back/Close, scroll containment and safe-area
+   padding rather than a desktop-sized dialog.
+5. In Settings, retain dirty-state rollback but add per-section save outcome and
+   warn before navigation with unsaved changes.
+6. Decide the unregistered Storage component explicitly: remove it as dead code
+   or write a backed specification and register it later. Do not expose it until
+   its API is real.
+
+**Verification:** Route completeness, focus return, deep links, unsaved-change
+navigation, mobile viewport/zoom, screen-reader landmarks and no duplicate page
+entries.
+
+## DEC-10 — Separate Account, Privacy and Security responsibilities
+
+**Decision:** Split the dense Security page into Sign-in & devices, Secrets &
+vault, Security findings and Standing access. Make Privacy answer “what leaves
+this device?” and Account own presentation identity and account lifecycle.
+
+**Implementation sequence:**
+
+1. Move password, MFA, recovery and device sessions into Sign-in & devices.
+2. Move encryption/vault/credential health and rotation into Secrets & vault.
+3. Move scanner and containment findings into Security findings with severity,
+   evidence, affected object, safe remediation and containment action.
+4. Move standing grants into Standing access with capability, scope, creator,
+   reason, last use, expiry and revoke.
+5. Put emergency pause/containment at the Security landing page, state its exact
+   scope and distinguish it from deleting configuration.
+6. Build a Privacy data-flow summary for local models, hosted models, web,
+   messaging, MCP and telemetry. Each line names data category, destination,
+   retention and control link.
+7. Make display name the main Account identity. Keep sign-in username and
+   principal ID semantically distinct.
+8. Require recent step-up and typed confirmation for account deletion; show
+   exact data/files removed, external data not removed, backup/restore options
+   and irreversibility.
+
+**Migration:** Settings keys may remain stable behind new sections. Route aliases
+must preserve old `?tab=security` links and focus the correct subsection.
+
+**Verification:** Authorization and CSRF tests for every mutation, MFA/recovery
+and session-revocation live tests, secret non-disclosure checks, privacy summary
+contract tests and account-delete restore/irreversibility evidence.
+
+## DEC-11 — Turn Runtime settings into a guided boundary setup
+
+**Decision:** Offer four user-facing runtime types—This device, Isolated
+container, My server and Managed remote—and keep fingerprints, ports, image
+digests and raw egress in Advanced.
+
+**Implementation sequence:**
+
+1. Define a runtime-provider interface for probe, configure, verify, select,
+   suspend, resume, delete and capability reporting.
+2. The wizard first selects type, then prerequisites, connection details,
+   filesystem/network/credential scope, cost/resource limits, verification and
+   final boundary preview.
+3. Verification must be measured server-side: executable/supervisor version,
+   host key, sandbox features, filesystem probe, network enforcement,
+   cancellation and cleanup. A configuration value is not proof.
+4. Persist a versioned runtime profile and latest verification receipt. Mark it
+   stale when relevant software, key, image, host or policy changes.
+5. Render one readiness state and next action. Advanced shows exact refusal
+   codes, host keys, network class and receipts.
+6. Disabling a runtime stops new claims, requests bounded cancellation for
+   active work and preserves evidence. Deletion requires no active references or
+   an explicit migration choice.
+
+**Non-goal:** Never fall back from an unavailable isolated/remote profile to the
+host for convenience.
+
+**Verification:** Clean local, unavailable daemon, changed SSH key, remote
+supervisor mismatch, egress denial, cost exhaustion, cancellation, restart and
+cleanup tests for every supported runtime type.
+
+## DEC-12 — Define Tasks as a durable scheduler and run history
+
+**Decision:** Separate timing from execution style, use a human schedule builder
+and make each task open a durable occurrence/run timeline.
+
+**Implementation sequence:**
+
+1. Model task definition separately from occurrences and attempts. A definition
+   holds objective, Project, method, schedule, policy and delivery; each
+   occurrence has an idempotency key; each attempt has lease and outcome.
+2. Present When as Now, Once or Repeating. Present Run mode separately as
+   foreground/background if that distinction remains meaningful.
+3. Store IANA timezone, local schedule expression, next occurrence, DST policy,
+   start/end bounds and missed-run policy. Preview the next three occurrences.
+4. Claim with a single bounded lease and heartbeat. On restart, reconcile
+   expired claims and never execute one occurrence twice.
+5. Record separate work and delivery states. A completed task with failed
+   notification remains completed with Delivery failed.
+6. Add bounded retry/backoff, maximum runtime/tool/cost limits and a visible
+   incident after exhaustion.
+7. Propagate pause/stop through child tasks, subagents and process trees.
+8. Add a doctor/readiness endpoint for scheduler tick, clock/timezone, model,
+   runtime, permissions and delivery target.
+9. Open task detail as a timeline with next run, current action, approvals,
+   attempts, outputs, delivery and audit evidence.
+
+**Migration:** Convert existing recurrence values into the new schedule schema
+with an explicit version. If conversion is ambiguous, preserve the old task as
+paused and request review; never guess a future time.
+
+**Verification:** DST forward/back, DST backward, host downtime, duplicate
+claim, approval pause, restart, retry exhaustion, parent/child settlement,
+delivery failure and owner cancellation.
+
+## DEC-13 — Give Memory one explicit lifecycle and review policy
+
+**Decision:** Use the lifecycle Observed → Suggested → Approved →
+Reviewed/Expired → Archived → Deleted. Age raises review priority but does not
+delete by itself.
+
+**Implementation sequence:**
+
+1. Publish one state-transition table and enforce it in the memory service.
+   Define precisely whether Forget means archive/exclude or deletion; recommended
+   UI is Archive for reversible exclusion and Delete permanently for erasure.
+2. Add retention policy fields: policy kind, review/expiry time, last verified,
+   last recalled, pin/hold, superseded-by and deletion grace time.
+3. Calculate review priority from retention, sensitivity, use, verification,
+   conflict, provenance and pin—not from one opaque score.
+4. Add server-side recall-use receipts linking memory ID, session/turn, rank,
+   reason and timestamp without copying the answer. Update counters atomically
+   after actual context use.
+5. Simplify cards to Edit, Pin and More. Put source, scope, expiry, history,
+   archive and permanent deletion in a details drawer.
+6. Translate confidence/trust into explainable labels and reasons. Raw values
+   remain advanced diagnostic data.
+7. Move embedding-engine configuration to Advanced/Models while Memory shows
+   health, indexed/pending counts and one repair action.
+8. Import into a staging batch; validate schema/version/ownership, classify
+   source trust, detect exact and semantic duplicates, preview merge/skip/new,
+   apply atomically and issue a reversible receipt where possible.
+9. Run background maintenance only as proposals. It may suggest merge,
+   supersession, expiry or deletion; it cannot approve itself or expand recall.
+
+**Migration:** Map current approved/expired/archived records without changing
+recall eligibility. Backfill use counters from available source ledgers only;
+unknown stays unknown. Never fabricate provenance or last-used dates.
+
+**Verification:** Full transition matrix, incognito, scope isolation,
+contradiction, expiry/restore, source deletion, import rollback, recall receipt,
+permanent deletion and backup behavior.
+
+## DEC-14 — Make Messaging a guided, durable channel service
+
+**Decision:** Users connect a Messaging account/channel through a wizard.
+Connector is an implementation term under Extensions. Routing, pairing and
+delivery use shared durable contracts.
+
+**Implementation sequence:**
+
+1. Define adapter capabilities: authentication method, DMs/groups/threads,
+   streaming, media, reactions, edits/deletes, buttons, presence/typing and
+   maximum payloads.
+2. Build Connect channel: choose service, authenticate or enter an advanced
+   secret reference, verify owner, discover/select conversations, choose routing
+   policy, send/receive test, then enable.
+3. Replace normal raw sender/conversation IDs with discovered labels plus IDs in
+   Advanced. If discovery is unsupported, validate manual IDs with a test before
+   enabling.
+4. Persist inbound events before model execution with provider event ID,
+   normalized sender/conversation/thread, signature time, content reference and
+   idempotency result.
+5. Verify signature, timestamp/nonce, account and pairing before routing. Pairing
+   does not itself enable a channel or grant tools.
+6. Map each inbound event to an explicit new/bound/side-question/interrupt
+   decision. Show the bound session and reply destination.
+7. Create outbound delivery records before send; update attempts, provider IDs,
+   delivered/failed state and dead-letter review independently from task status.
+8. Enforce per-sender/channel/global rate and cost limits, attachment bounds,
+   malware/content scan hooks, outbound secret/PII checks and destination
+   binding.
+9. Detect bot loops using actor identity, repeated content/event lineage and a
+   maximum automated-round budget. Activation in shared rooms is owner-only.
+10. Provide Pause/Contain account that blocks new processing and delivery while
+    preserving events and evidence.
+
+**Migration:** Import existing connector profiles as disabled or current state
+without inventing verified senders. Convert raw secrets to secret references
+through an explicit rotation flow.
+
+**Verification:** Adapter conformance suite plus forged/stale/duplicate events,
+DM/group/thread routing, media limits, approval buttons, edit/delete, bot loop,
+delivery retry/dead letter, pause and secret-redaction tests.
+
+## DEC-15 — Put every MCP server behind explicit trust and isolation
+
+**Decision:** All MCP transports use the common runtime services. Provide a
+catalogue/plugin/manual Add server journey with a permission and trust preview.
+Do not enable a server merely because its configuration parses.
+
+**Implementation sequence:**
+
+1. Route stdio through the common process launcher. Construct a minimal
+   environment, fixed working directory, filesystem mounts, resource limits,
+   output caps and full process-group cancellation.
+2. Replace inline secrets/environment values with purpose-bound secret handles.
+   Deliver only declared values to that server process and redact before
+   persistence/model exposure.
+3. Normalize remote endpoints and classify loopback, public and private/LAN.
+   Require HTTPS except an explicit loopback development profile.
+4. Resolve DNS, reject or explicitly grant private/link-local/metadata ranges,
+   validate the connected peer where possible, revalidate every redirect and
+   defend against DNS rebinding.
+5. Enforce request/response limits on actual streamed bytes, decompressed bytes,
+   event count, duration and reconnect attempts—not only headers.
+6. Complete initialize/version negotiation and store advertised capabilities.
+   Project tools/resources/prompts/roots separately; unsupported capabilities
+   stay visible as unsupported and cannot be invoked.
+7. Map each tool to a collision-safe name, JSON schema, capability/risk class,
+   per-server allow state and result-content policy before showing it to a model.
+8. Route sampling, elicitation and any server-initiated request through explicit
+   governance and owner UI. Never treat it as the response to Raiker's request.
+9. Separate monitor telemetry from containment health. Telemetry write failure
+   may degrade observability; inability to enforce containment, limits or
+   revocation must stop the call/session.
+10. For catalogue/plugin installation, record source, publisher, immutable
+    version/digest, signature/checksum and declared permissions. Updates show a
+    permission diff and require review when authority grows.
+11. The Add wizard shows server source, transport, endpoint/network class,
+    processes, writable paths, secrets, projected tools and Permissions changes;
+    then Test; then explicit Enable.
+12. Add one-click Pause and Kill. Resume re-runs readiness, integrity and policy
+    checks rather than restoring old trust blindly.
+
+**Migration:** Existing servers remain configured but should enter `review
+required` when their environment, endpoint trust, digest or projected authority
+cannot be proven. Do not silently break local development servers; offer an
+explicit loopback development classification.
+
+**Verification:** Ambient-secret enumeration, filesystem escape, forked child
+stop, oversized/decompression bomb, slow stream, redirect to private address,
+DNS rebinding, metadata address, schema collision, malicious tool description,
+server-initiated request, reconnect storm, monitor failure and update-permission
+diff tests.
+
+## DEC-16 — Require one opaque runtime authority context
+
+**Decision:** Every side-effecting executor accepts a runtime-issued,
+non-serializable authority context. Process, egress and credential access are
+services on that context, not utilities a caller can invoke independently.
+
+**Implementation sequence:**
+
+1. Inventory every executor and entry path: web, CLI, Tasks, Messaging,
+   approvals, plugins, hooks, MCP and subagents. Classify reads, reversible
+   changes, external effects, destructive effects and critical actions.
+2. Define `AuthorityContext` in the runtime authority package. Its constructor
+   is private/internal; an issuer creates it only after identity, scope,
+   capability, policy, approval and containment checks.
+3. Bind the context to action hash, subject, scope, principal/actor, expiry,
+   runtime profile, limits and audit correlation. It cannot be serialized and
+   replayed as a bearer token.
+4. Change executor interfaces to require the context. Remove direct helpers that
+   can cause the same side effect without it or make them private to the
+   executor.
+5. Make process, network and secret broker methods require context-derived
+   grants. A principal ID, boolean approval or client-supplied mode is
+   insufficient.
+6. Re-govern immediately before effect. Reject changed arguments, expired
+   approval, changed posture, inactive containment or mismatched scope.
+7. Issue a result receipt bound to action and authority, recording effect,
+   runtime, limit use and cleanup without sensitive content.
+8. Add a CI registry check: every real side-effect capability has an executor,
+   threat model, Permissions description, authority requirement and negative
+   bypass test.
+
+**Migration:** Introduce adapters around current governed paths, migrate one
+executor family at a time and keep a deny-by-default registry for unconverted
+side effects. Do not retain a compatibility flag that bypasses authority.
+
+**Verification:** Attempt direct calls from every entry path, forge context-like
+objects, reuse expired/other-action contexts, change arguments and revoke posture
+between approval and execution. All must fail before effect.
+
+## DEC-17 — Make installers own the supported application runtime
+
+**Decision:** Supported desktop installers carry or install into an app-owned,
+versioned runtime and only the dependencies needed to run Raiker. Host Python or
+developer tools are not release prerequisites.
+
+**Implementation sequence:**
+
+1. Define supported OS/architecture/version matrix and install scope per
+   platform before packaging changes.
+2. Resolve release dependencies from `uv.lock` or an exported hashed platform
+   lock. Build in clean pinned images/runners with no resolver drift.
+3. Bundle an app-owned interpreter/runtime and native dependencies under one
+   package-owned directory. Do not write unmanaged launchers outside the package
+   manifest.
+4. Produce and verify a complete file manifest. Exclude tests, caches, source
+   credentials, development tools and build-only dependencies.
+5. Pin and checksum every external packaging tool; never fetch a mutable
+   `latest`/`continuous` asset during a release build.
+6. Separate application binaries from owner data, keys and workspace. Define
+   paths and permissions for install, update, repair and uninstall.
+7. Make update staged and atomic: download, verify signature/provenance, check
+   compatibility/free space, stop safely, swap, migrate, health-check and roll
+   back on failure.
+8. Back up database/schema state before irreversible migration. Declare the
+   oldest supported rollback and refuse unsafe downgrade honestly.
+9. Uninstall removes package-owned files only by default. Workspace deletion is
+   a separate step-up flow with exact preview.
+10. Publish SBOM, checksums, signature, provenance/attestation and release notes
+    beside each artifact.
+
+**Verification:** Clean VMs with no Python/Node/toolchain; offline local first
+launch; spaces/non-ASCII paths; standard and non-admin install where supported;
+upgrade from previous release; interrupted update; repair; rollback; uninstall;
+workspace preservation; artifact diff/reproducibility and malware-signing checks.
+
+## DEC-18 — Decompose large UI modules around domain contracts
+
+**Decision:** Refactor the largest Svelte views without changing behavior first.
+Do not combine extraction with redesign unless a vertically complete user
+outcome requires it.
+
+**Implementation sequence:**
+
+1. Record current public props, route/query state, API calls, events, stores,
+   accessibility roles and visual states for each large view.
+2. Add characterization tests for the behavior being moved.
+3. Extract pure formatting/selectors first, then API/domain controllers, then
+   presentational components. Keep one owner for each state machine.
+4. Use generated API types for ordinary DTOs and explicit runtime validators at
+   trust boundaries. Do not generate away security checks.
+5. Extract by current product boundaries: Models tabs; Chat session/turn/source;
+   Build repository/conversation/approval/artifact; Memory lifecycle tabs;
+   Project list/detail/hierarchy; Security subsections.
+6. Measure bundle size, render/update frequency and test duration before and
+   after. A lower line count without clearer ownership is not success.
+7. Remove obsolete code only after route, screenshot and repository searches
+   prove it has no supported entry point.
+
+**Verification:** Existing unit/E2E suite unchanged, route/deep-link parity,
+keyboard/focus parity, no duplicate API requests, no lost draft/state and a
+documented module ownership map.
+
+## DEC-19 — Make accessibility and evidence release criteria
+
+**Decision:** A release candidate is incomplete until populated and failure
+states pass automated and manual accessibility/responsive review. Screenshots
+are evidence, not the test itself.
+
+**Implementation sequence:**
+
+1. Generate the route/state matrix from the route registry: loading, empty,
+   populated, blocked, error and recoverable states where applicable.
+2. Run automated semantic/accessibility checks, then keyboard-only and screen-
+   reader manual scripts for primary journeys and destructive dialogs.
+3. Verify focus order, visible focus, dialog trap/return, landmarks, headings,
+   names, live regions, reduced motion, zoom/reflow and color independence.
+4. Capture current 390×844 and 1920×1080 light/dark screenshots from seeded,
+   non-sensitive data. Include long names, many records and active errors so
+   density/overflow defects are visible.
+5. Store screenshot manifest with commit, viewport, theme, state/fixture and
+   capture command. Do not treat historical screenshots as current product
+   truth.
+6. Add visual-diff thresholds for stable chrome and manual review for dynamic
+   content. Never approve an inaccessible change because its pixels match.
+7. Attach release evidence to the candidate commit, not a later branch.
+
+**Verification:** Every supported route/state has a named result; all P0/P1
+accessibility defects are closed or explicitly block release; screenshots carry
+traceable metadata and contain no credentials or personal content.
+
+## DEC-20 — Defer multi-user and paired-device expansion until explicitly chosen
+
+**Decision:** Do not infer a team/multi-user product from Messaging or future
+device nodes. Keep the current owner-scoped model until the owner approves a
+tenancy, delegation and support model.
+
+**Why:** Multi-user identity changes memory, Project, credential, approval,
+notification, audit, deletion and legal/privacy boundaries. Device nodes add
+camera, screen, location and device-local action risk. They cannot be safely
+added as ordinary connectors.
+
+**Decision required before implementation:**
+
+- personal assistant with paired devices only, or collaborative workspace;
+- tenant/account/workspace relationship and data controller;
+- roles, invitation, removal and ownership transfer;
+- per-user versus shared Projects/memory/credentials;
+- whose approval authorizes which effect;
+- channel sender-to-user binding and guest behavior;
+- device enrollment, attestation, foreground indication and remote revoke;
+- audit visibility, export, retention and deletion rights.
+
+**If approved:** Write a separate threat model and schema migration, introduce
+delegated scopes with deny-by-default cross-principal access, and require
+negative isolation tests across every API and retrieval path before exposing the
+feature.
+
+---
+
+# 10. Traceability from findings to decisions
+
+| Review area/findings | Governing decision(s) |
+|---|---|
+| RR-IDENTITY-01 | DEC-01 |
+| RR-AUTHORITY-01 | DEC-16 |
+| RR-MCP-01, RR-MCP-02, SEC-MCP-01..03, UX-MCP-01..03 | DEC-15, DEC-16 |
+| RR-INSTALL-01 | DEC-17 |
+| RR-PROJECT-01, UX-PROJ-01..09 | DEC-04, DEC-10 |
+| RR-DESIGN-01, UX-DESIGN-01..04 | DEC-07 |
+| RR-VERIFY-01 | DEC-19 and the release gates |
+| UX-PERM-01..05 | DEC-03 |
+| UX-CHAT-01..05 | DEC-01, DEC-02, DEC-04, DEC-05, DEC-18 |
+| UX-BUILD-01..05 | DEC-04, DEC-06, DEC-11, DEC-16, DEC-18 |
+| UX-MODEL-01..05 | DEC-08, DEC-18 |
+| UX-SETPOP-01..04 and all Settings-page recommendations | DEC-09, DEC-10, DEC-11 |
+| UX-TASK-01..06 and automation reliability requirements | DEC-04, DEC-12, DEC-16 |
+| UX-MEM-01..08 and memory-age/usage recommendations | DEC-13 |
+| UX-MSG-01..06 and messaging security requirements | DEC-01, DEC-04, DEC-14, DEC-16 |
+| Runtime convergence services | DEC-06, DEC-11, DEC-15, DEC-16 |
+| Large view modules and contract recommendations | DEC-18 |
+| Accessibility, responsive and screenshot evidence | DEC-19 |
+| Multi-user and paired device proposals | DEC-20 |
+
+Any finding added later must be assigned to a decision record or receive a new
+one. This prevents recommendations from existing without an implementation and
+closure contract.
+
+---
+
+# 11. Prioritized documentation backlog
 
 This ordering is a recommendation, not an implementation claim.
 
@@ -960,7 +1742,7 @@ This ordering is a recommendation, not an implementation claim.
 
 ---
 
-# 10. Recommended documentation set for implementation
+# 12. Recommended documentation set for implementation
 
 Before implementation starts, split this review into authoritative, testable
 specifications rather than letting one long audit become a permanent backlog:

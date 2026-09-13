@@ -35,7 +35,7 @@ verified defects and verified implementation.
 
 **Final completeness review:** Every requested page is covered, but this is not
 a claim of exhaustive feature parity with two evolving external repositories or
-a completed live release certification. Section 13 records remaining evidence
+a completed live release certification. Sections 14–16 add individual decisions, newly identified defects and feature/security adaptation contracts. Section 13 records remaining evidence
 limits, decision conflicts resolved, and implementation contracts added in the
 final pass. Recommendations must not be interpreted as newly discovered
 exploits or as permission to implement them.
@@ -2142,3 +2142,282 @@ private technical preview rather than a stable first release. The green current
 CI baseline is encouraging, but it is evidence of repository health—not yet
 evidence that every advertised installation, identity, runtime and integration
 boundary is ready for general users.
+
+
+# 14. Individual change decisions and rationale
+
+All decisions below are **proposed implementation decisions**, not claims of implementation or owner sign-off. Each row inherits the corresponding finding's priority, the implementation/migration steps in sections 9 and 13, and the release gates. The decision column specifies the chosen change; the rationale explains why. New defects and capability contracts follow in sections 15 and 16. Section 13 corrections prevail over historical shorthand.
+
+## 14.1 PERM decisions
+
+| Finding | Decision | Explanation |
+| --- | --- | --- |
+| UX-PERM-01 | Lead with task-based presets and “Recently used / Needs attention”; preserve the full registry under Advanced. | Presets reduce setup effort without creating a second policy engine; preview the exact grant diff. |
+| UX-PERM-02 | Phrase them as two questions: “Can Raiker use this?” and “When Raiker wants to use it”. | Availability remains a hard gate even when behavior is Automatic; combining controls would conceal effective denial. |
+| UX-PERM-03 | Adopt the same four terms in buttons, MCP explanations, approvals and documentation. | One vocabulary prevents users interpreting identical policy differently across surfaces. |
+| UX-PERM-04 | Show plain-language action, consequence and example first; registry key in Details. | Examples explain consequences while stable keys preserve diagnosability. |
+| UX-PERM-05 | Add read-only summaries such as “Can edit project files after asking” and “Cannot send messages”. | Compute posture from effective policy; manually maintained summaries would drift. |
+
+## 14.2 CHAT decisions
+
+| Finding | Decision | Explanation |
+| --- | --- | --- |
+| UX-CHAT-01 | Split by state machine/domain: session controller, turn renderer, composer controller, citation/source panel and conversation actions. | Domain controllers isolate streaming and navigation races; file splitting alone does not improve correctness. |
+| UX-CHAT-02 | Default to a compact “Used 3 tools · 2 sources · 1 approval” disclosure; retain full evidence on expansion. | Progressive disclosure preserves audit evidence while prioritizing the answer. |
+| UX-CHAT-03 | Label the distinction: “Filed in Project X; Chat can still use account-wide memory.” | Filing is organization, not authorization; project selection must not silently widen retrieval. |
+| UX-CHAT-04 | Add a first-use label/badge and surface active count or failure state. | Visible status makes failed background work discoverable without opening Tasks. |
+| UX-CHAT-05 | Group them as Conversation, Evidence and Continuity actions; use consistent placement. | Stable action groups reduce hunting and prevent destructive actions looking like ordinary navigation. |
+
+## 14.3 BUILD decisions
+
+| Finding | Decision | Explanation |
+| --- | --- | --- |
+| UX-BUILD-01 | Extract repository, conversation, approval review, artifact, command and layout controllers with contract tests. | Extract ownership of state and effects before presentation; preserve session and approval contracts. |
+| UX-BUILD-02 | Present one “Work boundary” summary: Project → repository → environment → model, with only the currently actionable control expanded. | A single summary makes the execution destination reviewable before a write. |
+| UX-BUILD-03 | Use task-aware panel priority and one right-side inspector at a time; preserve state when switching. | Exclusive inspectors reduce simultaneous cognitive load without losing user state. |
+| UX-BUILD-04 | Release acceptance must cover edit → test → diagnose → retry → green → summary, including failure and approval interruption. | A passing tool call is insufficient evidence of a working change; require the entire recovery loop. |
+| UX-BUILD-05 | Add a persistent Project breadcrumb and “Open project work” backlink. | Explicit navigation preserves continuity across work modes. |
+
+## 14.4 DESIGN decisions
+
+| Finding | Decision | Explanation |
+| --- | --- | --- |
+| UX-DESIGN-01 | Add an asset model before adding canvas chrome: Project ownership, versions, source prompt/model/options and durable file reference. | Durable assets must precede a canvas so edits and lineage survive reloads. |
+| UX-DESIGN-02 | Bind every generation to an explicit project or “Unfiled” collection and show the destination before Generate. | Capture the destination at submission; changing the selector must not refile an in-flight result. |
+| UX-DESIGN-03 | Let approved research images/text become named references with provenance and explicit consent to send them to the image provider. | Reference import is an independent data disclosure requiring provenance and permission. |
+| UX-DESIGN-04 | Preserve this honesty; introduce an Options drawer only as governed endpoint fields become real. | Capability-driven controls avoid promising unsupported provider operations. |
+
+## 14.5 MODEL decisions
+
+| Finding | Decision | Explanation |
+| --- | --- | --- |
+| UX-MODEL-01 | Split by the existing five tabs; put connection lifecycle and global selection into shared stores/services. | Shared connection lifecycle prevents tabs from disagreeing about readiness. |
+| UX-MODEL-02 | Use a four-step readiness line and give one primary next action. | One next action makes missing credentials distinguishable from unavailable execution. |
+| UX-MODEL-03 | State: “Default model” and “This work uses …”; offer Reset to default. | Explicit inheritance avoids unexpected model and privacy changes. |
+| UX-MODEL-04 | Add a comparable decision table with Locality, Context, Tools, Vision, Estimated cost and Availability. | Comparable verified fields support informed choice; unknown pricing must remain unknown. |
+| UX-MODEL-05 | Keep stable IDs in Advanced diagnostics and exports, never as primary labels. | Friendly labels improve comprehension without replacing stable internal keys. |
+
+## 14.6 SETPOP decisions
+
+| Finding | Decision | Explanation |
+| --- | --- | --- |
+| UX-SETPOP-01 | Rename the trigger and dialog to “More” or split “More” from direct “Settings”. | A navigation launcher must have navigation language; the gear otherwise promises preferences. |
+| UX-SETPOP-02 | Give global search commands/pages and use the popup for stable navigation only, or merge them deliberately. | Assign navigation and command execution clear responsibilities to avoid duplicate discovery paths. |
+| UX-SETPOP-03 | Render as a full-height sheet with Back, recent pages and clear current-location state. | A mobile sheet supports reachable navigation, focus return and Back behavior. |
+| UX-SETPOP-04 | Group into Work, Review, Connect and Settings; put diagnostics/advanced last. | Use Connect as a subgroup under Manage, consistent with the three primary navigation groups. |
+
+## 14.7 TASK decisions
+
+| Finding | Decision | Explanation |
+| --- | --- | --- |
+| UX-TASK-01 | Separate “When” from “Run mode”; explain that background is still governed and may pause for the owner. | Timing and execution style are independent; background execution does not grant unattended authority. |
+| UX-TASK-02 | Use a human schedule builder with timezone and the next three occurrences. Keep cron/raw recurrence in Advanced. | Persist timezone and missed-run policy because local time and DST otherwise create surprises. |
+| UX-TASK-03 | Keep Project and When visible; group orchestration details separately. | Show scope and timing before commit because both materially change the requested work. |
+| UX-TASK-04 | Open a task detail timeline with current state, next action, output and evidence. | One attempt timeline distinguishes execution success from delivery success. |
+| UX-TASK-05 | Define Draft → Scheduled/Queued → Running → Waiting → Completed/Failed/Stopped, with retry/idempotency rules. | Explicit transitions prevent retries from creating duplicate external actions. |
+| UX-TASK-06 | Hide hierarchy unless requested; visualize child progress and define parent settlement. | Progressive disclosure keeps simple work simple while parent settlement remains deterministic. |
+
+## 14.8 MEM decisions
+
+| Finding | Decision | Explanation |
+| --- | --- | --- |
+| UX-MEM-01 | Keep Edit, Pin and More; move source/scope/expiry/history/archive/delete into a details drawer. | A compact card makes review tractable while retaining deliberate lifecycle controls. |
+| UX-MEM-02 | Publish one lifecycle and use the same verbs in UI, API, audit and documentation. | Use separate lifecycle dimensions from section 13; archive, pin and expiry are not mutually exclusive states. |
+| UX-MEM-03 | Add a retention summary: permanent, expires soon, stale for review, archived and pending deletion. | Explain age using creation, verification, retrieval and expiry separately; old does not imply wrong. |
+| UX-MEM-04 | Translate into reasoned labels with “Why?”; retain raw scores in Advanced. | Explain evidence quality instead of presenting scores as calibrated probabilities. |
+| UX-MEM-05 | Add last recalled, recall count, which answer used it, and a direct turn link. | Extend existing last-used data with context inclusion and provenance; do not claim inclusion proves model use. |
+| UX-MEM-06 | Explain the pipeline: observed → suggested → approved → recalled → reviewed/expired. | Separate suggested observations from approved facts so inference cannot silently become identity. |
+| UX-MEM-07 | Move engine configuration to Advanced or Models; show only health and repair action in Memory. | Engine configuration belongs with operators; personal review should expose health and repair. |
+| UX-MEM-08 | Require a preview with merge/skip choices, source trust classification and reversible batch receipt. | Imports are untrusted batches; previews prevent conflicting facts becoming accepted memory. |
+
+## 14.9 MSG decisions
+
+| Finding | Decision | Explanation |
+| --- | --- | --- |
+| UX-MSG-01 | Provide a “Connect channel” wizard with account authorization, sender discovery, test exchange and readiness check. Keep raw fields in Advanced/operator setup. | A guided connection reduces misconfiguration; secret acquisition still uses supported authenticated flows. |
+| UX-MSG-02 | Call these “Channels” or “Messaging accounts”; reserve Connector for the underlying integration. | Channels describe user-visible accounts while Connector remains the implementation term. |
+| UX-MSG-03 | Render a checklist: Connected → owner verified → allowed conversations → routing → test → enabled. | Pairing authenticates a sender; each route still needs independently scoped authorization. |
+| UX-MSG-04 | Test through the selected account/conversation and apply the same routing and egress policy as real delivery. | A test must exercise the same destination and policy as production to provide meaningful assurance. |
+| UX-MSG-05 | Show DM/group scope, mention requirement, thread mapping, sender role and bot-loop protection per route. | Visible group and sender scope prevents another participant being treated as the owner. |
+| UX-MSG-06 | Track received, accepted, queued, processed, reply queued, delivered and failed separately. | A completed task is not a delivered reply; separate receipts enable safe retry. |
+
+## 14.10 MCP decisions
+
+| Finding | Decision | Explanation |
+| --- | --- | --- |
+| UX-MCP-01 | Offer Add from verified catalogue, plugin, local command or remote URL; show raw template only in Advanced. | Catalogue discovery reduces setup effort but publisher verification never grants execution authority. |
+| UX-MCP-02 | Preview tools, roots/resources, network class, secrets, writable paths and required Permissions before activation. | A concrete scope preview lets owners understand what enabling a server exposes. |
+| UX-MCP-03 | Add plain-language purpose, risk category, source/publisher, last use and recent outcomes. | Purpose and provenance aid review; server-supplied descriptions remain untrusted. |
+
+## 14.11 PROJ decisions
+
+| Finding | Decision | Explanation |
+| --- | --- | --- |
+| UX-PROJ-01 | Pass an explicit project handoff or call the same selection contract used by Build. Keep Chat retrieval owner-wide while filing the new session to the project. | Use a typed handoff shared with Build; do not change owner-wide Chat retrieval as a side effect. |
+| UX-PROJ-02 | Use Open/Continue as primary, New work as secondary and move lifecycle actions into an overflow menu. | Prioritize continuation; lifecycle actions need deliberate discovery and confirmation. |
+| UX-PROJ-03 | Lead with Continue work, recent activity and needs attention; place files/tasks/sessions/checkpoints in tabs or grouped sections. | Summaries answer what to do next before presenting specialist inventories. |
+| UX-PROJ-04 | Resolve user-facing filenames/type/size; retain IDs only in provenance details. | Resolve labels through authorized metadata queries; raw identifiers remain available for diagnostics. |
+| UX-PROJ-05 | Add Active/Archived filter with restore and retention behavior. | Archive must have a find-and-restore path and a documented retention contract. |
+| UX-PROJ-06 | Use a real modal/tree, disable self/descendants and prove backend cycle rejection. | Client prevention aids usability; transactional server cycle rejection remains authoritative. |
+| UX-PROJ-07 | Require step-up, typed project name, exact filesystem impact preview and recoverability statement. | Destruction needs accurate impact and fresh authority; typed text is confirmation, not authentication. |
+| UX-PROJ-08 | Show title, last activity, mode and status; make the row open the conversation. | Make sessions recognizable and directly resumable. |
+| UX-PROJ-09 | Distinguish Current project, recently active and archived; use one authoritative work-project store. | Selection, activity and archival state are distinct facts and need distinct labels. |
+
+## 14.13 Identity, enforcement, installers and release decisions
+
+| Finding | Decision | Explanation and completion evidence |
+| --- | --- | --- |
+| RR-IDENTITY-01 | Resolve an authorized account presentation record at ingress and rendering; retain principal IDs for authorization/audit. | Display name → username → neutral account label fallback; never infer ownership from a name. Trace the reported sentence before assigning a root cause. Test missing, renamed, malicious and duplicate display names. |
+| RR-AUTHORITY-01 | Require broker-issued authority for every side effect and isolate untrusted execution outside the control process. | Issuer/type checks prevent accidental bypass, not hostile same-process code. Inventory every route, worker, plugin and nested tool call and prove denial and revocation. |
+| RR-MCP-01 / SEC-MCP-01 | Launch MCP with an explicit minimal environment inside the selected runtime. | Ambient secrets are unnecessary authority. Test sentinel secret absence, explicit secret grants, child inheritance and revocation. |
+| RR-MCP-02 / SEC-MCP-02 | Use owner-authorized endpoint classes and enforce them across DNS, redirects and proxies. | Do not prohibit deliberate LAN use or infer authorization from a URL alone. Test allowed private services and rejected destination changes. |
+| SEC-MCP-03 | Separate best-effort telemetry from mandatory containment enforcement. | Optional metrics may fail without stopping work; unavailable required enforcement must prevent execution. Inject each failure independently. |
+| RR-INSTALL-01 | Supply an app-owned supported runtime and install only base execution dependencies. | No host development toolchain assumptions; optional tools/models install through separately consented flows. Verify clean machines without Python/Node and inventory shipped files. |
+| RR-PROJECT-01 | Implement UX-PROJ-01 with explicit session filing. | Project context must not accidentally redirect the next unrelated conversation. Verify cross-mode and cancelled navigation. |
+| RR-DESIGN-01 | Release durable asset support before claiming a persistent design workspace. | Optional canvas breadth is not a universal first-release blocker; either implement and verify the claim or narrow the published scope. |
+| RR-VERIFY-01 | Require evidence for the exact signed release candidate and declared platform matrix. | A green development commit cannot certify installer/provider/device behavior. Record artifact digest, environment, test result and reviewer for each applicable gate. |
+| INSTALL-02 | Respect package-manager ownership; remove unmanaged post-install writes. | Install manifests must account for launchers and repair/uninstall; preserve workspaces and keys by default. |
+| INSTALL-03 | Resolve release dependencies from the lock and pin/checksum build tools. | Reproducibility requires identical inputs, not merely rerunning a mutable download. Compare native builds and retain input digests. |
+| INSTALL-04 | Stage updates with schema-aware backup and rollback. | Binary rollback alone may corrupt newer data. Test interrupted swaps, disk-full, failed migration and unsupported downgrade. |
+| RELEASE-02 | Retain generated SBOMs, provenance, vulnerability triage and signing evidence with each release. | Generation already exists; retention and verification must be demonstrated. Do not describe this as an entirely missing SBOM implementation. |
+| RELEASE-03 | Gate shipped dependencies with actionable scanning and documented exceptions. | A scanner result needs reachability/impact triage and an expiry-bound exception; no blanket declaration that every warning is a blocker. |
+| RELEASE-04 | Run mobile/1080p, keyboard, screen-reader and recovery journeys on a real authenticated build. | Static components cannot prove layout, focus or assistive behavior. Store current screenshots and failure states; no fabricated images. |
+| RUNTIME-01 | Negotiate capabilities and enforce the same filesystem/network/process/secret contract for local, container, SSH and remote adapters. | A backend unable to enforce a requested boundary must be unavailable for that operation, with a concrete remedy; no silent host fallback. |
+| RUNTIME-02 | Recheck policy revision and revocation before execution and resumption. | Approval binds normalized action, destination, scope and expiry. Retrying or waking a sandbox must not reuse stale authority. |
+| RUNTIME-03 | Bound execution time, output, CPU/memory, concurrency and delegated budgets. | Limits apply to nested work and actual streamed bytes; test output floods, hung children, cancellation and orphan cleanup. |
+| RUNTIME-04 | Represent ambiguous external outcomes explicitly and reconcile before retry. | Local leases cannot guarantee exactly-once external effects. Use provider idempotency where available and outcome_unknown otherwise. |
+
+## 14.14 Decisions for every Settings page
+
+Every page uses the revision-safe save contract in NEW-SET-01 below. The page-specific implementation and tests in DEC-10, DEC-11 and DEC-21 remain mandatory.
+
+| Page | Decision | Explanation |
+| --- | --- | --- |
+| General | Separate UI locale, speech locale, model context and IANA timezone; make weather location opt-in. | Changing appearance must not silently disclose location or reinterpret stored task instants. |
+| Notifications | Use per-event/channel preferences, quiet hours and the durable delivery outbox. | Muted alerts do not approve work; failed delivery must be visible and retryable. |
+| Personalisation | Provide reversible live previews with validated accessibility-safe bounds. | Users can assess changes before persistence; Cancel restores confirmed preferences. |
+| Security | Separate sign-in/devices, vault, findings and standing grants; expose emergency pause. | Different lifecycles and recovery actions should not compete in one long form. |
+| Privacy | Provide a data inventory and per-service disclosure of data leaving the device. | Local storage does not imply local inference; retention and external deletion limits need explicit explanation. |
+| Account | Resolve presentation identity independently and require fresh authority for deletion. | Renaming must preserve ownership; delete impact and backup retention must be accurate. |
+| Web access | Compile visible Allow/Block rules into shared destination policy. | UI rules cannot widen capability grants; bounded destination probes must not become an unrestricted fetch service. |
+| Git credential | Prefer supported OAuth/credential-manager flows with scoped-token fallback. | Repository/host/operation scope, expiry and revocation reduce credential exposure without excluding unsupported providers. |
+| Runtime | Guide boundary selection, prerequisite checks and access preview before activation. | A successful SSH connection is not proof of filesystem/network isolation. |
+| Updates | Expose verified candidate metadata and only offer supported rollback. | Trust comes from signature and schema compatibility checks, not a success-colored version label. |
+
+
+# 15. Additional source findings from the final pass
+
+These are static findings against the reviewed Raiker code, not live reproductions or demonstrated authorization exploits. They supplement the earlier review rather than marking existing work fixed.
+
+## NEW-SET-01 — Settings can acknowledge edits that were never saved
+
+**Priority/decision:** P1; implement revision-aware, serialized persistence before stable release. Effort M; frontend owner with API support for concurrent-client revision conflicts.
+
+**Evidence:** `web/src/lib/views/SettingsView.svelte::save`, `push` and the save bar (lines 73–100 and 190–193 at the reviewed source). `push` snapshots settings, awaits the request and unconditionally clears dirty state. Inputs and Save/Discard remain usable; there is no in-flight guard in `push`. A later failed save also restores the older server snapshot.
+
+**Reproduction to implement:** Change A, delay its save response, edit B, then resolve A. The code clears B's dirty indication although B was absent from the submitted snapshot. Start two saves and resolve them out of order to exercise stale acknowledgement. Reject the first save after editing B to exercise loss of the newer draft. These sequences are inferred from source and still require executable regression tests.
+
+**Explanation:** The existing load-time protection and failure rollback are useful, but do not establish correct save-time concurrency. A green “saved” message must acknowledge a precise edit revision.
+
+**Implementation:** Track confirmed server revision, draft revision and in-flight snapshot separately. Guard or serialize submissions; accept only the corresponding acknowledgement. Rebase edits made after submission onto the returned confirmed state and retain their dirty markers. On failure preserve the newer draft and expose Retry/Discard. Define Discard during a pending write explicitly: it cannot cancel an already committed server change. Use expected server revision for cross-tab conflicts and provide a field-level conflict choice. Do not silently implement last-response-wins.
+
+**Acceptance:** Deferred-request tests for edit-during-save, double Save, out-of-order responses, failure with newer edits, Discard while pending and two-tab conflicts. “All changes saved” must mean draft equals acknowledged state. Update the earlier positive assessment of Settings dirty-state handling with this qualification.
+
+## NEW-PROJ-01 — Project detail and child panels can resolve out of order
+
+**Priority/decision:** P1; bind every response to a selection generation. Effort S/M; Projects controller owner.
+
+**Evidence:** `web/src/lib/views/ProjectsView.svelte::open` (277–287) assigns awaited detail directly; `loadProjectContext` (257–274) assigns files and tasks without checking whether that project is still selected. These asynchronous requests share the same view state.
+
+**Reproduction to implement:** Open A with delayed file/task reads, open B and resolve B, then resolve A's child reads. B's detail can be presented with A's supplementary data. An older rejected detail request can also clear a newer successful selection. This is a same-owner presentation race; it is not evidence of a backend cross-owner read.
+
+**Explanation:** A workspace header is an implicit promise that every visible file/task belongs to that workspace. Ignoring stale results is required even if requests are cancellable.
+
+**Implementation:** Increment a selection generation on open/close and capture project ID plus generation for every detail/files/tasks request. Stage responses and commit only while both still match. Abort obsolete work where supported; retain generation checks because cancellation may race completion. Clear prior panels on selection, give each current panel a loading/error state, and bind actions to the actual loaded resource ID. Keep context edits per project and warn before discarding them.
+
+**Acceptance:** Resolve A/B detail and child reads in all relevant orders; reject stale requests; close while loading. No mixed-project header/files/tasks and no stale error may overwrite the current selection.
+
+## NEW-ACCOUNT-01 — Delete confirmation offers Cancel while deletion is running
+
+**Priority/decision:** P1 UX; make the irreversible request state explicit. Effort S; Account UI owner.
+
+**Evidence:** `web/src/lib/views/settings/Account.svelte::deleteAccount` sets busy and performs elevation followed by deletion; the Cancel control at line 88 only hides confirmation and is not disabled while busy. It neither aborts nor reverses deletion.
+
+**Reproduction to implement:** Delay account deletion, click Cancel after submitting, then complete the request. The page can appear to have left confirmation while deletion continues.
+
+**Explanation:** A control labelled Cancel must not imply that an irreversible operation has been cancelled when it only closes a form. This finding does not imply the existing elevation check is missing.
+
+**Implementation:** Once submission starts, show “Deleting account…” and disable the confirmation's Cancel action. If dismissal remains available, label it Close and clearly state that deletion continues; prefer keeping this destructive operation visible. Add a function-level busy guard. Preserve confirmed failure recovery; handle lost responses by checking account/session status before presenting a retry.
+
+**Acceptance:** Delayed success/failure, repeated submission, attempted dismissal and lost response; never display cancellation success without server confirmation. Verify deletion impact against the server's actual retention behavior.
+
+# 16. Feature/service adoption under Raiker governance
+
+## 16.1 Adoption decision and evidence limits
+
+**Decision:** Reproduce useful user outcomes through Raiker service contracts. Do not embed another unrestricted agent loop as an alternate executor. A compatibility adapter may translate protocols and data, but must not mint authority, import standing approvals, bypass audit, or silently move execution onto the host.
+
+This pass re-read both requested repositories' README and security policies, inspected one execution-environment implementation and one delegation entry point, and read the other reference's sandboxing and delegation documentation. README entries establish advertised capability, not tested implementation parity. Source snapshots are recorded below anonymously to respect the requested documentation style. The two sources remain identifiable to the requesting owner from the supplied review inputs. This is not an exhaustive inventory of their plugins, platform variants or every service.
+
+| Evidence token | Material inspected | Blob SHA |
+| --- | --- | --- |
+| REF-A-OVERVIEW | overview source snapshot, inspected 2026-09-13 | `c05112266746ff99a3326a62c38c33fbc08ecd23` |
+| REF-A-TRUST | trust source snapshot, inspected 2026-09-13 | `cea2a9a2e8869ac7a4b7307332b974a27e9fd27a` |
+| REF-A-RUNTIME | runtime source snapshot, inspected 2026-09-13 | `f9cbac4cb3372def4f832472e7f0803b7fc66859` |
+| REF-A-DELEGATION | delegation source snapshot, inspected 2026-09-13 | `b47e2fd7ac469d8e6b0d47c5a7e16c33107ca18c` |
+| REF-B-OVERVIEW | overview source snapshot, inspected 2026-09-13 | `07620dcb7d81596e63c344a73055b5e34d72d0c3` |
+| REF-B-TRUST | trust source snapshot, inspected 2026-09-13 | `383cfaafe78a281899e1f52cbfc9f5c9627cbf0a` |
+| REF-B-SANDBOX | sandbox source snapshot, inspected 2026-09-13 | `96a0fb85c51fe4eb03728cbc7fdd31b932d8fc05` |
+| REF-B-DELEGATION | delegation source snapshot, inspected 2026-09-13 | `1250827c1c290d55b5f5ec406487e1bba9f5a1c8` |
+
+Anonymous tokens preserve this document's naming constraint; they are not a substitute for a source/licensing inventory if code is copied. Keep legally required notices and provenance with any reused code. Prefer independent implementation of contracts where feasible.
+
+## 16.2 Security reconciliation decisions
+
+| Conflict to resolve | Raiker decision | Explanation |
+| --- | --- | --- |
+| Personal-agent trust versus hostile shared operators | Retain the declared owner/account boundary; treat channel participants as untrusted until mapped and authorized. | Pairing or a shared gateway secret must not silently make everyone an owner. Separate trust domains require real isolation, not separate chat tabs. |
+| Useful policy gates versus hostile code | Keep deterministic policy/approval checks and isolate untrusted code outside the trusted controller. | In-process handles and heuristics prevent classes of mistakes; they cannot constrain code able to read controller memory or bypass its functions. |
+| Terminal sandbox versus all execution paths | Inventory shell, file tools, code RPC, MCP, hooks, media workers and plugins; apply the intended boundary to each. | A container used only by terminal commands leaves other execution paths outside that boundary. |
+| Convenient automation versus consent | Use explicit, scoped, expiring standing grants where allowed; Ask pauses work durably. | Unattended does not mean unrestricted. Existing authorization may cover repeated work without prompting every step. |
+| Learning versus privilege growth | Learned procedures may propose behavior and tools; activation never expands grants by itself. | A successful task is evidence of utility, not permission to install code or disclose future data. |
+| Broad credentials versus integrated services | Resolve per-service scoped secret handles only in the authorized adapter. | One setup flow can feel seamless without distributing the owner's full credential set. |
+| Flexible network access versus unexpected destinations | Permit deliberate owner grants for private services; enforce exact destination policy across redirects and DNS. | Blanket private-network bans break legitimate local workflows; implicit reachability grants are too broad. |
+| Easy installation versus system modification | Bundle supported base runtime, install optional capabilities separately, verify artifacts. | Feature breadth does not justify installing all development/media/GPU dependencies or disabling endpoint protection. |
+
+## 16.3 Capability implementation contracts
+
+Status below is **planned adaptation unless the earlier Raiker evidence explicitly establishes a narrower existing behavior**. “Extend” refers to an existing surface, not complete service parity. Each acceptance scenario must cover allowed, denied, revoked, interrupted and replayed operation where applicable.
+
+| ID / capability / evidence | Raiker decision and rationale | Implementation sequence and data contract | Acceptance and dependency |
+| --- | --- | --- | --- |
+| CAP-01 Learning and reusable procedures; REF-A-OVERVIEW | Extend Memory/Extensions with reviewable learned skill versions; retain useful learning without autonomous privilege expansion. | Capture outcome evidence → propose procedure with source/task IDs → validate manifest/tool requirements → show diff → activate approved version. Keep rollback pointer and evaluation results. | Poisoned tool output cannot change policy; revoked capability stays denied after skill upgrade. DEC-13/23/16. |
+| CAP-02 Personal memory and conversation search; REF-A-OVERVIEW | Extend recall with provenance and explicit user-profile consent; inferred preferences are not verified identity. | Index authorized sessions; retrieve with owner/scope filters; summarize with source links; propose profile changes; enforce expiry/tombstones at query and restore. | Cross-owner negative tests, stale summary invalidation and forgotten fact suppression. DEC-01/13. |
+| CAP-03 Steering, branching, compaction and terminal commands; REF-A-OVERVIEW, REF-B-DELEGATION | Use one session command service across UI/CLI/channels; preserve predictable continuity. | Normalize commands into typed intents; bind session/run revision; checkpoint before compaction; preserve original evidence and pending approvals; distinguish stopping a run from deleting a session. | Redirect during a tool call, restart after compaction and branch without replaying completed writes. DEC-05/22. |
+| CAP-04 Delegated and parallel work; REF-A-DELEGATION, REF-B-DELEGATION | Extend Tasks with child runs and narrower grants; independent transcript is not a sandbox. | Persist parent/child IDs, context-sharing mode, scope intersection, depth/concurrency/token limits, cancellation lineage and result receipt. Return results to parent; expose a separate persistent conversation only when requested. | Child cannot exceed parent grants; revoke/stop propagates; duplicate completion settles parent once; child persistence survives parent lifecycle. DEC-12/16/22. |
+| CAP-05 Programmatic tool composition; REF-A-OVERVIEW | Add sandboxed orchestration RPC through the broker; reduce repeated model calls without introducing a bypass. | Validate script/input → run isolated worker → expose bounded RPC methods → broker authorizes each nested call → persist per-call outcome and aggregate budget. No controller secret/process access. | RPC attempts to invoke denied tools or forge authority fail; floods and oversized results remain bounded. DEC-16/25. |
+| CAP-06 Scheduled and proactive work; REF-A-OVERVIEW | Extend scheduler with explicit timing and standing authorization, not arbitrary background privilege. | Store schedule/timezone/misfire policy, task revision, grant binding and delivery target; create durable attempts under fenced leases; pause for missing authority. | DST, missed runs, duplicate wakeup, revoked grant and uncertain external outcomes. DEC-12/24. |
+| CAP-07 Channels and cross-channel continuity; both overviews | Extend Messaging with adapters sharing identity, session and outbox services. | Authenticate webhook/poll source → deduplicate event → resolve sender/route → authorize → enqueue task → record reply in durable outbox. Channel/account/thread keys remain separate from display names. | Pairing replay, forged sender, group mention rules, reconnect duplicates and delivered-versus-executed state. DEC-01/14. |
+| CAP-08 Voice and media; both overviews | Use optional bounded media workers and per-provider disclosure. | Validate actual bytes/dimensions/duration → quarantine/decode in worker → transcribe or synthesize through selected service → persist artifact provenance and retention. Microphone/camera use requires explicit device permission. | Malformed media, revoked permission, interrupted upload, transcript privacy and no secret-bearing diagnostics. DEC-10/16/25. |
+| CAP-09 Provider choice and unified service setup; both overviews | Extend Models with independent model/search/image/speech/browser adapters; one login need not imply one vendor for all tasks. | Discover capability descriptors, scoped auth references, locality and budgets; persist per-service overrides; validate fallback against tool/privacy requirements before use. | Expired auth, rate limit, absent vision/tools and forbidden cloud fallback; no automatic disclosure when local inference fails. DEC-08/24. |
+| CAP-10 Local, container, SSH and managed remote execution; REF-A-RUNTIME, REF-B-SANDBOX | Normalize adapter lifecycle and distinguish infrastructure failure from command failure. | Define prepare/execute/stream/cancel/checkpoint/restore/destroy; negotiate enforced capabilities; persist environment identity, path mapping, artifact manifest and resume policy revision. | Backend loss produces actionable degraded state; no automatic host fallback or blind replay of a potentially completed command. DEC-11/16. |
+| CAP-11 Hibernating/serverless environments; REF-A-OVERVIEW | Add optional durable remote lifecycle after the common runtime contract works. | Quiesce writes → checkpoint workspace and tool state → revoke transient credentials → suspend; on wake verify image/identity/schema, reconcile pending effects and reauthorize. | Wake after grant revocation, missing checkpoint, changed image and concurrent resume. DEC-11/24; optional release scope. |
+| CAP-12 Plugins, skills, MCP and catalogue; both overviews | Keep one extension registry with distinct package types and declared scopes. | Verify package digest/provenance/license; preview tool and secret requirements; stage install; execute code in a suitable worker; version manifests; rerun scope review on update. MCP remains behind common runtime/egress controls. | Malicious metadata treated as data; package update cannot silently add grants; rollback and disable terminate new invocations. DEC-15/23. |
+| CAP-13 Device actions and interactive canvas; REF-B-OVERVIEW | Plan revocable paired-device adapters and durable assets; do not bundle into the minimum first release implicitly. | Pair device key with owner confirmation; issue short-lived operation scopes; route camera/screen/actions through broker; persist canvas asset versions; render contributed UI in isolated origins. | Stolen/replayed pairing, offline device, revoked screen grant and hostile canvas links. DEC-07/20/23. |
+| CAP-14 Onboarding, diagnosis and migration; both overviews | Combine readiness checks with previewable imports; never import foreign approvals as Raiker grants. | Inventory configuration/memory/skills/assets; map schemas; preview conflicts; import into staged batch; validate provenance; separately authorize credentials and integrations; produce rollback receipt. | Secrets excluded by default, malformed import bounds, duplicate re-import and no privilege expansion. DEC-17/23/24. |
+| CAP-15 Research trajectories and evaluation exports; REF-A-OVERVIEW | Add opt-in redacted evaluation datasets separate from personal memory. | Define export schema and provenance; select task scope; redact secrets and personal data; review sample; record consent/destination and dataset version; run offline regression evaluation. | No automatic training export; deletion/retention obligations recorded; adversarial tests compare utility and policy violations. DEC-10/24. |
+| CAP-16 Gateway and client protocol compatibility; REF-B-OVERVIEW | Expose typed authenticated session/tool/event APIs over the same policy engine. | Version protocol; map tokens to real principal/scopes server-side; bound request size/rate; normalize idempotency keys; implement disconnect/resume cursors; audit every side effect. | Client-supplied scopes cannot grant authority; unknown event types fail clearly; reconnect cannot duplicate delivery or execution. DEC-01/16/25. |
+
+## 16.4 Shared service boundary and rollout
+
+Implement identity/policy/secret services first, then durable session/task/outbox and artifact services, then runtime adapters and feature adapters. UI pages consume the same service state as CLI/channel clients. Each mutation carries authenticated principal, resource scope, expected revision and idempotency key; execution adds normalized action digest, effective policy revision, expiry and broker-issued authority. Persist audit correlation without storing raw credentials. Treat these as proposed interface fields, not names of APIs already present.
+
+The complete journey to verify is: an authorized channel message creates Project work; a task delegates bounded research; a learned procedure remains a proposal; a remote runtime produces versioned artifacts; an approval can pause/resume the task; delivery uses the original authorized route; Memory records only approved facts with provenance. Repeat with revocation during each handoff, duplicate events, offline providers, restart and deletion. Every UI must show the same run, scope, pending decision and outcome.
+
+Roll out behind capability flags and schema migrations with old clients supported or explicitly rejected. Enable one adapter at a time after its contract tests and user journey pass; retain a kill switch that stops new execution and reconciles running work. Keep optional device/canvas/serverless/evaluation breadth in the documented roadmap if excluded from the first release; do not silently drop it from the long-term requested scope.
+
+## 16.5 Definition of feature matching
+
+A capability is matched only when its user-visible outcome, supported platforms/providers, lifecycle, permissions, failure recovery, migration and acceptance evidence are recorded. Catalogue rows are not a percentage-complete claim. Remaining work includes inventorying every source plugin and platform-specific feature at pinned revisions and assigning each an adopted, adapted, deferred or unsupported disposition with rationale. No full-parity claim is justified yet.
+
+Documentation review does not certify the first release. The verdict remains: do not call the broad intended product release-ready until applicable defects and assurance gates close; a smaller accurately described release may exclude optional capability breadth.

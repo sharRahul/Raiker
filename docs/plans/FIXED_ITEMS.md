@@ -514,6 +514,17 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-490](#fixed-490--a-composer-holding-eleven-choosable-models-said-none-was-set-up) | Low | Chat / Build / Tasks composer | Fixed 2026-09-12 (found live) |
 | [FIXED-491](#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach) | Medium | Design / image runtime | Fixed 2026-09-13 (BUG-277, VIS2-19, VIS2-20) |
 | [FIXED-492](#fixed-492--a-generated-image-did-not-belong-to-the-project-it-was-made-in) | Medium | Design / projects | Fixed 2026-09-13 (BUG-282, VIS2-11) |
+| [FIXED-493](#fixed-493--the-two-sections-at-the-top-of-permissions-named-a-control-and-did-not-offer-one) | High | Permissions / web UI | Fixed 2026-09-13 (NEW-PERM-01, owner-reported) |
+| [FIXED-494](#fixed-494--permissions-answered-the-same-question-two-ways-at-once) | High | Permissions / view model | Fixed 2026-09-13 (NEW-PERM-02) |
+| [FIXED-495](#fixed-495--an-unrecognised-mode-was-rendered-as-the-most-permissive-verdict-the-table-can-print) | Medium | Permissions / honesty | Fixed 2026-09-13 (NEW-PERM-03) |
+| [FIXED-496](#fixed-496--new-chat-on-a-project-card-opened-a-chat-that-belonged-to-no-project) | Medium | Projects / Chat continuity | Fixed 2026-09-13 (RR-PROJECT-01, DEC-04) |
+| [FIXED-497](#fixed-497--a-projects-header-could-stand-over-another-projects-work) | Medium | Projects / web UI | Fixed 2026-09-13 (NEW-PROJ-01) |
+| [FIXED-498](#fixed-498--cancel-stayed-live-while-an-account-was-being-deleted) | Medium | Account / irreversible actions | Fixed 2026-09-13 (NEW-ACCOUNT-01) |
+| [FIXED-499](#fixed-499--settings-said-all-changes-saved-about-an-edit-it-had-never-sent) | High | Settings / save concurrency | Fixed 2026-09-13 (NEW-SET-01) |
+| [FIXED-500](#fixed-500--every-local-mcp-server-was-handed-raikers-whole-environment) | **Critical** | MCP / secret exposure | Fixed 2026-09-13 (RR-MCP-01, SEC-MCP-01) |
+| [FIXED-501](#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name) | High | Identity / prompts | Fixed 2026-09-13 (RR-IDENTITY-01, DEC-01) |
+| [FIXED-502](#fixed-502--a-relative-time-assertion-written-against-an-absolute-instant) | Low | Web test suite | Fixed 2026-09-13 (found while fixing NEW-PERM-02) |
+| [FIXED-503](#fixed-503--the-live-harness-looked-for-provider-controls-that-had-moved-into-a-menu) | Low | Live test harness | Fixed 2026-09-13 (found while verifying FIXED-501) |
 
 ---
 
@@ -21700,3 +21711,416 @@ through the product's own control, asserts Design's outgoing request carries tha
 `fetch_failed:URLError` because this host cannot reach the provider, and the
 refused row landed against the project, which is the request half proven end to
 end through the runtime.
+
+---
+
+## FIXED-493 — The two sections at the top of Permissions named a control and did not offer one
+
+**Severity: High. Area: Permissions / web UI. Status: Fixed 2026-09-13. Closes
+[NEW-PERM-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#172-new-perm-01--top-sections-do-not-provide-a-working-shortcut).**
+
+**Observed.** The owner reported that the top of Permissions "is not working".
+It was: **Common permissions** and **Needs your attention** were lists of spans
+and `<strong>` text with no button, link or handler anywhere in them. They are
+the most prominent thing on the page and they name exactly the permissions an
+owner arrives to change, so an owner read the name and then went and found the
+same name again in a registry of sixty-six rows. Prominence that does not act is
+friction wearing the clothes of help.
+
+**Fixed.** Every common entry carries **Manage** and every attention entry
+carries **Review**, and both call one reveal: it clears a filter that would hide
+the row, expands the row's domain group, opens the row, scrolls it into view and
+**moves the keyboard onto its control**. A shortcut that scrolls and leaves focus
+behind has only helped the half of the page that uses a mouse.
+
+Deliberately a reveal rather than a second copy of the control. Two editable
+copies of one permission is how a page comes to disagree with itself, which is
+the defect next door ([FIXED-494](#fixed-494--permissions-answered-the-same-question-two-ways-at-once)).
+A capability with no registry row — no executor in this build — says so instead
+of scrolling to nothing, so there is no dead action.
+
+**Verification.** Two cases in `web/src/lib/views/CapabilitiesView.test.ts` (the
+shortcut works against a folded group and lands focus on the row; the attention
+entry opens the same row), and a live round that folds the group, presses
+**Manage** and reads the expanded, focused row back
+(`web/e2e/release-readiness-2026-09-13-live.spec.ts`, captures under
+`docs/screenshots/2026-09-13-release-readiness/`).
+
+---
+
+## FIXED-494 — Permissions answered the same question two ways at once
+
+**Severity: High. Area: Permissions / view model. Status: Fixed 2026-09-13.
+Closes [NEW-PERM-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#173-new-perm-02--summaries-can-disagree-with-changed-decision-modes).**
+
+**Observed.** The page rendered each capability four times — the segmented
+control, the Common permissions summary, the attention list and the authority
+table — and only the control read the modes the owner had just changed. The other
+three read the gate list as it arrived from the last
+`GET /api/capability-gates`. So setting a capability to **Never** left the
+control saying Never and the summary directly above it still saying Automatic,
+until a refresh nobody was told to make.
+
+A permissions page that answers the same question two ways is worse than one that
+answers slowly: the owner cannot tell which answer the runtime will act on.
+
+**Fixed.** One list. `permissionViewModel.ts` merges every server-confirmed mode
+into the read, and every presentation on the page derives from the result —
+nothing derives from the raw read once a mutation has landed on top of it. Two
+races are closed with it:
+
+* **A slow refresh cannot undo a fast change.** Each confirmation is stamped with
+  a sequence number and a read may only clear confirmations older than itself, so
+  pressing **Refresh** just after a change no longer shows the value it replaced.
+* **An older read cannot land on top of a newer one.** Reads are numbered too.
+
+**Found while fixing it.** The bulk bar stopped at the first refusal and reported
+*"The bulk change was rejected"* while the capabilities already changed stayed
+changed — the sentence told the owner something untrue about their own policy.
+Every selection is now attempted, each outcome recorded against its own
+capability, and the report names both halves (*"1 changed; 1 refused and left as
+it was: Web fetch"*). What was refused stays selected, so it can be retried
+without finding it in the registry again.
+
+**Verification.** Eight cases in `web/src/lib/permissionViewModel.test.ts`, two
+in `web/src/lib/views/CapabilitiesView.test.ts` (every summary moves together; a
+partly refused bulk change is reported honestly), and a live round that sets a
+mode through the product's own control and reads the summary, the row and a
+**Refresh** back.
+
+---
+
+## FIXED-495 — An unrecognised mode was rendered as the most permissive verdict the table can print
+
+**Severity: Medium. Area: Permissions / honesty. Status: Fixed 2026-09-13.
+Closes [NEW-PERM-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#174-new-perm-03--unknown-modes-and-automatic-mode-attention-need-honest-semantics).**
+
+**Observed.** Three separate places where the page stated more than it had been
+told.
+
+* `AuthorityMatrix.agentAuthority` returned **Direct** for every mode that was
+  not `deny` or `ask` — which quietly included a mode that is missing, misspelt
+  or newer than this build. An unrecognised value rendered as the most permissive
+  verdict the table can print. Unknown is not evidence of permission.
+* `permissionAttention` described *every* auto-mode capability as *"runs
+  automatically, without asking you"*, without checking whether it was available
+  or ready. Configured Automatic is a fact about the account; it is not evidence
+  that anything is running, and an alarm about work that cannot happen is worse
+  than no alarm.
+* Common permissions resolved availability as "not disabled", while the registry
+  row resolved it as "not disabled, **or** on by default" — so the same
+  capability read `Off` in the summary and `On` in the list below it.
+
+**Fixed.** One rule per fact, each stated once. `isAvailable` and `isReady` live
+in `capabilityModel.ts` and every surface uses them. The authority table
+enumerates modes exhaustively and prints **Allow**, **Automatic**, **Ask**,
+**Denied**, **Not ready**, **Unavailable** or **Unknown** — `Direct` is gone,
+because it was one word for two different grants and for a value the build did
+not recognise. Its owner column now restates the owner's own two answers in the
+page's own words (`On · Ask me`) rather than in a third vocabulary. An attention
+entry says *is set to run automatically, but is not available right now* when
+that is what is true.
+
+The heading claimed *carried* authority for a table that reads account
+configuration, so it says which: the summary is labelled **read-only**, and it
+states that a task's own scope and the runtime's checks at the moment of use can
+narrow it further.
+
+**Verification.** Four cases in `web/src/lib/components/AuthorityMatrix.test.ts`,
+two in `web/src/lib/permissionLanguage.test.ts`, two in
+`web/src/lib/views/CapabilitiesView.test.ts`, and a live round that reads the
+summary's own wording back off a running server.
+
+---
+
+## FIXED-496 — "New chat" on a project card opened a chat that belonged to no project
+
+**Severity: Medium. Area: Projects / Chat continuity. Status: Fixed 2026-09-13.
+Closes [RR-PROJECT-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#what-blocks-a-public-first-release)
+and the Chat half of [DEC-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-04--make-project-continuity-explicit-and-typed).**
+
+**Observed.** `newChatInProject` set `window.location.hash` and nothing else,
+while **Start in Build** beside it established the project. The comment above it
+explained why: Chat's retrieval is owner-wide by design and starting a
+conversation from a project must not quietly scope it.
+
+The first half of that is right and is unchanged. The second half conflated two
+different things — *what a turn may retrieve* and *where the resulting
+conversation is filed*. Only the first is a boundary. The second is the ordinary
+meaning of pressing **New chat** on a project card.
+
+**Fixed.** The button sets the shared Work project, which is filing: it is named
+in the composer before the owner presses Send, it re-files nothing that already
+exists, and retrieval stays account-wide exactly as before.
+
+**Two things that had to move with it.** Chat is mounted once and hidden between
+route visits, so it read the shared value when the application started and never
+again — the project was set and the composer had already made up its mind. It now
+adopts the shared value reactively, and only while no session exists, so nothing
+that already has a project is re-filed.
+
+And the *second* chat in a project was filed nowhere: the pending project is
+consumed when the first conversation is created, and starting another left it
+null while the composer went on naming the project. A new conversation re-reads
+the project the composer is showing.
+
+**Verification.** Two cases in `web/src/lib/views/ProjectsView.test.ts` (both work
+actions establish the project and route), two in
+`web/src/lib/workProjectContinuity.test.ts` (an already-mounted Chat picks the
+project up; the second conversation is filed too), and a live round that creates
+the project through the product's own control, presses **New chat** and reads the
+composer's picker back.
+
+---
+
+## FIXED-497 — A project's header could stand over another project's work
+
+**Severity: Medium. Area: Projects / web UI. Status: Fixed 2026-09-13. Closes
+[NEW-PROJ-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-proj-01--project-detail-and-child-panels-can-resolve-out-of-order).**
+
+**Observed.** A project home is four independent reads — the detail, the files,
+the tasks and the images — sharing one set of view variables, and every one of
+them was assigned the moment it resolved. Open project A on a slow workspace,
+open B while A's task read is still out, and B's header stood over A's work. A
+workspace header is an implicit promise that everything under it belongs to that
+workspace, and this broke the promise silently, which is the worst way to break
+it.
+
+The other direction was worse to look at: an older *failed* detail read replaced
+a project that had loaded correctly with an error about a different one.
+
+**Fixed.** A selection generation. Each open takes the next number, every
+response carries the number of the open that asked for it, and a response is
+committed only while that number is still current — for failures as well as
+successes, and for closing during a load, because closing takes a number too. The
+previous project's panels are cleared on selection rather than left under the new
+name.
+
+This is not a substitute for cancelling the request; it is what makes cancellation
+unnecessary to get right, because a cancel can always lose the race with a
+response already on the wire.
+
+**Verification.** Two cases in `web/src/lib/views/ProjectsView.test.ts` driving a
+fetch stub whose routes are resolved by hand, in the order the defect needs: a
+late answer for a project that has been left is discarded, and an older rejection
+cannot clear a newer selection. Both fail against the previous code.
+
+---
+
+## FIXED-498 — Cancel stayed live while an account was being deleted
+
+**Severity: Medium. Area: Account / irreversible actions. Status: Fixed
+2026-09-13. Closes [NEW-ACCOUNT-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-account-01--delete-confirmation-offers-cancel-while-deletion-is-running).**
+
+**Observed.** Deleting an account elevates, then deletes. Both are requests, so
+there is a window between pressing the button and the account being gone — and
+through that whole window the confirmation offered a control labelled **Cancel**
+that only hid the form. Pressing it returned the owner to a page that looked
+untouched while the deletion carried on behind it: the one moment in Raiker where
+a wrong impression cannot be undone.
+
+**Fixed.** Once the deletion is submitted there is no Cancel. The button reads
+**Deleting account…**, the password field is disabled, and the page says plainly
+that this cannot be cancelled or undone and that Raiker will return to the
+sign-in screen when it is finished. A refused deletion is still an ordinary
+failure and gives the form back.
+
+The guard is in the function, not only on the button: a disabled button is a
+presentation, not a lock.
+
+**Verification.** Four cases in `web/src/lib/views/settings/Account.test.ts`
+against a held-open deletion — no Cancel while it runs, no second submission, the
+form returned on refusal, and backing out before submitting still works.
+
+---
+
+## FIXED-499 — Settings said "All changes saved" about an edit it had never sent
+
+**Severity: High. Area: Settings / save concurrency. Status: Fixed 2026-09-13.
+Closes [NEW-SET-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-set-01--settings-can-acknowledge-edits-that-were-never-saved).**
+
+**Observed.** `push` snapshotted the settings, awaited the request and then
+cleared the dirty state outright. Everything about that is fine until the owner
+edits something while the request is in flight — and nothing stopped them,
+because the inputs and both buttons stayed live. Then three things went wrong at
+once:
+
+* the green *All changes saved* covered an edit that was never sent, so the owner
+  left the page believing a setting was stored that was not;
+* a second Save could overtake the first, and whichever answered last wrote its
+  own snapshot in as the server's;
+* a **failed** save replaced the whole draft with the older server snapshot,
+  discarding the newer edit along with the rejected one.
+
+**Fixed.** Two rules. Only one save is in flight at a time — the guard is in the
+function, and the control says **Saving…** while it runs. And what the page
+claims afterwards is recomputed from the keys that still differ from what the
+server confirmed, so an edit made during the request stays unsaved, keeps its
+section's mark, and is what the next Save sends. "All changes saved" is a claim
+about now, not about the request.
+
+On failure only the keys the request carried are rolled back, and the message
+says so rather than implying the newer edit went with them.
+
+**Verification.** Four cases in `web/src/lib/views/SettingsView.test.ts` against a
+held-open `PUT`, all four failing against the previous code, plus a live round
+that saves through the page and reads the acknowledgement back.
+
+---
+
+## FIXED-500 — Every local MCP server was handed Raiker's whole environment
+
+**Severity: Critical. Area: MCP / secret exposure. Status: Fixed 2026-09-13.
+Closes [RR-MCP-01 / SEC-MCP-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#required-mcp-implementation-contract).**
+
+**Observed.** `raiker/runtime/executors/mcp.py` started local stdio servers with
+`subprocess.Popen(...)` and no `env` argument, which in `subprocess` means
+*inherit the parent's entire environment*. Raiker's own process holds provider
+keys, credential references and internal settings, and every stdio MCP server the
+owner connected received all of them.
+
+Reproduced rather than reasoned about: a probe server written for this round
+recorded what it was actually started with, and the list began
+`ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `AWS_ACCESS_KEY_ID`.
+
+The server does not have to be malicious for this to matter — a crash dump, a
+debug log or a process listing leaks what a process was handed. It is an exposure
+class rather than a single bug.
+
+**Fixed.** The child gets a constructed environment: `PATH`, `HOME`, the locale
+and the Windows variables without which a process will not start, plus unbuffered
+UTF-8 output so a bounded session can read the answer. Nothing else.
+
+This is not a restriction on the owner, which is the posture Raiker holds to. The
+owner never asked for their Anthropic key to be in a weather server's
+environment; the exposure was an inheritance nobody chose, and the difference is
+between granting something and merely failing to withhold it. An owner who *does*
+want a server to have a named variable grants it by name in
+`RAIKER_MCP_ENV_ALLOWLIST` — a decision they made, written where it can be read
+back. The two variables that configure this boundary cannot be passed through it,
+so a line written to make one server work cannot quietly widen the rule it is
+written against.
+
+Remote HTTP servers are unaffected: they never share a process with Raiker.
+
+**Verification.** Seven cases in `tests/test_mcp_process_environment.py` — six on
+the constructed environment and the owner grant, and one end-to-end against a
+real local server started the way the product starts one, reporting what it was
+given. The last one fails against the previous code, naming the keys that
+travelled.
+
+---
+
+## FIXED-501 — Raiker knew its owner's authorisation key and not their name
+
+**Severity: High. Area: Identity / prompts. Status: Fixed 2026-09-13. Closes
+[RR-IDENTITY-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#2-owner-identity-defect)
+and [DEC-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-01--separate-presentation-identity-from-authorization-identity).**
+
+**Observed.** The owner reported Raiker answering *"The workspace's real owner is
+`principal_user_ac5eb6e5f7620f0d`"*. That sentence is not a literal anywhere in
+the repository, which is the interesting part: nothing wrote it. `UserMetadata`
+has always had a `display_name` field and the account routes have long returned
+one — but all four prompt entry points built `UserMetadata(id=principal_id)` and
+nothing else. The only identity a turn ever carried was the authorisation key,
+and a model handed an opaque owner identifier and no name will eventually offer
+the identifier as one. It was not hallucinating; it was answering with the only
+thing it had been given.
+
+**A second, smaller half, found closing the first.** The name the owner *chooses*
+is the `account.display_name` setting; the principals row holds the sign-in
+handle, which Account itself calls *Username* and says is fixed. Every resolver
+read the row, so setting a display name changed nothing anyone could see — Chat
+went on greeting the owner by their handle however many times they set one.
+
+**Fixed.** One server-side resolver, in `raiker/runtime/identity/presentation.py`,
+and one rule: `principal_id` stays the authorisation key and never becomes a
+name. It resolves the chosen name, falls back to the handle, and falls back again
+to **Owner** — never to an identifier, including when the store cannot be read at
+all. A display-name field that literally holds a principal id is refused as a
+name, because the whole defect is a model believing one of those is what people
+are called.
+
+All four entry points — web prompts, the scheduler, channel ingress and approval
+resume — build their `UserMetadata` through it, and a turn is given a standing
+identity block that carries the name **as data**, delimited and bounded, together
+with the sentence the symptom broke: *internal identifiers are authorization and
+audit keys, never a person's name.* The name is normalised and stripped of
+everything invisible, and that is stated as hygiene rather than as an injection
+defence — the delimiting and the standing instruction are what do that work.
+
+`GET /api/settings` now returns the resolved `display_name` beside `username`, so
+the greeting, the Account page and the model's own identity block cannot disagree
+about what to call the same person.
+
+**Verification.** Twenty cases in `tests/test_owner_identity_presentation.py`,
+including a source assertion at each of the four entry points so a new route
+cannot reintroduce the shape by copying its neighbour. And the one that actually
+closes it: a live round that sets the name through the Account page, connects
+Anthropic through the Models dialog, pins Haiku 4.5, and asks the owner's own
+question through the composer. The answer came back **"The owner of this
+workspace is Rahul S."** (`web/e2e/owner-identity-live.spec.ts`, capture at
+`docs/screenshots/2026-09-13-release-readiness/identity-answered-by-name.png`).
+A sweep over five ordinary pages asserts none of them renders a `principal_…`
+key as a label.
+
+**What the live round could not do.** This host's egress policy answers
+`connect_rejected` to `CONNECT api.openai.com` and `CONNECT openrouter.ai`, and
+it has no local Ollama, so only the Anthropic round trip is real. The other two
+keys were entered through the product's own dialog and their connections stored;
+what is proven for them is Raiker's half — the refusal reads as itself rather
+than as a bad key. Carried forward in [`TO_BE_FIXED.md`](TO_BE_FIXED.md).
+
+---
+
+## FIXED-502 — A relative-time assertion written against an absolute instant
+
+**Severity: Low. Area: Web test suite. Status: Fixed 2026-09-13. Found while
+fixing [FIXED-494](#fixed-494--permissions-answered-the-same-question-two-ways-at-once).**
+
+**Observed.** `web/src/lib/components/WorkMeta.test.ts` failed on 2026-09-13 with
+`4 sessions created 9/6/2026`, and nothing in the component had changed. The
+fixture was the absolute instant `2026-09-06T10:00:00Z`, and `relativeTime` stops
+saying "N days ago" after seven days and falls through to a plain date —
+correctly, because "8d ago" is not how anyone reads a date.
+
+So the assertions passed for a week and then began failing every day after, on a
+clock rather than on a change. The whole CI suite was red on `main` for it.
+
+**Fixed.** The fixture is a relative instant. A relative-time assertion has to
+name one.
+
+**Verification.** The four cases pass, and pass again on any later day.
+
+---
+
+## FIXED-503 — The live harness looked for provider controls that had moved into a menu
+
+**Severity: Low. Area: Live test harness. Status: Fixed 2026-09-13. Found while
+verifying [FIXED-501](#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name).**
+
+**Observed.** MODEL-15 gave a repeated row one primary action and one overflow,
+and the row has gone on tightening since: a connected provider card now offers
+`Select` and a **More actions** menu holding *Select models…*, *Test connection*
+and *Details*. `checkModelReady` and `openModelDialog` looked for a button **on
+the card**, found nothing, and waited out the whole spec timeout — so a UI that
+had merely moved a control read as a provider that could not be tested.
+
+Same shape as [BUG-229](TO_BE_FIXED.md) and
+[FIXED-313](#fixed-313--fullpage-evidence-captures-stopped-at-the-first-viewport):
+the drift is in the harness, and the fix belongs in the one place that knows
+where a control lives.
+
+**Fixed.** One `pressCardAction` helper tries the card first and falls back to the
+overflow menu, so a shape that still puts an action in the open keeps working.
+`checkModelReady`, `openModelDialog` and `openProviderDetails` all go through it.
+
+**Found with it.** `checkModelReady`'s closed set of outcomes did not include
+*"could not be reached"*, which is the product's honest last-resort sentence for a
+genuinely unclassified failure — so a provider this host's egress policy refuses
+hung the helper rather than being reported. The set is closed on purpose; the
+missing outcome joined it.
+
+**Verification.** The Anthropic round connects, pins, tests and sends a real turn
+through these helpers, and the OpenRouter and OpenAI rounds reach their honest
+refusal through them.

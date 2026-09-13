@@ -12,6 +12,19 @@ import { render, screen } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
 import WorkMeta from "./WorkMeta.svelte";
 
+/*
+ * Found while implementing NEW-PERM-02: this file failed on 2026-09-13 with
+ * `4 sessions created 9/6/2026`, and nothing in the component had changed.
+ *
+ * The fixture was the absolute instant `2026-09-06T10:00:00Z`, and
+ * `relativeTime` stops saying "N days ago" after seven days and falls through
+ * to a plain date — correctly, because "8d ago" is not how anyone reads a date.
+ * So these assertions passed for a week and then began failing every day after,
+ * on a clock rather than on a change. A relative-time assertion has to name a
+ * relative instant.
+ */
+const HOURS_AGO_2 = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+
 describe("work meta", () => {
   it("states project, state, detail and last activity in one order", () => {
     const { container } = render(WorkMeta, {
@@ -19,7 +32,7 @@ describe("work meta", () => {
       state: "waiting on you",
       stateVariant: "approval-required",
       detail: "3 turns",
-      activityAt: "2026-09-06T10:00:00Z",
+      activityAt: HOURS_AGO_2,
     });
 
     const text = container.textContent ?? "";
@@ -33,7 +46,7 @@ describe("work meta", () => {
     // chip or a dangling separator where one would be.
     const { container } = render(WorkMeta, {
       detail: "4 sessions",
-      activityAt: "2026-09-06T10:00:00Z",
+      activityAt: HOURS_AGO_2,
       activityVerb: "created",
     });
 
@@ -43,7 +56,7 @@ describe("work meta", () => {
   });
 
   it("names what last activity means rather than assuming it is an update", () => {
-    render(WorkMeta, { activityAt: "2026-09-06T10:00:00Z", activityVerb: "created" });
+    render(WorkMeta, { activityAt: HOURS_AGO_2, activityVerb: "created" });
     expect(screen.getByText(/^created /)).toBeInTheDocument();
   });
 

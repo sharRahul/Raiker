@@ -8,6 +8,7 @@ import { setToken } from "../api";
 import type { ProjectView } from "../apiTypes";
 import { stubFetch, stubFetchPending } from "../test-helpers";
 import ProjectsView from "./ProjectsView.svelte";
+import { resetWorkProject, workProject } from "../workProject.svelte";
 
 afterEach(() => {
   setToken(null);
@@ -610,5 +611,191 @@ describe("ProjectsView deletion", () => {
     await fireEvent.click(await screen.findByRole("button", { name: /^Delete$/ }));
 
     expect(confirmSpy.mock.calls[0][0]).toMatch(/permanently delete all project chats and files/i);
+  });
+});
+
+/*
+ * RR-PROJECT-01 — "New chat" on a project card starts the chat in that project.
+ *
+ * The button navigated and established nothing, while "Start in Build" beside
+ * it established the project. Retrieval stays owner-wide; what changes is where
+ * the conversation is filed, which is the ordinary meaning of the button.
+ */
+describe("ProjectsView work actions", () => {
+  afterEach(() => resetWorkProject());
+
+  it("makes the project the one a new chat is filed under", async () => {
+    stubFetch({
+      "GET /api/projects": { projects: [project({ project_id: "proj_7" })], active_project_id: null },
+      "GET /api/projects/tree": [],
+    });
+    render(ProjectsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /^New chat$/ }));
+
+    expect(workProject()).toBe("proj_7");
+    expect(window.location.hash).toBe("#/new-chat");
+  });
+
+  it("sends Build to the same project, as it always did", async () => {
+    stubFetch({
+      "GET /api/projects": { projects: [project({ project_id: "proj_7" })], active_project_id: null },
+      "GET /api/projects/tree": [],
+    });
+    render(ProjectsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /^Start in Build$/ }));
+
+    expect(workProject()).toBe("proj_7");
+    expect(window.location.hash).toBe("#/build");
+  });
+});
+
+/*
+ * NEW-PROJ-01 — a project header is a promise about everything under it.
+ *
+ * Four reads share one set of view variables. Resolve them out of order and the
+ * page presented one project's name over another project's files, with nothing
+ * on screen to say so. The fetch stub here is bespoke because the defect *is*
+ * the ordering: the routes have to be resolvable by hand.
+ */
+describe("ProjectsView selection races", () => {
+  type Deferred = { resolve: (value: unknown) => void; reject: (reason: unknown) => void };
+
+  /**
+   * A fetch stub whose named routes can be resolved by hand, one call at a
+   * time. The defect *is* the ordering, so the queue is per route and per call:
+   * two selections hit the same task and image endpoints, and the whole point is
+   * to answer the first one after the second has already been answered.
+   */
+  function deferredFetch(immediate: Record<string, unknown>, deferredPaths: string[]) {
+    const pending = new Map<string, Deferred[]>();
+    const answer = (value: unknown) =>
+      ({ ok: true, status: 200, json: async () => value }) as Response;
+    const queue = (key: string) => {
+      const existing = pending.get(key) ?? [];
+      pending.set(key, existing);
+      return existing;
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const path = url.split("?")[0];
+        const key = `${(init?.method ?? "GET").toUpperCase()} ${path}`;
+        if (deferredPaths.includes(key)) {
+          return new Promise<Response>((resolve, reject) => {
+            queue(key).push({ resolve: (value) => resolve(answer(value)), reject });
+          });
+        }
+        if (key in immediate) return answer(immediate[key]);
+        return { ok: false, status: 404, json: async () => ({ detail: { reason_code: "unrouted" } }) } as Response;
+      }),
+    );
+    return {
+      waiting: (key: string) => (pending.get(key) ?? []).length,
+      answer: (key: string, index: number, value: unknown) =>
+        pending.get(key)![index].resolve(value),
+      fail: (key: string, index: number, reason: unknown) =>
+        pending.get(key)![index].reject(reason),
+    };
+  }
+
+  const detailOf = (id: string, name: string) => ({
+    project: project({ project_id: id, name }),
+    context: { instructions: "", attachment_ids: [], memory_enabled: false, memory_mode: "inherit" },
+    sessions: [],
+    checkpoints: [],
+  });
+
+  const LIST = {
+    projects: [
+      project({ project_id: "proj_a", name: "Alpha" }),
+      project({ project_id: "proj_b", name: "Beta", root_subpath: "projects/beta" }),
+    ],
+    active_project_id: null,
+  };
+
+  const filesOf = (id: string, subpath: string) => ({
+    project_id: id,
+    root_subpath: subpath,
+    root_exists: true,
+    truncated: false,
+    note: "",
+    files: [],
+    provenance: {},
+  });
+
+  it("does not stand one project's header over another project's work", async () => {
+    const control = deferredFetch(
+      {
+        "GET /api/projects": LIST,
+        "GET /api/projects/tree": [],
+        "GET /api/projects/proj_a": detailOf("proj_a", "Alpha"),
+        "GET /api/projects/proj_b": detailOf("proj_b", "Beta"),
+        "GET /api/projects/proj_a/files": filesOf("proj_a", "projects/alpha"),
+        "GET /api/projects/proj_b/files": filesOf("proj_b", "projects/beta"),
+        "GET /api/images": { sizes: [], generations: [] },
+      },
+      ["GET /api/tasks"],
+    );
+    render(ProjectsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /open project alpha/i }));
+    await waitFor(() => expect(control.waiting("GET /api/tasks")).toBe(1));
+
+    await fireEvent.click(screen.getByRole("button", { name: /open project beta/i }));
+    await waitFor(() => expect(control.waiting("GET /api/tasks")).toBe(2));
+
+    // Beta is on screen and has no work. Alpha's task read now lands, late.
+    control.answer("GET /api/tasks", 1, []);
+    control.answer("GET /api/tasks", 0, [
+      {
+        task_id: "task_alpha",
+        title: "Alpha's private task",
+        state: "scheduled",
+        schedule_kind: "once",
+        schedule_value: "",
+        next_run_at: null,
+        last_run_at: null,
+        last_status: null,
+        created_at: "2026-09-01T00:00:00Z",
+        project_id: "proj_a",
+      },
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByRole("heading", { name: "Beta" })).toBeInTheDocument();
+    expect(screen.queryByText("Alpha's private task")).toBeNull();
+  });
+
+  it("does not let an older failure clear a newer selection", async () => {
+    // The other direction of the same race, and the one that looks like a bug in
+    // the project you *did* open: a rejected read for a project you left behind
+    // replaced a workspace that had loaded correctly with an error about it.
+    const control = deferredFetch(
+      {
+        "GET /api/projects": LIST,
+        "GET /api/projects/tree": [],
+        "GET /api/projects/proj_b": detailOf("proj_b", "Beta"),
+        "GET /api/projects/proj_b/files": filesOf("proj_b", "projects/beta"),
+        "GET /api/tasks": [],
+        "GET /api/images": { sizes: [], generations: [] },
+      },
+      ["GET /api/projects/proj_a"],
+    );
+    render(ProjectsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /open project alpha/i }));
+    await waitFor(() => expect(control.waiting("GET /api/projects/proj_a")).toBe(1));
+
+    await fireEvent.click(screen.getByRole("button", { name: /open project beta/i }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Beta" })).toBeInTheDocument());
+
+    control.fail("GET /api/projects/proj_a", 0, new TypeError("network"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByRole("heading", { name: "Beta" })).toBeInTheDocument();
+    expect(screen.queryByText(/Could not load project/)).toBeNull();
   });
 });

@@ -9,7 +9,7 @@
   import ProjectTreeNode from "../components/ProjectTreeNode.svelte";
   import SidePanel from "../components/SidePanel.svelte";
   import GuideLink from "../components/GuideLink.svelte";
-  import { startInBuild } from "../workProject.svelte";
+  import { setWorkProject, startInBuild } from "../workProject.svelte";
   import ProjectExplorer from "../components/ProjectExplorer.svelte";
   import { api, ApiError } from "../api";
   import type {
@@ -114,11 +114,23 @@
     }
   }
 
-  // "New chat in this project" opens Chat, and deliberately does not narrow it.
-  // Chat's retrieval is owner-wide by design, so starting a conversation from a
-  // project must not quietly scope it. The composer's own picker files the
-  // resulting conversation, which is filing rather than a boundary.
-  function newChatInProject() {
+  /*
+   * "New chat in this project" opens Chat in that project.
+   *
+   * RR-PROJECT-01 — this used to navigate and nothing else, on the reasoning
+   * that Chat's retrieval is owner-wide by design and starting a conversation
+   * from a project must not quietly scope it. The first half of that is right
+   * and is unchanged. The second half conflated two different things: *what a
+   * turn may retrieve* and *where the resulting conversation is filed*. Only the
+   * first is a boundary. The second is the ordinary meaning of pressing "New
+   * chat" on a project card, and the Build button beside it had always done it.
+   *
+   * So the shared Work project is set — which is filing, is visible in the
+   * composer's own picker before the owner presses Send, and re-files nothing
+   * that already exists — and retrieval stays owner-wide exactly as before.
+   */
+  function newChatInProject(projectId: string) {
+    setWorkProject(projectId);
     window.location.hash = "#/new-chat";
   }
 
@@ -145,7 +157,7 @@
         ? `This will remove the project and its chats from Raiker. The folder ${rootLabel} will not be deleted.`
         : "This will permanently delete all project chats and files in this project folder. To save chats, move them to your chat list or another project before deleting.";
     if (!window.confirm(message)) return;
-    try { deleteError = null; await api.deleteProject(projectId, true); detail = null; await load(); onchanged?.(); }
+    try { deleteError = null; await api.deleteProject(projectId, true); closeDetail(); await load(); onchanged?.(); }
     catch (e) { deleteError = e instanceof ApiError ? `Could not delete (${e.status}).` : "Could not delete"; }
   }
 
@@ -265,23 +277,54 @@
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
-  async function loadProjectContext(projectId: string) {
+  /*
+   * NEW-PROJ-01 — which selection a response belongs to.
+   *
+   * A project home is four independent reads — the detail, the files, the tasks
+   * and the images — sharing one set of view variables, and every one of them
+   * used to be assigned the moment it resolved. Open project A on a slow
+   * workspace, open B while A's file read is still out, and B's header stood
+   * over A's files: a header is an implicit promise that everything under it
+   * belongs to that workspace, and this broke the promise silently, which is
+   * the worst way to break it. An older *failed* detail read could also clear a
+   * newer successful selection, so a project that loaded fine disappeared
+   * behind an error about a different one.
+   *
+   * The counter is the whole fix. Each open takes the next number, every
+   * response carries the number of the open that asked for it, and a response
+   * is committed only if that number is still the current one. It holds for
+   * failures as well as successes, and for a close during a load, because
+   * closing takes a number too.
+   *
+   * This is not a substitute for cancelling the request — it is the thing that
+   * makes cancellation unnecessary to get right. A cancel can always lose the
+   * race with a response that is already on the wire.
+   */
+  let selectionSeq = 0;
+
+  async function loadProjectContext(projectId: string, seq: number) {
     filesError = null;
     files = null;
     selectedFile = null;
     projectTasks = [];
     projectImages = [];
     try {
-      files = await api.projectFiles(projectId);
+      const loaded = await api.projectFiles(projectId);
+      if (seq !== selectionSeq) return;
+      files = loaded;
     } catch (e) {
+      if (seq !== selectionSeq) return;
       filesError =
         e instanceof ApiError ? `Files unavailable (${e.status}).` : "Files unavailable.";
     }
     try {
-      projectTasks = await api.tasks({ project_id: projectId });
+      const loaded = await api.tasks({ project_id: projectId });
+      if (seq !== selectionSeq) return;
+      projectTasks = loaded;
     } catch {
       // Task scoping is supplementary context; a failed read leaves the rest
       // of the project home intact rather than blanking it.
+      if (seq !== selectionSeq) return;
       projectTasks = [];
     }
     try {
@@ -289,6 +332,7 @@
       // one request rather than a per-picture one; the bytes stay behind the
       // separate route each thumbnail names.
       const gallery = await api.images();
+      if (seq !== selectionSeq) return;
       projectImages = gallery.generations
         .filter(
           (generation) =>
@@ -300,17 +344,48 @@
     } catch {
       // Same rule as tasks: supplementary context, and a workspace with no
       // image provider connected answers this with an error rather than a list.
+      if (seq !== selectionSeq) return;
       projectImages = [];
     }
   }
 
+  /**
+   * Leave the project home, and take the selection's number with it.
+   *
+   * Closing during a load is a selection change like any other: the reads that
+   * are still out belong to a project that is no longer on screen, and without
+   * a new number they would re-open it when they land.
+   */
+  function closeDetail() {
+    selectionSeq += 1;
+    detail = null;
+    detailError = null;
+    files = null;
+    filesError = null;
+    selectedFile = null;
+    projectTasks = [];
+    projectImages = [];
+  }
+
   async function open(projectId: string) {
+    const seq = ++selectionSeq;
     detailError = null;
     exportError = null;
+    // Clear the previous project's panels on selection rather than leaving them
+    // under the new name while its own reads are out.
+    detail = null;
+    files = null;
+    filesError = null;
+    selectedFile = null;
+    projectTasks = [];
+    projectImages = [];
     try {
-      detail = await api.project(projectId);
-      await loadProjectContext(projectId);
+      const loaded = await api.project(projectId);
+      if (seq !== selectionSeq) return;
+      detail = loaded;
+      await loadProjectContext(projectId, seq);
     } catch (e) {
+      if (seq !== selectionSeq) return;
       detail = null;
       detailError =
         e instanceof ApiError ? `Could not load project (${e.status}).` : "Could not load project.";
@@ -533,7 +608,11 @@
             >
               Start in Build
             </button>
-            <button type="button" class="btn btn-primary btn-sm" onclick={() => newChatInProject()}>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              onclick={() => newChatInProject(p.project_id)}
+            >
               New chat
             </button>
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => void archiveProject(p.project_id)} disabled={archiving === p.project_id}>
@@ -596,7 +675,7 @@
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => void exportProject()} disabled={exporting}>
               {exporting ? "Exporting…" : "Export project"}
             </button>
-            <button type="button" class="btn btn-ghost btn-sm" onclick={() => (detail = null)}>
+            <button type="button" class="btn btn-ghost btn-sm" onclick={closeDetail}>
               <Icon name="x" size="sm" />
               Close
             </button>

@@ -29,11 +29,11 @@ from raiker.contracts.models import (
     PromptEnvelope,
     PromptOptions,
     PromptPayload,
-    UserMetadata,
 )
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority.models import Principal
+from raiker.runtime.identity.presentation import owner_user_metadata
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -652,7 +652,10 @@ async def _route_inbound_message(
         session_id=session_id,
         turn_id=new_id("turn_"),
         client=ClientMetadata(type=channel_type, name=f"raiker-{channel_type}", version="1.0"),
-        user=UserMetadata(id=principal_id),
+        # RR-IDENTITY-01 — resolved from the *paired owner's* principal, never
+        # from anything the channel message carries: a name a sender can set is
+        # a name a sender can borrow.
+        user=owner_user_metadata(store, principal_id),
         prompt=PromptPayload(
             text=text[:16000] or "(empty channel message)",
             metadata={

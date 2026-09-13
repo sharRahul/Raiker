@@ -261,13 +261,7 @@ export async function hostedProviderCard(
  * shape of row it is looking at.
  */
 export async function openProviderDetails(page: Page, card: Locator): Promise<void> {
-  const overflow = card.getByRole("button", { name: /More actions/ });
-  if (await overflow.isVisible().catch(() => false)) {
-    await overflow.click();
-    await page.getByRole("menuitem", { name: "Details" }).click();
-  } else {
-    await card.getByRole("button", { name: "Details", exact: true }).click();
-  }
+  await pressCardAction(page, card, /^Details$/);
   await expect(page.getByRole("button", { name: "Close model details" })).toBeVisible({
     timeout: 30_000,
   });
@@ -328,6 +322,32 @@ export async function connectHostedProvider(
 }
 
 /**
+ * Press one of a provider card's actions, wherever the card keeps it.
+ *
+ * **Found live on 2026-09-13.** MODEL-15 gave a repeated row one primary action
+ * and one overflow, and the row has gone on tightening since: a connected card
+ * now offers `Select` and a `More actions` menu holding **Select models…**,
+ * **Test connection** and **Details**. Every helper below looked for a button
+ * *on the card* and, not finding one, waited out the spec's whole timeout — so
+ * a UI that had merely moved a control read as a provider that could not be
+ * tested. Same shape as BUG-229 and BUG-241: the drift is in the harness, and
+ * the fix belongs in the one place that knows where a control lives.
+ *
+ * The card is tried first, so a shape that still puts the action in the open
+ * keeps working, and the menu name is matched loosely because "Test" and "Test
+ * connection" are the same control under two labels.
+ */
+async function pressCardAction(page: Page, card: Locator, name: RegExp): Promise<void> {
+  const direct = card.getByRole("button", { name }).first();
+  if (await direct.isVisible().catch(() => false)) {
+    await direct.click();
+    return;
+  }
+  await card.getByRole("button", { name: /More actions/ }).click();
+  await page.getByRole("menuitem", { name }).first().click();
+}
+
+/**
  * Run the readiness check for the model pinned on *card* and wait for it to
  * settle, so the composer will let a turn be sent.
  *
@@ -335,7 +355,7 @@ export async function connectHostedProvider(
  * clicks — rather than an API call the spec makes behind the page's back.
  */
 export async function checkModelReady(page: Page, card: Locator): Promise<void> {
-  await card.getByRole("button", { name: "Test", exact: true }).click();
+  await pressCardAction(page, card, /^Test( connection)?$/);
   // The card states the outcome for the *pinned model*: reachable, or the exact
   // reason it is not. "Not checked" is the state before the check answers, so it
   // is deliberately not one of the accepted outcomes.
@@ -345,7 +365,13 @@ export async function checkModelReady(page: Page, card: Locator): Promise<void> 
       // existed. The set is closed on purpose: an outcome missing from it does
       // not fail the check, it hangs for two minutes and then blames the spec
       // that was using the key rather than the key.
-      /can reach|cannot execute|not reachable|rejected|no credit|no quota|needs a workspace|identity-linked/i,
+      //
+      // `could not be reached` joined it on 2026-09-13, running the round
+      // against a host whose egress policy refuses `CONNECT openrouter.ai`.
+      // That is the product's honest last-resort sentence for a genuinely
+      // unclassified failure, and the helper was hanging on it — reporting a
+      // provider this host cannot reach as a spec that had gone wrong.
+      /can reach|could not be reached|cannot execute|not reachable|rejected|no credit|no quota|needs a workspace|identity-linked/i,
     ),
   ).toBeVisible({ timeout: 120_000 });
 }
@@ -358,9 +384,7 @@ export async function checkModelReady(page: Page, card: Locator): Promise<void> 
  * became a dialog.
  */
 export async function openModelDialog(page: Page, card: Locator): Promise<Locator> {
-  await card
-    .getByRole("button", { name: /Select models|Choose model|Change model/ })
-    .click();
+  await pressCardAction(page, card, /Select models|Choose model|Change model/);
   const dialog = page.getByRole("dialog", { name: /models/i });
   await expect(dialog).toBeVisible({ timeout: 60_000 });
   return dialog;

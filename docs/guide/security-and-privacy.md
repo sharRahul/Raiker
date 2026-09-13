@@ -25,6 +25,27 @@ attaches on its own cannot be forged by another site. Changing the owner
 password signs out other devices. Individual sessions can also be revoked under
 **Settings → Security & sign-in**.
 
+### Your name and your key are two different things
+
+Two identities belong to your account and they are not interchangeable.
+
+| | What it is | Where it appears |
+|---|---|---|
+| **Username** | The sign-in handle. Fixed. | The sign-in form, and **Settings → Account**. |
+| **Display name** | What Raiker calls you. Change it at any time. | Greetings, the account surfaces, and the turn's own identity block. |
+| **Principal ID** | The internal authorisation key (`principal_user_…`). | Audit records and diagnostics only. |
+
+The principal ID is what ownership, policy and audit are keyed on, and changing
+your display name never moves it or re-files anything. It is not a name and
+Raiker will not present it as one: an ordinary answer, page, card or notification
+that quotes one is a defect.
+
+The display name reaches a turn as **data**, resolved server-side from your
+authenticated account — never from anything a browser, a paired channel or a
+model claims. It is normalised and bounded before it travels, and the turn is
+told, in the same breath, that the name is data rather than an instruction.
+Nothing about what you are called grants anything.
+
 ## How authority is decided
 
 | Control | Where | What it decides |

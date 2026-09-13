@@ -265,3 +265,147 @@ describe("supported-preferences settings", () => {
     });
   });
 });
+
+/*
+ * NEW-SET-01 — a save acknowledges the revision it submitted.
+ *
+ * The load-time protection above is real and is unchanged. What it does not
+ * cover is the *save*: `push` snapshotted the settings, awaited the request and
+ * cleared the dirty state outright, while the inputs and both buttons stayed
+ * live throughout. So an edit made during a save was covered by a green "All
+ * changes saved" it had never been part of.
+ */
+describe("saving while the owner is still editing", () => {
+  /** A PUT that is held open, so the window the defect lives in stays open. */
+  function stubHeldPut() {
+    const putBodies: unknown[] = [];
+    let release: ((value: unknown) => void) | undefined;
+    let rejectWith: ((value: unknown) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = (init?.method ?? "GET").toUpperCase();
+        if (url.endsWith("/api/settings") && method === "PUT") {
+          putBodies.push(JSON.parse(String(init?.body)));
+          return new Promise((resolve, reject) => {
+            release = resolve;
+            rejectWith = reject;
+          });
+        }
+        if (url.endsWith("/api/settings")) {
+          return new Response(
+            JSON.stringify({
+              settings: { "notification.in_app": true, "personalisation.spacing": "comfortable" },
+              status: { vault: "configured", mfa_enrolled: false, username: "alice" },
+            }),
+            { status: 200 },
+          );
+        }
+        return new Response(JSON.stringify({}), { status: 200 });
+      }),
+    );
+    return {
+      putBodies,
+      ok: () => release?.(new Response(JSON.stringify({ ok: true }), { status: 200 })),
+      refuse: () => release?.(new Response(JSON.stringify({ detail: {} }), { status: 500 })),
+      drop: () => rejectWith?.(new TypeError("network")),
+    };
+  }
+
+  async function editDensity(name: RegExp) {
+    await fireEvent.click(screen.getByRole("button", { name: "Personalisation" }));
+    const group = await screen.findByRole("radiogroup", { name: "Density" });
+    await fireEvent.click(within(group).getByRole("radio", { name }));
+    return group;
+  }
+
+  it("does not report an edit as saved when it was never submitted", async () => {
+    const put = stubHeldPut();
+    render(SettingsView, { props: { principal: "alice" } });
+
+    // Change A, start its save, then change B while the request is out.
+    await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
+    await fireEvent.click(await screen.findByLabelText(/in-app popups/i));
+    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    await waitFor(() => expect(put.putBodies).toHaveLength(1));
+    await editDensity(/Compact/);
+
+    put.ok();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // A was in the request and is saved. B was not, so the page still says so
+    // rather than covering it with "All changes saved".
+    expect(screen.queryByText(/all changes saved/i)).toBeNull();
+    expect(screen.getByText(/you have unsaved changes/i)).toBeInTheDocument();
+    // And the next Save sends B.
+    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    await waitFor(() => expect(put.putBodies).toHaveLength(2));
+    expect(put.putBodies[1]).toMatchObject({
+      settings: { "personalisation.spacing": "compact" },
+    });
+  });
+
+  it("will not start a second save on top of one that is still running", async () => {
+    // Two saves in flight can answer out of order, and whichever answers last
+    // writes its own snapshot in as the server's. The guard is in the function,
+    // not only on the button.
+    const put = stubHeldPut();
+    render(SettingsView, { props: { principal: "alice" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
+    await fireEvent.click(await screen.findByLabelText(/in-app popups/i));
+
+    const saveButton = screen.getByRole("button", { name: /save changes/i });
+    await fireEvent.click(saveButton);
+    await waitFor(() => expect(put.putBodies).toHaveLength(1));
+
+    // The control says what is happening, and pressing it again sends nothing.
+    expect(screen.getByRole("button", { name: /saving…/i })).toBeDisabled();
+    await fireEvent.click(screen.getByRole("button", { name: /saving…/i }));
+    expect(put.putBodies).toHaveLength(1);
+  });
+
+  it("keeps the newer draft when the older save is refused", async () => {
+    // The rollback restored the whole server snapshot, so a rejected change took
+    // an unrelated newer edit down with it.
+    const put = stubHeldPut();
+    render(SettingsView, { props: { principal: "alice" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
+    await fireEvent.click(await screen.findByLabelText(/in-app popups/i));
+    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    await waitFor(() => expect(put.putBodies).toHaveLength(1));
+
+    const group = await editDensity(/Compact/);
+    put.refuse();
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/couldn't save/i));
+    // The refused change is rolled back … (the rail item now carries an unsaved
+    // mark, which is part of its accessible name, so it is matched loosely.)
+    await fireEvent.click(screen.getByRole("button", { name: /^Notifications/ }));
+    expect((screen.getByLabelText(/in-app popups/i) as HTMLInputElement).checked).toBe(true);
+    // … and the edit that was never part of the refusal is still there.
+    await fireEvent.click(screen.getByRole("button", { name: /^Personalisation/ }));
+    expect(within(group).getByRole("radio", { name: /Compact/ })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByRole("alert").textContent).toMatch(/still unsaved/i);
+  });
+
+  it("clears the section mark only for the section that was actually saved", async () => {
+    const put = stubHeldPut();
+    render(SettingsView, { props: { principal: "alice" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
+    await fireEvent.click(await screen.findByLabelText(/in-app popups/i));
+    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    await waitFor(() => expect(put.putBodies).toHaveLength(1));
+    await editDensity(/Compact/);
+
+    put.ok();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const marks = screen.getAllByLabelText("Unsaved changes");
+    expect(marks).toHaveLength(1);
+    expect(marks[0].closest("button")?.textContent).toMatch(/Personalisation/);
+  });
+});

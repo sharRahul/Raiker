@@ -6,6 +6,7 @@ import json
 import logging
 import time
 from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -70,6 +71,11 @@ from raiker.runtime.conversation_compaction import (
 from raiker.runtime.conversation_history import conversation_messages, history_char_budget
 from raiker.runtime.environment import EnvironmentContext, environment_context
 from raiker.runtime.identity.lifecycle import TrustedTurnIdentity
+from raiker.runtime.identity.presentation import (
+    resolve_presentation_identity,
+    sanitize_display_name,
+    user_identity_prompt,
+)
 from raiker.runtime.model_usage import ModelUsageLedger
 from raiker.runtime.planner import SimplePlanner
 from raiker.runtime.retrieval import RetrievalAugmentor
@@ -496,6 +502,25 @@ class RuntimeOrchestrator:
             item_id: source.cite_as
             for (item_id, _draft), source in zip(accepted, recorded, strict=False)
         }
+
+    def _identity_prompt(self, envelope: PromptEnvelope) -> str:
+        """Who the turn is talking to, resolved server-side.
+
+        RR-IDENTITY-01. The envelope now carries a display name at every entry
+        point, but it is re-resolved here rather than trusted: the envelope is
+        constructed by the entry point, and one that forgets — an older client,
+        a future route, a replayed record — should produce a turn that says
+        "Owner", never one that falls back to the principal id. The envelope's
+        name is used when it is there and agrees, because it was resolved from
+        the same server record a moment earlier.
+        """
+        identity = resolve_presentation_identity(
+            getattr(self.tool_broker, "store", None), envelope.user.id
+        )
+        carried = sanitize_display_name(envelope.user.display_name)
+        if identity.display_name is None and carried is not None:
+            identity = replace(identity, display_name=carried)
+        return user_identity_prompt(identity)
 
     @staticmethod
     def _citation_prompt() -> str:
@@ -2136,6 +2161,11 @@ class RuntimeOrchestrator:
                     str(envelope.prompt.metadata.get("surface", "chat"))
                 )
             ),
+            # RR-IDENTITY-01 — who this turn is for. Ahead of the workspace
+            # block for the same reason the clock is: this is server-resolved
+            # runtime fact, not material the turn read, and the one sentence
+            # that matters here is that an internal id is not a name.
+            ModelMessage(role="system", content=self._identity_prompt(envelope)),
             # The clock rides ahead of the workspace block on purpose. What
             # follows that heading is data the turn must not obey; this is
             # runtime metadata the turn must not doubt, and putting the two

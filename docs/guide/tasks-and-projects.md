@@ -112,9 +112,16 @@ not an authority — selecting a project grants nothing, and its folder can neve
 leave the workspace.
 
 **Projects → Create project.** Each card shows its path
-(`projects/<slug>`) and session count, with actions: **Set active**, **New
-chat** (starts a conversation inside it), **Details**, **Archive**, **Move**,
-**Delete**. A folder tree shows nesting.
+(`projects/<slug>`) and session count, with actions: **Start in Build**, **New
+chat**, **Archive**, **Move**, **Delete**. A folder tree shows nesting.
+
+**Start in Build** and **New chat** both open that Work mode *in the project*:
+the composer names it before you press Send, and the conversation or Build turn
+is filed under it. Neither narrows what Raiker may retrieve — Chat's recall stays
+account-wide by design — because where work is *filed* and what a turn may
+*read* are two separate things. Nothing that already exists is re-filed: changing
+the project changes where the next piece of work starts, not where past work
+lives.
 
 To move an existing conversation in, drag a recent chat onto the project, or use
 **Move to project** from the session's `⋯` menu.

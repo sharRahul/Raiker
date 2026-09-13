@@ -106,6 +106,8 @@ names.
 | [BUG-283](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others) | Low | Web UI / information architecture | **Closed 2026-09-04 ([FIXED-394](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others))** — 244 words of explanation to the guide, one contract that was stated twice, and two tabs that were copies of other surfaces |
 | [BUG-284](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything) | Medium | Web UI / responsive layout | **Closed 2026-09-04 ([FIXED-395](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything))** — found by running the width sweep against a workspace that had been worked in; reproduced on unmodified `main` |
 | [BUG-285](#bug-285--an-ollama-cloud-model-tests-and-runs-in-ollama-but-chat-cannot-use-it) | Medium | Models / Ollama cloud chat | Open — raised 2026-09-08 during the provider restart round |
+| [BUG-289](#bug-289--a-hosted-provider-this-machine-cannot-reach-is-told-to-check-that-it-is-running) | Low | Models / provider errors | Open — raised 2026-09-13 while verifying [FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name) |
+| [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — **a fifth round blocked on the same value, 2026-09-06**; confirmed in two requests again, and this host has no local runtime either. Raiker's half holds under a fifth key: the refusal reads as itself in the picker, not as *Provider unreachable*. The attempt found [FIXED-435](FIXED_ITEMS.md#fixed-435--the-models-page-said-a-gate-was-on-above-providers-it-would-refuse) |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
@@ -1561,3 +1563,73 @@ a model can propose.
 **Interface outcome that has to be true before this closes.** A turn answers
 with a table Raiker knows is a table — sortable, and legible to a screen reader
 as one — and with a chart, and neither is a string that happened to parse.
+
+---
+
+## BUG-289 — A hosted provider this machine cannot reach is told to "check that it is running"
+
+**Severity: Low. Area: Models / provider errors. Raised 2026-09-13 while
+verifying [FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name).**
+
+**Observed.** Pressing **Test connection** on an OpenRouter card, on a host whose
+egress policy refuses `CONNECT openrouter.ai`, reports:
+
+> OpenRouter could not be reached. Check that it is running and reachable from
+> this device.
+
+The sentence is honest about *what* happened and slightly wrong about *what to
+do*. This is `ModelsView.testNote`'s last-resort branch, which is correct here —
+a proxy's `connect_rejected` is genuinely unclassified, and
+[BUG-272](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network)
+is why anything classifiable no longer lands in it. But the advice it carries was
+written for a *local* runtime: "check that it is running" is a thing an owner can
+do about llama.cpp on their own machine and not a thing they can do about
+OpenRouter.
+
+**Root cause.** One fallback sentence for two kinds of destination. The branch
+does not distinguish a hosted provider from a local one, so both get the local
+remedy.
+
+**Proposed fix.** Split the last-resort sentence by provider kind. A local
+runtime keeps today's wording. A hosted one names the remedy that is actually
+available: this device's network access, and any proxy or firewall between it and
+the provider. Neither should guess at a cause — the point of this branch is that
+there is no classified one.
+
+**Interface outcome that has to be true before this closes.** A hosted provider
+that cannot be reached offers a remedy an owner can act on, and a local one still
+offers the one that applies to it — with a capture of each.
+
+---
+
+## BUG-290 — Three of the four providers this round was given keys for cannot be reached from this host
+
+**Severity: Low. Area: Live evidence / providers. Raised 2026-09-13. The same
+limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun),
+reconfirmed with three fresh keys.**
+
+**Observed.** The 2026-09-13 release-readiness round was given working keys for
+Anthropic, OpenAI and OpenRouter, and asked to use a local Ollama cloud model as
+a fourth. Only Anthropic answered:
+
+| Provider | Outcome on this host |
+|---|---|
+| Anthropic | **Real round trip.** Connected, Haiku 4.5 pinned, readiness confirmed, and a real turn answered — the evidence behind [FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name). |
+| OpenAI | `connect_rejected` — the egress proxy denies `CONNECT api.openai.com`. |
+| OpenRouter | `connect_rejected` — the egress proxy denies `CONNECT openrouter.ai`. |
+| Ollama (cloud model) | No Ollama on this machine, and no way to install one from here. |
+
+**What was proven anyway.** Raiker's half, for all three. Each key was entered
+through the product's own dialog, each connection was stored, and each readiness
+check reported its own outcome as a sentence rather than as a bare status or a
+wrong diagnosis — which is [FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network)'s
+rule holding under three more keys. `web/e2e/owner-identity-live.spec.ts` runs all
+three and skips with the reason when a key is absent.
+
+**What is still unverified.** A real turn through OpenAI, OpenRouter or a local
+Ollama cloud model, and therefore the identity block, the citation ledger and the
+tool loop against any provider but Anthropic.
+
+**Interface outcome that has to be true before this closes.** The same question
+the owner reported — *who is the owner of this workspace* — asked and answered
+through each of the four providers, with a capture of each answer.

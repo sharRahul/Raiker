@@ -83,6 +83,34 @@ Controls: **Test**, **Stop** / **Resume**, **Rename**, **Delete**. Stop is an
 instant containment switch — it refuses all sessions for that connection and is
 revocable.
 
+### What a local server is started with
+
+A local (stdio) MCP server is a program Raiker starts, and it is started with a
+**constructed environment** rather than Raiker's own. It receives what a program
+needs to run — `PATH`, `HOME`, the locale and the Windows variables without which
+a process will not start — and nothing else. Your provider keys, vault
+passphrase and other Raiker settings do not travel to it.
+
+That is not a restriction on you: you never asked for your Anthropic key to be
+in a weather server's environment, and a server does not have to be malicious for
+it to matter — a crash dump, a debug log or a process listing leaks whatever a
+process was handed.
+
+If a server genuinely needs a named variable, grant it by name:
+
+```
+RAIKER_MCP_ENV_ALLOWLIST=MY_SERVER_TOKEN,NODE_PATH
+```
+
+Every name listed is passed through to every local MCP server. The two variables
+that configure this boundary — `RAIKER_MCP_ENV_ALLOWLIST` itself and
+`RAIKER_MCP_COMMAND_ALLOWLIST` — cannot be passed through it, so a line written
+to make one server work cannot quietly widen the rule it is written against.
+
+Remote (HTTP) servers are unaffected: they never share a process with Raiker, and
+their token is still resolved from the single environment variable the connection
+names.
+
 ### Can Raiker actually call it?
 
 A connected server's tools are callable in Chat and Build as

@@ -311,7 +311,42 @@ Expand a capability's row on **Permissions** to change its mode. A change is
 governed like any other: it asks for a reason and is recorded against your
 principal.
 
+A mode Raiker does not recognise — an older record, or a value from a newer
+build — reads as **Unknown** rather than being guessed at. Unknown is not
+evidence of permission: refresh the page, and if it persists, review the
+capability's configuration.
+
 There is no unrestricted mode, by design.
+
+### Getting to a permission from the top of the page
+
+Two sections sit above the full registry and both are shortcuts into it rather
+than a second copy of it:
+
+* **Common permissions** — the handful most owners come to change. **Manage**
+  opens that capability's own row in the list below: it clears any filter that
+  would hide it, expands its group, opens the row and puts the keyboard on it.
+* **Needs your attention** — the capabilities set to **Automatic**, because that
+  is the one mode that acts with nobody in the loop. **Review** opens the same
+  row the same way. An entry says *runs automatically, without asking you* only
+  when the capability is actually available and ready; when it is not, it says
+  so, because configuring Automatic is not evidence that anything is running.
+
+Both derive from the same list the registry renders, so a change made on a row
+is reflected in them as soon as the runtime confirms it — they cannot show you a
+mode the list below disagrees with.
+
+### The delegated-authority summary
+
+The table at the top of **Permissions** is a **read-only summary** of the
+capabilities this account configures the most authority for. It restates what
+you set — `On · Ask me`, `Off · Never` — beside what that means for the agent:
+**Ask**, **Allow**, **Automatic**, **Denied**, **Not ready** or **Unavailable**.
+
+It describes *account configuration*. A task's own scope and the runtime's checks
+at the moment of use can narrow what a turn may actually do, so a row reading
+**Allow** is a statement about your settings and not a promise about a
+particular action. Change anything it shows in the list below it.
 
 ---
 

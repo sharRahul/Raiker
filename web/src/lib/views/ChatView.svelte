@@ -203,6 +203,31 @@
    */
   let pendingProjectId: string | null = workProject() === "" ? null : workProject();
   let projectNotice = $state<string | null>(null);
+
+  /*
+   * RR-PROJECT-01 — the shared value, while this conversation does not exist yet.
+   *
+   * Chat is mounted once and hidden between route visits, so the two reads above
+   * happen when the application starts and never again. Choosing a project
+   * somewhere else — pressing "New chat" on a project card, or picking one in
+   * Build — therefore reached a composer that had already made up its mind, and
+   * the conversation was filed nowhere while the page named the project.
+   *
+   * The three rules of the shared value are unchanged and are what makes this
+   * safe: it is read only while `sessionId` is null, so nothing that already
+   * exists is re-filed; the surface names the project before Send; and it
+   * decides filing, never retrieval. `sessionId` is read untracked because it is
+   * a condition on this rule, not a reason to re-apply it — a conversation that
+   * has just been created must not have the shared value reapplied to it.
+   */
+  $effect(() => {
+    const shared = workProject();
+    untrack(() => {
+      if (sessionId !== null || projectId === shared) return;
+      projectId = shared;
+      pendingProjectId = shared === "" ? null : shared;
+    });
+  });
   let backgroundWorkOpen = $state(false);
 
   async function refreshContextUsage() {
@@ -846,7 +871,12 @@
       speechRuntime = view.runtime.effective;
     }).catch(() => {});
     void api.settings().then((view) => {
-      userName = view.status.username || "there";
+      // RR-IDENTITY-01 — the name the owner chose, not their sign-in handle.
+      // Chat greeted them by the handle however many times they set a display
+      // name, because `username` is the fixed handle and the two were conflated.
+      // The server resolves which one applies, so the greeting and the model's
+      // own identity block cannot disagree about what to call the same person.
+      userName = view.status.display_name || view.status.username || "there";
       speechLanguage = speechLanguagePreference(view.settings["general.speech_language"]);
     }).catch(() => {});
     // The Workbench composer hands its text to this mounted chat rather than
@@ -1514,6 +1544,15 @@
     releaseThumbnails();
     turns = [];
     sessionId = null;
+    /*
+     * Found while closing RR-PROJECT-01: the *second* chat in a project was
+     * filed nowhere. `pendingProjectId` is consumed when the first conversation
+     * is created, and starting another one left it null while the composer went
+     * on naming the project — the picker said one thing and the filing did
+     * another, which is the consistency gate this review is built around. A new
+     * conversation re-reads the project the composer is showing.
+     */
+    pendingProjectId = projectId === "" ? null : projectId;
     plan = null;
     rewindCheckpointId = null;
     anchorNotice = null;

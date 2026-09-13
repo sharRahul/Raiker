@@ -16,7 +16,8 @@ adaptive-shell design and implementation plan.
 
 Start with:
 
-- [`DEEP_CODEBASE_DOCUMENTATION_UI_INSTALLER_AUDIT_2026-09-07.md`](DEEP_CODEBASE_DOCUMENTATION_UI_INSTALLER_AUDIT_2026-09-07.md) — current codebase/UI/installer/CI/competitive audit at `main` commit `ea2f48e70bfa7e68685f9865e9face17d820a61c`.
+- [`RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md`](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md) — documentation-only first-release assessment covering Permissions, Chat, Build, Design, Models, the Settings popup and all Settings pages, Tasks, Memory age/management/usage, Messaging, MCP, Projects, owner identity, runtime convergence and transferable external implementation patterns at `main` commit `327610ad0816cb5ce90590e29ef30179b7caa5a5`.
+- [`DEEP_CODEBASE_DOCUMENTATION_UI_INSTALLER_AUDIT_2026-09-07.md`](DEEP_CODEBASE_DOCUMENTATION_UI_INSTALLER_AUDIT_2026-09-07.md) — prior codebase/UI/installer/CI/competitive baseline at `main` commit `ea2f48e70bfa7e68685f9865e9face17d820a61c`; the 2026-09-13 release-readiness review above is newer where their status differs.
 - [`TO_BE_FIXED.md`](TO_BE_FIXED.md) — unresolved defect ledger.
 - [`TO_BE_ADDED.md`](TO_BE_ADDED.md) — future/differentiator proposals; proposals are not defects.
 - [`FIXED_ITEMS.md`](FIXED_ITEMS.md) — closure/evidence history.

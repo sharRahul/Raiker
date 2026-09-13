@@ -11,7 +11,7 @@ Knowledge Map, Projects and remaining pages. Read its status corrections before
 treating earlier findings as current. It contains 55 removal/move/merge/replace
 decisions, six additional source-derived findings and retained security/feature contracts.
 
-This document It does not implement, fix, enable,
+This document does not implement, fix, enable,
 disable, or reconfigure any application, runtime, installer, security control,
 workflow, or user interface behavior.
 

@@ -2421,3 +2421,77 @@ Roll out behind capability flags and schema migrations with old clients supporte
 A capability is matched only when its user-visible outcome, supported platforms/providers, lifecycle, permissions, failure recovery, migration and acceptance evidence are recorded. Catalogue rows are not a percentage-complete claim. Remaining work includes inventorying every source plugin and platform-specific feature at pinned revisions and assigning each an adopted, adapted, deferred or unsupported disposition with rationale. No full-parity claim is justified yet.
 
 Documentation review does not certify the first release. The verdict remains: do not call the broad intended product release-ready until applicable defects and assurance gates close; a smaller accurately described release may exclude optional capability breadth.
+
+
+# 17. Seamless experience requirement and Permissions follow-up
+
+## 17.1 DEC-26 — Consistency is an end-to-end acceptance requirement
+
+**Owner requirement:** Features must work seamlessly and consistently together. Necessary UI, API and runtime changes belong in the implementation scope; adding a page or adapter alone does not satisfy the requirement. This review remains documentation-only.
+
+**Decision:** Define one authoritative service contract for each concept and make every surface consume it: account identity, Project selection/filing, model overrides, effective permissions, execution destination, task state, memory lifecycle, artifacts and delivery receipts. Shared terminology must describe the same actual behavior. Similar-looking controls must have consistent interaction, pending, success, error and recovery semantics.
+
+**Explanation:** A feature can work in isolation while the overall experience fails because summaries are stale, navigation loses scope, a button has no outcome, or another surface interprets the same policy differently. UI consistency requires shared state and verified backend effects, not just shared colors and components.
+
+**Implementation instructions:**
+
+1. Inventory every visible control, summary, status, link and menu on each requested page. Record its purpose, authoritative data source, action/route, required scope, pending state, error recovery and test. Include popups, empty states and mobile variants. Mark informational content explicitly; do not make decorative elements resemble controls.
+2. Use shared domain controllers/selectors and typed API responses. Server-confirmed mutations return the effective state and revision; all presentations update from that record. Draft/pending values remain visibly pending and must never masquerade as confirmed authority.
+3. Carry explicit Project/session/run/resource identifiers through navigation and cross-service handoffs. A route must open the named destination, preserve relevant drafts and focus the intended control. Resolve account names for display while retaining principal IDs in authorization and evidence.
+4. Standardize command semantics: Save acknowledges a revision; Cancel cannot undo an already committed operation; Stop reports what has stopped and what remains in flight; Retry reconciles ambiguous effects before replay. Cross-reference NEW-SET-01, NEW-PROJ-01 and NEW-ACCOUNT-01.
+5. Treat capability availability, policy permission, configured behavior, runtime readiness and per-action authorization as distinct facts. Present one short effective explanation with Details for those facts. If enforcement differs across runtime adapters, change the adapter/service contract or clearly mark the operation unsupported.
+6. When an operation needs attention, offer the exact remedy: open its permission, approve its pending action, connect its missing provider, repair its environment or review its failed delivery. Do not send users to a generic Settings page and make them find it again.
+7. Retain the security boundary during simplification: a shortcut invokes the same governed action, step-up requirements, audit and revocation checks as the full page. A friendly status is not an authorization token.
+
+**Completion gate:** A feature is complete only when its advertised action succeeds end to end, resulting state agrees across all affected surfaces, failure/recovery is understandable, and keyboard/mobile access works. Unimplemented controls must be omitted or visibly unavailable with an accurate reason and useful remedy. This gate applies to both existing Raiker features and all CAP-01–16 adaptations.
+
+## 17.2 NEW-PERM-01 — Top sections do not provide a working shortcut
+
+**Evidence:** The owner reports the top details are not working. In the reviewed source, `web/src/lib/views/CapabilitiesView.svelte` renders Common permissions and Needs your attention as lists of spans/strong text. Neither list offers a button, link or navigation handler. `AuthorityMatrix.svelte` is also a read-only table/card summary. This confirms missing interaction paths, not failure of every backend permission mutation. The exact item the owner attempted to use still needs live reproduction.
+
+**Priority / decision / effort:** P1 / turn Common permissions into actionable shortcuts and attention entries into review actions; retain the authority table as clearly labelled read-only supporting detail / M.
+
+**Explanation:** The page offers a prominent list of the permissions users commonly want to change but requires them to locate the same item again in the registry. Prominence implies utility; repeating information without a direct action adds friction.
+
+**Implementation:** Give each common entry a “Manage permission” action and each actionable attention entry a “Review” action. Both call a shared reveal-by-capability function that clears conflicting search if necessary, expands the correct domain and row, scrolls into view and moves keyboard focus to the row heading/control. Preserve browser Back and avoid duplicate editable state. If inline controls are preferred later, reuse the exact row controller and mutation contract. Label the authority table “Permission summary — read-only” and collapse specialist detail by default. Use friendly capability labels, with stable IDs in Details.
+
+**Acceptance:** Each shortcut works with a collapsed domain, active filter and narrow viewport; keyboard activation lands at the correct capability; screen-reader focus and expanded state are announced; unknown/unavailable capabilities show an explanation rather than a dead action.
+
+## 17.3 NEW-PERM-02 — Summaries can disagree with changed decision modes
+
+**Evidence:** `CapabilitiesView.svelte::setMode` and `bulkSetMode` update `modeOverrides`. Editable `ToolControlBoard` consumes those overrides. However, `attention`, `common` and `authorityGates` derive from the original `gates`; Common permissions calls `rowSummary(gate, ...)` directly, and AuthorityMatrix receives those original gates. Tightening mutations do not reload the gate list. Consequently the control may show the new mode while the top summaries still show the previous mode until refresh.
+
+**Priority / decision / effort:** P1 / one effective, revision-aware view model for every presentation / M.
+
+**Explanation:** A permissions page cannot offer contradictory answers about whether an action will ask or run automatically. This is a source-supported presentation defect; it does not establish that backend enforcement uses the stale UI value.
+
+**Implementation:** Prefer mutation responses containing the authoritative gate and revision; merge the confirmed record into the shared store and remove redundant overrides. During migration, derive every presentation from the same validated merged model, not separate raw and overridden copies. Prevent an older refresh response from overwriting a newer confirmed mutation. Show pending operations distinctly. Report bulk partial successes per capability and reconcile current state after a failure; a generic rejected message must not imply all earlier successful changes rolled back.
+
+**Acceptance:** Change Automatic to Ask me and Never; verify control, common summary, attention list and authority table agree immediately after acknowledgement and after reload. Repeat for loosening with step-up, failed mutations, refresh during save, two tabs and a bulk request failing partway through.
+
+## 17.4 NEW-PERM-03 — Unknown modes and automatic-mode attention need honest semantics
+
+**Evidence:** `AuthorityMatrix.svelte::agentAuthority` returns Direct for a ready enabled gate whenever the mode is neither deny nor ask, including missing/unrecognized values. `permissionLanguage.ts::permissionAttention` selects every auto-mode gate without checking effective availability/readiness and describes it as running automatically. Common permissions also uses a different availability expression from registry rows, omitting the registry's `isOnByDefault` fallback.
+
+**Priority / decision / effort:** P1 / derive explicit availability, configured behavior and effective readiness using one exhaustively handled presentation contract / M.
+
+**Explanation:** Unknown is not evidence of permission. Configured Automatic is not evidence that an unavailable executor can run. A summary must distinguish policy configuration from an actual per-action authorization decision.
+
+**Implementation:** Enumerate known modes explicitly and show “Unknown — refresh or review configuration” for missing/unrecognized data; do not invent an enforcement decision in the UI. Distinguish Allow and Automatic using the shared vocabulary. Replace the unconditional automatic warning with either “Automatic configured; currently unavailable” or a readiness-aware review statement. Compute default-on resolution consistently using authoritative server semantics rather than copy-pasting inconsistent boolean expressions. Revise the heading that claims current carried authority if it only represents account configuration, because task scope and runtime checks may narrow actual execution.
+
+**Acceptance:** Test missing/future mode values, empty or failed readiness data, off + Automatic, default-on resolution, enabled + Never and enabled + Ask me. The UI must never label an unknown mode Direct or imply an unavailable tool is actively running. Verify server enforcement independently; changing display logic is not an enforcement fix.
+
+## 17.5 Cross-page consistency verification matrix
+
+| Areas | Required consistent experience | Evidence required before closing DEC-26 |
+| --- | --- | --- |
+| Projects, identity, Chat, Build, Design | Same account label and explicit work destination; results filed to submission-time scope; drafts survive navigation. | Start work from Project, switch mode, change selection during a pending request and reopen persisted artifacts; no stale or mixed scope. |
+| Permissions, MCP, runtimes, approvals | Same effective policy, capability names and pending approval state; shortcuts reach exact settings; revoked access prevents subsequent execution. | Change/revoke permission while MCP or a remote task is pending; verify all summaries and actual denial with audit correlation. |
+| Models, Settings popup and Settings pages | One override hierarchy and readiness model; direct destination links; revision-safe saves and honest recovery. | Connect provider, select per-work override, return to default, save while editing, recover from rejected save and follow every popup destination. |
+| Tasks, Chat, Messaging | One task/attempt identity, progress and cancellation state; task completion distinct from reply delivery. | Schedule from Chat, inspect in Tasks, pause for approval, reconnect channel and retry delivery without rerunning the task. |
+| Memory and work surfaces | Same retention, provenance and context-inclusion explanation; forgotten data cannot reappear through stale indexes. | Correct/forget from an answer, inspect Memory, retrieve again, restart and test restore suppression within declared retention limits. |
+| Design, Projects and file/artifact viewers | Version, filename, destination and provider provenance agree; unsupported edits are not presented as working actions. | Generate, reopen, version and revert supported assets; fail upload/generation and preserve recoverable work. |
+| Installers, Updates and runtimes | Installer supplies base requirements; runtime setup handles optional tools; updates preserve compatible user state. | Clean-machine launch, optional capability setup, interrupted update, supported rollback and uninstall with data preservation. |
+| Every page and popup | Buttons, links, summaries and status labels are truthful, reachable and useful in loading/error/empty states. | Control inventory with no unexplained inert affordances; authenticated 390×844 and 1920×1080 checks, keyboard/focus, zoom and screen-reader evidence. |
+
+**Release interpretation:** These are implementation requirements, not a promise that consistency is already achieved. The known Permissions defects are part of the first-release UX/correctness backlog. Optional feature breadth can still be phased; any feature exposed in a release must satisfy this consistency gate within its declared supported scope.

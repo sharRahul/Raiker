@@ -33,13 +33,34 @@ export function readinessForProfile(profile: ModelProfile): ModelReadinessView {
   };
 }
 
-export function readinessForSelection(profile: ModelProfile | null): ModelReadinessView {
+/**
+ * The readiness of whatever the surface currently has selected.
+ *
+ * The no-selection case is two different situations, and saying the same thing
+ * about both became wrong in one of them the moment GLOBAL-MODEL-06 landed. An
+ * instance with no provider connected genuinely has no model to run; an
+ * instance whose provider is connected has a catalogue full of them and is
+ * missing only a choice. Sending the second owner to the Models page to
+ * "connect a provider" sends them to do something they have already done.
+ *
+ * `reachable` is how many models the composer's own picker can reach. Nothing
+ * is loosened by it: no model is selected in either case, and the turn is
+ * blocked in either case. This is which sentence is true.
+ */
+export function readinessForSelection(
+  profile: ModelProfile | null,
+  reachable = 0,
+): ModelReadinessView {
   if (profile) return readinessForProfile(profile);
   return {
     owner_principal_id: "", profile_id: "", model: "", endpoint_fingerprint: "",
     state: "not_configured", checked_at: null, expires_at: null,
-    summary: "No model is set up.", reason_code: "model_not_configured",
-    remediation: "Open Models to connect a provider or set up a local model.",
+    summary: reachable > 0 ? "No model is chosen." : "No model is set up.",
+    reason_code: "model_not_configured",
+    remediation:
+      reachable > 0
+        ? "Choose one from the model menu beside Send."
+        : "Open Models to connect a provider or set up a local model.",
     evidence: {}, ready: false,
   };
 }

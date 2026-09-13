@@ -23,7 +23,9 @@ class ModelSetupState:
 class SetupState:
     owner_principal_id: str
     status: str = "required"
-    stage: str = "model"
+    #: First launch opens on what the product is, not on a provider matrix
+    #: (FIRST-03). `account` and `backup` remain readable stored values.
+    stage: str = "welcome"
     selected_profile_id: str | None = None
     selected_model: str | None = None
     model_deferred: bool = False

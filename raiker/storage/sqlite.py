@@ -130,6 +130,8 @@ from raiker.storage.migrations import (
     GIT_CREDENTIAL_GRANT_SQL,
     IMAGE_GENERATIONS_MIGRATION_ID,
     IMAGE_GENERATIONS_SQL,
+    IMAGE_LINEAGE_MIGRATION_ID,
+    IMAGE_LINEAGE_SQL,
     LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
     LOCAL_RUNTIME_PRESENCE_MIGRATION_ID,
     LOCAL_RUNTIME_PRESENCE_SQL,
@@ -1607,6 +1609,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 IMAGE_GENERATIONS_MIGRATION_ID,
                 IMAGE_GENERATIONS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                IMAGE_LINEAGE_MIGRATION_ID,
+                IMAGE_LINEAGE_SQL,
                 connection,
             )
             self._apply_migration(
@@ -11535,6 +11542,24 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return str(row[0]) if row is not None else None
 
+    def forget_provider_catalogue(self, principal_id: str, profile_id: str) -> int:
+        """Drop what one provider published, and say how many rows went.
+
+        The counterpart to :meth:`save_provider_catalogue`, and the reason it
+        exists: a remembered catalogue is right for a provider that is briefly
+        unreachable and wrong for one the owner has disconnected. Without this,
+        removing a credential left that account's models in every picker — a
+        list Raiker can no longer reach, presented exactly like one it can,
+        which is the disappearance defect pointing the other way.
+        """
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM principal_provider_catalogue "
+                "WHERE principal_id = ? AND profile_id = ?",
+                (principal_id, profile_id),
+            )
+            return int(cursor.rowcount or 0)
+
     def is_configured_model(self, principal_id: str, profile_id: str, model: str) -> bool:
         with self.connect() as connection:
             row = connection.execute(
@@ -11736,6 +11761,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         attachment_id: str | None = None,
         media_type: str | None = None,
         byte_size: int = 0,
+        source_generation_id: str | None = None,
+        kind: str = "create",
+        project_id: str | None = None,
     ) -> None:
         """Record one attempt, whether or not it produced an image.
 
@@ -11743,14 +11771,21 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         the owner asked for something and the runtime said no, and a refusal
         nobody can see afterwards is the failure this product is written
         against.
+
+        BUG-277 — `source_generation_id` and `kind` are what make a history out
+        of a list. A refusal carries them too: an edit that was denied is still
+        a thing the owner asked of a particular image, and dropping the subject
+        from the record would leave the refusal unattributable to the asset it
+        was about.
         """
         with self.connect() as connection:
             connection.execute(
                 """
                 INSERT OR REPLACE INTO image_generations
                 (generation_id, owner_principal_id, profile_id, provider, model, prompt,
-                 size, status, reason_code, attachment_id, media_type, byte_size, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 size, status, reason_code, attachment_id, media_type, byte_size, created_at,
+                 source_generation_id, kind, project_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     generation_id,
@@ -11766,6 +11801,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     media_type,
                     byte_size,
                     utc_now(),
+                    source_generation_id,
+                    kind,
+                    project_id,
                 ),
             )
 

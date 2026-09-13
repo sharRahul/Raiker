@@ -1,5 +1,29 @@
 # Raiker Page-by-Page Implementation Verification — 2026-09-07
 
+## Follow-up — 2026-09-12 (later the same day)
+
+First launch closed, which empties the P1 backlog of everything except the
+workspace-shaped work.
+
+| Conclusion | Now |
+|---|---|
+| 6. First Launch behaves like a configuration wizard | **Closed** — [FIXED-488](FIXED_ITEMS.md#fixed-488--first-launch-taught-infrastructure-before-it-taught-the-product). The stages are Welcome → Model → Privacy → Ready; FIRST-01's secure opening boundary is untouched |
+
+Two defects found while verifying the new global catalogue against a live
+provider, and closed with it:
+[FIXED-489](FIXED_ITEMS.md#fixed-489--a-remembered-catalogue-outlived-the-connection-that-earned-it) —
+disconnecting a provider left its models in every picker, which is the
+disappearance defect GLOBAL-MODEL-08 exists to prevent, pointing the other way;
+and
+[FIXED-490](FIXED_ITEMS.md#fixed-490--a-composer-holding-eleven-choosable-models-said-none-was-set-up) —
+a composer with eleven reachable models still told the owner to go and connect a
+provider.
+
+What remains in the backlog below is workspace-shaped: VIS2-19 (Design canvas,
+still blocked on an image runtime beyond one-shot generation), VIS2-12 (Build's
+workbench composition), VIS2-11 (a persistent Project shell), COMPOSER-10's
+remaining Tasks grammar, and the Extensions and Observability hub passes.
+
 ## Follow-up — 2026-09-08
 
 The Models, global web-read and environment/time/weather plans were reverified
@@ -22,7 +46,7 @@ status.
 | 8. global surface parity, readiness semantics and bounded extraction still need explicit implementation/tests | **Closed** — [FIXED-461](FIXED_ITEMS.md#fixed-461--four-derivations-of-one-fact-about-what-a-turn-can-read) |
 | 3. Design is a real route but has no research layer of its own | **Partly closed** — Design is a prompt surface with a research protocol and the full read catalogue (WEB-06); the *canvas workspace* (VIS2-19) remains open |
 | Models: MODEL-09 and MODEL-14 partial | **Closed** — [FIXED-462](FIXED_ITEMS.md#fixed-462--the-hugging-face-flow-did-all-six-steps-at-once), [FIXED-463](FIXED_ITEMS.md#fixed-463--come-back-and-press-look-again); the Models review is now complete end to end |
-| 1, 2, 4, 5, 6 | Unchanged — Build's workbench pane, the global model catalogue, Permissions UX and First Launch remain as first recorded |
+| 1, 2, 4, 5, 6 | Build's workbench pane (2) remains as first recorded. Home parity (1) closed 2026-09-07, the global model catalogue (4) and Permissions UX (5) on 2026-09-12, and First Launch (6) later the same day — see the follow-ups above |
 
 Two findings this re-verification made on its own, both in the evidence harness
 rather than the product, and both silent by construction: every live round had
@@ -40,11 +64,11 @@ A sweep that reports success while writing nothing is worse than one that fails.
 This document is the explicit implementation-verification companion to:
 
 - `VISUAL_UI_UX_REVIEW_2026-09-06.md`
-- `MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md`
+- the Models review
 - `UNIFIED_COMPOSER_REDESIGN_2026-09-06.md`
-- `GLOBAL_MODEL_CATALOGUE_AND_COMPOSER_PICKER_2026-09-06.md`
-- `ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md`
-- `GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md`
+- the global model-catalogue review
+- the environment-context plan
+- the global web-read plan
 
 It answers four questions directly:
 
@@ -956,7 +980,7 @@ as trusted metadata separate from the untrusted workspace block, recorded as an
 delegated subagent each read the clock rather than inherit one. Weather is a
 structured read with `observed_at`, forecast validity and `fetched_at` kept
 apart and a typed `fresh`/`stale`/`unavailable` state. See
-`ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md`,
+the environment-context plan,
 [FIXED-459](FIXED_ITEMS.md#fixed-459--nothing-in-raiker-told-a-model-what-day-it-was)
 and
 [FIXED-460](FIXED_ITEMS.md#fixed-460--weather-was-a-page-to-interpret-rather-than-a-reading-to-report).
@@ -985,7 +1009,7 @@ fetch, with explicit truncation and a typed `static_content_insufficient` that
 authorises no browser. Readiness is a typed state separate from authority, from
 one shared snapshot so a still-mounted composer updates without a reload. The
 fail-closed half is asserted directly: every read still refuses when the gate is
-off. See `GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md` and
+off. See the global web-read plan and
 [FIXED-461](FIXED_ITEMS.md#fixed-461--four-derivations-of-one-fact-about-what-a-turn-can-read).
 
 ---
@@ -1009,7 +1033,7 @@ Priority outranks effort. Within the same priority, lower effort comes first.
 ## P1
 
 1. ~~**Permissions UX redesign** — Availability + Behaviour with progressive disclosure; preserve backend semantics.~~ Done 2026-09-07 ([FIXED-486](FIXED_ITEMS.md#fixed-486--two-parallel-systems-where-there-were-two-questions)).
-2. **FIRST-02 through FIRST-10** simplified first launch/onboarding.
+2. ~~**FIRST-02 through FIRST-10** simplified first launch/onboarding.~~ Done 2026-09-12 ([FIXED-488](FIXED_ITEMS.md#fixed-488--first-launch-taught-infrastructure-before-it-taught-the-product)).
 3. **VIS2-19** Design canvas/workspace.
 4. ~~**VIS2-12** Build artifact/workbench pane.~~ Done 2026-09-07 ([FIXED-467](FIXED_ITEMS.md#fixed-467--builds-third-pane-showed-tools-not-the-work)).
 5. ~~**VIS2-11** persistent Project workspace/context.~~ Done 2026-09-07 ([FIXED-469](FIXED_ITEMS.md#fixed-469--the-project-was-chosen-again-on-every-surface)).
@@ -1045,7 +1069,7 @@ The following earlier labels should be interpreted carefully:
 | Permissions backend | **Correct** |
 | Permissions UX | **Needs focused redesign** |
 | First Launch security boundary | **Correct** |
-| First Launch onboarding flow | **Needs focused redesign** |
+| First Launch onboarding flow | **Closed 2026-09-12** (FIXED-488) — Welcome → Model → Privacy → Ready |
 | authoritative environment clock/date/day/timezone | **Closed 2026-09-07** (FIXED-459) |
 | structured weather | **Closed 2026-09-07** (FIXED-460) |
 | global web-read parity | **Closed 2026-09-07** (FIXED-461) |

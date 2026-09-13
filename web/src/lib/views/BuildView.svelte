@@ -135,6 +135,7 @@
     sourcesForTurn,
   } from "../citations";
   import { chatProfiles, refreshModels, modelCatalogues } from "../models.svelte";
+  import { catalogueChoices } from "../modelCatalogue";
   import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
   import {
     audioSessionCoordinator,
@@ -862,7 +863,7 @@
       (profile) => profile.profile_id === modelProfile && (!model || profile.model === model),
     ) ?? selectedProfile,
   );
-  const modelReadiness = $derived(readinessForSelection(activeProfile));
+  const modelReadiness = $derived(readinessForSelection(activeProfile, catalogueChoices(profiles, modelCatalogues()).length));
   // BUG-238 — a stale observation never blocks: the server re-checks it
   // before admitting the turn, so the only thing that stops a send is a
   // model problem the owner can actually fix.

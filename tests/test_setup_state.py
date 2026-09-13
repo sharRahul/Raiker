@@ -21,7 +21,8 @@ def test_full_setup_state_is_owner_scoped_and_resumable(tmp_path: Path) -> None:
     client, headers = _client(tmp_path)
     initial = client.get("/api/setup", headers=headers)
     assert initial.status_code == 200
-    assert initial.json()["stage"] == "model"
+    # FIRST-03 — first launch opens on what Raiker is, not on a provider matrix.
+    assert initial.json()["stage"] == "welcome"
     assert initial.json()["status"] == "required"
 
     saved = client.put(
@@ -31,6 +32,23 @@ def test_full_setup_state_is_owner_scoped_and_resumable(tmp_path: Path) -> None:
     )
     assert saved.status_code == 200
     assert client.get("/api/setup", headers=headers).json()["privacy_mode"] == "local_first"
+
+
+def test_a_row_stored_under_a_retired_stage_still_round_trips(tmp_path: Path) -> None:
+    """An instance part-way through the previous wizard has one of these stored.
+
+    The stages the *screen* shows are `welcome → model → privacy → finish`, but
+    refusing `account` or `backup` on the wire would make an in-progress setup
+    unsavable rather than merely differently drawn.
+    """
+    client, headers = _client(tmp_path)
+
+    for stage in ("account", "backup"):
+        saved = client.put(
+            "/api/setup", headers=headers, json={"status": "in_progress", "stage": stage}
+        )
+        assert saved.status_code == 200, saved.text
+        assert saved.json()["stage"] == stage
 
 
 def test_setup_rejects_unknown_stages_and_backup_modes(tmp_path: Path) -> None:

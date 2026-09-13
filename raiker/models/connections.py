@@ -63,8 +63,16 @@ def list_model_connections(store: SQLiteStore, principal_id: str) -> list[str]:
 
 
 def clear_model_connection(store: SQLiteStore, principal_id: str, profile_id: str) -> None:
+    """Forget one provider connection, and the catalogue it published.
+
+    GLOBAL-MODEL-08 remembers what a provider last served so a brief outage does
+    not empty every picker. Disconnecting is not an outage: the owner has said
+    Raiker may no longer reach that account, and leaving its models behind would
+    offer a list nothing can serve, drawn exactly like one that can.
+    """
     with store.connect() as connection:
         connection.execute(
             "DELETE FROM connector_credentials WHERE principal_id=? AND connector_id=?",
             (principal_id, f"{_PREFIX}{profile_id}"),
         )
+    store.forget_provider_catalogue(principal_id, profile_id)

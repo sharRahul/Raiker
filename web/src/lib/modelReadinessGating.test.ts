@@ -11,7 +11,12 @@
 // about the model and still blocks, because those are the ones an owner can fix.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelReadinessView } from "./apiTypes";
-import { blocksSending, isRevalidating, revalidateSelectedModel } from "./modelReadiness.svelte";
+import {
+  blocksSending,
+  isRevalidating,
+  readinessForSelection,
+  revalidateSelectedModel,
+} from "./modelReadiness.svelte";
 import { resetModels, selectedModelReadiness } from "./models.svelte";
 import { setToken } from "./api";
 import { stubFetch } from "./test-helpers";
@@ -155,5 +160,34 @@ describe("background revalidation", () => {
     await revalidateSelectedModel();
 
     expect(selectedModelReadiness()?.readiness_state).toBe("ready");
+  });
+});
+
+describe("what the composer says when nothing is selected", () => {
+  /**
+   * Two different situations wore the same sentence, and GLOBAL-MODEL-06 made
+   * the difference visible: an instance with no provider connected has no model
+   * to run, and an instance whose provider is connected has a catalogue full of
+   * them and is missing only a choice. Telling the second owner to go and
+   * connect a provider sends them to do something they have already done.
+   */
+  it("names the missing choice when the picker can reach models", () => {
+    const view = readinessForSelection(null, 11);
+
+    expect(view.summary).toBe("No model is chosen.");
+    expect(view.remediation).toMatch(/model menu/i);
+    expect(view.ready).toBe(false);
+  });
+
+  it("still names the missing provider when there is nothing to reach", () => {
+    const view = readinessForSelection(null, 0);
+
+    expect(view.summary).toBe("No model is set up.");
+    expect(view.remediation).toMatch(/connect a provider/i);
+  });
+
+  it("blocks the turn either way — this is wording, not authority", () => {
+    expect(blocksSending(readinessForSelection(null, 11))).toBe(true);
+    expect(blocksSending(readinessForSelection(null, 0))).toBe(true);
   });
 });

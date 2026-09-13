@@ -265,6 +265,23 @@ Two things to know:
   runtime will refuse the turn until you choose one."** That is your next step:
   [Connecting a model](connecting-a-model.md).
 
+### The four screens after the account
+
+Setup runs once and asks two questions.
+
+| Stage | What it is |
+|---|---|
+| **Welcome** | What Raiker is: Chat, Build and Design. Nothing to configure. |
+| **Model** | Connect a provider or a runtime. It leads with the easiest working path — a runtime already running on this machine needs no account and no key — and keeps the full provider matrix behind **Other options**. **Advanced setup** opens [Models](connecting-a-model.md) for deeper configuration; you do not need it to finish. |
+| **Privacy** | *Where may Raiker send model requests?* **Local only**, or **Local, and the providers I connect**. This is about where your words travel. [Permissions](permissions-and-runtime-modes.md) governs the actions Raiker may take. |
+| **Ready** | Finish into **Chat**, **Build** or **Design**, or **Start using Raiker** for the dashboard. |
+
+Backup is offered on the last screen as optional setup rather than asked for
+before your first turn, and nothing claims a backup exists until Raiker has
+written and verified an encrypted snapshot. Raiker starts conservatively and asks
+before it takes a governed action, so there is no permissions matrix to fill in
+on first run.
+
 ## What you get
 
 Destinations are split by how often you go to them. The sidebar carries the

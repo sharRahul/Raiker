@@ -736,17 +736,17 @@ summary that made the same statement.
 |---|---|
 | `CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md` | Historical analysis + active architecture recommendations. Paths such as old `apps/web` references must not be treated as current. Contract generation and module decomposition remain useful. |
 | `CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md` | Historical findings. Use the re-verification table in this audit for current status. |
-| `ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md` | Implementation-plan history; later records say core time/weather work closed. Re-run contract tests before reopening. |
+| the environment-context plan | Implementation-plan history; later records say core time/weather work closed. Re-run contract tests before reopening. |
 | `FIXED_ITEMS.md` | Evidence ledger. Keep append-only in spirit; not a current-priority list. |
 | `GAP_BUILD_CHAT.md` | Useful gap ledger but contains stale old source paths and narrative statements that predate closures. Status table is more authoritative than old prose. |
 | `GENERIC_STATIC_CODE_REVIEW_2026-09-05.md` | Historical static-review evidence; closed rows stay historical. |
 | `GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md` | Valuable, but internally contradictory: its “still open” prose names some findings that its own later table marks closed. Treat row-level closure + this audit as current. GCR-41/42/43 remain especially relevant. |
-| `GLOBAL_MODEL_CATALOGUE_AND_COMPOSER_PICKER_2026-09-06.md` | Architectural invariant remains correct. Later implementation records supersede its “not reliably yet” current-state paragraph. Keep owner-level catalogue contract as regression target. |
-| `GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md` | Later closure record says global read parity/readiness work landed. Preserve as design/acceptance history. |
+| the global model-catalogue review | Architectural invariant remains correct. Later implementation records supersede its “not reliably yet” current-state paragraph. Keep owner-level catalogue contract as regression target. |
+| the global web-read plan | Later closure record says global read parity/readiness work landed. Preserve as design/acceptance history. |
 | `GOVERNANCE_ENTRY_PATHS.md` | High-value architecture inventory. Should ultimately be generated/validated against executor/tool registries to prevent drift. |
 | `LIVE_TEST_ROUNDS.md` | Evidence history, not current product spec. Keep environment/date/provider context with every round. |
 | `MEMORY_RELIABILITY_PLAN.md` | Mostly completed reliability ledger; good evidence. Future memory scaling work should be new entries rather than reopening closed history. |
-| `MODELS_PAGE_UI_BACKEND_REVIEW_2026-09-06.md` | Historical review; current five-panel IA is implemented. Use global-catalogue contract tests for regression. |
+| the Models review | Historical review; current five-panel IA is implemented. Use global-catalogue contract tests for regression. |
 | `PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md` | **Superseded as current status by this audit.** It has a later closure section at the top but older open conclusions deeper in the same file. Preserve it as the original verification snapshot. |
 | `PILLAR_MAP.md` | Useful executive dependency map. Must reference current ledgers rather than duplicate detailed statuses. |
 | `RAIKER_LIVE_MANUAL_TEST_PLAN.md` | Active verification procedure. Add the new canonical screenshot path/resolutions and clean installer scenarios. |
@@ -755,8 +755,8 @@ summary that made the same statement.
 | `TO_BE_FIXED.md` | Defect backlog. Should remain the canonical unresolved-defect ledger; status summaries elsewhere should link to it rather than duplicate it. |
 | `UNIFIED_COMPOSER_REDESIGN_2026-09-06.md` | Design/implementation history; shared composer is substantially implemented. Use it for invariants, not current backlog. |
 | `VISUAL_UI_UX_REVIEW_2026-09-06.md` | Later status is more current than the older page-by-page file. `VIS2-15` 4K/8K is now explicitly **cancelled/superseded by product decision**, not an implementation gap. `VIS2-19` Design canvas remains open. |
-| `WEB_UI_ADAPTIVE_SHELL_DESIGN.md` | Design intent/history. Current route/nav source is the implementation truth. |
-| `WEB_UI_ADAPTIVE_SHELL_IMPLEMENTATION_PLAN.md` | Implementation history. Completed shell work should not be carried as active backlog. |
+| the adaptive-shell design | Design intent/history. Current route/nav source is the implementation truth. |
+| the adaptive-shell implementation plan | Implementation history. Completed shell work should not be carried as active backlog. |
 | `screenshots/` under `docs/plans` | **Legacy evidence only.** It contains stale Models IA and 4K/8K variants. New canonical location is `docs/screenshots/`. |
 
 ## 7.3 Documentation governance rule

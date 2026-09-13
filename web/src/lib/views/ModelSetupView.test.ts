@@ -74,7 +74,58 @@ const REGISTRY = [
 ];
 
 describe("first-run setup", () => {
-  it("presents the five-stage checklist and lets model setup be deferred", async () => {
+  it("opens on what Raiker is, not on a provider matrix", async () => {
+    // FIRST-02/03 — the account was created on the screen before this one, so a
+    // stage called Account implied a second one to configure; and an owner who
+    // has not met Chat, Build and Design cannot tell what a provider is for.
+    stubFetch({
+      "GET /api/setup": { ...required, stage: "welcome" },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByRole("heading", { name: "Meet Raiker" })).toBeInTheDocument();
+    for (const stage of ["Welcome", "Model", "Privacy", "Ready"]) {
+      expect(screen.getByText(stage)).toBeInTheDocument();
+    }
+    expect(screen.queryByText("Account")).not.toBeInTheDocument();
+    expect(screen.queryByText("Backup")).not.toBeInTheDocument();
+    // FIRST-10 — the posture in a sentence, not sixty-six gates to configure.
+    expect(screen.getByText(/starts conservatively/i)).toBeInTheDocument();
+  });
+
+  it("shows a stored account stage as the welcome screen rather than a blank one", async () => {
+    stubFetch({
+      "GET /api/setup": { ...required, stage: "account" },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByRole("heading", { name: "Meet Raiker" })).toBeInTheDocument();
+  });
+
+  it("leads with the easiest working path and keeps the matrix on request", async () => {
+    // FIRST-05 — a runtime already running here needs no account and no key.
+    stubFetch({
+      "GET /api/setup": required,
+      "GET /api/models": {
+        profiles: [profile({ profile_id: "ollama-local", provider: "ollama", provider_detected: true })],
+        chat_profiles: [],
+      },
+      "GET /api/model-library": { roots: [], models: [] },
+      "GET /api/models/ollama-local/provider-models": {
+        profile_id: "ollama-local", provider: "ollama", status: "unavailable", reason_code: "x", models: [],
+      },
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByText("Recommended")).toBeInTheDocument();
+    expect(screen.getByText(/Ollama is already running here/)).toBeInTheDocument();
+    // The full matrix is one press away rather than the opening move.
+    expect(screen.getByRole("button", { name: "Other options" })).toBeInTheDocument();
+  });
+
+  it("lets model setup be deferred", async () => {
     const fetchMock = stubFetch({
       "GET /api/setup": required,
       "PUT /api/setup": { ...required, status: "in_progress", stage: "privacy", model_deferred: true },
@@ -82,10 +133,12 @@ describe("first-run setup", () => {
     });
     render(ModelSetupView);
 
-    expect(await screen.findByRole("heading", { name: "Choose where Raiker thinks" })).toBeInTheDocument();
-    for (const stage of ["Account", "Model", "Privacy", "Backup", "Finish"]) {
-      expect(screen.getByText(stage)).toBeInTheDocument();
-    }
+    expect(
+      await screen.findByRole("heading", { name: "Choose how Raiker should think" }),
+    ).toBeInTheDocument();
+    // FIRST-06 — the Models page is deeper configuration, not the way out of an
+    // incomplete flow.
+    expect(screen.getByRole("link", { name: "Advanced setup" })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Decide later" }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) =>
       String(url).endsWith("/api/setup") && init?.method === "PUT",
@@ -374,27 +427,56 @@ describe("first-run setup", () => {
     await waitFor(() => expect(dialog).toHaveTextContent(/No model matches/));
   });
 
-  it("states the privacy boundary as an explicit choice", async () => {
+  it("asks where model requests may travel, not which authority system to adopt", async () => {
+    // FIRST-07 — `Local-first` and `Balanced` read as a second Permissions.
     stubFetch({
       "GET /api/setup": { ...required, status: "in_progress", stage: "privacy" },
-      "PUT /api/setup": { ...required, status: "in_progress", stage: "backup", privacy_mode: "local_first" },
+      "PUT /api/setup": { ...required, status: "in_progress", stage: "finish", privacy_mode: "local_first" },
       "GET /api/models": { profiles: [], chat_profiles: [] },
     });
     render(ModelSetupView);
-    expect(await screen.findByRole("heading", { name: "Choose your privacy boundary" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Local-first/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Balanced/i })).toBeInTheDocument();
+
+    expect(
+      await screen.findByRole("heading", { name: "Where may Raiker send model requests?" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Local only/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Local, and the providers I connect/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Permissions still govern what Raiker may do/)).toBeInTheDocument();
+  });
+
+  it("finishes into work, with backup recommended rather than required", async () => {
+    // FIRST-08/09 — a NAS path asked for before first use is friction in front
+    // of the work, and "Open Workbench" named a place nothing else calls that.
+    stubFetch({
+      "GET /api/setup": { ...required, status: "in_progress", stage: "finish", privacy_mode: "local_first" },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByRole("heading", { name: "Your Raiker is ready" })).toBeInTheDocument();
+    for (const mode of ["Chat", "Build", "Design"]) {
+      expect(screen.getByRole("button", { name: mode })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("button", { name: "Start using Raiker" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open Workbench" })).not.toBeInTheDocument();
+    // Still offered, and still real: nothing claims a backup until one verifies.
+    expect(screen.getByRole("button", { name: "Set up backup" })).toBeInTheDocument();
+    expect(screen.getByText("Recommended")).toBeInTheDocument();
   });
 
   it("never calls a deferred backup protected", async () => {
     stubFetch({
-      "GET /api/setup": { ...required, status: "in_progress", stage: "backup" },
-      "PUT /api/setup": { ...required, status: "in_progress", stage: "finish", backup_mode: "later" },
+      "GET /api/setup": { ...required, status: "in_progress", stage: "finish" },
       "GET /api/models": { profiles: [], chat_profiles: [] },
     });
     render(ModelSetupView);
-    expect(await screen.findByRole("heading", { name: "Create your first backup" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Set up later" })).toBeInTheDocument();
-    expect(screen.getByText(/No backup is configured/)).toBeInTheDocument();
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Set up backup" }));
+    expect(screen.getByLabelText(/Local, removable, or NAS folder/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Create and verify backup" }),
+    ).toBeInTheDocument();
   });
 });

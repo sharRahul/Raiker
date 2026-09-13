@@ -53,7 +53,7 @@ describe("App shell", () => {
     expect(
       await screen.findByRole(
         "heading",
-        { name: "Choose where Raiker thinks" },
+        { name: "Choose how Raiker should think" },
         { timeout: 10_000 },
       ),
     ).toBeInTheDocument();

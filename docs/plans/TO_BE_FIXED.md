@@ -1378,8 +1378,7 @@ appear only once the owner asks for them.
 ## BUG-280 — Weather and the environment clock are unmeasured against a real provider and a real model
 
 **Severity: Low. Area: runtime / environment context, weather. Raised while
-implementing
-[ENV-01…05 and WEATHER-01…03](ENVIRONMENT_CONTEXT_TIME_WEATHER_2026-09-07.md).**
+implementing ENV-01…05 and WEATHER-01…03.**
 
 **Observed.** The 2026-09-07 round proved the whole of the environment and
 weather contract against the runtime: the bundle a turn is given, the event it
@@ -1422,8 +1421,7 @@ reading is.
 
 ## BUG-281 — Design's research findings are text, not sources
 
-**Severity: Low. Area: Design. Raised while implementing
-[WEB-06](GLOBAL_WEB_READ_CAPABILITIES_2026-09-07.md#web-06--design-research-agent-integration).**
+**Severity: Low. Area: Design. Raised while implementing WEB-06.**
 
 **Observed.** Design's Tools menu runs a real governed research turn on the
 `design` surface: it searches, reads and extracts through the global read
@@ -1503,3 +1501,32 @@ live regression using an available `-cloud` profile.
 **Interface outcome that has to be true before this closes.** A model that
 passes Ollama's provider test can complete a Chat turn, or Chat reports the
 specific provider/runtime refusal rather than a generic reachability message.
+
+---
+
+## BUG-286 — A fresh composer names an unreachable default it was never given
+
+**Severity: Low. Area: Chat/Build composer, model decision. Status: Open —
+raised 2026-09-12 during the global-catalogue live round.**
+
+**Observed.** On a workspace with Anthropic connected and no default chosen, the
+Chat picker's trigger reads **Not selected** — correct — while the menu above it
+opens with a decision note naming `Gemma 4:31B Cloud` as **Selected ·
+unavailable**. Nothing selected that model; it is the shipped Ollama profile's
+declared model, on a host with no Ollama. The two statements are in the same menu
+and disagree with each other.
+
+**Why it was left.** It predates the global catalogue and is not caused by it.
+`GET /api/model-decision` resolves a selection from the profile registry when the
+owner has stored none, and the picker reports that resolution honestly — the
+defect is in what the decision answers, not in what the menu draws. Changing it
+is a contract change with its own tests (`tests/test_model_decision.py`) and
+belongs with that contract rather than inside a picker change.
+
+**Proposed fix.** Have the decision report no selection when the owner has stored
+none, rather than a registry default, so the **Selected · unavailable** note
+appears only when a selection exists and cannot serve.
+
+**Interface outcome that has to be true before this closes.** A composer with no
+default chosen says only that, and no model the owner never chose is described as
+selected.

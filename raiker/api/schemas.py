@@ -76,10 +76,19 @@ class GenerateImageRequest:
     # if the profile declares it for images, and falls back to the profile's
     # default when it is empty. Without that check this field would be a
     # free-text string forwarded to a provider unread.
+    #
+    # BUG-277 — `source_generation_id` is what makes "edit this" possible, and
+    # it is the one field here that names something the owner already has. It is
+    # resolved owner-scoped in the executor rather than trusted: a generation id
+    # is short and guessable in shape, and an id belonging to another owner
+    # answers exactly as one that was never issued.
     profile_id: str
     prompt: str
     size: str = "1024x1024"
     model: str = ""
+    source_generation_id: str = ""
+    variations: int = 1
+    project_id: str = ""
 
 
 @dataclass
@@ -277,7 +286,10 @@ class SetupUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     status: Literal["required", "in_progress", "skipped", "complete"]
-    stage: Literal["account", "model", "privacy", "backup", "finish"]
+    # `welcome` is where first launch now starts; `account` and `backup` stay
+    # accepted because an instance part-way through the previous wizard has one
+    # of them stored, and a stored row must still round-trip.
+    stage: Literal["welcome", "account", "model", "privacy", "backup", "finish"]
     selected_profile_id: str | None = None
     selected_model: str | None = None
     model_deferred: bool = False

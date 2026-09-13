@@ -1,12 +1,37 @@
 <script lang="ts">
+  /**
+   * First launch, after the secure opening boundary.
+   *
+   * The boundary above this screen is unchanged and deliberately so: runtime
+   * reachability, encrypted-store availability, owner registration versus
+   * unlock, and bootstrap verification all still happen before the workspace
+   * mounts, and none of them is collapsed into a generic failure.
+   *
+   * What changed is everything after it. This used to be
+   * `Account → Model → Privacy → Backup → Finish`, which asked an owner to
+   * understand infrastructure before they had used the product once: an Account
+   * stage after the account was already created, a full provider matrix as the
+   * opening move, a backup path requested before first use, and a final button
+   * to "Open Workbench" — a place the rest of the product does not call by that
+   * name. `firstRun.ts` holds the ordering and the wording; this file draws it.
+   */
   import { onMount } from "svelte";
   import { api } from "../api";
   import type { ModelProfile, SetupState } from "../apiTypes";
   import { modelName } from "../modelPresentation";
+  import {
+    PERMISSIONS_NOTE,
+    PRIVACY_CHOICES,
+    recommendedPath,
+    SETUP_STAGE_LABELS,
+    SETUP_STAGES,
+    visibleStage,
+  } from "../firstRun";
   import ProviderMatrix from "../components/ProviderMatrix.svelte";
+  import Icon from "../components/Icon.svelte";
 
-  const stages = ["account", "model", "privacy", "backup", "finish"] as const;
-  const labels = { account: "Account", model: "Model", privacy: "Privacy", backup: "Backup", finish: "Finish" };
+  const stages = SETUP_STAGES;
+  const labels = SETUP_STAGE_LABELS;
   let setup: SetupState | null = $state(null);
   let profiles: ModelProfile[] = $state([]);
   let chatProfiles: ModelProfile[] = $state([]);
@@ -86,9 +111,17 @@
     });
   }
 
+  /**
+   * FIRST-07 — the answer is about where content may travel, and it says so.
+   * Permissions still governs what Raiker may do; these two are not a second
+   * authority system, and the old `Local-first` / `Balanced` pair read like one.
+   */
   async function choosePrivacy(privacy_mode: "local_first" | "balanced") {
-    await save({ status: "in_progress", stage: "backup", privacy_mode });
+    await save({ status: "in_progress", stage: "finish", privacy_mode });
   }
+
+  /** FIRST-08 — backup is offered at the end, not asked for before first use. */
+  let wantsBackup = $state(false);
 
   async function createBackup() {
     if (!backupTarget.trim()) return;
@@ -102,14 +135,32 @@
         backup_mode: "local",
         backup_target: result.setup.backup_target,
       }));
+      wantsBackup = false;
     } catch { error = "The backup folder could not be verified. Choose a writable local folder."; }
     finally { busy = false; }
   }
 
-  async function finish() {
+  /**
+   * FIRST-09 — finish into work, not administration.
+   *
+   * The destination is a Work surface the owner just met by name, or Home when
+   * they would rather look around first. "Open Workbench" named a place the
+   * rest of the product does not call by that name.
+   */
+  async function finish(route = "#/home") {
     await save({ status: "complete", stage: "finish" });
-    window.location.hash = "#/home";
+    window.location.hash = route;
   }
+
+  // A function rather than an inline `setup?.stage`: control-flow analysis
+  // narrows the `$state(null)` initializer at this position and would type the
+  // access as `never`. The parameter carries the declared type instead.
+  const stageOf = (state: SetupState | null) => (state === null ? null : state.stage);
+  const stage = $derived(visibleStage(stageOf(setup)));
+  const recommended = $derived(recommendedPath(profiles));
+  /** The full matrix opens by itself only when there is nothing to recommend. */
+  let showAllProviders = $state(false);
+  const allProvidersOpen = $derived(showAllProviders || recommended === null);
 
   onMount(load);
 </script>
@@ -118,9 +169,9 @@
   <aside class="stage-rail" aria-label="Setup progress">
     <p class="rail-title">Your Raiker</p>
     <ol>
-      {#each stages as stage, index}
-        <li class:active={setup?.stage === stage} class:done={stage === "account" || (setup && stages.indexOf(setup.stage) > index)}>
-          <span>{index + 1}</span><strong>{labels[stage]}</strong>
+      {#each stages as railStage, index}
+        <li class:active={stage === railStage} class:done={stages.indexOf(stage) > index}>
+          <span>{index + 1}</span><strong>{labels[railStage]}</strong>
         </li>
       {/each}
     </ol>
@@ -130,57 +181,125 @@
     {#if error}<p class="error" role="alert">{error}</p>{/if}
     {#if setup === null}
       <h2 id="setup-title">Preparing your setup…</h2>
-    {:else if setup.stage === "model"}
+    {:else if stage === "welcome"}
+      <!-- FIRST-03 — the product model before the infrastructure. An owner who
+           has not met Chat, Build and Design cannot tell what a provider choice
+           is for. FIRST-02 — no Account stage: the account was created on the
+           screen before this one. -->
       <header>
-        <p class="eyebrow">02 · Model connection</p>
-        <h2 id="setup-title">Choose where Raiker thinks</h2>
-        <p>One row per provider. The three on this device are asked what they are serving; hosted providers use either their API key or, for Codex, your ChatGPT subscription. Nothing is contacted until you ask a row to, and Raiker still runs a readiness check against the exact model before any model-backed work.</p>
+        <p class="eyebrow">01 · Welcome</p>
+        <h2 id="setup-title">Meet Raiker</h2>
+        <p>Your governed AI workspace for Chat, Build and Design. Two short questions and you are working.</p>
       </header>
-      <ProviderMatrix
-        {profiles}
-        {chatProfiles}
-        onchanged={() => void loadProfiles()}
-        onselected={(profileId, model) => void chooseModel(profileId, model)}
-      />
+      <div class="modes">
+        <div class="mode"><Icon name="chat" size="md" /><strong>Chat</strong><span>Think something through, with memory, sources and approvals.</span></div>
+        <div class="mode"><Icon name="code" size="md" /><strong>Build</strong><span>Work on a repository — plan, change, run, review the diff.</span></div>
+        <div class="mode"><Icon name="design" size="md" /><strong>Design</strong><span>Research and generate images against a governed model.</span></div>
+      </div>
+      <p class="note">{PERMISSIONS_NOTE}</p>
+      <div class="actions">
+        <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: "model" })}>Continue</button>
+      </div>
+    {:else if stage === "model"}
+      <header>
+        <p class="eyebrow">02 · Model</p>
+        <h2 id="setup-title">Choose how Raiker should think</h2>
+        <!-- FIRST-04 — connect, then discover, then choose a default. What a
+             provider serves is discovered once and available everywhere; there
+             is no step in between where models are kept or withheld. -->
+        <p>Connect a provider or a runtime once. Every compatible model it serves becomes available in Chat, Build and Design, and you choose which one answers by default.</p>
+      </header>
+      {#if recommended !== null}
+        <!-- FIRST-05 — the easiest true path first, the matrix on request. -->
+        <div class="recommended">
+          <p class="eyebrow">Recommended</p>
+          <strong>{recommended.label}</strong>
+          <span>{recommended.detail}</span>
+        </div>
+      {/if}
+      {#if !allProvidersOpen}
+        <div class="actions">
+          <button class="quiet" onclick={() => (showAllProviders = true)}>Other options</button>
+        </div>
+      {/if}
+      {#if allProvidersOpen}
+        <ProviderMatrix
+          {profiles}
+          {chatProfiles}
+          onchanged={() => void loadProfiles()}
+          onselected={(profileId, model) => void chooseModel(profileId, model)}
+        />
+      {/if}
       {#if picked !== null}
-        <p class="picked" role="status">{picked} is selected. Continue to set your privacy boundary.</p>
+        <p class="picked" role="status">{picked} is selected. Next, where model requests may travel.</p>
       {/if}
       <div class="actions">
-        <a class="quiet" href="#/models">Open the full Models page</a>
+        <!-- FIRST-06 — this is not the way out of an incomplete flow. Everything
+             needed to connect a provider and pick a default is on this screen;
+             the Models page is where deeper configuration lives. -->
+        <a class="quiet" href="#/models">Advanced setup</a>
         <button class="primary" disabled={busy} onclick={deferModel}>{picked === null ? "Decide later" : "Continue"}</button>
       </div>
-    {:else if setup.stage === "privacy"}
+    {:else if stage === "privacy"}
       <header>
-        <p class="eyebrow">03 · Privacy boundary</p>
-        <h2 id="setup-title">Choose your privacy boundary</h2>
-        <p>This choice explains where content may travel. Permissions still govern every capability separately.</p>
+        <p class="eyebrow">03 · Privacy</p>
+        <!-- FIRST-07 — one question about where content travels. "Local-first"
+             and "Balanced" read as a second authority system standing beside
+             Permissions, which they are not. -->
+        <h2 id="setup-title">Where may Raiker send model requests?</h2>
+        <p>Permissions still govern what Raiker may do. This is only about where your words go.</p>
       </header>
       <div class="choice-list">
-        <button aria-label="Local-first" disabled={busy} onclick={() => choosePrivacy("local_first")}><strong>Local-first</strong><span>Prefer local models and keep network access off until you explicitly enable it.</span></button>
-        <button aria-label="Balanced" disabled={busy} onclick={() => choosePrivacy("balanced")}><strong>Balanced</strong><span>Allow configured hosted models while keeping tool permissions and approvals in force.</span></button>
+        {#each PRIVACY_CHOICES as choice (choice.mode)}
+          <button aria-label={choice.label} disabled={busy} onclick={() => choosePrivacy(choice.mode)}>
+            <strong>{choice.label}</strong><span>{choice.detail}</span>
+          </button>
+        {/each}
       </div>
       <div class="actions"><button class="quiet" onclick={() => save({ stage: "model" })}>Back</button></div>
-    {:else if setup.stage === "backup"}
-      <header>
-        <p class="eyebrow">04 · Backup</p>
-        <h2 id="setup-title">Create your first backup</h2>
-        <p>No backup is configured until Raiker writes and verifies a real encrypted local snapshot.</p>
-      </header>
-      <label>Local, removable, or NAS folder<input bind:value={backupTarget} placeholder="Full path to a backup folder" /></label>
-      <div class="actions"><button class="quiet" onclick={() => save({ stage: "privacy" })}>Back</button><button class="quiet" onclick={() => save({ stage: "finish", backup_mode: "later" })}>Set up later</button><button class="primary" disabled={busy || !backupTarget.trim()} onclick={createBackup}>Create and verify backup</button></div>
     {:else}
       <header>
-        <p class="eyebrow">05 · Ready</p>
+        <p class="eyebrow">04 · Ready</p>
         <h2 id="setup-title">Your Raiker is ready</h2>
-        <p>Review what is proven now. Deferred choices stay visible in Models and Settings.</p>
+        <p>Start where the work is. Everything below stays available in Models, Settings and Permissions.</p>
       </header>
+      <!-- FIRST-09 — finish into work. The three Work modes the welcome screen
+           introduced, as the three things to do next. -->
+      <div class="start-work">
+        <button class="mode-start" disabled={busy} onclick={() => finish("#/chat")}><Icon name="chat" size="md" /><strong>Chat</strong></button>
+        <button class="mode-start" disabled={busy} onclick={() => finish("#/build")}><Icon name="code" size="md" /><strong>Build</strong></button>
+        <button class="mode-start" disabled={busy} onclick={() => finish("#/design")}><Icon name="design" size="md" /><strong>Design</strong></button>
+      </div>
       <dl class="summary">
-        <div><dt>Account</dt><dd>Owner account active</dd></div>
         <div><dt>Model</dt><dd>{setup.model_deferred ? "Decide later" : setup.selected_model ?? "Not selected"}</dd></div>
-        <div><dt>Privacy</dt><dd>{setup.privacy_mode === "local_first" ? "Local-first" : "Balanced"}</dd></div>
-        <div><dt>Backup</dt><dd>{setup.backup_verified_at ? "Verified" : "Not configured"}</dd></div>
+        <div><dt>Model requests</dt><dd>{setup.privacy_mode === "local_first" ? "Local only" : "Local, and connected providers"}</dd></div>
+        <div><dt>Backup</dt><dd>{setup.backup_verified_at ? "Verified" : "Recommended"}</dd></div>
       </dl>
-      <div class="actions"><button class="quiet" onclick={() => save({ stage: "backup" })}>Back</button><button class="primary" disabled={busy} onclick={finish}>Open Workbench</button></div>
+      <!-- FIRST-08 — backup is recommended, not a stage that stands between an
+           owner and their first turn. It is still real: nothing claims a backup
+           exists until Raiker has written and verified an encrypted snapshot. -->
+      <div class="optional">
+        <p class="eyebrow">Optional setup</p>
+        {#if setup.backup_verified_at}
+          <p class="note">Backup verified at {setup.backup_target}.</p>
+        {:else if wantsBackup}
+          <label>Local, removable, or NAS folder<input bind:value={backupTarget} placeholder="Full path to a backup folder" /></label>
+          <div class="actions">
+            <button class="quiet" onclick={() => (wantsBackup = false)}>Cancel</button>
+            <button class="primary" disabled={busy || !backupTarget.trim()} onclick={createBackup}>Create and verify backup</button>
+          </div>
+        {:else}
+          <div class="actions">
+            <button class="quiet" onclick={() => (wantsBackup = true)}>Set up backup</button>
+            <a class="quiet" href="#/settings">Review privacy</a>
+            <a class="quiet" href="#/capabilities">Review permissions</a>
+          </div>
+        {/if}
+      </div>
+      <div class="actions">
+        <button class="quiet" onclick={() => save({ stage: "privacy" })}>Back</button>
+        <button class="primary" disabled={busy} onclick={() => finish("#/home")}>Start using Raiker</button>
+      </div>
     {/if}
   </div>
 </section>
@@ -204,9 +323,21 @@
   .choice-list { display: grid; gap: var(--space-2); } .choice-list button { display: grid; gap: .3rem; padding: var(--space-4); border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); text-align: left; }
   .choice-list button { cursor: pointer; } .choice-list button:hover { border-color: var(--accent-border); background: var(--accent-soft); } strong { color: var(--text-1); } span { font-size: var(--text-sm); line-height: 1.45; }
   .picked { margin: 0; color: var(--accent); font-size: var(--text-sm); font-weight: 650; }
+  /* The three Work modes, drawn the same way in both places they appear: as an
+     introduction on the welcome screen and as the first thing to do on the last
+     one. Chat, Build and Design are peers, so the grid gives them equal room. */
+  .modes, .start-work { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+  .mode, .mode-start { display: grid; justify-items: start; gap: .3rem; padding: var(--space-4); border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); text-align: left; }
+  .mode-start { cursor: pointer; }
+  .mode-start:hover { border-color: var(--accent-border); background: var(--accent-soft); }
+  .note { margin: 0; color: var(--text-3); font-size: var(--text-sm); line-height: 1.5; max-width: 45rem; }
+  /* Recommended is one sentence with a reason, not a card competing with the
+     matrix below it: the point is that most owners need read no further. */
+  .recommended { display: grid; gap: .25rem; padding: var(--space-4); border: 1px solid var(--accent-border); border-radius: var(--r-lg); background: var(--accent-soft); }
+  .optional { display: grid; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--border); }
   label { display: grid; gap: var(--space-2); max-width: 36rem; color: var(--text-1); } input { padding: .75rem .9rem; border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); color: var(--text-1); }
   .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; } .summary div { padding: var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--sunken); } dt { color: var(--text-3); font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; } dd { margin: .35rem 0 0; color: var(--text-1); }
   .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; } .quiet, .primary { width: max-content; border-radius: var(--r-pill); padding: .55rem .9rem; font: inherit; font-size: var(--text-sm); font-weight: 750; cursor: pointer; text-decoration: none; }
   .quiet { border: 1px solid var(--neutral-border); background: var(--surface); color: var(--text-2); } .primary { border: 1px solid var(--accent-border); background: var(--accent); color: white; } .error { color: var(--danger); }
-  @media (max-width: 760px) { .setup-shell { grid-template-columns: 1fr; } .stage-rail { border-right: 0; border-bottom: 1px solid var(--border); padding: 0 0 var(--space-3); overflow-x: auto; } .rail-title { display: none; } ol { display: flex; min-width: max-content; } li { grid-template-columns: auto auto; } .summary { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) { .setup-shell { grid-template-columns: 1fr; } .modes, .start-work { grid-template-columns: 1fr; } .stage-rail { border-right: 0; border-bottom: 1px solid var(--border); padding: 0 0 var(--space-3); overflow-x: auto; } .rail-title { display: none; } ol { display: flex; min-width: max-content; } li { grid-template-columns: auto auto; } .summary { grid-template-columns: 1fr; } }
 </style>

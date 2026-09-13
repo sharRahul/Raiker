@@ -58,6 +58,15 @@ def _public(row: dict[str, Any]) -> dict[str, Any]:
         "media_type": row["media_type"],
         "byte_size": row["byte_size"],
         "created_at": row["created_at"],
+        # BUG-277 — what this picture was made from, and which of the three
+        # requests made it. Together they are the whole lineage: a chain of
+        # single parents is a history, and a history is what a version strip
+        # draws. `.get` because a row written before the lineage migration has
+        # neither, and an image that predates the feature is an origin rather
+        # than a broken row.
+        "source_generation_id": row.get("source_generation_id"),
+        "kind": row.get("kind") or "create",
+        "project_id": row.get("project_id"),
     }
 
 
@@ -81,6 +90,9 @@ async def generate_image(body: GenerateImageRequest, request: Request) -> dict[s
         prompt=body.prompt.strip(),
         size=body.size.strip(),
         model=body.model.strip(),
+        source_generation_id=body.source_generation_id.strip(),
+        variations=body.variations,
+        project_id=body.project_id.strip(),
     )
     if not result.ok:
         # The refusal is already recorded against the owner by the executor, so

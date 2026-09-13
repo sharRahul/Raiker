@@ -1171,8 +1171,11 @@ class RuntimeControlService:
         prompt: str,
         size: str,
         model: str = "",
+        source_generation_id: str = "",
+        variations: int = 1,
+        project_id: str = "",
     ) -> ControlResult:
-        """One governed image generation, for the Design surface.
+        """One governed image generation, edit or variation, for Design.
 
         Takes the long way round like :meth:`run_telemetry_export`: the action
         goes through :class:`RuntimeAuthority`, so the ``image_generation``
@@ -1202,6 +1205,13 @@ class RuntimeControlService:
                 # named" as "use the profile default", and an empty string in
                 # the audited arguments would read as a choice that was made.
                 **({"model": model} if model else {}),
+                # Same rule for the three BUG-277 arguments. A subject that is
+                # absent from the audited arguments is a generation that named
+                # none, which is exactly what happened; an empty string would
+                # read as an edit of nothing.
+                **({"source_generation_id": source_generation_id} if source_generation_id else {}),
+                **({"variations": variations} if variations != 1 else {}),
+                **({"project_id": project_id} if project_id else {}),
             },
             risk_level=RiskLevelValue.MEDIUM,
         )

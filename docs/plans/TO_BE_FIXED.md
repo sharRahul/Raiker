@@ -1524,3 +1524,40 @@ through `GET /api/images`.
 **Interface outcome that has to be true before this closes.** A picture generated
 through a real provider, edited into a second version, and both shown on the
 canvas as the chain they are — with the captures to prove it.
+
+---
+
+## BUG-288 — A turn can only answer in prose, and the components to answer otherwise already exist
+
+**Severity: Low. Area: Chat / typed output. Raised 2026-09-13 while closing out
+[`VISUAL_UI_UX_REVIEW_2026-09-06.md`](VISUAL_UI_UX_REVIEW_2026-09-06.md); it is
+VIS-19, the last implementation item in that review.**
+
+**Observed.** Raiker's renderer already speaks a fair vocabulary — headings,
+fenced code with highlighting, lists, tables, citation chips, links
+(`web/src/lib/markdown.ts`) — and the product has purpose-built panes beside it
+(`CommandOutputPane`, `ReasoningBlock`, `FileInspector`'s table preview, Build's
+artifact pane). What it does not have is a *typed channel*: a model's answer is
+one Markdown string, and everything above is inferred from the characters in it.
+
+Two consequences. A turn cannot say *this part of my answer is a table of these
+columns* or *this is a series to plot* — only write something that happens to
+parse as a table. And there is no chart at all, so a turn whose answer is
+genuinely a shape has to describe the shape in words.
+
+**Why nothing was built for it here.** A chart component with no runtime
+producing chart data is the dead-button problem this product refuses everywhere
+else, and it is the same trap [BUG-277](#bug-277--design-is-a-one-shot-generator-so-most-of-its-composer-has-nothing-to-reach)
+set for Design: the interface cannot come first. The order is the same one that
+worked there — the channel, then the components that draw it.
+
+**Proposed fix.** A typed content part on a message, carried from the runtime
+through `MessageView` to the renderer, so a block declares what it is rather
+than being guessed at; the existing table and code renderers become the first
+two types it can name; a chart type third, with the series bounded and validated
+like every other action argument, because a payload a model proposes is a thing
+a model can propose.
+
+**Interface outcome that has to be true before this closes.** A turn answers
+with a table Raiker knows is a table — sortable, and legible to a screen reader
+as one — and with a chart, and neither is a string that happened to parse.

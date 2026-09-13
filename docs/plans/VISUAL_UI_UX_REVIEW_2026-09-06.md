@@ -17,7 +17,12 @@ badge budget now covers those entries, which print a state chip only when the
 state is *not* the ordinary one. VIS2-19 was then the largest open item — Design had
 gained a research layer (WEB-06), not a canvas.
 
-**Follow-up 2026-09-13.** VIS2-19 and the Design half of VIS2-20 are closed. The
+**Follow-up 2026-09-13.** VIS2-19 and the Design half of VIS2-20 are closed, and
+with them every Pass-2 row. One implementation item is left in the whole review
+and it is Pass 1's: VIS-19, a typed output channel and a chart, now carried as
+[BUG-288](TO_BE_FIXED.md#bug-288--a-turn-can-only-answer-in-prose-and-the-components-to-answer-otherwise-already-exist)
+rather than built ahead of the runtime that would fill it — the same order this
+change had to follow. The
 order the work needed was the order BUG-277 set out: a picture had to be able to
 record what it was made from before a canvas had anything to compose. It does
 now, and with it Design files its pictures against the project they were made in
@@ -166,7 +171,7 @@ The old implementation-order section is superseded. These findings remain histor
 | Finding | Pass-1 conclusion | Current disposition |
 |---|---|---|
 | VIS-01 | Simplify permanent sidebar | Done |
-| VIS-02 | Make Work modes unmistakable | Partly superseded: Chat/Build done; Pass 2 expands this to Chat/Build/Design |
+| VIS-02 | Make Work modes unmistakable | Done — superseded by VIS2-03, which carried it to Chat, Build *and* Design |
 | VIS-03 | Reduce work-surface chrome | Done |
 | VIS-04 | Standardize surface archetypes | Done |
 | VIS-05 | Reduce card walls | Done |
@@ -174,16 +179,16 @@ The old implementation-order section is superseded. These findings remain histor
 | VIS-07 | Distinctive Raiker identity through behaviour | Owner/product-design decision |
 | VIS-08 | Contextual governance posture | Done |
 | VIS-09 | Premium approval hierarchy | Done |
-| VIS-10 | Stronger Build workbench | Core layout done; artifact pane remains |
+| VIS-10 | Stronger Build workbench | Done — the artifact pane it was waiting on landed as VIS2-12 |
 | VIS-11 | Chat visually simpler than Build | Done; Pass 2 extends density contracts to Design |
 | VIS-12 | Better empty states | Done |
 | VIS-13 | Make Home useful or remove it | Done |
-| VIS-14 | Unify Threads/Tasks/Projects vocabulary | Done at component level; project continuity remains |
+| VIS-14 | Unify Threads/Tasks/Projects vocabulary | Done — project continuity landed as VIS2-11 and COMPOSER-11 |
 | VIS-15 | Reduce status colour | Done |
 | VIS-16 | De-emphasize technical IDs | Done |
 | VIS-17 | Regroup Settings | Done |
 | VIS-18 | Spatial Knowledge Map | Already satisfied |
-| VIS-19 | Rich typed output vocabulary | Most components exist; typed channel/chart incomplete |
+| VIS-19 | Rich typed output vocabulary | **The one implementation item left in this review.** Most components exist; there is no typed channel a turn can answer *in*, and no chart. Carried as [BUG-288](TO_BE_FIXED.md#bug-288--a-turn-can-only-answer-in-prose-and-the-components-to-answer-otherwise-already-exist) rather than built ahead of the runtime that would fill it |
 | VIS-20 | Motion only for meaningful state change | Done |
 | VIS-21 | Theme-specific depth | Done |
 | VIS-22 | Command palette | Done |

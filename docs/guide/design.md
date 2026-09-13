@@ -53,8 +53,8 @@ Press a picture and Design composes itself around it:
 - **Inspector**, on the right — the prompt, the model, the size, when it was
   made, and what it was made *from*.
 
-Under the canvas are two strips that appear only when they have something to
-show. **Versions** is the line this picture is on: the original, then each edit,
+The inspector also carries two strips that appear only when they have something
+to show. **Versions** is the line this picture is on: the original, then each edit,
 in the order they were made. It shows that line and no other — if you edited one
 picture twice, those are two branches, and putting both in one strip would claim
 the second came after the first when neither came from the other. **Variations**
@@ -64,7 +64,7 @@ is the set of pictures one request produced, side by side.
 something you asked of *this* picture, so it is recorded against it and shown
 there, with the reason, rather than disappearing.
 
-**Back to everything**, under the canvas, returns you to the history.
+**Back to everything**, above the picture, returns you to the history.
 
 ## What it needs before it can generate anything
 

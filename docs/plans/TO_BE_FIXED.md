@@ -1302,45 +1302,19 @@ flowing when nothing has run since the owner last pressed the button.
 
 ## BUG-277 — Design is a one-shot generator, so most of its composer has nothing to reach
 
-**Severity: Medium. Area: Design / image runtime. Raised while implementing
-[COMPOSER-09](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md) and
-[VIS2-19](VISUAL_UI_UX_REVIEW_2026-09-06.md).**
+**Closed 2026-09-13
+([FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach)).**
+The runtime first, the interface second, as the entry set out. A generation
+records `source_generation_id` and `kind`, so an edit has a subject, a variation
+set has siblings and a version strip has versions; Design composes Assets │
+Canvas │ Inspector around a selection, and the primary action says **Edit** while
+one is selected. The subject is resolved owner-scoped in the executor, after
+policy and the credential.
 
-**Observed.** The composer redesign asks Design to understand create, edit,
-edit-selection, variations, extend/outpaint, remove/replace, reference image and
-version compare, with the primary action changing from **Generate** to **Edit**
-when something is selected. VIS2-19 asks for the canvas workspace those actions
-belong to.
-
-Raiker's governed image endpoint takes a prompt, a size and a model and returns
-one picture. There is no asset selection, no edit request, no variation request
-and no version lineage for any of that to act on.
-
-**What was built instead, and why.** Design uses the same composer shell as Chat
-and Build — the same `+`, the same context line, the same model control — and
-nothing else. The composer redesign's own acceptance test 19 settles it: *every
-exposed composer action reaches an actual backend/runtime path or is omitted*. A
-`Generate ▾` offering Edit and Variations against an endpoint that cannot do
-either is the permanent-toolbar problem wearing a menu, and it would be worse
-than the toolbar because it looks like a promise.
-
-Design's Tools control is therefore absent rather than empty, which is visible
-in the live capture `live-composer-design.png`.
-
-**Proposed fix.** The runtime first, the interface second:
-
-1. an image request that names a prior generation as its subject, so "edit this"
-   has something to be about;
-2. a variation request, which is the same call with a seed or a count;
-3. a lineage on the stored generation, so a version picker has versions.
-
-Only then does the canvas composition in VIS2-19 have anything to compose, and
-only then does `Generate → Edit` describe a real state change.
-
-**Interface outcome that has to be true before this closes.** Selecting a
-generation in Design changes the primary action to **Edit**, and pressing it
-produces a new version that names the one it came from. Until then Design says
-what it can do and offers nothing it cannot.
+**One half is not closed with it** and is carried as
+[BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider):
+this host's egress policy blocks the image providers, so what a provider actually
+returns for an edit or a set of variations has not been seen.
 
 ---
 
@@ -1449,32 +1423,13 @@ Design.
 
 ## BUG-282 — A generated image does not belong to the project it was made in
 
-**Severity: Medium. Area: Design / projects. Raised while implementing
-[VIS2-11](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-11--make-project-the-persistent-context-across-chat-build-and-design).**
-
-**Observed.** The Work project now persists across Chat, Build and Design, and
-Design names it in the composer's context line. What it names is deliberately
-narrow: *research runs here; images are not filed to it yet.*
-
-VIS2-11 asks for more — "generated images/assets belong to the Project
-automatically when created there", and "visual versions/iterations are project
-artifacts, not isolated chat attachments". They cannot be. `POST /api/images`
-takes a profile, a prompt, a size and a model; the stored generation row carries
-no project, so there is nothing to file an image *to*.
-
-**Why it was left.** Adding a project to the image row is a schema change plus a
-governed read path, and the surrounding question — what a Design *asset* is,
-versioned or not, and how a Build task references one — is VIS2-19's canvas
-workspace, which is still open. Filing images against a project shape that is
-about to be designed would be work done twice.
-
-**Proposed fix.** Carry `project_id` on the image generation and on its stored
-attachment, scope the gallery read by it, and show a project's images on the
-project page beside its files.
-
-**Interface outcome that has to be true before this closes.** An image generated
-while working in a project appears among that project's material, and the
-Design composer's context line can drop the words "not filed to it yet".
+**Closed 2026-09-13
+([FIXED-492](FIXED_ITEMS.md#fixed-492--a-generated-image-did-not-belong-to-the-project-it-was-made-in)).**
+The deferral held until the shape it was waiting on existed. BUG-277's lineage
+work changed the same row and the same request, so `project_id` travelled with
+it: Design's composer sends the project it names, the row carries it, and the
+project's page shows its pictures beside its files. The context line no longer
+needs the words *not filed to it yet*.
 
 ---
 
@@ -1530,3 +1485,42 @@ appears only when a selection exists and cannot serve.
 **Interface outcome that has to be true before this closes.** A composer with no
 default chosen says only that, and no model the owner never chose is described as
 selected.
+
+---
+
+## BUG-287 — The image provider round trip is unverified against a real provider
+
+**Severity: Medium. Area: Design / image runtime / live evidence. Raised while
+closing [BUG-277](#bug-277--design-is-a-one-shot-generator-so-most-of-its-composer-has-nothing-to-reach),
+2026-09-13.**
+
+**Observed.** The lineage runtime and the canvas were built and verified, but
+no picture has been generated or edited through a real provider from this host.
+The egress policy answers 403 to `CONNECT api.openai.com`, and a live generate
+run through the product's own composer refuses with `fetch_failed:URLError`,
+which is the environment rather than the code.
+
+**What *was* exercised against the running server.** The governed route, the
+owner-scoped subject resolution, the count bound and its zero case, lineage
+recorded on refusals, `project_id` carried from the composer through to the
+stored row, and the canvas composing real rows read back through `GET /api/images`.
+The multipart wire format is proven against a real socket — a live HTTP server
+parses the body with Python's own MIME parser and the image comes back byte for
+byte (`tests/test_multipart_egress.py`).
+
+**What is not known.** What OpenAI's `/v1/images/edits` and Gemini's inline-data
+edit actually return: the response shape on success, how a provider refusal reads
+when the *source* image is the thing refused rather than the prompt, and whether
+a request for four pictures comes back as four images or as one with a count the
+decoder has to split. `_decode_images` handles the shapes the providers document;
+none of them has been seen.
+
+**Proposed fix.** One live round against a reachable image provider. Gemini is
+the cheaper route — `generativelanguage.googleapis.com` is reachable from this
+host, so a Gemini API key alone would close it — covering generate, edit,
+variations and a provider refusal of a source image, with the lineage read back
+through `GET /api/images`.
+
+**Interface outcome that has to be true before this closes.** A picture generated
+through a real provider, edited into a second version, and both shown on the
+canvas as the chain they are — with the captures to prove it.

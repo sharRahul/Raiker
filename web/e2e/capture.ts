@@ -50,6 +50,30 @@ export function capturePath(path: string): string {
 /** Beyond this a capture is a wall of pixels nobody reads. */
 const MAX_CAPTURE_HEIGHT = 6000;
 
+/**
+ * Wait for the pictures on the page to have arrived.
+ *
+ * **Found live on 2026-09-13**, in the same shape as BUG-241 above: the Design
+ * canvas capture showed an asset rail of empty boxes. Nothing was broken — the
+ * thumbnails load lazily, the resize below brings them into view, and the
+ * screenshot fired before the bytes landed. A capture of a picture gallery with
+ * no pictures in it is evidence of the wrong thing, and would be read as a
+ * defect that does not exist.
+ *
+ * Bounded and non-fatal: an image that genuinely cannot load must still be
+ * *visible* as a broken one in the capture rather than stopping the round.
+ */
+async function imagesSettled(page: Page): Promise<void> {
+  await page
+    .waitForFunction(
+      () =>
+        Array.from(document.images).every((image) => image.complete || image.naturalWidth > 0),
+      undefined,
+      { timeout: 5_000 },
+    )
+    .catch(() => undefined);
+}
+
 /** The tallest content the shell is scrolling, in CSS pixels. */
 async function contentHeight(page: Page): Promise<number> {
   return page.evaluate(() => {
@@ -85,6 +109,9 @@ export async function capture(page: Page, path: string, target?: Locator): Promi
   if (height !== viewport.height) {
     await page.setViewportSize({ width: viewport.width, height });
   }
+  // After the resize, not before: the taller viewport is what brings a lazy
+  // image into range, so waiting first would wait for the wrong set.
+  await imagesSettled(page);
   try {
     await page.screenshot({ path: capturedTo, fullPage: true });
   } finally {
@@ -100,5 +127,6 @@ export async function capture(page: Page, path: string, target?: Locator): Promi
  */
 export async function captureElement(target: Locator, path: string): Promise<void> {
   await target.scrollIntoViewIfNeeded();
+  await imagesSettled(target.page());
   await target.screenshot({ path: capturePath(path) });
 }

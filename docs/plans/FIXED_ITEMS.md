@@ -512,6 +512,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-488](#fixed-488--first-launch-taught-infrastructure-before-it-taught-the-product) | Medium | First launch / onboarding | Fixed 2026-09-12 (FIRST-02…FIRST-10) |
 | [FIXED-489](#fixed-489--a-remembered-catalogue-outlived-the-connection-that-earned-it) | Medium | Models / provider catalogue | Fixed 2026-09-12 (found live) |
 | [FIXED-490](#fixed-490--a-composer-holding-eleven-choosable-models-said-none-was-set-up) | Low | Chat / Build / Tasks composer | Fixed 2026-09-12 (found live) |
+| [FIXED-491](#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach) | Medium | Design / image runtime | Fixed 2026-09-13 (BUG-277, VIS2-19, VIS2-20) |
+| [FIXED-492](#fixed-492--a-generated-image-did-not-belong-to-the-project-it-was-made-in) | Medium | Design / projects | Fixed 2026-09-13 (BUG-282, VIS2-11) |
 
 ---
 
@@ -21562,3 +21564,139 @@ shape.
 **Verification.** `web/src/lib/modelReadinessGating.test.ts` covers both
 sentences and asserts the turn is blocked either way; the live round reads the
 composer with a connected provider and no default chosen.
+
+---
+
+## FIXED-491 — Design was a one-shot generator, so most of its composer had nothing to reach
+
+**Severity: Medium. Area: Design / image runtime. Status: Fixed 2026-09-13.
+Closes [BUG-277](TO_BE_FIXED.md), [VIS2-19](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-19--design-must-be-a-first-class-canvas-workspace-not-a-third-chat-variant)
+and VIS2-20's Design remainder.**
+
+**Observed.** The composer redesign asks Design to understand create, edit,
+edit-selection, variations and version compare, with the primary action changing
+from **Generate** to **Edit** when something is selected; VIS2-19 asks for the
+canvas workspace those actions belong to. Raiker's governed image endpoint took a
+prompt, a size and a model and returned one picture. There was no asset
+selection, no edit request, no variation request and no lineage for any of it to
+act on, so the five regions VIS2-20 names for Design — asset rail, canvas,
+variation grid, selection inspector, version history — described a runtime that
+did not exist. They were deliberately not extracted as empty shells.
+
+**Fixed, in the order the entry set: the runtime first, the interface second.**
+
+`source_generation_id` and `kind` are recorded on every generation. A request
+that names a prior generation is an `edit`; a request for several pictures
+stores one `variation` row per picture returned, because four pictures are four
+things an owner can pin, compare and edit and an edit must be able to name
+exactly one subject. A chain of single parents is what a version strip draws.
+
+**A subject is authority, not a parameter.** `source_generation_id` arrives as an
+action argument, and an action argument is a thing a model can propose: a
+generation id is short, guessable in shape, and names bytes belonging to
+somebody. It is resolved owner-scoped in the executor, *after* policy and the
+credential, so a request that was never going to reach a provider does not read
+anyone's bytes on the way to being refused. An id belonging to another owner
+answers exactly as one that was never issued — telling those apart tells a caller
+that somebody else's generation exists.
+
+**Multipart widens no boundary.** OpenAI takes the image as a file part at
+`/v1/images/edits`, so `post_multipart` joins `post_json` in the sandbox. Every
+check the JSON path makes is made in the same order with the same reason code,
+and a test asserts the two refuse *identically* on the same three cases so they
+cannot drift. Gemini needs none of it: an edit is its ordinary JSON call with one
+more inline part.
+
+**The interface, on top of that runtime.** `designAssets.ts` turns the two
+recorded fields into the three things a canvas draws, as a plain module rather
+than view code because each is a claim worth testing on its own: the asset rail,
+the version chain, the variation set. `DesignCanvasRegion` composes Assets │
+Canvas │ Inspector around a selection, with the canvas dominating — which is
+VIS2-19's one stated composition rule and is asserted by measuring the three
+regions rather than by reading a class name. Nothing invents a relationship the
+runtime did not record: an asset whose parent is missing is an origin, not a
+broken row, because a source can be forgotten while the pictures made from it
+remain, and the chain shows only the line the selection is on, because two edits
+of one picture are two branches and a strip holding both would say the second
+came after the first when neither came from the other.
+
+The primary action says **Edit** while an asset is selected and **Generate** —
+or **Generate 4** — while none is, which is COMPOSER-15's rule that the word
+names the act the press performs. The count is disabled while something is
+selected, because an edit produces one new version of one picture.
+
+**What the live round found.** `int(arguments.get("variations", 1) or 1)` — zero
+is falsy, so asking for no images quietly produced one and spent the owner's
+credit on a picture they had not asked for. Absent and zero are different
+requests and only one of them has a default.
+
+**What the live round could not do.** This host's egress policy answers 403 to
+`CONNECT api.openai.com`, so the provider round trip is unverified and is carried
+forward in [`TO_BE_FIXED.md`](TO_BE_FIXED.md). The multipart wire format is proven
+against a real socket instead — a live HTTP server parses the body with Python's
+own MIME parser and the image comes back byte for byte, which is the one thing a
+mocked `urlopen` cannot show.
+
+**Two things the captures found.** The **Back to everything** control sat under
+the picture, and the canvas takes the room the shell gives it — so the way out of
+the workspace was a control the owner had to scroll past a 70vh image to find. It
+is above the object now. And the capture helper shot the page before its lazily
+loaded thumbnails arrived, so the first evidence of the asset rail was a column
+of empty boxes: nothing was broken, but a capture of a picture gallery with no
+pictures in it is evidence of the wrong thing. `capture` now waits for the images
+to settle — bounded and non-fatal, so an image that genuinely cannot load is
+still *visible* as a broken one rather than stopping the round. Same shape as
+BUG-241, which is why the fix is in the harness.
+
+**Verification.** `tests/test_image_lineage.py` (owner-scoped subject resolution,
+the count bound, the zero fix, lineage on refusals), `tests/test_multipart_egress.py`
+(the two sandbox paths refusing identically), `web/src/lib/designAssets.test.ts`
+(19 cases over the rail, the chain, the grid, the refusals and the button's
+word), and a live round against a running server with real rows read back through
+`GET /api/images` (`web/e2e/design-canvas-live.spec.ts`, captures under
+`docs/screenshots/2026-09-12-design-canvas/`).
+
+---
+
+## FIXED-492 — A generated image did not belong to the project it was made in
+
+**Severity: Medium. Area: Design / projects. Status: Fixed 2026-09-13. Closes
+[BUG-282](TO_BE_FIXED.md) and the last of
+[VIS2-11](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-11--make-project-the-persistent-context-across-chat-build-and-design).**
+
+**Observed.** The Work project persists across Chat, Build and Design, and
+Design named it in the composer's context line — narrowly, and honestly:
+*research runs here; images are not filed to it yet.* VIS2-11 asks for more, and
+it could not be had: `POST /api/images` took a profile, a prompt, a size and a
+model, and the stored row carried no project, so there was nothing to file an
+image *to*.
+
+**Why it was left, and why it could be taken now.** Filing images against a
+project shape that was about to be designed would have been work done twice. The
+shape was designed by [FIXED-491](#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach),
+which had to change the same row and the same request anyway, so `project_id`
+travelled with the lineage rather than behind it.
+
+**Fixed.** The image row carries `project_id`, Design's composer sends the
+project it names, and the project's own page shows the pictures made in it — with
+the files and the sessions, because they are the project's material and not a
+gallery of their own. The filter is the row's own field: a picture made before
+the column existed carries no project and belongs to none of them rather than
+landing in whichever one is open. The context fact drops its qualification and
+now reads *research and generated images are filed here*.
+
+A refused request is filed too. It is still something the owner asked of that
+project, and the section draws pictures rather than rows, so a refusal is
+recorded and not shown here — it is shown against the asset it was about, which
+is what FIXED-491 built the lineage on refusals for.
+
+**Verification.** Two cases in `web/src/lib/views/ProjectsView.test.ts` — the
+pictures of this project appear, and one made elsewhere, one made before the
+column and one refused all stay out — and a live round that creates the project
+through the product's own control, asserts Design's outgoing request carries that
+`project_id`, and reads the project page back
+(`web/e2e/project-images-live.spec.ts`, capture under
+`docs/screenshots/2026-09-13-project-images/`). The live generation refused with
+`fetch_failed:URLError` because this host cannot reach the provider, and the
+refused row landed against the project, which is the request half proven end to
+end through the runtime.

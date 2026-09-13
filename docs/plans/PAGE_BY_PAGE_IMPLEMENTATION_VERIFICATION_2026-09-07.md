@@ -19,10 +19,16 @@ and
 a composer with eleven reachable models still told the owner to go and connect a
 provider.
 
-What remains in the backlog below is workspace-shaped: VIS2-19 (Design canvas,
-still blocked on an image runtime beyond one-shot generation), VIS2-12 (Build's
-workbench composition), VIS2-11 (a persistent Project shell), COMPOSER-10's
-remaining Tasks grammar, and the Extensions and Observability hub passes.
+What remains in the backlog below is workspace-shaped: VIS2-12 (Build's
+workbench composition), COMPOSER-10's remaining Tasks grammar, and the
+Extensions and Observability hub passes.
+
+**Follow-up 2026-09-13.** VIS2-19 is closed
+([FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach)).
+The image runtime it was blocked on was built first — a generation records what
+it was made from — and Design composes a canvas around a selection. VIS2-11's
+last clause closed with it: a picture is filed against the project it was made in
+([FIXED-492](FIXED_ITEMS.md#fixed-492--a-generated-image-did-not-belong-to-the-project-it-was-made-in)).
 
 ## Follow-up — 2026-09-08
 
@@ -44,7 +50,7 @@ status.
 |---|---|
 | 7. current date/time/day/timezone is not proven as authoritative runtime context, and weather is not first-class | **Closed** — [FIXED-459](FIXED_ITEMS.md#fixed-459--nothing-in-raiker-told-a-model-what-day-it-was), [FIXED-460](FIXED_ITEMS.md#fixed-460--weather-was-a-page-to-interpret-rather-than-a-reading-to-report) |
 | 8. global surface parity, readiness semantics and bounded extraction still need explicit implementation/tests | **Closed** — [FIXED-461](FIXED_ITEMS.md#fixed-461--four-derivations-of-one-fact-about-what-a-turn-can-read) |
-| 3. Design is a real route but has no research layer of its own | **Partly closed** — Design is a prompt surface with a research protocol and the full read catalogue (WEB-06); the *canvas workspace* (VIS2-19) remains open |
+| 3. Design is a real route but has no research layer of its own | **Closed** — Design is a prompt surface with a research protocol and the full read catalogue (WEB-06), and the canvas workspace (VIS2-19) landed 2026-09-13 on the image runtime it needed ([FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach)) |
 | Models: MODEL-09 and MODEL-14 partial | **Closed** — [FIXED-462](FIXED_ITEMS.md#fixed-462--the-hugging-face-flow-did-all-six-steps-at-once), [FIXED-463](FIXED_ITEMS.md#fixed-463--come-back-and-press-look-again); the Models review is now complete end to end |
 | 1, 2, 4, 5, 6 | Build's workbench pane (2) remains as first recorded. Home parity (1) closed 2026-09-07, the global model catalogue (4) and Permissions UX (5) on 2026-09-12, and First Launch (6) later the same day — see the follow-ups above |
 
@@ -1034,7 +1040,7 @@ Priority outranks effort. Within the same priority, lower effort comes first.
 
 1. ~~**Permissions UX redesign** — Availability + Behaviour with progressive disclosure; preserve backend semantics.~~ Done 2026-09-07 ([FIXED-486](FIXED_ITEMS.md#fixed-486--two-parallel-systems-where-there-were-two-questions)).
 2. ~~**FIRST-02 through FIRST-10** simplified first launch/onboarding.~~ Done 2026-09-12 ([FIXED-488](FIXED_ITEMS.md#fixed-488--first-launch-taught-infrastructure-before-it-taught-the-product)).
-3. **VIS2-19** Design canvas/workspace.
+3. ~~**VIS2-19** Design canvas/workspace.~~ Done 2026-09-13 ([FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach)) — the image runtime first, the canvas on top of it.
 4. ~~**VIS2-12** Build artifact/workbench pane.~~ Done 2026-09-07 ([FIXED-467](FIXED_ITEMS.md#fixed-467--builds-third-pane-showed-tools-not-the-work)).
 5. ~~**VIS2-11** persistent Project workspace/context.~~ Done 2026-09-07 ([FIXED-469](FIXED_ITEMS.md#fixed-469--the-project-was-chosen-again-on-every-surface)).
 6. ~~**COMPOSER-10** Tasks/Schedule shared composer grammar.~~ Done 2026-09-07 ([FIXED-470](FIXED_ITEMS.md#fixed-470--tasks-asked-to-be-filled-in-rather-than-instructed)).
@@ -1062,7 +1068,7 @@ The following earlier labels should be interpreted carefully:
 | VIS2-03 Chat/Build/Design Done | **Mostly correct** — core shell done; Home/first-run parity still needs work |
 | VIS2-11 Project context Partial | **Correct** |
 | VIS2-12 Build artifact pane Open | **Correct** |
-| VIS2-19 Design canvas Open | **Correct** |
+| VIS2-19 Design canvas Open | **Correct when written; closed 2026-09-13** ([FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach)) |
 | COMPOSER-10 Tasks/Schedule Partial | **Correct** |
 | COMPOSER-11 Project continuity Partial | **Correct** |
 | MODEL global availability / old Keep available behaviour | **Reopen under later global-catalogue decision** |

@@ -3159,6 +3159,20 @@ export interface ImageGeneration {
   media_type: string | null;
   byte_size: number;
   created_at: string;
+  /**
+   * BUG-277 — what this picture was made from, and which of the three requests
+   * made it: `create` from a prompt alone, `edit` from a named image,
+   * `variation` from asking the same question again. Together they are the
+   * lineage, and a chain of single parents is what a version strip draws.
+   *
+   * Optional because a row written before the lineage existed carries neither,
+   * and an image that predates the feature is an origin rather than a broken
+   * row.
+   */
+  source_generation_id?: string | null;
+  kind?: string;
+  /** BUG-282 — the project this was made in, when it was made in one. */
+  project_id?: string | null;
 }
 
 export interface ImageGenerationsView {

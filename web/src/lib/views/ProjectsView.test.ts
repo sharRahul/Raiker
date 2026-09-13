@@ -353,6 +353,76 @@ describe("ProjectsView context home", () => {
     await fireEvent.click(screen.getByRole("button", { name: /open project alpha/i }));
   }
 
+  /*
+   * BUG-282 — a picture generated in a project is that project's material.
+   *
+   * The filter is the row's own `project_id`. These two cases are the ones that
+   * decide whether the section is honest: a picture made elsewhere must not
+   * appear here, and a picture made before the column existed carries no
+   * project and belongs to none of them.
+   */
+  function generation(partial: Record<string, unknown>) {
+    return {
+      generation_id: "img_1",
+      profile_id: "openai-hosted",
+      provider: "openai",
+      model: "gpt-image-1",
+      prompt: "a leaf",
+      size: "1024x1024",
+      status: "ok",
+      reason_code: null,
+      has_image: true,
+      media_type: "image/png",
+      byte_size: 100,
+      created_at: "2026-09-12T10:00:00Z",
+      kind: "create",
+      source_generation_id: null,
+      project_id: "proj_1",
+      ...partial,
+    };
+  }
+
+  it("shows the images generated while this project was the working one", async () => {
+    await openDetail(
+      routes({
+        "GET /api/images": {
+          sizes: ["1024x1024"],
+          generations: [generation({ generation_id: "img_1", prompt: "a maple leaf" })],
+        },
+      }),
+    );
+
+    const shot = await screen.findByRole("img", { name: "a maple leaf" });
+    expect(shot).toHaveAttribute("src", "/api/images/img_1/bytes");
+  });
+
+  it("keeps out a picture that belongs to another project or to none", async () => {
+    await openDetail(
+      routes({
+        "GET /api/images": {
+          sizes: ["1024x1024"],
+          generations: [
+            generation({ generation_id: "img_2", prompt: "elsewhere", project_id: "proj_2" }),
+            generation({ generation_id: "img_3", prompt: "unfiled", project_id: null }),
+            generation({
+              generation_id: "img_4",
+              prompt: "refused",
+              status: "refused",
+              has_image: false,
+            }),
+          ],
+        },
+      }),
+    );
+
+    expect(
+      await screen.findByText(/pictures generated in design while this project is active/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "elsewhere" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "unfiled" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "refused" })).not.toBeInTheDocument();
+  });
+
   it("renders exactly one file list", async () => {
     await openDetail(routes());
     await screen.findByRole("tree", { name: /project files/i });

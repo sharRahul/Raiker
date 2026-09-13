@@ -13,6 +13,7 @@
   import ProjectExplorer from "../components/ProjectExplorer.svelte";
   import { api, ApiError } from "../api";
   import type {
+    ImageGeneration,
     ProjectBrowseEntry,
     ProjectDetail,
     ProjectFilesView,
@@ -51,6 +52,16 @@
 
   let detail = $state<ProjectDetail | null>(null);
   let detailError = $state<string | null>(null);
+  /*
+   * BUG-282 — the images made while this project was the working one.
+   *
+   * `POST /api/images` carries `project_id` now, so a generated picture belongs
+   * somewhere; this is the half that makes the belonging visible. The filter is
+   * on the row's own field rather than on anything derived, so a picture made
+   * before the column existed stays out of every project rather than landing in
+   * whichever one is open.
+   */
+  let projectImages = $state<ImageGeneration[]>([]);
   let exporting = $state(false);
   let exportError = $state<string | null>(null);
   let deleteError = $state<string | null>(null);
@@ -259,6 +270,7 @@
     files = null;
     selectedFile = null;
     projectTasks = [];
+    projectImages = [];
     try {
       files = await api.projectFiles(projectId);
     } catch (e) {
@@ -271,6 +283,24 @@
       // Task scoping is supplementary context; a failed read leaves the rest
       // of the project home intact rather than blanking it.
       projectTasks = [];
+    }
+    try {
+      // The gallery read is owner-scoped and returns metadata only, so this is
+      // one request rather than a per-picture one; the bytes stay behind the
+      // separate route each thumbnail names.
+      const gallery = await api.images();
+      projectImages = gallery.generations
+        .filter(
+          (generation) =>
+            generation.project_id === projectId &&
+            generation.status === "ok" &&
+            generation.has_image,
+        )
+        .sort((left, right) => right.created_at.localeCompare(left.created_at));
+    } catch {
+      // Same rule as tasks: supplementary context, and a workspace with no
+      // image provider connected answers this with an error rather than a list.
+      projectImages = [];
     }
   }
 
@@ -624,6 +654,30 @@
             {/each}
           </ul>
         {/if}
+        <!-- BUG-282 / VIS2-11 — "generated images belong to the Project
+             automatically when created there". They are material, so they sit
+             with the files rather than in a gallery of their own. -->
+        <h3 class="kicker">Images</h3>
+        {#if projectImages.length === 0}
+          <p class="sub">
+            No images yet — pictures generated in Design while this project is active land here.
+          </p>
+        {:else}
+          <ul class="image-strip">
+            {#each projectImages.slice(0, 8) as image (image.generation_id)}
+              <li>
+                <img
+                  src={api.imageBytesUrl(image.generation_id)}
+                  alt={image.prompt}
+                  loading="lazy"
+                />
+                <span class="sub" title={image.created_at}>{relativeTime(image.created_at)}</span>
+              </li>
+            {/each}
+          </ul>
+          <a class="cross-link" href="#/design">Open Design</a>
+        {/if}
+
         <h3 class="kicker">Work under this project</h3>
         {#if projectTasks.length === 0}
           <p class="sub">
@@ -852,6 +906,36 @@
     align-items: baseline;
     border-bottom: 1px dashed var(--border);
     padding-bottom: 0.3rem;
+  }
+  /* A strip rather than a grid: this is the project's material at a glance,
+     and Design is where a picture is worked on. The hairline is the same one
+     Design's asset carries (VIS2-14) so a thumbnail reads as a picture on both
+     grounds without a card around it. */
+  .image-strip {
+    list-style: none;
+    margin: 0 0 var(--space-3);
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .image-strip li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    width: 7rem;
+  }
+  .image-strip img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border: 1px solid var(--canvas-edge);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+  }
+  .image-strip .sub {
+    margin: 0;
+    font-size: var(--text-2xs);
   }
   /* `.kicker` is a shared rule; only the spacing above it is this view's. */
   .project-root {

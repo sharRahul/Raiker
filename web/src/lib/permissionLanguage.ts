@@ -22,7 +22,15 @@
  * behaviour is still decided by the gate, never by the label over it.
  */
 
-import { capabilityLabel, type DecisionMode } from "./capabilityModel";
+import {
+  capabilityLabel,
+  isAvailable,
+  isDecisionMode,
+  isDeferred,
+  isInherent,
+  isReady,
+  type DecisionMode,
+} from "./capabilityModel";
 import type { CapabilityGate } from "./apiTypes";
 
 /** The first question, in the owner's words. */
@@ -65,6 +73,25 @@ export const BEHAVIOUR_COPY: Record<DecisionMode, BehaviourCopy> = {
 };
 
 /**
+ * What to read when the stored mode is not one Raiker knows.
+ *
+ * NEW-PERM-03 — the page used to answer a missing or unrecognised mode by
+ * quietly dropping the behaviour half of the row, and the authority table
+ * answered it by calling the capability `Direct`. Both are the page inventing
+ * an enforcement decision it has not been told. Unknown is not evidence of
+ * permission, so it is said as itself.
+ */
+export const UNKNOWN_BEHAVIOUR: BehaviourCopy = {
+  label: "Unknown",
+  hint: "Raiker does not recognise this setting. Refresh the page, or review the configuration.",
+};
+
+/** Owner wording for a stored mode, including one Raiker does not recognise. */
+export function behaviourCopy(mode: string): BehaviourCopy {
+  return isDecisionMode(mode) ? BEHAVIOUR_COPY[mode] : UNKNOWN_BEHAVIOUR;
+}
+
+/**
  * The one line a collapsed row shows: availability, then behaviour.
  *
  * Both facts on the closed row is the point — a permission list that has to be
@@ -75,9 +102,7 @@ export function rowSummary(
   gate: Pick<CapabilityGate, "state" | "decision_mode">,
   available: boolean,
 ): string {
-  const behaviour = BEHAVIOUR_COPY[gate.decision_mode as DecisionMode];
-  const availability = available ? "On" : "Off";
-  return behaviour === undefined ? availability : `${availability} · ${behaviour.label}`;
+  return `${available ? "On" : "Off"} · ${behaviourCopy(gate.decision_mode).label}`;
 }
 
 /**
@@ -137,13 +162,29 @@ export interface PermissionAttention {
  * nobody in the loop, so it is the one an owner may want to be reminded they
  * left on. When nothing is automatic this returns nothing, and the page says so
  * by showing no attention section at all.
+ *
+ * NEW-PERM-03 narrows it once more, and makes the remaining sentence honest.
+ * Configured *Automatic* is a fact about the account; it is not evidence that
+ * anything is running. A capability whose executor this build does not ship, or
+ * which is switched off, or whose readiness the backend reports as unmet, is not
+ * "running automatically, without asking you" — it is not running at all. Saying
+ * otherwise puts an alarm in front of an owner about work that cannot happen,
+ * and an alarm that is wrong is worse than no alarm. So the row still appears
+ * (the setting is real and the owner may want it changed) and says which of the
+ * two states it is in.
  */
 export function permissionAttention(gates: CapabilityGate[]): PermissionAttention[] {
   return gates
     .filter((gate) => gate.decision_mode === "auto")
+    // A capability with no executor in this build is a fact about the build, not
+    // a decision. It has no registry row either, so an action here would be dead.
+    .filter((gate) => !isDeferred(gate) && !isInherent(gate))
     .map((gate) => ({
       capability: gate.capability,
       label: capabilityLabel(gate.capability),
-      reason: "runs automatically, without asking you",
+      reason:
+        isAvailable(gate) && isReady(gate)
+          ? "runs automatically, without asking you"
+          : "is set to run automatically, but is not available right now",
     }));
 }

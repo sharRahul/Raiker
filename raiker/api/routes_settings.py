@@ -24,6 +24,7 @@ from raiker.contracts.ids import utc_now
 from raiker.contracts.models import ContractValidationError, normalize_approval_mode
 from raiker.hooks.contracts import HookInput
 from raiker.hooks.factory import dispatcher_for_workspace
+from raiker.runtime.identity.presentation import resolve_presentation_identity
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -153,6 +154,14 @@ async def get_settings(request: Request) -> dict[str, Any]:
             "vault": vault_status(ws),
             "mfa_enrolled": AccountService(ws).mfa_enrolled(principal.principal_id),
             "username": principal.display_name,
+            # RR-IDENTITY-01 — what to call this owner, resolved the one way.
+            # `username` is the fixed sign-in handle; this is the name they
+            # chose, and the two are different fields the product kept
+            # conflating — Chat greeted the owner by their handle however many
+            # times they set a display name.
+            "display_name": resolve_presentation_identity(
+                SQLiteStore(ws), principal.principal_id
+            ).addressable_name,
         },
     }
 

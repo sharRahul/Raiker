@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { CapabilityGate } from "../apiTypes";
+  import { isAvailable, isDecisionMode, isReady } from "../capabilityModel";
+  import { rowSummary } from "../permissionLanguage";
 
   let {
     gates,
@@ -10,28 +12,60 @@
     total?: number;
   } = $props();
 
-  function isReady(gate: CapabilityGate): boolean {
-    return Object.values(gate.readiness).every(Boolean);
-  }
-
-  function agentAuthority(gate: CapabilityGate): "Direct" | "Ask" | "Denied" | "Unavailable" {
-    if (gate.state !== "enabled_runtime" || !isReady(gate)) return "Unavailable";
-    if (gate.decision_mode === "deny") return "Denied";
-    if (gate.decision_mode === "ask") return "Ask";
-    return "Direct";
-  }
-
-  function ownerControl(gate: CapabilityGate): string {
-    if (gate.state !== "enabled_runtime") return "Off";
+  /*
+   * NEW-PERM-03 — what the agent may do with this capability, said only as far
+   * as the page has actually been told.
+   *
+   * This returned `Direct` for every mode that was not `deny` or `ask`, which
+   * quietly included a mode that is missing, misspelt, or newer than this
+   * build: an unrecognised value was rendered as the *most permissive* verdict
+   * the table can print. Unknown is not evidence of permission. It is now its
+   * own answer, and `allow` and `auto` are told apart in the page's own words
+   * rather than collapsed into one invented one.
+   *
+   * Availability and readiness come from the shared helpers, so this table
+   * resolves "is it on" the same way the registry row below it does — including
+   * a capability that is on because nothing is stored against it, which this
+   * copy of the rule used to read as Off.
+   */
+  function agentAuthority(
+    gate: CapabilityGate,
+  ): "Allow" | "Automatic" | "Ask" | "Denied" | "Not ready" | "Unavailable" | "Unknown" {
+    if (!isAvailable(gate)) return "Unavailable";
     if (!isReady(gate)) return "Not ready";
-    return gate.decision_mode === "auto" ? "Auto-approved" : "Enabled";
+    if (!isDecisionMode(gate.decision_mode)) return "Unknown";
+    switch (gate.decision_mode) {
+      case "deny":
+        return "Denied";
+      case "ask":
+        return "Ask";
+      case "allow":
+        return "Allow";
+      case "auto":
+        return "Automatic";
+    }
+  }
+
+  /** Nothing is carried for a capability that cannot run, whatever is configured. */
+  function isBlocked(gate: CapabilityGate): boolean {
+    return ["Denied", "Unavailable", "Not ready", "Unknown"].includes(agentAuthority(gate));
+  }
+
+  /*
+   * The owner's own two answers, in the words the rest of the page uses for
+   * them. This column said `Enabled` and `Auto-approved` — a third vocabulary
+   * for facts the row below already states as `On · Automatic`, which is how a
+   * summary comes to look like it disagrees with the thing it summarises.
+   */
+  function ownerControl(gate: CapabilityGate): string {
+    return rowSummary(gate, isAvailable(gate));
   }
 </script>
 
 <section class="authority-matrix" aria-labelledby="authority-title">
   <div class="matrix-intro">
     <div>
-      <p class="eyebrow">Delegated authority</p>
+      <p class="eyebrow">Delegated authority · summary, read-only</p>
       <h2 id="authority-title">Owner sets the boundary. The agent inherits less.</h2>
     </div>
     <span class="delegation-rail" aria-hidden="true"><b>Owner</b><i></i><b>Signed turn</b></span>
@@ -41,8 +75,13 @@
          list. It is a summary, and the summary says which eight: the ones that
          carry the most authority right now. -->
     <p class="matrix-note">
-      The {gates.length} of {total} capabilities the agent currently carries the most authority
-      for. All {total} are listed below.
+      The {gates.length} of {total} capabilities this account configures the most authority for.
+      Change any of them in the list below, where all {total} are.
+      <!-- NEW-PERM-03 — the heading claimed carried authority, and this table
+           reads account configuration. What a turn may actually do is narrowed
+           again by the task's own scope and by the runtime's checks at the
+           moment it asks, so the summary says which of the two it is. -->
+      A task's own scope and the runtime's checks at the moment of use can narrow it further.
     </p>
   {/if}
   <!-- BUG-246 — two presentations of one list, and exactly one of them is in
@@ -61,7 +100,7 @@
           <tr>
             <th scope="row"><code>{gate.capability}</code></th>
             <td>{ownerControl(gate)}</td>
-            <td><span class:ask={agentAuthority(gate) === "Ask"} class:blocked={["Denied", "Unavailable"].includes(agentAuthority(gate))} class="authority-state">{agentAuthority(gate)}</span></td>
+            <td><span class:ask={agentAuthority(gate) === "Ask"} class:blocked={isBlocked(gate)} class="authority-state">{agentAuthority(gate)}</span></td>
           </tr>
         {/each}
       </tbody>
@@ -78,7 +117,7 @@
             <dd>
               <span
                 class:ask={agentAuthority(gate) === "Ask"}
-                class:blocked={["Denied", "Unavailable"].includes(agentAuthority(gate))}
+                class:blocked={isBlocked(gate)}
                 class="authority-state">{agentAuthority(gate)}</span
               >
             </dd>

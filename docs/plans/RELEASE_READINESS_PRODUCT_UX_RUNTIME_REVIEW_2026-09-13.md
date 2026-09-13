@@ -80,16 +80,28 @@ end contract.
 
 ## What blocks a public first release
 
-| ID | Priority | Blocker | Evidence and reason |
-|---|---:|---|---|
-| RR-IDENTITY-01 | P0 | Internal principal ID reaches owner-facing/model-facing language | The account routes already return a display name, and `UserMetadata` has a `display_name` field, but prompt envelopes populate only `id=principal_id`. The exact rendered sentence is owner-observed and not present as a static literal. |
-| RR-AUTHORITY-01 | P0 | Side-effect authority is not yet proven mechanically exclusive across every executor | Raiker has strong governance, but release assurance requires a type/issuer boundary that a future route, plugin, scheduler or connector cannot bypass by convention. |
-| RR-MCP-01 | P0/P1 | MCP stdio inherits the Raiker process environment | `raiker/runtime/executors/mcp.py` starts the subprocess without a constructed `env`, creating an ambient-secret exposure class. |
-| RR-MCP-02 | P1 | Remote MCP trust and network reach are under-specified | URL parsing is present, but owner-added remote endpoints are treated as authorization without a shared destination trust class, redirect/DNS-rebinding contract and explicit private-network grant. |
-| RR-INSTALL-01 | P1 | Linux/macOS installer runtime ownership is incomplete | A normal user must not need to supply a compatible Python toolchain or inherit unmanaged system dependencies for a supported desktop release. |
-| RR-PROJECT-01 | P1 | “New chat” from a project does not establish that project for filing | The Projects view routes to `#/new-chat` without setting the work project; the adjacent Build action does set it. The source comment says Chat remains owner-wide, which is correct for retrieval, but that is separate from filing the new session to the selected project. |
-| RR-DESIGN-01 | P1 | Design is generation history, not yet the promised persistent design workspace | Real generation and governed research exist; asset filing, versions, selection/masking, edits, compare/revert and canvas state do not. |
-| RR-VERIFY-01 | P1 | Required release acceptance runs are not current in this review | Clean-machine installers, upgrades, repair/uninstall, live providers, remote runtimes, MCP adversarial cases and assistive-technology passes need a signed release-candidate evidence bundle. |
+> **Implementation status, 2026-09-13.** Three of these are closed and recorded
+> in [`FIXED_ITEMS.md`](FIXED_ITEMS.md) — RR-IDENTITY-01 as
+> [FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name),
+> RR-MCP-01 as
+> [FIXED-500](FIXED_ITEMS.md#fixed-500--every-local-mcp-server-was-handed-raikers-whole-environment),
+> and RR-PROJECT-01 as
+> [FIXED-496](FIXED_ITEMS.md#fixed-496--new-chat-on-a-project-card-opened-a-chat-that-belonged-to-no-project).
+> The Status column below records that; the rest of this document remains the
+> review as written, and the remaining blockers remain open. This review is
+> still a documentation-only review — the implementation it describes was
+> carried out separately and is evidenced there, not here.
+
+| ID | Priority | Status | Blocker | Evidence and reason |
+|---|---:|---|---|---|
+| RR-IDENTITY-01 | P0 | **Closed** ([FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name)) | Internal principal ID reaches owner-facing/model-facing language | The account routes already return a display name, and `UserMetadata` has a `display_name` field, but prompt envelopes populate only `id=principal_id`. The exact rendered sentence is owner-observed and not present as a static literal. |
+| RR-AUTHORITY-01 | P0 | Open | Side-effect authority is not yet proven mechanically exclusive across every executor | Raiker has strong governance, but release assurance requires a type/issuer boundary that a future route, plugin, scheduler or connector cannot bypass by convention. |
+| RR-MCP-01 | P0/P1 | **Closed** ([FIXED-500](FIXED_ITEMS.md#fixed-500--every-local-mcp-server-was-handed-raikers-whole-environment)) | MCP stdio inherits the Raiker process environment | `raiker/runtime/executors/mcp.py` starts the subprocess without a constructed `env`, creating an ambient-secret exposure class. |
+| RR-MCP-02 | P1 | Open | Remote MCP trust and network reach are under-specified | URL parsing is present, but owner-added remote endpoints are treated as authorization without a shared destination trust class, redirect/DNS-rebinding contract and explicit private-network grant. |
+| RR-INSTALL-01 | P1 | Open | Linux/macOS installer runtime ownership is incomplete | A normal user must not need to supply a compatible Python toolchain or inherit unmanaged system dependencies for a supported desktop release. |
+| RR-PROJECT-01 | P1 | **Closed** ([FIXED-496](FIXED_ITEMS.md#fixed-496--new-chat-on-a-project-card-opened-a-chat-that-belonged-to-no-project)) | “New chat” from a project does not establish that project for filing | The Projects view routes to `#/new-chat` without setting the work project; the adjacent Build action does set it. The source comment says Chat remains owner-wide, which is correct for retrieval, but that is separate from filing the new session to the selected project. |
+| RR-DESIGN-01 | P1 | Open | Design is generation history, not yet the promised persistent design workspace | Real generation and governed research exist; asset filing, versions, selection/masking, edits, compare/revert and canvas state do not. |
+| RR-VERIFY-01 | P1 | Partial | Required release acceptance runs are not current in this review | Clean-machine installers, upgrades, repair/uninstall, live providers, remote runtimes, MCP adversarial cases and assistive-technology passes need a signed release-candidate evidence bundle. |
 
 ## Current CI evidence
 
@@ -2311,6 +2323,8 @@ These are static findings against the reviewed Raiker code, not live reproductio
 
 ## NEW-SET-01 — Settings can acknowledge edits that were never saved
 
+> **Closed 2026-09-13** — [FIXED-499](FIXED_ITEMS.md#fixed-499--settings-said-all-changes-saved-about-an-edit-it-had-never-sent).
+
 **Priority/decision:** P1; implement revision-aware, serialized persistence before stable release. Effort M; frontend owner with API support for concurrent-client revision conflicts.
 
 **Evidence:** `web/src/lib/views/SettingsView.svelte::save`, `push` and the save bar (lines 73–100 and 190–193 at the reviewed source). `push` snapshots settings, awaits the request and unconditionally clears dirty state. Inputs and Save/Discard remain usable; there is no in-flight guard in `push`. A later failed save also restores the older server snapshot.
@@ -2325,6 +2339,8 @@ These are static findings against the reviewed Raiker code, not live reproductio
 
 ## NEW-PROJ-01 — Project detail and child panels can resolve out of order
 
+> **Closed 2026-09-13** — [FIXED-497](FIXED_ITEMS.md#fixed-497--a-projects-header-could-stand-over-another-projects-work).
+
 **Priority/decision:** P1; bind every response to a selection generation. Effort S/M; Projects controller owner.
 
 **Evidence:** `web/src/lib/views/ProjectsView.svelte::open` (277–287) assigns awaited detail directly; `loadProjectContext` (257–274) assigns files and tasks without checking whether that project is still selected. These asynchronous requests share the same view state.
@@ -2338,6 +2354,8 @@ These are static findings against the reviewed Raiker code, not live reproductio
 **Acceptance:** Resolve A/B detail and child reads in all relevant orders; reject stale requests; close while loading. No mixed-project header/files/tasks and no stale error may overwrite the current selection.
 
 ## NEW-ACCOUNT-01 — Delete confirmation offers Cancel while deletion is running
+
+> **Closed 2026-09-13** — [FIXED-498](FIXED_ITEMS.md#fixed-498--cancel-stayed-live-while-an-account-was-being-deleted).
 
 **Priority/decision:** P1 UX; make the irreversible request state explicit. Effort S; Account UI owner.
 
@@ -2447,6 +2465,8 @@ Documentation review does not certify the first release. The verdict remains: do
 
 ## 17.2 NEW-PERM-01 — Top sections do not provide a working shortcut
 
+> **Closed 2026-09-13** — [FIXED-493](FIXED_ITEMS.md#fixed-493--the-two-sections-at-the-top-of-permissions-named-a-control-and-did-not-offer-one).
+
 **Evidence:** The owner reports the top details are not working. In the reviewed source, `web/src/lib/views/CapabilitiesView.svelte` renders Common permissions and Needs your attention as lists of spans/strong text. Neither list offers a button, link or navigation handler. `AuthorityMatrix.svelte` is also a read-only table/card summary. This confirms missing interaction paths, not failure of every backend permission mutation. The exact item the owner attempted to use still needs live reproduction.
 
 **Priority / decision / effort:** P1 / turn Common permissions into actionable shortcuts and attention entries into review actions; retain the authority table as clearly labelled read-only supporting detail / M.
@@ -2459,6 +2479,8 @@ Documentation review does not certify the first release. The verdict remains: do
 
 ## 17.3 NEW-PERM-02 — Summaries can disagree with changed decision modes
 
+> **Closed 2026-09-13** — [FIXED-494](FIXED_ITEMS.md#fixed-494--permissions-answered-the-same-question-two-ways-at-once).
+
 **Evidence:** `CapabilitiesView.svelte::setMode` and `bulkSetMode` update `modeOverrides`. Editable `ToolControlBoard` consumes those overrides. However, `attention`, `common` and `authorityGates` derive from the original `gates`; Common permissions calls `rowSummary(gate, ...)` directly, and AuthorityMatrix receives those original gates. Tightening mutations do not reload the gate list. Consequently the control may show the new mode while the top summaries still show the previous mode until refresh.
 
 **Priority / decision / effort:** P1 / one effective, revision-aware view model for every presentation / M.
@@ -2470,6 +2492,8 @@ Documentation review does not certify the first release. The verdict remains: do
 **Acceptance:** Change Automatic to Ask me and Never; verify control, common summary, attention list and authority table agree immediately after acknowledgement and after reload. Repeat for loosening with step-up, failed mutations, refresh during save, two tabs and a bulk request failing partway through.
 
 ## 17.4 NEW-PERM-03 — Unknown modes and automatic-mode attention need honest semantics
+
+> **Closed 2026-09-13** — [FIXED-495](FIXED_ITEMS.md#fixed-495--an-unrecognised-mode-was-rendered-as-the-most-permissive-verdict-the-table-can-print).
 
 **Evidence:** `AuthorityMatrix.svelte::agentAuthority` returns Direct for a ready enabled gate whenever the mode is neither deny nor ask, including missing/unrecognized values. `permissionLanguage.ts::permissionAttention` selects every auto-mode gate without checking effective availability/readiness and describes it as running automatically. Common permissions also uses a different availability expression from registry rows, omitting the registry's `isOnByDefault` fallback.
 

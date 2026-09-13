@@ -39,6 +39,16 @@
   let saveDetail = $state<string | null>(null);
   let dirty = $state(false);
   let dirtySections = $state<string[]>([]);
+  /*
+   * NEW-SET-01 — which section each unsaved key was edited in.
+   *
+   * The dirty marks used to be a list of sections appended to as the owner
+   * typed and emptied wholesale on save, which is right only while a save
+   * acknowledges everything. Once a save acknowledges *the revision it
+   * submitted*, the marks have to be recomputed from the keys that are still
+   * outstanding, and that needs to know where each key lives.
+   */
+  let keySection: Record<string, string> = {};
 
   async function load() {
     loadError = null;
@@ -72,34 +82,83 @@
 
   function save(patch: Record<string, unknown>) {
     settings = { ...settings, ...patch };
+    for (const key of Object.keys(patch)) keySection[key] = active;
     dirty = true;
     if (!dirtySections.includes(active)) dirtySections = [...dirtySections, active];
     saveState = "idle";
   }
 
+  /** Restate what is still unsaved, from the keys rather than from a flag. */
+  function recomputeDirty() {
+    const outstanding = Object.keys(changedFromServer());
+    dirty = outstanding.length > 0;
+    dirtySections = [
+      ...new Set(
+        outstanding
+          .map((key) => keySection[key])
+          .filter((section): section is string => section !== undefined),
+      ),
+    ];
+  }
+
+  /*
+   * NEW-SET-01 — a save acknowledges the revision it submitted, and only that.
+   *
+   * `push` snapshotted the settings, awaited the request, and then cleared the
+   * dirty state outright. Everything about that is fine until the owner edits
+   * something while the request is in flight — and nothing stopped them, because
+   * the inputs and both buttons stayed live. Then:
+   *
+   *   * the green "All changes saved" covered an edit that was never sent, so
+   *     the owner left the page believing a setting was stored that was not;
+   *   * a second Save could overtake the first, and whichever answered last
+   *     wrote its own snapshot into `serverSettings`;
+   *   * a *failed* save replaced the whole draft with the older server snapshot,
+   *     discarding the newer edit along with the rejected one.
+   *
+   * Two rules fix all three. Only one save is in flight at a time — the guard is
+   * in the function, not only on the button, because a disabled button is a
+   * presentation. And what the page claims afterwards is recomputed from the
+   * keys that still differ from what the server confirmed, so an edit made
+   * during the request stays unsaved, stays marked, and is what the next Save
+   * sends. On failure only the keys this request carried are rolled back.
+   */
   async function push() {
+    if (saveState === "saving") return;
     const snapshot = { ...settings };
     saveState = "saving";
     try {
       await api.putSettings(snapshot);
       serverSettings = snapshot;
-      saveState = "saved";
       saveDetail = null;
       applyUiPrefs(snapshot);
-      dirty = false;
-      dirtySections = [];
+      recomputeDirty();
+      // "All changes saved" is a claim about now, not about the request. If the
+      // owner changed something while it was out, the page is dirty again and
+      // says so rather than reporting a state it has already left.
+      saveState = dirty ? "idle" : "saved";
     } catch (e) {
-      settings = { ...serverSettings };
+      // Roll back what was rejected. An edit made while the request was out is
+      // newer than the server's copy and was never part of the refusal.
+      const madeDuringSave: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(settings)) {
+        if (JSON.stringify(snapshot[key]) !== JSON.stringify(value)) madeDuringSave[key] = value;
+      }
+      settings = { ...serverSettings, ...madeDuringSave };
+      recomputeDirty();
       saveState = "error";
+      const kept = Object.keys(madeDuringSave).length > 0;
       saveDetail =
-        e instanceof ApiError
-          ? `Couldn't save (${e.status}). Your change was rolled back.`
-          : "Couldn't save. Your change was rolled back.";
+        (e instanceof ApiError ? `Couldn't save (${e.status}).` : "Couldn't save.") +
+        (kept
+          ? " The rejected changes were rolled back; what you changed while it was saving is still unsaved."
+          : " Your change was rolled back.");
     }
   }
 
   function discard() {
     settings = { ...serverSettings };
+    keySection = {};
     dirty = false;
     dirtySections = [];
     saveState = "idle";
@@ -187,7 +246,7 @@
     {#if dirty}
       <div class="save-bar" role="region" aria-label="Unsaved settings changes">
         <strong>You have unsaved changes</strong>
-        <div><button class="btn btn-ghost" type="button" onclick={discard}>Discard changes</button><button class="btn btn-primary" type="button" onclick={push}>Save changes</button></div>
+        <div><button class="btn btn-ghost" type="button" onclick={discard} disabled={saveState === "saving"}>Discard changes</button><button class="btn btn-primary" type="button" onclick={push} disabled={saveState === "saving"}>{saveState === "saving" ? "Saving…" : "Save changes"}</button></div>
       </div>
     {/if}
   </div>

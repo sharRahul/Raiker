@@ -10,6 +10,30 @@ export function isDisabled(gate: CapabilityGate): boolean {
   return !ENABLED_STATES.has(gate.state);
 }
 
+/**
+ * Every readiness requirement the backend reports for this gate is met.
+ *
+ * NEW-PERM-03 — availability and readiness are two facts, and the page used to
+ * compute the second one in whichever module needed it. Two copies of one rule
+ * is how the summaries came to disagree with each other, so there is one.
+ */
+export function isReady(gate: CapabilityGate): boolean {
+  return Object.values(gate.readiness).every(Boolean);
+}
+
+/**
+ * Whether Raiker may use this capability at all — the page's first question,
+ * answered the one way.
+ *
+ * The registry row resolved it as "not disabled, or on by default"; Common
+ * permissions resolved it as "not disabled" alone, which read `Off` beside a
+ * registry row reading `On` for the same capability. A page cannot answer its
+ * own first question two ways.
+ */
+export function isAvailable(gate: CapabilityGate): boolean {
+  return !isDisabled(gate) || isOnByDefault(gate);
+}
+
 /** A capability with no real executor is deferred (future), not merely gated. */
 export function isDeferred(gate: CapabilityGate): boolean {
   const reason = gate.blocked_reason_code ?? "";

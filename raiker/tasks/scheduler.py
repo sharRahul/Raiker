@@ -36,7 +36,6 @@ from raiker.contracts.models import (
     PromptOptions,
     PromptPayload,
     TaskRecord,
-    UserMetadata,
 )
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
@@ -44,6 +43,7 @@ from raiker.notify.approval_notifier import (
     dispatch_notification_hook,
     fire_os_notification,
 )
+from raiker.runtime.identity.presentation import owner_user_metadata
 from raiker.runtime.turn_suspension import TurnSuspensionError
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
@@ -385,7 +385,9 @@ class TaskScheduler:
             PromptEnvelope(
                 request_id=new_id("req_"), session_id=run_session_id, turn_id=turn_id,
                 client=ClientMetadata(type="dashboard", name="raiker-scheduler", version="1"),
-                user=UserMetadata(id=principal_id),
+                # RR-IDENTITY-01 — a scheduled run addresses the same owner as a
+                # typed one. The entry point differs; who it is for does not.
+                user=owner_user_metadata(self.store, principal_id),
                 prompt=PromptPayload(
                     text=prompt,
                     attachments=task.attachments,

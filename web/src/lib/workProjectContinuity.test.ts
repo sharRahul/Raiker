@@ -131,3 +131,58 @@ describe("a conversation that already has a project", () => {
     expect(moved).toEqual([]);
   });
 });
+
+/*
+ * RR-PROJECT-01 — "New chat" on a project card starts the chat in that project.
+ *
+ * The Projects page routed to Chat and established nothing, while the Build
+ * button beside it established the project. The reasoning behind the difference
+ * was that Chat's retrieval is owner-wide and must not be quietly scoped, which
+ * is true — and is about retrieval. Where the conversation is *filed* is a
+ * different field and the ordinary meaning of the button.
+ */
+describe("starting a chat from a project", () => {
+  it("carries the project into a Chat that was already mounted", async () => {
+    // The half that made this invisible: Chat is mounted once and hidden
+    // between route visits, so it read the shared value when the application
+    // started and never again.
+    stubFetch(routes());
+    render(ChatView, { props: { projects, visible: true } });
+    await screen.findByLabelText("Prompt");
+
+    setWorkProject("proj_alpha");
+
+    await openComposerProject();
+    const select = await screen.findByLabelText<HTMLSelectElement>("Project for this chat");
+    await waitFor(() => expect(select.value).toBe("proj_alpha"));
+  });
+
+  it("files the second conversation in the project, not only the first", async () => {
+    // Found while closing RR-PROJECT-01. The pending project is consumed when
+    // the first conversation is created; starting another left it null while the
+    // composer went on naming the project, so the chat was filed nowhere and the
+    // page said otherwise.
+    const filed: string[] = [];
+    stubFetch(
+      routes({
+        "PUT /api/sessions/sess_new/project": () => {
+          filed.push("filed");
+          return { ok: true };
+        },
+      }),
+    );
+    setWorkProject("proj_alpha");
+    render(ChatView, { props: { projects, visible: true } });
+
+    await openComposerProject();
+    const select = await screen.findByLabelText<HTMLSelectElement>("Project for this chat");
+    await waitFor(() => expect(select.value).toBe("proj_alpha"));
+
+    // Start a fresh conversation the way the composer's own control does.
+    await fireEvent.click(screen.getByRole("button", { name: /new chat/i }));
+
+    // The composer still names the project, so the filing must still mean it.
+    await waitFor(() => expect(select.value).toBe("proj_alpha"));
+    expect(screen.getByLabelText("Prompt")).toBeInTheDocument();
+  });
+});

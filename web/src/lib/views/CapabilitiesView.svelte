@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import AuthorityMatrix from "../components/AuthorityMatrix.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
@@ -13,13 +13,14 @@
     canDisable,
     canEnable,
     capabilityDescription,
+    capabilityDomain,
     capabilityLabel,
     enableableTargets,
     groupByDomain,
+    isAvailable,
     isDecisionMode,
     isDeferred,
     isInherent,
-    isDisabled,
     authorityMatrixGates,
     isOnByDefault,
     realityLabel,
@@ -34,10 +35,19 @@
     BEHAVIOUR_COPY,
     BEHAVIOUR_QUESTION,
     CANNOT_CHANGE_HERE,
+    behaviourCopy,
     commonGates,
     permissionAttention,
     rowSummary,
   } from "../permissionLanguage";
+  import {
+    bulkOutcome,
+    confirmMode,
+    confirmedModeValues,
+    effectiveGates,
+    survivingModes,
+    type ConfirmedModes,
+  } from "../permissionViewModel";
 
   let { principal = "—" }: { principal?: string } = $props();
 
@@ -61,18 +71,6 @@
   let collapsedDomains = $state<string[]>([]);
   const searching = $derived(search.trim() !== "");
 
-  /**
-   * The two sections that come before the registry.
-   *
-   * Sixty-six equally weighted cards is a filing system: an owner arrives
-   * either because something needs them or because they want to change one of a
-   * handful of permissions, and the rest of the list is reference. Both are
-   * derived from the same gates the registry renders, so neither can claim a
-   * state the list below contradicts. A search is a request to see matches, so
-   * both fold away while one is running.
-   */
-  const attention = $derived(gates === null ? [] : permissionAttention(gates));
-  const common = $derived(gates === null ? [] : commonGates(gates));
   function isCollapsed(domain: string): boolean {
     return !searching && collapsedDomains.includes(domain);
   }
@@ -83,11 +81,43 @@
   }
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
 
-  // The per-capability decision mode is the primary control here. It arrives inline
-  // on each gate (gate.decision_mode) from the single /api/capability-gates read, so
-  // there is no per-capability fan-out. Local overrides after a successful set are
-  // kept here so the segmented control updates without a full reload.
-  let modeOverrides = $state<Record<string, DecisionMode>>({});
+  /*
+   * The per-capability decision mode is the primary control here. It arrives
+   * inline on each gate (gate.decision_mode) from the single
+   * /api/capability-gates read, so there is no per-capability fan-out. A mode
+   * the server has confirmed is kept here so the control updates without a full
+   * reload.
+   *
+   * NEW-PERM-02 — this used to be *only* the control's private knowledge. Every
+   * summary above the registry read the raw gate list instead, so a capability
+   * set to Never showed Never on its control and Automatic in the two sections
+   * above it. There is one list now: `effective` is the read with every
+   * confirmation merged in, and nothing on this page derives from anything else.
+   */
+  let confirmedModes = $state<ConfirmedModes>({});
+  /** Counts confirmed mutations, so a slow refresh cannot undo a fast change. */
+  let mutationSeq = $state(0);
+  const effective = $derived(effectiveGates(gates ?? [], confirmedModes));
+  const controlModes = $derived(confirmedModeValues(confirmedModes));
+
+  /**
+   * The two sections that come before the registry.
+   *
+   * Sixty-six equally weighted cards is a filing system: an owner arrives
+   * either because something needs them or because they want to change one of a
+   * handful of permissions, and the rest of the list is reference. Both derive
+   * from `effective` — the same list the registry renders — so neither can claim
+   * a state the list below contradicts. A search is a request to see matches, so
+   * both fold away while one is running.
+   */
+  const attention = $derived(permissionAttention(effective));
+  const common = $derived(commonGates(effective));
+
+  /** Record a mode the server has confirmed, for every presentation at once. */
+  function recordConfirmed(capability: string, mode: DecisionMode) {
+    mutationSeq += 1;
+    confirmedModes = confirmMode(confirmedModes, capability, mode, mutationSeq);
+  }
   let modeBusyCap = $state<string | null>(null);
   let selectedCaps = $state<Set<string>>(new Set());
   let bulkBusy = $state(false);
@@ -108,29 +138,56 @@
   function allSelectedInGroup(caps: string[]): boolean {
     return caps.length > 0 && caps.every((c) => selectedCaps.has(c));
   }
-  // Bulk-apply a tightening mode (ask/deny) to all selected capabilities.
+  /*
+   * Bulk-apply a tightening mode (ask/deny) to all selected capabilities.
+   *
+   * NEW-PERM-02 — these are N independent governed mutations, and the loop used
+   * to stop at the first refusal and report "The bulk change was rejected". The
+   * capabilities already changed stayed changed, so the sentence told the owner
+   * something untrue about their own policy. Every selection is now attempted,
+   * each outcome is recorded against its own capability, and the report names
+   * what changed and what did not.
+   */
   async function bulkSetMode(mode: DecisionMode) {
     if (bulkBusy || selectedCaps.size === 0) return;
     bulkBusy = true;
     notice = null;
+    const applied: string[] = [];
+    const failed: string[] = [];
     try {
       for (const cap of selectedCaps) {
-        await api.setCapabilityDecisionMode(cap, mode, "bulk-set via web UI");
-        modeOverrides = { ...modeOverrides, [cap]: mode };
+        try {
+          await api.setCapabilityDecisionMode(cap, mode, "bulk-set via web UI");
+          recordConfirmed(cap, mode);
+          applied.push(cap);
+        } catch {
+          failed.push(cap);
+        }
       }
-      notice = { kind: "ok", text: `${selectedCaps.size} capabilit${selectedCaps.size === 1 ? "y" : "ies"} set to "${BEHAVIOUR_COPY[mode].label}".` };
-      selectedCaps = new Set();
-    } catch (e) {
-      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
-      notice = { kind: "error", text: explained ? `${explained.plain} ${explained.remediation ?? ""}` : "The bulk change was rejected." };
+      const outcome = bulkOutcome(applied, failed);
+      if (outcome !== null) {
+        notice =
+          failed.length === 0
+            ? {
+                kind: "ok",
+                text: `${outcome.text.replace(/\.$/, "")} to “${BEHAVIOUR_COPY[mode].label}”.`,
+              }
+            : outcome;
+      }
+      // Only what changed leaves the selection, so a refused capability is still
+      // selected and can be retried without finding it in the registry again.
+      selectedCaps = new Set(failed);
     } finally {
       bulkBusy = false;
     }
   }
 
+  /**
+   * The mode a row renders. `gate` already comes from `effective`, so the
+   * confirmation is merged in before this is asked — there is no second place
+   * that has to remember to apply it.
+   */
   function modeFor(gate: CapabilityGate): DecisionMode | "unknown" {
-    const override = modeOverrides[gate.capability];
-    if (override !== undefined) return override;
     return isDecisionMode(gate.decision_mode) ? gate.decision_mode : "unknown";
   }
 
@@ -150,12 +207,29 @@
   let busy = $state(false);
   let dialogError = $state<string | null>(null);
 
+  /** Counts reads, so an older one cannot land on top of a newer one. */
+  let loadSeq = 0;
+
   async function load() {
+    /*
+     * NEW-PERM-02 — a read is only authoritative about what the server held
+     * when it left. Two things are stamped before it goes: which read this is,
+     * so a slow one that resolves after a fast one is discarded rather than
+     * rendered; and how many mutations had been confirmed, so the confirmations
+     * this response already reflects are dropped and anything confirmed while it
+     * was in flight survives it. Without the second, pressing Refresh just after
+     * a change showed the owner the value they had replaced.
+     */
+    const read = ++loadSeq;
+    const confirmedBefore = mutationSeq;
     loadError = null;
     try {
-      gates = await api.capabilityGates();
-      modeOverrides = {};
+      const fresh = await api.capabilityGates();
+      if (read !== loadSeq) return;
+      gates = fresh;
+      confirmedModes = survivingModes(confirmedModes, confirmedBefore);
     } catch (e) {
+      if (read !== loadSeq) return;
       gates = null;
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
     }
@@ -170,7 +244,7 @@
   // (FIX-05). We detect it as gates whose default is runtime-enabled but whose
   // effective state is not.
   const integratedButOff = $derived(
-    (gates ?? []).filter(
+    effective.filter(
       (g) =>
         g.default_state === "enabled_runtime" &&
         g.state !== "enabled_runtime" &&
@@ -182,10 +256,11 @@
   const filtered = $derived.by(() => {
     if (gates === null) return [];
     const q = search.trim().toLowerCase();
+    const gatesNow = effective;
     // Only real tools appear here. Deferred capabilities (no executor) and
     // inherent contract surfaces are not tools: no row, no selector, no
     // pretend control. They stay visible in Diagnostics as fail-closed.
-    const actionable = gates.filter((g) => !isDeferred(g) && !isInherent(g));
+    const actionable = gatesNow.filter((g) => !isDeferred(g) && !isInherent(g));
     const matches = q
       ? actionable.filter(
           (g) =>
@@ -200,12 +275,61 @@
   // summary said nothing at all. Ranked by authority instead — see
   // `authorityMatrixGates`.
   const governedGates = $derived(
-    (gates ?? []).filter((gate) => !isDeferred(gate) && !isInherent(gate)),
+    effective.filter((gate) => !isDeferred(gate) && !isInherent(gate)),
   );
   const authorityGates = $derived(authorityMatrixGates(governedGates));
 
   function toggleExpand(capability: string) {
     expanded = expanded === capability ? null : capability;
+  }
+
+  /** The row's own control, so a shortcut can land keyboard focus on it. */
+  function rowToggleId(capability: string): string {
+    return `cap-row-${capability}`;
+  }
+
+  /*
+   * NEW-PERM-01 — the shortcut the two top sections were missing.
+   *
+   * Common permissions and Needs your attention were lists of text. They are
+   * the most prominent thing on the page, they name exactly the permissions an
+   * owner arrived to change, and neither offered a way to change one: the owner
+   * read the name, then went and found the same name again in a registry of
+   * sixty-six rows. Prominence that does not act is friction wearing the
+   * clothes of help.
+   *
+   * This is deliberately a reveal rather than a second copy of the control. Two
+   * editable copies of one permission is how a page comes to disagree with
+   * itself, which is the defect next door (NEW-PERM-02). So the shortcut moves
+   * the owner to the one control that exists — clearing a filter that would hide
+   * it, opening the group that holds it, opening the row, and putting the
+   * keyboard on it, because a shortcut that scrolls and leaves focus behind has
+   * only helped the half of the page that uses a mouse.
+   */
+  async function revealCapability(capability: string) {
+    const gate = effective.find((entry) => entry.capability === capability);
+    if (gate === undefined || isDeferred(gate) || isInherent(gate)) {
+      // Never a dead action: a capability with no registry row says so instead
+      // of scrolling to nothing.
+      notice = {
+        kind: "error",
+        text: `${capabilityLabel(capability)} has no control in this build, so there is nothing to open.`,
+      };
+      return;
+    }
+    search = "";
+    const domain = capabilityDomain(capability);
+    collapsedDomains = collapsedDomains.filter((entry) => entry !== domain);
+    expanded = capability;
+    await tick();
+    const control = document.getElementById(rowToggleId(capability));
+    if (control === null) return;
+    // Focus first, and never behind a scroll helper that a non-browser DOM does
+    // not implement: the keyboard landing on the control is the part of this
+    // that a screen-reader user depends on, and it must not be lost to an
+    // environment where scrolling is a no-op.
+    control.focus();
+    control.scrollIntoView?.({ block: "center" });
   }
 
   async function setMode(gate: CapabilityGate, mode: DecisionMode) {
@@ -222,7 +346,7 @@
     notice = null;
     try {
       await api.setCapabilityDecisionMode(capability, mode, "set via web UI");
-      modeOverrides = { ...modeOverrides, [capability]: mode };
+      recordConfirmed(capability, mode);
       notice = {
         kind: "ok",
         text: `${capabilityLabel(capability)} is now set to “${BEHAVIOUR_COPY[mode].label}”.`,
@@ -296,12 +420,10 @@
       await runMutation(p, values);
       notice = { kind: "ok", text: describeSuccess(p) };
       pending = null;
+      // Record the confirmation before the reload leaves, so the read cannot
+      // clear it: the set is authoritative and the persisted read may lag it.
+      if (p.kind === "set_mode") recordConfirmed(p.capability, p.mode);
       await load();
-      // load() clears overrides; re-apply the just-set mode so the control reflects it
-      // even if the persisted read lags (the set itself is authoritative).
-      if (p.kind === "set_mode") {
-        modeOverrides = { [p.capability]: p.mode };
-      }
     } catch (e) {
       const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
       // Keep the dialog open so the user can supply what the backend says is missing.
@@ -408,7 +530,19 @@
       <h2>Needs your attention</h2>
       <ul>
         {#each attention as item (item.capability)}
-          <li><strong>{item.label}</strong> — {item.reason}</li>
+          <li>
+            <span class="shortcut-text"><strong>{item.label}</strong> — {item.reason}</span>
+            <!-- NEW-PERM-01 — the section says a decision wants a second look,
+                 so it offers the place to make it. -->
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              onclick={() => void revealCapability(item.capability)}
+            >
+              Review
+              <span class="sr-only">{item.label}</span>
+            </button>
+          </li>
         {/each}
       </ul>
     </section>
@@ -423,12 +557,25 @@
       <ul>
         {#each common as gate (gate.capability)}
           <li>
-            <span class="cap-label">{capabilityLabel(gate.capability)}</span>
-            <span class="cap-summary">{rowSummary(gate, !isDisabled(gate))}</span>
+            <span class="shortcut-text">
+              <span class="cap-label">{capabilityLabel(gate.capability)}</span>
+              <span class="cap-summary">{rowSummary(gate, isAvailable(gate))}</span>
+            </span>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              onclick={() => void revealCapability(gate.capability)}
+            >
+              Manage
+              <span class="sr-only">{capabilityLabel(gate.capability)}</span>
+            </button>
           </li>
         {/each}
       </ul>
-      <p class="muted">Every permission, including these, is in the list below.</p>
+      <p class="muted">
+        Every permission, including these, is in the list below. <strong>Manage</strong> opens the
+        one there — these are a shortcut to it, not a second copy of it.
+      </p>
     </section>
   {/if}
 
@@ -464,7 +611,6 @@
       </div>
       {#each isCollapsed(group.domain) ? [] : group.gates as gate (gate.capability)}
         {@const isOpen = expanded === gate.capability}
-        {@const mode = modeFor(gate)}
         <div class="cap card" class:open={isOpen}>
           <div class="cap-row">
             <input
@@ -477,6 +623,7 @@
             <button
               type="button"
               class="cap-toggle"
+              id={rowToggleId(gate.capability)}
               aria-expanded={isOpen}
               onclick={() => toggleExpand(gate.capability)}
             >
@@ -505,7 +652,7 @@
                   <span class="cap-reality cap-default-on">On by default</span>
                 {/if}
                 <span class="cap-summary">
-                  {rowSummary(gate, !isDisabled(gate) || isOnByDefault(gate))}
+                  {rowSummary(gate, isAvailable(gate))}
                 </span>
                 {#if realityLabel(gate)}
                   <span class="cap-reality">{realityLabel(gate)}</span>
@@ -516,7 +663,7 @@
             <ToolControlBoard
               gates={[gate]}
               showLabel={false}
-              modes={modeOverrides}
+              modes={controlModes}
               busyCapability={modeBusyCap}
               onDecision={(_capability, m) => setMode(gate, m)}
             />
@@ -544,10 +691,11 @@
                      leaving an owner to discover it from behaviour. -->
                 <p class="cap-reality-note">{unsetResolutionNote(gate)}</p>
               {/if}
-              {#if isDecisionMode(mode)}
-                <p class="question">{BEHAVIOUR_QUESTION}</p>
-                <p class="mode-hint">{BEHAVIOUR_COPY[mode].hint}</p>
-              {/if}
+              <!-- NEW-PERM-03 — an unrecognised mode used to drop this block
+                   entirely, so the card answered the behaviour question with
+                   silence. It is answered as Unknown instead. -->
+              <p class="question">{BEHAVIOUR_QUESTION}</p>
+              <p class="mode-hint">{behaviourCopy(gate.decision_mode).hint}</p>
 
               <p class="question">{AVAILABILITY_QUESTION}</p>
               <div class="cap-actions">
@@ -758,8 +906,13 @@
   }
   .cap-attention h2, .cap-common h2 { margin: 0 0 var(--space-2); font-size: var(--text-md); }
   .cap-attention ul, .cap-common ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
-  .cap-common li { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
   .cap-attention li { color: var(--text-2); font-size: var(--text-sm); }
+  /* NEW-PERM-01 — each entry is a fact and the action on it, so the row reads
+     left to right and the buttons line up down the right-hand edge. Wraps
+     rather than truncates at a phone width: the name of the permission is the
+     part that must survive. */
+  .cap-attention li, .cap-common li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+  .shortcut-text { display: flex; align-items: baseline; gap: var(--space-3); flex: 1 1 12rem; min-width: 0; flex-wrap: wrap; }
   .cap-common .muted { margin: var(--space-2) 0 0; font-size: var(--text-xs); }
   .question {
     margin: var(--space-3) 0 0.35rem;

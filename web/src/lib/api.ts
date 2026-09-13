@@ -502,7 +502,19 @@ export const auth = {
 
 export interface SettingsView {
   settings: Record<string, unknown>;
-  status: { vault: string; mfa_enrolled: boolean; username: string };
+  status: {
+    vault: string;
+    mfa_enrolled: boolean;
+    /** The fixed sign-in handle. */
+    username: string;
+    /**
+     * What to call this owner — the name they chose, or "Owner". Resolved
+     * server-side (RR-IDENTITY-01) so the greeting, the Account page and the
+     * model's own identity block cannot disagree. Optional so an older host
+     * that does not send it still renders.
+     */
+    display_name?: string;
+  };
 }
 
 export const api = {

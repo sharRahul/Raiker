@@ -24,7 +24,6 @@ from raiker.contracts.models import (
     PromptEnvelope,
     PromptOptions,
     PromptPayload,
-    UserMetadata,
     normalize_input_mode,
     normalize_prompt_surface,
 )
@@ -46,6 +45,7 @@ from raiker.runtime.attachments import (
     store_image,
 )
 from raiker.runtime.authority.models import Principal, PrincipalType
+from raiker.runtime.identity.presentation import owner_user_metadata
 from raiker.runtime.interrupts import InterruptController
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
@@ -183,7 +183,12 @@ def _build_envelope(
         session_id=body.session_id or new_id("sess_"),
         turn_id=new_id("turn_"),
         client=client,
-        user=UserMetadata(id=principal_id),
+        # RR-IDENTITY-01 — the authorisation key *and* the name to address the
+        # owner by, resolved server-side. A turn that carries only the key is a
+        # turn whose only answer to "who am I talking to" is an internal id.
+        user=owner_user_metadata(
+            SQLiteStore(workspace) if workspace is not None else None, principal_id
+        ),
         prompt=PromptPayload(
             text=prompt_text,
             attachments=_validated_attachments(body.attachments),

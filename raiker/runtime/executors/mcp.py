@@ -80,6 +80,97 @@ MCP_SUPPORTED_PROTOCOL_VERSIONS: frozenset[str] = frozenset(
 _MCP_SERVERS_DIR = ".raiker/mcp/servers"
 
 
+# ── stdio process environment (SEC-MCP-01) ──────────────────────────────────
+#
+# A local MCP server is an owner-chosen program that Raiker starts. Until this,
+# it was started with no ``env`` at all, which in ``subprocess`` means *inherit
+# the parent's entire environment* — so every provider key, every credential
+# reference and every internal setting that Raiker itself was launched with went
+# to it, whether it had any use for them or not.
+#
+# That is an exposure class rather than a single bug: the server does not have
+# to be malicious for it to matter, because a crash dump, a debug log or a
+# process listing leaks what the process was handed. Raiker's posture is
+# owner-authoritative and monitored, not prevention-by-restriction, and this is
+# not a restriction on the owner — the owner never asked for their Anthropic key
+# to be in a weather server's environment. It is the difference between granting
+# something and merely failing to withhold it.
+#
+# So the child gets a constructed environment: the variables a program needs to
+# start and find its own runtime, and nothing else. An owner who has a server
+# that genuinely needs a named variable says so, by name, in
+# ``RAIKER_MCP_ENV_ALLOWLIST`` — which is a grant they made, recorded where it
+# can be read back, rather than an inheritance nobody chose.
+#
+# The names below are deliberately boring: a PATH to find the interpreter, a
+# HOME because interpreters and their package managers read it, the Windows
+# variables without which a process will not start at all, and the locale and
+# encoding settings, because a server that cannot decode its own output is a
+# server that fails in a way nobody will diagnose.
+_MCP_ENV_PASSTHROUGH: tuple[str, ...] = (
+    "PATH",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TZ",
+    # Windows will not start a process without these.
+    "SYSTEMROOT",
+    "SYSTEMDRIVE",
+    "WINDIR",
+    "COMSPEC",
+    "PATHEXT",
+    "NUMBER_OF_PROCESSORS",
+    "PROCESSOR_ARCHITECTURE",
+    "TEMP",
+    "TMP",
+    "USERPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
+)
+
+#: Names an owner may never pass through, whatever they put in the allowlist.
+#:
+#: Not a security boundary — an owner who wants a server to have a secret can
+#: give it one directly, and Raiker does not stand between an owner and their
+#: own machine. It is a guard against the *accident*: a broad-looking entry
+#: (`RAIKER_MCP_ENV_ALLOWLIST=ANTHROPIC_API_KEY`) added to make one server work
+#: is exactly how a secret ends up somewhere nobody remembers putting it, and
+#: the refusal says so at the point the owner writes it.
+_MCP_ENV_NEVER: frozenset[str] = frozenset(
+    {"RAIKER_MCP_ENV_ALLOWLIST", "RAIKER_MCP_COMMAND_ALLOWLIST"}
+)
+
+
+def allowed_mcp_env_names() -> tuple[str, ...]:
+    """The extra environment names the owner has granted local MCP servers.
+
+    Comma-separated in ``RAIKER_MCP_ENV_ALLOWLIST``. Empty entries are ignored;
+    the two variables that configure this boundary cannot be passed through it.
+    """
+    raw = os.environ.get("RAIKER_MCP_ENV_ALLOWLIST", "")
+    names = [part.strip() for part in raw.split(",") if part.strip()]
+    return tuple(name for name in names if name not in _MCP_ENV_NEVER)
+
+
+def mcp_stdio_env(source: dict[str, str] | None = None) -> dict[str, str]:
+    """The environment one local MCP server is started with.
+
+    Built rather than inherited. ``source`` defaults to Raiker's own
+    environment; a name that is not set in it is simply absent from the result,
+    because an empty string and "not set" mean different things to the programs
+    that read these.
+    """
+    env = dict(os.environ) if source is None else source
+    allowed = (*_MCP_ENV_PASSTHROUGH, *allowed_mcp_env_names())
+    built = {name: env[name] for name in allowed if name in env}
+    # Unbuffered output, so a bounded session reads the server's answer instead
+    # of waiting on a pipe buffer the server never flushes.
+    built.setdefault("PYTHONUNBUFFERED", "1")
+    built.setdefault("PYTHONIOENCODING", "utf-8")
+    return built
+
+
 def allowed_mcp_commands() -> frozenset[str]:
     """Fixed interpreter allowlist, optionally extended by the owner.
 
@@ -930,6 +1021,10 @@ class McpConnectorExecutor:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=str(self._ws),
+                # SEC-MCP-01 — constructed, never inherited. Omitting `env`
+                # hands the child every variable Raiker was started with,
+                # provider keys included.
+                env=mcp_stdio_env(),
                 text=True,
             )
         except FileNotFoundError:

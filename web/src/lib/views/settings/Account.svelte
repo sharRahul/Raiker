@@ -18,7 +18,23 @@
   let busy = $state(false);
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
 
+  /*
+   * NEW-ACCOUNT-01 — a control labelled Cancel must not look like it cancelled
+   * something irreversible.
+   *
+   * The confirmation's Cancel only ever hid the form. While a deletion was
+   * running it stayed live, so pressing it took the owner back to a page that
+   * looked untouched while the account was being destroyed behind it — the one
+   * moment in the product where a wrong impression cannot be undone. It is also
+   * why the deletion needs a guard of its own: the Permanently delete button was
+   * disabled while busy, and a disabled button is a presentation, not a lock.
+   *
+   * So during the request there is no Cancel. There is a statement of what is
+   * happening, and the form stays on screen, because the owner watching an
+   * irreversible operation finish is the honest version of this moment.
+   */
   async function deleteAccount() {
+    if (busy) return;
     busy = true;
     notice = null;
     const control = getToken();
@@ -79,14 +95,27 @@
   {:else}
     <label>
       Confirm your password
-      <input type="password" bind:value={deletePassword} autocomplete="current-password" />
+      <input
+        type="password"
+        bind:value={deletePassword}
+        autocomplete="current-password"
+        disabled={busy}
+      />
     </label>
     <div class="actions">
       <button type="button" class="btn btn-danger" disabled={busy || !deletePassword} onclick={deleteAccount}>
-        Permanently delete
+        {busy ? "Deleting account…" : "Permanently delete"}
       </button>
-      <button type="button" class="btn btn-soft" onclick={() => (confirmingDelete = false)}>Cancel</button>
+      {#if !busy}
+        <button type="button" class="btn btn-soft" onclick={() => (confirmingDelete = false)}>Cancel</button>
+      {/if}
     </div>
+    {#if busy}
+      <p class="sub deleting" role="status">
+        Deleting your account. This cannot be cancelled or undone — Raiker will return to the sign-in
+        screen when it is finished.
+      </p>
+    {/if}
   {/if}
 </section>
 
@@ -116,4 +145,5 @@
   .sub {
     color: var(--text-2);
   }
+  .deleting { margin: var(--space-2) 0 0; }
 </style>

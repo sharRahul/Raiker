@@ -53,6 +53,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/**
+ * The registry list, as opposed to the short "Common permissions" section above
+ * it. A capability an owner commonly changes appears in both by design, so a
+ * test about the grouped list has to say which one it means.
+ */
+function registry() {
+  return within(screen.getByRole("region", { name: "All permissions" }));
+}
+
+/** The same, for a test that renders and reads before the gates have arrived. */
+async function registryWhenLoaded() {
+  return within(await screen.findByRole("region", { name: "All permissions" }));
+}
+
 // GEP-04 — a switch beside a running feature that it does not govern tells the
 // owner something untrue about their own control. The card has to say so.
 describe("CapabilitiesView — what each switch actually decides", () => {
@@ -65,7 +79,7 @@ describe("CapabilitiesView — what each switch actually decides", () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView);
 
-    const shell = await screen.findByRole("button", { name: /Shell commands/i });
+    const shell = (await registryWhenLoaded()).getByRole("button", { name: /Shell commands/i });
     await fireEvent.click(shell);
 
     expect(screen.getByText("Can Raiker use this?")).toBeInTheDocument();
@@ -146,20 +160,11 @@ describe("CapabilitiesView — what each switch actually decides", () => {
       ],
     });
     render(CapabilitiesView, { principal: "prin_owner" });
-    const row = await screen.findByRole("button", { name: /Shell/i });
+    const row = (await registryWhenLoaded()).getByRole("button", { name: /Shell/i });
     expect(within(row).queryByText("Governed elsewhere")).toBeNull();
     expect(within(row).queryByText("No route yet")).toBeNull();
   });
 });
-
-/**
- * The registry list, as opposed to the short "Common permissions" section above
- * it. A capability an owner commonly changes appears in both by design, so a
- * test about the grouped list has to say which one it means.
- */
-function registry() {
-  return within(screen.getByRole("region", { name: "All permissions" }));
-}
 
 describe("CapabilitiesView", () => {
   it("groups executable tools by domain and omits non-executors entirely", async () => {
@@ -290,5 +295,187 @@ describe("CapabilitiesView", () => {
       target: { value: "shell" },
     });
     expect(registry().getByText("Shell commands")).toBeInTheDocument();
+  });
+});
+
+/*
+ * NEW-PERM-01 / NEW-PERM-02 / NEW-PERM-03 — the three defects the release
+ * review found in the two sections above the registry.
+ *
+ * They are one page and they were three different readings of it: a prominent
+ * list of the permissions an owner arrives to change with no way to change one;
+ * summaries derived from the raw read while the control below them showed the
+ * mode the owner had just set; and a table that answered an unrecognised mode
+ * with the most permissive verdict it can print.
+ */
+describe("Permissions — the sections above the registry", () => {
+  const AUTO_GATES = [
+    makeGate({
+      capability: "shell_execution",
+      phase: 3,
+      state: "enabled_runtime",
+      can_current_principal_change: true,
+      allowed_transitions: ["disabled"],
+      decision_mode: "auto",
+    }),
+    makeGate({
+      capability: "web_fetch",
+      phase: 3,
+      state: "enabled_runtime",
+      can_current_principal_change: true,
+      allowed_transitions: ["disabled"],
+      decision_mode: "ask",
+    }),
+  ];
+
+  function common() {
+    return within(screen.getByRole("region", { name: "Common permissions" }));
+  }
+  function attention() {
+    return within(screen.getByRole("region", { name: "Needs your attention" }));
+  }
+
+  it("gives a common permission a control to reach, not just a name to read", async () => {
+    // The owner-reported symptom: the top sections "are not working". They were
+    // lists of spans. Prominence that does not act is friction wearing the
+    // clothes of help.
+    stubFetch({ "GET /api/capability-gates": AUTO_GATES });
+    render(CapabilitiesView, { principal: "prin_owner" });
+    await waitFor(() => expect(registry().getByText("Shell commands")).toBeInTheDocument());
+
+    // Fold the group away, so the shortcut has to undo it to reach the row.
+    const fold = screen
+      .getAllByRole("button", { expanded: true })
+      .find((b) => b.className.includes("phase-fold"));
+    await fireEvent.click(fold!);
+    expect(registry().queryByText("Shell commands")).not.toBeInTheDocument();
+
+    await fireEvent.click(common().getByRole("button", { name: /Manage Shell commands/i }));
+
+    // The group is open, the row is expanded, and the keyboard is on the row's
+    // own control rather than left behind on the shortcut.
+    const row = await waitFor(() => registry().getByRole("button", { name: /Shell commands/i }));
+    expect(row.getAttribute("aria-expanded")).toBe("true");
+    await waitFor(() => expect(document.activeElement).toBe(row));
+  });
+
+  it("offers a review action on what it says needs reviewing", async () => {
+    stubFetch({ "GET /api/capability-gates": AUTO_GATES });
+    render(CapabilitiesView, { principal: "prin_owner" });
+    await waitFor(() => expect(registry().getByText("Shell commands")).toBeInTheDocument());
+
+    await fireEvent.click(attention().getByRole("button", { name: /Review Shell commands/i }));
+    expect(
+      registry().getByRole("button", { name: /Shell commands/i }).getAttribute("aria-expanded"),
+    ).toBe("true");
+  });
+
+  it("moves every summary when one mode is confirmed", async () => {
+    // NEW-PERM-02 — the control said Never and the two sections above it went on
+    // saying Automatic, because they read the gate list and it read the
+    // override. A permissions page cannot answer the same question two ways.
+    stubFetch({
+      "GET /api/capability-gates": AUTO_GATES,
+      "POST /api/capability-modes/shell_execution/deny": {
+        ok: true,
+        capability: "shell_execution",
+        decision_mode: "deny",
+      },
+    });
+    render(CapabilitiesView, { principal: "prin_owner" });
+    await waitFor(() => expect(registry().getByText("Shell commands")).toBeInTheDocument());
+
+    expect(common().getByText("On · Automatic")).toBeInTheDocument();
+    expect(
+      attention().getByRole("button", { name: /Review Shell commands/i }),
+    ).toBeInTheDocument();
+
+    const board = screen.getAllByRole("group", { name: /when Raiker wants to use/i })[0];
+    await fireEvent.click(within(board).getByRole("button", { name: "Never" }));
+
+    await waitFor(() => expect(common().getByText("On · Never")).toBeInTheDocument());
+    // The attention entry was there *because* of the mode, so it goes with it —
+    // and with it the whole section, which no longer has anything in it.
+    expect(screen.queryByRole("region", { name: "Needs your attention" })).toBeNull();
+    expect(registry().getByText("On · Never")).toBeInTheDocument();
+  });
+
+  it("does not say an unavailable capability is running automatically", async () => {
+    // NEW-PERM-03 — configured Automatic is a fact about the account. It is not
+    // evidence that an executor which is not ready is doing anything.
+    stubFetch({
+      "GET /api/capability-gates": [
+        makeGate({
+          capability: "web_fetch",
+          phase: 3,
+          state: "enabled_runtime",
+          can_current_principal_change: true,
+          allowed_transitions: ["disabled"],
+          decision_mode: "auto",
+          readiness: { provider_ready: false },
+        }),
+      ],
+    });
+    render(CapabilitiesView, { principal: "prin_owner" });
+    await waitFor(() => expect(registry().getByText("Web fetch")).toBeInTheDocument());
+
+    expect(attention().getByText(/is not available right now/)).toBeInTheDocument();
+    expect(attention().queryByText(/runs automatically, without asking you/)).toBeNull();
+  });
+
+  it("reads an unrecognised mode as unknown rather than as permission", async () => {
+    stubFetch({
+      "GET /api/capability-gates": [
+        makeGate({
+          capability: "shell_execution",
+          phase: 3,
+          state: "enabled_runtime",
+          can_current_principal_change: true,
+          allowed_transitions: ["disabled"],
+          decision_mode: "supervise",
+        }),
+      ],
+    });
+    render(CapabilitiesView, { principal: "prin_owner" });
+    await waitFor(() => expect(registry().getByText("Shell commands")).toBeInTheDocument());
+
+    expect(registry().getByText("On · Unknown")).toBeInTheDocument();
+    await fireEvent.click(registry().getByRole("button", { name: /Shell commands/i }));
+    // The card answers the behaviour question instead of falling silent on it.
+    expect(screen.getByText("When Raiker wants to use it")).toBeInTheDocument();
+    expect(screen.getByText(/does not recognise this setting/i)).toBeInTheDocument();
+  });
+
+  it("names what a partly refused bulk change actually did", async () => {
+    // NEW-PERM-02 — the loop stopped at the first refusal and reported "The bulk
+    // change was rejected", while the capabilities already changed stayed
+    // changed. Every selection is attempted and the report names both halves.
+    stubFetch({
+      "GET /api/capability-gates": AUTO_GATES,
+      "POST /api/capability-modes/shell_execution/ask": {
+        ok: true,
+        capability: "shell_execution",
+        decision_mode: "ask",
+      },
+      "POST /api/capability-modes/web_fetch/ask": {
+        __status: 409,
+        detail: { reason_code: "capability_change_refused" },
+      },
+    });
+    render(CapabilitiesView, { principal: "prin_owner" });
+    await waitFor(() => expect(registry().getByText("Shell commands")).toBeInTheDocument());
+
+    // The per-capability boxes only: pressing a group's "select all" as well
+    // would toggle the same capabilities straight back off.
+    for (const name of [/^Select Shell commands$/, /^Select Web fetch$/]) {
+      await fireEvent.click(registry().getByRole("checkbox", { name }));
+    }
+    await fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+
+    const notice = await screen.findByRole("status");
+    expect(notice.textContent).toMatch(/1 changed/);
+    expect(notice.textContent).toMatch(/Web fetch/);
+    // The one that was refused stays selected, so it can be retried where it is.
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
   });
 });

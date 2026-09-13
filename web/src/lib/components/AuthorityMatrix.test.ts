@@ -34,9 +34,67 @@ describe("AuthorityMatrix", () => {
 
     expect(screen.getByRole("columnheader", { name: "Owner control" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Raiker agent" })).toBeInTheDocument();
+    // The agent column, one verdict per gate: asked for, switched off, and on
+    // but with a readiness requirement the backend reports as unmet.
     expect(within(table).getByText("Ask")).toBeInTheDocument();
-    expect(within(table).getAllByText("Unavailable")).toHaveLength(2);
+    expect(within(table).getByText("Unavailable")).toBeInTheDocument();
     expect(within(table).getByText("Not ready")).toBeInTheDocument();
+    // NEW-PERM-03 — the owner column now answers in the same two words the row
+    // below it uses, rather than in a third vocabulary of its own.
+    expect(within(table).getByText("On · Ask me")).toBeInTheDocument();
+    expect(within(table).getByText("Off · Allow")).toBeInTheDocument();
+  });
+
+  it("tells Allow and Automatic apart instead of calling both Direct", () => {
+    // NEW-PERM-03 — `Direct` was one word for two different grants, and the
+    // page names them separately everywhere else.
+    const { container } = render(AuthorityMatrix, {
+      gates: [
+        makeGate({ capability: "web_fetch", state: "enabled_runtime", decision_mode: "allow" }),
+        makeGate({
+          capability: "shell_execution",
+          state: "enabled_runtime",
+          decision_mode: "auto",
+        }),
+      ],
+    });
+    const table = container.querySelector<HTMLElement>(".matrix-scroll")!;
+    expect(within(table).getByText("Allow")).toBeInTheDocument();
+    expect(within(table).getByText("Automatic")).toBeInTheDocument();
+    expect(within(table).queryByText("Direct")).toBeNull();
+  });
+
+  it("does not read an unrecognised mode as permission", () => {
+    // The defect this closes: anything that was not `deny` or `ask` fell through
+    // to `Direct`, so a missing, misspelt or newer-than-this-build value
+    // rendered as the most permissive verdict the table can print.
+    const { container } = render(AuthorityMatrix, {
+      gates: [
+        makeGate({ capability: "web_fetch", state: "enabled_runtime", decision_mode: "" }),
+        makeGate({
+          capability: "shell_execution",
+          state: "enabled_runtime",
+          decision_mode: "supervise",
+        }),
+      ],
+    });
+    const table = container.querySelector<HTMLElement>(".matrix-scroll")!;
+    expect(within(table).getAllByText("Unknown")).toHaveLength(2);
+    expect(within(table).queryByText("Direct")).toBeNull();
+    expect(within(table).queryByText("Allow")).toBeNull();
+    // And the verdict is styled as blocked rather than as a live authority.
+    expect(container.querySelectorAll(".matrix-scroll .authority-state.blocked")).toHaveLength(2);
+  });
+
+  it("says the table summarises configuration, not what a turn may do", () => {
+    // NEW-PERM-03 — the heading claimed *carried* authority for a table that
+    // reads account configuration; a task's scope and the runtime's own checks
+    // narrow it again at the moment of use.
+    const { container } = render(AuthorityMatrix, { gates: GATES, total: 60 });
+    const note = container.querySelector(".matrix-note")!;
+    expect(note.textContent).toMatch(/this account configures/i);
+    expect(note.textContent).toMatch(/can narrow it further/i);
+    expect(container.querySelector(".eyebrow")!.textContent).toMatch(/read-only/i);
   });
 
   it("gives a narrow window the same verdicts without a sideways scroll", () => {
@@ -46,7 +104,7 @@ describe("AuthorityMatrix", () => {
     // Every capability, and the verdict that was the part being scrolled away.
     expect(within(cards).getAllByRole("listitem")).toHaveLength(GATES.length);
     expect(within(cards).getByText("Ask")).toBeInTheDocument();
-    expect(within(cards).getAllByText("Unavailable")).toHaveLength(2);
+    expect(within(cards).getByText("Unavailable")).toBeInTheDocument();
     expect(within(cards).getByText("Not ready")).toBeInTheDocument();
     // Each verdict is labelled, so it reads as an answer rather than a word.
     expect(within(cards).getAllByText("Raiker agent")).toHaveLength(GATES.length);

@@ -16,7 +16,6 @@ from raiker.contracts.models import (
     PromptEnvelope,
     PromptOptions,
     PromptPayload,
-    UserMetadata,
     normalize_input_mode,
     normalize_prompt_surface,
 )
@@ -46,6 +45,7 @@ from raiker.runtime.identity.lifecycle import (
     TrustedTurnIdentity,
     TurnMachineIdentityLifecycle,
 )
+from raiker.runtime.identity.presentation import owner_user_metadata
 from raiker.runtime.orchestrator import RuntimeOrchestrator
 from raiker.runtime.turn_suspension import (
     TurnSuspensionError,
@@ -806,7 +806,9 @@ class AgentGateway:
                 name=str(client_raw.get("name", "raiker-web")),
                 version=str(client_raw.get("version", "0.0.0")),
             ),
-            user=UserMetadata(id=self.tool_broker.principal_id),
+            # RR-IDENTITY-01 — a resumed turn is the same turn, for the same
+            # owner, and must not lose the name the original one carried.
+            user=owner_user_metadata(self.store, self.tool_broker.principal_id),
             prompt=PromptPayload(
                 text=str(row["prompt_text"]),
                 metadata={"resumed_from_approval": approval_id},

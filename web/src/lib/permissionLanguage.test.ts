@@ -4,6 +4,8 @@ import {
   BEHAVIOUR_COPY,
   CANNOT_CHANGE_HERE,
   COMMON_PERMISSIONS,
+  UNKNOWN_BEHAVIOUR,
+  behaviourCopy,
   commonGates,
   permissionAttention,
   rowSummary,
@@ -77,6 +79,16 @@ describe("the two questions Permissions asks (P1 — Permissions UX)", () => {
     expect(commonGates([])).toEqual([]);
   });
 
+  it("does not read an unrecognised mode as an answer it was never given", () => {
+    // NEW-PERM-03 — a missing or future mode used to drop the behaviour half of
+    // the row, so the summary quietly stopped answering its own second question.
+    expect(rowSummary(gate({ decision_mode: "supervise" }), true)).toBe("On · Unknown");
+    expect(rowSummary(gate({ decision_mode: "" }), false)).toBe("Off · Unknown");
+    expect(behaviourCopy("supervise")).toBe(UNKNOWN_BEHAVIOUR);
+    expect(behaviourCopy("deny")).toBe(BEHAVIOUR_COPY.deny);
+    expect(UNKNOWN_BEHAVIOUR.hint).toMatch(/refresh/i);
+  });
+
   it("calls attention only what an owner can act on", () => {
     // A capability at its default is not attention. A page that calls
     // everything attention has said nothing.
@@ -103,6 +115,32 @@ describe("the two questions Permissions asks (P1 — Permissions UX)", () => {
       decision_mode: "ask",
     });
     expect(permissionAttention([deferred])).toEqual([]);
+  });
+
+  it("does not tell an owner that an unavailable capability is running", () => {
+    /*
+     * NEW-PERM-03 — configured *Automatic* is a fact about the account. It is
+     * not evidence that anything is running: an executor whose readiness the
+     * backend reports as unmet, or a capability switched off, cannot act at
+     * all, and an alarm about work that cannot happen is worse than no alarm.
+     */
+    const running = permissionAttention([
+      gate({ decision_mode: "auto", state: "enabled_runtime", readiness: { provider: true } }),
+    ]);
+    expect(running[0].reason).toBe("runs automatically, without asking you");
+
+    const notReady = permissionAttention([
+      gate({ decision_mode: "auto", state: "enabled_runtime", readiness: { provider: false } }),
+    ]);
+    expect(notReady[0].reason).toMatch(/not available right now/);
+
+    const switchedOff = permissionAttention([
+      gate({ decision_mode: "auto", state: "disabled", allowed_transitions: ["enabled_runtime"] }),
+    ]);
+    expect(switchedOff[0].reason).toMatch(/not available right now/);
+    // Still listed either way: the setting is real and the owner may want it
+    // changed. What moves is the sentence, not whether the row exists.
+    expect(notReady).toHaveLength(1);
   });
 
   it("explains an unchangeable setting as a fact about the account", () => {

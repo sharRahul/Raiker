@@ -16,13 +16,13 @@ with the two defects the work surfaced as
 | COMPOSER-04 one Tools menu | Done, derived from the typed registry. The single **Search the web** entry became four — search, read a URL, extract page content, weather — because they fail differently and one row could only report the state of whichever it happened to check |
 | COMPOSER-05 model identity, hidden management | Done — picker ends in one link to Models |
 | COMPOSER-06 one context line | Done — the meter is composed into its inspector |
-| COMPOSER-07/08/09 per-surface composition | Done. Design's Tools control is present as of 2026-09-07 and reaches something real: the four research reads run a governed research turn on the `design` surface (WEB-06). The *image* controls COMPOSER-09 lists are still absent, for the reason stated below |
+| COMPOSER-07/08/09 per-surface composition | Done. Design's Tools control is present as of 2026-09-07 and reaches something real: the four research reads run a governed research turn on the `design` surface (WEB-06). Of the *image* controls COMPOSER-09 lists, edit, variations and version compare landed 2026-09-13 once the runtime under them existed ([FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach)); outpaint and reference images remain absent, for the reason stated below |
 | COMPOSER-10 Tasks/Schedule composer | Done — Tasks is written on the shared shell as an instruction (`taskComposer.ts`); cadence chooses the primary action, and the schedule, project, model and notification details expand only when asked ([FIXED-470](FIXED_ITEMS.md#fixed-470--tasks-asked-to-be-filled-in-rather-than-instructed)) |
 | COMPOSER-11 Project continuity | Done — one browser-session draft is keyed by Project and follows the owner across Chat, Build and Design ([FIXED-478](FIXED_ITEMS.md#fixed-478--a-work-draft-was-lost-at-every-mode-switch)) |
 | COMPOSER-12 governance near the action | Done — the posture chip renders only as an exception |
 | COMPOSER-13 slash and `@` accelerators | Already satisfied; `+` now makes the same actions discoverable without the syntax |
 | COMPOSER-14 paste/drop intelligence | Done for the supported Chat/Build attachment surfaces — text at or above 4,000 characters becomes `pasted-text.txt`, and **Show inline** restores the exact text ([FIXED-479](FIXED_ITEMS.md#fixed-479--a-large-paste-could-hide-the-conversation-it-belonged-to)) |
-| COMPOSER-15 adaptive primary action | Done — the word names the act the press performs on every surface: Chat `Send`, Build `Run`/`Plan`/`Propose` per mode (`buildPrimaryAction`), Design `Generate`, Tasks `Create task`/`Schedule task`/`Create routine`/`Start background agent` per cadence, and a running turn offers Stop instead ([FIXED-471](FIXED_ITEMS.md#fixed-471--one-primary-action-that-did-not-say-what-it-would-do)) |
+| COMPOSER-15 adaptive primary action | Done — the word names the act the press performs on every surface: Chat `Send`, Build `Run`/`Plan`/`Propose` per mode (`buildPrimaryAction`), Design `Generate`/`Generate 4`/`Edit` per what is on the canvas (`designPrimaryAction`, [FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach)), Tasks `Create task`/`Schedule task`/`Create routine`/`Start background agent` per cadence, and a running turn offers Stop instead ([FIXED-471](FIXED_ITEMS.md#fixed-471--one-primary-action-that-did-not-say-what-it-would-do)) |
 | COMPOSER-16 mobile bottom sheet | Done |
 | COMPOSER-17 keyboard behaviour | Done — Escape closes a menu, the composer's own bindings are unchanged |
 | COMPOSER-18 no duplicated page actions | Done |
@@ -30,13 +30,21 @@ with the two defects the work surfaced as
 | COMPOSER-20 visual quality rules | Done; rules 3 and 12 are pinned by `visualRubric.test.ts` |
 
 **What is deliberately not built, and why.** COMPOSER-09 describes edit,
-variations, outpaint, reference images and version compare. Raiker's governed
-image endpoint takes a prompt, a size and a model and returns one picture, so
-those controls have no runtime to reach. This document's own acceptance test 19
-settles what to do about that — *every exposed composer action reaches an actual
+variations, outpaint, reference images and version compare. Three of those exist
+now, and they exist in the order this rule demanded: the runtime first
+([BUG-277](TO_BE_FIXED.md#bug-277--design-is-a-one-shot-generator-so-most-of-its-composer-has-nothing-to-reach)),
+then the controls. A generation records what it was made from, so **Edit** names
+a subject, a count asks for a set, and a version strip has versions
+([FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach)).
+
+**Outpaint and reference images are still absent**, and for the same reason the
+other three were: they need provider capabilities behind the governed endpoint
+that this build does not have. This document's own acceptance test 19 settles
+what to do about that — *every exposed composer action reaches an actual
 backend/runtime path or is omitted* — so they are absent rather than present and
-inert, and the missing runtime is recorded in
-[`TO_BE_FIXED.md`](TO_BE_FIXED.md).
+inert. The evidence that the three that landed reach a *real* provider is itself
+incomplete on this host and is carried as
+[BUG-287](TO_BE_FIXED.md#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider).
 
 ---
 

@@ -1278,7 +1278,17 @@ export const api = {
   // The list is metadata only; the bytes are a separate, owner-scoped request
   // that names one generation, so a gallery cannot accidentally ship megabytes.
   images: () => request<ImageGenerationsView>("/api/images"),
-  generateImage: (body: { profile_id: string; prompt: string; size: string; model?: string }) =>
+  generateImage: (body: {
+    profile_id: string;
+    prompt: string;
+    size: string;
+    model?: string;
+    /** BUG-277 — the prior generation this request is about, making it an edit. */
+    source_generation_id?: string;
+    /** How many pictures to ask for. More than one makes it a variation set. */
+    variations?: number;
+    project_id?: string;
+  }) =>
     postJson<{ ok: boolean; generation_id: string }>("/api/images", body),
   imageBytesUrl: (generationId: string) =>
     `/api/images/${encodeURIComponent(generationId)}/bytes`,

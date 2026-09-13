@@ -747,14 +747,14 @@ summary that made the same statement.
 | `LIVE_TEST_ROUNDS.md` | Evidence history, not current product spec. Keep environment/date/provider context with every round. |
 | `MEMORY_RELIABILITY_PLAN.md` | Mostly completed reliability ledger; good evidence. Future memory scaling work should be new entries rather than reopening closed history. |
 | the Models review | Historical review; current five-panel IA is implemented. Use global-catalogue contract tests for regression. |
-| `PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md` | **Superseded as current status by this audit.** It has a later closure section at the top but older open conclusions deeper in the same file. Preserve it as the original verification snapshot. |
+| `PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md` | **Removed 2026-09-13**, its last open item — Design's canvas workspace — having closed as [FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach). It was superseded as current status by this audit long before that; what it verified now lives in the `FIXED_ITEMS.md` entries it produced, and its reasoning in git history. |
 | `PILLAR_MAP.md` | Useful executive dependency map. Must reference current ledgers rather than duplicate detailed statuses. |
 | `RAIKER_LIVE_MANUAL_TEST_PLAN.md` | Active verification procedure. Add the new canonical screenshot path/resolutions and clean installer scenarios. |
 | `SECURITY_COMPLIANCE_GAP_ASSESSMENT_2026-09-05.md` | Mapping evidence; must not imply certification or current control effectiveness solely from implementation. Revalidate when release boundary changes. |
 | `TO_BE_ADDED.md` | Future/differentiator ledger. Good distinction between proposals and defects, but proposals must not outrank closing P0/P1 boundary gaps. |
 | `TO_BE_FIXED.md` | Defect backlog. Should remain the canonical unresolved-defect ledger; status summaries elsewhere should link to it rather than duplicate it. |
 | `UNIFIED_COMPOSER_REDESIGN_2026-09-06.md` | Design/implementation history; shared composer is substantially implemented. Use it for invariants, not current backlog. |
-| `VISUAL_UI_UX_REVIEW_2026-09-06.md` | Later status is more current than the older page-by-page file. `VIS2-15` 4K/8K is now explicitly **cancelled/superseded by product decision**, not an implementation gap. `VIS2-19` Design canvas remains open. |
+| `VISUAL_UI_UX_REVIEW_2026-09-06.md` | Later status is more current than the older page-by-page file. `VIS2-15` 4K/8K is now explicitly **cancelled/superseded by product decision**, not an implementation gap. `VIS2-19` Design canvas closed 2026-09-13 ([FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach)). |
 | the adaptive-shell design | Design intent/history. Current route/nav source is the implementation truth. |
 | the adaptive-shell implementation plan | Implementation history. Completed shell work should not be carried as active backlog. |
 | `screenshots/` under `docs/plans` | **Legacy evidence only.** It contains stale Models IA and 4K/8K variants. New canonical location is `docs/screenshots/`. |

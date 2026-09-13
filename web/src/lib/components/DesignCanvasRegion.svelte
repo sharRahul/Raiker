@@ -1,66 +1,112 @@
 <script lang="ts">
   /*
-   * VIS2-20 — Design's canvas region, as its own component.
+   * VIS2-19 — Design's canvas, now that there is something to compose.
    *
-   * The review names six regions Design should converge on. Five of them —
-   * asset rail, variation grid, crop/selection inspector, version history,
-   * export dialog — describe a canvas runtime Raiker does not have: the
-   * governed image endpoint takes a prompt, a size and a model and returns one
-   * picture (recorded in docs/plans/TO_BE_FIXED.md as BUG-277). Extracting
-   * empty shells for them would be the projection-without-substance this
-   * product refuses everywhere else.
+   * This component used to be one region and said so: "five of them describe a
+   * canvas runtime Raiker does not have", because the governed image endpoint
+   * took a prompt and returned one picture. BUG-277 built that runtime — a
+   * request can name a prior generation as its subject, ask for several
+   * pictures, and the store records what each was made from — so the regions the
+   * review asks for now have real relationships to draw and are no longer empty
+   * shells.
    *
-   * This is the region that exists: what has been generated, in order, with the
-   * prompt that asked for it. It is extracted so the surface's *object* has a
-   * component of its own — the thing VIS2-20 is actually for — and so a change
-   * to how an asset is presented happens in one file rather than inside a
-   * 700-line view.
+   * Three regions, and the review's rule about which dominates:
+   *
+   *   Assets  │  Canvas / selected asset  │  Inspector
+   *           │                           │   versions, variations, detail
+   *
+   * The canvas is the largest intentional region whenever an asset exists. With
+   * nothing selected it is the history — what has been generated, in order, with
+   * the prompt that asked for it — because a canvas with no object on it is not
+   * a canvas, and an empty three-pane frame would be chrome pretending to be a
+   * workspace.
+   *
+   * What is still absent, and deliberately: selection within an image, masking,
+   * outpainting. Those need provider capabilities behind the governed endpoint
+   * that this build does not have, and the composer redesign's acceptance test
+   * 19 settles what to do about that — every exposed action reaches a real
+   * runtime path or is omitted. A crop tool that cannot crop is worse than no
+   * crop tool, because it looks like a promise.
    */
   import Icon from "./Icon.svelte";
   import PageState from "./PageState.svelte";
   import { api } from "../api";
   import type { ImageGeneration } from "../apiTypes";
   import { relativeTime } from "../format";
+  import {
+    designAssets,
+    KIND_LABEL,
+    refusalsFor,
+    variationSet,
+    versionChain,
+  } from "../designAssets";
 
   let {
     turns,
     loading = false,
     loadError = null,
     readable,
+    selectedId = $bindable(null),
   }: {
     turns: ImageGeneration[];
     loading?: boolean;
     loadError?: string | null;
     /** The view's own plain-English reading of a refusal's reason code. */
     readable: (code: string | null) => string;
+    /**
+     * The asset the next instruction is about. Bindable because the composer
+     * above needs it too: it is what turns **Generate** into **Edit**, and a
+     * selection the button cannot see would be a selection that means nothing.
+     */
+    selectedId?: string | null;
   } = $props();
+
+  const assets = $derived(designAssets(turns));
+  const selected = $derived(
+    selectedId === null
+      ? null
+      : (assets.find((asset) => asset.generation.generation_id === selectedId) ?? null),
+  );
+  const versions = $derived(selectedId ? versionChain(turns, selectedId) : []);
+  const variations = $derived(selectedId ? variationSet(turns, selectedId) : []);
+  const refusals = $derived(selectedId ? refusalsFor(turns, selectedId) : []);
+
+  // A selection that no longer exists is not a selection. Clearing it here
+  // rather than rendering an empty canvas keeps the button's word honest.
+  $effect(() => {
+    if (selectedId !== null && selected === null) selectedId = null;
+  });
+
+  const shot = (generation: ImageGeneration) => api.imageBytesUrl(generation.generation_id);
 </script>
 
 {#if loadError}
   <PageState state="error" title="Couldn't read your generations" detail={loadError} />
 {:else if loading}
   <PageState state="loading" title="Reading your generations…" />
-{:else if turns.length === 0}
+{:else if assets.length === 0 && turns.length === 0}
   <PageState
     state="empty"
     title="Nothing generated yet"
     detail="Describe an image below. What you generate is stored in this workspace."
   />
-{:else}
+{:else if selected === null}
+  <!-- No object, so no three-pane frame: the history *is* the page. Selecting
+       an asset is what turns this surface into a canvas. -->
   <ol class="turns">
     {#each turns as item (item.generation_id)}
       <li class="turn">
         <p class="asked">{item.prompt}</p>
         <div class="answer" class:refused={item.status !== "ok"}>
           {#if item.has_image}
-            <a
+            <button
+              type="button"
               class="shot"
-              href={api.imageBytesUrl(item.generation_id)}
-              target="_blank"
-              rel="noopener"
+              onclick={() => (selectedId = item.generation_id)}
+              aria-label={`Open ${item.prompt} on the canvas`}
             >
-              <img src={api.imageBytesUrl(item.generation_id)} alt={item.prompt} loading="lazy" />
-            </a>
+              <img src={shot(item)} alt={item.prompt} loading="lazy" />
+            </button>
           {:else}
             <p class="refusal">
               <Icon name="warning" size="sm" />
@@ -72,6 +118,134 @@
       </li>
     {/each}
   </ol>
+{:else}
+  <div class="workspace">
+    <!-- Assets. Every picture this owner has, newest first, so the one being
+         worked on can be swapped without leaving the canvas. -->
+    <aside class="rail" aria-label="Assets">
+      <ol>
+        {#each assets as asset (asset.generation.generation_id)}
+          <li>
+            <button
+              type="button"
+              class="thumb"
+              class:current={asset.generation.generation_id === selectedId}
+              aria-current={asset.generation.generation_id === selectedId ? "true" : undefined}
+              onclick={() => (selectedId = asset.generation.generation_id)}
+              title={asset.generation.prompt}
+            >
+              <img src={shot(asset.generation)} alt={asset.generation.prompt} loading="lazy" />
+            </button>
+          </li>
+        {/each}
+      </ol>
+    </aside>
+
+    <!-- The canvas. The largest region whenever an asset exists, which is the
+         one composition rule VIS2-19 states outright. -->
+    <section class="canvas" aria-label="Canvas">
+      <!-- Above the object, not below it. The canvas takes the room the shell
+           gives it, so a control placed under the picture is one the owner has
+           to scroll past the picture to find — and the way back out of a
+           workspace should never be the thing you go looking for. -->
+      <button type="button" class="clear" onclick={() => (selectedId = null)}>
+        <Icon name="x" size="sm" />
+        Back to everything
+      </button>
+      <img src={shot(selected.generation)} alt={selected.generation.prompt} />
+      <p class="prompt">{selected.generation.prompt}</p>
+    </section>
+
+    <aside class="inspector" aria-label="Inspector">
+      {#if versions.length > 1}
+        <!-- The version strip. A chain of single parents, oldest first, showing
+             only the line this asset is on — two edits of one picture are two
+             branches, and putting both here would say one came after the other
+             when neither came from the other. -->
+        <section class="panel" aria-label="Versions">
+          <h3>Versions</h3>
+          <ol class="strip">
+            {#each versions as version, index (version.generation_id)}
+              <li>
+                <button
+                  type="button"
+                  class="thumb small"
+                  class:current={version.generation_id === selectedId}
+                  onclick={() => (selectedId = version.generation_id)}
+                  aria-label={`Version ${index + 1}: ${version.prompt}`}
+                >
+                  <img src={shot(version)} alt="" loading="lazy" />
+                  <span class="ordinal">{index + 1}</span>
+                </button>
+              </li>
+            {/each}
+          </ol>
+        </section>
+      {/if}
+
+      {#if variations.length > 1}
+        <!-- The compare grid: the pictures one request returned together. -->
+        <section class="panel" aria-label="Variations">
+          <h3>From the same request</h3>
+          <div class="grid">
+            {#each variations as sibling (sibling.generation_id)}
+              <button
+                type="button"
+                class="thumb"
+                class:current={sibling.generation_id === selectedId}
+                onclick={() => (selectedId = sibling.generation_id)}
+                aria-label={`Variation: ${sibling.prompt}`}
+              >
+                <img src={shot(sibling)} alt="" loading="lazy" />
+              </button>
+            {/each}
+          </div>
+        </section>
+      {/if}
+
+      <section class="panel" aria-label="Detail">
+        <h3>Detail</h3>
+        <dl class="facts">
+          <div>
+            <dt>Made</dt>
+            <dd>
+              {KIND_LABEL[selected.generation.kind ?? "create"] ?? "Generated"}
+              {#if selected.parent}
+                <button
+                  type="button"
+                  class="link"
+                  onclick={() => (selectedId = selected!.parent!.generation_id)}
+                >{selected.parent.prompt}</button>
+              {:else if selected.generation.source_generation_id}
+                <!-- The source is gone. An origin, not a broken row: a source
+                     can be forgotten while the images made from it remain. -->
+                <span class="muted">an image no longer stored</span>
+              {/if}
+            </dd>
+          </div>
+          <div><dt>Model</dt><dd>{selected.generation.model}</dd></div>
+          <div><dt>Size</dt><dd>{selected.generation.size}</dd></div>
+          <div><dt>When</dt><dd>{relativeTime(selected.generation.created_at)}</dd></div>
+        </dl>
+        <a class="download" href={shot(selected.generation)} target="_blank" rel="noopener">
+          Open full size
+        </a>
+      </section>
+
+      {#if refusals.length > 0}
+        <!-- Why the executor records lineage on refusals too: an edit that was
+             denied is still something the owner asked of this picture. -->
+        <section class="panel" aria-label="Refused attempts">
+          <h3>Refused</h3>
+          <ul class="refusals">
+            {#each refusals as item (item.generation_id)}
+              <li>{readable(item.reason_code)} <span class="muted">· {relativeTime(item.created_at)}</span></li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
+    </aside>
+  </div>
 {/if}
 
 <style>
@@ -120,10 +294,13 @@
      `--canvas-edge` and `--canvas-lift` hold that difference. */
   .shot {
     display: block;
+    padding: 0;
     border: 1px solid var(--canvas-edge);
     border-radius: var(--r-sm);
     box-shadow: var(--canvas-lift);
+    background: none;
     overflow: hidden;
+    cursor: pointer;
   }
   .shot img {
     display: block;
@@ -142,5 +319,177 @@
     margin: 0;
     color: var(--text-3);
     font-size: var(--text-xs);
+  }
+
+  /* ── The canvas workspace ── */
+
+  /* VIS2-19 — "the canvas must dominate whenever an asset exists", which is a
+     statement about column widths: the rail and the inspector are sized to
+     their content and the canvas takes what is left. VIS2-15 — on a spatial
+     page the room a large display adds goes here, to the space. */
+  .workspace {
+    display: grid;
+    grid-template-columns: 6rem minmax(0, 1fr) minmax(0, 17rem);
+    gap: var(--space-4);
+    align-items: start;
+    min-height: 0;
+  }
+  .rail ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+    max-height: 34rem;
+    overflow-y: auto;
+  }
+  .thumb {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 1px solid var(--canvas-edge);
+    border-radius: var(--r-sm);
+    background: var(--sunken);
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+  }
+  .thumb img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+  /* Which asset is on the canvas, said by more than colour: the accent ring is
+     doubled by `aria-current` for assistive tech and by the ordinal in a
+     version strip. */
+  .thumb.current {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+  .thumb:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  .canvas {
+    display: grid;
+    gap: var(--space-2);
+    justify-items: start;
+    min-width: 0;
+  }
+  .canvas img {
+    display: block;
+    width: 100%;
+    /* The object takes the room the shell gives it: a work surface is already
+       full width, so on a large display this grows with the viewport rather
+       than stopping at a laptop's height. */
+    max-height: min(70vh, 48rem);
+    object-fit: contain;
+    border: 1px solid var(--canvas-edge);
+    border-radius: var(--r-md);
+    background: var(--sunken);
+  }
+  .canvas .prompt {
+    margin: 0;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    max-width: var(--prose-measure);
+  }
+  .clear {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-3);
+    font: inherit;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+  .clear:hover { color: var(--accent); }
+  .inspector {
+    display: grid;
+    gap: var(--space-4);
+    align-content: start;
+    min-width: 0;
+  }
+  .panel { display: grid; gap: var(--space-2); }
+  .panel h3 {
+    margin: 0;
+    font-size: var(--text-2xs);
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .strip {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: var(--space-2);
+    overflow-x: auto;
+  }
+  .strip .thumb { width: 3.2rem; flex: none; }
+  .ordinal {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    padding: 0 0.25rem;
+    border-radius: var(--r-sm);
+    background: var(--overlay);
+    color: var(--brand-white);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+  .facts { display: grid; gap: 0.4rem; margin: 0; }
+  .facts div { display: grid; grid-template-columns: 4.2rem minmax(0, 1fr); gap: var(--space-2); }
+  .facts dt { color: var(--text-3); font-size: var(--text-xs); }
+  .facts dd {
+    margin: 0;
+    color: var(--text-2);
+    font-size: var(--text-xs);
+    overflow-wrap: anywhere;
+  }
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: var(--text-xs);
+    text-align: left;
+    cursor: pointer;
+  }
+  .muted { color: var(--text-3); }
+  .download { font-size: var(--text-xs); }
+  .refusals {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.3rem;
+    color: var(--warn);
+    font-size: var(--text-xs);
+  }
+
+  /* VIS2-19's mobile rule: do not squeeze three desktop panes onto a small
+     screen. The canvas stays the object; the rail becomes a horizontal strip
+     above it and the inspector follows underneath. */
+  @media (max-width: 60rem) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+    .rail ol {
+      grid-auto-flow: column;
+      grid-auto-columns: 4rem;
+      max-height: none;
+      overflow-x: auto;
+    }
   }
 </style>

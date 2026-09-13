@@ -24,6 +24,7 @@
   import Icon from "../components/Icon.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import DesignCanvasRegion from "../components/DesignCanvasRegion.svelte";
+  import { designPrimaryAction, MAX_DESIGN_VARIATIONS } from "../designAssets";
   import { densityGap, workSurface } from "../workSurface";
   import { api, ApiError } from "../api";
   import { providerName } from "../format";
@@ -59,6 +60,14 @@
 
   const draft = $derived(workDraft(workProject()));
   let size = $state("1024x1024");
+  /*
+   * VIS2-19 — the object the next instruction is about, and how many pictures
+   * it asks for. Both are BUG-277's doing: until a request could name a prior
+   * generation there was no subject to select, and until it could ask for
+   * several there was no count to set.
+   */
+  let selectedId = $state<string | null>(null);
+  let variations = $state(1);
 
   /**
    * WEB-06 — Design's research layer.
@@ -170,10 +179,11 @@
    *
    * Named, and honestly bounded. Design's research turns run inside this
    * project like any other governed turn; the *image* endpoint takes a prompt,
-   * a size and a model and has no project field, so a generated picture does
-   * not yet belong to the project it was made in. The fact says which of the
-   * two it is rather than implying the stronger one — recorded in
-   * docs/plans/TO_BE_FIXED.md as the runtime half that is missing.
+   * a size and a model and had no project field, so a generated picture did not
+   * belong to the project it was made in. BUG-277's lineage work carried
+   * `project_id` with it (BUG-282), so a picture generated here is filed
+   * against the project the composer names, and the fact below says so without
+   * the qualification it used to need.
    */
   const project = $derived(
     (projects?.projects ?? []).find((entry) => entry.project_id === workProject()) ?? null,
@@ -184,7 +194,7 @@
       ? [
           {
             label: "Project",
-            value: `${project.name} — research runs here; images are not filed to it yet`,
+            value: `${project.name} — research and generated images are filed here`,
             short: project.name,
             href: "#/projects",
             action: "Projects",
@@ -269,6 +279,8 @@
    * answers newest-first because it was written for a gallery.
    */
   const turns = $derived([...(view?.generations ?? [])].reverse());
+  const COUNTS = Array.from({ length: MAX_DESIGN_VARIATIONS }, (_, index) => index + 1);
+  const primaryAction = $derived(designPrimaryAction(selectedId, variations));
 
   const REASONS: Record<string, string> = {
     disabled_by_capability_gate:
@@ -358,6 +370,12 @@
         prompt: draft.text.trim(),
         size,
         model: choice.model,
+        // The subject, when one is on the canvas. Its absence is what makes
+        // this a plain generation rather than an edit, which is also what the
+        // button has been saying.
+        ...(selectedId ? { source_generation_id: selectedId } : {}),
+        ...(variations > 1 ? { variations } : {}),
+        ...(project ? { project_id: project.project_id } : {}),
       });
       if (sentDraft.text === sentText) sentDraft.text = "";
     } catch (error) {
@@ -408,7 +426,13 @@
     <!-- VIS2-20 — the region that holds this surface's object, as its own
          component. What Design shows *is* the asset, so how an asset is
          presented lives in one file rather than in the middle of the view. -->
-    <DesignCanvasRegion turns={turns} loading={view === null} {loadError} {readable} />
+    <DesignCanvasRegion
+      turns={turns}
+      loading={view === null}
+      {loadError}
+      {readable}
+      bind:selectedId
+    />
   </div>
 
   {#if researching || research !== null || researchError !== null}
@@ -486,6 +510,25 @@
           </select>
         </label>
       {/if}
+      <!-- A count, beside the size, for the same reason the size is there: it is
+           a visual parameter changed often enough to stay at rest, and unlike
+           aspect, seed and quality it now reaches a real runtime path. -->
+      <label class="composer-scope">
+        <span class="sr-only">How many</span>
+        <select
+          class="bar-select"
+          bind:value={variations}
+          aria-label="How many"
+          disabled={busy || selectedId !== null}
+          title={selectedId !== null
+            ? "An edit produces one new version of the selected image."
+            : "How many images to generate"}
+        >
+          {#each COUNTS as option (option)}
+            <option value={option}>{option === 1 ? "1 image" : `${option} images`}</option>
+          {/each}
+        </select>
+      </label>
       <ComposerContext facts={contextFacts} disabled={busy} />
     {/snippet}
 
@@ -551,10 +594,13 @@
         type="submit"
         class="btn btn-primary send"
         disabled={busy || !draft.text.trim() || choice === null || block.kind !== "none"}
-        aria-label={busy ? "Generating" : "Generate"}
+        aria-label={busy ? "Working" : primaryAction}
       >
         <Icon name={busy ? "clock" : "send"} size="sm" />
-        <span class="send-label">{busy ? "Generating…" : "Generate"}</span>
+        <!-- COMPOSER-15 — the word names the act the press performs. Design has
+             three now because it has three requests, and the word follows the
+             state: Edit only while an asset is on the canvas. -->
+        <span class="send-label">{busy ? "Working…" : primaryAction}</span>
       </button>
     {/snippet}
 
@@ -563,7 +609,10 @@
     {/snippet}
 
     {#snippet hint()}
-      Enter generates · Shift+Enter adds a line
+      <!-- The hint names the same act the button does. "Enter generates" beside
+           a button reading **Edit** is the mismatch COMPOSER-15 is about, one
+           line further down. -->
+      Enter {selectedId ? "edits" : "generates"} · Shift+Enter adds a line
     {/snippet}
   </Composer>
 </div>

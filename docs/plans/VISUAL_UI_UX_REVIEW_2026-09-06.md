@@ -14,10 +14,21 @@ are complete with it. Waves 2 (remainder) and 3 are open.
 VIS2-18 gained the composer's research entries, which report readiness where the
 capability is offered rather than failing silently at the point of use; VIS2-13's
 badge budget now covers those entries, which print a state chip only when the
-state is *not* the ordinary one. VIS2-19 is unchanged and remains the largest
-open item — Design gained a research layer
-(WEB-06),
-not a canvas.
+state is *not* the ordinary one. VIS2-19 was then the largest open item — Design had
+gained a research layer (WEB-06), not a canvas.
+
+**Follow-up 2026-09-13.** VIS2-19 and the Design half of VIS2-20 are closed, and
+with them every Pass-2 row. One implementation item is left in the whole review
+and it is Pass 1's: VIS-19, a typed output channel and a chart, now carried as
+[BUG-288](TO_BE_FIXED.md#bug-288--a-turn-can-only-answer-in-prose-and-the-components-to-answer-otherwise-already-exist)
+rather than built ahead of the runtime that would fill it — the same order this
+change had to follow. The
+order the work needed was the order BUG-277 set out: a picture had to be able to
+record what it was made from before a canvas had anything to compose. It does
+now, and with it Design files its pictures against the project they were made in
+(VIS2-11's last clause). What a real provider returns for an edit is still
+unseen from this host and is carried as
+[BUG-287](TO_BE_FIXED.md#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider).
 
 | Item | State |
 |---|---|
@@ -39,8 +50,8 @@ not a canvas.
 | VIS2-16 neutral persistent normal state | Done — [FIXED-450](FIXED_ITEMS.md#fixed-450--success-colour-as-the-standing-state-of-everything-that-is-merely-fine) |
 | VIS2-17 standardised overlay composition | Done — the vocabulary is a named ladder in `app.css` (`--z-raised`, `--z-popover`/`-panel`, `--z-docked`, `--z-panel`, `--z-scrim`, `--z-modal`, `--z-palette`, `--z-alert`); thirty-odd surfaces name the layer they are on instead of a number, a scrim and its modal are adjacent by construction, and `visualRubric.test.ts` refuses a raw overlay-scale z-index ([FIXED-474](FIXED_ITEMS.md#fixed-474--thirteen-z-index-numbers-and-no-way-to-say-what-was-above-what)) |
 | VIS2-18 attention vs information | Done — the same three-level hierarchy everywhere a row repeats: needs action is a toned badge, worth knowing is plain metadata on the row, detail is behind a disclosure. `rowTokens()` is where a fact is sorted into one of the three ([FIXED-472](FIXED_ITEMS.md#fixed-472--every-row-wore-the-same-weight-as-the-row-that-needed-you)) |
-| VIS2-19 Design as a canvas workspace | Open — needs an image runtime beyond one-shot generation. Design's *research* half landed 2026-09-07 (WEB-06); the canvas did not |
-| VIS2-20 component extraction in large views | Partly — `ModelsOverview`, `MyModels`, `WorkDefaults` and `RowOverflow` came out of `ModelsView`, and `DesignCanvasRegion` now owns how an asset is presented. The other five regions this item names for Design (asset rail, variation grid, selection inspector, version history, export) describe a canvas runtime that does not exist — [BUG-277](TO_BE_FIXED.md#bug-277--design-is-a-one-shot-generator-so-most-of-its-composer-has-nothing-to-reach) — and are deliberately not extracted as empty shells |
+| VIS2-19 Design as a canvas workspace | Done — the runtime it needed was built first ([BUG-277](TO_BE_FIXED.md#bug-277--design-is-a-one-shot-generator-so-most-of-its-composer-has-nothing-to-reach)): a generation records what it was made from and which request made it, so Design composes Assets │ Canvas │ Inspector around a selection, with a version strip, a variation grid and the refusals an asset collected ([FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach)) |
+| VIS2-20 component extraction in large views | Done — `ModelsOverview`, `MyModels`, `WorkDefaults` and `RowOverflow` came out of `ModelsView`, and `DesignCanvasRegion` owns Design's asset rail, canvas, variation grid, selection inspector and version history. They were not extracted as empty shells while the runtime behind them was missing; they were extracted once it existed ([FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach)). Export remains a Design gap rather than an extraction one |
 | VIS2-21 shared Work-surface contract | Done — `workSurface.ts` states both halves: the seven answers every Work mode owes, and the object, secondary context and density each mode differs in. Every shell declares its own half in the DOM (`data-work-surface`, `data-primary-object`, `data-density`) and spends its density as real spacing, so the three read as one product without becoming one layout ([FIXED-483](FIXED_ITEMS.md#fixed-483--three-work-modes-agreeing-by-habit-rather-than-by-contract)) |
 
 ---
@@ -160,7 +171,7 @@ The old implementation-order section is superseded. These findings remain histor
 | Finding | Pass-1 conclusion | Current disposition |
 |---|---|---|
 | VIS-01 | Simplify permanent sidebar | Done |
-| VIS-02 | Make Work modes unmistakable | Partly superseded: Chat/Build done; Pass 2 expands this to Chat/Build/Design |
+| VIS-02 | Make Work modes unmistakable | Done — superseded by VIS2-03, which carried it to Chat, Build *and* Design |
 | VIS-03 | Reduce work-surface chrome | Done |
 | VIS-04 | Standardize surface archetypes | Done |
 | VIS-05 | Reduce card walls | Done |
@@ -168,16 +179,16 @@ The old implementation-order section is superseded. These findings remain histor
 | VIS-07 | Distinctive Raiker identity through behaviour | Owner/product-design decision |
 | VIS-08 | Contextual governance posture | Done |
 | VIS-09 | Premium approval hierarchy | Done |
-| VIS-10 | Stronger Build workbench | Core layout done; artifact pane remains |
+| VIS-10 | Stronger Build workbench | Done — the artifact pane it was waiting on landed as VIS2-12 |
 | VIS-11 | Chat visually simpler than Build | Done; Pass 2 extends density contracts to Design |
 | VIS-12 | Better empty states | Done |
 | VIS-13 | Make Home useful or remove it | Done |
-| VIS-14 | Unify Threads/Tasks/Projects vocabulary | Done at component level; project continuity remains |
+| VIS-14 | Unify Threads/Tasks/Projects vocabulary | Done — project continuity landed as VIS2-11 and COMPOSER-11 |
 | VIS-15 | Reduce status colour | Done |
 | VIS-16 | De-emphasize technical IDs | Done |
 | VIS-17 | Regroup Settings | Done |
 | VIS-18 | Spatial Knowledge Map | Already satisfied |
-| VIS-19 | Rich typed output vocabulary | Most components exist; typed channel/chart incomplete |
+| VIS-19 | Rich typed output vocabulary | **The one implementation item left in this review.** Most components exist; there is no typed channel a turn can answer *in*, and no chart. Carried as [BUG-288](TO_BE_FIXED.md#bug-288--a-turn-can-only-answer-in-prose-and-the-components-to-answer-otherwise-already-exist) rather than built ahead of the runtime that would fill it |
 | VIS-20 | Motion only for meaningful state change | Done |
 | VIS-21 | Theme-specific depth | Done |
 | VIS-22 | Command palette | Done |

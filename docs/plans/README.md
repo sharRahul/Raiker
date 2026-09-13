@@ -10,7 +10,10 @@ the tests and live evidence behind it — and the reasoning stays in git history
 for anyone who needs it. Seven reviews were removed on 2026-09-12 this way:
 environment context and weather, global web-read capabilities, the Models page
 review, the global model catalogue, the memory-restart closure record, and the
-adaptive-shell design and implementation plan.
+adaptive-shell design and implementation plan. The page-by-page implementation
+verification followed on 2026-09-13, its last open item — Design's canvas
+workspace — closing as
+[FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach).
 
 ## Current status entry point
 
@@ -36,7 +39,6 @@ When these disagree with an older topic review's current-status prose, re-verify
 | `GOVERNANCE_ENTRY_PATHS.md` | Governance entry-path inventory; candidate for registry-backed validation |
 | `LIVE_TEST_ROUNDS.md` | Historical live-test evidence by round |
 | `MEMORY_RELIABILITY_PLAN.md` | Memory reliability evidence/closure ledger |
-| `PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md` | Historical page-verification snapshot; current status superseded by the deep audit |
 | `RAIKER_LIVE_MANUAL_TEST_PLAN.md` | Active manual verification procedure |
 | `SECURITY_COMPLIANCE_GAP_ASSESSMENT_2026-09-05.md` | Standards/control mapping evidence, not a certification claim |
 | `UNIFIED_COMPOSER_REDESIGN_2026-09-06.md` | Composer design/implementation history |

@@ -119,6 +119,11 @@ chat** (starts a conversation inside it), **Details**, **Archive**, **Move**,
 To move an existing conversation in, drag a recent chat onto the project, or use
 **Move to project** from the session's `⋯` menu.
 
+Opening a project shows what belongs to it in one place: its files, its
+sessions, the tasks scoped to it, its checkpoints, and the **images** generated
+in [Design](design.md) while it was the working project. Pictures made with no
+project chosen stand alone and are not shown under any project.
+
 ## The work board
 
 **Workbench** is the first thing Raiker opens on, and it answers one question:

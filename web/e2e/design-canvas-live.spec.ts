@@ -90,11 +90,15 @@ test("the primary action says Edit once there is something to edit", async ({ pa
   await expect(page.getByRole("button", { name: "Generate", exact: true })).toBeVisible({
     timeout: 60_000,
   });
+  await expect(page.getByText(/Enter generates/)).toBeVisible();
 
   await page.getByRole("button", { name: /Open .* on the canvas/ }).first().click();
 
   await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Generate", exact: true })).toHaveCount(0);
+  // The hint one line below the button names the same act. "Enter generates"
+  // beside a button reading Edit is the mismatch this item is about, moved.
+  await expect(page.getByText(/Enter edits/)).toBeVisible();
   // An edit produces one new version of the selected image, so the count is not
   // a choice while one is selected.
   await expect(page.getByLabel("How many")).toBeDisabled();

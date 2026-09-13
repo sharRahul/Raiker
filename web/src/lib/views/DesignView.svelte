@@ -609,7 +609,10 @@
     {/snippet}
 
     {#snippet hint()}
-      Enter generates · Shift+Enter adds a line
+      <!-- The hint names the same act the button does. "Enter generates" beside
+           a button reading **Edit** is the mismatch COMPOSER-15 is about, one
+           line further down. -->
+      Enter {selectedId ? "edits" : "generates"} · Shift+Enter adds a line
     {/snippet}
   </Composer>
 </div>

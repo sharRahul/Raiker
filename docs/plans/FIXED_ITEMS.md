@@ -21235,7 +21235,7 @@ present on each. Screenshots `vis2-21-chat-surface.png`,
 ## FIXED-484 — Home offered two of the three Work modes
 
 **Severity: Medium. Area: home. Status: Fixed 2026-09-07. Found in
-[PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md](PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md)
+the 2026-09-07 page-by-page implementation verification
 §1.**
 
 **Observed.** The shell calls Chat, Build and Design three peer Work modes. The
@@ -21268,7 +21268,7 @@ Screenshot `home-start-work-parity.png`.
 ## FIXED-485 — Memory kept settings, records and decisions at one visual level
 
 **Severity: Medium. Area: memory. Status: Fixed 2026-09-07. Found in
-[PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md](PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md)
+the 2026-09-07 page-by-page implementation verification
 §10.**
 
 **Observed.** Memory rendered approved records, proposals, relationship
@@ -21312,7 +21312,7 @@ than merely scrolled away. Live-verified 2026-09-07 in
 ## FIXED-486 — Two parallel systems where there were two questions
 
 **Severity: Medium. Area: permissions. Status: Fixed 2026-09-07. Found in
-[PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md](PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md)
+the 2026-09-07 page-by-page implementation verification
 — dedicated Permissions review.**
 
 **Observed.** The page put availability (`On` / `Off`) and decision mode (`Ask` /

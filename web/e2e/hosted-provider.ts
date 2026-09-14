@@ -344,7 +344,7 @@ export async function connectHostedProvider(
  * keeps working, and the menu name is matched loosely because "Test" and "Test
  * connection" are the same control under two labels.
  */
-async function pressCardAction(page: Page, card: Locator, name: RegExp): Promise<void> {
+export async function pressCardAction(page: Page, card: Locator, name: RegExp): Promise<void> {
   const direct = card.getByRole("button", { name }).first();
   if (await direct.isVisible().catch(() => false)) {
     await direct.click();
@@ -394,20 +394,63 @@ export async function openModelDialog(page: Page, card: Locator): Promise<Locato
   await pressCardAction(page, card, /Select models|Choose model|Change model/);
   const dialog = page.getByRole("dialog", { name: /models/i });
   await expect(dialog).toBeVisible({ timeout: 60_000 });
+  // BUG-295 — visible is not the same as answered.
+  //
+  // The dialog mounts immediately and asks the provider for its catalogue
+  // afterwards, so for the first second or two it holds nothing but "Loading
+  // models from X…". Every helper below read its checkboxes the instant it
+  // appeared, saw an empty fieldset, and handed back an empty list — and the
+  // spec that had asked for `offered[0]` then went looking for
+  // `input[value="undefined"]`, waited its full timeout for an element that
+  // could never exist, and failed two hundred lines later as though the product
+  // had lost a model.
+  //
+  // Waiting on the loading note to go is the honest wait: it is the one thing
+  // on this dialog that means "the answer has not arrived yet", and when it
+  // clears the dialog is showing whatever it really has — a catalogue, a
+  // refusal, or the custom-name fallback.
+  await expect(dialog.getByText(/^Loading models from/i)).toBeHidden({
+    timeout: 120_000,
+  });
   return dialog;
 }
 
-/** Every model id this provider published, in the order it published them. */
+/**
+ * Every model id this provider published, in the order it published them.
+ *
+ * BUG-295 — fails saying so when the provider published none, rather than
+ * returning `[]` for a caller to trip over. A helper that cannot find what it
+ * is waiting for has to be the thing that fails: the whole failure mode this
+ * closes is a silent empty answer being blamed on the assertion that used it.
+ */
 export async function offeredModelIds(dialog: Locator): Promise<string[]> {
-  return dialog
+  const ids = await dialog
     .locator('input[type="checkbox"]')
     .evaluateAll((boxes) =>
       boxes.map((box) => (box as HTMLInputElement).value).filter(Boolean),
     );
+  if (ids.length === 0) {
+    const note = (await dialog.locator(".picker-note").first().textContent()) ?? "";
+    throw new Error(
+      "offeredModelIds: this provider's model dialog published no models. " +
+        `The dialog says: ${note.trim() || "(no note)"}`,
+    );
+  }
+  return ids;
 }
 
 /** Turn one model's switch on, if it is not already on, and close the dialog. */
 export async function keepOffered(dialog: Locator, model: string): Promise<void> {
+  // BUG-295 — the second half of the same failure. `offered[0]` on an empty
+  // list is `undefined`, and a selector built from it is a valid selector for
+  // nothing, so this waited its timeout and reported a missing element instead
+  // of a missing model id.
+  if (typeof model !== "string" || model.trim() === "") {
+    throw new Error(
+      `keepOffered: asked to keep ${JSON.stringify(model)}, which is not a ` +
+        "model id. The caller's list of offered models was probably empty.",
+    );
+  }
   const box = dialog.locator(`input[type="checkbox"][value="${model}"]`);
   await expect(box).toBeAttached({ timeout: 30_000 });
   if (!(await box.isChecked())) await box.click();
@@ -593,4 +636,35 @@ export async function signInAsOwner(
   await expect(
     page.getByRole("navigation", { name: "All navigation" }).or(workbench).first(),
   ).toBeVisible({ timeout: 60_000 });
+}
+
+/**
+ * Choose the model this turn will use, from the composer's own picker.
+ *
+ * BUG-292 — pinning a model on a provider card and choosing it for a turn are
+ * two different decisions, by design. The first makes a model *available*; the
+ * second makes it the one that answers. A workspace where no global model has
+ * ever been chosen leaves Send disabled and says so — *"No model is chosen.
+ * Choose one from the model menu beside Send."* — which is the composer being
+ * right, and several live specs were waiting out their timeout on that disabled
+ * button and reporting it as a product failure.
+ *
+ * Here rather than inline in each spec for the reason FIXED-503 gives: the
+ * harness keeps encoding where a control used to be, and one copy is one edit
+ * the next time the picker changes.
+ */
+export async function chooseModelForTurn(page: Page, model: RegExp): Promise<void> {
+  const composer = page.getByRole("group", { name: "Message composer" });
+  await composer.getByRole("button", { name: /^Model for this turn:/ }).click();
+  const menu = page.getByRole("menu", { name: "Models" });
+  await expect(menu).toBeVisible({ timeout: 30_000 });
+  // A radio, not a plain item: the menu is a single choice among the models the
+  // owner's providers published, and it says so in its roles.
+  await menu.getByRole("menuitemradio", { name: model }).first().click();
+  // The trigger reading anything but "Not selected" is the product's own
+  // confirmation that the choice landed. Asserting it here is what stops a
+  // silently-missed click becoming a disabled Send three lines later.
+  await expect(
+    composer.getByRole("button", { name: /^Model for this turn: (?!Not selected)/ }),
+  ).toBeVisible({ timeout: 30_000 });
 }

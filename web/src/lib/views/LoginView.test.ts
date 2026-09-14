@@ -189,10 +189,21 @@ describe("LoginView", () => {
   });
 
   it("creates an account in a separate same-server instance from the login screen", async () => {
+    // REM-LAUNCH-02 — this control used to be labelled "Create a User Account",
+    // identical to the register button that makes an account on *this*
+    // instance, and sat at the same weight as "Forgot password?". It opens a
+    // separate Raiker with its own database in a new tab, and the only way to
+    // find that out was to press it.
     stubFetch({ ...HEALTH_OK, "POST /api/instances": { name: "alex", url: "/instances/alex/" } });
     const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
     render(LoginView, { props: { onAuthenticated } });
-    await fireEvent.click(screen.getByRole("button", { name: "Create a User Account" }));
+    // Unlock stays the primary action, and the branch explains itself before it
+    // is taken rather than after.
+    expect(screen.getByRole("button", { name: /^Unlock Raiker$/ })).toHaveClass("btn-primary");
+    expect(
+      screen.getByText(/own workspace, models and memory/i),
+    ).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Use or create another instance" }));
     await fireEvent.input(screen.getByLabelText("Instance name"), { target: { value: "alex" } });
     await fillCredentials();
     await fireEvent.input(screen.getByLabelText("Confirm password"), { target: { value: "pw" } });

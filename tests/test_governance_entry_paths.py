@@ -269,21 +269,98 @@ def test_the_entry_path_document_names_both_chokepoints() -> None:
 # is the one failure mode a governance product cannot have.
 
 
+def _classifiable_capabilities() -> set[str]:
+    """Everything that must carry a traced reality.
+
+    Two sources, because a gate is not the same thing as an executor. A
+    capability with a real executor is something Raiker can *do*, and a
+    capability the router maps is something an owner can be shown a *control*
+    for — and BUG-297 is what happens when the second set is larger than the
+    first and only the first is checked.
+    """
+    from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
+    from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
+
+    return set(REAL_EXECUTOR_CAPABILITIES) | set(CAPABILITY_GATE_MAP.values())
+
+
 def test_every_real_executor_capability_is_classified() -> None:
     """A new registered executor must say how it is reached before it ships."""
     from raiker.runtime.authority.entry_paths import CAPABILITY_ENTRY_PATHS
-    from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
 
-    missing = sorted(REAL_EXECUTOR_CAPABILITIES - set(CAPABILITY_ENTRY_PATHS))
-    extra = sorted(set(CAPABILITY_ENTRY_PATHS) - REAL_EXECUTOR_CAPABILITIES)
+    classifiable = _classifiable_capabilities()
+    missing = sorted(classifiable - set(CAPABILITY_ENTRY_PATHS))
+    extra = sorted(set(CAPABILITY_ENTRY_PATHS) - classifiable)
     assert missing == [], (
-        "A capability has a real executor and no entry-path classification. Add "
-        "it to raiker/runtime/authority/entry_paths.py saying what reaches it, "
-        f"or that nothing does: {missing}"
+        "A capability has a real executor or a routed gate and no entry-path "
+        "classification. Add it to raiker/runtime/authority/entry_paths.py "
+        f"saying what reaches it, or that nothing does: {missing}"
     )
     assert extra == [], (
-        "An entry-path row names a capability with no real executor. Remove it "
-        f"or register the executor: {extra}"
+        "An entry-path row names a capability with neither a real executor nor "
+        f"a routed gate. Remove it, or register the executor: {extra}"
+    )
+
+
+def test_no_routed_gate_is_effective_by_default() -> None:
+    """BUG-297 — `own_gate` is a classification, never a fallback.
+
+    `gate_is_effective` and `RuntimeControlService._build_gate_view` both read
+    `own_gate` for a capability with no row, which is the fail-safe answer for
+    rendering and the wrong answer for governance: it is how `admin_mutation`,
+    `policy_mutation` and `role_mutation` each came to carry a full set of
+    decision-mode buttons on the Permissions page without anyone tracing what
+    constructs an action for them. Two of the three had a path. The third did
+    not, and looked identical.
+
+    So the fallback stays — a page that will not render is worse than a row that
+    fails closed — and this asserts it is unreachable for anything the router
+    can route a decision onto.
+    """
+    from raiker.runtime.authority.entry_paths import CAPABILITY_ENTRY_PATHS
+    from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
+
+    untraced = sorted(set(CAPABILITY_GATE_MAP.values()) - set(CAPABILITY_ENTRY_PATHS))
+    assert untraced == [], (
+        "A capability the action router maps a gate for has no traced entry "
+        "path, so it reports itself as deciding its own capability by default. "
+        f"Classify it in entry_paths.py: {untraced}"
+    )
+
+
+def test_the_three_governance_gates_are_traced() -> None:
+    """BUG-297 — the finding, kept as the regression it came from.
+
+    Deliberately names the three rather than asserting the general rule twice:
+    the general rule above would still pass if someone classified all three as
+    `own_gate` to make it green, and the point of the finding was that one of
+    them is not.
+    """
+    from raiker.runtime.authority.entry_paths import (
+        ENTRY_CONTROL_PLANE,
+        NO_PATH,
+        OWN_GATE,
+        entry_for,
+    )
+
+    admin = entry_for("admin_mutation")
+    assert admin is not None and admin.reality == OWN_GATE
+    assert ENTRY_CONTROL_PLANE in admin.entries, (
+        "`/user create`, `/user deactivate` and `/principal create` route an "
+        "`admin_mutation` through `_govern_admin_mutation`, so the gate decides."
+    )
+
+    role = entry_for("role_mutation")
+    assert role is not None and role.reality == OWN_GATE
+    assert ENTRY_CONTROL_PLANE in role.entries, (
+        "`/role create`, `/role grant` and `/role revoke` route a "
+        "`role_mutation` through `_govern_admin_mutation`, so the gate decides."
+    )
+
+    policy = entry_for("policy_mutation")
+    assert policy is not None and policy.reality == NO_PATH, (
+        "Nothing constructs a policy mutation. If something now does, trace it "
+        "here — do not classify it `own_gate` to match the two beside it."
     )
 
 

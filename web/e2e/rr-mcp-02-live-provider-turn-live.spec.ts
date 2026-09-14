@@ -16,7 +16,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
-import { signInAsOwner, useHostedModel } from "./hosted-provider";
+import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = "../../docs/screenshots/2026-09-13-mcp-endpoint-trust";
@@ -38,20 +38,13 @@ test("the provider key is added through the UI and a real turn answers", async (
   await expect(card.locator("code")).toBeVisible({ timeout: 60_000 });
 
   await page.goto(`${BASE}/#/new-chat`);
-  const composer = page.getByRole("group", { name: "Message composer" });
 
   // Where an owner chooses the model: the picker beside Send. A workspace that
   // has never chosen one says so rather than guessing, which is right, and it
-  // means the choice has to be made before a turn can go.
-  await composer.getByRole("button", { name: /^Model for this turn:/ }).click();
-  const menu = page.getByRole("menu", { name: "Models" });
-  await expect(menu).toBeVisible({ timeout: 30_000 });
-  // A radio, not a plain item: the menu is a single choice among the models the
-  // owner's providers published, and it says so in its roles.
-  await menu.getByRole("menuitemradio", { name: /Haiku 4\.5/i }).first().click();
-  await expect(
-    composer.getByRole("button", { name: /^Model for this turn: (?!Not selected)/ }),
-  ).toBeVisible({ timeout: 30_000 });
+  // means the choice has to be made before a turn can go. BUG-292 moved the
+  // steps into `chooseModelForTurn`, because every spec that sends a turn needs
+  // them and this was the only one that had them.
+  await chooseModelForTurn(page, /Haiku 4\.5/i);
 
   await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: RRMCP LIVE");
   const send = page.getByRole("button", { name: "Send", exact: true });

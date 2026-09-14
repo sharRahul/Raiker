@@ -1356,6 +1356,44 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     expect(screen.getByLabelText("Custom model name")).toBeTruthy();
   });
 
+  it("names an identity-linked key's refusal, beside the field that fixes it", async () => {
+    // BUG-291 — this assertion used to live only in a *live* spec, written for
+    // one round's credential. That key authenticated only with the id of the
+    // workspace it acts inside, so `anthropic-key-live` asserted the dialog
+    // said so; the next round's key worked normally, and the spec spent ninety
+    // seconds waiting for a refusal that was never coming. It was encoding a
+    // property of one credential as a property of the product.
+    //
+    // Raiker's half is worth keeping and belongs here, where the refusal can be
+    // produced on demand: classified, stated in words the owner can act on, and
+    // never reported as the provider being unreachable when it answered in full.
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "anthropic-hosted",
+            provider: "anthropic",
+            model: "<model>",
+            off_machine: true,
+          }),
+        ],
+      }),
+      "GET /api/models/anthropic-hosted/provider-models": {
+        profile_id: "anthropic-hosted",
+        provider: "anthropic",
+        status: "unavailable",
+        reason_code: "provider_workspace_required:http_400",
+        models: [],
+      },
+    });
+    render(ModelsView, { tab: "add" });
+    await rowAction("Select models…");
+    await waitFor(() => expect(screen.getByText(/identity-linked/i)).toBeTruthy());
+    // The provider answered. Saying it could not be reached is the defect
+    // FIXED-370 closed, and this is the assertion that keeps it closed.
+    expect(screen.queryByText(/Provider unreachable/i)).toBeNull();
+  });
+
   it("saves the advisor model via PUT /api/model-advisor", async () => {
     const mock = stubFetch({
       "GET /api/models": models({}),
@@ -1515,6 +1553,37 @@ describe("ModelsView action-category tabs", () => {
     expect(screen.queryByText("Model fallback sequence")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Pricing" })).toBeNull();
     expect(screen.queryByText("Off-machine provider posture")).toBeNull();
+  });
+
+  it("folds fallback order and the advisor into advanced routing", async () => {
+    // REM-MODEL-02 / UX-MODEL-05 — "Runtime & routing" opened on four things at
+    // once: what is serving, what is on disk, what each surface starts on, and
+    // then two orchestration controls at the same weight as all of it. Most
+    // owners need the selected model, where it runs and what it costs long
+    // before they need a fallback order.
+    stubFetch({ "GET /api/models": models({}) });
+    render(ModelsView);
+    await fireEvent.click(
+      await screen.findByRole("tab", { name: "Runtime & routing" }),
+    );
+
+    const advanced = await screen.findByText("Advanced routing");
+    const disclosure = advanced.closest("details");
+    expect(disclosure).not.toBeNull();
+    // Closed by default: it is a reach, not a hidden feature.
+    expect(disclosure).not.toHaveAttribute("open");
+    // Both controls are inside it, and neither was removed.
+    expect(disclosure).toContainElement(
+      screen.getByRole("heading", { name: "Model fallback sequence" }),
+    );
+    expect(disclosure).toContainElement(
+      screen.getByRole("heading", { name: "Advisor model" }),
+    );
+    // The one thing that must NOT be folded away. A fallback that displaced the
+    // owner's selection changes which provider their words reach, and
+    // `WorkDefaults` names it above this disclosure rather than inside it.
+    const defaults = screen.getByRole("heading", { name: "Work defaults" });
+    expect(defaults.closest("details")).toBeNull();
   });
 
   // MODEL-12 — what you spent and what it costs were two top-level tabs, so an

@@ -209,7 +209,7 @@ test("getting-started — every destination is where the guide says it is", asyn
   // link — is what found the defect underneath: those ten rows emitted
   // `?section=` while the router read `?tab=`, so every one of them opened
   // General anyway (FIXED-418).
-  await page.getByRole("button", { name: "Settings and pages" }).click();
+  await page.getByRole("button", { name: "More pages and settings" }).click();
   const allPages = page.getByRole("dialog");
   await expect(allPages).toBeVisible({ timeout: 30_000 });
   for (const label of ["Permissions", "Models", "Extensions", "Observability", "Guide"]) {

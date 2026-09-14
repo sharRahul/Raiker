@@ -90,14 +90,26 @@ describe("App shell", () => {
     ]) {
       expect(within(nav).queryByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeNull();
     }
-    await fireEvent.click(screen.getByRole("button", { name: "Settings and pages" }));
-    const pages = await screen.findByRole("dialog", { name: /settings & pages/i });
+    await fireEvent.click(screen.getByRole("button", { name: "More pages and settings" }));
+    const pages = await screen.findByRole("dialog", { name: /^more$/i });
     for (const label of [
       "Permissions", "Models", "Extensions", "Observability",
       "Approvals", "Messaging",
     ]) {
       expect(within(pages).getByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument();
     }
+    // REM-POPUP-01 — the control is `More`, and Settings is reachable from it
+    // directly. The trigger used to be a gear, which promises the settings
+    // screen, opening a window that listed every page *except* Settings: its
+    // sections were there, the destination itself was deliberately omitted. A
+    // gear that cannot open Settings is the clearest form of this finding.
+    const settings = within(pages).getByRole("link", { name: /^settings/i });
+    expect(settings).toHaveAttribute("href", "#/settings");
+    // The sections stay, because "where is that setting" is the other question
+    // this window answers and a deep link is the shorter road to it.
+    expect(
+      within(pages).getByRole("link", { name: /^security & sign-in$/i }),
+    ).toHaveAttribute("href", "#/settings?tab=security");
     // The acting principal and mode are surfaced, honestly, from the API — the runtime
     // mode identifier is shown as a plain-English name, not the raw code.
     expect(screen.queryByText("prin_owner")).not.toBeInTheDocument();

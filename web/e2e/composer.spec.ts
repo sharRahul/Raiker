@@ -592,8 +592,8 @@ test("a dismiss scrim stays a scrim when the pointer is on it", async ({ page })
   // sheet — and it looked enough like a deliberate modal that a full responsive
   // sweep never questioned it.
   await page.goto("http://raiker.test/#/home");
-  await page.getByRole("button", { name: "Settings and pages" }).click();
-  await expect(page.getByRole("dialog", { name: /settings & pages/i })).toBeVisible();
+  await page.getByRole("button", { name: "More pages and settings" }).click();
+  await expect(page.getByRole("dialog", { name: /^more$/i })).toBeVisible();
   await page.mouse.move(400, 500);
   const scrim = page.locator(".scrim");
   await expect(scrim).toHaveCSS("background-color", "rgba(15, 23, 42, 0.48)");

@@ -624,6 +624,22 @@ describe("ProjectsView folder attachment", () => {
 });
 
 // ── Deleting ──────────────────────────────────────────────────────────────
+
+/**
+ * REM-PROJ-01 — Archive, Move and Delete moved into the card's overflow menu,
+ * so reaching Delete is two steps and the helper below is both of them.
+ *
+ * Written as a helper rather than inlined because the point of the change is
+ * that a destructive action is *not* one click from a card an owner clicks all
+ * day; a test that could still find it in one would no longer be testing the
+ * thing the row promises.
+ */
+async function openLifecycleMenu(projectName = "Alpha"): Promise<void> {
+  await fireEvent.click(
+    await screen.findByRole("button", { name: new RegExp(`More actions for ${projectName}`, "i") }),
+  );
+}
+
 describe("ProjectsView deletion", () => {
   it("states that deleting an attached project keeps the folder", async () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
@@ -636,7 +652,8 @@ describe("ProjectsView deletion", () => {
     });
     render(ProjectsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /^Delete$/ }));
+    await openLifecycleMenu();
+    await fireEvent.click(await screen.findByRole("menuitem", { name: /^Delete$/ }));
 
     expect(confirmSpy.mock.calls[0][0]).toMatch(/folder repo will not be deleted/i);
   });
@@ -649,9 +666,33 @@ describe("ProjectsView deletion", () => {
     });
     render(ProjectsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /^Delete$/ }));
+    await openLifecycleMenu();
+    await fireEvent.click(await screen.findByRole("menuitem", { name: /^Delete$/ }));
 
     expect(confirmSpy.mock.calls[0][0]).toMatch(/permanently delete all project chats and files/i);
+  });
+
+  it("keeps the three lifecycle actions off the card's own row", async () => {
+    // REM-PROJ-01 / UX-PROJ-02 — the finding, as an assertion. Five actions at
+    // equal weight meant Delete, which erases a managed project's folder, was
+    // the same size and one click away as New chat, which an owner presses all
+    // day. Work stays on the card; lifecycle is one deliberate reach further.
+    stubFetch({
+      "GET /api/projects": { projects: [project({})], active_project_id: null },
+      "GET /api/projects/tree": [],
+    });
+    render(ProjectsView);
+
+    expect(await screen.findByRole("button", { name: /^New chat$/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Start in Build$/ })).toBeInTheDocument();
+    for (const action of [/^Archive$/, /^Move$/, /^Delete$/]) {
+      expect(screen.queryByRole("button", { name: action })).toBeNull();
+    }
+
+    await openLifecycleMenu();
+    for (const action of [/^Archive$/, /^Move$/, /^Delete$/]) {
+      expect(screen.getByRole("menuitem", { name: action })).toBeInTheDocument();
+    }
   });
 });
 

@@ -10,7 +10,8 @@ A switch in the "off" position beside a feature that is running is worse than no
 switch. It is the one failure mode a governance product cannot have, because the
 owner's belief about what they control is the product.
 
-So this module records, for every capability with a real executor:
+So this module records, for every capability with a real executor **and for
+every capability the action router can route a gate decision onto**:
 
 * **reality** — does this capability's own gate decide whether it runs
   (:data:`OWN_GATE`), does the work happen under a different named control
@@ -21,11 +22,20 @@ So this module records, for every capability with a real executor:
   what really governs this, or why nothing runs.
 
 ``tests/test_governance_entry_paths.py`` asserts this table against
-``REAL_EXECUTOR_CAPABILITIES``, ``TOOL_DEFINITIONS`` and
-``EXECUTABLE_ON_APPROVAL``, so a new executor, a new tool or a new relay cannot
-land without classifying itself. That test is invariant **I3** in
-``docs/plans/GOVERNANCE_ENTRY_PATHS.md`` §5 — the invariant whose absence
+``REAL_EXECUTOR_CAPABILITIES``, ``CAPABILITY_GATE_MAP``, ``TOOL_DEFINITIONS`` and
+``EXECUTABLE_ON_APPROVAL``, so a new executor, a new tool, a new relay or a new
+routed gate cannot land without classifying itself. That test is invariant **I3**
+in ``docs/plans/GOVERNANCE_ENTRY_PATHS.md`` §5 — the invariant whose absence
 produced the finding this module answers.
+
+**BUG-297 widened the second of those**, as **I3c**. The table used to be
+asserted against ``REAL_EXECUTOR_CAPABILITIES`` alone, and ``admin_mutation``,
+``policy_mutation`` and ``role_mutation`` are governance gates with no executor
+of their own — so the invariant never reached them, and
+:func:`gate_is_effective` answered ``own_gate`` for all three *by default rather
+than by classification*. Two of them deserved that answer and one did not.
+Anything the router can route onto is classified here now, which is the set the
+Permissions page can offer a control for.
 
 The API serves this to the web app, which renders it beside the gate rather than
 letting the switch speak for itself.
@@ -229,6 +239,79 @@ _ENTRIES: tuple[CapabilityEntry, ...] = (
         "email_runtime",
         "Local email drafts have no owner surface and no model tool. Nothing "
         "drafts, and nothing has ever sent.",
+    ),
+    # ── BUG-297: the governance gates, which have no executor of their own ──
+    #
+    # These three are not executed. They are read by `ActionRouter.route` when a
+    # governed *identity* mutation is proposed, so the thing a gate decides here
+    # is whether the mutation is allowed to be recorded at all. They belong in
+    # this table for the reason everything else does: the Permissions page offers
+    # a control for each, and an uncounted row defaults to `own_gate` rather than
+    # earning it.
+    _own("admin_mutation", ENTRY_CONTROL_PLANE),
+    _own("role_mutation", ENTRY_CONTROL_PLANE),
+    _no_path(
+        "policy_mutation",
+        "Nothing proposes a policy mutation. `CAPABILITY_GATE_MAP` names the "
+        "gate so a future one would be routed, and no surface, tool or approval "
+        "constructs the action today: policy changes are made by editing the "
+        "policy configuration, which the runtime reads rather than governs.",
+    ),
+    # ── The sensitive domains: registered, fail-closed, and reached by nothing ─
+    #
+    # Each has an executor class that returns `not_implemented`, and none of them
+    # is registered in the default registry, so `has_executor` is false and the
+    # Permissions page already shows them as futures rather than as controls.
+    # They are classified here because the router maps a gate for each, and the
+    # BUG-297 invariant is that a routed gate is classified rather than assumed.
+    _no_path(
+        "finance_runtime",
+        "No surface and no model tool proposes a finance action. The executor "
+        "is fail-closed and is not registered, so turning this on could not "
+        "make anything run; a real integration and a per-domain threat model "
+        "come before the switch does.",
+    ),
+    _no_path(
+        "investment_runtime",
+        "No surface and no model tool proposes an investment action. The "
+        "executor is fail-closed and is not registered, so turning this on "
+        "could not make anything run; a real integration and a per-domain "
+        "threat model come before the switch does.",
+    ),
+    _no_path(
+        "medical_runtime",
+        "No surface and no model tool proposes a medical action. The executor "
+        "is fail-closed and is not registered, so turning this on could not "
+        "make anything run; a real integration and a per-domain threat model "
+        "come before the switch does.",
+    ),
+    _no_path(
+        "pregnancy_baby_runtime",
+        "No surface and no model tool proposes a pregnancy or baby-tracking "
+        "action. The executor is fail-closed and is not registered, so turning "
+        "this on could not make anything run; a real integration and a "
+        "per-domain threat model come before the switch does.",
+    ),
+    _no_path(
+        "cctv_runtime",
+        "No surface and no model tool proposes a camera action. The executor "
+        "is fail-closed and is not registered, so turning this on could not "
+        "make anything run; a real integration and a per-domain threat model "
+        "come before the switch does.",
+    ),
+    _no_path(
+        "home_security_runtime",
+        "No surface and no model tool proposes a home-security action. The "
+        "executor is fail-closed and is not registered, so turning this on "
+        "could not make anything run; a real integration and a per-domain "
+        "threat model come before the switch does.",
+    ),
+    _no_path(
+        "hardware_operator_runtime",
+        "No surface and no model tool proposes a hardware action. The executor "
+        "is fail-closed and is not registered, so turning this on could not "
+        "make anything run; a real integration and a per-domain threat model "
+        "come before the switch does.",
     ),
 )
 

@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-14 (second) | Targeted | `2026-09-14-simplification/` | Anthropic, the same eighth key — a catalogue, a model kept offered, a model chosen for the turn, and an answer | Nine owner-facing changes of the simplification pass, driven through the product's own controls on a workspace that started empty, ending with **zero uncaught console errors** on a host that can reach neither `huggingface.co` nor `openrouter.ai` |
 | 2026-09-14 | Targeted | `2026-09-14-permissions-overhaul/` | Anthropic, an eighth key entered through the Connect dialog — the first of the eight that authenticates and lists models | The rebuilt Permissions page measured on the running product, the §18.3 rows that closed with it, and three live-test helpers that had been waiting on strings the product stopped printing |
 | 2026-09-07 | Targeted | `env-01-` … `env-05-` | Anthropic, a **seventh** identity-linked key entered through the interface; no local runtime on the host | The clock, the weather and the global read catalogue as runtime facts — and two harness defects that had been silent since the `apps/web` → `web` move: every live round writing its captures outside the repository, and every provider spec waiting for a tab the Models redesign removed |
 | 2026-09-06 | Targeted | `gcr-01-`, `gcr-02-`, `models-posture-` | Anthropic, a **sixth** identity-linked key entered through the interface; no local runtime on the host | Provider validation that opens no client — measured against the host's own socket count — the connection and the pin both going through it, and one defect the evidence screenshot itself showed: the Models page calling the hosted gate **Off** above the provider it had just accepted a model for |
@@ -67,6 +68,87 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-09-14 (second) — Twelve simplifications, nine of them watched
+
+**Tier: Targeted. Build: production `npm run build`. Providers: Anthropic
+(the same eighth key, entered through the Connect dialog); OpenRouter connected
+with a placeholder credential purely to reach the unreachable-host branch, which
+the proxy refuses before anything is transmitted. Owner: the shared
+`OWNER_CREDENTIALS`. Workspace: a fresh scratch directory
+(`scripts/reset_live_workspace.py`). Spec:
+`web/e2e/round-2026-09-14-simplification-live.spec.ts` — 9 cases, all passing.
+Screenshots: `docs/screenshots/2026-09-14-simplification/`.**
+
+Twelve items from `docs/plans/` were implemented in this pass. Nine of them
+change something an owner sees, and this round drove each one through the
+product's own controls rather than asserting it in a component test alone. The
+three that are not here are not owner-facing: the entry-path classification
+(BUG-297) is asserted against the router and the executor registry in
+`tests/test_governance_entry_paths.py`, and the two harness repairs
+(BUG-291/292/295) are asserted by the specs that stopped mis-reporting — though
+this round's own spec exercises all three of the BUG-295 helper fixes on the way
+to sending its turn.
+
+1. **The gear is `More`, and Settings is one click from it.** The trigger reads
+   *More pages and settings*, the dialog is headed **More**, and the first row
+   resolves to `#/settings` — the destination the gear icon had promised and the
+   window would not go to. `Security & sign-in` still deep-links to
+   `#/settings?tab=security`.
+2. **Home leads with work.** No duplicate row; the board opens on the greeting
+   and the next action.
+3. **The Knowledge Map opens on Filters**, exactly one disclosure open, with
+   Groups, Display, Forces and Motion closed and an **Advanced display**
+   divider above the last three. Every control is still present.
+4. **Models opens with no console error.** The Add-model tab was loaded on a
+   host with no route to `huggingface.co`; the panel says so where the results
+   would be, and nothing about `hugging-face` reached the console.
+5. **Runtime & routing is folded, and the substitution disclosure is not.**
+   `details.advanced-routing` is present and closed; opening it reveals the
+   fallback sequence and the advisor; `Work defaults` — which names a fallback
+   that displaced a selection — is outside it.
+6. **An unreachable hosted provider gets a remedy an owner has.** This host's
+   proxy answers `CONNECT openrouter.ai` with 403, which is the genuinely
+   unclassified case the last-resort branch exists for. The card reads *“…
+   Check this device's network access, and any proxy or firewall between it and
+   the provider.”* The string *check that it is running* is absent.
+7. **A fresh composer names nothing, then answers.** Before any model was
+   chosen the trigger read *Not selected* and the menu above it carried no
+   `Selected · unavailable` note — the two statements that used to disagree with
+   each other. The Anthropic key then went in through the Connect dialog, the
+   catalogue was read *after it arrived*, a model was kept offered, chosen for
+   the turn from the composer's own picker, and answered `SIMPLIFICATION LIVE`.
+8. **A project card leads with work.** New chat and Start in Build are on the
+   card; Archive, Move and Delete are in its overflow menu and nowhere else.
+9. **Unlock stays primary**, with *Use or create another instance* named for
+   what it does and the isolation stated before the branch is taken.
+10. **Zero uncaught console errors** across the whole round, asserted as its own
+    final case. That is the assertion BUG-296 was filed to protect, on the
+    exact host condition that used to break it.
+
+**What it found.** Two things, both filed rather than fixed, and both in
+[`TO_BE_FIXED.md`](TO_BE_FIXED.md):
+
+* **BUG-298** — tracing the authority gates for BUG-297 found `policy_mutation`
+  is routed and proposed by nothing. Policy is changed by editing the policy
+  configuration, so the one change an owner might most want a governed record of
+  produces none. Filed rather than repaired because the answer is a design
+  decision — govern policy edits, or say plainly that policy is process
+  configuration and remove the capability.
+* **BUG-299** — a task has no per-attempt history and no address of its own.
+  Two changes in this pass now depend on one: the unified lifecycle controller
+  tells an owner honestly that an outcome is unknown and says to refresh, with
+  nowhere to refresh to; and the Home dedupe was asked to link to a canonical
+  Tasks detail that does not exist. This is UX-TASK-04, recorded as a defect
+  because implemented behaviour now leans on it.
+
+**A harness note, in the round rather than in the plan.** The pre-installed
+Chromium on this host is build 1194 and `@playwright/test` wanted 1234, so the
+run used `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`
+— the escape hatch `playwright.config.ts` already documents. Nothing about the
+product depends on it.
 
 ---
 

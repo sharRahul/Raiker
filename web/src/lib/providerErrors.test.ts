@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { providerErrorGuidance } from "./providerErrors";
+import { providerErrorGuidance, unreachableProviderNote } from "./providerErrors";
 
 describe("providerErrorGuidance", () => {
   it("turns the policy-approval refusal into the Permissions control that unblocks it", () => {
@@ -81,5 +81,35 @@ describe("an identity-linked key", () => {
   it("still returns null for a code nothing knows about", () => {
     // Callers fall back to the raw status, so nothing is silently swallowed.
     expect(providerErrorGuidance("provider_http_error:http_418")).toBeNull();
+  });
+});
+
+describe("BUG-289 — the last-resort sentence names a remedy the owner has", () => {
+  it("does not tell an owner to start a service somebody else runs", () => {
+    // Observed: pressing Test on an OpenRouter card, on a host whose egress
+    // policy refuses `CONNECT openrouter.ai`, answered "Check that it is
+    // running and reachable from this device." A proxy's `connect_rejected` is
+    // genuinely unclassified, so reaching this branch was right; "check that it
+    // is running" is a thing an owner can do about llama.cpp on their own
+    // machine and not a thing they can do about OpenRouter.
+    const note = unreachableProviderNote("OpenRouter", true);
+    expect(note).not.toMatch(/running/i);
+    expect(note).toMatch(/network access/i);
+    expect(note).toMatch(/proxy or firewall/i);
+  });
+
+  it("keeps the local remedy for a runtime on this machine", () => {
+    // The other half: a local runtime is a thing the owner can start, and
+    // replacing both sentences with the network one would swap the defect for
+    // its mirror image.
+    const note = unreachableProviderNote("llama.cpp", false);
+    expect(note).toMatch(/Check that it is running/i);
+  });
+
+  it("names the provider in both, because a result sits among other cards", () => {
+    // BUG-47's rule, which this must not regress: an anonymous
+    // "Provider unreachable" is what made a misplaced result invisible.
+    expect(unreachableProviderNote("OpenRouter", true)).toMatch(/^OpenRouter/);
+    expect(unreachableProviderNote("Ollama", false)).toMatch(/^Ollama/);
   });
 });

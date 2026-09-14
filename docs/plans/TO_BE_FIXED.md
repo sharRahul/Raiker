@@ -1467,8 +1467,10 @@ specific provider/runtime refusal rather than a generic reachability message.
 
 ## BUG-286 — A fresh composer names an unreachable default it was never given
 
-**Severity: Low. Area: Chat/Build composer, model decision. Status: Open —
-raised 2026-09-12 during the global-catalogue live round.**
+**Severity: Low. Area: Chat/Build composer, model decision. Status: Closed
+2026-09-14 as
+[FIXED-525](FIXED_ITEMS.md#fixed-525--a-composer-with-no-default-chosen-opened-naming-a-model-nobody-had-chosen).
+Raised 2026-09-12 during the global-catalogue live round.**
 
 **Observed.** On a workspace with Anthropic connected and no default chosen, the
 Chat picker's trigger reads **Not selected** — correct — while the menu above it
@@ -1572,8 +1574,10 @@ as one — and with a chart, and neither is a string that happened to parse.
 
 ## BUG-289 — A hosted provider this machine cannot reach is told to "check that it is running"
 
-**Severity: Low. Area: Models / provider errors. Raised 2026-09-13 while
-verifying [FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name).**
+**Severity: Low. Area: Models / provider errors. Status: Closed 2026-09-14 as
+[FIXED-526](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running).
+Raised 2026-09-13 while verifying
+[FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name).**
 
 **Observed.** Pressing **Test connection** on an OpenRouter card, on a host whose
 egress policy refuses `CONNECT openrouter.ai`, reports:
@@ -1642,8 +1646,9 @@ through each of the four providers, with a capture of each answer.
 
 ## BUG-291 — A live spec asserts a refusal that a working key will never produce
 
-**Severity: Low. Area: Live test harness. Raised 2026-09-13 while running the
-RR-MCP-02 round.**
+**Severity: Low. Area: Live test harness. Status: Closed 2026-09-14 as
+[FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame).
+Raised 2026-09-13 while running the RR-MCP-02 round.**
 
 **Observed.** `web/e2e/anthropic-key-live.spec.ts` fails against the Anthropic key
 this round was given. Nothing is wrong with the key or with Raiker: the spec was
@@ -1679,8 +1684,9 @@ looking at.
 
 ## BUG-292 — A live spec sends a turn without choosing a model, and the composer is right to refuse
 
-**Severity: Low. Area: Live test harness. Raised 2026-09-13 while running the
-RR-MCP-02 round.**
+**Severity: Low. Area: Live test harness. Status: Closed 2026-09-14 as
+[FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame).
+Raised 2026-09-13 while running the RR-MCP-02 round.**
 
 **Observed.** `web/e2e/bug-206-207-tool-rows-and-reasoning-live.spec.ts` connects
 Anthropic, pins Haiku 4.5 on the provider card, goes to `#/new-chat`, types a
@@ -1808,13 +1814,23 @@ of them now waits on the field's label. They were found by grepping for the
 string rather than by a failing run, which is the point: a wait that finds
 nothing does not fail, it expires.
 
-**What remains open.** `offeredModelIds` and `keepOffered` read the model
-picker's checkboxes immediately after opening the dialog, before the provider's
-list has arrived, so they see an empty fieldset and a spec then asks for
-`value="undefined"`. Waiting for the first checkbox to attach fixes it; the
-helper was not changed in this pass because no committed spec currently fails on
-it, and changing a shared helper without a failing spec to prove it is how the
-next stale wait gets introduced.
+**Closed 2026-09-14** as
+[FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame),
+with the round that gave the helper a failing spec to prove itself against.
+
+**What remained open until then.** `offeredModelIds` and `keepOffered` read the
+model picker's checkboxes immediately after opening the dialog, before the
+provider's list has arrived, so they saw an empty fieldset and a spec then asked
+for `value="undefined"`. The helper was not changed in the 2026-09-14 morning
+pass because no committed spec failed on it, and changing a shared helper without
+a failing spec to prove it is how the next stale wait gets introduced. The
+simplification round's own live spec is that proof: it reads the Anthropic
+catalogue, keeps a model offered and sends a turn with it, and before the fix it
+asked for `input[value="undefined"]`.
+
+`openModelDialog` waits for the *"Loading models from …"* note to clear;
+`offeredModelIds` throws with the note the dialog is showing rather than
+returning an empty list; and `keepOffered` refuses a non-string model id.
 
 **Interface outcome that has to be true before this closes.** A live helper that
 cannot find what it is waiting for fails saying so, rather than timing out and
@@ -1826,7 +1842,9 @@ silently disarm a scenario.
 
 ## BUG-296 — Models reports a Hugging Face 503 into the browser console on every visit
 
-**Severity: Low. Area: Models / Hugging Face. Raised 2026-09-14.**
+**Severity: Low. Area: Models / Hugging Face. Status: Closed 2026-09-14 as
+[FIXED-527](FIXED_ITEMS.md#fixed-527--an-outage-raiker-had-already-reported-also-reported-itself-to-the-console).
+Raised 2026-09-14.**
 
 **Observed.** Opening Models on a host with no route to `huggingface.co` puts
 `GET /api/hugging-face/trending — 503` in the browser console. The page itself
@@ -1851,7 +1869,9 @@ means what it says.
 
 ## BUG-297 — Three authority gates were never classified by the entry-path audit
 
-**Severity: Low. Area: Governance / Permissions. Raised 2026-09-14.**
+**Severity: Low. Area: Governance / Permissions. Status: Closed 2026-09-14 as
+[FIXED-524](FIXED_ITEMS.md#fixed-524--three-authority-gates-decided-their-own-capability-by-default-rather-than-by-classification).
+Raised 2026-09-14.**
 
 **Observed.** `admin_mutation`, `policy_mutation` and `role_mutation` are absent
 from `CAPABILITY_ENTRY_PATHS` in `raiker/runtime/authority/entry_paths.py`. That
@@ -1883,3 +1903,67 @@ opposite of what that change was for.
 the Permissions page offers a control for has a traced entry path and a recorded
 reality, and `OWN_GATE` is something a capability is classified as rather than
 something it defaults to.
+
+---
+
+## BUG-298 — `policy_mutation` has a gate, a name in the router, and nothing that proposes one
+
+**Severity: Low. Area: Governance / policy. Raised 2026-09-14 while closing
+[BUG-297](#bug-297--three-authority-gates-were-never-classified-by-the-entry-path-audit).**
+
+**Observed.** Tracing the three untraced authority gates found that two are real
+— `admin_mutation` and `role_mutation` are routed by the CLI's identity commands
+and their gates decide whether the mutation is recorded — and the third reaches
+nothing. `CAPABILITY_GATE_MAP` names `policy_mutation` so a proposal would be
+routed if one existed; no surface, tool or approval constructs the action.
+
+Policy is changed by editing the policy configuration, which the runtime *reads*.
+So the one kind of change an owner might most want a governed record of — a
+change to the rules themselves — is the one that does not produce one.
+
+This is not a hole in the sense of something running ungoverned: the policy file
+is process configuration, on the same footing as the model egress allowlist, and
+deliberately not editable from a browser session. It is a gap in the *record*: a
+policy edit leaves no governed action, no approval and no audit row of its own,
+and `policy_mutation` is the gate that was presumably meant to carry one.
+
+It is filed rather than fixed because the answer is a design decision rather than
+a repair. Either policy edits become governed actions — which means a surface, an
+approval path and a threat model for changing the rules from inside the product —
+or the capability is removed and the configuration-file boundary is stated
+outright as the answer. Both are defensible; a routed gate nothing proposes is
+not.
+
+**Interface outcome that has to be true before this closes.** Either a policy
+change is a governed action with a record, or Raiker says plainly that policy is
+process configuration and `policy_mutation` is gone from the gate map with it.
+
+---
+
+## BUG-299 — A task's history of attempts, pauses and retries has nowhere to be read
+
+**Severity: Low. Area: Tasks. Raised 2026-09-14 while implementing
+REM-TASK-02.**
+
+**Observed.** [FIXED-533](FIXED_ITEMS.md#fixed-533--one-run-three-stop-buttons-and-two-of-them-threw-the-reason-away)
+gave one run one Stop, Resume and Run-now meaning across Home, Tasks and Build,
+and reports three settlements rather than two — including `outcome_unknown`,
+whose remedy is *"refresh to see the run's current state"*.
+
+There is nowhere to refresh *to*. A task has a status and a current step, and no
+per-task destination: no `#/tasks?task=…`, no attempt list, no record of the
+approval it paused on or the retry that followed. So the controller can now tell
+an owner honestly that it does not know what happened, and cannot then show them.
+
+REM-HOME-01 ran into the same wall from the other side: its acceptance asks a
+deduplicated row to "link to the canonical Tasks detail", and the dedupe landed
+without the link because there is no such route.
+
+This is UX-TASK-04 of the release-readiness review, and it is recorded here as a
+defect rather than only as a recommendation because two implemented changes now
+depend on it: one promises a place to look and the other promises a link.
+
+**Interface outcome that has to be true before this closes.** A task has one
+address that shows its attempts in order — each with its outcome, the approval it
+waited on, the retry that followed and the evidence it produced — and the rows on
+Home and in Build link to it.

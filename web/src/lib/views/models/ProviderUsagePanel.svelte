@@ -121,7 +121,14 @@
             <span class="provider-mark"><ProviderLogo provider={row.provider} size={26} /></span>
             <div>
               <h3>{providerName(row.provider)}</h3>
-              <code>{row.profile_id}</code>
+              <!-- UX-MODEL-05 / REM-MODEL-02 — the profile id was the second
+                   line under the provider's name, in mono, which made an
+                   internal identifier a primary label on a page about money.
+                   It is still exactly here for anyone correlating a row with a
+                   log or an export — as the row's title, and in the connection
+                   detail below — and it is no longer the first thing an owner
+                   reads about their own provider. -->
+              <p class="profile-id" title={row.profile_id}>{row.profile_id}</p>
             </div>
             <span class="window-chip">7 days</span>
           </header>
@@ -217,7 +224,14 @@
   .usage-row { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
   .usage-row > header { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border-bottom: 1px solid var(--border); }
   .usage-row h3 { margin: 0; font-size: var(--text-md); }
-  .usage-row code { color: var(--text-3); font-size: var(--text-2xs); }
+  .profile-id {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-3);
+    font-size: var(--text-2xs);
+  }
   .provider-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--r-sm); background: var(--sunken); }
   .window-chip { margin-left: auto; color: var(--text-2); font-size: var(--text-2xs); font-weight: 700; border: 1px solid var(--border); border-radius: 999px; padding: .18rem .48rem; }
   .source-pair { display: grid; grid-template-columns: 1fr 1fr; }

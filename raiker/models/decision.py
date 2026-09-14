@@ -15,7 +15,9 @@ what produced the confusion the review describes:
 ``selected``
     The owner's choice for this scope. It is a *preference*, it persists, and it
     may name a model that cannot currently run. This is the one the interface
-    must keep showing.
+    must keep showing. It is **empty when the owner has chosen nothing** — the
+    shipped default is not a choice they made, and reporting it as one is
+    BUG-286.
 ``effective``
     What a turn started right now would actually use, after the fallback
     sequence has been walked. Usually the same pair; when it is not, that is a
@@ -170,20 +172,32 @@ class ModelDecisionService:
             except Exception:  # noqa: BLE001 — fall through to the global choice
                 pass
 
+        # BUG-286 — the owner has stored nothing, so there is nothing to report.
+        #
+        # `resolve_request_target` ends at the *shipped* native default when no
+        # selection exists, and this used to return that pair as `selected` with
+        # the source set to `native_default`. Every consumer then had to know
+        # that one of the three sources means "this is not actually a choice",
+        # and the composer's menu did not: on a fresh workspace with Anthropic
+        # connected it opened with `Gemma 4:31B Cloud — Selected · unavailable`,
+        # naming the shipped Ollama profile's model on a host with no Ollama,
+        # directly above its own trigger correctly reading `Not selected`.
+        #
+        # A selection nobody made is not a selection. The empty pair is the
+        # honest answer, `decide` turns it into the `no_model_selected` problem
+        # below, and the interface stops having to tell two kinds of `selected`
+        # apart. What a turn sent *without* a model would run is a different
+        # question, asked of the gateway's own router and not of this read.
+        if not self._has_global_selection(owner_principal_id):
+            return ModelChoice("", "", "native_default")
+
         try:
             profile_id, model = self.readiness.resolve_request_target(
                 owner_principal_id, None, None
             )
         except Exception:  # noqa: BLE001
             return ModelChoice("", "", "native_default")
-        # `resolve_request_target` ends at the shipped native default when the
-        # owner has never chosen, which is a real answer and a different one
-        # from a stored global selection. Telling them apart is what lets the
-        # interface say "you have not chosen a model yet" without guessing.
-        source = "global_default" if self._has_global_selection(owner_principal_id) else (
-            "native_default"
-        )
-        return ModelChoice(profile_id, model, source)
+        return ModelChoice(profile_id, model, "global_default")
 
     def _has_global_selection(self, owner_principal_id: str) -> bool:
         from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID

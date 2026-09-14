@@ -20,6 +20,7 @@
   import Icon from "./Icon.svelte";
   import PageState from "./PageState.svelte";
   import { api, ApiError } from "../api";
+  import { stopRun } from "../taskLifecycle";
   import type { ProjectsList, TaskView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { AGENT_CADENCES, cadenceLabel } from "../agentCadence";
@@ -70,23 +71,21 @@
     }
   }
 
+  /**
+   * REM-TASK-02 — the same controller Home and Tasks use.
+   *
+   * This copy discarded the runtime's reason on failure and said "Could not
+   * request the stop" for a refusal it had been told about *and* for a request
+   * that never got an answer. Those are different facts, and the second is the
+   * one where an owner needs to go and look.
+   */
   async function stopTask(task: TaskView) {
     busyTask = task.task_id;
     notice = null;
-    try {
-      await api.interrupt({
-        session_id: task.session_id,
-        task_id: task.task_id,
-        action_type: "cancel",
-        reason: "stopped from the Build workspace",
-      });
-      notice = `Asked “${task.title}” to stop at its next safe boundary.`;
-      await load();
-    } catch {
-      notice = "Could not request the stop.";
-    } finally {
-      busyTask = null;
-    }
+    const outcome = await stopRun(task, "stopped from the Build workspace");
+    notice = outcome.notice;
+    await load();
+    busyTask = null;
   }
 
   async function createAgent() {

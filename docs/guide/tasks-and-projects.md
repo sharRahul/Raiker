@@ -112,8 +112,10 @@ not an authority — selecting a project grants nothing, and its folder can neve
 leave the workspace.
 
 **Projects → Create project.** Each card shows its path
-(`projects/<slug>`) and session count, with actions: **Start in Build**, **New
-chat**, **Archive**, **Move**, **Delete**. A folder tree shows nesting.
+(`projects/<slug>`) and session count. **New chat** and **Start in Build** are on
+the card; **Archive**, **Move** and **Delete** are in its `⋯` menu, because
+deleting a managed project deletes its folder and that is not a neighbour for a
+button you press all day. A folder tree shows nesting.
 
 **Start in Build** and **New chat** both open that Work mode *in the project*:
 the composer names it before you press Send, and the conversation or Build turn
@@ -143,10 +145,22 @@ there are more.
 what is Raiker doing right now. It has three boards.
 
 - **Running now** — a governed cycle in flight. Each one can be stopped at its
-  next safe boundary.
-- **Standing agents** — work with a repeating cadence, one governed turn per
-  cycle.
+  next safe boundary. A repeating task appears here *while its cycle runs*, and
+  carries its cadence and next slot with it.
+- **Standing agents** — work with a repeating cadence that is waiting for its
+  next cycle, one governed turn per cycle.
 - **Scheduled runs** — a single future run that has not fired yet.
+
+A standing agent whose cycle is running is one row, not two. It used to appear on
+both boards, which is two true statements about one piece of work and reads as
+two pieces of work.
+
+**Stop, Continue and Run now mean the same thing wherever you press them** — on
+the board, on the Tasks page, or in Build's side panel. *Stop* asks the run to
+stop at its next safe boundary, so a cycle already in flight finishes its current
+step; it is never a force-kill. When Raiker cannot tell whether the request took
+effect it says so and asks you to refresh, rather than reporting that nothing
+happened — a request that lost its answer may well have been applied.
 
 ## Where to watch work run
 

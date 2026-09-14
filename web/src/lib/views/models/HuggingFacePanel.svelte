@@ -50,8 +50,13 @@
     loadingTrending = true;
     hubUnreachable = false;
     try {
-      results = (await api.trendingHuggingFace()).items;
-      showingTrending = results.length > 0;
+      // BUG-296 — the probe now *says* it could not reach the Hub rather than
+      // failing, so this reads the answer instead of inferring it from a throw.
+      // The throw branch stays for a request that never got an answer at all.
+      const trending = await api.trendingHuggingFace();
+      results = trending.items;
+      hubUnreachable = trending.unreachable !== undefined;
+      showingTrending = !hubUnreachable && results.length > 0;
       // An empty answer is not an unreachable Hub. The Hub answered; it just
       // had nothing to volunteer, and the search box is still the way forward.
     } catch {

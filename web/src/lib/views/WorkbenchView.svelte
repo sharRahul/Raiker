@@ -42,6 +42,7 @@
   import { relativeFuture, relativeTime } from "../format";
   import { cadenceLabel } from "../agentCadence";
   import GuideLink from "../components/GuideLink.svelte";
+  import { stopRun } from "../taskLifecycle";
   import { isActiveTask, isBlockedTask, taskBadge, taskStatusLabel } from "../statusMaps";
   import {
     type Freshness,
@@ -95,11 +96,28 @@
   const runningNow = $derived(
     active.filter((task) => IN_FLIGHT.includes(task.status) || !armed(task)),
   );
-  // Every repeating task that is still alive stands, whether this second's cycle
-  // is in flight or the next one is armed. A running agent therefore appears in
-  // both groups, because "a cycle is running" and "an agent is standing" are two
-  // different facts and the board answers both.
-  const agents = $derived(active.filter(repeats));
+  /**
+   * REM-HOME-01 — a standing agent whose cycle is in flight is one row, not two.
+   *
+   * This used to be every repeating task that was still alive, on the reasoning
+   * that "a cycle is running" and "an agent is standing" are two different
+   * facts and the board should answer both. They are two different facts, and
+   * the board still answers both — but it was answering them with the *same
+   * row, twice*, under two headings, with two Stop buttons that do the same
+   * thing to the same run. An owner scanning Home counted one nightly routine
+   * as two pieces of work, and there was nothing on either row to tell them it
+   * was not.
+   *
+   * So the cycle wins the row while it is in flight, and it carries the
+   * schedule with it: the running row states the cadence and the next slot, so
+   * nothing that was in the standing row is lost. `Standing agents` lists the
+   * repeating work that is *waiting* for its next cycle, which is what the
+   * heading has always meant to an owner reading it.
+   */
+  const runningIds = $derived(new Set(runningNow.map((task) => task.task_id)));
+  const agents = $derived(
+    active.filter((task) => repeats(task) && !runningIds.has(task.task_id)),
+  );
   const scheduled = $derived(active.filter((task) => !repeats(task) && armed(task)));
   // Deliberately not "the active project": no route is scoped by one any more.
   // What the board can honestly say is how many projects exist.
@@ -201,27 +219,21 @@
     }
   }
 
-  /** Ask one run to stop at its next safe boundary. Never a hard kill. */
+  /**
+   * Ask one run to stop at its next safe boundary. Never a hard kill.
+   *
+   * REM-TASK-02 — through the shared controller, so this board, the Tasks page
+   * and Build's side panel report the same three outcomes for the same request.
+   * The reason string stays local because it is the audit trail's record of
+   * *where* the owner pressed it.
+   */
   async function stopTask(task: TaskView) {
     busyTask = task.task_id;
     notice = null;
-    try {
-      await api.interrupt({
-        session_id: task.session_id,
-        task_id: task.task_id,
-        action_type: "cancel",
-        reason: "stopped from the Workbench board",
-      });
-      notice = `Asked “${task.title}” to stop at its next safe boundary.`;
-      await load();
-    } catch (error) {
-      notice =
-        error instanceof ApiError
-          ? `Could not request the stop (${error.reasonCode ?? error.status}).`
-          : "Could not request the stop.";
-    } finally {
-      busyTask = null;
-    }
+    const outcome = await stopRun(task, "stopped from the Workbench board");
+    notice = outcome.notice;
+    await load();
+    busyTask = null;
   }
 
   /** What a row is waiting for, in the owner's language. */
@@ -324,10 +336,17 @@
                     <strong>{task.title}</strong>
                     <span>{detail(task)}</span>
                   </div>
+                  <!-- REM-HOME-01 — the schedule travels with the attempt.
+                       A repeating task is only in this section while a cycle is
+                       actually running, so its cadence and next slot have to be
+                       here or they would be the thing the dedupe lost. -->
                   <div class="row-meta">
                     <Badge variant={taskBadge(task.status)} label={taskStatusLabel(task.status)} />
                     {#if task.recurrence}<span class="kind">{cadenceLabel(task.recurrence)}</span>{/if}
-                    <span class="since">started {relativeTime(task.created_at)}</span>
+                    <span class="since">this cycle started {relativeTime(task.created_at)}</span>
+                    {#if repeats(task) && task.scheduled_at}
+                      <span class="since">next cycle {relativeFuture(task.scheduled_at)}</span>
+                    {/if}
                   </div>
                   <div class="row-actions">
                     {#if task.status === "waiting_for_approval"}

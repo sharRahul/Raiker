@@ -22,6 +22,7 @@
   import { formatCost, sourceNote, spendShares } from "../contextPresentation";
   import {
     providerErrorGuidance,
+    unreachableProviderNote,
     type ProviderErrorGuidance,
   } from "../providerErrors";
   import { modelName } from "../modelPresentation";
@@ -502,7 +503,12 @@
         // back to reachability.
         const guidance = providerErrorGuidance(list.reason_code);
         if (guidance !== null) return `${name}: ${guidance.message} ${guidance.fix}`;
-        return `${name} could not be reached. Check that it is running and reachable from this device.`;
+        // BUG-289 — one fallback sentence used to carry the *local* remedy to
+        // both kinds of destination, so an owner whose host refuses
+        // `CONNECT openrouter.ai` was told to check that OpenRouter was
+        // running. The diagnosis was right and the advice was for a machine
+        // they do not own.
+        return unreachableProviderNote(name, profile.off_machine);
       }
     }
   }
@@ -1964,150 +1970,171 @@
            directly beneath, so cause and effect are on one screen. -->
       <WorkDefaults {models} />
 
-      <section class="card fallback" aria-labelledby="fallback-h">
-        <h2 id="fallback-h">Model fallback sequence</h2>
+      <!-- REM-MODEL-02 / UX-MODEL-05 — orchestration tuning, one reach down.
+           The two controls below decide what happens when the owner's model
+           *cannot* serve, and what a local model may consult. Both are real and
+           both stay editable; neither is what somebody opens this tab to find
+           out. Above them, `WorkDefaults` already answers the ordinary
+           questions — what each surface starts on, and what would really answer
+           right now — and it keeps naming a fallback that displaced a selection
+           **outside** this disclosure, because a substitution that changes
+           provider, and therefore where the owner's words go, is never
+           something to fold away. What is folded is the tuning, not the
+           disclosure. -->
+      <details class="advanced-routing">
+        <summary>
+          <span>
+            <strong>Advanced routing</strong>
+            <small>What runs when the selected model cannot, and the advisor a local model may consult.</small>
+          </span>
+          <Icon name="chevron-down" size="md" />
+        </summary>
 
-        {#if sequence.length === 0}
-          <p class="fallback-empty">
-            No fallback configured. The turn fails closed if the selected
-            provider is unavailable.
-          </p>
-        {:else}
-          <ol class="fallback-list">
-            {#each sequence as id, i (id)}
-              <li class="fallback-item">
-                <span class="rank">{i + 1}</span>
-                <span class="fallback-name">
-                  {profileLabel(id)}
-                </span>
-                <span class="fallback-actions">
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-sm"
-                    onclick={() => move(i, -1)}
-                    disabled={i === 0}
-                    aria-label="Move up">↑</button
-                  >
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-sm"
-                    onclick={() => move(i, 1)}
-                    disabled={i === sequence.length - 1}
-                    aria-label="Move down">↓</button
-                  >
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-sm"
-                    onclick={() => remove(i)}
-                    aria-label="Remove">Remove</button
-                  >
-                </span>
-              </li>
-            {/each}
-          </ol>
-        {/if}
+        <section class="card fallback" aria-labelledby="fallback-h">
+          <h2 id="fallback-h">Model fallback sequence</h2>
 
-        <div class="fallback-add">
-          <select bind:value={addChoice} aria-label="Add a fallback backend">
-            <option value="">Add a backend…</option>
-            {#each addable as p (p.profile_id)}
-              <option value={p.profile_id}
-                >{providerName(p.provider)}{namesAModel(p)
-                  ? ` (${modelName(p.model)})`
-                  : " (no model)"}</option
-              >
-            {/each}
-          </select>
-          <button
-            type="button"
-            class="btn btn-sm"
-            onclick={add}
-            disabled={addChoice === ""}>Add</button
-          >
-        </div>
-
-        <div class="fallback-save">
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            onclick={save}
-            disabled={!dirty || saving}
-          >
-            {saving ? "Saving…" : "Save sequence"}
-          </button>
-          {#if saveError}
-            <span class="error" role="alert">{saveError}</span>
-          {:else if saved && !dirty}
-            <span class="ok-note">Saved.</span>
+          {#if sequence.length === 0}
+            <p class="fallback-empty">
+              No fallback configured. The turn fails closed if the selected
+              provider is unavailable.
+            </p>
+          {:else}
+            <ol class="fallback-list">
+              {#each sequence as id, i (id)}
+                <li class="fallback-item">
+                  <span class="rank">{i + 1}</span>
+                  <span class="fallback-name">
+                    {profileLabel(id)}
+                  </span>
+                  <span class="fallback-actions">
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm"
+                      onclick={() => move(i, -1)}
+                      disabled={i === 0}
+                      aria-label="Move up">↑</button
+                    >
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm"
+                      onclick={() => move(i, 1)}
+                      disabled={i === sequence.length - 1}
+                      aria-label="Move down">↓</button
+                    >
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm"
+                      onclick={() => remove(i)}
+                      aria-label="Remove">Remove</button
+                    >
+                  </span>
+                </li>
+              {/each}
+            </ol>
           {/if}
-        </div>
-      </section>
 
-      <section class="card advisor" aria-labelledby="advisor-h">
-        <h2 id="advisor-h">Advisor model</h2>
-        <p class="sub">
-          A local model can consult one advisor through the governed
-          <code>consult_advisor</code> tool. Picking one grants nothing: every
-          consult is still gated at call time.
-          <GuideLink section="connecting-a-model" label="How an advisor is governed" />
-        </p>
-        <div class="advisor-row">
-          <select bind:value={advisorChoice} aria-label="Advisor model profile">
-            <option value="">No advisor</option>
-            {#each advisorCandidates as p (p.profile_id)}
-              <option value={p.profile_id}
-                >{providerName(p.provider)} — {modelName(p.model)}</option
-              >
-            {/each}
-          </select>
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            onclick={saveAdvisor}
-            disabled={!advisorDirty || advisorSaving}
-          >
-            {advisorSaving ? "Saving…" : "Save advisor"}
-          </button>
-          {#if advisorError}
-            <span class="error" role="alert">{advisorError}</span>
-          {:else if advisorSaved && !advisorDirty}
-            <span class="ok-note">Saved.</span>
-          {/if}
-        </div>
-        <!-- BUG-82 — what the last check of the *exact* advisor model found, and
-             the one control that repairs it. Without this an owner could pin an
-             advisor with no credential, no credit or no running runtime and see
-             nothing wrong until a consult failed mid-turn. -->
-        {#if models?.advisor_profile_id}
-          <div class="advisor-readiness">
-            {#if advisorChip}
-              <span
-                class="chip"
-                class:chip-ok={models.advisor_readiness_state === "ready"}
-                class:chip-warn={models.advisor_readiness_state !== "ready"}
-                data-testid="advisor-readiness-chip"
-                title={models.advisor_readiness_summary ?? undefined}>{advisorChip}</span
-              >
-            {/if}
-            <span class="advisor-model-name">{modelName(models.advisor_model ?? "")}</span>
+          <div class="fallback-add">
+            <select bind:value={addChoice} aria-label="Add a fallback backend">
+              <option value="">Add a backend…</option>
+              {#each addable as p (p.profile_id)}
+                <option value={p.profile_id}
+                  >{providerName(p.provider)}{namesAModel(p)
+                    ? ` (${modelName(p.model)})`
+                    : " (no model)"}</option
+                >
+              {/each}
+            </select>
             <button
               type="button"
-              class="btn btn-ghost btn-sm"
-              onclick={checkAdvisor}
-              disabled={advisorChecking || !models.advisor_model}
+              class="btn btn-sm"
+              onclick={add}
+              disabled={addChoice === ""}>Add</button
             >
-              {advisorChecking ? "Checking…" : "Check advisor"}
-            </button>
           </div>
-          {#if advisorCheckNote}
-            <p class="sub" role="status">{advisorCheckNote}</p>
-          {:else if models.advisor_readiness_state !== "ready" && models.advisor_readiness_remediation}
-            <p class="sub" role="status">
-              {models.advisor_readiness_summary} {models.advisor_readiness_remediation}
-            </p>
+
+          <div class="fallback-save">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              onclick={save}
+              disabled={!dirty || saving}
+            >
+              {saving ? "Saving…" : "Save sequence"}
+            </button>
+            {#if saveError}
+              <span class="error" role="alert">{saveError}</span>
+            {:else if saved && !dirty}
+              <span class="ok-note">Saved.</span>
+            {/if}
+          </div>
+        </section>
+
+        <section class="card advisor" aria-labelledby="advisor-h">
+          <h2 id="advisor-h">Advisor model</h2>
+          <p class="sub">
+            A local model can consult one advisor through the governed
+            <code>consult_advisor</code> tool. Picking one grants nothing: every
+            consult is still gated at call time.
+            <GuideLink section="connecting-a-model" label="How an advisor is governed" />
+          </p>
+          <div class="advisor-row">
+            <select bind:value={advisorChoice} aria-label="Advisor model profile">
+              <option value="">No advisor</option>
+              {#each advisorCandidates as p (p.profile_id)}
+                <option value={p.profile_id}
+                  >{providerName(p.provider)} — {modelName(p.model)}</option
+                >
+              {/each}
+            </select>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              onclick={saveAdvisor}
+              disabled={!advisorDirty || advisorSaving}
+            >
+              {advisorSaving ? "Saving…" : "Save advisor"}
+            </button>
+            {#if advisorError}
+              <span class="error" role="alert">{advisorError}</span>
+            {:else if advisorSaved && !advisorDirty}
+              <span class="ok-note">Saved.</span>
+            {/if}
+          </div>
+          <!-- BUG-82 — what the last check of the *exact* advisor model found, and
+               the one control that repairs it. Without this an owner could pin an
+               advisor with no credential, no credit or no running runtime and see
+               nothing wrong until a consult failed mid-turn. -->
+          {#if models?.advisor_profile_id}
+            <div class="advisor-readiness">
+              {#if advisorChip}
+                <span
+                  class="chip"
+                  class:chip-ok={models.advisor_readiness_state === "ready"}
+                  class:chip-warn={models.advisor_readiness_state !== "ready"}
+                  data-testid="advisor-readiness-chip"
+                  title={models.advisor_readiness_summary ?? undefined}>{advisorChip}</span
+                >
+              {/if}
+              <span class="advisor-model-name">{modelName(models.advisor_model ?? "")}</span>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                onclick={checkAdvisor}
+                disabled={advisorChecking || !models.advisor_model}
+              >
+                {advisorChecking ? "Checking…" : "Check advisor"}
+              </button>
+            </div>
+            {#if advisorCheckNote}
+              <p class="sub" role="status">{advisorCheckNote}</p>
+            {:else if models.advisor_readiness_state !== "ready" && models.advisor_readiness_remediation}
+              <p class="sub" role="status">
+                {models.advisor_readiness_summary} {models.advisor_readiness_remediation}
+              </p>
+            {/if}
           {/if}
-        {/if}
-      </section>
+        </section>
+      </details>
 
       <!-- MODEL-03/MODEL-10 — downloads, conversions and pulls are what the
            runtime is *doing*, so they belong to the runtime rather than beside
@@ -2478,6 +2505,20 @@
 {/if}
 
 <style>
+  /* REM-MODEL-02 — the advanced-routing disclosure, in the same shape Memory's
+     "Advanced memory management" already uses, so a second idiom for "this is
+     the tuning" does not appear on a second page. */
+  .advanced-routing { border:1px solid var(--border); border-radius:var(--r-lg); background:var(--raised); }
+  .advanced-routing > summary {
+    display:flex; align-items:center; justify-content:space-between; gap:var(--space-3);
+    padding:var(--space-3) var(--space-4); cursor:pointer; color:var(--text-1);
+  }
+  .advanced-routing > summary span { display:grid; gap:2px; min-width:0; }
+  .advanced-routing > summary small { color:var(--text-3); font-size:var(--text-xs); }
+  .advanced-routing[open] > summary { border-bottom:1px solid var(--border); }
+  .advanced-routing[open] > summary :global(svg) { transform:rotate(180deg); }
+  .advanced-routing > :global(section.card) { border:0; border-radius:0; background:transparent; }
+
   /* Each panel keeps the vertical rhythm the page had as one scroll, so moving
      a section into a tab changed where it lives, not how it reads. */
   /* A grid column left at `auto` is sized by the widest thing inside it, so one

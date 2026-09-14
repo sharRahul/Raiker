@@ -39,7 +39,7 @@ test("the guide opens from the gear's window and from a deep link", async ({ pag
   // The gear's own window is the route now, so this still tests reachability
   // rather than a hash somebody typed — which is what the deep link below is
   // for.
-  await page.getByRole("button", { name: "Settings and pages" }).click();
+  await page.getByRole("button", { name: "More pages and settings" }).click();
   const allPages = page.getByRole("dialog");
   await expect(allPages).toBeVisible({ timeout: 30_000 });
   await allPages.getByRole("link", { name: "Guide" }).click();

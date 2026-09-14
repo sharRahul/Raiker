@@ -105,3 +105,70 @@ def test_download_uses_a_collision_free_revision_snapshot(
     assert ".raiker-hf" in body["snapshot_path"]
     assert body["snapshot_path"] != body["conversion_output_path"]
     assert Path(body["snapshot_path"]).is_dir()
+
+
+def test_an_unreachable_hub_is_a_200_with_the_reason_on_the_trending_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """BUG-296 — the probe nobody asked for must not report itself as an error.
+
+    `trending` runs on every visit to Models so the panel opens with somewhere
+    to start. On a host with no route to `huggingface.co` it answered 503, and
+    the browser wrote `GET /api/hugging-face/trending — 503` into the console
+    every time. The panel itself was already correct — it says the Hub could not
+    be reached, where the results would have been, with a Try again.
+
+    The cost was to the evidence rather than to the owner: the live manual test
+    plan requires a round to end with zero uncaught console errors and several
+    live specs assert it, so one expected outage was spending the budget that
+    exists to catch real ones.
+    """
+    from raiker.models.huggingface import HuggingFaceAccessError
+
+    client, headers, _workspace = _client(tmp_path)
+
+    class UnreachableService:
+        def trending(self, **_kwargs: object) -> list[object]:
+            raise HuggingFaceAccessError("hugging_face_unavailable", "")
+
+    monkeypatch.setattr(
+        model_routes, "_hugging_face_service", lambda _request: UnreachableService()
+    )
+
+    response = client.get("/api/hugging-face/trending", headers=headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["items"] == []
+    # The reason travels in the body, so the panel states the outage rather than
+    # inferring it from a throw — and an empty Hub stays distinguishable from an
+    # unreachable one.
+    assert body["unreachable"]["reason_code"] == "hugging_face_unavailable"
+
+
+def test_an_owner_driven_hugging_face_read_still_fails_loudly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The other half of BUG-296, and the reason it is not a blanket change.
+
+    Search is something the owner asked for. A failed request there *is* a
+    failed request, and turning every Hub route into a 200 would be how the next
+    real outage becomes invisible. Only the unrequested probe changed.
+    """
+    from raiker.models.huggingface import HuggingFaceAccessError
+
+    client, headers, _workspace = _client(tmp_path)
+
+    class UnreachableService:
+        def search(self, *_args: object, **_kwargs: object) -> list[object]:
+            raise HuggingFaceAccessError("hugging_face_unavailable", "")
+
+    monkeypatch.setattr(
+        model_routes, "_hugging_face_service", lambda _request: UnreachableService()
+    )
+
+    response = client.get(
+        "/api/hugging-face/search", headers=headers, params={"query": "gguf"}
+    )
+
+    assert response.status_code == 503

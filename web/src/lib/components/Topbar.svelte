@@ -210,16 +210,26 @@
         </section>
       {/if}
     </div>
-    <!-- Settings, and with it every destination that left the sidebar. The gear
-         is the last thing before the host controls because it is the one an
-         owner reaches for least often and knows where to find. -->
+    <!-- REM-POPUP-01 — every destination that left the sidebar, behind one
+         control that promises one thing.
+         This was a **gear** labelled "Settings and pages", and a gear is a
+         universal promise: press it and you are on the settings screen. What it
+         actually opened was a route launcher for Permissions, Models,
+         Extensions, Observability, Approvals, Messaging and Guide, with the ten
+         Settings sections as one group among several — so the control said
+         "Settings" and delivered navigation, and the one destination its icon
+         named was the one it would not take you to directly.
+         It is **More** now: an overflow control, which is what it has always
+         been, and the window it opens leads with a direct link to Settings.
+         Last before the host controls, because it is the one an owner reaches
+         for least often and knows where to find. -->
     <button
       type="button"
       class="btn btn-ghost"
-      aria-label="Settings and pages"
+      aria-label="More pages and settings"
       aria-haspopup="dialog"
       onclick={(event) => onOpenAllPages(event.currentTarget)}
-    ><Icon name="settings" size="md" /></button>
+    ><Icon name="more" size="md" /></button>
     <span class="cluster-rule" aria-hidden="true"></span>
     <div class="runtime-cluster">
       <HostControl />

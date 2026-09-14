@@ -36,6 +36,10 @@ from raiker.models.readiness import (
     ModelReadinessService,
     ModelReadinessState,
 )
+from raiker.models.session_state import (
+    TERMINAL_MODEL_SESSION_ID as _TERMINAL_SESSION,
+)
+from raiker.models.session_state import ModelSessionState
 from raiker.storage.sqlite import SQLiteStore
 
 OWNER = "principal_owner"
@@ -60,6 +64,19 @@ def client(workspace: Path) -> TestClient:
 def owner_token(workspace: Path) -> str:
     token, _session = ApiSessionStore(workspace).create_session(OWNER)
     return token
+
+
+def _store_global_selection(store: SQLiteStore, profile_id: str, model: str) -> None:
+    """Write the owner's global choice through whichever store holds it.
+
+    `_has_global_selection` reads the principal row for an account-bearing
+    workspace and the terminal session row otherwise, so a test that wrote only
+    one of the two would assert against whichever branch it happened to take.
+    """
+    state = ModelSessionState(session_id=_TERMINAL_SESSION, profile_id=profile_id, model=model)
+    store.save_model_session_state(state)
+    if store.get_account(OWNER) is not None:
+        store.save_principal_model_state(OWNER, state)
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -151,6 +168,55 @@ class TestSelectionResolvesMostSpecificFirst:
         ).decide(OWNER, "design")
 
         assert decision.selected.source == "native_default"
+
+    def test_an_owner_who_has_chosen_nothing_has_nothing_selected(
+        self, workspace: Path
+    ) -> None:
+        """BUG-286 — the shipped default is not a choice the owner made.
+
+        Observed on a workspace with Anthropic connected and no default chosen:
+        the Chat picker's trigger read `Not selected`, correct, while the menu
+        directly above it opened with `Gemma 4:31B Cloud — Selected ·
+        unavailable`. Nothing selected that model. It is the shipped Ollama
+        profile's declared model, on a host with no Ollama, and it was reaching
+        the interface because this read resolved a *registry* default and
+        reported it in the field named `selected`.
+
+        The two statements were in the same menu and disagreed with each other,
+        which is worse than either being wrong on its own: an owner cannot tell
+        a product that has forgotten their choice from one that never had it.
+        """
+        store = SQLiteStore(workspace)
+
+        decision = _service(
+            store, ready={(LOCAL, "small")}, chain=[(LOCAL, "small")]
+        ).decide(OWNER, "chat")
+
+        assert decision.selected.profile_id == ""
+        assert decision.selected.model == ""
+        assert decision.effective.model == ""
+        assert decision.ready is False
+        assert decision.problem is not None
+        assert decision.problem["reason_code"] == "no_model_selected"
+
+    def test_a_stored_global_selection_is_still_reported(
+        self, workspace: Path
+    ) -> None:
+        """The other half of BUG-286, and the reason it is not just a blanket.
+
+        Emptying `selected` for an owner who *has* chosen would be the same
+        defect pointing the other way — a selection that disappears — so the
+        stored global choice has to keep arriving with `global_default` on it.
+        """
+        store = SQLiteStore(workspace)
+        _store_global_selection(store, LOCAL, "small")
+
+        decision = _service(
+            store, ready={(LOCAL, "small")}, chain=[(LOCAL, "small")]
+        ).decide(OWNER, "chat")
+
+        assert decision.selected.source == "global_default"
+        assert decision.selected.model == "small"
 
     def test_each_work_mode_resolves_its_own_default(self, workspace: Path) -> None:
         # The whole point of a surface default: Chat on the small local model,

@@ -231,12 +231,16 @@
                 </span>
                 <span class="choice-where">
                   {row.profile ? providerName(row.profile.provider) : "Unknown provider"}
+                  <!-- BUG-286 — there is no third branch any more. `selected`
+                       used to carry the *shipped* default for an owner who had
+                       chosen nothing, and this said "Raiker's default" about
+                       it; a model nobody picked is not a selection, so that
+                       case now arrives with an empty model and is answered by
+                       "No model yet" above. -->
                   {#if row.decision.selected.source === "surface_default"}
                     · chosen for {row.label}
-                  {:else if row.decision.selected.source === "global_default"}
-                    · your global choice
                   {:else}
-                    · Raiker's default
+                    · your global choice
                   {/if}
                 </span>
                 {#if row.displaced !== null}

@@ -187,3 +187,30 @@ test("Threads asks the index rather than sieving one page (NEW-THREAD-01)", asyn
   await expect(page.getByRole("button", { name: "Search message text" })).toBeVisible();
   await capture(page, `${SHOTS}/threads-filters-stay-while-typing.png`);
 });
+
+test("Permissions says one thing about one policy (REM-PERM-02)", async ({ page }) => {
+  test.setTimeout(180_000);
+  await signInAsOwner(page, BASE);
+  await page.goto(`${BASE}/#/capabilities`);
+
+  // The authority matrix is a read-only summary of the same stored values the
+  // controls below it change. It used to say "Ask" and "Denied" about values
+  // the controls call "Ask me" and "Never", so one policy had two names on one
+  // screen — and a third, unused, waiting in `DECISION_MODE_COPY`.
+  const matrix = page.getByRole("region", { name: /Owner sets the boundary/i });
+  await expect(matrix).toBeVisible({ timeout: 60_000 });
+  await expect(matrix.getByText("Denied", { exact: true })).toHaveCount(0);
+  await expect(matrix.getByText("Ask", { exact: true })).toHaveCount(0);
+
+  // A row leads with the capability's name; the registry key is under it, where
+  // an owner quoting it in a bug report can still find it. Asserted on shape
+  // rather than on one capability, because which eight rows the matrix ranks
+  // depends on the workspace.
+  const firstName = matrix.locator("th .cap-name").first();
+  await expect(firstName).toBeVisible();
+  // A registry key has underscores; the name a person reads does not.
+  expect(await firstName.innerText()).not.toContain("_");
+  await expect(matrix.locator("th code").first()).toBeVisible();
+
+  await capture(page, `${SHOTS}/permissions-one-vocabulary.png`, matrix);
+});

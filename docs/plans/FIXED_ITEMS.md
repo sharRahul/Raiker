@@ -22629,3 +22629,12 @@ duplicate has not been re-declared (read from source, so re-adding it fails),
 and that a mode's word is the same wherever it is read. The matrix and bulk-bar
 cases updated with it — the bulk assertion is now scoped to the toolbar, because
 the button shares its word with the row controls, which is the point.
+
+Live, against a running host: the matrix contains no `Denied` and no bare `Ask`,
+and a row leads with a name rather than a registry key — asserted on shape
+rather than on one capability, because which eight rows the matrix ranks depends
+on the workspace. Capture at
+`docs/screenshots/2026-09-13-removal-review/permissions-one-vocabulary.png`,
+where the whole page reads one vocabulary: `On · Ask me` in the summary, `Ask
+me` in the agent column, and `Ask me / Allow / Automatic / Never` on every
+control below.

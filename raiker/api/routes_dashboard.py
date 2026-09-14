@@ -320,7 +320,10 @@ def _mcp_result(result: Any) -> dict[str, Any]:
     reason = result.reason_code or ""
     if (
         reason.startswith("mcp_invalid_server_name")
-        or reason.startswith("mcp_remote_invalid_endpoint")
+        # RR-MCP-02 — every endpoint refusal is a statement about the URL the
+        # owner just typed, so it belongs with the other unprocessable inputs
+        # rather than reading as "you are not allowed to do this".
+        or reason.startswith("mcp_remote_")
         or reason.startswith("invalid")
     ):
         code = status.HTTP_422_UNPROCESSABLE_CONTENT

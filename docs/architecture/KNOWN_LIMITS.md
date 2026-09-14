@@ -442,7 +442,13 @@ on the shipped build, not estimated.
   `tools/list`, `tools/call`. Streamable-HTTP session semantics, structured tool
   output, resource links, elicitation and the `server/discover` RPC are not
   implemented, and remote transport still has no OAuth flow; the `http`
-  transport is Raiker's own bounded client rather than the spec's.
+  transport is Raiker's own bounded client rather than the spec's. That client
+  classifies its destination — the owner's own machine, their own network, or the
+  public internet — requires TLS off the first two, pins a public name to an
+  address that passed the guard, and re-checks every redirect as a destination of
+  its own; a name that presents as public and answers privately is refused rather
+  than followed. Details in
+  [Extensions and MCP](../guide/extensions-and-mcp.md#where-a-remote-server-may-be).
 
 The memory items are the ones to weigh first if you are choosing Raiker for its
 memory: the full audit, with reproductions, is

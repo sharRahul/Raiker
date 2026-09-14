@@ -237,7 +237,7 @@ def resolve_public_addresses(host: str, port: int = 443) -> list[str]:
     picking the public answer out of the set would be doing exactly what the
     attack wants.
     """
-    literal = _as_address(host)
+    literal = literal_address(host)
     if literal is not None:
         return [str(literal)] if address_is_reachable(literal) else []
     try:
@@ -256,7 +256,7 @@ def resolve_public_addresses(host: str, port: int = 443) -> list[str]:
     return addresses
 
 
-def _as_address(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+def literal_address(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     """The address *host* literally is, including bracketed IPv6 and integer forms."""
     text = host.strip().strip("[]")
     try:
@@ -308,7 +308,7 @@ def evaluate_host(
         if rule.matches_host(target):
             return EgressDecision(False, "web_egress_blocked", target)
 
-    literal = _as_address(target)
+    literal = literal_address(target)
     if literal is not None:
         for rule in rules:
             if rule.matches_address(literal):

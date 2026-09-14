@@ -525,6 +525,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-501](#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name) | High | Identity / prompts | Fixed 2026-09-13 (RR-IDENTITY-01, DEC-01) |
 | [FIXED-502](#fixed-502--a-relative-time-assertion-written-against-an-absolute-instant) | Low | Web test suite | Fixed 2026-09-13 (found while fixing NEW-PERM-02) |
 | [FIXED-503](#fixed-503--the-live-harness-looked-for-provider-controls-that-had-moved-into-a-menu) | Low | Live test harness | Fixed 2026-09-13 (found while verifying FIXED-501) |
+| [FIXED-504](#fixed-504--five-destinations-one-label-and-the-owners-token-sent-to-all-of-them) | High | MCP / remote trust and egress | Fixed 2026-09-13 (closes RR-MCP-02) |
+| [FIXED-505](#fixed-505--the-four-capabilities-that-reach-furthest-into-an-owners-accounts-explained-themselves-least) | Medium | Permissions / capability copy | Fixed 2026-09-13 (reduces RR-AUTHORITY-01; remainder is BUG-293) |
 
 ---
 
@@ -22124,3 +22126,146 @@ missing outcome joined it.
 **Verification.** The Anthropic round connects, pins, tests and sends a real turn
 through these helpers, and the OpenRouter and OpenAI rounds reach their honest
 refusal through them.
+
+---
+
+## FIXED-504 — Five destinations, one label, and the owner's token sent to all of them
+
+**Severity: High. Area: MCP / remote trust and egress. Status: Fixed 2026-09-13.
+Closes [RR-MCP-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#what-blocks-a-public-first-release)
+and steps 3–5 of [DEC-15](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-15--put-every-mcp-server-behind-explicit-trust-and-isolation).**
+
+**Observed.** Adding a remote MCP server was one check — the scheme is `http` or
+`https` and the host is non-empty — and the session then went wherever the string
+pointed. Five genuinely different destinations were indistinguishable to Raiker
+and identical on the card, which printed *Remote (HTTPS)* over every one of them:
+
+- the owner's own machine, over plain http;
+- a box on the owner's own network, over plain http;
+- a public endpoint, over TLS;
+- a public *name* whose resolver answers with a private address — the standard
+  shape of a server-side request forgery, and not a destination anyone chose;
+- `169.254.169.254` and `metadata.google.internal`, which answer with the
+  credentials of the machine Raiker is running on.
+
+The owner's bearer token went to all five the same way. Three more followed from
+the transport: `urllib` followed redirects by itself, so a server that answered
+once could move the session anywhere — including into private space, carrying the
+`Authorization` header with it — and a checked *name* was handed back to the HTTP
+client to be resolved a second time, which is the gap DNS rebinding is for.
+
+**Fixed.** `raiker/runtime/mcp_endpoint_policy.py` classifies a destination as
+**loopback**, **private_network** or **public**, and the two halves of Raiker's
+posture are kept apart deliberately:
+
+*Nothing the owner chose is blocked.* A local MCP server on `http://127.0.0.1` is
+the ordinary case, not a threat, and requiring TLS there would only mean nobody
+could run one. A NAS or a workstation on the owner's own network is the owner's
+own machine. Both stay allowed, over plain http, and are now *named* as what they
+are so the choice is visible rather than assumed.
+
+*What is refused is the narrow set where the destination is not the thing the
+owner typed.* A public name that answers privately; link-local, multicast and
+reserved addresses; a cloud metadata name; a public endpoint over plain http,
+because typing a hostname did not ask for the token to travel in clear text; and
+a URL carrying its own username and password, which is a credential in every log
+that prints it.
+
+Then the two things that can only be done at the socket:
+
+- **The connection is pinned.** A public name is resolved, every address checked,
+  and the connection dialled at one that passed — while TLS and the `Host` header
+  keep the original name, so certificate validation is unchanged. This reuses the
+  opener `web_policy` already built for agent web reads, which is where the same
+  problem was solved once.
+- **A redirect is a destination of its own.** The transport no longer lets
+  `urllib` follow one. Each hop is classified exactly like the endpoint, at most
+  three are followed, and the `Authorization` header is dropped the moment the
+  origin changes — so a server cannot send a session somewhere the endpoint could
+  not go, and cannot collect a token by redirecting.
+
+The check runs in three places, and they are deliberately not the same check. At
+**add time** it classifies without resolving, because refusing the URL an owner
+is typing for a server that is not up yet would be the wrong answer, and the
+refusals an owner needs to read are all readable from the string. At the
+**executor** it runs again, still without resolving, so a refusal names the
+endpoint rather than arriving as a transport failure. In the **transport** it
+resolves, immediately before the socket and again for every redirect, because an
+answer that is minutes old is an answer that can have changed.
+
+**What the owner sees.** The card and the Add form say *This machine*, *Your
+network* or *Remote*, each with **HTTPS** or **unencrypted HTTP** — the label was
+`Remote (HTTPS)` for all three before, including for an endpoint with no TLS at
+all. A refusal arrives as a sentence rather than as its reason code: the page
+used to print `mcp_remote_host_not_public`, which is true and is not something an
+owner can act on. `web/src/lib/mcpEndpoint.ts` makes the same classification the
+runtime makes, from the URL alone, so the page never blocks on a lookup and never
+disagrees with the runtime that connects.
+
+**Verification.** Thirty-four cases in `tests/test_mcp_endpoint_policy.py` and
+nine in `tests/test_mcp_remote_transport_trust.py` — the redirect into private
+space, the token dropped across an origin change, the token *kept* across a
+same-origin path redirect (refusing that would break servers behaving correctly),
+the redirect loop, the pin, and the refused endpoint that never reaches the
+transport. The last of the nine runs a real socket: a local server answers 307
+pointing at the metadata address, because substituting the opener proves the
+decision and not that the no-redirect handler is installed on it. Eight more in `tests/test_mcp_runtime.py` cover the add-time answer in
+both directions, including that a local, a LAN and a public server are all still
+added. Eleven in `web/src/lib/mcpEndpoint.test.ts` hold the page's copy of the
+classification to the runtime's.
+
+Live: `web/e2e/rr-mcp-02-remote-endpoint-trust-live.spec.ts` against a running
+host adds all three allowed destinations and reads the three labels back off the
+cards, is refused by all four bad endpoints with the right reason and stores none
+of them, and watches the Add form name the endpoint as it is typed. Captures at
+`docs/screenshots/2026-09-13-mcp-endpoint-trust/`.
+
+And the round trip these changes sit on top of, because an egress change is not
+evidence of anything until a real provider call still works with it in place:
+`web/e2e/rr-mcp-02-live-provider-turn-live.spec.ts` types this round's Anthropic
+key into the product's own Connect dialog, pins Haiku 4.5, chooses it in the
+composer's own picker and sends a turn. The model answered
+(`docs/screenshots/2026-09-13-mcp-endpoint-trust/live-anthropic-turn.png`). This
+round's key is not identity-linked, so unlike
+[FIXED-501](#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name)'s
+the provider answered a model list as well as a turn.
+
+---
+
+## FIXED-505 — The four capabilities that reach furthest into an owner's accounts explained themselves least
+
+**Severity: Medium. Area: Permissions / capability copy. Status: Fixed
+2026-09-13. Part of [RR-AUTHORITY-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#what-blocks-a-public-first-release)
+— the registry half of [DEC-16](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-16--require-one-opaque-runtime-authority-context) step 8.**
+
+**Observed.** DEC-16 step 8 asks for a CI check that every real side-effect
+capability carries, among other things, an owner-facing Permissions description.
+There was no such check — and four capabilities had none at all. The connector
+runtimes are registered dynamically, so `capabilityLabel` humanised their names
+from the capability string while `capabilityDescription` fell through to its
+fallback: **"Governed capability."** The switches for the owner's mail, calendar,
+Slack and repositories were the four the Permissions page explained least.
+
+A fifth, `semantic_memory_runtime`, said *"Governed semantic memory store
+operations"*, which is the fallback with more characters.
+
+**Fixed.** Each of the four says what it reads, that it reads **only**, and that
+anything it brings back is treated as untrusted data rather than as instructions
+to the agent — which is the fact that decides whether an owner turns it on.
+`semantic_memory_runtime` says what it is for.
+
+`tests/test_capability_permissions_copy.py` reads the web module rather than
+duplicating its text, so the copy stays where the page renders it from and a
+capability that gains a real executor cannot reach Permissions without a sentence
+saying what it does. The parser reads an entry from its own key to the next one:
+a first attempt matched only the four-line form and silently skipped every entry
+following a one-line one, which is the kind of quiet under-reading that makes a
+coverage check worse than none.
+
+**Not closed by this.** DEC-16's other requirements — a per-capability threat
+model, a stated authority requirement, and a negative bypass test for each real
+side-effect capability — remain open, and RR-AUTHORITY-01 stays open with them.
+Carried in [`TO_BE_FIXED.md`](TO_BE_FIXED.md).
+
+**Verification.** Three cases, including the regression itself: each connector
+description must say it only reads and that what it returns is untrusted.

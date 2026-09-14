@@ -1164,6 +1164,17 @@ code,
   margin: 0 0 0.25rem;
 }
 
+/* The sentence under a field that says what the value the owner just typed
+   actually means. It lives beside `.field-label` rather than inside one view
+   because a field's explanation is the same kind of thing as its label, and the
+   two should not drift apart across surfaces. */
+.field-note {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--text-3);
+  margin: 0.25rem 0 0.5rem;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

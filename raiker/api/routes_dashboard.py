@@ -196,6 +196,42 @@ async def mint_session(
 
 
 # ── Read-only governed views (Bearer required) ────────────────────────────────
+@router.get("/api/work-threads/page")
+async def work_thread_page(
+    request: Request,
+    project_id: str | None = None,
+    kind: str | None = None,
+    query: str = "",
+    cursor: str | None = None,
+    limit: int = 50,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """The work index: one filtered, faceted, bounded page of it (NEW-THREAD-01).
+
+    Beside `/api/work-threads`, which stays the unfiltered first page for
+    callers that want exactly that. This one exists because Threads was doing
+    the index's job in a browser: it read one page of a hundred rows and derived
+    its Project choices from what arrived, so a project whose newest thread fell
+    outside that page was not offered as a filter at all — indistinguishable, on
+    screen, from a project with nothing in it.
+
+    Filters are applied first, facets are computed over everything that matched
+    with their own filter lifted, and only then is the answer paged. Owner-scoped
+    exactly like the listing beside it, and read-only.
+    """
+    user_id = auth_data[1].delegated_by_user_id
+    return serialize_dto(
+        _service(request).work_thread_page(
+            user_id=user_id,
+            project_id=project_id,
+            kind=kind,
+            query=query,
+            cursor=cursor,
+            limit=limit,
+        )
+    )
+
+
 @router.get("/api/work-threads")
 async def list_work_threads(
     request: Request,

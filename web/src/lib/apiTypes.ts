@@ -1619,6 +1619,34 @@ export interface DiagnosticsExport {
  * the owner typed *and* the threads a routine is advancing on its own (C11),
  * wants the project each sits in, and wants to know which are blocked.
  */
+/**
+ * NEW-THREAD-01 — one filtered, faceted, bounded page of the work index.
+ *
+ * Threads used to derive its Project choices from whatever arrived in one
+ * unpaginated read of a hundred rows, so a project whose newest thread fell
+ * outside that page was not offered as a filter at all — on screen,
+ * indistinguishable from a project with nothing in it. The facets below are
+ * computed on the server over everything that matched, with each facet's own
+ * filter lifted, so every choice stays reachable from every page.
+ */
+export interface WorkThreadFacet {
+  value: string;
+  label: string;
+  count: number;
+}
+
+export interface WorkThreadPage {
+  threads: WorkThread[];
+  /** Opaque, and bound to the owner and these filters. */
+  next_cursor: string | null;
+  /** How many threads matched the filters, within the scan bound. */
+  total: number;
+  projects: WorkThreadFacet[];
+  kinds: WorkThreadFacet[];
+  /** True when the index considered its most recent rows rather than all of them. */
+  scan_truncated: boolean;
+}
+
 export interface WorkThread {
   session_id: string;
   title: string;

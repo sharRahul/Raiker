@@ -2587,6 +2587,12 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 
 ### Launch, unlock, setup and Home
 
+> **REM-HOME-02 is closed**, as
+> [FIXED-506](FIXED_ITEMS.md#fixed-506--home-reported-an-unread-readiness-check-as-nothing-to-worry-about):
+> healthy running work no longer reaches the attention rail, and an unread
+> readiness check is never an all-clear. The remaining rows in this table are
+> open.
+
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
 | REM-LAUNCH-01 / P1 / S | Replace unconditional “Your Raiker is ready” when model selection was deferred. | Say “Setup saved” and name the remaining prerequisite; readiness must be scoped to the intended mode. ModelSetup renders Ready while its summary permits Decide later. | Derive each Chat/Build/Design next action from readiness; route an unavailable action to its exact setup remedy while permitting exploration. Test deferred model, unavailable image model and disconnected runtime. Do not require all optional services before launch. |
@@ -2619,6 +2625,12 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 
 ### Threads, Tasks and Projects
 
+> **REM-THREAD-01 and REM-THREAD-02 are closed**, as
+> [FIXED-511](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace):
+> the work index filters, facets over everything that matched, and pages, and
+> the filters stay visible and applied while the owner types. The remaining rows
+> in this table are open.
+
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
 | REM-THREAD-01 / P1 / M | Remove the implicit board-to-global-search scope switch. | SearchChatView hides board filters and calls unscoped search on typing. Users should explicitly control whether search spans all work. | Preserve visible Project/kind filters in query mode; add an explicit Search all action. Implement owner-scoped server filters before paginating; test switching query modes with a Project selected. |
@@ -2630,6 +2642,14 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 | REM-PROJ-02 / P2 / M | Replace the long detail stack with Overview plus Files/Work/Assets/Evidence sections. | ProjectsView currently stacks context, sessions, images, tasks and checkpoints. | Reuse Threads, artifact and evidence components scoped to the Project; avoid copied databases or mutation logic. Verify selection races, unsaved context and asset filing. |
 
 ### Memory, Knowledge Map and usage
+
+> **REM-MAP-03 is closed**, as
+> [FIXED-507](FIXED_ITEMS.md#fixed-507--a-stale-knowledge-graph-called-itself-live-and-a-failed-refresh-erased-it)
+> and
+> [FIXED-508](FIXED_ITEMS.md#fixed-508--the-folder-an-owner-added-was-not-always-the-folder-they-reviewed):
+> the graph states its own freshness, outdated requests are discarded, and a
+> reviewed source is the source that gets added. The remaining rows in this
+> table are open.
 
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
@@ -2686,7 +2706,7 @@ Do not remove a service because its current UI is technical. Replace the setup j
 
 These findings are derived from the pinned source, not live reproductions. “Remove” below refers to misleading behavior or unsafe assumptions; suggested repairs remain unimplemented by this review.
 
-> **Implementation status, 2026-09-14.** Five of the six are closed and recorded
+> **Implementation status, 2026-09-14. All six are closed** and recorded
 > in [`FIXED_ITEMS.md`](FIXED_ITEMS.md) — NEW-HOME-01 as
 > [FIXED-506](FIXED_ITEMS.md#fixed-506--home-reported-an-unread-readiness-check-as-nothing-to-worry-about),
 > NEW-MAP-01 as
@@ -2695,10 +2715,13 @@ These findings are derived from the pinned source, not live reproductions. “Re
 > [FIXED-508](FIXED_ITEMS.md#fixed-508--the-folder-an-owner-added-was-not-always-the-folder-they-reviewed),
 > NEW-MAP-03 as
 > [FIXED-509](FIXED_ITEMS.md#fixed-509--a-source-reviews-entry-cap-bounded-its-answer-and-not-its-work),
-> and NEW-PROJ-02 as
-> [FIXED-510](FIXED_ITEMS.md#fixed-510--a-projects-pictures-could-not-be-opened-from-the-project).
-> **NEW-THREAD-01 remains open** — it needs Project/kind/query filters and cursor
-> pagination on the work index, which is an API change rather than a view fix.
+> NEW-PROJ-02 as
+> [FIXED-510](FIXED_ITEMS.md#fixed-510--a-projects-pictures-could-not-be-opened-from-the-project),
+> and NEW-THREAD-01 as
+> [FIXED-511](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace) —
+> the one that needed the work index itself to grow filters, facets and cursor
+> pagination rather than a view fix. It closes **REM-THREAD-01** and
+> **REM-THREAD-02** of §18.3 with it.
 >
 > Three further defects were found while closing them and are closed with them:
 > a failed Knowledge Map *refresh* replaced the whole map with a load error about

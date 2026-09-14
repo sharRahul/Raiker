@@ -1482,6 +1482,114 @@ class WorkThreadView:
         return asdict(self)
 
 
+# ── The work index (NEW-THREAD-01) ───────────────────────────────────────────
+#
+# Threads derived its Project choices *and* its results from one unpaginated
+# read of a hundred rows. Three things followed, and all three read as facts
+# about the workspace rather than about the read:
+#
+# * a project whose newest thread fell outside the first hundred was **not
+#   offered as a filter at all**, which is indistinguishable from a project with
+#   nothing in it;
+# * the window looked like the whole inventory, because nothing said otherwise;
+# * typing a query called an unscoped search and hid the filters, so narrowing
+#   something down silently widened it.
+#
+# The browser was being used as the index. These are the bounds that let the
+# server be one: filter, then facet over everything that matched, then page.
+
+#: Default rows per page, and the most a caller may ask for.
+WORK_THREAD_PAGE_LIMIT = 50
+WORK_THREAD_MAX_PAGE_LIMIT = 200
+
+#: How many of the owner's threads the index will consider. Generous enough
+#: that an ordinary workspace is answered completely, bounded because an index
+#: that reads everything is the defect with a larger number. When it binds, the
+#: answer says so rather than quietly describing a slice.
+WORK_THREAD_SCAN_LIMIT = 2000
+
+
+@dataclass(frozen=True)
+class WorkThreadFacet:
+    """One filter choice, with how many threads it would select."""
+
+    value: str
+    label: str
+    count: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class WorkThreadPage:
+    """One page of the work index, and the filters that produced it."""
+
+    threads: list[WorkThreadView]
+    #: Opaque, and bound to the owner and the filters. A cursor from one scope
+    #: is refused in another rather than paging through a different question.
+    next_cursor: str | None
+    #: How many threads matched the filters, within the scan bound.
+    total: int
+    #: Every project the owner has work in — computed with the *project* filter
+    #: lifted, so choosing a different one is possible from any page. This is
+    #: the finding: a facet computed over the current page can only ever offer
+    #: what is already on screen.
+    projects: list[WorkThreadFacet]
+    #: Same, with the *kind* filter lifted.
+    kinds: list[WorkThreadFacet]
+    #: True when the scan bound was reached, so the counts above describe the
+    #: most recent `WORK_THREAD_SCAN_LIMIT` threads rather than all of them.
+    scan_truncated: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "threads": [thread.to_dict() for thread in self.threads],
+            "next_cursor": self.next_cursor,
+            "total": self.total,
+            "projects": [facet.to_dict() for facet in self.projects],
+            "kinds": [facet.to_dict() for facet in self.kinds],
+            "scan_truncated": self.scan_truncated,
+        }
+
+
+def _work_thread_scope(
+    user_id: str | None, project_id: str | None, kind: str | None, query: str
+) -> str:
+    """A short digest of the question a cursor was issued for.
+
+    Carried inside the cursor so a cursor cannot be replayed against a different
+    owner or a different filter set — paging is a position in one ordered
+    answer, and the position means nothing in another.
+    """
+    material = "\x1f".join([user_id or "", project_id or "", kind or "", query])
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
+
+
+def encode_work_thread_cursor(thread: WorkThreadView, scope: str) -> str:
+    """Where the next page starts: the last row of this one, plus its scope."""
+    raw = "\x1f".join([scope, thread.updated_at, thread.session_id])
+    return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii")
+
+
+def decode_work_thread_cursor(cursor: str, scope: str) -> tuple[str, str] | None:
+    """``(updated_at, session_id)`` the next page follows, or ``None``.
+
+    ``None`` for anything that is not a cursor this scope issued — a corrupted
+    string, and a valid cursor from a different filter set alike. A refused
+    cursor restarts the listing rather than failing the read: the owner has
+    changed the question, and the honest answer is its first page.
+    """
+    try:
+        raw = base64.urlsafe_b64decode(cursor.encode("ascii")).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return None
+    parts = raw.split("\x1f")
+    if len(parts) != 3 or parts[0] != scope:
+        return None
+    return parts[1], parts[2]
+
+
 @dataclass(frozen=True)
 class TaskView:
     task_id: str
@@ -6385,6 +6493,15 @@ class DashboardService:
         user_id: str | None = None,
         limit: int = 100,
     ) -> list[WorkThreadView]:
+        """The unfiltered first page, kept for callers that want exactly that.
+
+        Home reads this: it wants the newest few threads to offer as somewhere
+        to continue, and has no filters to apply. :meth:`work_thread_page` is
+        the index behind Threads.
+        """
+        return self.work_thread_page(user_id=user_id, limit=limit).threads
+
+    def _all_work_threads(self, *, user_id: str | None) -> tuple[list[WorkThreadView], bool]:
         """Every thread of this owner's work, newest first (GAP-CHAT C18).
 
         Two kinds, in one list, because the owner has one head:
@@ -6408,7 +6525,7 @@ class DashboardService:
         }
         threads: list[WorkThreadView] = []
         for session in self.store.list_sessions(
-            limit=limit, user_id=user_id, include_archived=False, origin="chat"
+            limit=WORK_THREAD_SCAN_LIMIT, user_id=user_id, include_archived=False, origin="chat"
         ):
             session_id = str(session.get("session_id", ""))
             project_id = session.get("project_id")
@@ -6464,8 +6581,89 @@ class DashboardService:
                     ),
                 )
             )
-        threads.sort(key=lambda thread: thread.updated_at, reverse=True)
-        return threads[:limit]
+        # Stable, with a tie-breaker: two threads touched in the same second
+        # must not swap places between pages, or a cursor would skip one and
+        # repeat the other.
+        threads.sort(key=lambda thread: (thread.updated_at, thread.session_id), reverse=True)
+        return threads, len(threads) >= WORK_THREAD_SCAN_LIMIT
+
+    def work_thread_page(
+        self,
+        *,
+        user_id: str | None = None,
+        project_id: str | None = None,
+        kind: str | None = None,
+        query: str = "",
+        cursor: str | None = None,
+        limit: int = WORK_THREAD_PAGE_LIMIT,
+    ) -> WorkThreadPage:
+        """One page of the owner's work, with the filters that produced it.
+
+        NEW-THREAD-01. The order is the whole point and it is the order Threads
+        could not perform in a browser: **filter, then facet over everything
+        that matched, then page.** Facets computed over a page can only ever
+        offer what is already on screen, which is how a project whose newest
+        thread fell outside the first hundred rows stopped existing as a filter.
+
+        A blank ``query`` is not a filter. A query *with* a project selected
+        keeps the project — narrowing something down must not widen it, which is
+        what an unscoped search on the first keystroke did.
+        """
+        size = max(1, min(int(limit or WORK_THREAD_PAGE_LIMIT), WORK_THREAD_MAX_PAGE_LIMIT))
+        needle = (query or "").strip().casefold()
+        every, truncated = self._all_work_threads(user_id=user_id)
+
+        def matches(
+            thread: WorkThreadView, *, ignore_project: bool = False, ignore_kind: bool = False
+        ) -> bool:
+            if not ignore_project and project_id is not None and thread.project_id != project_id:
+                return False
+            if not ignore_kind and kind is not None and thread.kind != kind:
+                return False
+            return not (needle and needle not in thread.title.casefold())
+
+        # Each facet is computed with its own filter lifted, so every choice
+        # stays reachable from every other. A project facet that respected the
+        # project filter would offer exactly one project: the one already on.
+        project_counts: dict[str, int] = {}
+        project_labels: dict[str, str] = {}
+        kind_counts: dict[str, int] = {}
+        for thread in every:
+            if matches(thread, ignore_project=True) and thread.project_id:
+                key = str(thread.project_id)
+                project_counts[key] = project_counts.get(key, 0) + 1
+                project_labels.setdefault(key, thread.project_name or key)
+            if matches(thread, ignore_kind=True):
+                kind_counts[thread.kind] = kind_counts.get(thread.kind, 0) + 1
+
+        matched = [thread for thread in every if matches(thread)]
+        scope = _work_thread_scope(user_id, project_id, kind, needle)
+        start = 0
+        if cursor:
+            after = decode_work_thread_cursor(cursor, scope)
+            if after is not None:
+                for index, thread in enumerate(matched):
+                    if (thread.updated_at, thread.session_id) == after:
+                        start = index + 1
+                        break
+        page = matched[start : start + size]
+        more = start + size < len(matched)
+        return WorkThreadPage(
+            threads=page,
+            next_cursor=encode_work_thread_cursor(page[-1], scope) if page and more else None,
+            total=len(matched),
+            projects=[
+                WorkThreadFacet(value=key, label=project_labels[key], count=count)
+                for key, count in sorted(
+                    project_counts.items(), key=lambda item: (-item[1], project_labels[item[0]])
+                )
+            ],
+            kinds=[
+                WorkThreadFacet(value=key, label=key, count=count)
+                for key, count in sorted(kind_counts.items())
+            ],
+            scan_truncated=truncated,
+        )
 
     def create_task(
         self,

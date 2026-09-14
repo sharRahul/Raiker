@@ -267,22 +267,33 @@ Every chat appears under **RECENT CHATS** in the sidebar with its title and a
 relative timestamp. The `⋯` menu offers Copy local link, Rename, Move to
 project, Pin, Archive, and Delete.
 
-**Threads** is two things in one place, and which one it is follows the box.
-
-With the box empty it is the board: everything you have going, newest first —
-the conversations you started **and** the threads your routines are advancing on
+**Threads** is the board: everything you have going, newest first — the
+conversations you started **and** the threads your routines are advancing on
 their own. Each row names the project it sits in and says what it is blocked on;
-a routine's row says how often it runs. Narrow it to **Chats** or **Routines**,
-or to one project, when the whole list is more than you wanted.
+a routine's row says how often it runs.
 
-Type anything and it becomes the search it has always been: conversation titles
-*and* message text across every conversation you have had, however old. Each result shows the exchange that
-matched beneath its title — so you can tell which chat it is before opening it —
-and groups results by the day they happened. Where the match was in a message,
-*"Open the match →"* opens the conversation **at that exchange** and marks it for
-a moment, rather than at the top; where only the title matched, *"Open →"*
-resumes where you left off. A checkpoint's **Turn** field and a turn opened from
-Observability → Sessions link back the same way.
+Narrow it to **Chats** or **Routines**, or to one project. The project list is
+every project you have work in, with a count beside each — not only the projects
+on the page you are looking at, which is a different and much smaller list.
+Typing in the box narrows the board further by title, and **the filters stay
+on and stay visible while you type**: choosing a project and then typing does
+not quietly drop the project.
+
+The board shows a page at a time and says so — *Showing 12 of 140 threads* —
+with **Load more** for the next page. A count you can see is better than a
+window that looks like everything you have.
+
+**Search message text** is the other question, and it is a button rather than
+something that happens as you type, because its scope is different: it reads
+message text across **every** conversation the account has, however old, and is
+not narrowed by the filters. Each result shows the exchange that matched beneath
+its title — so you can tell which chat it is before opening it — and results are
+grouped by the day they happened. Where the match was in a message, *"Open the
+match →"* opens the conversation **at that exchange** and marks it for a moment,
+rather than at the top; where only the title matched, *"Open →"* resumes where
+you left off. A checkpoint's **Turn** field and a turn opened from
+Observability → Sessions link back the same way. **Back to your threads**
+returns to the board with your filters as you left them.
 
 **Observability → Sessions** is the complete record: every conversation with its
 turn count, status, tags, and the governed events behind each turn. Task runs

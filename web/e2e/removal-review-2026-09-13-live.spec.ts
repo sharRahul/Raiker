@@ -154,3 +154,36 @@ test("a project's image opens in Design, not the whole history (NEW-PROJ-02)", a
   await expect(page.getByText(/Enter edits/)).toBeVisible({ timeout: 30_000 });
   await capture(page, `${SHOTS}/design-opened-from-project.png`);
 });
+
+test("Threads asks the index rather than sieving one page (NEW-THREAD-01)", async ({ page }) => {
+  test.setTimeout(180_000);
+  await signInAsOwner(page, BASE);
+  await page.goto(`${BASE}/#/search-chat`);
+
+  // The facets come from the server, computed over everything that matched —
+  // which is what a project whose newest thread is a hundred rows down needs in
+  // order to be offered as a filter at all.
+  const index = (await apiGet(page, "/api/work-threads/page?limit=2")) as Record<string, unknown>;
+  expect(index).toHaveProperty("projects");
+  expect(index).toHaveProperty("kinds");
+  expect(index).toHaveProperty("next_cursor");
+  expect(index).toHaveProperty("scan_truncated");
+  expect(typeof index.total).toBe("number");
+
+  // A cursor is a position in one ordered answer, so one issued for a different
+  // question restarts rather than paging through it.
+  const filtered = (await apiGet(
+    page,
+    "/api/work-threads/page?kind=routine&limit=2",
+  )) as Record<string, unknown>;
+  expect(Array.isArray(filtered.threads)).toBe(true);
+
+  // And the filters are on screen with the box empty *and* with a query typed —
+  // hiding them was the implicit scope switch.
+  const box = page.getByLabel("Search chat history");
+  await expect(box).toBeVisible({ timeout: 30_000 });
+  await box.fill("a");
+  await expect(page.getByRole("group", { name: "Show" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Search message text" })).toBeVisible();
+  await capture(page, `${SHOTS}/threads-filters-stay-while-typing.png`);
+});

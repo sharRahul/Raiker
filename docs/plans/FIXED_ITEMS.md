@@ -532,6 +532,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-508](#fixed-508--the-folder-an-owner-added-was-not-always-the-folder-they-reviewed) | Medium | Knowledge Map / source review | Fixed 2026-09-14 (closes NEW-MAP-02) |
 | [FIXED-509](#fixed-509--a-source-reviews-entry-cap-bounded-its-answer-and-not-its-work) | Medium | Knowledge Map / resource bounds | Fixed 2026-09-14 (closes NEW-MAP-03) |
 | [FIXED-510](#fixed-510--a-projects-pictures-could-not-be-opened-from-the-project) | Low | Projects / Design continuity | Fixed 2026-09-14 (closes NEW-PROJ-02) |
+| [FIXED-511](#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace) | Medium | Threads / work index | Fixed 2026-09-14 (closes NEW-THREAD-01, REM-THREAD-01/02) |
 
 ---
 
@@ -22509,3 +22510,74 @@ the composer, which says `Enter edits` when an asset is selected and
 host reaches no image provider, so the workspace holds no picture filed to a
 project to open. The same limit as
 [BUG-290](TO_BE_FIXED.md#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host).
+
+---
+
+## FIXED-511 — Threads described a hundred rows and called it a workspace
+
+**Severity: Medium. Area: Threads / work index. Status: Fixed 2026-09-14.
+Closes [NEW-THREAD-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-thread-01--filters-only-cover-a-truncated-list-and-disappear-during-search),
+and with it [REM-THREAD-01 and REM-THREAD-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#threads-tasks-and-projects).
+The last open finding of §18.5.**
+
+**Observed.** `SearchChatView.svelte` derived its Project choices *and* its
+results from the threads it had loaded, and it loaded one unpaginated page:
+`api.ts::workThreads` defaults to `limit 100`, `routes_dashboard.py` forwards
+it, and `DashboardService.list_work_threads` returned `threads[:limit]`. The
+browser was being used as the index. Three things followed, and each read as a
+fact about the workspace rather than about the read:
+
+- **A project whose newest thread fell outside the first hundred rows was not
+  offered as a filter at all** — which on screen is indistinguishable from a
+  project with nothing in it.
+- **The window looked like the whole inventory**, because nothing said
+  otherwise.
+- **Typing called `searchChats` without the Project or kind filter, and hid the
+  filter controls.** Narrowing something down silently widened it, in the middle
+  of the gesture that means the opposite.
+
+**Fixed.** `GET /api/work-threads/page` is the index, and it does the three
+things in the order that matters: **filter, then facet over everything that
+matched, then page.**
+
+Each facet is computed with *its own* filter lifted, so every choice stays
+reachable from every page — a project facet that respected the project filter
+would offer exactly one project, the one already selected. The page carries
+`total`, `next_cursor` and `scan_truncated`, so the view can say "Showing 12 of
+140" instead of implying 12 is all there is.
+
+A cursor is a position in one ordered answer, so it carries a digest of the
+question it was issued for: owner, project, kind and query. A cursor from
+another scope restarts the listing rather than paging through a different
+question, and a corrupt one does the same rather than failing the read. The sort
+has a tie-breaker (`updated_at`, then `session_id`), without which threads
+touched in the same second swap places between pages — a cursor then skips one
+row and repeats another.
+
+The index is bounded at `WORK_THREAD_SCAN_LIMIT` rows and says when that binds.
+An index that reads everything is the defect with a larger number.
+
+**In the view**, the filters stay on screen while typing and stay *applied*.
+Typing now narrows the board by title, inside the filters. *"Where did I say
+that"* is a different question with a different scope — it reads message text
+across every conversation the account has — so it is an explicit **Search
+message text** action with its own result block and a way back, rather than
+something that happens to the owner on the first keystroke.
+
+`list_work_threads` is unchanged for its other caller: Home wants the newest few
+threads to offer as somewhere to continue and has no filters to apply.
+
+**Verification.** Sixteen cases in `tests/test_work_thread_index.py`, including
+the finding itself — a project whose only thread is ninth in a three-row page is
+still offered, and can still be selected — plus each facet lifting its own
+filter, a cursor walking eleven rows across pages exactly once, six threads
+sharing one timestamp keeping their order, a replayed cursor from another scope
+restarting, and the scan bound being stated. Thirteen in
+`SearchChatView.test.ts`, including that the page *asks* the narrowed question
+rather than sieving what arrived, that a project outside this page is offered
+with its count, that the filters survive typing, and that Load more appends
+rather than replaces.
+
+Live: `web/e2e/removal-review-2026-09-13-live.spec.ts` reads the index against a
+running host and watches the filters stay on screen with a query typed
+(`docs/screenshots/2026-09-13-removal-review/threads-filters-stay-while-typing.png`).

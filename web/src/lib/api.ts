@@ -129,6 +129,7 @@ import type {
   WebBlocklist,
   WebBlocklistProbe,
   WorkThread,
+  WorkThreadPage,
   GitCredentialStatus,
   ManagedFile,
   ManagedFileImportResponse,
@@ -1683,6 +1684,25 @@ export const api = {
   // Chat search answers "where did I say that"; this answers the other question.
   workThreads: (limit = 100) =>
     request<WorkThread[]>(`/api/work-threads?limit=${limit}`),
+  // NEW-THREAD-01 — the index behind Threads. Filters and paging happen on the
+  // server, because facets computed over one page can only ever offer what is
+  // already on screen.
+  workThreadPage: (options: {
+    projectId?: string | null;
+    kind?: string | null;
+    query?: string;
+    cursor?: string | null;
+    limit?: number;
+  } = {}) =>
+    request<WorkThreadPage>(
+      withQuery("/api/work-threads/page", {
+        project_id: options.projectId ?? undefined,
+        kind: options.kind ?? undefined,
+        query: options.query || undefined,
+        cursor: options.cursor ?? undefined,
+        limit: options.limit ?? undefined,
+      }),
+    ),
   searchChats: (q: string) =>
     request<SessionSummary[]>(withQuery("/api/chat-search", { q })),
 

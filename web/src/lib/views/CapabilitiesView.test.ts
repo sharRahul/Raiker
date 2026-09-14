@@ -470,7 +470,12 @@ describe("Permissions — the sections above the registry", () => {
     for (const name of [/^Select Shell commands$/, /^Select Web fetch$/]) {
       await fireEvent.click(registry().getByRole("checkbox", { name }));
     }
-    await fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    // REM-PERM-02 — the bulk buttons speak the page's one vocabulary now:
+    // "Ask me" and "Never", not "Ask" and "Deny" about the same stored values.
+    // Scoped to the toolbar, because that is now the same word the per-row
+    // controls use — which is the point, and is why the toolbar names itself.
+    const bulk = within(screen.getByRole("toolbar", { name: "Bulk capability actions" }));
+    await fireEvent.click(bulk.getByRole("button", { name: "Ask me" }));
 
     const notice = await screen.findByRole("status");
     expect(notice.textContent).toMatch(/1 changed/);

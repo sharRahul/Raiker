@@ -486,12 +486,17 @@ export type DecisionMode = "ask" | "allow" | "auto" | "deny";
 
 export const DECISION_MODES: readonly DecisionMode[] = ["ask", "allow", "auto", "deny"];
 
-export const DECISION_MODE_COPY: Record<DecisionMode, { label: string; hint: string }> = {
-  ask: { label: "Ask", hint: "Every AI-proposed action pauses for your approval (default)." },
-  allow: { label: "Allow", hint: "AI-proposed actions run without prompting, within policy." },
-  auto: { label: "Auto", hint: "Fully automatic within policy — the most permissive mode." },
-  deny: { label: "Deny", hint: "Every AI-proposed action for this capability is refused." },
-};
+// REM-PERM-02 — `DECISION_MODE_COPY` lived here: a fourth-and-unused set of
+// words for the same four stored values (`Ask`/`Allow`/`Auto`/`Deny`). Nothing
+// rendered it, which is precisely why it was worth deleting rather than
+// leaving: the next surface that needed a label for a decision mode would have
+// found it, imported it, and given this policy another name on another screen.
+//
+// The one owner vocabulary is `BEHAVIOUR_COPY` in `permissionLanguage.ts` —
+// **Ask me**, **Allow**, **Automatic**, **Never** — and it is deliberately
+// worded as the answer to "when Raiker wants to use it", which is what makes
+// `On · Never` read as a sentence instead of a contradiction. The mode *ids*
+// are unchanged in the store, the API and exports.
 
 export function isDecisionMode(value: unknown): value is DecisionMode {
   return typeof value === "string" && (DECISION_MODES as readonly string[]).includes(value);

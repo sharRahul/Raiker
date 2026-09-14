@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { CapabilityGate } from "../apiTypes";
-  import { isAvailable, isDecisionMode, isReady } from "../capabilityModel";
-  import { rowSummary } from "../permissionLanguage";
+  import { capabilityLabel, isAvailable, isDecisionMode, isReady } from "../capabilityModel";
+  import { behaviourCopy, rowSummary } from "../permissionLanguage";
 
   let {
     gates,
@@ -28,27 +28,31 @@
    * a capability that is on because nothing is stored against it, which this
    * copy of the rule used to read as Off.
    */
-  function agentAuthority(
-    gate: CapabilityGate,
-  ): "Allow" | "Automatic" | "Ask" | "Denied" | "Not ready" | "Unavailable" | "Unknown" {
+  /**
+   * What this table says the agent carries.
+   *
+   * REM-PERM-02 — the mode words come from the one owner vocabulary now. This
+   * table used to say **Ask** and **Denied** while the control three rows below
+   * it said **Ask me** and **Never** about the same stored value, so one policy
+   * had two names on one screen (and `DECISION_MODE_COPY` was a third, unused,
+   * waiting to be picked up).
+   *
+   * The three verdicts that are *not* modes stay as they are: unavailable, not
+   * ready and unrecognised are different facts about whether the capability can
+   * run at all, not different answers to "what happens when Raiker wants to".
+   */
+  function agentAuthority(gate: CapabilityGate): string {
     if (!isAvailable(gate)) return "Unavailable";
     if (!isReady(gate)) return "Not ready";
     if (!isDecisionMode(gate.decision_mode)) return "Unknown";
-    switch (gate.decision_mode) {
-      case "deny":
-        return "Denied";
-      case "ask":
-        return "Ask";
-      case "allow":
-        return "Allow";
-      case "auto":
-        return "Automatic";
-    }
+    return behaviourCopy(gate.decision_mode).label;
   }
 
   /** Nothing is carried for a capability that cannot run, whatever is configured. */
   function isBlocked(gate: CapabilityGate): boolean {
-    return ["Denied", "Unavailable", "Not ready", "Unknown"].includes(agentAuthority(gate));
+    return [behaviourCopy("deny").label, "Unavailable", "Not ready", "Unknown"].includes(
+      agentAuthority(gate),
+    );
   }
 
   /*
@@ -98,9 +102,15 @@
       <tbody>
         {#each gates as gate (gate.capability)}
           <tr>
-            <th scope="row"><code>{gate.capability}</code></th>
+            <!-- REM-PERM-02 — the name first, the identifier under it. A
+                 registry key is what an owner exports and quotes in a bug
+                 report, not what they read a row by. -->
+            <th scope="row">
+              <span class="cap-name">{capabilityLabel(gate.capability)}</span>
+              <code>{gate.capability}</code>
+            </th>
             <td>{ownerControl(gate)}</td>
-            <td><span class:ask={agentAuthority(gate) === "Ask"} class:blocked={isBlocked(gate)} class="authority-state">{agentAuthority(gate)}</span></td>
+            <td><span class:ask={agentAuthority(gate) === behaviourCopy("ask").label} class:blocked={isBlocked(gate)} class="authority-state">{agentAuthority(gate)}</span></td>
           </tr>
         {/each}
       </tbody>
@@ -109,6 +119,7 @@
   <ul class="matrix-cards">
     {#each gates as gate (gate.capability)}
       <li>
+        <span class="cap-name">{capabilityLabel(gate.capability)}</span>
         <code>{gate.capability}</code>
         <dl>
           <div><dt>Owner control</dt><dd>{ownerControl(gate)}</dd></div>
@@ -116,7 +127,7 @@
             <dt>Raiker agent</dt>
             <dd>
               <span
-                class:ask={agentAuthority(gate) === "Ask"}
+                class:ask={agentAuthority(gate) === behaviourCopy("ask").label}
                 class:blocked={isBlocked(gate)}
                 class="authority-state">{agentAuthority(gate)}</span
               >
@@ -144,7 +155,9 @@
      not built on `.table`, so it carried its own copy of the old styling. */
   thead th { color:var(--text-2); font-size:var(--text-xs); font-weight:650; }
   tbody th { font-weight:600; }
-  code { color:var(--text-2); font-family:var(--font-mono); font-size:var(--text-2xs); }
+  code { color:var(--text-3); font-family:var(--font-mono); font-size:var(--text-2xs); }
+  /* REM-PERM-02 — the name a person reads, above the identifier they quote. */
+  .cap-name { display:block; color:var(--text-1); font-weight:650; }
   /* VIS2-16 — a persistent normal state is neutral. Success colour is spent on
      something that just happened or on a decision that was just confirmed; used
      as the standing representation of "connected", "enabled", "verified" or

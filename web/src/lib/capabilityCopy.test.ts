@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   capabilityDescription,
   capabilityLabel,
-  DECISION_MODE_COPY,
   DECISION_MODES,
   isDecisionMode,
 } from "./capabilityModel";
+import { BEHAVIOUR_COPY } from "./permissionLanguage";
 
 describe("capability copy", () => {
   it("labels known capabilities with friendly names", () => {
@@ -28,7 +28,10 @@ describe("capability copy", () => {
 describe("decision modes", () => {
   it("exposes exactly the four canonical modes with ask as the default copy", () => {
     expect([...DECISION_MODES]).toEqual(["ask", "allow", "auto", "deny"]);
-    expect(DECISION_MODE_COPY.ask.hint.toLowerCase()).toContain("default");
+    // REM-PERM-02 — the copy lives in `permissionLanguage`, which is the one
+    // owner vocabulary. `DECISION_MODE_COPY` was a second set of words for the
+    // same four values that nothing rendered, and is gone.
+    expect(BEHAVIOUR_COPY.ask.hint.toLowerCase()).toContain("default");
   });
 
   it("validates decision mode strings", () => {

@@ -533,6 +533,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-509](#fixed-509--a-source-reviews-entry-cap-bounded-its-answer-and-not-its-work) | Medium | Knowledge Map / resource bounds | Fixed 2026-09-14 (closes NEW-MAP-03) |
 | [FIXED-510](#fixed-510--a-projects-pictures-could-not-be-opened-from-the-project) | Low | Projects / Design continuity | Fixed 2026-09-14 (closes NEW-PROJ-02) |
 | [FIXED-511](#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace) | Medium | Threads / work index | Fixed 2026-09-14 (closes NEW-THREAD-01, REM-THREAD-01/02) |
+| [FIXED-512](#fixed-512--one-policy-three-sets-of-words-on-one-screen) | Low | Permissions / vocabulary | Fixed 2026-09-14 (closes REM-PERM-02) |
 
 ---
 
@@ -22581,3 +22582,50 @@ rather than replaces.
 Live: `web/e2e/removal-review-2026-09-13-live.spec.ts` reads the index against a
 running host and watches the filters stay on screen with a query typed
 (`docs/screenshots/2026-09-13-removal-review/threads-filters-stay-while-typing.png`).
+
+---
+
+## FIXED-512 — One policy, three sets of words, on one screen
+
+**Severity: Low. Area: Permissions / vocabulary. Status: Fixed 2026-09-14.
+Closes [REM-PERM-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#models-popup-and-permissions).**
+
+**Observed.** Four stored decision-mode values had three owner-facing
+vocabularies, two of them on the same page at the same time:
+
+| Where | `ask` | `deny` |
+|---|---|---|
+| Every row control, via `permissionLanguage.ts` | **Ask me** | **Never** |
+| The bulk toolbar, hard-coded | Ask | Deny |
+| The authority matrix, hard-coded | Ask | Denied |
+| `DECISION_MODE_COPY`, rendered nowhere | Ask | Deny |
+
+An owner who reads **Never** on a control and **Denied** in the table above it
+has to work out that those are the same decision. The wording in
+`permissionLanguage.ts` is not arbitrary, either: it answers the *when*
+question — "when Raiker wants to use it: never" — which is what makes `On ·
+Never` read as a sentence instead of a contradiction. A table that says
+`Denied` loses exactly that.
+
+**Fixed.** The matrix and the bulk buttons read their mode words from
+`BEHAVIOUR_COPY`, the one owner vocabulary. The three matrix verdicts that are
+*not* modes — Unavailable, Not ready, Unknown — keep their own words, because
+they answer a different question: whether the capability can run at all, rather
+than what happens when Raiker wants to use it.
+
+`DECISION_MODE_COPY` is deleted. Nothing rendered it, which is exactly why it
+was worth removing rather than leaving: the next surface needing a label for a
+decision mode would have found it, imported it, and given this policy another
+name on another screen.
+
+**And the raw key as a row's primary label.** The matrix led each row with
+`<code>mcp_connector_runtime</code>`. The name is first now, with the identifier
+under it — a registry key is what an owner exports and quotes in a bug report,
+not what they read a row by. The ids are unchanged in the store, the API and
+exports.
+
+**Verification.** Two cases in `permissionLanguage.test.ts`: that the deleted
+duplicate has not been re-declared (read from source, so re-adding it fails),
+and that a mode's word is the same wherever it is read. The matrix and bulk-bar
+cases updated with it — the bulk assertion is now scoped to the toolbar, because
+the button shares its word with the row controls, which is the point.

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 import type { CapabilityGate } from "./apiTypes";
 import {
@@ -146,5 +148,32 @@ describe("the two questions Permissions asks (P1 — Permissions UX)", () => {
   it("explains an unchangeable setting as a fact about the account", () => {
     expect(CANNOT_CHANGE_HERE).not.toMatch(/principal/i);
     expect(CANNOT_CHANGE_HERE).toMatch(/account/i);
+  });
+
+  // ── REM-PERM-02 — one policy, one set of words ──────────────────────────
+  //
+  // The page carried three vocabularies for four stored values: these,
+  // `Ask`/`Deny` on the bulk buttons, and `Ask`/`Denied` in the authority
+  // matrix — plus an unused `DECISION_MODE_COPY` waiting to become a fourth.
+  // An owner reading `Never` on a control and `Denied` in the table above it
+  // has to work out that they are the same decision.
+  it("is the only place a decision mode gets a word", () => {
+    // Read from the project root: vitest runs from `web/`, and under jsdom
+    // `import.meta.url` is not a file URL.
+    const source = readFileSync("src/lib/capabilityModel.ts", "utf-8");
+    // The deleted duplicate, by name. A file that mentions it in prose is
+    // explaining why it is gone; a file that *declares* it has brought it back.
+    expect(source).not.toMatch(/export const DECISION_MODE_COPY/);
+  });
+
+  it("says the same thing about a mode wherever it is read", () => {
+    // Whatever the matrix, the bulk bar and a row control print for a stored
+    // mode, it comes from here — so there is exactly one answer per value.
+    expect(behaviourCopy("deny").label).toBe(BEHAVIOUR_COPY.deny.label);
+    expect(behaviourCopy("ask").label).toBe(BEHAVIOUR_COPY.ask.label);
+    // And the words answer the *when* question, which is what makes
+    // "On · Never" a sentence rather than a contradiction.
+    expect(BEHAVIOUR_COPY.deny.label).toBe("Never");
+    expect(BEHAVIOUR_COPY.ask.label).toBe("Ask me");
   });
 });

@@ -2614,6 +2614,12 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 
 ### Models, popup and Permissions
 
+> **REM-PERM-02 is closed**, as
+> [FIXED-512](FIXED_ITEMS.md#fixed-512--one-policy-three-sets-of-words-on-one-screen):
+> the bulk buttons and the authority matrix read the one owner vocabulary, the
+> unused fourth set of words is deleted, and a row leads with the capability's
+> name rather than its registry key. The remaining rows in this table are open.
+
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
 | REM-MODEL-01 / P2 / M | Merge duplicated provider readiness/default-model presentations across tabs and setup. | Five tabs already organize Models; adding more categories would recreate the old fragmentation. | One profile readiness controller powers onboarding, overview and composers. Keep tab-specific tasks; do not repeat an editable connection form in each. Test credential expiry and global/per-work override consistency. |

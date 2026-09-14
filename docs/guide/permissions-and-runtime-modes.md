@@ -14,23 +14,36 @@ configure before your gates mean anything.
 
 ## Finding and changing permissions
 
-Open **Permissions** to inspect the tools reported by your runtime. The status
-cards filter the list to all, available, unavailable, or permissions needing
-review. Availability describes the capability gate; policy, decision mode and
+Open **Permissions** to inspect the tools reported by your runtime. The page
+reads top to bottom in the order the questions arrive.
+
+**Posture** leads: one sentence saying how many of your permissions are
+available to Raiker and how many are set to act without asking you, with the
+counts beneath it as the page's status filter — **All**, **Available**,
+**Unavailable**, **Needs review**, and **Selected** once you have selected
+something. Availability describes the capability gate; policy, decision mode and
 runtime checks still determine whether an action can execute.
 
-Search by tool name, identifier, description or group. Combine search with the
-**Group** and **Show** filters, or use **Clear filters** to restore the full list.
-**Expand groups** and **Collapse groups** control the registry; searching reveals
-matching rows even in collapsed groups. **How your permissions apply** expands
-the authority summary. Common-permission and review shortcuts open and focus
-the corresponding control in the registry.
+**Needs your attention** and **Common permissions** come next, when there is
+anything in them, and both are shortcuts into the registry rather than a second
+copy of it. **All permissions** holds everything, grouped, with one toolbar:
+search by tool name, identifier, description or group; narrow by **Group**;
+**Expand groups** and **Collapse groups**; and **Clear filters** to restore the
+full list. Searching reveals matching rows even in collapsed groups.
 
-Open a permission to read its scope and turn it on or off. The decision controls
-retain **Ask me**, **Allow**, **Automatic** and **Never**. Broader access continues
-through the existing confirmation dialog and server-side authorization checks.
+A row states what is on and what happens — `On · Ask me`, `Off · Never` —
+without being opened. Open it to read what the capability does, whether Raiker
+may use it on this account, what happens when Raiker wants to, and a **Why**
+when this switch does not decide the matter by itself. Turn it on or off from
+there. The decision controls are **Ask me**, **Allow**, **Automatic** and
+**Never**; broader access continues through the confirmation dialog and
+server-side authorization checks.
 
-Only editable permissions can be selected. **Show → Selected** lets you inspect
+**How your permissions apply** sits at the foot of the page, closed. It is the
+read-only authority summary — evidence for a question you ask second, which is
+why it reads after the controls it summarises rather than before them.
+
+Only editable permissions can be selected. The **Selected** chip lets you inspect
 the selection, including items outside an earlier search. Bulk changes support
 **Ask me** and **Never** only; selection and other mutations are disabled while
 an update runs. Partial failures name the refused permissions and retain them
@@ -154,21 +167,45 @@ its own short-lived signed machine identity, so Activity and Approvals can name
 the machine actor separately from you, the owner.
 
 Raiker's registry contains 66 capability gates. **Permissions** displays the
-owner-operable subset, grouped as follows; deliberately unavailable domains are
-kept out of the interactive list altogether, and named in
+subset this page actually decides, grouped as follows; deliberately unavailable
+domains are kept out of the interactive list altogether, and named in
 [Capabilities with no enable path](#capabilities-with-no-enable-path) below.
 
 | Group | Examples |
 |---|---|
-| Workspace | Audit export, Code map, Language intelligence, File writes, Git writes, Memory store/forget, Patch apply, Task creation, Project assignment, Semantic memory, Vector embeddings, Graph indexing |
-| Local execution | Shell commands, Processes, Container execution, Subagents, Multi-agent teams |
-| Network | Web fetch, Git push, Telemetry export, External channels, Channel approval relay |
+| Workspace | Audit export, Code map, Language intelligence, File writes, Memory store/forget, Patch apply, Task creation, Project assignment, Vector embeddings, Graph indexing, Checkpoint restore |
+| Git | Git writes, Git push, GitHub connector |
+| Execution | Shell commands, Subagents, Remote execution, Cloud execution |
+| Network | Web fetch, Telemetry export, External channels, Image generation |
 | Models | Hosted models, Home-lab models, Advisor model, Provider embeddings |
-| Connectors | GitHub, Gmail, Google Calendar, Slack, Calendar (local), Email drafts, Reminders, plugin lifecycle |
+| Connectors | Gmail, Google Calendar, Slack, Plugin install |
 | MCP | MCP builder, MCP connector |
-| Automation | Scheduled routines, Approval execution relay, Admin/policy/role mutation |
+| Automation | Approval execution relay, Admin/policy/role mutation |
 
 Expand a row for its description and current decision mode, then **Turn on**.
+
+**Git is one group** because a branch, a commit, a push and the account the push
+authenticates to are one decision about your repository. A push is still the one
+of them that leaves this machine — its own row says so, and
+**Settings → Privacy** lists it alongside everything else that can.
+
+### Not decided here
+
+Fourteen gates in the registry are not decisions this page makes, and they are
+listed read-only at the foot of it rather than as rows with controls. Each is one
+of two things, and each says which:
+
+* **Governed elsewhere** — the work happens, and a different named control
+  decides it. A scheduled task, for example, runs as one whole governed turn, so
+  every action inside it answers to that action's own gate; pausing the host is
+  what stops new scheduled work. The note names the real control.
+* **No route yet** — nothing in Raiker constructs an action for it. The executor
+  exists and nothing invokes it.
+
+They used to be rows like any other, carrying a mode control, a selection box and
+a small grey chip. The chip was true and it was not enough: a control that
+changes nothing still invites you to set it, and still leaves you believing
+afterwards that you closed something.
 
 ### Off, and on by default
 
@@ -353,7 +390,9 @@ There is no unrestricted mode, by design.
 ### Getting to a permission from the top of the page
 
 Two sections sit above the full registry and both are shortcuts into it rather
-than a second copy of it:
+than a second copy of it. Neither carries its own control: two editable copies
+of one permission is how a page comes to disagree with itself, so both move you
+to the one control that exists.
 
 * **Common permissions** — the handful most owners come to change. **Manage**
   opens that capability's own row in the list below: it clears any filter that
@@ -370,10 +409,12 @@ mode the list below disagrees with.
 
 ### The delegated-authority summary
 
-The table at the top of **Permissions** is a **read-only summary** of the
-capabilities this account configures the most authority for. It restates what
-you set — `On · Ask me`, `Off · Never` — beside what that means for the agent:
-**Ask**, **Allow**, **Automatic**, **Denied**, **Not ready** or **Unavailable**.
+**How your permissions apply**, at the foot of **Permissions**, is a
+**read-only summary** of the capabilities this account configures the most
+authority for. It restates what you set — `On · Ask me`, `Off · Never` — beside
+what that means for the agent: **Ask me**, **Allow**, **Automatic**, **Never**,
+**Not ready**, **Unavailable** or **Unknown**. It uses the same words the
+controls do, so one policy never has two names on one screen.
 
 It describes *account configuration*. A task's own scope and the runtime's checks
 at the moment of use can narrow what a turn may actually do, so a row reading

@@ -32,7 +32,7 @@ test.beforeEach(async ({ page }) => {
 test("Permissions offers a way to change what it puts at the top", async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto(`${BASE}/#/capabilities`);
-  await page.getByPlaceholder(/Search capabilities/).waitFor({ timeout: 60_000 });
+  await page.getByLabel("Search capabilities").waitFor({ timeout: 60_000 });
 
   const common = page.getByRole("region", { name: "Common permissions" });
   await expect(common).toBeVisible({ timeout: 30_000 });
@@ -56,7 +56,7 @@ test("Permissions offers a way to change what it puts at the top", async ({ page
 test("every Permissions summary moves when one decision is confirmed", async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto(`${BASE}/#/capabilities`);
-  await page.getByPlaceholder(/Search capabilities/).waitFor({ timeout: 60_000 });
+  await page.getByLabel("Search capabilities").waitFor({ timeout: 60_000 });
 
   const common = page.getByRole("region", { name: "Common permissions" });
   const entry = common.getByRole("listitem").filter({ hasText: "Web fetch" }).first();
@@ -87,7 +87,7 @@ test("every Permissions summary moves when one decision is confirmed", async ({ 
 test("the authority summary says what it is a summary of", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto(`${BASE}/#/capabilities`);
-  await page.getByPlaceholder(/Search capabilities/).waitFor({ timeout: 60_000 });
+  await page.getByLabel("Search capabilities").waitFor({ timeout: 60_000 });
 
   const table = page.locator(".authority-matrix");
   await expect(table).toBeVisible({ timeout: 30_000 });

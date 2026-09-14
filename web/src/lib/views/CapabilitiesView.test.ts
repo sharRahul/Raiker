@@ -67,6 +67,11 @@ async function registryWhenLoaded() {
   return within(await screen.findByRole("region", { name: "All permissions" }));
 }
 
+/** The posture chips, which are the page's one status filter. */
+function status() {
+  return within(screen.getByRole("group", { name: "Filter permissions by status" }));
+}
+
 // GEP-04 — a switch beside a running feature that it does not govern tells the
 // owner something untrue about their own control. The card has to say so.
 describe("CapabilitiesView — what each switch actually decides", () => {
@@ -98,9 +103,24 @@ describe("CapabilitiesView — what each switch actually decides", () => {
     await waitFor(() => expect(screen.getAllByText(/^(On|Off) · /).length).toBeGreaterThan(0));
   });
 
-  it("marks a gate whose work is governed by a different control, and names it", async () => {
+  /*
+   * GEP-04's second answer. A gate that decides nothing when flipped is not a
+   * decision, and it used to be rendered as one: a row with four mode buttons,
+   * a selection box and a grey chip. It is read-only reference now, and the
+   * note — what really governs this, or why nothing runs — is the content
+   * rather than a caveat under a control that should not exist.
+   */
+  it("keeps a gate governed by another control out of the registry, and names that control", async () => {
     stubFetch({
       "GET /api/capability-gates": [
+        makeGate({
+          capability: "shell_execution",
+          phase: 3,
+          state: "enabled_runtime",
+          can_current_principal_change: true,
+          allowed_transitions: ["disabled"],
+          decision_mode: "ask",
+        }),
         makeGate({
           capability: "scheduled_routines",
           phase: 5,
@@ -115,18 +135,22 @@ describe("CapabilitiesView — what each switch actually decides", () => {
       ],
     });
     render(CapabilitiesView, { principal: "prin_owner" });
-    const row = await screen.findByRole("button", { name: /Scheduled/i });
-    expect(within(row).getByText("Governed elsewhere")).toBeTruthy();
+    await waitFor(() => expect(registry().getByText("Shell commands")).toBeInTheDocument());
 
-    await fireEvent.click(row);
-    await waitFor(() =>
-      expect(
-        screen.getByText(/one whole governed turn through the Agent Gateway/i),
-      ).toBeTruthy(),
-    );
+    // No row, so no mode control, no selection box, and nothing counted as a
+    // permission the owner has decided.
+    expect(registry().queryByText("Scheduled routines")).not.toBeInTheDocument();
+    expect(screen.getByText("Showing 1 of 1 permissions")).toBeInTheDocument();
+
+    const reference = within(screen.getByText("Not decided here").closest("details")!);
+    expect(reference.getByText("Scheduled routines")).toBeInTheDocument();
+    expect(reference.getByText("Governed elsewhere")).toBeInTheDocument();
+    expect(
+      reference.getByText(/one whole governed turn through the Agent Gateway/i),
+    ).toBeInTheDocument();
   });
 
-  it("marks a gate nothing in the product reaches", async () => {
+  it("keeps a gate nothing in the product reaches out of the registry, and says why", async () => {
     stubFetch({
       "GET /api/capability-gates": [
         makeGate({
@@ -142,8 +166,15 @@ describe("CapabilitiesView — what each switch actually decides", () => {
       ],
     });
     render(CapabilitiesView, { principal: "prin_owner" });
-    const row = await screen.findByRole("button", { name: /Subagents/i });
-    expect(within(row).getByText("No route yet")).toBeTruthy();
+
+    const reference = within(
+      (await screen.findByText("Not decided here")).closest("details")!,
+    );
+    expect(reference.getByText("Subagents")).toBeInTheDocument();
+    expect(reference.getByText("No route yet")).toBeInTheDocument();
+    // And the page does not offer it as something to decide.
+    expect(screen.queryByRole("group", { name: /when Raiker wants to use/i })).toBeNull();
+    expect(screen.getByText("No permissions available")).toBeInTheDocument();
   });
 
   it("adds no caveat to a switch that means what it says", async () => {
@@ -175,7 +206,7 @@ describe("CapabilitiesView", () => {
     });
 
     // Domain headings replace backend phase numbers.
-    expect(registry().getByRole("checkbox", { name: "Select all Local execution capabilities" })).toBeInTheDocument();
+    expect(registry().getByRole("checkbox", { name: "Select all Execution capabilities" })).toBeInTheDocument();
     expect(registry().getByRole("checkbox", { name: "Select all Network capabilities" })).toBeInTheDocument();
     expect(registry().queryByText(/^Phase \d/)).not.toBeInTheDocument();
 
@@ -493,7 +524,10 @@ describe("Permissions workspace", () => {
     await fireEvent.change(screen.getByRole("combobox", { name: "Permission group" }), { target: { value: "Network" } });
     expect(registry().queryByRole("button", { name: /Shell commands/i })).not.toBeInTheDocument();
     expect(registry().getByRole("button", { name: /Web fetch/i })).toBeInTheDocument();
-    await fireEvent.change(screen.getByRole("combobox", { name: "Permission status" }), { target: { value: "off" } });
+    // REM-PERM-01 — the status filter is the posture chips, which are also the
+    // page's one statement of what is on. It used to be both four page-width
+    // tiles at the top and a select two-thirds of the way down.
+    await fireEvent.click(status().getByRole("button", { name: /Unavailable/ }));
     expect(screen.getByText("No matching permissions")).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     expect(screen.getByText("Showing 2 of 2 permissions")).toBeInTheDocument();
@@ -510,7 +544,8 @@ describe("Permissions workspace", () => {
     expect(list.getByRole("checkbox", { name: "Select Web fetch" })).toBeDisabled();
     expect(list.getByRole("checkbox", { name: "Select all Network capabilities" })).toBeDisabled();
     await fireEvent.click(list.getByRole("checkbox", { name: "Select Shell commands" }));
-    await fireEvent.change(screen.getByRole("combobox", { name: "Permission status" }), { target: { value: "selected" } });
+    // The Selected chip appears only once there is a selection to filter to.
+    await fireEvent.click(status().getByRole("button", { name: /Selected/ }));
     expect(screen.getByText("Showing 1 of 2 permissions")).toBeInTheDocument();
     expect(registry().queryByRole("checkbox", { name: "Select Web fetch" })).not.toBeInTheDocument();
   });

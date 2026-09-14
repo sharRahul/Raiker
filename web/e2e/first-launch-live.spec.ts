@@ -89,11 +89,18 @@ test("first launch teaches Chat, Build and Design before any provider", async ({
   await capture(page, `${SHOTS}/first-run-03-privacy.png`);
 
   await page.getByRole("button", { name: /Local, and the providers I connect/ }).click();
-  await expect(title).toHaveText(/Your Raiker is ready/, { timeout: 30_000 });
+  // REM-LAUNCH-01 — this run deferred the model, so the stage says what it
+  // actually did rather than calling the instance ready. The unconditional
+  // "Your Raiker is ready" was the defect.
+  await expect(title).toHaveText(/Setup saved/, { timeout: 30_000 });
+  await expect(page.getByText(/nothing to answer with yet/i)).toBeVisible();
   // FIRST-09 — finish into work. FIRST-08 — backup offered, not required.
+  // Every mode still opens: exploring one with no model is how an owner finds
+  // out what it is, and each names the page that supplies what it needs.
   for (const mode of ["Chat", "Build", "Design"]) {
-    await expect(page.getByRole("button", { name: mode, exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: mode, exact: true })).toBeEnabled();
   }
+  await expect(page.getByRole("link", { name: "Choose a model" }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Set up backup" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open Workbench" })).toHaveCount(0);
   await capture(page, `${SHOTS}/first-run-04-ready.png`);

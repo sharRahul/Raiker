@@ -5,10 +5,12 @@ import {
   authorityMatrixGates,
   canDisable,
   canEnable,
+  capabilityDomain,
   enableableTargets,
   explainCapability,
   gateBadge,
   governsItsOwnCapability,
+  groupByDomain,
   groupByPhase,
   hasNoRoute,
   isDeferred,
@@ -93,6 +95,54 @@ describe("grouping and explanations", () => {
     );
     expect(info.kind).toBe("gated");
     expect(info.requirement.toLowerCase()).toContain("test");
+  });
+});
+
+/*
+ * Where a capability is filed is not decoration: it is how an owner finds the
+ * decision they came to make.
+ */
+describe("what each group holds", () => {
+  it("keeps every Git decision in one group", () => {
+    // A branch, a commit, a push and the account the push authenticates to were
+    // filed in three different groups — Workspace, Network and Connectors — so
+    // an owner deciding what Raiker may do with their repository had to find the
+    // answer in three parts of a fifty-one-row list, and know in advance that it
+    // was in three parts.
+    for (const capability of [
+      "git_write_execution",
+      "git_push_execution",
+      "connector_github_runtime",
+    ]) {
+      expect(capabilityDomain(capability), capability).toBe("Git");
+    }
+  });
+
+  it("files every execution destination with the rest of execution", () => {
+    // `Other tools` is the fallback, and its name means "nobody filed this".
+    for (const capability of [
+      "shell_execution",
+      "subagents",
+      "remote_execution_cap",
+      "cloud_execution_cap",
+    ]) {
+      expect(capabilityDomain(capability), capability).toBe("Execution");
+    }
+  });
+
+  it("still has a fallback for a capability nothing has filed", () => {
+    // The bucket stays, because a new capability with no mapping must land
+    // somewhere visible rather than vanish.
+    expect(capabilityDomain("something_nobody_has_filed")).toBe("Other tools");
+  });
+
+  it("orders the groups so a group cannot be rendered before it is named", () => {
+    const groups = groupByDomain([
+      gate({ capability: "cloud_execution_cap" }),
+      gate({ capability: "git_push_execution" }),
+      gate({ capability: "file_write_execution" }),
+    ]);
+    expect(groups.map((group) => group.domain)).toEqual(["Workspace", "Git", "Execution"]);
   });
 });
 

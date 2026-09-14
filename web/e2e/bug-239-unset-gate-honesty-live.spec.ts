@@ -47,8 +47,12 @@ test("an untouched gate says which of the three things it means", async ({ page 
   await capture(page, `${SHOTS}/bug-239-unset-gate-honesty.png`, webFetch);
 
   // A capability whose empty table really does mean off is untouched by this.
+  // Read from the row's one summary, which is where availability has been said
+  // since it and the separate chip beside it were merged: asserting an exact
+  // "Off" element was asserting a chip that no longer exists, and the spec had
+  // been failing on the harness rather than on the product.
   const shell = page.locator(".cap.card", { hasText: "Shell commands" }).first();
-  await expect(shell.getByText("Off", { exact: true })).toBeVisible();
+  await expect(shell.locator(".cap-summary")).toHaveText(/^Off · /);
   await expect(shell.getByText("On by default")).toHaveCount(0);
 
   expect(consoleErrors).toEqual([]);

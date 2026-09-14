@@ -46,11 +46,18 @@
     loading = false,
     loadError = null,
     readable,
+    sizedProviders = undefined,
     selectedId = $bindable(null),
   }: {
     turns: ImageGeneration[];
     loading?: boolean;
     loadError?: string | null;
+    /**
+     * REM-DESIGN-01 — the providers whose governed request carries the size.
+     * `undefined` on a host older than the field, which makes no claim either
+     * way; the detail then prints the recorded value as it always did.
+     */
+    sizedProviders?: string[];
     /** The view's own plain-English reading of a refusal's reason code. */
     readable: (code: string | null) => string;
     /**
@@ -62,6 +69,12 @@
   } = $props();
 
   const assets = $derived(designAssets(turns));
+
+  /** Whether this generation's size is a request Raiker actually made. */
+  function sizeWasSent(generation: ImageGeneration): boolean {
+    if (sizedProviders === undefined) return true;
+    return sizedProviders.includes(generation.provider);
+  }
   const selected = $derived(
     selectedId === null
       ? null
@@ -224,7 +237,19 @@
             </dd>
           </div>
           <div><dt>Model</dt><dd>{selected.generation.model}</dd></div>
-          <div><dt>Size</dt><dd>{selected.generation.size}</dd></div>
+          <!-- REM-DESIGN-01 — the recorded size is what was *asked for*, and
+               for a provider Raiker sends no size to it was never asked. It
+               printed here beside the picture as though it described it. -->
+          <div>
+            <dt>Size</dt>
+            <dd>
+              {#if sizeWasSent(selected.generation)}
+                {selected.generation.size}
+              {:else}
+                <span class="muted">chosen by {selected.generation.provider}</span>
+              {/if}
+            </dd>
+          </div>
           <div><dt>When</dt><dd>{relativeTime(selected.generation.created_at)}</dd></div>
         </dl>
         <a class="download" href={shot(selected.generation)} target="_blank" rel="noopener">

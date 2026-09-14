@@ -28,6 +28,7 @@ import {
   isDecisionMode,
   isDeferred,
   isInherent,
+  isOnByDefault,
   isReady,
   type DecisionMode,
 } from "./capabilityModel";
@@ -106,6 +107,23 @@ export function rowSummary(
 }
 
 /**
+ * The first question's answer, in a sentence rather than in a word.
+ *
+ * REM-PERM-03 — the detail used to print the question as a heading and then
+ * offer only the buttons underneath it, so the card asked "Can Raiker use
+ * this?" and never said. `On by default` is kept apart from `On` because they
+ * are different facts about the same capability: one is a choice the owner
+ * made, the other is what an empty table resolves to.
+ */
+export function availabilityAnswer(gate: CapabilityGate, available: boolean): string {
+  if (!available) return "No — Raiker cannot use this on this account.";
+  if (isOnByDefault(gate)) {
+    return "Yes — nothing is stored for it, and it ships on.";
+  }
+  return "Yes — Raiker may use this on this account.";
+}
+
+/**
  * The handful an owner actually comes to change, above the full registry.
  *
  * Sixty-six equally weighted cards is a registry, not a page: the capabilities
@@ -136,6 +154,47 @@ export function commonGates(gates: CapabilityGate[]): CapabilityGate[] {
  * is about their account rather than about our vocabulary.
  */
 export const CANNOT_CHANGE_HERE = "This setting cannot be changed for this account.";
+
+export interface PermissionPosture {
+  /** Every governed capability this build ships a control for. */
+  total: number;
+  available: number;
+  /** Configured to act without asking — a fact about the account, not about work in flight. */
+  automatic: number;
+  /** The same, as the one sentence the page leads with. */
+  sentence: string;
+}
+
+/**
+ * The effective posture, in one sentence.
+ *
+ * REM-PERM-01 asks for *one* short posture summary above the actionable
+ * permissions. What was there instead was four tiles the width of the page
+ * reading `51 / 1 / 50 / 0`, which spends the most valuable space on the page
+ * restating the same list four ways — and reads "50 Unavailable" as though an
+ * account where almost nothing is switched on were a problem, when it is
+ * Raiker's fail-closed default working.
+ *
+ * The counts survive as filters. What leads is the sentence, and it states
+ * configuration rather than execution: a capability set to Automatic is a
+ * standing decision, not evidence that anything ran.
+ */
+export function permissionPosture(gates: CapabilityGate[]): PermissionPosture {
+  const total = gates.length;
+  const available = gates.filter(isAvailable).length;
+  const automatic = gates.filter((gate) => gate.decision_mode === "auto").length;
+  const acting =
+    automatic === 0
+      ? "Every one of them stops and asks you first."
+      : `${automatic} ${automatic === 1 ? "is" : "are"} set to act without asking you.`;
+  const sentence =
+    total === 0
+      ? "This runtime has not reported any permission Raiker can be given."
+      : available === 0
+        ? `None of the ${total} permissions Raiker can be given is available on this account yet.`
+        : `${available} of ${total} permissions are available to Raiker on this account. ${acting}`;
+  return { total, available, automatic, sentence };
+}
 
 export interface PermissionAttention {
   capability: string;

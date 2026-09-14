@@ -2340,6 +2340,12 @@ export interface MemoryControlView {
   search_enabled: boolean;
   expires_at: string | null;
   updated_at: string | null;
+  /**
+   * REM-MEM-02 — the most recent `recall` lifecycle event: when this record was
+   * last put into a model's context. It is **not** evidence that the model
+   * relied on it, quoted it, or read it at all; nothing records that. Present
+   * it as inclusion, never as use.
+   */
   last_used_at: string | null;
 }
 
@@ -2834,6 +2840,8 @@ export interface UpdateStatusView {
     | "source_checkout"
     | "no_channel"
     | "unsigned_build"
+    /** REM-SET-UPDATES — nothing has asked the channel; not an assurance. */
+    | "not_checked"
     | "up_to_date"
     | "available"
     | "unreachable";
@@ -3205,6 +3213,11 @@ export interface ImageGeneration {
 
 export interface ImageGenerationsView {
   sizes: string[];
+  /**
+   * REM-DESIGN-01 — providers the size is actually sent to. Absent on a host
+   * older than the field, which is read as "no claim" rather than as "none".
+   */
+  sized_providers?: string[];
   generations: ImageGeneration[];
 }
 

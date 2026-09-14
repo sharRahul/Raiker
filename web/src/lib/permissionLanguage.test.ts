@@ -9,7 +9,9 @@ import {
   UNKNOWN_BEHAVIOUR,
   behaviourCopy,
   commonGates,
+  availabilityAnswer,
   permissionAttention,
+  permissionPosture,
   rowSummary,
 } from "./permissionLanguage";
 import { capabilityLabel, DECISION_MODES } from "./capabilityModel";
@@ -175,5 +177,64 @@ describe("the two questions Permissions asks (P1 — Permissions UX)", () => {
     // "On · Never" a sentence rather than a contradiction.
     expect(BEHAVIOUR_COPY.deny.label).toBe("Never");
     expect(BEHAVIOUR_COPY.ask.label).toBe("Ask me");
+  });
+});
+
+/*
+ * REM-PERM-01 — one posture summary, above controls rather than instead of
+ * them.
+ *
+ * What the page led with was four page-width tiles reading `51 / 1 / 50 / 0`:
+ * the same list counted four ways, in the most valuable space on the screen,
+ * with no sentence saying what any of it meant. The counts are still the page's
+ * status filter. The summary is a sentence, and it says only what the account
+ * is configured to do.
+ */
+describe("the effective posture summary", () => {
+  it("counts what is available and what is set to act alone", () => {
+    const posture = permissionPosture([
+      gate({ capability: "shell_execution", decision_mode: "auto" }),
+      gate({ capability: "web_fetch", decision_mode: "ask" }),
+      gate({ capability: "git_push_execution", state: "disabled", decision_mode: "ask" }),
+    ]);
+    expect(posture.total).toBe(3);
+    expect(posture.available).toBe(2);
+    expect(posture.automatic).toBe(1);
+    expect(posture.sentence).toContain("2 of 3");
+    expect(posture.sentence).toContain("1 is set to act without asking you");
+  });
+
+  it("says nothing runs alone when nothing does, rather than printing a zero", () => {
+    const posture = permissionPosture([gate({ capability: "web_fetch", decision_mode: "ask" })]);
+    expect(posture.automatic).toBe(0);
+    expect(posture.sentence).toMatch(/stops and asks you first/);
+  });
+
+  it("does not read a fail-closed account as a page full of problems", () => {
+    // Almost nothing being available on a new account is Raiker's default
+    // working, not a fault, and the sentence must not imply otherwise.
+    const posture = permissionPosture([
+      gate({ capability: "shell_execution", state: "disabled" }),
+      gate({ capability: "web_fetch", state: "disabled" }),
+    ]);
+    expect(posture.available).toBe(0);
+    expect(posture.sentence).toMatch(/None of the 2 permissions/);
+    expect(posture.sentence).not.toMatch(/unavailable/i);
+  });
+
+  it("says a capability that is on because nothing is stored is on, and why", () => {
+    // BUG-239's distinction, in the detail's own answer: `On by default` is not
+    // the same claim as a switch the owner turned on.
+    const shipped = gate({
+      capability: "web_fetch",
+      state: "disabled",
+      source: "default",
+      enforced_enabled: true,
+    });
+    expect(availabilityAnswer(shipped, true)).toMatch(/ships on/);
+    expect(availabilityAnswer(gate({ capability: "shell_execution" }), true)).toMatch(
+      /may use this/,
+    );
+    expect(availabilityAnswer(gate({ state: "disabled" }), false)).toMatch(/cannot use this/);
   });
 });

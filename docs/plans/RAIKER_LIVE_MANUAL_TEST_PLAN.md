@@ -759,18 +759,25 @@ matches and nothing is silently dropped.
 
 ## 12. Permissions
 
-1. **[S]** All **67** gates **MUST** be listed, grouped, and searchable.
-2. Expand a row. It **MUST** give a description, the current decision mode in
+1. **[S]** Every gate this page decides **MUST** be listed, grouped, and
+   searchable, and the count line **MUST** agree with what is on screen.
+2. **[S]** The gates it does **not** decide — the ones whose own switch changes
+   nothing — **MUST** be listed read-only under **Not decided here**, each
+   naming what really governs it or why nothing runs, and **MUST** offer no mode
+   control and no selection box.
+3. **[S]** Git writes, Git push and the GitHub connector **MUST** be in one
+   group, and no group may be named **Other tools**.
+4. Expand a row. It **MUST** give a description, the current decision mode in
    plain words, and the control that changes it.
-3. Set a capability to each of **Ask**, **Allow**, **Auto**, **Deny** and confirm
+5. Set a capability to each of **Ask**, **Allow**, **Auto**, **Deny** and confirm
    the runtime honours each.
-4. **Turn on** a higher-risk gate. The step-up **MUST** require a
+6. **Turn on** a higher-risk gate. The step-up **MUST** require a
    `runtime_gate_manager`, a reason, a typed phrase and a threat-model
    acknowledgement — and **MUST** explain that the phrase is not a credential.
-5. **Bulk capability actions** — exercise it.
-6. **Deferred domains** — finance, medical, CCTV, home security, hardware
+7. **Bulk capability actions** — exercise it.
+8. **Deferred domains** — finance, medical, CCTV, home security, hardware
    **MUST** offer **no enable path at all**, not a disabled switch.
-7. Stop the agent runtime from Settings → Runtime. **MUST**: every surface says
+9. Stop the agent runtime from Settings → Runtime. **MUST**: every surface says
    so, and no new execution starts.
 
 ---

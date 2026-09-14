@@ -23,7 +23,7 @@ from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import GenerateImageRequest
 from raiker.api.sessions import ApiSession
 from raiker.runtime.authority.models import Principal
-from raiker.runtime.executors.tier2_image import SUPPORTED_SIZES
+from raiker.runtime.executors.tier2_image import SIZED_PROVIDERS, SUPPORTED_SIZES
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -77,6 +77,10 @@ async def list_images(request: Request) -> dict[str, Any]:
     rows = store.list_image_generations(owner_principal_id=principal.principal_id)
     return {
         "sizes": list(SUPPORTED_SIZES),
+        # REM-DESIGN-01 — which providers the size is actually sent to, so the
+        # page can stop offering a choice to one that ignores it and stop
+        # printing a requested size as though it were the returned picture's.
+        "sized_providers": list(SIZED_PROVIDERS),
         "generations": [_public(row) for row in rows],
     }
 

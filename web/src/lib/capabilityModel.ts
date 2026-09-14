@@ -114,12 +114,21 @@ export function gateBadge(gate: CapabilityGate): BadgeVariant {
 }
 
 // ── What the switch actually decides (GEP-04) ────────────────────────────────
-// Forty-five capabilities have a real executor and therefore a gate, and this
-// page renders every gate as a switch. For fifteen of them, flipping it changed
-// nothing: either nothing in the product reaches the executor, or the work
-// happens under a different control the gate never consults. An owner holding a
-// switch that governs nothing is the one failure mode a governance product
-// cannot have, so the card says which kind of switch it is.
+// Forty-five capabilities have a real executor and therefore a gate, and the
+// Permissions page used to render every one of them as a switch. For fourteen,
+// flipping it changed nothing: either nothing in the product reaches the
+// executor, or the work happens under a different control the gate never
+// consults. An owner holding a switch that governs nothing is the one failure
+// mode a governance product cannot have.
+//
+// The first answer was to label them — a grey `No route yet` or `Governed
+// elsewhere` chip on the row. That is honest and it is not enough: fourteen of
+// fifty-one rows on a page of decisions were not decisions, and a chip does not
+// stop an owner setting a mode, selecting the row for a bulk change, or
+// believing afterwards that they have closed something. They are off the
+// decision surface now and read as what they are — a short read-only list that
+// names what really governs each one. Nothing is hidden; nothing pretends to be
+// a lever.
 
 /** True when this gate's own state decides whether the capability runs. */
 export function governsItsOwnCapability(gate: CapabilityGate): boolean {
@@ -264,9 +273,34 @@ export function isInherent(gate: CapabilityGate): boolean {
   return capabilityLabel(gate.capability).toLowerCase().includes("legacy gate");
 }
 
+/*
+ * The groups, in reading order.
+ *
+ * **Git is its own group.** Its three capabilities were filed in three
+ * different places — `git_write_execution` under Workspace, `git_push_execution`
+ * under Network because a push leaves the machine, and
+ * `connector_github_runtime` under Connectors — so an owner deciding what Raiker
+ * may do with their repository had to find the answer in three parts of a
+ * fifty-one-row list and know in advance that it was in three parts. Repository
+ * work is one subject.
+ *
+ * The reason the push was filed under Network is still true and is not lost:
+ * its own description says a push leaves this machine and still needs the
+ * remote's host on the egress allowlist, and **Settings → Privacy** now carries
+ * the whole outbound inventory, which is a better answer to "what can reach the
+ * network" than one row's position in a list ever was.
+ *
+ * **`Local execution` is `Execution`.** `cloud_execution_cap` and
+ * `remote_execution_cap` were unmapped, so they landed in `Other tools` — a
+ * bucket whose name means "nobody filed this". They are execution destinations
+ * like the rest of the group; what varies is where the command runs, which is
+ * what each row's own description says. With them filed, nothing reaches the
+ * fallback, which is what a fallback should look like.
+ */
 export const CAPABILITY_DOMAIN_ORDER = [
   "Workspace",
-  "Local execution",
+  "Git",
+  "Execution",
   "Network",
   "Models",
   "Connectors",
@@ -278,7 +312,6 @@ export const CAPABILITY_DOMAIN_ORDER = [
 const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   file_write_execution: "Workspace",
   patch_apply_execution: "Workspace",
-  git_write_execution: "Workspace",
   memory_write_execution: "Workspace",
   memory_forget_execution: "Workspace",
   task_management_runtime: "Workspace",
@@ -301,11 +334,21 @@ const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   // BUG-230 — the rewind. It belongs beside the file capabilities it puts
   // back, not in "Other tools", which is where an unmapped capability lands.
   checkpoint_restore_execution: "Workspace",
-  shell_execution: "Local execution",
-  process_execution: "Local execution",
-  container_execution_cap: "Local execution",
-  subagents: "Local execution",
-  multi_agent_teams: "Local execution",
+  // One subject, one group. A branch, a commit, a push and the account the push
+  // authenticates to are four halves of the same decision, and they used to be
+  // three groups apart.
+  git_write_execution: "Git",
+  git_push_execution: "Git",
+  connector_github_runtime: "Git",
+  shell_execution: "Execution",
+  process_execution: "Execution",
+  container_execution_cap: "Execution",
+  subagents: "Execution",
+  multi_agent_teams: "Execution",
+  // Filed rather than left to the `Other tools` fallback: both are places a
+  // command runs, which is what this group is.
+  remote_execution_cap: "Execution",
+  cloud_execution_cap: "Execution",
   web_fetch: "Network",
   // Backlog #18 — Network, and deliberately not beside `audit_export` in
   // Workspace. They export the same record and differ in the one way this page
@@ -315,10 +358,6 @@ const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   // The Design surface. Network for the same reason: the prompt leaves the
   // machine and the image comes back from somebody else's model.
   image_generation: "Network",
-  // BUG-67 — a push is repository work, but what makes it a separate decision is
-  // that it leaves the machine. It sits with the other egress switches so the
-  // owner reviewing "what can reach the network" sees it.
-  git_push_execution: "Network",
   external_channel_runtime: "Network",
   channel_approval_relay: "Network",
   hosted_model_runtime: "Models",

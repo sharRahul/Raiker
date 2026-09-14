@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-14 | Targeted | `2026-09-14-permissions-overhaul/` | Anthropic, an eighth key entered through the Connect dialog — the first of the eight that authenticates and lists models | The rebuilt Permissions page measured on the running product, the §18.3 rows that closed with it, and three live-test helpers that had been waiting on strings the product stopped printing |
 | 2026-09-07 | Targeted | `env-01-` … `env-05-` | Anthropic, a **seventh** identity-linked key entered through the interface; no local runtime on the host | The clock, the weather and the global read catalogue as runtime facts — and two harness defects that had been silent since the `apps/web` → `web` move: every live round writing its captures outside the repository, and every provider spec waiting for a tab the Models redesign removed |
 | 2026-09-06 | Targeted | `gcr-01-`, `gcr-02-`, `models-posture-` | Anthropic, a **sixth** identity-linked key entered through the interface; no local runtime on the host | Provider validation that opens no client — measured against the host's own socket count — the connection and the pin both going through it, and one defect the evidence screenshot itself showed: the Models page calling the hosted gate **Off** above the provider it had just accepted a model for |
 | 2026-09-05 (second) | Targeted | `gcr-19-`, `gcr-38-`, `gcr-round-` | Anthropic, a fifth **identity-linked** key entered through the interface | The third-pass review's P0 proved on a real library — a failed conversion's cleanup naming its own files and leaving the model beside them intact — plus Retry refused on an unfinished job, the host's background passes reported on Observability, and one label the redactor had been eating |
@@ -68,6 +69,79 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-09-14 — Permissions rebuilt, and a key that finally answers
+
+**Tier: Targeted. Build: production `npm run build`. Providers: Anthropic, an
+eighth key, entered through the Connect dialog. Owner: the shared
+`OWNER_CREDENTIALS`. Workspace: a fresh scratch directory
+(`scripts/reset_live_workspace.py`). Specs:
+`web/e2e/removal-review-permissions-2026-09-14-live.spec.ts` (3 cases, all
+passing), plus `permissions-language-live`, `bug-239-unset-gate-honesty-live`
+and the two Permissions cases of `release-readiness-2026-09-13-live`, all
+re-run green. Screenshots:
+`docs/screenshots/2026-09-14-permissions-overhaul/`.**
+
+The round measured the Permissions rebuild and the nine other §18.3 rows that
+closed with it.
+
+1. **One page title.** The view's own `<h1>` is gone; the document has exactly
+   one level-1 heading, which is the top bar's.
+2. **One posture summary, and it is the filter.** The sentence reads *“1 of 51
+   permissions are available to Raiker on this account. Every one of them stops
+   and asks you first.”*, the counts beneath it set the status filter, and the
+   `Permission status` combobox that used to do the same job two-thirds of the
+   way down the page is absent.
+3. **The authority table reads after the controls it summarises**, asserted on
+   measured geometry rather than on source order.
+4. **A row answers both questions closed** — `Off · Ask me` — and an opened row
+   asks them in words, answering the first in a sentence rather than in buttons
+   alone.
+5. **No sideways scroll at 390 px**, with the control dropping to its own line
+   and the selection box aligning to the first line of a three-line row.
+6. **The MCP sample is a developer example**: the name field is not on screen
+   until the disclosure is opened, the scope sentence is shown, and the string
+   *safe starter* appears nowhere on the page.
+7. **Privacy is an inventory**, and its outbound rows print the availability
+   sentence in the Permissions vocabulary — read from the same gate list, so the
+   two pages cannot disagree about whether something can leave.
+8. **The page decides 37 permissions, not 51.** The fourteen gates whose own
+   switch changes nothing are read-only under **Not decided here**, with no mode
+   control and no selection box anywhere in that section, each naming what really
+   governs it or why nothing runs. `GIT` holds Git writes, Git push and the
+   GitHub connector; no group is named `Other tools`
+   (`permissions-git-grouped.png`, `permissions-not-decided-here.png`).
+
+**What the round found.**
+
+* **The key works, and a turn completed.** Seven previous rounds recorded an
+  identity-linked key that could authenticate only with a workspace id its owner
+  had not supplied, and every one of them had to stop short of a provider turn.
+  This one lists eleven models through the product's own picker, and a chat turn
+  on `Haiku 4.5` — prompt typed into the composer, model chosen from the
+  composer's own menu, answer streamed back through the governed path — returned
+  the exact string it was asked for
+  (`anthropic-turn-end-to-end.png`). That is the first end-to-end provider turn
+  in this ledger, and it settles the premise **BUG-273** was waiting on.
+
+  It also makes `anthropic-key-live.spec.ts` assert a refusal this key will
+  never produce — already recorded as **BUG-291**, now observed rather than
+  predicted.
+* **Three live helpers had gone stale**, and the first of them had been
+  disarming scenarios silently: `enableCapability` waited on a placeholder the
+  Permissions page stopped printing, so every spec that turns a capability on
+  spent sixty seconds finding nothing and walked on with the gate shut. Fixed in
+  this round; the remaining harness gap is **BUG-295**.
+* **A handled 503 reaches the console.** Models reports `GET
+  /api/hugging-face/trending — 503` on a host with no route to huggingface.co.
+  The page says the right thing in the right place; the console entry spends the
+  zero-console-errors budget that exists to catch real faults. **BUG-296**.
+* **Ten more specs waited on the dead placeholder**, found by grepping for the
+  string rather than by a failing run — which is the point: a wait that finds
+  nothing expires rather than failing. All ten now wait on the field's label.
+* **Three authority gates were never classified** by the entry-path audit, so
+  they report `own_gate` by default rather than by finding. Left on the page
+  deliberately and recorded as **BUG-297**.
 
 ## 2026-09-07 — The clock, the read catalogue, and two silent harness defects
 

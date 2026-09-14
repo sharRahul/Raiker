@@ -62,7 +62,7 @@ async function signIn(target: Page) {
 /** Open one capability's card on the Permissions page. */
 async function openCapability(label: string) {
   await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByPlaceholder("Search capabilities…");
+  const search = page.getByLabel("Search capabilities");
   await expect(search).toBeVisible({ timeout: 30_000 });
   await search.fill(label);
   const card = page.locator(".cap.card").filter({ hasText: label }).first();

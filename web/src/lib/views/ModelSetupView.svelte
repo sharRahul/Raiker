@@ -29,6 +29,7 @@
   } from "../firstRun";
   import ProviderMatrix from "../components/ProviderMatrix.svelte";
   import Icon from "../components/Icon.svelte";
+  import type { IconName } from "../icons";
 
   const stages = SETUP_STAGES;
   const labels = SETUP_STAGE_LABELS;
@@ -122,6 +123,97 @@
 
   /** FIRST-08 — backup is offered at the end, not asked for before first use. */
   let wantsBackup = $state(false);
+
+  /*
+   * REM-LAUNCH-01 — the last stage says what is true of *this* setup.
+   *
+   * It said "Your Raiker is ready" unconditionally, directly above a summary
+   * whose own Model row could read "Decide later". A first-run screen is the one
+   * place an owner has no other way to check, so a readiness claim there is
+   * taken at face value — and the first thing they do with it is press Chat and
+   * meet a composer that cannot send.
+   *
+   * Readiness is per work mode, because the prerequisites differ: Chat and Build
+   * need a model to talk to, Design needs a provider that answers with images.
+   * Nothing is blocked — exploring a mode with no model connected is how an
+   * owner finds out what it is — but an action that cannot do its work yet says
+   * so and names the exact page that fixes it, rather than being presented as
+   * ready alongside two that are.
+   */
+  const modelChosen = $derived.by(() => {
+    const state: SetupState | null = setup;
+    if (state === null) return false;
+    return !state.model_deferred && (state.selected_model ?? "") !== "";
+  });
+  /** A profile Raiker could actually reach: detected locally or connected. */
+  function usable(profile: ModelProfile): boolean {
+    return (
+      profile.connection_configured === true ||
+      profile.configured === true ||
+      profile.provider_detected === true
+    );
+  }
+  const imageReady = $derived(
+    profiles.some(
+      (profile) =>
+        usable(profile) &&
+        ((profile.image_model ?? "") !== "" || (profile.image_models?.length ?? 0) > 0),
+    ),
+  );
+
+  interface StartAction {
+    id: string;
+    label: string;
+    icon: IconName;
+    route: string;
+    ready: boolean;
+    /** What is missing, and the page that supplies it. Empty when ready. */
+    missing: string;
+    remedy: string;
+    remedyLabel: string;
+  }
+
+  const startActions = $derived<StartAction[]>([
+    {
+      id: "chat",
+      label: "Chat",
+      icon: "chat",
+      route: "#/chat",
+      ready: modelChosen,
+      missing: modelChosen ? "" : "Needs a model to answer with.",
+      remedy: "#/models?tab=add",
+      remedyLabel: "Choose a model",
+    },
+    {
+      id: "build",
+      label: "Build",
+      icon: "code",
+      route: "#/build",
+      ready: modelChosen,
+      missing: modelChosen ? "" : "Needs a model to answer with.",
+      remedy: "#/models?tab=add",
+      remedyLabel: "Choose a model",
+    },
+    {
+      id: "design",
+      label: "Design",
+      icon: "design",
+      route: "#/design",
+      ready: imageReady,
+      missing: imageReady ? "" : "Needs a provider that returns images.",
+      remedy: "#/models?tab=add",
+      remedyLabel: "Connect an image provider",
+    },
+  ]);
+
+  /** The heading, and the sentence under it, scoped to what is actually set up. */
+  const finishHeading = $derived(modelChosen ? "Your Raiker is ready" : "Setup saved");
+  const finishNote = $derived(
+    modelChosen
+      ? "Start where the work is. Everything below stays available in Models, Settings and Permissions."
+      : "You chose to decide about a model later, so Chat and Build have nothing to answer with yet. " +
+        "Everything else is saved, and you can pick a model whenever you want to.",
+  );
 
   async function createBackup() {
     if (!backupTarget.trim()) return;
@@ -259,16 +351,31 @@
       <div class="actions"><button class="quiet" onclick={() => save({ stage: "model" })}>Back</button></div>
     {:else}
       <header>
-        <p class="eyebrow">04 · Ready</p>
-        <h2 id="setup-title">Your Raiker is ready</h2>
-        <p>Start where the work is. Everything below stays available in Models, Settings and Permissions.</p>
+        <p class="eyebrow">04 · {finishHeading === "Your Raiker is ready" ? "Ready" : "Saved"}</p>
+        <!-- REM-LAUNCH-01 — a readiness claim scoped to what was actually set
+             up. This said "Your Raiker is ready" above a summary that could read
+             "Decide later" on the very next line. -->
+        <h2 id="setup-title">{finishHeading}</h2>
+        <p>{finishNote}</p>
       </header>
       <!-- FIRST-09 — finish into work. The three Work modes the welcome screen
-           introduced, as the three things to do next. -->
+           introduced, as the three things to do next — each saying whether it
+           can do its work yet, and naming the page that fixes it if not. -->
       <div class="start-work">
-        <button class="mode-start" disabled={busy} onclick={() => finish("#/chat")}><Icon name="chat" size="md" /><strong>Chat</strong></button>
-        <button class="mode-start" disabled={busy} onclick={() => finish("#/build")}><Icon name="code" size="md" /><strong>Build</strong></button>
-        <button class="mode-start" disabled={busy} onclick={() => finish("#/design")}><Icon name="design" size="md" /><strong>Design</strong></button>
+        {#each startActions as action (action.id)}
+          <div class="mode-cell" class:unready={!action.ready}>
+            <button class="mode-start" disabled={busy} onclick={() => finish(action.route)}>
+              <Icon name={action.icon} size="md" />
+              <strong>{action.label}</strong>
+            </button>
+            {#if !action.ready}
+              <p class="mode-missing">
+                {action.missing}
+                <a href={action.remedy}>{action.remedyLabel}</a>
+              </p>
+            {/if}
+          </div>
+        {/each}
       </div>
       <dl class="summary">
         <div><dt>Model</dt><dd>{setup.model_deferred ? "Decide later" : setup.selected_model ?? "Not selected"}</dd></div>
@@ -328,8 +435,14 @@
      one. Chat, Build and Design are peers, so the grid gives them equal room. */
   .modes, .start-work { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
   .mode, .mode-start { display: grid; justify-items: start; gap: .3rem; padding: var(--space-4); border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); text-align: left; }
-  .mode-start { cursor: pointer; }
+  .mode-start { cursor: pointer; width: 100%; }
   .mode-start:hover { border-color: var(--accent-border); background: var(--accent-soft); }
+  /* REM-LAUNCH-01 — the mode stays usable; what it cannot do yet is said under
+     it, with the page that supplies the missing piece. Never colour alone. */
+  .mode-cell { display: grid; gap: var(--space-2); align-content: start; }
+  .mode-cell.unready .mode-start { border-style: dashed; }
+  .mode-missing { margin: 0; color: var(--text-3); font-size: var(--text-xs); line-height: 1.45; }
+  .mode-missing a { color: var(--accent); font-weight: 650; }
   .note { margin: 0; color: var(--text-3); font-size: var(--text-sm); line-height: 1.5; max-width: 45rem; }
   /* Recommended is one sentence with a reason, not a card competing with the
      matrix below it: the point is that most owners need read no further. */

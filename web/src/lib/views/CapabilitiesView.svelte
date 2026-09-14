@@ -55,6 +55,9 @@
   let loadError = $state<string | null>(null);
   let search = $state("");
   let expanded = $state<string | null>(null);
+  let statusFilter = $state("all");
+  let domainFilter = $state("all");
+  let refreshing = $state(false);
 
   /**
    * Domain groups the owner has folded away.
@@ -70,6 +73,7 @@
    */
   let collapsedDomains = $state<string[]>([]);
   const searching = $derived(search.trim() !== "");
+  const filtering = $derived(searching || statusFilter !== "all" || domainFilter !== "all");
 
   function isCollapsed(domain: string): boolean {
     return !searching && collapsedDomains.includes(domain);
@@ -149,13 +153,13 @@
    * what changed and what did not.
    */
   async function bulkSetMode(mode: DecisionMode) {
-    if (bulkBusy || selectedCaps.size === 0) return;
+    if (mutationBusy || selectedCaps.size === 0 || (mode !== "ask" && mode !== "deny")) return;
     bulkBusy = true;
     notice = null;
     const applied: string[] = [];
     const failed: string[] = [];
     try {
-      for (const cap of selectedCaps) {
+      for (const cap of [...selectedCaps]) {
         try {
           await api.setCapabilityDecisionMode(cap, mode, "bulk-set via web UI");
           recordConfirmed(cap, mode);
@@ -205,6 +209,7 @@
     | { kind: "set_mode"; capability: string; mode: DecisionMode };
   let pending = $state<Pending | null>(null);
   let busy = $state(false);
+  const mutationBusy = $derived(bulkBusy || modeBusyCap !== null || busy);
   let dialogError = $state<string | null>(null);
 
   /** Counts reads, so an older one cannot land on top of a newer one. */
@@ -223,15 +228,21 @@
     const read = ++loadSeq;
     const confirmedBefore = mutationSeq;
     loadError = null;
+    refreshing = true;
     try {
       const fresh = await api.capabilityGates();
       if (read !== loadSeq) return;
       gates = fresh;
+      const editable = new Set(fresh.filter(g => g.can_current_principal_change && !isDeferred(g) && !isInherent(g)).map(g => g.capability));
+      selectedCaps = new Set([...selectedCaps].filter(cap => editable.has(cap)));
       confirmedModes = survivingModes(confirmedModes, confirmedBefore);
     } catch (e) {
       if (read !== loadSeq) return;
       gates = null;
+      selectedCaps = new Set();
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+    } finally {
+      if (read === loadSeq) refreshing = false;
     }
   }
 
@@ -254,22 +265,28 @@
   );
 
   const filtered = $derived.by(() => {
-    if (gates === null) return [];
     const q = search.trim().toLowerCase();
-    const gatesNow = effective;
-    // Only real tools appear here. Deferred capabilities (no executor) and
-    // inherent contract surfaces are not tools: no row, no selector, no
-    // pretend control. They stay visible in Diagnostics as fail-closed.
-    const actionable = gatesNow.filter((g) => !isDeferred(g) && !isInherent(g));
-    const matches = q
-      ? actionable.filter(
-          (g) =>
-            g.capability.toLowerCase().includes(q) ||
-            capabilityLabel(g.capability).toLowerCase().includes(q),
-        )
-      : actionable;
-    return groupByDomain(matches);
+    return groupByDomain(governedGates.filter(gate => {
+      const text = `${gate.capability} ${capabilityLabel(gate.capability)} ${capabilityDescription(gate.capability)} ${capabilityDomain(gate.capability)}`.toLowerCase();
+      if (q && !text.includes(q)) return false;
+      if (domainFilter !== "all" && capabilityDomain(gate.capability) !== domainFilter) return false;
+      if (statusFilter === "on") return isAvailable(gate);
+      if (statusFilter === "off") return !isAvailable(gate);
+      if (statusFilter === "attention") return attention.some(item => item.capability === gate.capability);
+      if (statusFilter === "selected") return selectedCaps.has(gate.capability);
+      return true;
+    }));
   });
+  const visibleCount = $derived(filtered.reduce((count, group) => count + group.gates.length, 0));
+
+  function clearFilters() {
+    search = "";
+    statusFilter = "all";
+    domainFilter = "all";
+  }
+  function selectable(gates: CapabilityGate[]): string[] {
+    return gates.filter(gate => gate.can_current_principal_change).map(gate => gate.capability);
+  }
   // A summary of eight, and which eight matters: the alphabetically first eight
   // are capabilities nobody has an opinion about, so on a fresh account the
   // summary said nothing at all. Ranked by authority instead — see
@@ -278,6 +295,8 @@
     effective.filter((gate) => !isDeferred(gate) && !isInherent(gate)),
   );
   const authorityGates = $derived(authorityMatrixGates(governedGates));
+  const domains = $derived(groupByDomain(governedGates).map(group => group.domain));
+  const onCount = $derived(governedGates.filter(isAvailable).length);
 
   function toggleExpand(capability: string) {
     expanded = expanded === capability ? null : capability;
@@ -317,7 +336,7 @@
       };
       return;
     }
-    search = "";
+    clearFilters();
     const domain = capabilityDomain(capability);
     collapsedDomains = collapsedDomains.filter((entry) => entry !== domain);
     expanded = capability;
@@ -334,7 +353,7 @@
 
   async function setMode(gate: CapabilityGate, mode: DecisionMode) {
     const capability = gate.capability;
-    if (modeFor(gate) === mode || modeBusyCap !== null) return;
+    if (modeFor(gate) === mode || mutationBusy || !gate.can_current_principal_change) return;
     // Tightening modes (ask/deny) apply immediately; loosening modes (allow/auto)
     // require the step-up window with an explicit reason.
     if (mode === "allow" || mode === "auto") {
@@ -363,6 +382,7 @@
   }
 
   function startEnable(gate: CapabilityGate) {
+    if (mutationBusy || !canEnable(gate)) return;
     const targets = enableableTargets(gate);
     const target = targets.includes("enabled_runtime") ? "enabled_runtime" : targets[0];
     // Drive the step-up requirements from the gate's real activation
@@ -412,7 +432,7 @@
   }
 
   async function confirm(values: StepUpValues) {
-    if (pending === null) return;
+    if (pending === null || mutationBusy) return;
     busy = true;
     dialogError = null;
     try {
@@ -464,14 +484,30 @@
   onMount(load);
 </script>
 
+<header class="permissions-header">
+  <div>
+    <h1>Permissions</h1>
+    <p>Choose what Raiker can use and when it should ask you.</p>
+  </div>
   <GuideLink route="capabilities" />
+</header>
 
 {#if notice}
   <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
 {/if}
 
 {#if gates !== null && authorityGates.length > 0}
-  <AuthorityMatrix gates={authorityGates} total={governedGates.length} />
+  <div class="permission-stats" role="group" aria-label="Filter permissions by status">
+    {#each [{id: "all", label: "All permissions", count: governedGates.length}, {id: "on", label: "Available", count: onCount}, {id: "off", label: "Unavailable", count: governedGates.length - onCount}, {id: "attention", label: "Needs review", count: attention.length}] as item}
+      <button type="button" class:active={statusFilter === item.id} aria-pressed={statusFilter === item.id} onclick={() => statusFilter = item.id}>
+        <strong>{item.count}</strong><span>{item.label}</span>
+      </button>
+    {/each}
+  </div>
+  <details class="authority-disclosure">
+    <summary>How your permissions apply</summary>
+    <AuthorityMatrix gates={authorityGates} total={governedGates.length} />
+  </details>
 {/if}
 
 {#if integratedButOff > 0}
@@ -491,13 +527,13 @@
 {#if selectedCaps.size > 0}
   <div class="bulk-bar" role="toolbar" aria-label="Bulk capability actions">
     <span class="bulk-count">{selectedCaps.size} selected</span>
-    <button type="button" class="btn btn-ghost btn-sm" onclick={() => (selectedCaps = new Set())} disabled={bulkBusy}>Clear</button>
+    <button type="button" class="btn btn-ghost btn-sm" onclick={() => (selectedCaps = new Set())} disabled={mutationBusy}>Clear</button>
     <span class="bulk-label">Set all to:</span>
     <!-- REM-PERM-02 — the same words the controls below use. These two said
          "Ask" and "Deny" about the values every other control on the page calls
          "Ask me" and "Never", so one policy had two names on one screen. -->
-    <button type="button" class="btn btn-sm" onclick={() => void bulkSetMode("ask")} disabled={bulkBusy}>{BEHAVIOUR_COPY.ask.label}</button>
-    <button type="button" class="btn btn-sm btn-danger" onclick={() => void bulkSetMode("deny")} disabled={bulkBusy}>{BEHAVIOUR_COPY.deny.label}</button>
+    <button type="button" class="btn btn-sm" onclick={() => void bulkSetMode("ask")} disabled={mutationBusy}>{BEHAVIOUR_COPY.ask.label}</button>
+    <button type="button" class="btn btn-sm btn-danger" onclick={() => void bulkSetMode("deny")} disabled={mutationBusy}>{BEHAVIOUR_COPY.deny.label}</button>
   </div>
 {/if}
 
@@ -509,13 +545,13 @@
       id="cap-search"
       class="search-input"
       type="search"
-      placeholder="Search capabilities…"
+      placeholder="Search permissions, actions or groups…"
       bind:value={search}
     />
   </div>
-  <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh capabilities">
+  <button type="button" class="btn btn-ghost btn-sm" onclick={load} disabled={refreshing || mutationBusy} aria-label="Refresh capabilities">
     <Icon name="refresh" size="sm" />
-    Refresh
+    {refreshing ? "Refreshing…" : "Refresh"}
   </button>
 </div>
 
@@ -524,7 +560,7 @@
 {:else if gates === null}
   <PageState state="loading" title="Loading capabilities…" />
 {:else}
-  {#if !searching && attention.length > 0}
+  {#if !filtering && attention.length > 0}
     <!-- VIS2-18's hierarchy, on this page: what needs a decision comes before
          what is merely configured. Narrow on purpose — a capability sitting at
          its default is not attention, and a page that calls everything
@@ -551,7 +587,7 @@
     </section>
   {/if}
 
-  {#if !searching && common.length > 0}
+  {#if !filtering && common.length > 0}
     <!-- The handful people actually come to change, above the registry that
          holds everything. Same gates, same controls: this is an ordering, not a
          second copy of the page's state. -->
@@ -575,10 +611,7 @@
           </li>
         {/each}
       </ul>
-      <p class="muted">
-        Every permission, including these, is in the list below. <strong>Manage</strong> opens the
-        one there — these are a shortcut to it, not a second copy of it.
-      </p>
+
     </section>
   {/if}
 
@@ -586,14 +619,42 @@
        owner may need to audit, and sits under the two sections that answer the
        questions people actually arrive with. -->
   <section class="cap-registry" aria-label="All permissions">
+  <div class="registry-heading">
+    <div><h2>All permissions</h2><p aria-live="polite">Showing {visibleCount} of {governedGates.length} permissions</p></div>
+    <div class="registry-filters">
+      <label>Group
+        <select bind:value={domainFilter} aria-label="Permission group">
+          <option value="all">All groups</option>
+          {#each domains as domain}<option value={domain}>{domain}</option>{/each}
+        </select>
+      </label>
+      <label>Show
+        <select bind:value={statusFilter} aria-label="Permission status">
+          <option value="all">All permissions</option>
+          <option value="on">Available</option>
+          <option value="off">Unavailable</option>
+          <option value="attention">Needs review</option>
+          <option value="selected">Selected</option>
+        </select>
+      </label>
+      <button type="button" class="btn btn-ghost btn-sm" onclick={() => collapsedDomains = []}>Expand groups</button>
+      <button type="button" class="btn btn-ghost btn-sm" disabled={searching} onclick={() => collapsedDomains = [...domains]}>Collapse groups</button>
+      {#if filtering}<button type="button" class="btn btn-ghost btn-sm" onclick={clearFilters}>Clear filters</button>{/if}
+    </div>
+  </div>
+  {#if visibleCount === 0}
+    <PageState state="empty" title={governedGates.length === 0 ? "No permissions available" : "No matching permissions"} detail={governedGates.length === 0 ? "This runtime has not reported any configurable tools." : "Try a different search, group or status filter."} />
+  {/if}
   {#each filtered as group (group.domain)}
     <div class="cap-list">
       <div class="phase-head">
         <label class="phase-select-all">
           <input
             type="checkbox"
-            checked={allSelectedInGroup(group.gates.map((g) => g.capability))}
-            onchange={() => toggleSelectAllInGroup(group.gates.map((g) => g.capability))}
+            disabled={mutationBusy || selectable(group.gates).length === 0}
+            indeterminate={selectable(group.gates).some(cap => selectedCaps.has(cap)) && !allSelectedInGroup(selectable(group.gates))}
+            checked={allSelectedInGroup(selectable(group.gates))}
+            onchange={() => toggleSelectAllInGroup(selectable(group.gates))}
             aria-label={`Select all ${group.domain} capabilities`}
           />
           {group.domain}
@@ -619,6 +680,7 @@
             <input
               type="checkbox"
               class="cap-check"
+              disabled={mutationBusy || !gate.can_current_principal_change}
               checked={selectedCaps.has(gate.capability)}
               onchange={() => toggleCapSelected(gate.capability)}
               aria-label={`Select ${capabilityLabel(gate.capability)}`}
@@ -667,7 +729,7 @@
               gates={[gate]}
               showLabel={false}
               modes={controlModes}
-              busyCapability={modeBusyCap}
+              busyCapability={mutationBusy ? gate.capability : null}
               onDecision={(_capability, m) => setMode(gate, m)}
             />
           </div>
@@ -703,7 +765,7 @@
               <p class="question">{AVAILABILITY_QUESTION}</p>
               <div class="cap-actions">
                 {#if canEnable(gate)}
-                  <button type="button" class="btn btn-soft btn-sm" onclick={() => startEnable(gate)}>
+                  <button type="button" class="btn btn-soft btn-sm" disabled={mutationBusy} onclick={() => startEnable(gate)}>
                     Turn on
                   </button>
                 {/if}
@@ -711,6 +773,7 @@
                   <button
                     type="button"
                     class="btn btn-danger btn-sm"
+                    disabled={mutationBusy}
                     onclick={() => {
                       pending = { kind: "disable_cap", capability: gate.capability };
                       dialogError = null;
@@ -754,6 +817,26 @@
 {/if}
 
 <style>
+  .permissions-header { display: flex; align-items: start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); }
+  .permissions-header h1 { margin: 0; font-size: var(--text-xl); }
+  .permissions-header p { margin: var(--space-2) 0 0; color: var(--text-2); }
+  .permission-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
+  .permission-stats button { display: flex; flex-direction: column; align-items: start; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); font: inherit; cursor: pointer; text-align: left; }
+  .permission-stats strong { font-size: var(--text-xl); color: var(--text-1); font-variant-numeric: tabular-nums; }
+  .permission-stats button.active { border-color: var(--accent); background: var(--accent-soft); }
+  .authority-disclosure { margin-bottom: var(--space-4); }
+  .authority-disclosure summary { cursor: pointer; color: var(--text-2); padding: var(--space-2) 0; }
+  .registry-heading { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-4); }
+  .registry-heading h2 { font-size: var(--text-md); margin: 0; }
+  .registry-heading p { font-size: var(--text-sm); color: var(--text-3); margin: var(--space-2) 0 0; }
+  .registry-filters { display: flex; align-items: end; gap: var(--space-2); flex-wrap: wrap; }
+  .registry-filters label { display: grid; gap: var(--space-1); font-size: var(--text-xs); color: var(--text-2); }
+  .registry-filters select { font: inherit; font-size: var(--text-sm); color: var(--text-1); background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: var(--space-2); max-width: 100%; }
+  @media (max-width: 600px) {
+    .permission-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .permissions-header { flex-wrap: wrap; }
+    .registry-filters { width: 100%; }
+  }
   .toolbar {
     display: flex;
     align-items: center;
@@ -916,7 +999,6 @@
      part that must survive. */
   .cap-attention li, .cap-common li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
   .shortcut-text { display: flex; align-items: baseline; gap: var(--space-3); flex: 1 1 12rem; min-width: 0; flex-wrap: wrap; }
-  .cap-common .muted { margin: var(--space-2) 0 0; font-size: var(--text-xs); }
   .question {
     margin: var(--space-3) 0 0.35rem;
     color: var(--text-2);

@@ -847,3 +847,25 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     if (geometry.controlFont > 0) expect(geometry.controlFont, route).toBeLessThanOrEqual(16);
   }
 });
+
+for (const width of [390, 1440]) {
+  test(`permissions workspace filters and remains accessible at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto("http://raiker.test/#/capabilities");
+    const registry = page.getByRole("region", { name: "All permissions", exact: true });
+    await expect(registry).toBeVisible();
+    await expect(page.getByText("Showing 3 of 3 permissions")).toBeVisible();
+    await page.getByRole("combobox", { name: "Permission status" }).selectOption("off");
+    await expect(registry.getByRole("button", { name: /Shell commands/i })).toBeVisible();
+    await expect(registry.getByRole("button", { name: /Web fetch/i })).toHaveCount(0);
+    await page.getByRole("searchbox").fill("no-such-permission");
+    await expect(page.getByText("No matching permissions")).toBeVisible();
+    await page.getByRole("button", { name: "Clear filters" }).click();
+    await registry.getByRole("button", { name: /Shell commands/i }).click();
+    await expect(registry.getByRole("button", { name: "Turn on", exact: true })).toBeVisible();
+    const audit = await new AxeBuilder({ page }).include(".cap-registry").withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+    expect(audit.violations).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await capture(page, join(shots, `permissions-overhaul-${width}.png`));
+  });
+}

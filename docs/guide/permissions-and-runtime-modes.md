@@ -12,6 +12,33 @@ configure before your gates mean anything.
 
 ---
 
+## Finding and changing permissions
+
+Open **Permissions** to inspect the tools reported by your runtime. The status
+cards filter the list to all, available, unavailable, or permissions needing
+review. Availability describes the capability gate; policy, decision mode and
+runtime checks still determine whether an action can execute.
+
+Search by tool name, identifier, description or group. Combine search with the
+**Group** and **Show** filters, or use **Clear filters** to restore the full list.
+**Expand groups** and **Collapse groups** control the registry; searching reveals
+matching rows even in collapsed groups. **How your permissions apply** expands
+the authority summary. Common-permission and review shortcuts open and focus
+the corresponding control in the registry.
+
+Open a permission to read its scope and turn it on or off. The decision controls
+retain **Ask me**, **Allow**, **Automatic** and **Never**. Broader access continues
+through the existing confirmation dialog and server-side authorization checks.
+
+Only editable permissions can be selected. **Show → Selected** lets you inspect
+the selection, including items outside an earlier search. Bulk changes support
+**Ask me** and **Never** only; selection and other mutations are disabled while
+an update runs. Partial failures name the refused permissions and retain them
+for retry. Refresh removes selections that are no longer editable. Counts,
+filters and summaries use the same server-confirmed permission state.
+
+---
+
 ## Configuring something is permission for it
 
 Raiker's stated [security posture](../architecture/HANDOFF.md#security-posture-read-before-adding-any-restriction) is

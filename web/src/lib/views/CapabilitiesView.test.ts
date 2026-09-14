@@ -175,8 +175,8 @@ describe("CapabilitiesView", () => {
     });
 
     // Domain headings replace backend phase numbers.
-    expect(registry().getByText("Local execution")).toBeInTheDocument();
-    expect(registry().getByText("Network")).toBeInTheDocument();
+    expect(registry().getByRole("checkbox", { name: "Select all Local execution capabilities" })).toBeInTheDocument();
+    expect(registry().getByRole("checkbox", { name: "Select all Network capabilities" })).toBeInTheDocument();
     expect(registry().queryByText(/^Phase \d/)).not.toBeInTheDocument();
 
     // A capability with no executor is a future, not a tool: no row, no selector.
@@ -483,4 +483,81 @@ describe("Permissions — the sections above the registry", () => {
     // The one that was refused stays selected, so it can be retried where it is.
     expect(screen.getByText("1 selected")).toBeInTheDocument();
   });
+});
+
+describe("Permissions workspace", () => {
+  it("combines search, group and status filters and recovers from no matches", async () => {
+    stubFetch({ "GET /api/capability-gates": GATES });
+    render(CapabilitiesView);
+    await registryWhenLoaded();
+    await fireEvent.change(screen.getByRole("combobox", { name: "Permission group" }), { target: { value: "Network" } });
+    expect(registry().queryByRole("button", { name: /Shell commands/i })).not.toBeInTheDocument();
+    expect(registry().getByRole("button", { name: /Web fetch/i })).toBeInTheDocument();
+    await fireEvent.change(screen.getByRole("combobox", { name: "Permission status" }), { target: { value: "off" } });
+    expect(screen.getByText("No matching permissions")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getByText("Showing 2 of 2 permissions")).toBeInTheDocument();
+    // Domain names are searchable even when they do not occur in tool labels.
+    await fireEvent.input(screen.getByRole("searchbox"), { target: { value: "Network" } });
+    expect(screen.getByText("Showing 1 of 2 permissions")).toBeInTheDocument();
+    expect(registry().getByRole("button", { name: /Web fetch/i })).toBeInTheDocument();
+  });
+
+  it("excludes read-only permissions from group selection", async () => {
+    stubFetch({ "GET /api/capability-gates": [GATES[0], { ...GATES[1], can_current_principal_change: false }] });
+    render(CapabilitiesView);
+    const list = await registryWhenLoaded();
+    expect(list.getByRole("checkbox", { name: "Select Web fetch" })).toBeDisabled();
+    expect(list.getByRole("checkbox", { name: "Select all Network capabilities" })).toBeDisabled();
+    await fireEvent.click(list.getByRole("checkbox", { name: "Select Shell commands" }));
+    await fireEvent.change(screen.getByRole("combobox", { name: "Permission status" }), { target: { value: "selected" } });
+    expect(screen.getByText("Showing 1 of 2 permissions")).toBeInTheDocument();
+    expect(registry().queryByRole("checkbox", { name: "Select Web fetch" })).not.toBeInTheDocument();
+  });
+
+  it("makes search results visible after all groups are collapsed", async () => {
+    stubFetch({ "GET /api/capability-gates": GATES });
+    render(CapabilitiesView);
+    await registryWhenLoaded();
+    await fireEvent.click(screen.getByRole("button", { name: "Collapse groups" }));
+    expect(registry().queryByRole("button", { name: /Shell commands/i })).not.toBeInTheDocument();
+    await fireEvent.input(screen.getByRole("searchbox"), { target: { value: "shell" } });
+    expect(registry().getByRole("button", { name: /Shell commands/i })).toBeInTheDocument();
+  });
+
+  it("shows an explicit empty state when no executable permissions are reported", async () => {
+    stubFetch({ "GET /api/capability-gates": [] });
+    render(CapabilitiesView);
+    expect(await screen.findByText("No permissions available")).toBeInTheDocument();
+  });
+});
+
+it("locks selection and individual controls until a bulk update settles", async () => {
+  const fetchMock = stubFetch({ "GET /api/capability-gates": GATES });
+  render(CapabilitiesView);
+  const list = await registryWhenLoaded();
+  await fireEvent.click(list.getByRole("checkbox", { name: "Select Shell commands" }));
+  let finish!: (response: Response) => void;
+  fetchMock.mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve; }));
+  const bulk = within(screen.getByRole("toolbar", { name: "Bulk capability actions" }));
+  await fireEvent.click(bulk.getByRole("button", { name: "Never" }));
+  expect(list.getByRole("checkbox", { name: "Select Web fetch" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Refresh capabilities" })).toBeDisabled();
+  const controls = within(list.getByRole("group", { name: "When Raiker wants to use Web fetch" }));
+  expect(controls.getByRole("button", { name: "Allow" })).toBeDisabled();
+  finish({ ok: true, status: 200, json: async () => ({ ok: true }) } as Response);
+  await waitFor(() => expect(controls.getByRole("button", { name: "Allow" })).toBeEnabled());
+  expect(list.getByRole("checkbox", { name: "Select Shell commands" })).not.toBeChecked();
+});
+
+it("drops selected permissions when refresh revokes editing access", async () => {
+  const routes = { "GET /api/capability-gates": GATES };
+  stubFetch(routes);
+  render(CapabilitiesView);
+  const list = await registryWhenLoaded();
+  await fireEvent.click(list.getByRole("checkbox", { name: "Select Shell commands" }));
+  routes["GET /api/capability-gates"] = GATES.map(gate => ({ ...gate, can_current_principal_change: false }));
+  await fireEvent.click(screen.getByRole("button", { name: "Refresh capabilities" }));
+  await waitFor(() => expect(screen.queryByRole("toolbar", { name: "Bulk capability actions" })).not.toBeInTheDocument());
+  expect(registry().getByRole("checkbox", { name: "Select Shell commands" })).toBeDisabled();
 });

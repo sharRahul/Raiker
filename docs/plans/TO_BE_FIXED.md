@@ -111,6 +111,7 @@ names.
 | [BUG-291](#bug-291--a-live-spec-asserts-a-refusal-that-a-working-key-will-never-produce) | Low | Live test harness | Open — raised 2026-09-13 running the RR-MCP-02 round with a key that works |
 | [BUG-292](#bug-292--a-live-spec-sends-a-turn-without-choosing-a-model-and-the-composer-is-right-to-refuse) | Low | Live test harness | Open — raised 2026-09-13; the product is correct and the spec skips the step |
 | [BUG-293](#bug-293--a-side-effect-capabilitys-threat-model-and-bypass-test-are-not-mechanically-required) | Medium | Governance / release assurance | Open — the remainder of RR-AUTHORITY-01 after [FIXED-505](FIXED_ITEMS.md#fixed-505--the-four-capabilities-that-reach-furthest-into-an-owners-accounts-explained-themselves-least) |
+| [BUG-294](#bug-294--threads-filters-describe-a-hundred-rows-and-are-called-a-workspace) | Medium | Threads / work index | Open — NEW-THREAD-01, the last of the removal review's six findings; needs API pagination rather than a view fix |
 | [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — **a fifth round blocked on the same value, 2026-09-06**; confirmed in two requests again, and this host has no local runtime either. Raiker's half holds under a fifth key: the refusal reads as itself in the picker, not as *Provider unreachable*. The attempt found [FIXED-435](FIXED_ITEMS.md#fixed-435--the-models-page-said-a-gate-was-on-above-providers-it-would-refuse) |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
@@ -1753,3 +1754,48 @@ collected.
 **Interface outcome that has to be true before this closes.** Permissions can show
 an owner what a capability would cost if it were reached without governance, and
 a new executor cannot ship without answering that question.
+
+---
+
+## BUG-294 — Threads filters describe a hundred rows and are called a workspace
+
+**Severity: Medium. Area: Threads / work index. Raised 2026-09-14 as
+[NEW-THREAD-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-thread-01--filters-only-cover-a-truncated-list-and-disappear-during-search)
+of the removal and simplification review; the only one of that section's six
+findings still open.**
+
+**Observed.** `SearchChatView.svelte` derives its Project choices *and* its
+filtered results from the threads it has loaded, and it loads one unpaginated
+page: `api.ts::workThreads` defaults to `limit 100`,
+`routes_dashboard.py::list_work_threads` forwards it, and
+`DashboardService.list_work_threads` returns `threads[:limit]`. So:
+
+- a Project that appears only in older work is **not offered as a filter**, and
+  a filter that is missing reads as a project with nothing in it;
+- the result window looks like the whole inventory, with nothing saying it is a
+  window;
+- typing a query calls `searchChats` without the Project or kind filter, and the
+  filter controls are hidden while searching — an implicit scope switch nobody
+  asked for, in the middle of narrowing something down.
+
+**Root cause.** The browser is being used as the index. Filtering and faceting
+happen over whatever arrived, so both are only ever as complete as the first
+page — and the first page is the only page.
+
+**Why it is not closed with the other five.** The other findings in §18.5 were
+view-level: a label, a race, a walk, a link. This one needs the canonical work
+index to grow authenticated Project/kind/query filters and bounded cursor
+pagination, filtering **before** paginating, with independently scoped facets and
+a stable sort with a tie-breaker. Fetching everything into the browser is not the
+remedy — it is the current behaviour with a larger number.
+
+**Proposed fix.** Add the filters and a cursor to `GET /api/work-threads`; return
+facets computed over the filtered set rather than the page, plus `next_cursor`
+and an accurate total where one is cheap. Keep the selected filters while typing
+and offer an explicit **Search all work**. Bind cursors to the owner and the
+query context so a cursor cannot be replayed against a different scope. Until
+that lands, label the window honestly rather than implying completeness.
+
+**Interface outcome that has to be true before this closes.** A workspace with
+more than 100 threads offers every Project that has one, and a Project that
+exists only in older work can be selected and filtered to.

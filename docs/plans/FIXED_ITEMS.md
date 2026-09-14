@@ -527,6 +527,11 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-503](#fixed-503--the-live-harness-looked-for-provider-controls-that-had-moved-into-a-menu) | Low | Live test harness | Fixed 2026-09-13 (found while verifying FIXED-501) |
 | [FIXED-504](#fixed-504--five-destinations-one-label-and-the-owners-token-sent-to-all-of-them) | High | MCP / remote trust and egress | Fixed 2026-09-13 (closes RR-MCP-02) |
 | [FIXED-505](#fixed-505--the-four-capabilities-that-reach-furthest-into-an-owners-accounts-explained-themselves-least) | Medium | Permissions / capability copy | Fixed 2026-09-13 (reduces RR-AUTHORITY-01; remainder is BUG-293) |
+| [FIXED-506](#fixed-506--home-reported-an-unread-readiness-check-as-nothing-to-worry-about) | High | Home / readiness honesty | Fixed 2026-09-14 (closes NEW-HOME-01) |
+| [FIXED-507](#fixed-507--a-stale-knowledge-graph-called-itself-live-and-a-failed-refresh-erased-it) | Medium | Knowledge Map / freshness | Fixed 2026-09-14 (closes NEW-MAP-01) |
+| [FIXED-508](#fixed-508--the-folder-an-owner-added-was-not-always-the-folder-they-reviewed) | Medium | Knowledge Map / source review | Fixed 2026-09-14 (closes NEW-MAP-02) |
+| [FIXED-509](#fixed-509--a-source-reviews-entry-cap-bounded-its-answer-and-not-its-work) | Medium | Knowledge Map / resource bounds | Fixed 2026-09-14 (closes NEW-MAP-03) |
+| [FIXED-510](#fixed-510--a-projects-pictures-could-not-be-opened-from-the-project) | Low | Projects / Design continuity | Fixed 2026-09-14 (closes NEW-PROJ-02) |
 
 ---
 
@@ -22269,3 +22274,238 @@ Carried in [`TO_BE_FIXED.md`](TO_BE_FIXED.md).
 
 **Verification.** Three cases, including the regression itself: each connector
 description must say it only reads and that what it returns is untrusted.
+
+---
+
+## FIXED-506 — Home reported an unread readiness check as nothing to worry about
+
+**Severity: High. Area: Home / readiness honesty. Status: Fixed 2026-09-14.
+Closes [NEW-HOME-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-home-01--missing-health-data-becomes-zero-issues).**
+
+**Observed.** `WorkbenchView.svelte::load` caught a diagnostics failure and set
+`diagnostics = null`. `runtimeIssues` mapped `null` to **0**. With no approvals
+and no active work, `nothingNeedsAttention` then became true and the default
+screen of the product said:
+
+> Nothing needs you right now.
+
+Nobody had looked. `null` was carrying three different facts at once — not read
+yet, read and failed, nothing to report — and the page resolved all three to the
+most reassuring one. A readiness claim made from an unread endpoint is worse than
+no claim, because an owner acts on it.
+
+**A second half, in the same rail.** "Needs your attention" counted *every*
+active task. A healthy overnight routine therefore put Home permanently in a
+state that said something needed the owner — which is how a person learns to
+stop reading the rail that also carries their approvals. The board below already
+lists running work, with the same Stop control.
+
+**Fixed.** `web/src/lib/freshness.ts` gives the four states `null` was standing
+in for: `loading`, `fresh`, `stale` (read once, newest attempt failed — worth
+showing, not worth asserting) and `unavailable` (never read). Home holds
+readiness as one of those. `runtimeIssues` is `number | null` and is never a
+zero it did not measure; the all-clear requires readiness to have actually been
+read; and when it has not, the rail says what *is* true and names the gap:
+
+> No approvals are waiting and no work is blocked. Raiker could not read its own
+> runtime readiness, so this is not an all-clear.
+
+The attention rail now counts **blocked** work — `waiting_for_approval` and
+`paused`, the two states that do not move again until a person acts — rather than
+all active work. `BLOCKED_TASK_STATES` lives beside `ACTIVE_TASK_STATES` in
+`statusMaps.ts` so the distinction is shared rather than re-derived per surface.
+
+Home also reloads every fifteen seconds, so two reads are routinely in flight and
+the network may answer them in either order. Each load takes a number and only
+the newest commits — the same idiom as
+[FIXED-497](#fixed-497--a-projects-header-could-stand-over-another-projects-work).
+
+**Verification.** Nine cases in `web/src/lib/freshness.test.ts` and five in
+`WorkbenchView.test.ts`, including the two the old code would fail: a 503 from
+diagnostics must not produce an all-clear, and a running task must not appear in
+the attention rail. One of the existing cases had to change with it — it ran with
+no diagnostics route at all, so the read 404'd and the board reported zero issues
+from it, which is the defect encoded as a test.
+
+Live: `web/e2e/removal-review-2026-09-13-live.spec.ts` watches readiness stop
+answering while the board is open and reads the stale line off the tile
+(`docs/screenshots/2026-09-13-removal-review/home-readiness-unavailable.png`).
+Deliberately not a reload — `/api/diagnostics` is also what the boot probe calls
+to decide whether the runtime is reachable, so refusing it across a reload locks
+the workspace and proves nothing about the rail. Found by trying it.
+
+---
+
+## FIXED-507 — A stale knowledge graph called itself live, and a failed refresh erased it
+
+**Severity: Medium. Area: Knowledge Map / freshness. Status: Fixed 2026-09-14.
+Closes [NEW-MAP-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-map-01--stale-graph-remains-labelled-live).**
+
+**Observed.** `BrainView.svelte` kept the last graph it managed to load and went
+on labelling it **"Live workspace graph"**, because the label checked only
+whether `updatedAt` existed — whether *some* update had once happened. A graph an
+hour old under a word meaning "now" is not a small inaccuracy on this page: the
+Knowledge Map is what an owner reads to decide what Raiker knows about them.
+
+**Worse, found while fixing it.** `loadError` was rendered as a route-level
+`PageState`, so a failed *refresh* replaced the entire map with **"Couldn't load
+the knowledge graph"** — about a graph that had loaded and was still in memory.
+On a fifteen-second poll, one hiccup wiped the owner's map and told them it could
+not be read.
+
+**And a third, beside it.** `rejectRelationship` wrote its failure to
+`loadError` too, so one failed rejection produced that same full-page "couldn't
+load" — a sentence about a read that had succeeded.
+
+**Fixed.** The graph is held as a `Freshness<BrainData>` (FIXED-506's module).
+The corner says which of four things is true — Loading, Live workspace graph,
+Refreshing, or `Workspace graph · last updated … · refresh failed (…)` — and the
+status dot goes amber with it. The route-level error is now for having *nothing*
+to show; a graph that has gone stale stays on screen and says so. A failed action
+has its own dismissible notice over the canvas rather than borrowing the load
+error.
+
+Loads are generation-checked, like Home's: a fifteen-second poll and a manual
+Refresh can be in flight together, and an older graph must not land on a newer
+one.
+
+**Verification.** One case in `BrainView.test.ts` drives a successful load, fails
+every read after it, and asserts the label changes, the stale line carries both
+halves, and the graph is still rendered. Live, the same sequence against a
+running host
+(`docs/screenshots/2026-09-13-removal-review/knowledge-map-stale.png`).
+
+---
+
+## FIXED-508 — The folder an owner added was not always the folder they reviewed
+
+**Severity: Medium. Area: Knowledge Map / source review. Status: Fixed
+2026-09-14. Closes [NEW-MAP-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-map-02--source-review-responses-are-not-bound-to-the-current-selection).**
+
+**Observed.** `reviewSource` awaited `reviewBrainSource(sourcePath)` and then
+assigned `sourceReview` unconditionally. The review is a plan for **one** source
+— how many files it would index, how many it would skip, the warnings that go
+with them — and `addSource` adds `sourceReview.path`.
+
+Pressing Review twice is prevented by the button's own busy state, so the
+reachable reproduction is the one the dialog is actually built around: select a
+source, press Review, and **pick a different one in the browser** while the first
+is still on the wire. Choosing a file has no busy guard — it is a click, not a
+request. The first plan then lands under the second selection, and **Add reviewed
+source** adds the first. The owner reads a plan for one source and indexes
+another.
+
+**Fixed.** Every read in the dialog takes a number and only the newest writes:
+browsing, reviewing, revoking and opening. A review additionally checks that the
+selection has not moved — `sourcePath` must still be the path that was
+requested — because picking a file does not start a request and so cannot bump
+the counter on its own. `addSource` names the reviewed path explicitly and
+refuses when the two have diverged, so the guarantee is local to the write rather
+than inherited from four earlier checks.
+
+The plan now prints the source it is a plan **for**. It never did, so a plan that
+had arrived for a previously selected folder looked exactly like a plan for the
+one on screen.
+
+**Found by writing the test.** A superseded response still has to release the
+dialog's busy state, or the owner is left looking at a "Reviewing…" button for a
+review whose answer was thrown away.
+
+**Verification.** Two cases in `BrainView.test.ts`: the full A-then-B race with a
+held response, asserting the stale plan never renders and that what is added is
+what was reviewed; and that editing the selection clears the plan rather than
+leaving an addable one behind.
+
+---
+
+## FIXED-509 — A source review's entry cap bounded its answer and not its work
+
+**Severity: Medium. Area: Knowledge Map / resource bounds. Status: Fixed
+2026-09-14. Closes [NEW-MAP-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-map-03--review-entry-cap-does-not-bound-all-traversal-work).**
+
+**Observed.** `DashboardService.review_brain_source` walked `path.rglob("*")` and
+stopped at `scanned >= 5000` — but `scanned` advanced only on entries it
+**accepted**. Every directory, every hidden path, every name under
+`node_modules`, every file it could not `stat` was free. So the cap bounded the
+*answer* and not the *work*: a folder whose dependency tree holds four hundred
+thousand entries was walked in full to report that it contains six markdown
+files, and `rglob` produced every one of those entries before the filter dropped
+it.
+
+This is a resource-bound weakness in an authenticated, owner-scoped path rather
+than a demonstrated denial of service, and it is recorded as that. It is still
+the wrong shape: an owner pointing the picker at their home directory should get
+a bounded answer, not a request that walks their disk.
+
+**Fixed.** A prunable walker with four budgets, because there are four ways a
+walk gets expensive and no one of them stops the others:
+
+| Budget | What it bounds |
+|---|---|
+| `REVIEW_ACCEPTED_FILE_BUDGET` (5,000) | The answer — what the card has always meant by its cap. |
+| `REVIEW_VISITED_ENTRY_BUDGET` (50,000) | The work. Every entry looked at, accepted or not. |
+| `REVIEW_DEPTH_BUDGET` (24) | A tree that is deep rather than wide. |
+| `REVIEW_TIME_BUDGET_SECONDS` (5) | Work that is slow rather than large — a network mount, a sleeping disk. |
+
+Excluded directories are pruned **before descent**: `os.walk` lets the walker
+edit the directory list in place, which is the difference between not entering
+`node_modules` and enumerating it to discard the result. Symlinked directories
+are not followed, which is what ends a cycle, and the containment check against
+the selected root is unchanged.
+
+The answer says what it cost and why it stopped — `visited_entries`, `truncated`
+and `truncated_reason` — and each of the four reasons is a different sentence,
+because each names a different thing the owner might do about it.
+
+**Verification.** Nine cases in `tests/test_knowledge_source_review_budget.py`,
+including the one that is the finding: a folder holding 600 entries inside
+pruned trees beside one real file must cost **five or fewer visits**. Each budget
+is exercised at a lowered value rather than by building fifty thousand files.
+Live, the review endpoint is read against a running host and the two new fields
+asserted.
+
+---
+
+## FIXED-510 — A project's pictures could not be opened from the project
+
+**Severity: Low. Area: Projects / Design continuity. Status: Fixed 2026-09-14.
+Closes [NEW-PROJ-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-proj-02--project-images-cannot-open-the-selected-asset-directly).**
+
+**Observed.** `ProjectsView.svelte` rendered up to eight of a project's images as
+plain `<img>` elements with no per-asset action, under a single generic link to
+`#/design`. Everything needed to do better was already there — since
+[FIXED-492](#fixed-492--a-generated-image-did-not-belong-to-the-project-it-was-made-in)
+an image carries the project it was made in — so the missing part was precise
+continuation: an owner looking at a picture in a project had to go and find it
+again in the account's whole Design history.
+
+The strip also showed eight tiles whether there were eight or eighty, which is a
+count nobody stated.
+
+**Fixed.** `asset` joins `project`, `session`, `turn` and `record` in
+`routeState.ts` — the typed, allowlisted, non-secret route state — and is held to
+the same rule they are: a coordinate naming something the reader may already
+open, granting nothing. The gallery it resolves against is owner-scoped on the
+server, so an id belonging to somebody else resolves to nothing at all, and one
+that has been deleted selects nothing and leaves the surface usable.
+
+Each picture is a link to `#/design?project=…&asset=…`; **View all in Design**
+keeps the project rather than dropping the owner into everything they have ever
+generated; and the strip says "Showing 8 of 11" when it is truncated.
+
+Design reads both. A project scopes the canvas, and says so in a chip carrying
+the project's **name** — resolved from the owner's own project list, because the
+gallery carries the id and a chip reading `proj_a1b2c3` would be the same defect
+one surface along — with a **Show all images** way out. A filter nobody can see
+is a canvas that looks like it has lost work.
+
+**Verification.** Six cases in a new `DesignView.test.ts` (the surface had none)
+and three in `ProjectsView.test.ts`: the link each picture carries, the count
+when truncated, the scope chip named and unnamed, the asset selecting — read off
+the composer, which says `Enter edits` when an asset is selected and
+`Enter generates` when none is — and an unknown asset selecting nothing.
+
+**What the live round could not do.** The live case skips with its reason: this
+host reaches no image provider, so the workspace holds no picture filed to a
+project to open. The same limit as
+[BUG-290](TO_BE_FIXED.md#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host).

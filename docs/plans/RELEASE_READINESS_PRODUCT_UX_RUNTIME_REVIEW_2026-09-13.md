@@ -2686,6 +2686,28 @@ Do not remove a service because its current UI is technical. Replace the setup j
 
 These findings are derived from the pinned source, not live reproductions. “Remove” below refers to misleading behavior or unsafe assumptions; suggested repairs remain unimplemented by this review.
 
+> **Implementation status, 2026-09-14.** Five of the six are closed and recorded
+> in [`FIXED_ITEMS.md`](FIXED_ITEMS.md) — NEW-HOME-01 as
+> [FIXED-506](FIXED_ITEMS.md#fixed-506--home-reported-an-unread-readiness-check-as-nothing-to-worry-about),
+> NEW-MAP-01 as
+> [FIXED-507](FIXED_ITEMS.md#fixed-507--a-stale-knowledge-graph-called-itself-live-and-a-failed-refresh-erased-it),
+> NEW-MAP-02 as
+> [FIXED-508](FIXED_ITEMS.md#fixed-508--the-folder-an-owner-added-was-not-always-the-folder-they-reviewed),
+> NEW-MAP-03 as
+> [FIXED-509](FIXED_ITEMS.md#fixed-509--a-source-reviews-entry-cap-bounded-its-answer-and-not-its-work),
+> and NEW-PROJ-02 as
+> [FIXED-510](FIXED_ITEMS.md#fixed-510--a-projects-pictures-could-not-be-opened-from-the-project).
+> **NEW-THREAD-01 remains open** — it needs Project/kind/query filters and cursor
+> pagination on the work index, which is an API change rather than a view fix.
+>
+> Three further defects were found while closing them and are closed with them:
+> a failed Knowledge Map *refresh* replaced the whole map with a load error about
+> a graph that had loaded; a failed relationship rejection was reported the same
+> way; and Home's attention rail counted every running task, so a healthy
+> standing routine made the board permanently claim something needed the owner.
+>
+> The prose below remains the review as written.
+
 ### NEW-HOME-01 — Missing health data becomes zero issues
 
 **Evidence:** `WorkbenchView.svelte::load` catches a diagnostics failure and sets diagnostics to null. `runtimeIssues` maps null to 0; `nothingNeedsAttention` can then become true when approvals and active work are empty. The page renders “Nothing needs you right now.” The same attention rail includes all active work regardless of whether it requires action.

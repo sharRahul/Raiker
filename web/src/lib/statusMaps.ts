@@ -28,6 +28,24 @@ export function isActiveTask(status: string): boolean {
   return ACTIVE_TASK_STATES.includes(status);
 }
 
+// NEW-HOME-01 — active and *blocked* are two different facts, and Home's
+// attention rail counted the first as though it were the second. A run that is
+// running is progress; under a heading that says "Needs your attention" it is
+// noise, and noise there is what makes an owner stop reading the rail that also
+// carries their approvals.
+//
+// These two are the states that do not move again until a person acts:
+// `waiting_for_approval` is parked on a decision only they can make, and
+// `paused` stays paused until they resume it — whether they paused it or the
+// containment circuit breaker did. Everything else in `ACTIVE_TASK_STATES` is
+// waiting on a machine, including `waiting_for_children`, and is reported on
+// the board rather than in the rail.
+export const BLOCKED_TASK_STATES = ["waiting_for_approval", "paused"];
+
+export function isBlockedTask(status: string): boolean {
+  return BLOCKED_TASK_STATES.includes(status);
+}
+
 export function taskBadge(status: string): BadgeVariant {
   switch (status) {
     case "completed":

@@ -11,6 +11,7 @@ import re
 import shutil
 import stat
 import sys
+import time
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -29,6 +30,11 @@ from raiker.control.knowledge_scope import (
     KNOWLEDGE_UPLOAD_DIR,
     MAX_KNOWLEDGE_UPLOAD_BYTES,
     MAX_SOURCE_PATH_CHARS,
+    REVIEW_ACCEPTED_FILE_BUDGET,
+    REVIEW_DEPTH_BUDGET,
+    REVIEW_TIME_BUDGET_SECONDS,
+    REVIEW_TRUNCATION_REASONS,
+    REVIEW_VISITED_ENTRY_BUDGET,
     RUNTIME_DIR_NAME,
     SKIPPED_DIRECTORY_NAMES,
     ScopeError,
@@ -136,6 +142,132 @@ TASK_OUTCOME_STATES = frozenset({"completed", "failed", "cancelled", "waiting_fo
 # network call is made to find out.
 _GITHUB_NAME = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9_])?")
 _GITHUB_REF = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._/-]{0,98}[A-Za-z0-9_-])?")
+
+
+@dataclass(frozen=True)
+class _SourceReviewWalk:
+    """What one bounded review walk found, and what it cost to find it."""
+
+    supported: int
+    unsupported: int
+    total_bytes: int
+    examples: tuple[str, ...]
+    #: Every entry looked at, accepted or skipped. The number the old cap was
+    #: mistaken for.
+    visited: int
+    truncated_reason: str | None
+
+
+def _walk_source_for_review(path: Path, base: Path) -> _SourceReviewWalk:
+    """Walk *path* for an indexing plan, under four budgets that actually bind.
+
+    NEW-MAP-03. The previous walk was ``path.rglob("*")`` with a counter that
+    only advanced on entries it accepted, so everything it skipped was free:
+    every directory, every hidden path, every name under ``node_modules``, every
+    file it could not ``stat``. A cap of 5,000 therefore bounded the *answer*
+    and not the *work*, and a folder with a large dependency tree beside it was
+    walked in full to report the six files an owner cared about.
+
+    Three things change:
+
+    * **Excluded directories are pruned before descent** rather than after
+      every entry inside them has been produced. ``os.walk`` lets the walker
+      edit the directory list in place, which is the difference between not
+      entering ``node_modules`` and enumerating it and discarding the result.
+    * **Every entry visited is counted**, whatever happens to it, so the visit
+      budget is a bound on the work and the file budget stays a bound on the
+      answer.
+    * **Depth and elapsed time are their own budgets.** A pathological tree is
+      deep rather than wide, and a slow drive is neither — no counter of entries
+      notices either one.
+
+    Symlinked directories are not followed (``os.walk`` does not by default),
+    which is what stops a cycle; the containment check below is unchanged and
+    still judges every accepted file against the selected root.
+    """
+    started = time.monotonic()
+    supported = 0
+    unsupported = 0
+    total_bytes = 0
+    visited = 0
+    examples: list[str] = []
+    truncated: str | None = None
+
+    def _example(resolved: Path) -> None:
+        if len(examples) < 8:
+            with contextlib.suppress(ValueError):
+                examples.append(resolved.relative_to(base).as_posix())
+
+    def _consider(candidate: Path) -> None:
+        """Count one file, if it is one Raiker could read."""
+        nonlocal supported, unsupported, total_bytes
+        try:
+            resolved = candidate.resolve()
+            if resolved != base and base not in resolved.parents:
+                return
+            size = candidate.stat().st_size
+        except (OSError, ValueError):
+            return
+        if candidate.suffix.casefold() in KNOWLEDGE_SOURCE_EXTENSIONS and size <= 5 * 1024 * 1024:
+            supported += 1
+            total_bytes += size
+            _example(resolved)
+        else:
+            unsupported += 1
+
+    if path.is_file():
+        visited = 1
+        _consider(path)
+        return _SourceReviewWalk(
+            supported, unsupported, total_bytes, tuple(examples), visited, None
+        )
+
+    base_depth = len(path.parts)
+    for dirpath, dirnames, filenames in os.walk(path, onerror=None):
+        here = Path(dirpath)
+        depth = len(here.parts) - base_depth
+        # Pruned in place, before anything inside them is produced. This is the
+        # whole finding: the previous walk enumerated these and threw the
+        # entries away one at a time.
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if name not in SKIPPED_DIRECTORY_NAMES and not name.startswith(".")
+        ]
+        visited += len(dirnames)
+        if depth >= REVIEW_DEPTH_BUDGET:
+            dirnames.clear()
+            truncated = truncated or "depth_cap"
+
+        for name in filenames:
+            visited += 1
+            if visited >= REVIEW_VISITED_ENTRY_BUDGET:
+                truncated = "visited_entry_cap"
+                break
+            if time.monotonic() - started >= REVIEW_TIME_BUDGET_SECONDS:
+                truncated = "time_cap"
+                break
+            if name.startswith("."):
+                continue
+            _consider(here / name)
+            # The accepted-file budget is checked after the file is counted, so
+            # the number the owner reads is the number that was reached.
+            if supported + unsupported >= REVIEW_ACCEPTED_FILE_BUDGET:
+                truncated = "accepted_file_cap"
+                break
+
+        if truncated in {"visited_entry_cap", "time_cap", "accepted_file_cap"}:
+            break
+        if visited >= REVIEW_VISITED_ENTRY_BUDGET:
+            truncated = "visited_entry_cap"
+            break
+        if time.monotonic() - started >= REVIEW_TIME_BUDGET_SECONDS:
+            truncated = "time_cap"
+            break
+
+    return _SourceReviewWalk(
+        supported, unsupported, total_bytes, tuple(examples), visited, truncated
+    )
 
 
 def _runs_on_this_platform(profile: Any) -> bool:
@@ -2323,61 +2455,36 @@ class DashboardService:
         """Build a bounded, read-only indexing plan before a source is selected."""
         root, relative, path = self._scoped_source(raw_path, owner_principal_id=owner_principal_id)
         relative_path = scope_path(root, relative)
-        candidates = [path] if path.is_file() else path.rglob("*")
-        supported = 0
-        unsupported = 0
-        total_bytes = 0
-        scanned = 0
-        examples: list[str] = []
-        warnings: list[str] = []
         # Containment is judged against the root that was selected, not against
         # the workspace: a granted folder lives outside the workspace entirely,
         # and everything under it — and nothing above it — is in scope.
         base = root.path.resolve() if root.path is not None else path
-        for candidate in candidates:
-            if scanned >= 5000:
-                warnings.append(
-                    "More than 5,000 entries were found; review is capped and indexing will remain incremental."
-                )
-                break
-            try:
-                resolved = candidate.resolve()
-                if resolved != base and base not in resolved.parents:
-                    continue
-                if not candidate.is_file() or any(
-                    part in SKIPPED_DIRECTORY_NAMES or part.startswith(".")
-                    for part in candidate.relative_to(base).parts
-                ):
-                    continue
-                size = candidate.stat().st_size
-            except (OSError, ValueError):
-                continue
-            scanned += 1
-            if (
-                candidate.suffix.casefold() in KNOWLEDGE_SOURCE_EXTENSIONS
-                and size <= 5 * 1024 * 1024
-            ):
-                supported += 1
-                total_bytes += size
-                if len(examples) < 8:
-                    examples.append(scope_path(root, resolved.relative_to(base).as_posix()))
-            else:
-                unsupported += 1
-        if total_bytes > 100 * 1024 * 1024:
+        walk = _walk_source_for_review(path, base)
+
+        warnings: list[str] = []
+        if walk.truncated_reason is not None:
+            warnings.append(REVIEW_TRUNCATION_REASONS[walk.truncated_reason])
+        if walk.total_bytes > 100 * 1024 * 1024:
             warnings.append(
                 "The selected source exceeds 100 MB; content will be loaded incrementally as it is needed."
             )
-        if unsupported:
-            warnings.append(f"{unsupported} unsupported or oversized file(s) will be skipped.")
+        if walk.unsupported:
+            warnings.append(f"{walk.unsupported} unsupported or oversized file(s) will be skipped.")
         return {
             "path": relative_path,
             "kind": "folder" if path.is_dir() else "file",
-            "supported_files": supported,
-            "unsupported_files": unsupported,
-            "total_bytes": total_bytes,
-            "examples": examples,
+            "supported_files": walk.supported,
+            "unsupported_files": walk.unsupported,
+            "total_bytes": walk.total_bytes,
+            "examples": [scope_path(root, example) for example in walk.examples],
             "warnings": warnings,
-            "review_cap": 5000,
+            "review_cap": REVIEW_ACCEPTED_FILE_BUDGET,
+            # NEW-MAP-03 — what the walk actually cost, and why it stopped if it
+            # did. A partial answer that does not say it is partial is the
+            # defect this replaced, one level up.
+            "visited_entries": walk.visited,
+            "truncated": walk.truncated_reason is not None,
+            "truncated_reason": walk.truncated_reason,
         }
 
     def get_brain_preferences(self, owner_principal_id: str) -> dict[str, Any]:

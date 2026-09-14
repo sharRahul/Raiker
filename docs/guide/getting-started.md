@@ -301,6 +301,19 @@ rather than behind the gear because a decision waiting on you is the work,
 arriving many times a day, while Permissions and Models are configured once and
 revisited.
 
+**Needs your attention** on that board means exactly that. A run that is running
+is progress and stays on the board below with its Stop control; what reaches the
+rail is work that will not move again until you act — a run waiting on an
+approval, or a paused one — along with approvals themselves and any runtime
+readiness problem.
+
+**"Nothing needs you right now" is a claim about all three, and it is only made
+when all three were read.** If Raiker cannot read its own readiness it says so
+and names the gap — *No approvals are waiting and no work is blocked. Raiker
+could not read its own runtime readiness, so this is not an all-clear* — rather
+than counting an unread check as zero problems. A readiness claim nobody checked
+is worse than no claim, because you would act on it.
+
 **Sessions is inside Observability**, not a destination of its own: it is the
 complete record of every conversation *and* every task run, which is why the
 sidebar's RECENT CHATS list stays conversations only.

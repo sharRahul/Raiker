@@ -131,6 +131,12 @@ sessions, the tasks scoped to it, its checkpoints, and the **images** generated
 in [Design](design.md) while it was the working project. Pictures made with no
 project chosen stand alone and are not shown under any project.
 
+Click any of those images to open **that** picture in Design, with the canvas
+scoped to this project and a **Show all images** way back out. **View all in
+Design** keeps the project too, so neither route drops you into every image you
+have ever generated. The strip shows eight and says how many there are when
+there are more.
+
 ## The work board
 
 **Workbench** is the first thing Raiker opens on, and it answers one question:

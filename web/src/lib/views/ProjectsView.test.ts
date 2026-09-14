@@ -393,8 +393,49 @@ describe("ProjectsView context home", () => {
       }),
     );
 
-    const shot = await screen.findByRole("img", { name: "a maple leaf" });
+    // NEW-PROJ-02 — the alt text names the action, because the picture is now
+    // a link to itself rather than an illustration.
+    const shot = await screen.findByRole("img", { name: "Open in Design: a maple leaf" });
     expect(shot).toHaveAttribute("src", "/api/images/img_1/bytes");
+  });
+
+  it("opens the image that was clicked, not the whole Design history (NEW-PROJ-02)", async () => {
+    // The strip showed eight pictures and offered no way to open one: the only
+    // continuation was a bare `#/design`, so finding the image you had just
+    // been looking at meant searching the account's whole Design history.
+    await openDetail(
+      routes({
+        "GET /api/images": {
+          sizes: ["1024x1024"],
+          generations: [generation({ generation_id: "img_1", prompt: "a maple leaf" })],
+        },
+      }),
+    );
+
+    const link = (await screen.findByRole("img", { name: /a maple leaf/ })).closest("a");
+    expect(link).toHaveAttribute("href", "#/design?project=proj_1&asset=img_1");
+    // And View all keeps the project rather than dropping the owner into every
+    // image they have ever generated.
+    expect(screen.getByRole("link", { name: "View all in Design" })).toHaveAttribute(
+      "href",
+      "#/design?project=proj_1",
+    );
+  });
+
+  it("says how many images there are when the strip is truncated (NEW-PROJ-02)", async () => {
+    await openDetail(
+      routes({
+        "GET /api/images": {
+          sizes: ["1024x1024"],
+          generations: Array.from({ length: 11 }, (_unused, index) =>
+            generation({ generation_id: `img_${index}`, prompt: `picture ${index}` }),
+          ),
+        },
+      }),
+    );
+
+    // Eight tiles that look like the whole set are a count nobody stated.
+    expect(await screen.findByText("Showing 8 of 11.")).toBeInTheDocument();
   });
 
   it("keeps out a picture that belongs to another project or to none", async () => {

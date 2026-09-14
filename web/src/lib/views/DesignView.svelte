@@ -25,6 +25,7 @@
   import GuideLink from "../components/GuideLink.svelte";
   import DesignCanvasRegion from "../components/DesignCanvasRegion.svelte";
   import { designPrimaryAction, MAX_DESIGN_VARIATIONS } from "../designAssets";
+  import { routeStateFromHash } from "../routeState";
   import { densityGap, workSurface } from "../workSurface";
   import { api, ApiError } from "../api";
   import { providerName } from "../format";
@@ -278,7 +279,31 @@
    * Oldest first, the way every other transcript in the product reads. The API
    * answers newest-first because it was written for a gallery.
    */
-  const turns = $derived([...(view?.generations ?? [])].reverse());
+  /**
+   * NEW-PROJ-02 — the project a link arrived with, and the asset it named.
+   *
+   * A project's image strip had no per-asset action and one generic
+   * `#/design` link, so an owner who had just been looking at a picture in a
+   * project had to search the whole account's Design history to find it again.
+   * Both are coordinates: the gallery behind them is owner-scoped on the
+   * server, so an id belonging to somebody else resolves to nothing.
+   */
+  const arrivedWith = $state(routeStateFromHash(window.location.hash));
+  const all = $derived([...(view?.generations ?? [])].reverse());
+  /**
+   * The project the canvas was scoped to, named. Resolved from the owner's own
+   * project list rather than from the gallery, which carries the id and not the
+   * name — a filter chip reading `proj_a1b2c3` would be the same defect this
+   * change is about, one surface along.
+   */
+  let scopedProjectName = $state<string | null>(null);
+  /** The filter is on whenever a project arrived, named or not. */
+  const scoped = $derived(arrivedWith.projectId !== null);
+  const turns = $derived(
+    arrivedWith.projectId === null
+      ? all
+      : all.filter((generation) => generation.project_id === arrivedWith.projectId),
+  );
   const COUNTS = Array.from({ length: MAX_DESIGN_VARIATIONS }, (_, index) => index + 1);
   const primaryAction = $derived(designPrimaryAction(selectedId, variations));
 
@@ -396,7 +421,28 @@
     }
   }
 
-  onMount(load);
+  onMount(async () => {
+    await load();
+    if (arrivedWith.projectId !== null) {
+      try {
+        const list = await api.projects();
+        scopedProjectName =
+          list.projects.find((project) => project.project_id === arrivedWith.projectId)?.name ??
+          null;
+      } catch {
+        // Supplementary: the filter still holds and the chip says so without a
+        // name, rather than the surface failing over a label.
+        scopedProjectName = null;
+      }
+    }
+    // Selected only if it is genuinely in this owner's gallery. An asset that
+    // was deleted, failed, or never belonged to them selects nothing and leaves
+    // the surface usable, rather than pointing at something that is not there.
+    const named = arrivedWith.assetId;
+    if (named !== null && (view?.generations ?? []).some((g) => g.generation_id === named)) {
+      selectedId = named;
+    }
+  });
 </script>
 
 <!-- VIS2-21 — the Work contract. Design shares its terms with Chat and Build
@@ -420,6 +466,20 @@
       <p class="notice" role="status">
         {block.reason}
         {#if block.href}<a href={block.href}>{block.linkLabel}</a>{/if}
+      </p>
+    {/if}
+
+    <!-- NEW-PROJ-02 — when a project sent the owner here, the canvas says so
+         and offers the way out. A filter nobody can see is a canvas that looks
+         like it has lost work. -->
+    {#if scoped}
+      <p class="scope-chip" role="status">
+        <Icon name="folder" size="sm" />
+        <span
+          >Showing images from {scopedProjectName ?? "one project"} · {turns.length}
+          {turns.length === 1 ? "image" : "images"}</span
+        >
+        <a href="#/design">Show all images</a>
       </p>
     {/if}
 
@@ -618,6 +678,20 @@
 </div>
 
 <style>
+  /* NEW-PROJ-02 — the canvas saying which project it is scoped to. */
+  .scope-chip {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-3);
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--sunken);
+    color: var(--text-2);
+    font-size: var(--text-xs);
+  }
+  .scope-chip a { margin-left: auto; color: var(--accent); }
   .research {
     margin: 0 0 var(--space-3);
     padding: var(--space-3);

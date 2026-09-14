@@ -144,6 +144,27 @@ are selected explicitly; it is not a general-purpose file browser. Citations
 are bidirectional, and a missing source remains visible as a hollow node rather
 than silently disappearing from the record.
 
+**The corner of the canvas says how current the picture is.** *Live workspace
+graph* means the last read succeeded. If a refresh fails, the graph you already
+have stays on screen — throwing away the only answer anybody has helps nobody —
+and the label changes to say when it was last true and that renewing it failed.
+Only a map that has never loaded is replaced by an error; the graph itself is
+never used to authorise anything, so a stale one is safe to keep reading.
+
+**Adding a source shows you a plan first.** Pick a file or folder from one of the
+places listed — Raiker's own document areas, and folders you have granted — and
+**Review indexing plan** reports how many files would be indexed, how many would
+be skipped, and the total size. The plan names the source it is a plan *for*, and
+**Add reviewed source** adds exactly that one: change the selection and the plan
+goes with it, rather than being added under a source you did not review.
+
+The review is bounded on purpose. It stops at 5,000 readable files, at 50,000
+entries examined, at 24 levels of nesting, or after five seconds — whichever
+comes first — and says which of them stopped it. Dependency and build
+directories (`node_modules`, `.git`, `dist` and the rest) are skipped without
+being walked at all. A folder with a large tree beside what you want indexed will
+say so rather than making you wait: choose a folder further in.
+
 Current semantic recall is limited unless you build a meaning-based index: the
 default vector representation is a feature-hashed bag of tokens, not a
 meaning-aware embedding model, so paraphrases without shared terms can be missed.

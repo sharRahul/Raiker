@@ -493,8 +493,11 @@
     <span class="bulk-count">{selectedCaps.size} selected</span>
     <button type="button" class="btn btn-ghost btn-sm" onclick={() => (selectedCaps = new Set())} disabled={bulkBusy}>Clear</button>
     <span class="bulk-label">Set all to:</span>
-    <button type="button" class="btn btn-sm" onclick={() => void bulkSetMode("ask")} disabled={bulkBusy}>Ask</button>
-    <button type="button" class="btn btn-sm btn-danger" onclick={() => void bulkSetMode("deny")} disabled={bulkBusy}>Deny</button>
+    <!-- REM-PERM-02 — the same words the controls below use. These two said
+         "Ask" and "Deny" about the values every other control on the page calls
+         "Ask me" and "Never", so one policy had two names on one screen. -->
+    <button type="button" class="btn btn-sm" onclick={() => void bulkSetMode("ask")} disabled={bulkBusy}>{BEHAVIOUR_COPY.ask.label}</button>
+    <button type="button" class="btn btn-sm btn-danger" onclick={() => void bulkSetMode("deny")} disabled={bulkBusy}>{BEHAVIOUR_COPY.deny.label}</button>
   </div>
 {/if}
 

@@ -91,13 +91,19 @@ end contract.
 
 ## What blocks a public first release
 
-> **Implementation status, 2026-09-13.** Three of these are closed and recorded
+> **Implementation status, 2026-09-13.** Four of these are closed and recorded
 > in [`FIXED_ITEMS.md`](FIXED_ITEMS.md) — RR-IDENTITY-01 as
 > [FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name),
 > RR-MCP-01 as
 > [FIXED-500](FIXED_ITEMS.md#fixed-500--every-local-mcp-server-was-handed-raikers-whole-environment),
-> and RR-PROJECT-01 as
-> [FIXED-496](FIXED_ITEMS.md#fixed-496--new-chat-on-a-project-card-opened-a-chat-that-belonged-to-no-project).
+> RR-PROJECT-01 as
+> [FIXED-496](FIXED_ITEMS.md#fixed-496--new-chat-on-a-project-card-opened-a-chat-that-belonged-to-no-project),
+> and RR-MCP-02 as
+> [FIXED-504](FIXED_ITEMS.md#fixed-504--five-destinations-one-label-and-the-owners-token-sent-to-all-of-them).
+> RR-AUTHORITY-01 is reduced but open: its Permissions-coverage half is
+> [FIXED-505](FIXED_ITEMS.md#fixed-505--the-four-capabilities-that-reach-furthest-into-an-owners-accounts-explained-themselves-least),
+> and the per-capability threat model, authority requirement and negative bypass
+> test that DEC-16 step 8 also asks for are not built.
 > The Status column below records that; the rest of this document remains the
 > review as written, and the remaining blockers remain open. This review is
 > still a documentation-only review — the implementation it describes was
@@ -106,9 +112,9 @@ end contract.
 | ID | Priority | Status | Blocker | Evidence and reason |
 |---|---:|---|---|---|
 | RR-IDENTITY-01 | P0 | **Closed** ([FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name)) | Internal principal ID reaches owner-facing/model-facing language | The account routes already return a display name, and `UserMetadata` has a `display_name` field, but prompt envelopes populate only `id=principal_id`. The exact rendered sentence is owner-observed and not present as a static literal. |
-| RR-AUTHORITY-01 | P0 | Open | Side-effect authority is not yet proven mechanically exclusive across every executor | Raiker has strong governance, but release assurance requires a type/issuer boundary that a future route, plugin, scheduler or connector cannot bypass by convention. |
+| RR-AUTHORITY-01 | P0 | Open (reduced, [FIXED-505](FIXED_ITEMS.md#fixed-505--the-four-capabilities-that-reach-furthest-into-an-owners-accounts-explained-themselves-least)) | Side-effect authority is not yet proven mechanically exclusive across every executor | Raiker has strong governance, but release assurance requires a type/issuer boundary that a future route, plugin, scheduler or connector cannot bypass by convention. DEC-16 step 8's Permissions-coverage half is now CI-enforced — four capabilities had no owner-facing description at all — and the registry's other columns, and the authority context itself, are not built. |
 | RR-MCP-01 | P0/P1 | **Closed** ([FIXED-500](FIXED_ITEMS.md#fixed-500--every-local-mcp-server-was-handed-raikers-whole-environment)) | MCP stdio inherits the Raiker process environment | `raiker/runtime/executors/mcp.py` starts the subprocess without a constructed `env`, creating an ambient-secret exposure class. |
-| RR-MCP-02 | P1 | Open | Remote MCP trust and network reach are under-specified | URL parsing is present, but owner-added remote endpoints are treated as authorization without a shared destination trust class, redirect/DNS-rebinding contract and explicit private-network grant. |
+| RR-MCP-02 | P1 | **Closed** ([FIXED-504](FIXED_ITEMS.md#fixed-504--five-destinations-one-label-and-the-owners-token-sent-to-all-of-them)) | Remote MCP trust and network reach are under-specified | URL parsing is present, but owner-added remote endpoints are treated as authorization without a shared destination trust class, redirect/DNS-rebinding contract and explicit private-network grant. |
 | RR-INSTALL-01 | P1 | Open | Linux/macOS installer runtime ownership is incomplete | A normal user must not need to supply a compatible Python toolchain or inherit unmanaged system dependencies for a supported desktop release. |
 | RR-PROJECT-01 | P1 | **Closed** ([FIXED-496](FIXED_ITEMS.md#fixed-496--new-chat-on-a-project-card-opened-a-chat-that-belonged-to-no-project)) | “New chat” from a project does not establish that project for filing | The Projects view routes to `#/new-chat` without setting the work project; the adjacent Build action does set it. The source comment says Chat remains owner-wide, which is correct for retrieval, but that is separate from filing the new session to the selected project. |
 | RR-DESIGN-01 | P1 | Open | Design is generation history, not yet the promised persistent design workspace | Real generation and governed research exist; asset filing, versions, selection/masking, edits, compare/revert and canvas state do not. |
@@ -2581,6 +2587,12 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 
 ### Launch, unlock, setup and Home
 
+> **REM-HOME-02 is closed**, as
+> [FIXED-506](FIXED_ITEMS.md#fixed-506--home-reported-an-unread-readiness-check-as-nothing-to-worry-about):
+> healthy running work no longer reaches the attention rail, and an unread
+> readiness check is never an all-clear. The remaining rows in this table are
+> open.
+
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
 | REM-LAUNCH-01 / P1 / S | Replace unconditional “Your Raiker is ready” when model selection was deferred. | Say “Setup saved” and name the remaining prerequisite; readiness must be scoped to the intended mode. ModelSetup renders Ready while its summary permits Decide later. | Derive each Chat/Build/Design next action from readiness; route an unavailable action to its exact setup remedy while permitting exploration. Test deferred model, unavailable image model and disconnected runtime. Do not require all optional services before launch. |
@@ -2602,6 +2614,12 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 
 ### Models, popup and Permissions
 
+> **REM-PERM-02 is closed**, as
+> [FIXED-512](FIXED_ITEMS.md#fixed-512--one-policy-three-sets-of-words-on-one-screen):
+> the bulk buttons and the authority matrix read the one owner vocabulary, the
+> unused fourth set of words is deleted, and a row leads with the capability's
+> name rather than its registry key. The remaining rows in this table are open.
+
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
 | REM-MODEL-01 / P2 / M | Merge duplicated provider readiness/default-model presentations across tabs and setup. | Five tabs already organize Models; adding more categories would recreate the old fragmentation. | One profile readiness controller powers onboarding, overview and composers. Keep tab-specific tasks; do not repeat an editable connection form in each. Test credential expiry and global/per-work override consistency. |
@@ -2612,6 +2630,12 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 | REM-PERM-03 / P2 / M | Replace repeated per-row explanations with concise summaries plus contextual Why. | Keep availability and behavior distinct while reducing repeated prose. | Use one effective gate selector across summaries, controls and MCP. Preserve scope, pending mutation and step-up flows; test permissions while work is paused and after revocation. |
 
 ### Threads, Tasks and Projects
+
+> **REM-THREAD-01 and REM-THREAD-02 are closed**, as
+> [FIXED-511](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace):
+> the work index filters, facets over everything that matched, and pages, and
+> the filters stay visible and applied while the owner types. The remaining rows
+> in this table are open.
 
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
@@ -2624,6 +2648,14 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 | REM-PROJ-02 / P2 / M | Replace the long detail stack with Overview plus Files/Work/Assets/Evidence sections. | ProjectsView currently stacks context, sessions, images, tasks and checkpoints. | Reuse Threads, artifact and evidence components scoped to the Project; avoid copied databases or mutation logic. Verify selection races, unsaved context and asset filing. |
 
 ### Memory, Knowledge Map and usage
+
+> **REM-MAP-03 is closed**, as
+> [FIXED-507](FIXED_ITEMS.md#fixed-507--a-stale-knowledge-graph-called-itself-live-and-a-failed-refresh-erased-it)
+> and
+> [FIXED-508](FIXED_ITEMS.md#fixed-508--the-folder-an-owner-added-was-not-always-the-folder-they-reviewed):
+> the graph states its own freshness, outdated requests are discarded, and a
+> reviewed source is the source that gets added. The remaining rows in this
+> table are open.
 
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
@@ -2647,6 +2679,18 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 | REM-SKILL-01 / P2 / M | Merge Upload/Import from link/Build one into a single Add skill entry with deliberate choices. | Multiple full forms compete before the user has chosen acquisition mode. | Shared staged preview, provenance/license check, permission diff and rollback receipt; skill learning produces reviewable versions. Test malicious metadata and upgrade requesting new grants. |
 
 ### Settings pages and remaining destinations
+
+> **REM-SET-ACCOUNT was already closed when this section was written**, which is
+> what its own row asks a reader to check before editing. Both halves shipped
+> earlier on 2026-09-13: the internal principal language as
+> [FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name)
+> — Account shows the fixed username and an editable display name, and no
+> `principal_…` key appears on the page — and the misleading cancellation as
+> [FIXED-498](FIXED_ITEMS.md#fixed-498--cancel-stayed-live-while-an-account-was-being-deleted),
+> which removes Cancel for the duration of the request rather than leaving a
+> control that looks like it undoes a deletion already running. Verified in
+> source on 2026-09-14; no change was made for this row. The remaining rows in
+> this table are open.
 
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
@@ -2679,6 +2723,31 @@ Do not remove a service because its current UI is technical. Replace the setup j
 ## 18.5 Additional code and UX findings requiring changes
 
 These findings are derived from the pinned source, not live reproductions. “Remove” below refers to misleading behavior or unsafe assumptions; suggested repairs remain unimplemented by this review.
+
+> **Implementation status, 2026-09-14. All six are closed** and recorded
+> in [`FIXED_ITEMS.md`](FIXED_ITEMS.md) — NEW-HOME-01 as
+> [FIXED-506](FIXED_ITEMS.md#fixed-506--home-reported-an-unread-readiness-check-as-nothing-to-worry-about),
+> NEW-MAP-01 as
+> [FIXED-507](FIXED_ITEMS.md#fixed-507--a-stale-knowledge-graph-called-itself-live-and-a-failed-refresh-erased-it),
+> NEW-MAP-02 as
+> [FIXED-508](FIXED_ITEMS.md#fixed-508--the-folder-an-owner-added-was-not-always-the-folder-they-reviewed),
+> NEW-MAP-03 as
+> [FIXED-509](FIXED_ITEMS.md#fixed-509--a-source-reviews-entry-cap-bounded-its-answer-and-not-its-work),
+> NEW-PROJ-02 as
+> [FIXED-510](FIXED_ITEMS.md#fixed-510--a-projects-pictures-could-not-be-opened-from-the-project),
+> and NEW-THREAD-01 as
+> [FIXED-511](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace) —
+> the one that needed the work index itself to grow filters, facets and cursor
+> pagination rather than a view fix. It closes **REM-THREAD-01** and
+> **REM-THREAD-02** of §18.3 with it.
+>
+> Three further defects were found while closing them and are closed with them:
+> a failed Knowledge Map *refresh* replaced the whole map with a load error about
+> a graph that had loaded; a failed relationship rejection was reported the same
+> way; and Home's attention rail counted every running task, so a healthy
+> standing routine made the board permanently claim something needed the owner.
+>
+> The prose below remains the review as written.
 
 ### NEW-HOME-01 — Missing health data becomes zero issues
 

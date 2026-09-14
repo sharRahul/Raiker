@@ -36,7 +36,12 @@ describe("AuthorityMatrix", () => {
     expect(screen.getByRole("columnheader", { name: "Raiker agent" })).toBeInTheDocument();
     // The agent column, one verdict per gate: asked for, switched off, and on
     // but with a readiness requirement the backend reports as unmet.
-    expect(within(table).getByText("Ask")).toBeInTheDocument();
+    //
+    // REM-PERM-02 — "Ask me", not "Ask". This column said `Ask` and `Denied`
+    // about the values every control on the page calls `Ask me` and `Never`,
+    // so one policy had two names on one screen. The three verdicts that are
+    // not modes keep their own words, because they answer a different question.
+    expect(within(table).getByText("Ask me")).toBeInTheDocument();
     expect(within(table).getByText("Unavailable")).toBeInTheDocument();
     expect(within(table).getByText("Not ready")).toBeInTheDocument();
     // NEW-PERM-03 — the owner column now answers in the same two words the row
@@ -103,7 +108,7 @@ describe("AuthorityMatrix", () => {
 
     // Every capability, and the verdict that was the part being scrolled away.
     expect(within(cards).getAllByRole("listitem")).toHaveLength(GATES.length);
-    expect(within(cards).getByText("Ask")).toBeInTheDocument();
+    expect(within(cards).getByText("Ask me")).toBeInTheDocument();
     expect(within(cards).getByText("Unavailable")).toBeInTheDocument();
     expect(within(cards).getByText("Not ready")).toBeInTheDocument();
     // Each verdict is labelled, so it reads as an answer rather than a word.

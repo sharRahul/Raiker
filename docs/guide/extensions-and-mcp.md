@@ -111,6 +111,47 @@ Remote (HTTP) servers are unaffected: they never share a process with Raiker, an
 their token is still resolved from the single environment variable the connection
 names.
 
+### Where a remote server may be
+
+A remote server is a URL you typed, and Raiker names which of three places it
+points at rather than calling all of them *remote*. The card and the Add form
+both say it, together with whether the wire is encrypted:
+
+| What the card says | What it means |
+|---|---|
+| **This machine (unencrypted HTTP)** | A server on `localhost` or `127.0.0.1`. The ordinary case for a tool server you run yourself, and there is no network to encrypt. |
+| **Your network (unencrypted HTTP)** | A private address or a `.internal` / `.lan` / `.local` / `.home.arpa` name — a NAS, a workstation, a box in the next room. Your own machine on your own network, and named as unencrypted so the choice is visible. |
+| **Remote (HTTPS)** | A public endpoint, reached over TLS. |
+
+Four endpoints are refused, and each says why. None of them is a choice you
+made — each is a destination that is not the thing you typed:
+
+- **A public name that answers with a private address.** This is how a request to
+  a tool server becomes a request to your router or a cloud metadata service. If
+  the server really is on your own network, add it by its address or its
+  `.internal` name.
+- **A cloud metadata service** — `169.254.169.254`, `metadata.google.internal`
+  and the rest. They answer with the credentials of the machine Raiker is running
+  on. They are not tool servers.
+- **A public endpoint over plain `http`.** Your token and every tool call would
+  travel in clear text, and typing a hostname did not ask for that. Loopback and
+  your own network are exempt, because there is no public wire to protect.
+- **A URL carrying its own username and password.** That is a credential in every
+  log that ever prints the URL. Put the token in an environment variable and name
+  that variable instead.
+
+Two things then happen at the moment of connection rather than at the moment you
+typed the URL, because a name can answer differently a minute later:
+
+- **The connection is pinned.** A public name is resolved, checked, and then
+  dialled at an address that passed — while TLS and the `Host` header keep the
+  original name, so certificate validation is unchanged. A name cannot be moved
+  between the check and the socket.
+- **A redirect is re-checked as a destination of its own.** Raiker follows at
+  most three, each one held to everything above, and your token is **not** sent
+  on after the origin changes. A server cannot send a session somewhere the
+  endpoint itself could not go, and cannot collect a token by redirecting.
+
 ### Can Raiker actually call it?
 
 A connected server's tools are callable in Chat and Build as
@@ -544,6 +585,10 @@ An offer can never carry a credential. A plaintext `http://` endpoint, a URL wit
 a username or password in it, or an `auth_ref` that is not an environment
 variable name is refused at install, and re-validated when the offer is read — so
 hand-editing the file afterwards cannot smuggle one in.
+
+An offer is also held to [where a remote server may be](#where-a-remote-server-may-be),
+which is the same rule a URL you type yourself meets. A plugin offering a server
+gets no destination you could not have added by hand.
 
 ## Channels
 

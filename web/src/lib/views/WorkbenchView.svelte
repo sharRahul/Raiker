@@ -42,7 +42,16 @@
   import { relativeFuture, relativeTime } from "../format";
   import { cadenceLabel } from "../agentCadence";
   import GuideLink from "../components/GuideLink.svelte";
-  import { isActiveTask, taskBadge, taskStatusLabel } from "../statusMaps";
+  import { isActiveTask, isBlockedTask, taskBadge, taskStatusLabel } from "../statusMaps";
+  import {
+    type Freshness,
+    failed as freshnessFailed,
+    freshnessLabel,
+    isCurrent,
+    loading as freshnessLoading,
+    received,
+    valueOf,
+  } from "../freshness";
 
   // C18 — "continue working" used to mean only the conversations the owner
   // typed, so a routine advancing a thread on its own was invisible here and
@@ -51,7 +60,13 @@
   let tasks = $state<TaskView[] | null>(null);
   let approvals = $state<ApprovalView[] | null>(null);
   let projects = $state<ProjectsList | null>(null);
-  let diagnostics = $state<Diagnostics | null>(null);
+  // NEW-HOME-01 — readiness used to be `Diagnostics | null`, and `null` meant
+  // three different things: not read yet, read and failed, and nothing to
+  // report. `runtimeIssues` resolved all three to **0**, so a diagnostics
+  // endpoint that was down produced a board that said nothing needed the owner.
+  // A readiness claim nobody checked is worse than no claim, because it is
+  // acted on.
+  let health = $state<Freshness<Diagnostics>>(freshnessLoading());
   let unavailable = $state(false);
   let updatedAt = $state<Date | null>(null);
   let busyTask = $state<string | null>(null);
@@ -93,28 +108,62 @@
   const hasActivity = $derived(
     named.length > 0 || (tasks ?? []).length > 0 || (projects?.projects ?? []).length > 0,
   );
-  const runtimeIssues = $derived(
-    diagnostics === null
-      ? 0
-      : diagnostics.missing_config.length > 0
-        ? diagnostics.missing_config.length
-        : diagnostics.production_ready_local_single_user_runtime
-          ? 0
-          : 1,
-  );
+  // `null` is now *only* "nobody has a current answer", and it is never a zero.
+  const runtimeIssues = $derived.by(() => {
+    const diagnostics = valueOf(health);
+    if (diagnostics === null) return null;
+    if (diagnostics.missing_config.length > 0) return diagnostics.missing_config.length;
+    return diagnostics.production_ready_local_single_user_runtime ? 0 : 1;
+  });
+  const healthIsCurrent = $derived(isCurrent(health));
+  const healthLine = $derived(freshnessLabel(health, "Runtime health"));
+
+  // NEW-HOME-01 — a run that is running is progress, not attention. The rail
+  // counted every active task, so a healthy overnight routine made Home look
+  // like it had something for the owner, every time they opened it. Only work
+  // that will not move again until a person acts belongs here.
+  const blocked = $derived(active.filter((task) => isBlockedTask(task.status)));
 
   // VIS-13 — the rail is called "Needs your attention"; when nothing does, it
   // should say so once rather than in three tiles reading zero. Declared after
   // `runtimeIssues` because it reads it: a `$derived` re-runs lazily so the
   // earlier position worked, and named a binding in its own temporal dead zone.
+  //
+  // NEW-HOME-01 — and it now requires readiness to have actually been read.
+  // "Nothing needs you right now" is a claim about three things, and it may
+  // only be made when all three were looked at.
   const nothingNeedsAttention = $derived(
-    (approvals ?? []).length === 0 && runtimeIssues === 0 && active.length === 0,
+    (approvals ?? []).length === 0 &&
+      healthIsCurrent &&
+      runtimeIssues === 0 &&
+      blocked.length === 0,
   );
 
+  /**
+   * The all-clear, scoped to what was actually read.
+   *
+   * When readiness could not be read there is still something true and useful
+   * to say — the approvals queue and the work board were read, and they are
+   * empty — so the page says that and names the gap, rather than choosing
+   * between a false all-clear and a blank rail.
+   */
+  const partialAllClear = $derived(
+    (approvals ?? []).length === 0 && blocked.length === 0 && !healthIsCurrent,
+  );
+
+  /**
+   * NEW-HOME-01 — Home reloads every fifteen seconds, so two reads are
+   * routinely in flight at once and the network is free to answer them in
+   * either order. Nothing stopped an older response from landing on top of a
+   * newer one, which is the same defect a project home had (FIXED-497) and the
+   * same fix: each load takes a number, and only the newest one commits.
+   */
+  let loadSeq = 0;
+
   async function load() {
-    unavailable = false;
+    const seq = ++loadSeq;
     try {
-      [sessions, tasks, approvals, projects] = await Promise.all([
+      const [loadedSessions, loadedTasks, loadedApprovals, loadedProjects] = await Promise.all([
         // Threads, not sessions: the owner's own conversations plus the
         // threads a routine is advancing (C11/C18). The Inbox — the
         // server-owned session task bookkeeping lands in — is still not
@@ -124,15 +173,30 @@
         api.approvals(),
         api.projects(),
       ]);
+      if (seq !== loadSeq) return;
+      unavailable = false;
+      sessions = loadedSessions;
+      tasks = loadedTasks;
+      approvals = loadedApprovals;
+      projects = loadedProjects;
       try {
-        diagnostics = await api.diagnostics();
-      } catch {
-        // Readiness is supplementary; an older or temporarily unavailable
-        // diagnostics endpoint must not erase the board.
-        diagnostics = null;
+        const diagnostics = await api.diagnostics();
+        if (seq !== loadSeq) return;
+        health = received(diagnostics);
+      } catch (error) {
+        // Readiness is supplementary, and an unavailable diagnostics endpoint
+        // must not erase the board — but it must not be quietly reported as a
+        // pass either. Whatever was last read survives as stale; a workspace
+        // that has never read it says so.
+        if (seq !== loadSeq) return;
+        health = freshnessFailed(
+          health,
+          error instanceof ApiError ? `HTTP ${error.status}` : "unreachable",
+        );
       }
       updatedAt = new Date();
     } catch {
+      if (seq !== loadSeq) return;
       unavailable = true;
     }
   }
@@ -392,6 +456,24 @@
              thing on an idle Home. One line instead, and each tile comes back
              the moment its own count is not zero. -->
         <p class="all-clear">Nothing needs you right now.</p>
+      {:else if partialAllClear}
+        <!-- NEW-HOME-01 — the same rail when readiness could not be read. Two
+             of the three things were looked at and both are clear; the third
+             is named rather than counted as zero, which is what turned a
+             failed read into "Nothing needs you right now." -->
+        <p class="all-clear">
+          No approvals are waiting and no work is blocked. Raiker could not read
+          its own runtime readiness, so this is not an all-clear.
+        </p>
+        <StatTile
+          label="Runtime health"
+          value="—"
+          detail={healthLine}
+          tone="warn"
+          icon="diagnostics"
+          href="#/observe?tab=diagnostics"
+          linkLabel="Open diagnostics"
+        />
       {:else}
         {#if approvals.length > 0}
         <StatTile
@@ -408,26 +490,43 @@
           linkLabel="Review approvals"
         />
         {/if}
-        {#if runtimeIssues > 0}
+        {#if !healthIsCurrent}
+        <!-- NEW-HOME-01 — an unread readiness check is its own row, and it
+             carries when it was last true. It is not a count, because there is
+             no number to give: nobody looked. -->
+        <StatTile
+          label="Runtime health"
+          value="—"
+          detail={healthLine}
+          tone="warn"
+          icon="diagnostics"
+          href="#/observe?tab=diagnostics"
+          linkLabel="Open diagnostics"
+        />
+        {:else if runtimeIssues !== null && runtimeIssues > 0}
         <StatTile
           label="Runtime issues"
           value={runtimeIssues}
-          detail={runtimeIssues === 0
-            ? "No readiness issue needs attention."
-            : "Review configuration and readiness evidence before critical work."}
-          tone={runtimeIssues > 0 ? "warn" : "neutral"}
+          detail="Review configuration and readiness evidence before critical work."
+          tone="warn"
           icon="diagnostics"
           href="#/observe?tab=diagnostics"
           linkLabel="Review issues"
         />
         {/if}
-        {#if active.length > 0}
+        {#if blocked.length > 0}
+        <!-- NEW-HOME-01 — blocked work, not all work. Every running task used
+             to appear here, so a healthy overnight routine put Home permanently
+             in a state that said something needed the owner; the board below
+             already lists running work, with the same Stop control. What is
+             left here is the work that will not move again until they act. -->
         <StatTile
-          label="Active work"
-          value={active.length}
-          detail={active.length === 0
-            ? "Nothing is queued, running, paused, or waiting for approval."
-            : "You can stop any of these at a safe boundary."}
+          label="Blocked work"
+          value={blocked.length}
+          detail={blocked.length === 1
+            ? "One run is paused or waiting for your decision."
+            : "These runs are paused or waiting for your decision."}
+          tone="warn"
           icon="tasks"
           href="#/observe?tab=work"
           linkLabel="Open the live board"

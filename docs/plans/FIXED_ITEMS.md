@@ -525,6 +525,15 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-501](#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name) | High | Identity / prompts | Fixed 2026-09-13 (RR-IDENTITY-01, DEC-01) |
 | [FIXED-502](#fixed-502--a-relative-time-assertion-written-against-an-absolute-instant) | Low | Web test suite | Fixed 2026-09-13 (found while fixing NEW-PERM-02) |
 | [FIXED-503](#fixed-503--the-live-harness-looked-for-provider-controls-that-had-moved-into-a-menu) | Low | Live test harness | Fixed 2026-09-13 (found while verifying FIXED-501) |
+| [FIXED-504](#fixed-504--five-destinations-one-label-and-the-owners-token-sent-to-all-of-them) | High | MCP / remote trust and egress | Fixed 2026-09-13 (closes RR-MCP-02) |
+| [FIXED-505](#fixed-505--the-four-capabilities-that-reach-furthest-into-an-owners-accounts-explained-themselves-least) | Medium | Permissions / capability copy | Fixed 2026-09-13 (reduces RR-AUTHORITY-01; remainder is BUG-293) |
+| [FIXED-506](#fixed-506--home-reported-an-unread-readiness-check-as-nothing-to-worry-about) | High | Home / readiness honesty | Fixed 2026-09-14 (closes NEW-HOME-01) |
+| [FIXED-507](#fixed-507--a-stale-knowledge-graph-called-itself-live-and-a-failed-refresh-erased-it) | Medium | Knowledge Map / freshness | Fixed 2026-09-14 (closes NEW-MAP-01) |
+| [FIXED-508](#fixed-508--the-folder-an-owner-added-was-not-always-the-folder-they-reviewed) | Medium | Knowledge Map / source review | Fixed 2026-09-14 (closes NEW-MAP-02) |
+| [FIXED-509](#fixed-509--a-source-reviews-entry-cap-bounded-its-answer-and-not-its-work) | Medium | Knowledge Map / resource bounds | Fixed 2026-09-14 (closes NEW-MAP-03) |
+| [FIXED-510](#fixed-510--a-projects-pictures-could-not-be-opened-from-the-project) | Low | Projects / Design continuity | Fixed 2026-09-14 (closes NEW-PROJ-02) |
+| [FIXED-511](#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace) | Medium | Threads / work index | Fixed 2026-09-14 (closes NEW-THREAD-01, REM-THREAD-01/02) |
+| [FIXED-512](#fixed-512--one-policy-three-sets-of-words-on-one-screen) | Low | Permissions / vocabulary | Fixed 2026-09-14 (closes REM-PERM-02) |
 
 ---
 
@@ -22124,3 +22133,508 @@ missing outcome joined it.
 **Verification.** The Anthropic round connects, pins, tests and sends a real turn
 through these helpers, and the OpenRouter and OpenAI rounds reach their honest
 refusal through them.
+
+---
+
+## FIXED-504 — Five destinations, one label, and the owner's token sent to all of them
+
+**Severity: High. Area: MCP / remote trust and egress. Status: Fixed 2026-09-13.
+Closes [RR-MCP-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#what-blocks-a-public-first-release)
+and steps 3–5 of [DEC-15](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-15--put-every-mcp-server-behind-explicit-trust-and-isolation).**
+
+**Observed.** Adding a remote MCP server was one check — the scheme is `http` or
+`https` and the host is non-empty — and the session then went wherever the string
+pointed. Five genuinely different destinations were indistinguishable to Raiker
+and identical on the card, which printed *Remote (HTTPS)* over every one of them:
+
+- the owner's own machine, over plain http;
+- a box on the owner's own network, over plain http;
+- a public endpoint, over TLS;
+- a public *name* whose resolver answers with a private address — the standard
+  shape of a server-side request forgery, and not a destination anyone chose;
+- `169.254.169.254` and `metadata.google.internal`, which answer with the
+  credentials of the machine Raiker is running on.
+
+The owner's bearer token went to all five the same way. Three more followed from
+the transport: `urllib` followed redirects by itself, so a server that answered
+once could move the session anywhere — including into private space, carrying the
+`Authorization` header with it — and a checked *name* was handed back to the HTTP
+client to be resolved a second time, which is the gap DNS rebinding is for.
+
+**Fixed.** `raiker/runtime/mcp_endpoint_policy.py` classifies a destination as
+**loopback**, **private_network** or **public**, and the two halves of Raiker's
+posture are kept apart deliberately:
+
+*Nothing the owner chose is blocked.* A local MCP server on `http://127.0.0.1` is
+the ordinary case, not a threat, and requiring TLS there would only mean nobody
+could run one. A NAS or a workstation on the owner's own network is the owner's
+own machine. Both stay allowed, over plain http, and are now *named* as what they
+are so the choice is visible rather than assumed.
+
+*What is refused is the narrow set where the destination is not the thing the
+owner typed.* A public name that answers privately; link-local, multicast and
+reserved addresses; a cloud metadata name; a public endpoint over plain http,
+because typing a hostname did not ask for the token to travel in clear text; and
+a URL carrying its own username and password, which is a credential in every log
+that prints it.
+
+Then the two things that can only be done at the socket:
+
+- **The connection is pinned.** A public name is resolved, every address checked,
+  and the connection dialled at one that passed — while TLS and the `Host` header
+  keep the original name, so certificate validation is unchanged. This reuses the
+  opener `web_policy` already built for agent web reads, which is where the same
+  problem was solved once.
+- **A redirect is a destination of its own.** The transport no longer lets
+  `urllib` follow one. Each hop is classified exactly like the endpoint, at most
+  three are followed, and the `Authorization` header is dropped the moment the
+  origin changes — so a server cannot send a session somewhere the endpoint could
+  not go, and cannot collect a token by redirecting.
+
+The check runs in three places, and they are deliberately not the same check. At
+**add time** it classifies without resolving, because refusing the URL an owner
+is typing for a server that is not up yet would be the wrong answer, and the
+refusals an owner needs to read are all readable from the string. At the
+**executor** it runs again, still without resolving, so a refusal names the
+endpoint rather than arriving as a transport failure. In the **transport** it
+resolves, immediately before the socket and again for every redirect, because an
+answer that is minutes old is an answer that can have changed.
+
+**What the owner sees.** The card and the Add form say *This machine*, *Your
+network* or *Remote*, each with **HTTPS** or **unencrypted HTTP** — the label was
+`Remote (HTTPS)` for all three before, including for an endpoint with no TLS at
+all. A refusal arrives as a sentence rather than as its reason code: the page
+used to print `mcp_remote_host_not_public`, which is true and is not something an
+owner can act on. `web/src/lib/mcpEndpoint.ts` makes the same classification the
+runtime makes, from the URL alone, so the page never blocks on a lookup and never
+disagrees with the runtime that connects.
+
+**Verification.** Thirty-four cases in `tests/test_mcp_endpoint_policy.py` and
+nine in `tests/test_mcp_remote_transport_trust.py` — the redirect into private
+space, the token dropped across an origin change, the token *kept* across a
+same-origin path redirect (refusing that would break servers behaving correctly),
+the redirect loop, the pin, and the refused endpoint that never reaches the
+transport. The last of the nine runs a real socket: a local server answers 307
+pointing at the metadata address, because substituting the opener proves the
+decision and not that the no-redirect handler is installed on it. Eight more in `tests/test_mcp_runtime.py` cover the add-time answer in
+both directions, including that a local, a LAN and a public server are all still
+added. Eleven in `web/src/lib/mcpEndpoint.test.ts` hold the page's copy of the
+classification to the runtime's.
+
+Live: `web/e2e/rr-mcp-02-remote-endpoint-trust-live.spec.ts` against a running
+host adds all three allowed destinations and reads the three labels back off the
+cards, is refused by all four bad endpoints with the right reason and stores none
+of them, and watches the Add form name the endpoint as it is typed. Captures at
+`docs/screenshots/2026-09-13-mcp-endpoint-trust/`.
+
+And the round trip these changes sit on top of, because an egress change is not
+evidence of anything until a real provider call still works with it in place:
+`web/e2e/rr-mcp-02-live-provider-turn-live.spec.ts` types this round's Anthropic
+key into the product's own Connect dialog, pins Haiku 4.5, chooses it in the
+composer's own picker and sends a turn. The model answered
+(`docs/screenshots/2026-09-13-mcp-endpoint-trust/live-anthropic-turn.png`). This
+round's key is not identity-linked, so unlike
+[FIXED-501](#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name)'s
+the provider answered a model list as well as a turn.
+
+---
+
+## FIXED-505 — The four capabilities that reach furthest into an owner's accounts explained themselves least
+
+**Severity: Medium. Area: Permissions / capability copy. Status: Fixed
+2026-09-13. Part of [RR-AUTHORITY-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#what-blocks-a-public-first-release)
+— the registry half of [DEC-16](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-16--require-one-opaque-runtime-authority-context) step 8.**
+
+**Observed.** DEC-16 step 8 asks for a CI check that every real side-effect
+capability carries, among other things, an owner-facing Permissions description.
+There was no such check — and four capabilities had none at all. The connector
+runtimes are registered dynamically, so `capabilityLabel` humanised their names
+from the capability string while `capabilityDescription` fell through to its
+fallback: **"Governed capability."** The switches for the owner's mail, calendar,
+Slack and repositories were the four the Permissions page explained least.
+
+A fifth, `semantic_memory_runtime`, said *"Governed semantic memory store
+operations"*, which is the fallback with more characters.
+
+**Fixed.** Each of the four says what it reads, that it reads **only**, and that
+anything it brings back is treated as untrusted data rather than as instructions
+to the agent — which is the fact that decides whether an owner turns it on.
+`semantic_memory_runtime` says what it is for.
+
+`tests/test_capability_permissions_copy.py` reads the web module rather than
+duplicating its text, so the copy stays where the page renders it from and a
+capability that gains a real executor cannot reach Permissions without a sentence
+saying what it does. The parser reads an entry from its own key to the next one:
+a first attempt matched only the four-line form and silently skipped every entry
+following a one-line one, which is the kind of quiet under-reading that makes a
+coverage check worse than none.
+
+**Not closed by this.** DEC-16's other requirements — a per-capability threat
+model, a stated authority requirement, and a negative bypass test for each real
+side-effect capability — remain open, and RR-AUTHORITY-01 stays open with them.
+Carried in [`TO_BE_FIXED.md`](TO_BE_FIXED.md).
+
+**Verification.** Three cases, including the regression itself: each connector
+description must say it only reads and that what it returns is untrusted.
+
+---
+
+## FIXED-506 — Home reported an unread readiness check as nothing to worry about
+
+**Severity: High. Area: Home / readiness honesty. Status: Fixed 2026-09-14.
+Closes [NEW-HOME-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-home-01--missing-health-data-becomes-zero-issues).**
+
+**Observed.** `WorkbenchView.svelte::load` caught a diagnostics failure and set
+`diagnostics = null`. `runtimeIssues` mapped `null` to **0**. With no approvals
+and no active work, `nothingNeedsAttention` then became true and the default
+screen of the product said:
+
+> Nothing needs you right now.
+
+Nobody had looked. `null` was carrying three different facts at once — not read
+yet, read and failed, nothing to report — and the page resolved all three to the
+most reassuring one. A readiness claim made from an unread endpoint is worse than
+no claim, because an owner acts on it.
+
+**A second half, in the same rail.** "Needs your attention" counted *every*
+active task. A healthy overnight routine therefore put Home permanently in a
+state that said something needed the owner — which is how a person learns to
+stop reading the rail that also carries their approvals. The board below already
+lists running work, with the same Stop control.
+
+**Fixed.** `web/src/lib/freshness.ts` gives the four states `null` was standing
+in for: `loading`, `fresh`, `stale` (read once, newest attempt failed — worth
+showing, not worth asserting) and `unavailable` (never read). Home holds
+readiness as one of those. `runtimeIssues` is `number | null` and is never a
+zero it did not measure; the all-clear requires readiness to have actually been
+read; and when it has not, the rail says what *is* true and names the gap:
+
+> No approvals are waiting and no work is blocked. Raiker could not read its own
+> runtime readiness, so this is not an all-clear.
+
+The attention rail now counts **blocked** work — `waiting_for_approval` and
+`paused`, the two states that do not move again until a person acts — rather than
+all active work. `BLOCKED_TASK_STATES` lives beside `ACTIVE_TASK_STATES` in
+`statusMaps.ts` so the distinction is shared rather than re-derived per surface.
+
+Home also reloads every fifteen seconds, so two reads are routinely in flight and
+the network may answer them in either order. Each load takes a number and only
+the newest commits — the same idiom as
+[FIXED-497](#fixed-497--a-projects-header-could-stand-over-another-projects-work).
+
+**Verification.** Nine cases in `web/src/lib/freshness.test.ts` and five in
+`WorkbenchView.test.ts`, including the two the old code would fail: a 503 from
+diagnostics must not produce an all-clear, and a running task must not appear in
+the attention rail. One of the existing cases had to change with it — it ran with
+no diagnostics route at all, so the read 404'd and the board reported zero issues
+from it, which is the defect encoded as a test.
+
+Live: `web/e2e/removal-review-2026-09-13-live.spec.ts` watches readiness stop
+answering while the board is open and reads the stale line off the tile
+(`docs/screenshots/2026-09-13-removal-review/home-readiness-unavailable.png`).
+Deliberately not a reload — `/api/diagnostics` is also what the boot probe calls
+to decide whether the runtime is reachable, so refusing it across a reload locks
+the workspace and proves nothing about the rail. Found by trying it.
+
+---
+
+## FIXED-507 — A stale knowledge graph called itself live, and a failed refresh erased it
+
+**Severity: Medium. Area: Knowledge Map / freshness. Status: Fixed 2026-09-14.
+Closes [NEW-MAP-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-map-01--stale-graph-remains-labelled-live).**
+
+**Observed.** `BrainView.svelte` kept the last graph it managed to load and went
+on labelling it **"Live workspace graph"**, because the label checked only
+whether `updatedAt` existed — whether *some* update had once happened. A graph an
+hour old under a word meaning "now" is not a small inaccuracy on this page: the
+Knowledge Map is what an owner reads to decide what Raiker knows about them.
+
+**Worse, found while fixing it.** `loadError` was rendered as a route-level
+`PageState`, so a failed *refresh* replaced the entire map with **"Couldn't load
+the knowledge graph"** — about a graph that had loaded and was still in memory.
+On a fifteen-second poll, one hiccup wiped the owner's map and told them it could
+not be read.
+
+**And a third, beside it.** `rejectRelationship` wrote its failure to
+`loadError` too, so one failed rejection produced that same full-page "couldn't
+load" — a sentence about a read that had succeeded.
+
+**Fixed.** The graph is held as a `Freshness<BrainData>` (FIXED-506's module).
+The corner says which of four things is true — Loading, Live workspace graph,
+Refreshing, or `Workspace graph · last updated … · refresh failed (…)` — and the
+status dot goes amber with it. The route-level error is now for having *nothing*
+to show; a graph that has gone stale stays on screen and says so. A failed action
+has its own dismissible notice over the canvas rather than borrowing the load
+error.
+
+Loads are generation-checked, like Home's: a fifteen-second poll and a manual
+Refresh can be in flight together, and an older graph must not land on a newer
+one.
+
+**Verification.** One case in `BrainView.test.ts` drives a successful load, fails
+every read after it, and asserts the label changes, the stale line carries both
+halves, and the graph is still rendered. Live, the same sequence against a
+running host
+(`docs/screenshots/2026-09-13-removal-review/knowledge-map-stale.png`).
+
+---
+
+## FIXED-508 — The folder an owner added was not always the folder they reviewed
+
+**Severity: Medium. Area: Knowledge Map / source review. Status: Fixed
+2026-09-14. Closes [NEW-MAP-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-map-02--source-review-responses-are-not-bound-to-the-current-selection).**
+
+**Observed.** `reviewSource` awaited `reviewBrainSource(sourcePath)` and then
+assigned `sourceReview` unconditionally. The review is a plan for **one** source
+— how many files it would index, how many it would skip, the warnings that go
+with them — and `addSource` adds `sourceReview.path`.
+
+Pressing Review twice is prevented by the button's own busy state, so the
+reachable reproduction is the one the dialog is actually built around: select a
+source, press Review, and **pick a different one in the browser** while the first
+is still on the wire. Choosing a file has no busy guard — it is a click, not a
+request. The first plan then lands under the second selection, and **Add reviewed
+source** adds the first. The owner reads a plan for one source and indexes
+another.
+
+**Fixed.** Every read in the dialog takes a number and only the newest writes:
+browsing, reviewing, revoking and opening. A review additionally checks that the
+selection has not moved — `sourcePath` must still be the path that was
+requested — because picking a file does not start a request and so cannot bump
+the counter on its own. `addSource` names the reviewed path explicitly and
+refuses when the two have diverged, so the guarantee is local to the write rather
+than inherited from four earlier checks.
+
+The plan now prints the source it is a plan **for**. It never did, so a plan that
+had arrived for a previously selected folder looked exactly like a plan for the
+one on screen.
+
+**Found by writing the test.** A superseded response still has to release the
+dialog's busy state, or the owner is left looking at a "Reviewing…" button for a
+review whose answer was thrown away.
+
+**Verification.** Two cases in `BrainView.test.ts`: the full A-then-B race with a
+held response, asserting the stale plan never renders and that what is added is
+what was reviewed; and that editing the selection clears the plan rather than
+leaving an addable one behind.
+
+---
+
+## FIXED-509 — A source review's entry cap bounded its answer and not its work
+
+**Severity: Medium. Area: Knowledge Map / resource bounds. Status: Fixed
+2026-09-14. Closes [NEW-MAP-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-map-03--review-entry-cap-does-not-bound-all-traversal-work).**
+
+**Observed.** `DashboardService.review_brain_source` walked `path.rglob("*")` and
+stopped at `scanned >= 5000` — but `scanned` advanced only on entries it
+**accepted**. Every directory, every hidden path, every name under
+`node_modules`, every file it could not `stat` was free. So the cap bounded the
+*answer* and not the *work*: a folder whose dependency tree holds four hundred
+thousand entries was walked in full to report that it contains six markdown
+files, and `rglob` produced every one of those entries before the filter dropped
+it.
+
+This is a resource-bound weakness in an authenticated, owner-scoped path rather
+than a demonstrated denial of service, and it is recorded as that. It is still
+the wrong shape: an owner pointing the picker at their home directory should get
+a bounded answer, not a request that walks their disk.
+
+**Fixed.** A prunable walker with four budgets, because there are four ways a
+walk gets expensive and no one of them stops the others:
+
+| Budget | What it bounds |
+|---|---|
+| `REVIEW_ACCEPTED_FILE_BUDGET` (5,000) | The answer — what the card has always meant by its cap. |
+| `REVIEW_VISITED_ENTRY_BUDGET` (50,000) | The work. Every entry looked at, accepted or not. |
+| `REVIEW_DEPTH_BUDGET` (24) | A tree that is deep rather than wide. |
+| `REVIEW_TIME_BUDGET_SECONDS` (5) | Work that is slow rather than large — a network mount, a sleeping disk. |
+
+Excluded directories are pruned **before descent**: `os.walk` lets the walker
+edit the directory list in place, which is the difference between not entering
+`node_modules` and enumerating it to discard the result. Symlinked directories
+are not followed, which is what ends a cycle, and the containment check against
+the selected root is unchanged.
+
+The answer says what it cost and why it stopped — `visited_entries`, `truncated`
+and `truncated_reason` — and each of the four reasons is a different sentence,
+because each names a different thing the owner might do about it.
+
+**Verification.** Nine cases in `tests/test_knowledge_source_review_budget.py`,
+including the one that is the finding: a folder holding 600 entries inside
+pruned trees beside one real file must cost **five or fewer visits**. Each budget
+is exercised at a lowered value rather than by building fifty thousand files.
+Live, the review endpoint is read against a running host and the two new fields
+asserted.
+
+---
+
+## FIXED-510 — A project's pictures could not be opened from the project
+
+**Severity: Low. Area: Projects / Design continuity. Status: Fixed 2026-09-14.
+Closes [NEW-PROJ-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-proj-02--project-images-cannot-open-the-selected-asset-directly).**
+
+**Observed.** `ProjectsView.svelte` rendered up to eight of a project's images as
+plain `<img>` elements with no per-asset action, under a single generic link to
+`#/design`. Everything needed to do better was already there — since
+[FIXED-492](#fixed-492--a-generated-image-did-not-belong-to-the-project-it-was-made-in)
+an image carries the project it was made in — so the missing part was precise
+continuation: an owner looking at a picture in a project had to go and find it
+again in the account's whole Design history.
+
+The strip also showed eight tiles whether there were eight or eighty, which is a
+count nobody stated.
+
+**Fixed.** `asset` joins `project`, `session`, `turn` and `record` in
+`routeState.ts` — the typed, allowlisted, non-secret route state — and is held to
+the same rule they are: a coordinate naming something the reader may already
+open, granting nothing. The gallery it resolves against is owner-scoped on the
+server, so an id belonging to somebody else resolves to nothing at all, and one
+that has been deleted selects nothing and leaves the surface usable.
+
+Each picture is a link to `#/design?project=…&asset=…`; **View all in Design**
+keeps the project rather than dropping the owner into everything they have ever
+generated; and the strip says "Showing 8 of 11" when it is truncated.
+
+Design reads both. A project scopes the canvas, and says so in a chip carrying
+the project's **name** — resolved from the owner's own project list, because the
+gallery carries the id and a chip reading `proj_a1b2c3` would be the same defect
+one surface along — with a **Show all images** way out. A filter nobody can see
+is a canvas that looks like it has lost work.
+
+**Verification.** Six cases in a new `DesignView.test.ts` (the surface had none)
+and three in `ProjectsView.test.ts`: the link each picture carries, the count
+when truncated, the scope chip named and unnamed, the asset selecting — read off
+the composer, which says `Enter edits` when an asset is selected and
+`Enter generates` when none is — and an unknown asset selecting nothing.
+
+**What the live round could not do.** The live case skips with its reason: this
+host reaches no image provider, so the workspace holds no picture filed to a
+project to open. The same limit as
+[BUG-290](TO_BE_FIXED.md#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host).
+
+---
+
+## FIXED-511 — Threads described a hundred rows and called it a workspace
+
+**Severity: Medium. Area: Threads / work index. Status: Fixed 2026-09-14.
+Closes [NEW-THREAD-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-thread-01--filters-only-cover-a-truncated-list-and-disappear-during-search),
+and with it [REM-THREAD-01 and REM-THREAD-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#threads-tasks-and-projects).
+The last open finding of §18.5.**
+
+**Observed.** `SearchChatView.svelte` derived its Project choices *and* its
+results from the threads it had loaded, and it loaded one unpaginated page:
+`api.ts::workThreads` defaults to `limit 100`, `routes_dashboard.py` forwards
+it, and `DashboardService.list_work_threads` returned `threads[:limit]`. The
+browser was being used as the index. Three things followed, and each read as a
+fact about the workspace rather than about the read:
+
+- **A project whose newest thread fell outside the first hundred rows was not
+  offered as a filter at all** — which on screen is indistinguishable from a
+  project with nothing in it.
+- **The window looked like the whole inventory**, because nothing said
+  otherwise.
+- **Typing called `searchChats` without the Project or kind filter, and hid the
+  filter controls.** Narrowing something down silently widened it, in the middle
+  of the gesture that means the opposite.
+
+**Fixed.** `GET /api/work-threads/page` is the index, and it does the three
+things in the order that matters: **filter, then facet over everything that
+matched, then page.**
+
+Each facet is computed with *its own* filter lifted, so every choice stays
+reachable from every page — a project facet that respected the project filter
+would offer exactly one project, the one already selected. The page carries
+`total`, `next_cursor` and `scan_truncated`, so the view can say "Showing 12 of
+140" instead of implying 12 is all there is.
+
+A cursor is a position in one ordered answer, so it carries a digest of the
+question it was issued for: owner, project, kind and query. A cursor from
+another scope restarts the listing rather than paging through a different
+question, and a corrupt one does the same rather than failing the read. The sort
+has a tie-breaker (`updated_at`, then `session_id`), without which threads
+touched in the same second swap places between pages — a cursor then skips one
+row and repeats another.
+
+The index is bounded at `WORK_THREAD_SCAN_LIMIT` rows and says when that binds.
+An index that reads everything is the defect with a larger number.
+
+**In the view**, the filters stay on screen while typing and stay *applied*.
+Typing now narrows the board by title, inside the filters. *"Where did I say
+that"* is a different question with a different scope — it reads message text
+across every conversation the account has — so it is an explicit **Search
+message text** action with its own result block and a way back, rather than
+something that happens to the owner on the first keystroke.
+
+`list_work_threads` is unchanged for its other caller: Home wants the newest few
+threads to offer as somewhere to continue and has no filters to apply.
+
+**Verification.** Sixteen cases in `tests/test_work_thread_index.py`, including
+the finding itself — a project whose only thread is ninth in a three-row page is
+still offered, and can still be selected — plus each facet lifting its own
+filter, a cursor walking eleven rows across pages exactly once, six threads
+sharing one timestamp keeping their order, a replayed cursor from another scope
+restarting, and the scan bound being stated. Thirteen in
+`SearchChatView.test.ts`, including that the page *asks* the narrowed question
+rather than sieving what arrived, that a project outside this page is offered
+with its count, that the filters survive typing, and that Load more appends
+rather than replaces.
+
+Live: `web/e2e/removal-review-2026-09-13-live.spec.ts` reads the index against a
+running host and watches the filters stay on screen with a query typed
+(`docs/screenshots/2026-09-13-removal-review/threads-filters-stay-while-typing.png`).
+
+---
+
+## FIXED-512 — One policy, three sets of words, on one screen
+
+**Severity: Low. Area: Permissions / vocabulary. Status: Fixed 2026-09-14.
+Closes [REM-PERM-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#models-popup-and-permissions).**
+
+**Observed.** Four stored decision-mode values had three owner-facing
+vocabularies, two of them on the same page at the same time:
+
+| Where | `ask` | `deny` |
+|---|---|---|
+| Every row control, via `permissionLanguage.ts` | **Ask me** | **Never** |
+| The bulk toolbar, hard-coded | Ask | Deny |
+| The authority matrix, hard-coded | Ask | Denied |
+| `DECISION_MODE_COPY`, rendered nowhere | Ask | Deny |
+
+An owner who reads **Never** on a control and **Denied** in the table above it
+has to work out that those are the same decision. The wording in
+`permissionLanguage.ts` is not arbitrary, either: it answers the *when*
+question — "when Raiker wants to use it: never" — which is what makes `On ·
+Never` read as a sentence instead of a contradiction. A table that says
+`Denied` loses exactly that.
+
+**Fixed.** The matrix and the bulk buttons read their mode words from
+`BEHAVIOUR_COPY`, the one owner vocabulary. The three matrix verdicts that are
+*not* modes — Unavailable, Not ready, Unknown — keep their own words, because
+they answer a different question: whether the capability can run at all, rather
+than what happens when Raiker wants to use it.
+
+`DECISION_MODE_COPY` is deleted. Nothing rendered it, which is exactly why it
+was worth removing rather than leaving: the next surface needing a label for a
+decision mode would have found it, imported it, and given this policy another
+name on another screen.
+
+**And the raw key as a row's primary label.** The matrix led each row with
+`<code>mcp_connector_runtime</code>`. The name is first now, with the identifier
+under it — a registry key is what an owner exports and quotes in a bug report,
+not what they read a row by. The ids are unchanged in the store, the API and
+exports.
+
+**Verification.** Two cases in `permissionLanguage.test.ts`: that the deleted
+duplicate has not been re-declared (read from source, so re-adding it fails),
+and that a mode's word is the same wherever it is read. The matrix and bulk-bar
+cases updated with it — the bulk assertion is now scoped to the toolbar, because
+the button shares its word with the row controls, which is the point.
+
+Live, against a running host: the matrix contains no `Denied` and no bare `Ask`,
+and a row leads with a name rather than a registry key — asserted on shape
+rather than on one capability, because which eight rows the matrix ranks depends
+on the workspace. Capture at
+`docs/screenshots/2026-09-13-removal-review/permissions-one-vocabulary.png`,
+where the whole page reads one vocabulary: `On · Ask me` in the summary, `Ask
+me` in the agent column, and `Ask me / Allow / Automatic / Never` on every
+control below.

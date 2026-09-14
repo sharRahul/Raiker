@@ -412,6 +412,37 @@ def post_multipart(
     return parsed_body
 
 
+def _mcp_opener(trust: Any) -> Any:
+    """A urllib opener for one classified MCP destination.
+
+    Two things it does that the default opener does not:
+
+    * **It dials the address that passed the guard.** For a public endpoint the
+      name was resolved and checked; handing that *name* to the HTTP client
+      would resolve it a second time, and the second answer does not have to
+      match the first. Pinning closes that gap while TLS and the Host header
+      keep the original name, so certificate validation is unchanged.
+    * **It never follows a redirect by itself.** A redirect is a new
+      destination, and a destination is something this module decides about.
+      Returning ``None`` from ``redirect_request`` makes urllib surface the 3xx
+      as an ``HTTPError``, which :func:`post_json_rpc` re-checks and follows
+      deliberately.
+    """
+    import urllib.request
+
+    from raiker.runtime.web_policy import pinned_https_opener
+
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *args: Any, **kwargs: Any) -> None:
+            return None
+
+    if trust.pin and trust.scheme == "https":
+        opener = pinned_https_opener(trust.host, trust.pin)
+        opener.add_handler(_NoRedirect())
+        return opener
+    return urllib.request.build_opener(_NoRedirect())
+
+
 def post_json_rpc(
     url: str,
     payload: dict[str, object],
@@ -424,21 +455,27 @@ def post_json_rpc(
 
     Returns status, the bounded response body text, and the response headers
     (lower-cased) — the latter so the caller can carry an ``Mcp-Session-Id``
-    across requests. Only the URL scheme is validated; the request goes to the
-    owner-supplied host because *the owner adding the URL is the authorization*
-    (monitored, not allowlist-blocked — see the Security Philosophy). Request
-    headers (e.g. an owner bearer token) are sent verbatim and are never
-    returned or logged by this function. An HTTP error still returns its body,
-    since an MCP server may deliver a JSON-RPC error with a non-2xx status.
+    across requests. Request headers (e.g. an owner bearer token) are sent
+    verbatim and are never returned or logged by this function. An HTTP error
+    still returns its body, since an MCP server may deliver a JSON-RPC error
+    with a non-2xx status.
+
+    **RR-MCP-02.** The owner adding the URL is still the authorization — this is
+    monitored, not allowlist-blocked. What changed is that the destination is
+    now *classified* rather than merely parsed
+    (:mod:`raiker.runtime.mcp_endpoint_policy`), the connection is pinned to an
+    address that passed, and a redirect is re-checked as its own destination
+    rather than followed by the HTTP client. A server cannot send a session
+    somewhere the endpoint itself would have been refused, and the owner's token
+    does not travel across an origin change.
     """
     import json as _json
     import urllib.error
     import urllib.request
-    from urllib.parse import urlparse
+    from urllib.parse import urljoin
 
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        raise SandboxError("mcp_remote_invalid_endpoint")
+    from raiker.runtime.mcp_endpoint_policy import MAX_REDIRECTS, evaluate_endpoint
+
     body = _json.dumps(payload).encode("utf-8")
     # BUG-234 — the streamable HTTP transport requires a client to accept both
     # framings on every POST. Raiker sent `application/json` alone for five
@@ -450,29 +487,55 @@ def post_json_rpc(
         "Accept": "application/json, text/event-stream",
     }
     merged.update(headers or {})
-    request = urllib.request.Request(  # noqa: S310 - scheme checked above
-        url, data=body, method="POST", headers=merged,
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
-            data = resp.read(max_bytes + 1)
-            status_code = resp.status if hasattr(resp, "status") else 200
-            resp_headers = {str(k).lower(): str(v) for k, v in resp.headers.items()}
-    except urllib.error.HTTPError as exc:
-        data = exc.read(max_bytes + 1) if hasattr(exc, "read") else b""
-        status_code = exc.code
-        resp_headers = {
-            str(k).lower(): str(v) for k, v in (exc.headers.items() if exc.headers else [])
+
+    target = url
+    origin: str | None = None
+    for hop in range(MAX_REDIRECTS + 1):
+        trust = evaluate_endpoint(target)
+        if not trust.allowed:
+            # The first refusal is the endpoint's own and says exactly what was
+            # wrong with it. A later one is the server moving the session, and
+            # the owner needs to read it as that rather than as a property of
+            # the URL they typed.
+            raise SandboxError(
+                trust.reason if hop == 0 else f"mcp_remote_redirect_untrusted:{trust.reason}"
+            )
+        if origin is not None and trust.origin != origin:
+            # A different server is not the server the owner gave a token to.
+            merged.pop("Authorization", None)
+        origin = trust.origin
+
+        request = urllib.request.Request(  # noqa: S310 - scheme checked by the policy
+            target, data=body, method="POST", headers=merged,
+        )
+        opener = _mcp_opener(trust)
+        try:
+            with opener.open(request, timeout=timeout) as resp:  # noqa: S310
+                data = resp.read(max_bytes + 1)
+                status_code = resp.status if hasattr(resp, "status") else 200
+                resp_headers = {str(k).lower(): str(v) for k, v in resp.headers.items()}
+        except urllib.error.HTTPError as exc:
+            data = exc.read(max_bytes + 1) if hasattr(exc, "read") else b""
+            status_code = exc.code
+            resp_headers = {
+                str(k).lower(): str(v) for k, v in (exc.headers.items() if exc.headers else [])
+            }
+        except Exception:
+            raise SandboxError("mcp_remote_unreachable") from None
+
+        location = resp_headers.get("location", "")
+        if 300 <= int(status_code) < 400 and location:
+            target = urljoin(target, location)
+            continue
+
+        truncated = len(data) > max_bytes
+        return {
+            "status": status_code,
+            "body_text": data[:max_bytes].decode("utf-8", errors="replace"),
+            "headers": resp_headers,
+            "truncated": truncated,
         }
-    except Exception:
-        raise SandboxError("mcp_remote_unreachable") from None
-    truncated = len(data) > max_bytes
-    return {
-        "status": status_code,
-        "body_text": data[:max_bytes].decode("utf-8", errors="replace"),
-        "headers": resp_headers,
-        "truncated": truncated,
-    }
+    raise SandboxError("mcp_remote_too_many_redirects")
 
 
 def delete_mcp_session(
@@ -492,14 +555,18 @@ def delete_mcp_session(
     """
     import urllib.error
     import urllib.request
-    from urllib.parse import urlparse
 
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+    from raiker.runtime.mcp_endpoint_policy import evaluate_endpoint
+
+    # The same classification as the session it is ending (RR-MCP-02). A
+    # courtesy DELETE is still a request carrying the owner's token, and the
+    # destination it goes to is decided in one place.
+    trust = evaluate_endpoint(url)
+    if not trust.allowed:
         return 0
     request = urllib.request.Request(url, method="DELETE", headers=headers or {})  # noqa: S310
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
+        with _mcp_opener(trust).open(request, timeout=timeout) as resp:  # noqa: S310
             return int(resp.status if hasattr(resp, "status") else 200)
     except urllib.error.HTTPError as exc:
         return int(exc.code)

@@ -14,11 +14,24 @@ export interface RouteState {
    */
   turnId: string | null;
   recordId: string | null;
+  /**
+   * NEW-PROJ-02 — the asset a link is pointing at, on a surface whose object is
+   * an asset. A project's image strip could show eight pictures and offer no
+   * way to open one of them: the only continuation was a bare `#/design`, so
+   * finding the image you had just been looking at meant searching the whole
+   * account's Design history for it.
+   *
+   * A coordinate, like the session and turn ids beside it. It names a
+   * generation the reader may already open and grants nothing — the gallery it
+   * resolves against is owner-scoped on the server, so an id belonging to
+   * somebody else resolves to nothing at all.
+   */
+  assetId: string | null;
   filter: string | null;
   tab: string | null;
 }
 
-const ROUTE_STATE_KEYS = ["project", "session", "turn", "record", "filter", "tab"] as const;
+const ROUTE_STATE_KEYS = ["project", "session", "turn", "record", "asset", "filter", "tab"] as const;
 
 function safeValue(value: string | null): string | null {
   if (value === null || value.length === 0 || value.length > 256) return null;
@@ -36,6 +49,7 @@ export function routeStateFromHash(hash: string): RouteState {
     sessionId: values.session,
     turnId: values.turn,
     recordId: values.record,
+    assetId: values.asset,
     filter: values.filter,
     tab: values.tab,
   };

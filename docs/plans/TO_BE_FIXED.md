@@ -108,6 +108,10 @@ names.
 | [BUG-285](#bug-285--an-ollama-cloud-model-tests-and-runs-in-ollama-but-chat-cannot-use-it) | Medium | Models / Ollama cloud chat | Open — raised 2026-09-08 during the provider restart round |
 | [BUG-289](#bug-289--a-hosted-provider-this-machine-cannot-reach-is-told-to-check-that-it-is-running) | Low | Models / provider errors | Open — raised 2026-09-13 while verifying [FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name) |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
+| [BUG-291](#bug-291--a-live-spec-asserts-a-refusal-that-a-working-key-will-never-produce) | Low | Live test harness | Open — raised 2026-09-13 running the RR-MCP-02 round with a key that works |
+| [BUG-292](#bug-292--a-live-spec-sends-a-turn-without-choosing-a-model-and-the-composer-is-right-to-refuse) | Low | Live test harness | Open — raised 2026-09-13; the product is correct and the spec skips the step |
+| [BUG-293](#bug-293--a-side-effect-capabilitys-threat-model-and-bypass-test-are-not-mechanically-required) | Medium | Governance / release assurance | Open — the remainder of RR-AUTHORITY-01 after [FIXED-505](FIXED_ITEMS.md#fixed-505--the-four-capabilities-that-reach-furthest-into-an-owners-accounts-explained-themselves-least) |
+| [BUG-294](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace) | Medium | Threads / work index | **Closed 2026-09-14 ([FIXED-511](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace))** — raised and closed in the same run: the work index filters, facets over everything that matched, and pages |
 | [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — **a fifth round blocked on the same value, 2026-09-06**; confirmed in two requests again, and this host has no local runtime either. Raiker's half holds under a fifth key: the refusal reads as itself in the picker, not as *Provider unreachable*. The attempt found [FIXED-435](FIXED_ITEMS.md#fixed-435--the-models-page-said-a-gate-was-on-above-providers-it-would-refuse) |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
@@ -1633,3 +1637,139 @@ tool loop against any provider but Anthropic.
 **Interface outcome that has to be true before this closes.** The same question
 the owner reported — *who is the owner of this workspace* — asked and answered
 through each of the four providers, with a capture of each answer.
+
+---
+
+## BUG-291 — A live spec asserts a refusal that a working key will never produce
+
+**Severity: Low. Area: Live test harness. Raised 2026-09-13 while running the
+RR-MCP-02 round.**
+
+**Observed.** `web/e2e/anthropic-key-live.spec.ts` fails against the Anthropic key
+this round was given. Nothing is wrong with the key or with Raiker: the spec was
+written for the *previous* round's key, which was identity-linked and could only
+authenticate with the id of the workspace it acts inside, and it asserts that the
+model dialog says so —
+
+```ts
+await expect(dialog.getByText(/identity-linked/i)).toBeVisible({ timeout: 90_000 });
+```
+
+This round's key authenticates normally. `/v1/models` answers 200 with eleven
+models, the connection saves, the picker fills, and the spec spends ninety seconds
+waiting for a refusal that is not coming.
+
+**Root cause.** The spec encodes a property of one *credential* as though it were
+a property of the *product*. Raiker's half — that an identity-linked refusal is
+classified and stated in words beside the field that fixes it — is worth keeping;
+what is not is a scenario that only passes when the key is broken in one specific
+way.
+
+**Proposed fix.** Split it. Assert the classification against a stubbed provider
+response, where an identity-linked refusal can be produced on demand, and leave
+the live spec asserting what a *working* key does: models listed, a model pinned,
+a turn answered. A live spec that passes only with a key nobody would want is a
+spec that will be deleted rather than fixed the next time it fails.
+
+**Interface outcome that has to be true before this closes.** The spec passes
+against a working key and against an identity-linked one, and says which it is
+looking at.
+
+---
+
+## BUG-292 — A live spec sends a turn without choosing a model, and the composer is right to refuse
+
+**Severity: Low. Area: Live test harness. Raised 2026-09-13 while running the
+RR-MCP-02 round.**
+
+**Observed.** `web/e2e/bug-206-207-tool-rows-and-reasoning-live.spec.ts` connects
+Anthropic, pins Haiku 4.5 on the provider card, goes to `#/new-chat`, types a
+prompt and presses **Send**. On a workspace where no global model has ever been
+chosen, Send is disabled and the composer says so: *"No model is chosen. Choose
+one from the model menu beside Send."* The spec waits out its timeout on a
+disabled button, and the five scenarios behind it never run.
+
+The product is behaving correctly — a composer that guessed a model would be the
+defect — and the spec is asserting a step it never takes. Pinning a model on a
+provider card is what makes it *available*; choosing it in the composer's picker
+is what makes it the model for the turn, and they are two different decisions by
+design.
+
+**Root cause.** The same drift as [FIXED-503](FIXED_ITEMS.md#fixed-503--the-live-harness-looked-for-provider-controls-that-had-moved-into-a-menu):
+the harness encodes where a control used to be, or what state a workspace used to
+be left in. `useHostedModel` returns a card with a pinned model and no scenario
+using it chooses one for the turn.
+
+**Proposed fix.** A `chooseModelForTurn` helper beside `useHostedModel`, opening
+the composer's own picker and selecting the model by name — which is what
+`web/e2e/rr-mcp-02-live-provider-turn-live.spec.ts` does inline, and what every
+spec that sends a turn needs. One place, so the next change to the picker is one
+edit rather than a sweep.
+
+**Interface outcome that has to be true before this closes.** Every live spec
+that sends a turn passes against a workspace where no global model was ever
+chosen.
+
+---
+
+## BUG-293 — A side-effect capability's threat model and bypass test are not mechanically required
+
+**Severity: Medium. Area: Governance / release assurance. Raised 2026-09-13 as
+the remainder of [RR-AUTHORITY-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#what-blocks-a-public-first-release)
+after [FIXED-505](FIXED_ITEMS.md#fixed-505--the-four-capabilities-that-reach-furthest-into-an-owners-accounts-explained-themselves-least).**
+
+**Observed.** [DEC-16](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-16--require-one-opaque-runtime-authority-context)
+step 8 asks for a CI registry check that every real side-effect capability has
+*an executor, a threat model, a Permissions description, an authority requirement
+and a negative bypass test.* Three of those five are now mechanical:
+
+| Column | Enforced by |
+|---|---|
+| Executor | `REAL_EXECUTOR_CAPABILITIES` and the registry assertion in `raiker/runtime/executors/__init__.py` |
+| How it is reached | `tests/test_governance_entry_paths.py` against `CAPABILITY_ENTRY_PATHS` |
+| Permissions description | `tests/test_capability_permissions_copy.py` |
+| **Threat model** | **nothing** |
+| **Authority requirement** | **nothing** |
+| **Negative bypass test** | **nothing per capability** |
+
+The bypass property is established *structurally* today — `route_action`'s callers
+are enumerated and asserted, and the agent gateway is constructed only by named
+surfaces — which is a genuine boundary and is not the same claim. It says no
+current path bypasses the chokepoint; it does not say each of the forty-eight
+capabilities has a test proving its own executor refuses an ungoverned call.
+
+**Root cause.** The capability registry grew a column at a time, each with its own
+home, and the two columns nobody has a home for are the two that need a sentence
+written per capability rather than a set intersection.
+
+**Proposed fix.** One `CAPABILITY_AUTHORITY` table beside `CAPABILITY_ENTRY_PATHS`
+carrying, per capability, its side-effect class (read / reversible / external /
+destructive / critical), one sentence on what goes wrong if it runs ungoverned,
+and the test that proves it will not. Assert completeness against
+`REAL_EXECUTOR_CAPABILITIES`, that the sentence is not a restatement of the
+capability name — the bar `test_an_inert_gate_says_what_really_governs_it`
+already sets for entry-path notes — and that every named test exists and is
+collected.
+
+**Interface outcome that has to be true before this closes.** Permissions can show
+an owner what a capability would cost if it were reached without governance, and
+a new executor cannot ship without answering that question.
+
+---
+
+## BUG-294 — Threads filters describe a hundred rows and are called a workspace
+
+**Severity: Medium. Area: Threads / work index. Raised 2026-09-14 as
+[NEW-THREAD-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-thread-01--filters-only-cover-a-truncated-list-and-disappear-during-search)
+of the removal and simplification review. Closed the same day as
+[FIXED-511](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace).**
+
+Raised here because the fix was an API change rather than a view fix and was not
+expected to land in the run that found it. It did: `GET /api/work-threads/page`
+filters, facets over everything that matched with each facet's own filter
+lifted, and pages behind a scope-bound cursor. The full record — what was
+observed, why a browser could not be the index, and the sixteen server cases
+behind it — is in
+[`FIXED_ITEMS.md`](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace).
+
+With it, every finding in §18.5 of that review is closed.

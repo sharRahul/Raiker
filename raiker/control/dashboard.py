@@ -11,6 +11,7 @@ import re
 import shutil
 import stat
 import sys
+import time
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -29,6 +30,11 @@ from raiker.control.knowledge_scope import (
     KNOWLEDGE_UPLOAD_DIR,
     MAX_KNOWLEDGE_UPLOAD_BYTES,
     MAX_SOURCE_PATH_CHARS,
+    REVIEW_ACCEPTED_FILE_BUDGET,
+    REVIEW_DEPTH_BUDGET,
+    REVIEW_TIME_BUDGET_SECONDS,
+    REVIEW_TRUNCATION_REASONS,
+    REVIEW_VISITED_ENTRY_BUDGET,
     RUNTIME_DIR_NAME,
     SKIPPED_DIRECTORY_NAMES,
     ScopeError,
@@ -136,6 +142,132 @@ TASK_OUTCOME_STATES = frozenset({"completed", "failed", "cancelled", "waiting_fo
 # network call is made to find out.
 _GITHUB_NAME = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9_])?")
 _GITHUB_REF = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._/-]{0,98}[A-Za-z0-9_-])?")
+
+
+@dataclass(frozen=True)
+class _SourceReviewWalk:
+    """What one bounded review walk found, and what it cost to find it."""
+
+    supported: int
+    unsupported: int
+    total_bytes: int
+    examples: tuple[str, ...]
+    #: Every entry looked at, accepted or skipped. The number the old cap was
+    #: mistaken for.
+    visited: int
+    truncated_reason: str | None
+
+
+def _walk_source_for_review(path: Path, base: Path) -> _SourceReviewWalk:
+    """Walk *path* for an indexing plan, under four budgets that actually bind.
+
+    NEW-MAP-03. The previous walk was ``path.rglob("*")`` with a counter that
+    only advanced on entries it accepted, so everything it skipped was free:
+    every directory, every hidden path, every name under ``node_modules``, every
+    file it could not ``stat``. A cap of 5,000 therefore bounded the *answer*
+    and not the *work*, and a folder with a large dependency tree beside it was
+    walked in full to report the six files an owner cared about.
+
+    Three things change:
+
+    * **Excluded directories are pruned before descent** rather than after
+      every entry inside them has been produced. ``os.walk`` lets the walker
+      edit the directory list in place, which is the difference between not
+      entering ``node_modules`` and enumerating it and discarding the result.
+    * **Every entry visited is counted**, whatever happens to it, so the visit
+      budget is a bound on the work and the file budget stays a bound on the
+      answer.
+    * **Depth and elapsed time are their own budgets.** A pathological tree is
+      deep rather than wide, and a slow drive is neither — no counter of entries
+      notices either one.
+
+    Symlinked directories are not followed (``os.walk`` does not by default),
+    which is what stops a cycle; the containment check below is unchanged and
+    still judges every accepted file against the selected root.
+    """
+    started = time.monotonic()
+    supported = 0
+    unsupported = 0
+    total_bytes = 0
+    visited = 0
+    examples: list[str] = []
+    truncated: str | None = None
+
+    def _example(resolved: Path) -> None:
+        if len(examples) < 8:
+            with contextlib.suppress(ValueError):
+                examples.append(resolved.relative_to(base).as_posix())
+
+    def _consider(candidate: Path) -> None:
+        """Count one file, if it is one Raiker could read."""
+        nonlocal supported, unsupported, total_bytes
+        try:
+            resolved = candidate.resolve()
+            if resolved != base and base not in resolved.parents:
+                return
+            size = candidate.stat().st_size
+        except (OSError, ValueError):
+            return
+        if candidate.suffix.casefold() in KNOWLEDGE_SOURCE_EXTENSIONS and size <= 5 * 1024 * 1024:
+            supported += 1
+            total_bytes += size
+            _example(resolved)
+        else:
+            unsupported += 1
+
+    if path.is_file():
+        visited = 1
+        _consider(path)
+        return _SourceReviewWalk(
+            supported, unsupported, total_bytes, tuple(examples), visited, None
+        )
+
+    base_depth = len(path.parts)
+    for dirpath, dirnames, filenames in os.walk(path, onerror=None):
+        here = Path(dirpath)
+        depth = len(here.parts) - base_depth
+        # Pruned in place, before anything inside them is produced. This is the
+        # whole finding: the previous walk enumerated these and threw the
+        # entries away one at a time.
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if name not in SKIPPED_DIRECTORY_NAMES and not name.startswith(".")
+        ]
+        visited += len(dirnames)
+        if depth >= REVIEW_DEPTH_BUDGET:
+            dirnames.clear()
+            truncated = truncated or "depth_cap"
+
+        for name in filenames:
+            visited += 1
+            if visited >= REVIEW_VISITED_ENTRY_BUDGET:
+                truncated = "visited_entry_cap"
+                break
+            if time.monotonic() - started >= REVIEW_TIME_BUDGET_SECONDS:
+                truncated = "time_cap"
+                break
+            if name.startswith("."):
+                continue
+            _consider(here / name)
+            # The accepted-file budget is checked after the file is counted, so
+            # the number the owner reads is the number that was reached.
+            if supported + unsupported >= REVIEW_ACCEPTED_FILE_BUDGET:
+                truncated = "accepted_file_cap"
+                break
+
+        if truncated in {"visited_entry_cap", "time_cap", "accepted_file_cap"}:
+            break
+        if visited >= REVIEW_VISITED_ENTRY_BUDGET:
+            truncated = "visited_entry_cap"
+            break
+        if time.monotonic() - started >= REVIEW_TIME_BUDGET_SECONDS:
+            truncated = "time_cap"
+            break
+
+    return _SourceReviewWalk(
+        supported, unsupported, total_bytes, tuple(examples), visited, truncated
+    )
 
 
 def _runs_on_this_platform(profile: Any) -> bool:
@@ -1350,6 +1482,114 @@ class WorkThreadView:
         return asdict(self)
 
 
+# ── The work index (NEW-THREAD-01) ───────────────────────────────────────────
+#
+# Threads derived its Project choices *and* its results from one unpaginated
+# read of a hundred rows. Three things followed, and all three read as facts
+# about the workspace rather than about the read:
+#
+# * a project whose newest thread fell outside the first hundred was **not
+#   offered as a filter at all**, which is indistinguishable from a project with
+#   nothing in it;
+# * the window looked like the whole inventory, because nothing said otherwise;
+# * typing a query called an unscoped search and hid the filters, so narrowing
+#   something down silently widened it.
+#
+# The browser was being used as the index. These are the bounds that let the
+# server be one: filter, then facet over everything that matched, then page.
+
+#: Default rows per page, and the most a caller may ask for.
+WORK_THREAD_PAGE_LIMIT = 50
+WORK_THREAD_MAX_PAGE_LIMIT = 200
+
+#: How many of the owner's threads the index will consider. Generous enough
+#: that an ordinary workspace is answered completely, bounded because an index
+#: that reads everything is the defect with a larger number. When it binds, the
+#: answer says so rather than quietly describing a slice.
+WORK_THREAD_SCAN_LIMIT = 2000
+
+
+@dataclass(frozen=True)
+class WorkThreadFacet:
+    """One filter choice, with how many threads it would select."""
+
+    value: str
+    label: str
+    count: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class WorkThreadPage:
+    """One page of the work index, and the filters that produced it."""
+
+    threads: list[WorkThreadView]
+    #: Opaque, and bound to the owner and the filters. A cursor from one scope
+    #: is refused in another rather than paging through a different question.
+    next_cursor: str | None
+    #: How many threads matched the filters, within the scan bound.
+    total: int
+    #: Every project the owner has work in — computed with the *project* filter
+    #: lifted, so choosing a different one is possible from any page. This is
+    #: the finding: a facet computed over the current page can only ever offer
+    #: what is already on screen.
+    projects: list[WorkThreadFacet]
+    #: Same, with the *kind* filter lifted.
+    kinds: list[WorkThreadFacet]
+    #: True when the scan bound was reached, so the counts above describe the
+    #: most recent `WORK_THREAD_SCAN_LIMIT` threads rather than all of them.
+    scan_truncated: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "threads": [thread.to_dict() for thread in self.threads],
+            "next_cursor": self.next_cursor,
+            "total": self.total,
+            "projects": [facet.to_dict() for facet in self.projects],
+            "kinds": [facet.to_dict() for facet in self.kinds],
+            "scan_truncated": self.scan_truncated,
+        }
+
+
+def _work_thread_scope(
+    user_id: str | None, project_id: str | None, kind: str | None, query: str
+) -> str:
+    """A short digest of the question a cursor was issued for.
+
+    Carried inside the cursor so a cursor cannot be replayed against a different
+    owner or a different filter set — paging is a position in one ordered
+    answer, and the position means nothing in another.
+    """
+    material = "\x1f".join([user_id or "", project_id or "", kind or "", query])
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
+
+
+def encode_work_thread_cursor(thread: WorkThreadView, scope: str) -> str:
+    """Where the next page starts: the last row of this one, plus its scope."""
+    raw = "\x1f".join([scope, thread.updated_at, thread.session_id])
+    return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii")
+
+
+def decode_work_thread_cursor(cursor: str, scope: str) -> tuple[str, str] | None:
+    """``(updated_at, session_id)`` the next page follows, or ``None``.
+
+    ``None`` for anything that is not a cursor this scope issued — a corrupted
+    string, and a valid cursor from a different filter set alike. A refused
+    cursor restarts the listing rather than failing the read: the owner has
+    changed the question, and the honest answer is its first page.
+    """
+    try:
+        raw = base64.urlsafe_b64decode(cursor.encode("ascii")).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return None
+    parts = raw.split("\x1f")
+    if len(parts) != 3 or parts[0] != scope:
+        return None
+    return parts[1], parts[2]
+
+
 @dataclass(frozen=True)
 class TaskView:
     task_id: str
@@ -2323,61 +2563,36 @@ class DashboardService:
         """Build a bounded, read-only indexing plan before a source is selected."""
         root, relative, path = self._scoped_source(raw_path, owner_principal_id=owner_principal_id)
         relative_path = scope_path(root, relative)
-        candidates = [path] if path.is_file() else path.rglob("*")
-        supported = 0
-        unsupported = 0
-        total_bytes = 0
-        scanned = 0
-        examples: list[str] = []
-        warnings: list[str] = []
         # Containment is judged against the root that was selected, not against
         # the workspace: a granted folder lives outside the workspace entirely,
         # and everything under it — and nothing above it — is in scope.
         base = root.path.resolve() if root.path is not None else path
-        for candidate in candidates:
-            if scanned >= 5000:
-                warnings.append(
-                    "More than 5,000 entries were found; review is capped and indexing will remain incremental."
-                )
-                break
-            try:
-                resolved = candidate.resolve()
-                if resolved != base and base not in resolved.parents:
-                    continue
-                if not candidate.is_file() or any(
-                    part in SKIPPED_DIRECTORY_NAMES or part.startswith(".")
-                    for part in candidate.relative_to(base).parts
-                ):
-                    continue
-                size = candidate.stat().st_size
-            except (OSError, ValueError):
-                continue
-            scanned += 1
-            if (
-                candidate.suffix.casefold() in KNOWLEDGE_SOURCE_EXTENSIONS
-                and size <= 5 * 1024 * 1024
-            ):
-                supported += 1
-                total_bytes += size
-                if len(examples) < 8:
-                    examples.append(scope_path(root, resolved.relative_to(base).as_posix()))
-            else:
-                unsupported += 1
-        if total_bytes > 100 * 1024 * 1024:
+        walk = _walk_source_for_review(path, base)
+
+        warnings: list[str] = []
+        if walk.truncated_reason is not None:
+            warnings.append(REVIEW_TRUNCATION_REASONS[walk.truncated_reason])
+        if walk.total_bytes > 100 * 1024 * 1024:
             warnings.append(
                 "The selected source exceeds 100 MB; content will be loaded incrementally as it is needed."
             )
-        if unsupported:
-            warnings.append(f"{unsupported} unsupported or oversized file(s) will be skipped.")
+        if walk.unsupported:
+            warnings.append(f"{walk.unsupported} unsupported or oversized file(s) will be skipped.")
         return {
             "path": relative_path,
             "kind": "folder" if path.is_dir() else "file",
-            "supported_files": supported,
-            "unsupported_files": unsupported,
-            "total_bytes": total_bytes,
-            "examples": examples,
+            "supported_files": walk.supported,
+            "unsupported_files": walk.unsupported,
+            "total_bytes": walk.total_bytes,
+            "examples": [scope_path(root, example) for example in walk.examples],
             "warnings": warnings,
-            "review_cap": 5000,
+            "review_cap": REVIEW_ACCEPTED_FILE_BUDGET,
+            # NEW-MAP-03 — what the walk actually cost, and why it stopped if it
+            # did. A partial answer that does not say it is partial is the
+            # defect this replaced, one level up.
+            "visited_entries": walk.visited,
+            "truncated": walk.truncated_reason is not None,
+            "truncated_reason": walk.truncated_reason,
         }
 
     def get_brain_preferences(self, owner_principal_id: str) -> dict[str, Any]:
@@ -6278,6 +6493,15 @@ class DashboardService:
         user_id: str | None = None,
         limit: int = 100,
     ) -> list[WorkThreadView]:
+        """The unfiltered first page, kept for callers that want exactly that.
+
+        Home reads this: it wants the newest few threads to offer as somewhere
+        to continue, and has no filters to apply. :meth:`work_thread_page` is
+        the index behind Threads.
+        """
+        return self.work_thread_page(user_id=user_id, limit=limit).threads
+
+    def _all_work_threads(self, *, user_id: str | None) -> tuple[list[WorkThreadView], bool]:
         """Every thread of this owner's work, newest first (GAP-CHAT C18).
 
         Two kinds, in one list, because the owner has one head:
@@ -6301,7 +6525,7 @@ class DashboardService:
         }
         threads: list[WorkThreadView] = []
         for session in self.store.list_sessions(
-            limit=limit, user_id=user_id, include_archived=False, origin="chat"
+            limit=WORK_THREAD_SCAN_LIMIT, user_id=user_id, include_archived=False, origin="chat"
         ):
             session_id = str(session.get("session_id", ""))
             project_id = session.get("project_id")
@@ -6357,8 +6581,89 @@ class DashboardService:
                     ),
                 )
             )
-        threads.sort(key=lambda thread: thread.updated_at, reverse=True)
-        return threads[:limit]
+        # Stable, with a tie-breaker: two threads touched in the same second
+        # must not swap places between pages, or a cursor would skip one and
+        # repeat the other.
+        threads.sort(key=lambda thread: (thread.updated_at, thread.session_id), reverse=True)
+        return threads, len(threads) >= WORK_THREAD_SCAN_LIMIT
+
+    def work_thread_page(
+        self,
+        *,
+        user_id: str | None = None,
+        project_id: str | None = None,
+        kind: str | None = None,
+        query: str = "",
+        cursor: str | None = None,
+        limit: int = WORK_THREAD_PAGE_LIMIT,
+    ) -> WorkThreadPage:
+        """One page of the owner's work, with the filters that produced it.
+
+        NEW-THREAD-01. The order is the whole point and it is the order Threads
+        could not perform in a browser: **filter, then facet over everything
+        that matched, then page.** Facets computed over a page can only ever
+        offer what is already on screen, which is how a project whose newest
+        thread fell outside the first hundred rows stopped existing as a filter.
+
+        A blank ``query`` is not a filter. A query *with* a project selected
+        keeps the project — narrowing something down must not widen it, which is
+        what an unscoped search on the first keystroke did.
+        """
+        size = max(1, min(int(limit or WORK_THREAD_PAGE_LIMIT), WORK_THREAD_MAX_PAGE_LIMIT))
+        needle = (query or "").strip().casefold()
+        every, truncated = self._all_work_threads(user_id=user_id)
+
+        def matches(
+            thread: WorkThreadView, *, ignore_project: bool = False, ignore_kind: bool = False
+        ) -> bool:
+            if not ignore_project and project_id is not None and thread.project_id != project_id:
+                return False
+            if not ignore_kind and kind is not None and thread.kind != kind:
+                return False
+            return not (needle and needle not in thread.title.casefold())
+
+        # Each facet is computed with its own filter lifted, so every choice
+        # stays reachable from every other. A project facet that respected the
+        # project filter would offer exactly one project: the one already on.
+        project_counts: dict[str, int] = {}
+        project_labels: dict[str, str] = {}
+        kind_counts: dict[str, int] = {}
+        for thread in every:
+            if matches(thread, ignore_project=True) and thread.project_id:
+                key = str(thread.project_id)
+                project_counts[key] = project_counts.get(key, 0) + 1
+                project_labels.setdefault(key, thread.project_name or key)
+            if matches(thread, ignore_kind=True):
+                kind_counts[thread.kind] = kind_counts.get(thread.kind, 0) + 1
+
+        matched = [thread for thread in every if matches(thread)]
+        scope = _work_thread_scope(user_id, project_id, kind, needle)
+        start = 0
+        if cursor:
+            after = decode_work_thread_cursor(cursor, scope)
+            if after is not None:
+                for index, thread in enumerate(matched):
+                    if (thread.updated_at, thread.session_id) == after:
+                        start = index + 1
+                        break
+        page = matched[start : start + size]
+        more = start + size < len(matched)
+        return WorkThreadPage(
+            threads=page,
+            next_cursor=encode_work_thread_cursor(page[-1], scope) if page and more else None,
+            total=len(matched),
+            projects=[
+                WorkThreadFacet(value=key, label=project_labels[key], count=count)
+                for key, count in sorted(
+                    project_counts.items(), key=lambda item: (-item[1], project_labels[item[0]])
+                )
+            ],
+            kinds=[
+                WorkThreadFacet(value=key, label=key, count=count)
+                for key, count in sorted(kind_counts.items())
+            ],
+            scan_truncated=truncated,
+        )
 
     def create_task(
         self,

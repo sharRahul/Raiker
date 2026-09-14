@@ -4,6 +4,7 @@
   import PageState from "../components/PageState.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
+  import { endpointRefusal, networkClassLabel } from "../mcpEndpoint";
   import type { ConnectorStoreView, StoreConnector } from "../apiTypes";
 
   let view = $state<ConnectorStoreView | null>(null);
@@ -41,9 +42,15 @@
   );
 
   function reason(e: unknown): string {
-    return e instanceof ApiError
-      ? (e.reasonCode ?? `Request failed (${e.status})`)
-      : "Request failed";
+    if (!(e instanceof ApiError)) return "Request failed";
+    // RR-MCP-02 — a refused endpoint used to arrive here as its reason code.
+    // `mcp_remote_host_not_public` is a true statement and not one an owner can
+    // do anything with.
+    return (
+      endpointRefusal(e.reasonCode) ??
+      e.reasonCode ??
+      `Request failed (${e.status})`
+    );
   }
 
   async function load() {
@@ -422,7 +429,11 @@
           type="url"
           bind:value={endpointUrl}
           placeholder="https://mcp.example.com"
-        /><label class="field-label" for="mcp-token-ref"
+        />{#if endpointUrl.trim()}<p class="field-note">
+            {networkClassLabel(endpointUrl)}. Raiker connects to the address this
+            resolves to and follows a redirect only to somewhere it would have
+            accepted as the endpoint itself.
+          </p>{/if}<label class="field-label" for="mcp-token-ref"
           >Token environment variable</label
         ><input
           id="mcp-token-ref"

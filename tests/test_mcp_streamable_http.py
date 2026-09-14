@@ -166,25 +166,23 @@ class TestTheTransportIsTheSpecificationsTransport:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """A conformant server may answer 406 to a POST that offers only JSON."""
-        import urllib.request
-
         from raiker.runtime.executors import sandbox
 
         captured: dict[str, str] = {}
 
-        def _fake_request(url: str, data: bytes, method: str, headers: dict) -> object:
-            captured.update(headers)
-            return object()
+        class _Opener:
+            def open(self, request: Any, timeout: float) -> None:
+                captured.update(dict(request.header_items()))
+                raise OSError("no network in a unit test")
 
-        def _no_network(request: object, timeout: float) -> None:
-            raise OSError("no network in a unit test")
-
-        monkeypatch.setattr(urllib.request, "Request", _fake_request)
-        monkeypatch.setattr(urllib.request, "urlopen", _no_network)
+        # RR-MCP-02 — the destination is classified immediately before the
+        # socket now, so the request is built against a loopback endpoint that
+        # needs no lookup. What is being asserted is the headers, not the host.
+        monkeypatch.setattr(sandbox, "_mcp_opener", lambda trust: _Opener())
         # The refusal is how the fake stops before any network call; the headers
         # it captured on the way in are the assertion.
         with pytest.raises(SandboxError):
-            sandbox.post_json_rpc(_URL, {"jsonrpc": "2.0"})
+            sandbox.post_json_rpc("http://127.0.0.1:8931/rpc", {"jsonrpc": "2.0"})
 
         accept = captured.get("Accept", "")
         assert "application/json" in accept

@@ -486,12 +486,17 @@ export type DecisionMode = "ask" | "allow" | "auto" | "deny";
 
 export const DECISION_MODES: readonly DecisionMode[] = ["ask", "allow", "auto", "deny"];
 
-export const DECISION_MODE_COPY: Record<DecisionMode, { label: string; hint: string }> = {
-  ask: { label: "Ask", hint: "Every AI-proposed action pauses for your approval (default)." },
-  allow: { label: "Allow", hint: "AI-proposed actions run without prompting, within policy." },
-  auto: { label: "Auto", hint: "Fully automatic within policy — the most permissive mode." },
-  deny: { label: "Deny", hint: "Every AI-proposed action for this capability is refused." },
-};
+// REM-PERM-02 — `DECISION_MODE_COPY` lived here: a fourth-and-unused set of
+// words for the same four stored values (`Ask`/`Allow`/`Auto`/`Deny`). Nothing
+// rendered it, which is precisely why it was worth deleting rather than
+// leaving: the next surface that needed a label for a decision mode would have
+// found it, imported it, and given this policy another name on another screen.
+//
+// The one owner vocabulary is `BEHAVIOUR_COPY` in `permissionLanguage.ts` —
+// **Ask me**, **Allow**, **Automatic**, **Never** — and it is deliberately
+// worded as the answer to "when Raiker wants to use it", which is what makes
+// `On · Never` read as a sentence instead of a contradiction. The mode *ids*
+// are unchanged in the store, the API and exports.
 
 export function isDecisionMode(value: unknown): value is DecisionMode {
   return typeof value === "string" && (DECISION_MODES as readonly string[]).includes(value);
@@ -713,7 +718,8 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
   },
   semantic_memory_runtime: {
     label: "Semantic memory runtime",
-    description: "Governed semantic memory store operations.",
+    description:
+      "Store what a memory means, not only what it says, so a question can recall a memory that shares none of its words. Runs on this machine over memories you already hold.",
   },
   vector_embedding_runtime: {
     label: "Vector embeddings",
@@ -761,6 +767,32 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
     label: "Checkpoint restore",
     description:
       "Rewind workspace files to a checkpoint. Approval-gated, and the restore is captured too, so it can be rewound.",
+  },
+  // RR-AUTHORITY-01 — the four connector capabilities were registered
+  // dynamically, so `capabilityLabel` humanised their names and
+  // `capabilityDescription` fell through to "Governed capability." The four
+  // switches with the widest reach into an owner's own accounts were the four
+  // the page explained least. Each says what it reads, what it does not, and
+  // the one thing that matters about anything it brings back.
+  connector_github_runtime: {
+    label: "GitHub connector",
+    description:
+      "Read one issue or pull request from GitHub, with the credential you connected. Reads only — it opens nothing, comments nowhere, and merges nothing — and what it brings back is treated as untrusted data rather than as instructions to the agent.",
+  },
+  connector_gmail_runtime: {
+    label: "Gmail connector",
+    description:
+      "Read one Gmail message or thread, with the credential you connected. Reads only — it sends nothing and deletes nothing — and the message body is treated as untrusted data rather than as instructions to the agent.",
+  },
+  connector_gcal_runtime: {
+    label: "Google Calendar connector",
+    description:
+      "Read one Google Calendar event or calendar, with the credential you connected. Reads only — it creates, moves and cancels nothing — and what it brings back is treated as untrusted data rather than as instructions to the agent.",
+  },
+  connector_slack_runtime: {
+    label: "Slack connector",
+    description:
+      "Read a Slack channel's details or its recent history, with the credential you connected. Reads only — it posts nothing — and the messages are treated as untrusted data rather than as instructions to the agent.",
   },
 };
 

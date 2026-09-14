@@ -4,13 +4,13 @@ import { routeStateFromHash } from "./routeState";
 describe("route state contract", () => {
   it("accepts only documented non-secret selection state", () => {
     expect(routeStateFromHash("#/sessions?project=proj_1&session=sess_1&filter=open&token=nope")).toEqual({
-      projectId: "proj_1", sessionId: "sess_1", turnId: null, recordId: null, filter: "open", tab: null,
+      projectId: "proj_1", sessionId: "sess_1", turnId: null, recordId: null, assetId: null, filter: "open", tab: null,
     });
   });
 
   it("drops empty and oversized values", () => {
     expect(routeStateFromHash(`#/home?session=&record=${"x".repeat(257)}`)).toEqual({
-      projectId: null, sessionId: null, turnId: null, recordId: null, filter: null, tab: null,
+      projectId: null, sessionId: null, turnId: null, recordId: null, assetId: null, filter: null, tab: null,
     });
   });
 
@@ -23,6 +23,22 @@ describe("route state contract", () => {
       sessionId: "sess_1",
       turnId: "turn_9",
       recordId: null,
+      assetId: null,
+      filter: null,
+      tab: null,
+    });
+  });
+
+  // NEW-PROJ-02 — the asset a link points at, on a surface whose object is an
+  // asset. Same rule as every key beside it: a coordinate the reader may
+  // already open, carrying no payload, credential or decision.
+  it("carries the asset a project's image links to", () => {
+    expect(routeStateFromHash("#/design?project=proj_1&asset=img_7")).toEqual({
+      projectId: "proj_1",
+      sessionId: null,
+      turnId: null,
+      recordId: null,
+      assetId: "img_7",
       filter: null,
       tab: null,
     });

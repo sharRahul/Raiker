@@ -742,19 +742,37 @@
             No images yet — pictures generated in Design while this project is active land here.
           </p>
         {:else}
+          <!-- NEW-PROJ-02 — the strip showed eight pictures and offered no way
+               to open one of them: the only continuation was a bare `#/design`,
+               so finding the image you had just been looking at meant searching
+               the whole account's Design history for it. Each one is now a link
+               to itself, and the strip says how many there are rather than
+               implying eight is all of them. -->
           <ul class="image-strip">
             {#each projectImages.slice(0, 8) as image (image.generation_id)}
               <li>
-                <img
-                  src={api.imageBytesUrl(image.generation_id)}
-                  alt={image.prompt}
-                  loading="lazy"
-                />
+                <a
+                  href={`#/design?project=${encodeURIComponent(detail.project.project_id)}&asset=${encodeURIComponent(image.generation_id)}`}
+                  title={image.prompt}
+                >
+                  <img
+                    src={api.imageBytesUrl(image.generation_id)}
+                    alt={`Open in Design: ${image.prompt}`}
+                    loading="lazy"
+                  />
+                </a>
                 <span class="sub" title={image.created_at}>{relativeTime(image.created_at)}</span>
               </li>
             {/each}
           </ul>
-          <a class="cross-link" href="#/design">Open Design</a>
+          {#if projectImages.length > 8}
+            <p class="sub">Showing 8 of {projectImages.length}.</p>
+          {/if}
+          <a
+            class="cross-link"
+            href={`#/design?project=${encodeURIComponent(detail.project.project_id)}`}
+            >View all in Design</a
+          >
         {/if}
 
         <h3 class="kicker">Work under this project</h3>

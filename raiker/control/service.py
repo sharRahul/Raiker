@@ -597,12 +597,26 @@ class RuntimeControlService:
             return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.runtime.mcp_endpoint_policy import evaluate_endpoint
+
         normalized = _normalize_server_name(name)
         if normalized is None:
             return ControlResult(ok=False, reason_code="mcp_invalid_server_name")
+        # RR-MCP-02 — the same classification the session will make, made now.
+        # An endpoint Raiker would refuse to connect to has no business becoming
+        # a stored server that looks added and fails at first use; and the
+        # reasons it refuses for — a metadata service, a public name answering
+        # privately, a token about to travel in clear text — are things the
+        # owner wants to read while they still have the URL in front of them.
+        #
+        # `resolve=False`: a name is judged on what it claims here. A machine
+        # that is offline, or a server that is not up yet, is not a reason to
+        # refuse an address the owner is typing; the resolved check runs when
+        # the session does, where being unreachable is the honest answer.
+        trust = evaluate_endpoint(endpoint_url, resolve=False)
+        if not trust.allowed:
+            return ControlResult(ok=False, reason_code=trust.reason)
         parsed = urlparse(endpoint_url)
-        if parsed.scheme not in ("http", "https") or not parsed.netloc:
-            return ControlResult(ok=False, reason_code="mcp_remote_invalid_endpoint")
         if self._store.get_mcp_server_by_name(principal.principal_id, normalized) is not None:
             return ControlResult(ok=False, reason_code="mcp_name_taken")
         server_id = new_id("mcp_")
@@ -629,6 +643,10 @@ class RuntimeControlService:
                     "name": normalized,
                     "transport": "http",
                     "host": parsed.netloc,
+                    # RR-MCP-02 — which kind of destination this is, so the
+                    # record of the decision says where the owner pointed
+                    # Raiker rather than only that it was "remote".
+                    "network_class": trust.network_class,
                 },
             )
         )

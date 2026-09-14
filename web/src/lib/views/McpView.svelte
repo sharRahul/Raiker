@@ -5,6 +5,7 @@
   import NotificationCenter from "../components/NotificationCenter.svelte";
   import { api, ApiError } from "../api";
   import { runtimeBlock } from "../capabilityModel";
+  import { endpointRefusal, networkClassLabel } from "../mcpEndpoint";
   import type {
     CapabilityGate,
     McpAgentAccess,
@@ -131,7 +132,12 @@
     if (e instanceof ApiError) {
       if (e.reasonCode === "disabled_by_capability_gate")
         return "The MCP capability is disabled. Enable it in Permissions to continue.";
-      return e.reasonCode ?? `Request failed (${e.status})`;
+      // RR-MCP-02 — a refused endpoint used to arrive on screen as its reason
+      // code. `mcp_remote_host_not_public` is a true statement and not one an
+      // owner can do anything with.
+      return (
+        endpointRefusal(e.reasonCode) ?? e.reasonCode ?? `Request failed (${e.status})`
+      );
     }
     return "Request failed";
   }
@@ -378,7 +384,9 @@
           <div class="offer-copy">
             <strong>{offer.name}</strong>
             <span class="offer-meta">
-              {offer.transport === "http" ? "Remote (HTTPS)" : "Local (stdio)"} · from plugin
+              {offer.transport === "http"
+                ? networkClassLabel(offer.endpoint_url)
+                : "Local (stdio)"} · from plugin
               <code>{offer.plugin_id}</code>
             </span>
             {#if offer.description}<span class="offer-meta">{offer.description}</span>{/if}
@@ -458,6 +466,12 @@
         <dl class="meta">
           <div><dt>{s.transport === "http" ? "Endpoint" : "Command"}</dt><dd><code>{s.transport === "http" ? s.endpoint_url : s.command.join(" ")}</code></dd></div>
           <div><dt>{s.transport === "http" ? "Token reference" : "Template"}</dt><dd>{s.transport === "http" ? s.auth_ref ?? "None" : templateLabel(s.template)}</dd></div>
+          <!-- RR-MCP-02 — the owner's own machine, their own network and the
+               public internet are three different destinations, and the card
+               printed one label over all three. -->
+          {#if s.transport === "http"}
+            <div><dt>Destination</dt><dd>{networkClassLabel(s.endpoint_url)}</dd></div>
+          {/if}
           <div><dt>Last connected</dt><dd>{s.last_connected_at ?? "Never"}</dd></div>
           <!-- BUG-234 — which revision of the Model Context Protocol this
                server agreed to. Nothing said it before, so "why will this

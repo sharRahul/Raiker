@@ -6,7 +6,7 @@ import { render, screen, waitFor, within } from "@testing-library/svelte";
 import { fireEvent } from "@testing-library/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import WorkbenchView from "./WorkbenchView.svelte";
-import { stubFetch, stubFetchPending } from "../test-helpers";
+import { DIAGNOSTICS, stubFetch, stubFetchPending } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 
 afterEach(() => {
@@ -82,6 +82,11 @@ function routes(overrides: Record<string, unknown> = {}) {
     "GET /api/work-threads": [SESSION],
     "GET /api/tasks": [],
     "GET /api/approvals": [],
+    // NEW-HOME-01 — every one of these cases used to run with no diagnostics
+    // route at all, so the read 404'd and the board reported zero runtime
+    // issues from it. The default is now a readiness check that actually
+    // answers, and the failure is a case of its own below.
+    "GET /api/diagnostics": DIAGNOSTICS,
     "GET /api/projects": {
       projects: [
         {
@@ -214,15 +219,89 @@ describe("WorkbenchView", () => {
     expect(await within(rail).findByText(/nothing needs you right now/i)).toBeInTheDocument();
     expect(within(rail).queryByText("Approvals")).toBeNull();
     expect(within(rail).queryByText("Runtime issues")).toBeNull();
-    expect(within(rail).queryByText("Active work")).toBeNull();
+    expect(within(rail).queryByText("Blocked work")).toBeNull();
   });
 
-  it("brings a tile back the moment its own count is not zero", async () => {
+  it("does not call an unread readiness check an all-clear (NEW-HOME-01)", async () => {
+    // The defect, and the reason this case did not exist before: a diagnostics
+    // failure became `null`, `null` became **0** runtime issues, and Home went
+    // on to say nothing needed the owner. Nobody had looked.
+    stubFetch(routes({ "GET /api/diagnostics": { __status: 503 } }));
+    render(WorkbenchView);
+
+    const rail = await screen.findByRole("complementary", { name: "Needs your attention" });
+    // What is still true is said, and the gap is named rather than counted.
+    expect(await within(rail).findByText(/this is not an all-clear/i)).toBeInTheDocument();
+    expect(within(rail).queryByText(/nothing needs you right now/i)).toBeNull();
+    const tile = within(rail).getByText("Runtime health").closest("article");
+    expect(tile).toHaveTextContent(/unavailable \(HTTP 503\)/i);
+    // Never a number. There is no number to give.
+    expect(within(rail).queryByText("Runtime issues")).toBeNull();
+  });
+
+  it("keeps showing the last readiness it had, and says it is old (NEW-HOME-01)", async () => {
+    // A refresh that fails must not erase the board, and must not be reported
+    // as a pass either. The answer survives as stale, and says so.
+    vi.useFakeTimers();
+    let calls = 0;
+    const routeTable = routes();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const path = url.split("?")[0];
+        const key = `${(init?.method ?? "GET").toUpperCase()} ${path}`;
+        if (key === "GET /api/diagnostics") {
+          calls += 1;
+          if (calls > 1) return { ok: false, status: 500, json: async () => ({}) } as Response;
+          return { ok: true, status: 200, json: async () => DIAGNOSTICS } as Response;
+        }
+        const value = (routeTable as Record<string, unknown>)[key];
+        if (value === undefined) return { ok: false, status: 404, json: async () => ({}) } as Response;
+        return { ok: true, status: 200, json: async () => value } as Response;
+      }),
+    );
+    render(WorkbenchView);
+
+    const rail = await screen.findByRole("complementary", { name: "Needs your attention" });
+    expect(await within(rail).findByText(/nothing needs you right now/i)).toBeInTheDocument();
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.waitFor(() =>
+      expect(within(rail).queryByText(/nothing needs you right now/i)).toBeNull(),
+    );
+    const tile = within(rail).getByText("Runtime health").closest("article");
+    expect(tile).toHaveTextContent(/last updated/i);
+    expect(tile).toHaveTextContent(/refresh failed/i);
+  });
+
+  it("keeps running work out of the attention rail (NEW-HOME-01)", async () => {
+    // A run that is running is progress. Under a heading that says *Needs your
+    // attention* it was noise, and it was permanent for anyone with a standing
+    // routine — which is how an owner learns to stop reading the rail that also
+    // carries their approvals.
     stubFetch(routes({ "GET /api/tasks": [RUNNING] }));
     render(WorkbenchView);
 
     const rail = await screen.findByRole("complementary", { name: "Needs your attention" });
-    expect(await within(rail).findByText("Active work")).toBeInTheDocument();
+    expect(await within(rail).findByText(/nothing needs you right now/i)).toBeInTheDocument();
+    expect(within(rail).queryByText("Blocked work")).toBeNull();
+    // And the run is still on the board, with its Stop control.
+    expect(await screen.findByText("Running now")).toBeInTheDocument();
+  });
+
+  it("brings a tile back the moment work is actually blocked", async () => {
+    stubFetch(
+      routes({
+        "GET /api/tasks": [
+          task({ task_id: "t_block", title: "Apply the patch", status: "waiting_for_approval" }),
+        ],
+      }),
+    );
+    render(WorkbenchView);
+
+    const rail = await screen.findByRole("complementary", { name: "Needs your attention" });
+    expect(await within(rail).findByText("Blocked work")).toBeInTheDocument();
     // The two that are still clear stay quiet.
     expect(within(rail).queryByText("Approvals")).toBeNull();
     expect(within(rail).queryByText(/nothing needs you right now/i)).toBeNull();

@@ -717,5 +717,59 @@ def test_api_create_remote_rejects_bad_url(tmp_path: Path) -> None:
     assert resp.json()["detail"]["reason_code"] == "mcp_remote_invalid_endpoint"
 
 
+# ── RR-MCP-02: what an owner learns while the URL is still in front of them ──
+
+
+@pytest.mark.parametrize(
+    ("endpoint", "reason"),
+    [
+        # A cloud metadata service answers with the credentials of the machine
+        # Raiker is running on. It is not a tool server.
+        ("http://169.254.169.254/latest/meta-data/", "mcp_remote_link_local"),
+        ("http://metadata.google.internal/mcp", "mcp_remote_metadata_endpoint"),
+        # A public endpoint over plain http puts the owner's token on the wire
+        # in clear text, which typing a hostname did not ask for.
+        ("http://tools.example.com/mcp", "mcp_remote_requires_https"),
+        # A credential in a URL is a credential in every log that prints it.
+        ("https://user:secret@tools.example.com/mcp", "mcp_remote_endpoint_credentials"),
+    ],
+)
+def test_api_create_remote_refuses_at_add_time(
+    tmp_path: Path, endpoint: str, reason: str
+) -> None:
+    """An endpoint the session would refuse has no business becoming a stored
+    server that looks added and fails at first use."""
+    _ws3, client = _mgmt_client(tmp_path, f"remote_add_{abs(hash(endpoint))}")
+    resp = client.post(
+        "/api/mcp/servers/remote", json={"name": "refused", "endpoint_url": endpoint}
+    )
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["detail"]["reason_code"] == reason
+    assert client.get("/api/mcp/servers").json() == []
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "http://127.0.0.1:3000/mcp",  # the owner's own machine
+        "http://192.168.1.20:3000/mcp",  # the owner's own network
+        "https://tools.example.com/mcp",  # a public endpoint, over TLS
+    ],
+)
+def test_api_create_remote_still_accepts_what_the_owner_chose(
+    tmp_path: Path, endpoint: str
+) -> None:
+    """Raiker is owner-authoritative and monitored. A local tool server over
+    plain http is the ordinary case, and a LAN box is the owner's own machine —
+    neither is a thing to block, and neither is resolved at add time, so a
+    server that is not up yet still gets added."""
+    _ws4, client = _mgmt_client(tmp_path, f"remote_ok_{abs(hash(endpoint))}")
+    resp = client.post(
+        "/api/mcp/servers/remote", json={"name": "allowed", "endpoint_url": endpoint}
+    )
+    assert resp.status_code == 200, resp.text
+    assert len(client.get("/api/mcp/servers").json()) == 1
+
+
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-q"]))

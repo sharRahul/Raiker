@@ -112,6 +112,17 @@ Web fetches require HTTPS, disallow credentials in URLs, reject private or
 otherwise unsafe resolved addresses, and repeat the address check after every
 redirect. Content reaches the model as sanitized text.
 
+A remote MCP server meets the same checks, with one deliberate difference: your
+own machine and your own network stay reachable over plain http, because a tool
+server you run yourself is the ordinary case and there is no public wire to
+protect. Raiker names which of the three a server is on its card. What is refused
+is the narrow set where the destination is not the one you typed — a public name
+that answers with a private address, a cloud metadata service, a public endpoint
+with no TLS, a URL carrying its own password — and the connection is pinned to an
+address that passed, with every redirect re-checked and your token never sent on
+after the origin changes. See
+[Extensions and MCP](extensions-and-mcp.md#where-a-remote-server-may-be).
+
 ## Records and privacy choices
 
 The append-only audit log records conversations and governed steps, scoped to

@@ -4,6 +4,14 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
+  import {
+    type Freshness,
+    failed as freshnessFailed,
+    freshnessLabel,
+    isCurrent,
+    loading as freshnessLoading,
+    received,
+  } from "../freshness";
   import type { BrainEdge, BrainNode, BrainSourceBrowse, BrainSourceReview, BrainView as BrainData } from "../apiTypes";
 
   type MotionMode = "paused" | "activity" | "alive";
@@ -43,8 +51,16 @@
 
   let brain = $state<BrainData | null>(null);
   let loadError = $state<string | null>(null);
+  /** A failed *action*, which is not a failed read and must not read as one. */
+  let actionError = $state<string | null>(null);
   let refreshing = $state(false);
-  let updatedAt = $state<string | null>(null);
+  // NEW-MAP-01 — the graph's own freshness, which used to be a timestamp that
+  // only ever moved forward. A failed refresh left the previous graph on screen
+  // under the words **Live workspace graph**, because the label checked only
+  // that *some* update had once happened. A graph an hour old under a word
+  // meaning "now" is not a small inaccuracy on this page: the map is what an
+  // owner reads to decide what Raiker knows about them.
+  let graph = $state<Freshness<BrainData>>(freshnessLoading());
   let selectedIds = $state<string[]>([]);
   let hoveredId = $state<string | null>(null);
   let centreId = $state<string | null>(null);
@@ -100,15 +116,44 @@
   let panOrigin = { x: 0, y: 0, tx: 0, ty: 0 };
   let contextMenu = $state<{ x: number; y: number; node: GraphNode } | null>(null);
 
+  /**
+   * NEW-MAP-01 — the map reloads every fifteen seconds and can be refreshed by
+   * hand at the same time, so two reads are routinely in flight and the network
+   * may answer them in either order. Nothing stopped an older graph landing on
+   * top of a newer one. Each load takes a number and only the newest commits,
+   * which is the idiom a project home already uses (FIXED-497).
+   */
+  let graphSeq = 0;
+
   async function load() {
+    const seq = ++graphSeq;
     refreshing = true; loadError = null;
     try {
-      brain = await api.brain();
-      updatedAt = new Date().toISOString();
+      const loaded = await api.brain();
+      if (seq !== graphSeq) return;
+      brain = loaded;
+      graph = received(loaded);
     } catch (error) {
+      if (seq !== graphSeq) return;
       loadError = error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable";
-    } finally { refreshing = false; }
+      // The graph already on screen stays on screen — throwing away the only
+      // answer anyone has helps nobody — and stops being called live.
+      graph = freshnessFailed(graph, error instanceof ApiError ? `HTTP ${error.status}` : "unreachable");
+    } finally { if (seq === graphSeq) refreshing = false; }
   }
+
+  const graphIsLive = $derived(isCurrent(graph));
+  /**
+   * What the corner of the canvas says. Four states, because there are four:
+   * nothing read yet, current, current-but-being-renewed, and old with the
+   * renewal having failed. The last one is the whole finding.
+   */
+  const graphFreshness = $derived.by(() => {
+    if (graph.kind === "loading") return "Loading";
+    if (graph.kind === "unavailable") return "Workspace graph unavailable";
+    if (graph.kind === "stale") return freshnessLabel(graph, "Workspace graph");
+    return refreshing ? "Refreshing workspace graph" : "Live workspace graph";
+  });
 
   async function loadPreferences() {
     try {
@@ -324,7 +369,11 @@
     const reason = window.prompt("Why is this relationship incorrect?", "Incorrect relationship");
     if (!reason?.trim()) return;
     try { await api.rejectMemoryRelationship(edge.relationship_id, reason.trim()); await load(); }
-    catch { loadError = "This relationship could not be rejected. Refresh in case it changed elsewhere."; }
+    // Found while closing NEW-MAP-01: this wrote `loadError`, so one failed
+    // rejection replaced the whole map with "Couldn't load the knowledge
+    // graph" — a sentence about a read that had succeeded. An action that
+    // fails says so where it was taken.
+    catch { actionError = "This relationship could not be rejected. Refresh in case it changed elsewhere."; }
   }
   function onWheel(event: WheelEvent) { event.preventDefault(); const next = Math.max(0.35, Math.min(3, transform.k * Math.exp(-event.deltaY * 0.001))); const rect = graphElement?.getBoundingClientRect(); if (!rect) return; const px = event.clientX - rect.left; const py = event.clientY - rect.top; transform = { k: next, x: px - ((px - transform.x) / transform.k) * next, y: py - ((py - transform.y) / transform.k) * next }; }
   function panStart(event: PointerEvent) { if (event.target !== event.currentTarget && (event.target as Element).closest(".graph-stage")) return; panning = true; panOrigin = { x: event.clientX, y: event.clientY, tx: transform.x, ty: transform.y }; (event.currentTarget as Element).setPointerCapture(event.pointerId); }
@@ -420,29 +469,87 @@
   // from a root the owner already has — a project's files, what Raiker
   // generated, approved memory, or a folder they granted — so there is no
   // moment at which the dialog offers the whole installation to index.
+  /**
+   * NEW-MAP-02 — every read in this dialog takes a number, and only the newest
+   * one is allowed to write what is on screen.
+   *
+   * The review is a plan for **one** source: how many files it would index, how
+   * many it would skip, and the warnings that go with them. It was assigned
+   * from whichever response arrived last. Choose folder A, change your mind and
+   * choose B before A's review lands, and A's plan appears under B's
+   * selection — and **Add reviewed source** then adds `sourceReview.path`,
+   * which is A. The owner reads a plan for one folder and indexes another.
+   *
+   * The counter covers browsing too, for the same reason: the browser writes
+   * `sourcePath`, so a slow folder listing could move the selection out from
+   * under a review the owner was already reading.
+   */
+  let sourceSeq = 0;
+
   async function openSourcePicker() {
+    const seq = ++sourceSeq;
     sourceOpen = true; sourceError = null; sourceReview = null;
     sourcePath = ""; grantPath = ""; uploadConsent = false; uploadName = null;
-    try { sourceBrowse = await api.browseBrainSources(""); } catch { sourceBrowse = null; }
+    try {
+      const browsed = await api.browseBrainSources("");
+      if (seq !== sourceSeq) return;
+      sourceBrowse = browsed;
+    } catch {
+      if (seq !== sourceSeq) return;
+      sourceBrowse = null;
+    }
   }
   async function browseSource(path: string) {
+    const seq = ++sourceSeq;
     sourceBusy = true; sourceError = null; sourceReview = null;
-    try { sourceBrowse = await api.browseBrainSources(path); sourcePath = sourceBrowse.path; }
-    catch { sourceError = "Could not open that folder. It may have been moved, or its access revoked."; }
-    finally { sourceBusy = false; }
+    try {
+      const browsed = await api.browseBrainSources(path);
+      if (seq !== sourceSeq) return;
+      sourceBrowse = browsed; sourcePath = browsed.path;
+    }
+    catch {
+      if (seq !== sourceSeq) return;
+      sourceError = "Could not open that folder. It may have been moved, or its access revoked.";
+    }
+    finally { if (seq === sourceSeq) sourceBusy = false; }
   }
   async function reviewSource() {
-    if (!sourcePath.trim()) return; sourceBusy = true; sourceError = null;
-    try { sourceReview = await api.reviewBrainSource(sourcePath.trim()); }
-    catch (error) { sourceError = error instanceof ApiError ? "Choose a file or folder inside one of the places listed above. Nothing outside them is readable." : "Could not add this source."; }
-    finally { sourceBusy = false; }
+    const requested = sourcePath.trim();
+    if (!requested) return;
+    const seq = ++sourceSeq;
+    sourceBusy = true; sourceError = null;
+    try {
+      const reviewed = await api.reviewBrainSource(requested);
+      // Two conditions, and both matter: this must still be the newest request,
+      // and the selection must not have moved while it was in flight.
+      if (seq !== sourceSeq || sourcePath.trim() !== requested) return;
+      sourceReview = reviewed;
+    }
+    catch (error) {
+      if (seq !== sourceSeq) return;
+      sourceError = error instanceof ApiError ? "Choose a file or folder inside one of the places listed above. Nothing outside them is readable." : "Could not add this source.";
+    }
+    finally { if (seq === sourceSeq) sourceBusy = false; }
   }
   async function addSource() {
     if (!sourceReview) return;
+    // The path the owner read a plan for, not whatever the field says now. The
+    // two are kept equal by the checks above; naming it here is what makes the
+    // guarantee local to the write.
+    const reviewed = sourceReview.path;
+    if (sourcePath.trim() !== reviewed) {
+      sourceError = "The selection changed after this plan was made. Review it again before adding it.";
+      sourceReview = null;
+      return;
+    }
+    const seq = ++sourceSeq;
     sourceBusy = true; sourceError = null;
-    try { await api.addBrainSource(sourceReview.path); sourcePath = ""; sourceReview = null; sourceOpen = false; await load(); }
-    catch { sourceError = "Could not add this reviewed source."; }
-    finally { sourceBusy = false; }
+    try { await api.addBrainSource(reviewed); sourcePath = ""; sourceReview = null; sourceOpen = false; await load(); }
+    catch {
+      if (seq !== sourceSeq) return;
+      sourceError = "Could not add this reviewed source.";
+    }
+    finally { if (seq === sourceSeq) sourceBusy = false; }
   }
 
   // Granting a folder is how a file from the computer joins the graph *without*
@@ -470,10 +577,20 @@
     return "Could not grant that folder.";
   }
   async function revokeFolder(rootId: string) {
+    const seq = ++sourceSeq;
     sourceBusy = true; sourceError = null;
-    try { await api.revokeBrainSourceFolder(rootId); sourceBrowse = await api.browseBrainSources(""); sourcePath = ""; sourceReview = null; await load(); }
-    catch { sourceError = "Could not revoke that folder."; }
-    finally { sourceBusy = false; }
+    try {
+      await api.revokeBrainSourceFolder(rootId);
+      const browsed = await api.browseBrainSources("");
+      if (seq !== sourceSeq) return;
+      sourceBrowse = browsed; sourcePath = ""; sourceReview = null;
+      await load();
+    }
+    catch {
+      if (seq !== sourceSeq) return;
+      sourceError = "Could not revoke that folder.";
+    }
+    finally { if (seq === sourceSeq) sourceBusy = false; }
   }
 
   // Uploading duplicates the file into the workspace, so it is behind an
@@ -510,7 +627,13 @@
   const selectedConnections = $derived(selected ? renderedLinks.filter((edge) => nodeId(edge.source) === selected.node_id || nodeId(edge.target) === selected.node_id) : []);
 </script>
 
-{#if loadError}
+<!-- NEW-MAP-01 — a *refresh* that fails used to replace the whole map with
+     this, even though the previous graph was still in memory. On a fifteen
+     second poll that meant one hiccup wiped the owner's map and told them it
+     could not be loaded, about a graph that had loaded. The error page is for
+     having nothing to show; a graph that has gone stale stays on screen and
+     says so in the corner. -->
+{#if graph.kind === "unavailable"}
   <PageState state="error" title="Couldn't load the knowledge graph" detail={loadError} />
 {:else if brain === null}
   <PageState state="loading" title="Loading the knowledge graph…" />
@@ -569,7 +692,12 @@
       {#if summaryOpen}<section class="summary-popover"><h3>Workspace summary</h3>{#each summary as item}<p><span>{item[0]}</span><b>{item[1]}</b></p>{/each}<small><Icon name="shield" size="sm" /> Governed workspace boundary</small></section>{/if}
 
       <div class="viewport-controls"><button aria-label="Fit graph" onclick={fitGraph}>Fit</button><button aria-label="Zoom out" onclick={() => transform = { ...transform, k: Math.max(.35, transform.k - .15) }}>−</button><span>{Math.round(transform.k * 100)}%</span><button aria-label="Zoom in" onclick={() => transform = { ...transform, k: Math.min(3, transform.k + .15) }}>+</button></div>
-      <div class="graph-meta"><span class="live-dot"></span>{updatedAt ? "Live workspace graph" : "Loading"}<button onclick={(event) => { event.stopPropagation(); void load(); }} disabled={refreshing}>{refreshing ? "Updating…" : "Refresh"}</button></div>
+      <!-- NEW-MAP-01 — the dot and the word both say what is actually true of
+           the graph on screen. "Live workspace graph" used to survive every
+           failed refresh, because it only ever asked whether an update had once
+           happened. -->
+      {#if actionError}<p class="action-error" role="alert">{actionError}<button onclick={() => (actionError = null)} aria-label="Dismiss">×</button></p>{/if}
+      <div class="graph-meta"><span class="live-dot" class:stale={!graphIsLive}></span>{graphFreshness}<button onclick={(event) => { event.stopPropagation(); void load(); }} disabled={refreshing}>{refreshing ? "Updating…" : "Refresh"}</button></div>
 
       {#if settingsOpen}
         <aside class="settings-panel" aria-label="Graph settings">
@@ -622,7 +750,10 @@
     {/if}
     {#if sourcePath}<form onsubmit={(event) => { event.preventDefault(); void reviewSource(); }}><label>Selected source<input bind:value={sourcePath} aria-label="Selected source" oninput={() => sourceReview = null} /></label><button class="primary" disabled={sourceBusy || !sourcePath.trim()}>{sourceBusy ? "Reviewing…" : "Review indexing plan"}</button></form>{/if}
     {#if sourceError}<p class="error" role="alert">{sourceError}</p>{/if}
-    {#if sourceReview}<section class="source-review" aria-label="Source indexing review"><h3>Indexing plan</h3><p><b>{sourceReview.supported_files}</b> supported files · <b>{sourceReview.total_bytes.toLocaleString()}</b> bytes · <b>{sourceReview.unsupported_files}</b> skipped</p>{#each sourceReview.warnings as warning}<p class="warning">{warning}</p>{/each}<button class="primary" disabled={sourceBusy} onclick={() => void addSource()}>Add reviewed source</button></section>{/if}
+    <!-- NEW-MAP-02 — the plan names the source it is a plan for. It never did,
+     so a plan that had arrived for a previously selected folder looked exactly
+     like a plan for the one on screen. -->
+{#if sourceReview}<section class="source-review" aria-label="Source indexing review"><h3>Indexing plan</h3><p class="reviewed-path">for <code>{sourceReview.path}</code></p><p><b>{sourceReview.supported_files}</b> supported files · <b>{sourceReview.total_bytes.toLocaleString()}</b> bytes · <b>{sourceReview.unsupported_files}</b> skipped</p>{#each sourceReview.warnings as warning}<p class="warning">{warning}</p>{/each}<button class="primary" disabled={sourceBusy} onclick={() => void addSource()}>Add reviewed source</button></section>{/if}
 
     <!-- Two ways to bring in something from the computer, and the difference
          between them is stated rather than implied: a grant is read in place,
@@ -684,7 +815,8 @@
   .summary-pill { left:16px; top:16px; gap:8px; border-radius:20px; padding:7px 11px; font:inherit; font-size:var(--text-2xs); cursor:pointer; } .summary-pill i { width:3px; height:3px; border-radius:50%; background:var(--text-3); }
   .summary-popover { position:absolute; z-index:8; left:16px; top:56px; width:230px; padding:14px; border:1px solid var(--border-strong); border-radius:10px; background:color-mix(in srgb, var(--raised) 96%, transparent); box-shadow:var(--shadow-2); } .summary-popover h3 { margin:0 0 10px; font-size:var(--text-sm); } .summary-popover p { display:flex; justify-content:space-between; margin:6px 0; color:var(--text-2); font-size:var(--text-xs); } .summary-popover p b { color:var(--text-1); } .summary-popover small { display:flex; gap:5px; align-items:center; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); color:var(--accent); font-size:var(--text-2xs); }
   .viewport-controls { right:16px; bottom:16px; border-radius:8px; overflow:hidden; } .viewport-controls button { height:32px; min-width:34px; border:0; border-right:1px solid var(--border); background:transparent; color:var(--text-2); cursor:pointer; } .viewport-controls button:first-child { padding:0 11px; font-size:var(--text-2xs); } .viewport-controls span { min-width:46px; text-align:center; font-size:var(--text-2xs); }
-  .graph-meta { left:16px; bottom:16px; gap:7px; padding:7px 10px; border-radius:7px; font-size:var(--text-2xs); } .graph-meta button { border:0; background:transparent; color:var(--accent); font:inherit; cursor:pointer; } .live-dot { width:6px; height:6px; border-radius:50%; background:var(--success); box-shadow:0 0 7px var(--success); }
+  .action-error { position:absolute; top:16px; left:50%; transform:translateX(-50%); z-index:4; display:flex; align-items:center; gap:8px; margin:0; padding:7px 10px; border:1px solid var(--danger); border-radius:7px; background:var(--surface); color:var(--danger); font-size:var(--text-2xs); } .action-error button { border:0; background:transparent; color:inherit; font:inherit; cursor:pointer; }
+  .graph-meta { left:16px; bottom:16px; gap:7px; padding:7px 10px; border-radius:7px; font-size:var(--text-2xs); } .graph-meta button { border:0; background:transparent; color:var(--accent); font:inherit; cursor:pointer; } .live-dot { width:6px; height:6px; border-radius:50%; background:var(--success); box-shadow:0 0 7px var(--success); } .live-dot.stale { background:var(--warn); box-shadow:none; }
   .depth-control { left:50%; bottom:16px; transform:translateX(-50%); gap:10px; padding:8px 12px; border-radius:8px; font-size:var(--text-2xs); } .depth-control input { width:130px; accent-color:var(--accent); }
   /* Below this the bottom-left status and the bottom-right zoom controls are
      wider together than the window, so they overlapped and each hid half of the
@@ -719,7 +851,7 @@
   .source-browser button.disabled { cursor:default; opacity:.72; }
   .source-browser button.revoke { justify-content:flex-end; padding:5px 9px 9px; color:var(--danger); font-size:var(--text-2xs); }
   .from-computer { margin-top:16px; padding-top:14px; border-top:1px solid var(--border); } .from-computer h3 { margin:0 0 8px; font-size:var(--text-sm); } .from-computer form button { width:100%; margin-top:8px; border:1px solid var(--border); border-radius:6px; padding:8px; background:transparent; color:var(--text-2); cursor:pointer; } .upload { margin-top:14px; display:grid; gap:8px; color:var(--text-2); font-size:var(--text-2xs); } .upload input[type="file"] { color:var(--text-2); font-size:var(--text-2xs); } .consent { display:flex !important; align-items:flex-start; gap:8px; line-height:1.45; }
-  .source-browser { display:grid; max-height:280px; overflow:auto; margin:0 0 12px; border:1px solid var(--border); border-radius:7px; } .source-browser button { display:flex; gap:8px; border:0; border-bottom:1px solid var(--border); padding:7px 9px; background:transparent; color:var(--text-2); text-align:left; cursor:pointer; } .source-browser button:hover,.source-browser button.selected { background:var(--accent-soft); } .source-browser button span { width:42px; color:var(--text-3); font-size:var(--text-2xs); } .source-browser button b { font-size:var(--text-2xs); } .source-browser small { padding:8px; color:var(--text-3); } .source-review { margin-top:12px; padding:12px; border:1px solid var(--border); border-radius:7px; background:var(--sunken); } .source-review h3 { margin:0 0 6px; } .source-review p { font-size:var(--text-2xs); } .source-review .warning { color:var(--warn); }
+  .source-browser { display:grid; max-height:280px; overflow:auto; margin:0 0 12px; border:1px solid var(--border); border-radius:7px; } .source-browser button { display:flex; gap:8px; border:0; border-bottom:1px solid var(--border); padding:7px 9px; background:transparent; color:var(--text-2); text-align:left; cursor:pointer; } .source-browser button:hover,.source-browser button.selected { background:var(--accent-soft); } .source-browser button span { width:42px; color:var(--text-3); font-size:var(--text-2xs); } .source-browser button b { font-size:var(--text-2xs); } .source-browser small { padding:8px; color:var(--text-3); } .source-review { margin-top:12px; padding:12px; border:1px solid var(--border); border-radius:7px; background:var(--sunken); } .source-review h3 { margin:0 0 6px; } .source-review .reviewed-path { margin:0 0 6px; color:var(--text-3); font-size:var(--text-2xs); } .source-review .reviewed-path code { word-break:break-all; } .source-review p { font-size:var(--text-2xs); } .source-review .warning { color:var(--warn); }
   .context-menu { position:fixed; z-index:var(--z-popover); display:grid; min-width:160px; padding:5px; border:1px solid var(--border-strong); border-radius:7px; background:var(--raised); box-shadow:var(--shadow-2); } .context-menu button { border:0; border-radius:4px; padding:7px 9px; background:transparent; color:var(--text-1); text-align:left; cursor:pointer; font-size:var(--text-2xs); } .context-menu button:hover { background:var(--accent-soft); }
   @media (prefers-reduced-motion: reduce) { .particle { display:none; } }
   @media (max-width:800px) { .graph-toolbar { flex-wrap:wrap; } .search { flex:1 0 100%; order:2; margin-bottom:8px; } .knowledge-shell { grid-template-rows:auto 1fr; } .title-block { min-width:0; } .settings-panel,.inspector { width:min(300px, calc(100% - 28px)); } }

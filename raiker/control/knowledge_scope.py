@@ -245,3 +245,61 @@ def parent_scope_path(root: ScopeRoot, relative: str) -> str:
         return ""
     parent = Path(relative).parent.as_posix()
     return scope_path(root, "" if parent in {"", "."} else parent)
+
+
+# ── What one source review is allowed to cost (NEW-MAP-03) ───────────────────
+#
+# The review walked `path.rglob("*")` and stopped when it had counted 5,000
+# entries — but it counted only the entries it *accepted*. Everything it skipped
+# was free: a directory, a hidden path, a name under `node_modules`, a file it
+# could not stat. So the cap bounded the answer and not the work, and a folder
+# whose dependency tree holds four hundred thousand entries was walked in full
+# to report that it contains six markdown files.
+#
+# That is a resource-bound weakness rather than a demonstrated denial of
+# service — the route is authenticated and owner-scoped, and the paths it will
+# look at are ones the owner granted. It is still the wrong shape: an owner
+# pointing at their home directory should get a bounded answer, not a request
+# that walks their disk.
+#
+# Four budgets, because there are four ways a walk gets expensive, and one of
+# them alone stops none of the others:
+
+#: Files the review will actually describe. What the owner is told, and what
+#: `review_cap` has always meant.
+REVIEW_ACCEPTED_FILE_BUDGET = 5000
+
+#: Entries the walk may *look at*, accepted or not. This is the one the old cap
+#: was mistaken for. An order of magnitude above the file budget, so an ordinary
+#: folder with a lot of noise in it still produces a complete answer.
+REVIEW_VISITED_ENTRY_BUDGET = 50_000
+
+#: How deep the walk may go. A pathological tree is deep rather than wide, and
+#: neither of the counters above notices depth on its own.
+REVIEW_DEPTH_BUDGET = 24
+
+#: Wall-clock seconds. The backstop for the case none of the counters catch — a
+#: network mount, a sleeping disk — where the work is slow rather than large.
+REVIEW_TIME_BUDGET_SECONDS = 5.0
+
+#: Why a review stopped early, in the order the walker checks them. Rendered to
+#: the owner, so each names a different thing they might do about it.
+REVIEW_TRUNCATION_REASONS: dict[str, str] = {
+    "accepted_file_cap": (
+        f"More than {REVIEW_ACCEPTED_FILE_BUDGET:,} readable files were found; review is capped "
+        "and indexing will remain incremental."
+    ),
+    "visited_entry_cap": (
+        f"More than {REVIEW_VISITED_ENTRY_BUDGET:,} entries were examined before the review could "
+        "finish. Choose a folder further in, rather than one with a large dependency or build tree "
+        "beside what you want indexed."
+    ),
+    "depth_cap": (
+        f"This folder nests more than {REVIEW_DEPTH_BUDGET} levels deep; the review stopped there. "
+        "Everything above that depth was counted."
+    ),
+    "time_cap": (
+        "The review reached its time limit before finishing. This usually means a slow or network "
+        "drive; the counts below cover what it managed to read."
+    ),
+}

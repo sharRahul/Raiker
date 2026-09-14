@@ -12,12 +12,19 @@ Two real, bounded, fail-closed executors:
   be workspace-relative; tool output is returned as **redacted metadata only**
   (length + redaction flag), never raw content.
 
-Explicitly out of scope (fail closed): remote HTTP/SSE transport, OAuth
-discovery, arbitrary shell commands, and execution of unreviewed tools. The
-stdio session is implemented directly over the documented MCP JSON-RPC wire
-format (no third-party SDK dependency), which keeps the runtime hermetic and
-local-only. The generated server template speaks the same wire format, so the
-builder + connector are testable end-to-end without any network.
+The connector also speaks the streamable **HTTP** transport against an
+owner-added remote endpoint. That destination is classified before a socket is
+opened (:mod:`raiker.runtime.mcp_endpoint_policy`): the owner's own machine,
+their own network, or the public internet — and, for the last of those, HTTPS,
+an address that passed the guard, a connection pinned to it, and every redirect
+re-checked as a destination of its own.
+
+Explicitly out of scope (fail closed): OAuth discovery, arbitrary shell
+commands, and execution of unreviewed tools. Both transports are implemented
+directly over the documented MCP JSON-RPC wire format (no third-party SDK
+dependency), which keeps the runtime hermetic. The generated server template
+speaks the same wire format, so the builder + connector are testable
+end-to-end without any network.
 """
 from __future__ import annotations
 
@@ -35,6 +42,7 @@ from urllib.parse import urlparse
 from raiker.contracts.ids import new_id, utc_now
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.runtime.executors.sandbox import SandboxError, delete_mcp_session, post_json_rpc
+from raiker.runtime.mcp_endpoint_policy import evaluate_endpoint
 from raiker.security.mcp_monitor import (
     McpSessionMonitor,
     McpSessionTelemetry,
@@ -573,8 +581,19 @@ class McpConnectorExecutor:
         timeout: float,
     ) -> ExecutionResult:
         endpoint_url = str(action.arguments.get("endpoint_url", "")).strip()
-        if urlparse(endpoint_url).scheme not in ("http", "https") or not urlparse(endpoint_url).netloc:
-            return self._fail(action.action_id, "mcp_remote_invalid_endpoint")
+        # RR-MCP-02 — classify the destination before a socket is opened, so a
+        # refusal names what was wrong with the endpoint rather than arriving as
+        # a transport failure with nothing to act on.
+        #
+        # `resolve=False`: this is the fast, legible answer about the URL, not
+        # the boundary. Whether a public *name* answers with a public address is
+        # a question that has to be asked as late as possible — an answer that
+        # is minutes old is an answer that can have changed — so the transport
+        # asks it, immediately before the socket, and asks it again of every
+        # redirect.
+        trust = evaluate_endpoint(endpoint_url, resolve=False)
+        if not trust.allowed:
+            return self._fail(action.action_id, trust.reason)
         ctx.endpoint_url = endpoint_url
         token, token_error = self._resolve_remote_token(
             str(action.arguments.get("auth_ref", "")).strip() or None

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import BrainView from "./BrainView.svelte";
 import { stubFetch, stubFetchPending } from "../test-helpers";
@@ -204,5 +204,191 @@ describe("BrainView", () => {
     const dialog = screen.getByRole("dialog", { name: "Add a source" });
     await fireEvent(dialog, new Event("cancel", { cancelable: true }));
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+  // ── NEW-MAP-01 and NEW-MAP-02 — what the map shows, and when it was true ──
+
+  it("stops calling a graph live once a refresh has failed (NEW-MAP-01)", async () => {
+    // The graph an owner reads to decide what Raiker knows about them kept the
+    // words "Live workspace graph" through every failed refresh, because the
+    // label only ever asked whether *some* update had once happened.
+    vi.useFakeTimers();
+    let calls = 0;
+    const GRAPH = {
+      generated_at: "2026-09-13T00:00:00Z",
+      illustrative_motion_notice: "Stored records only.",
+      nodes: [
+        { node_id: "principal:p", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: true },
+      ],
+      edges: [],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        if (url.includes("/api/brain/settings")) {
+          return { ok: true, status: 200, json: async () => ({ settings: {} }) } as Response;
+        }
+        if (url.includes("/api/brain")) {
+          calls += 1;
+          if (calls > 1) return { ok: false, status: 500, json: async () => ({}) } as Response;
+          return { ok: true, status: 200, json: async () => GRAPH } as Response;
+        }
+        return { ok: false, status: 404, json: async () => ({}) } as Response;
+      }),
+    );
+    render(BrainView);
+
+    expect(await screen.findByText("Live workspace graph")).toBeInTheDocument();
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.waitFor(() => expect(screen.queryByText("Live workspace graph")).toBeNull());
+    // Still on screen — throwing away the only graph anyone has helps nobody —
+    // and it says how old it is and that renewing it failed.
+    expect(screen.getByText(/last updated/i)).toHaveTextContent(/refresh failed/i);
+    expect(screen.getByRole("button", { name: /You, user record/i })).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  // Both NEW-MAP-02 cases pick their source from the browser, which is how the
+  // dialog is actually used: the "Selected source" field only exists once
+  // something is selected.
+  const BROWSE = {
+    // A folder rather than the top level: at the top the browser lists the
+    // *places* an owner has granted, and files only appear inside one.
+    path: "/granted",
+    parent: "",
+    truncated: false,
+    roots: [],
+    children: [
+      { name: "notes-a.md", path: "/granted/notes-a.md", kind: "file" },
+      { name: "notes-b.md", path: "/granted/notes-b.md", kind: "file" },
+    ],
+  };
+
+  const GRAPH_ONE_NODE = {
+    generated_at: "2026-09-13T00:00:00Z",
+    illustrative_motion_notice: "Stored records only.",
+    nodes: [
+      { node_id: "principal:p", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: true },
+    ],
+    edges: [],
+  };
+
+  function sourceDialogFetch(
+    review: (path: string) => Promise<Response> | Response,
+  ): ReturnType<typeof vi.fn> {
+    return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes("/api/brain/settings")) {
+        return { ok: true, status: 200, json: async () => ({ settings: {} }) } as Response;
+      }
+      if (url.includes("/api/brain/sources/review")) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { path?: string };
+        return review(String(body.path ?? ""));
+      }
+      if (url.includes("/api/brain/sources/browse")) {
+        return { ok: true, status: 200, json: async () => BROWSE } as Response;
+      }
+      if (url.includes("/api/brain/sources")) {
+        return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+      }
+      if (url.includes("/api/brain")) {
+        return { ok: true, status: 200, json: async () => GRAPH_ONE_NODE } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    });
+  }
+
+  function plan(path: string, supported: number): Response {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ path, supported_files: supported, unsupported_files: 0, total_bytes: supported * 10, warnings: [] }),
+    } as Response;
+  }
+
+  it("never presents one file's indexing plan under another's selection (NEW-MAP-02)", async () => {
+    // The reachable reproduction. Reviewing disables its own button while it
+    // runs, but *choosing a different source* in the browser does not — and it
+    // is the browser the dialog is built around. Select A, review it, pick B
+    // while A is still on the wire, and A's plan used to land under B's
+    // selection; **Add reviewed source** then added A, because it adds
+    // `sourceReview.path`. The owner reads a plan for one source and indexes
+    // another.
+    const slow: { release: ((value: Response) => void) | null } = { release: null };
+    const fetchMock = sourceDialogFetch((path) =>
+      path === "/granted/notes-a.md"
+        ? new Promise<Response>((resolve) => { slow.release = resolve; })
+        : plan(path, 2),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(BrainView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Add workspace source" }));
+    await fireEvent.click(await screen.findByRole("button", { name: /notes-a\.md/ }));
+    await fireEvent.click(await screen.findByRole("button", { name: /Review indexing plan/i }));
+
+    // The owner changes their mind while A is still on the wire.
+    await fireEvent.click(screen.getByRole("button", { name: /notes-b\.md/ }));
+    expect(screen.queryByRole("region", { name: "Source indexing review" })).toBeNull();
+
+    // A finally answers. It is a plan for a source that is no longer selected,
+    // so it is not shown at all.
+    slow.release?.(plan("/granted/notes-a.md", 900));
+    await waitFor(() => expect(screen.getByLabelText("Selected source")).toHaveValue("/granted/notes-b.md"));
+    expect(screen.queryByRole("region", { name: "Source indexing review" })).toBeNull();
+    expect(screen.queryByText(/notes-a\.md/)).not.toHaveTextContent("900");
+
+    // Reviewing the source that *is* selected works, and adds that one. Found
+    // by writing this: the superseded response still has to release the dialog,
+    // or the owner is left looking at a "Reviewing…" button for a review whose
+    // answer was thrown away.
+    await fireEvent.click(await screen.findByRole("button", { name: /Review indexing plan/i }));
+    const review = await screen.findByRole("region", { name: "Source indexing review" });
+    expect(review).toHaveTextContent("/granted/notes-b.md");
+    await fireEvent.click(within(review).getByRole("button", { name: "Add reviewed source" }));
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) =>
+            String(url).endsWith("/api/brain/sources") &&
+            String((init as RequestInit | undefined)?.body ?? "").includes("/granted/notes-b.md"),
+        ),
+      ).toBe(true),
+    );
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) =>
+          String(url).endsWith("/api/brain/sources") &&
+          String((init as RequestInit | undefined)?.body ?? "").includes("notes-a"),
+      ),
+    ).toBe(false);
+  });
+
+  it("refuses to add a plan whose selection has since changed (NEW-MAP-02)", async () => {
+    const fetchMock = sourceDialogFetch((path) => plan(path, 1));
+    vi.stubGlobal("fetch", fetchMock);
+    render(BrainView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Add workspace source" }));
+    await fireEvent.click(await screen.findByRole("button", { name: /notes-a\.md/ }));
+    await fireEvent.click(await screen.findByRole("button", { name: /Review indexing plan/i }));
+    const review = await screen.findByRole("region", { name: "Source indexing review" });
+    expect(review).toHaveTextContent("/granted/notes-a.md");
+
+    // The field stays editable while a plan is on screen, which is fine — what
+    // is not fine is adding the plan for something else.
+    const selected = screen.getByLabelText("Selected source");
+    await fireEvent.input(selected, { target: { value: "/granted/notes-b.md" } });
+    // Editing clears the plan, so the owner cannot press Add at all; the guard
+    // below is what holds if a future change ever stops clearing it.
+    expect(screen.queryByRole("region", { name: "Source indexing review" })).toBeNull();
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) =>
+          String(url).endsWith("/api/brain/sources") &&
+          String((init as RequestInit | undefined)?.body ?? "").includes("notes-a"),
+      ),
+    ).toBe(false);
   });
 });

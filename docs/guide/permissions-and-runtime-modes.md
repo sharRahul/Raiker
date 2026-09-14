@@ -112,9 +112,14 @@ first time it is contained or fails often enough to be watched.
 ## Capability gates
 
 The Permissions page separates what you control from what the current Raiker
-agent can derive from it. **Owner** is the gate and decision-mode control;
-**Raiker agent** is a read-only result: `Direct`, `Ask`, `Denied`, or
-`Unavailable`. The agent cannot change its own authority. *Delegated authority*
+agent can derive from it. **Owner control** is the gate and decision-mode
+control; **Raiker agent** is a read-only result, and it answers in the same
+words the control does — **Ask me**, **Allow**, **Automatic** or **Never** —
+plus three that are not decisions at all: `Unavailable` when the capability is
+switched off, `Not ready` when something it needs is missing, and `Unknown` when
+the stored setting is not one Raiker recognises. Those three answer a different
+question — whether it can run at all — which is why they keep their own words.
+The agent cannot change its own authority. *Delegated authority*
 at the top of the page shows both for every capability at once — as a table on a
 wide window, and as one labelled card per capability on a narrow one, so the
 verdict is never the part you have to scroll for. Each agentic turn uses

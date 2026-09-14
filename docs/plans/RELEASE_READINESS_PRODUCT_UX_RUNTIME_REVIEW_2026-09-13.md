@@ -2680,6 +2680,18 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 
 ### Settings pages and remaining destinations
 
+> **REM-SET-ACCOUNT was already closed when this section was written**, which is
+> what its own row asks a reader to check before editing. Both halves shipped
+> earlier on 2026-09-13: the internal principal language as
+> [FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name)
+> — Account shows the fixed username and an editable display name, and no
+> `principal_…` key appears on the page — and the misleading cancellation as
+> [FIXED-498](FIXED_ITEMS.md#fixed-498--cancel-stayed-live-while-an-account-was-being-deleted),
+> which removes Cancel for the duration of the request rather than leaving a
+> control that looks like it undoes a deletion already running. Verified in
+> source on 2026-09-14; no change was made for this row. The remaining rows in
+> this table are open.
+
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
 | REM-SET-GENERAL / P2 / S | Remove repeated setup teaching; move weather/location to optional personalization. | Language, timezone and startup should be short and explicit about UI versus model context. | Preserve IANA timezone and data-egress consent; test locale changes do not shift stored schedules. |

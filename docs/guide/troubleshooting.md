@@ -69,6 +69,8 @@ in the process environment.
 | An approved file write produced no file | **Fixed** (FIXED-08). An approved `write_file`/`edit_file`/`apply_patch` is carried out once, re-governed at execution time and checkpointed first. If it still records only, one of `approval_execution_relay` or the target's own capability is off in Permissions, and the approval detail says so before you decide. |
 | An approved **network** or **process** action produced nothing | By design — those two keep metadata-only resolution (`executes_action: false`). The parked turn still continues, with an honest "approved, but not executed" result. |
 | `provider_connection_failed` | The provider was unreachable — check network, endpoint, and the fallback sequence |
+| "X could not be reached. Check this device's network access, and any proxy or firewall between it and the provider." | A **hosted** provider Raiker could not classify a refusal from, because nothing answered. Raiker does not guess at a cause here; what it can tell you is which remedies exist. A corporate proxy or an egress rule that does not allow the provider's host is the usual one. |
+| "X could not be reached. Check that it is running and reachable from this device." | The same, for a **local** runtime — Ollama, LM Studio, llama.cpp. Here starting the service is a thing you can actually do, which is why the two sentences differ. |
 
 ## Server and session
 

@@ -191,6 +191,20 @@ and the Capabilities page read —
 | `calendar_runtime` | No owner surface and no model tool. Nothing syncs and nothing creates an event |
 | `email_runtime` | No owner surface and no model tool. Nothing drafts, and nothing has ever sent |
 
+**Eight more were added on 2026-09-14 by BUG-297**, and they are a different
+kind of row: capabilities with a *routed gate* and no registered executor. The
+table above is asserted against `REAL_EXECUTOR_CAPABILITIES`, and these are not
+in that set, so nothing required them to be traced — they simply reported
+`own_gate` because that is what a capability with no row reports.
+
+| Capability | Why nothing reaches it |
+|---|---|
+| `policy_mutation` | Nothing proposes one. `CAPABILITY_GATE_MAP` names the gate so a future proposal would be routed; policy changes are made by editing the policy configuration, which the runtime reads rather than governs |
+| `finance_runtime`, `investment_runtime`, `medical_runtime`, `pregnancy_baby_runtime`, `cctv_runtime`, `home_security_runtime`, `hardware_operator_runtime` | The seven sensitive domains. Each has a `not_implemented` executor class that is deliberately **not registered**, so `has_executor` is false, activation cannot reach an enabled state, and the Permissions page already renders each as a future rather than a control. A real integration and a per-domain threat model come before the switch does |
+
+`admin_mutation` and `role_mutation` were traced in the same pass and are *not*
+here: both are `own_gate`, reached from the control plane, and listed in §3.6.
+
 **None of the nine is a hole.** An executor nothing constructs an action for
 cannot run at all; the risk it carries is the opposite one, and it is the reason
 this section exists — an unreachable registered executor is the shape a future
@@ -269,6 +283,14 @@ propose a restore, so an agent can never rewind the workspace on its own say-so.
 | `image_generation` | `control/service.py::generate_image` (path 25) |
 | `mcp_builder_runtime` | `control/service.py::_route_mcp` (`:492`) |
 | `external_channel_runtime` | `control/service.py:838` |
+| `admin_mutation` | `cli/commands.py::_govern_admin_mutation`, raised by `/user create`, `/user deactivate` and `/principal create` |
+| `role_mutation` | `cli/commands.py::_govern_admin_mutation`, raised by `/role create`, `/role grant` and `/role revoke` |
+
+The last two were added on 2026-09-14 by BUG-297. They have no executor — an
+identity mutation is recorded rather than executed — so the invariant that
+required every other row here never reached them, and both answered `own_gate`
+by default. Both turned out to deserve it. `policy_mutation`, which looked
+identical on the Permissions page, did not: §3.5.
 
 **Traced 2026-08-24 — the fifteen that had no traced path.** GEP-04 asked
 whether each was benign (reached through a control-plane method that authorises
@@ -292,6 +314,17 @@ The answer was neither of the two readings the question offered. It was three:
 DTO carries it, and the Capabilities page renders it beside the switch. A
 capability whose switch does not decide whether it runs says so, and says what
 does.
+
+**And `own_gate` is now a classification rather than a fallback.** BUG-297 found
+the last way a switch could govern nothing and still look like a lever: not a
+mis-traced row, but *no row at all*. `gate_is_effective` answers `own_gate` for a
+capability it has never heard of — the right fail-safe for rendering and the
+wrong answer for governance — and the invariant above only ever asked about
+capabilities with a real executor. Ten capabilities had a routed gate and no
+executor, and every one of them was taking that default. The invariant asks
+about `REAL_EXECUTOR_CAPABILITIES | CAPABILITY_GATE_MAP.values()` now, so
+anything the router can route a decision onto — which is the set the Permissions
+page can offer a control for — has to be traced before it ships.
 
 ---
 
@@ -397,6 +430,7 @@ defect this repository has already had.
 | I1 | `route_action` has exactly six call sites, in the five modules named in §2 | A seventh entry path appearing unreviewed |
 | I2 | `AgentGateway` is constructed in exactly the five modules named in §3.1 | A surface that reaches the orchestrator without the gateway |
 | I3 | Every capability in `REAL_EXECUTOR_CAPABILITIES` is named in this document **and** classified in `entry_paths.py` | **The two-egress problem** and the unreachable checkpoint restore, both since closed; the invariant is what keeps a new registered executor from repeating either |
+| I3c | Every capability in `CAPABILITY_GATE_MAP.values()` is classified in `entry_paths.py`, so `own_gate` is never a default | **BUG-297** — `admin_mutation`, `policy_mutation` and `role_mutation` have routed gates and no executors, so I3 never reached them; all three reported themselves as deciding their own capability without anyone tracing whether anything constructs one, and the Permissions page gave each a full set of decision-mode buttons |
 | I3b | The tool-reachable set is exactly sixteen | A capability moving between §3.6's categories without the document moving |
 | I4 | Every module reading a capability gate itself calls `capability_admission`, and is listed in §4 | A further local gate check appearing silently. **The original form of this — "has a local `_ENABLED_GATE_STATES`" — already missed one**: `context/gatherer.py` spelled the constant without the leading underscore and was absent from §4 for that reason alone |
 | I4b | No module outside `admission.py` declares its own enabled-state set | The three-way fork in what an empty gate table means |

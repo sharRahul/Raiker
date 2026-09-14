@@ -997,6 +997,27 @@ def trending_hugging_face(
 
     Registered before the `{owner}/{repository}` routes so `trending` is never
     read as a repository owner.
+
+    **BUG-296 — an unreachable Hub is an answer here, not an error.** Every other
+    Hugging Face route raises 503 when the Hub cannot be reached, which is right
+    for them: an owner asked for a specific repository, a variant or a download,
+    and did not get it. Nobody asks for this one. It runs on every visit to
+    Models so the panel has something to open with, and a host with no route to
+    `huggingface.co` therefore put `GET /api/hugging-face/trending — 503` in the
+    browser console every single time.
+
+    That console entry was the whole defect. The panel already *handles* the
+    outage correctly and says so in the right place; what the 503 cost was
+    somewhere else entirely — the live manual test plan requires a round to end
+    with zero uncaught console errors, and several live specs assert exactly
+    that. An expected, handled, correctly-reported outage was spending the
+    budget that exists to catch real ones, and a round that learns to ignore one
+    console error has learned to ignore the next.
+
+    So the probe answers 200 with no items and the reason it has none. The
+    request to *Raiker* did succeed; "the Hub is not reachable from this host" is
+    the true answer to it. The routes an owner drives keep their 503, because
+    there a failed request is a failed request.
     """
     session, principal = auth_data
     _require_human(principal)
@@ -1005,9 +1026,13 @@ def trending_hugging_face(
             token=_hugging_face_token(request, session.principal_id)
         )
     except HuggingFaceAccessError as exc:
-        raise HTTPException(
-            status_code=503, detail={"reason_code": exc.code, "repository_url": exc.repository_url}
-        ) from exc
+        return {
+            "items": [],
+            "unreachable": {
+                "reason_code": exc.code,
+                "repository_url": exc.repository_url,
+            },
+        }
     return {"items": [item.to_dict() for item in items]}
 
 

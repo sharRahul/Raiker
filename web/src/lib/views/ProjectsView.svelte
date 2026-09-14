@@ -8,6 +8,7 @@
   import PathPicker from "../components/PathPicker.svelte";
   import ProjectTreeNode from "../components/ProjectTreeNode.svelte";
   import SidePanel from "../components/SidePanel.svelte";
+  import RowOverflow from "../components/RowOverflow.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import { setWorkProject, startInBuild } from "../workProject.svelte";
   import ProjectExplorer from "../components/ProjectExplorer.svelte";
@@ -600,14 +601,17 @@
               activityVerb="created"
             />
           </button>
+          <!-- REM-PROJ-01 / UX-PROJ-02 — five actions at equal weight is not a
+               card, it is a menu with the lid off. "Start in Build", "New chat",
+               "Archive", "Move" and "Delete" each looked like the thing to press
+               next, so the two an owner wants many times a day sat beside the
+               three they want a handful of times ever — one of which erases a
+               project and, for a managed one, its folder.
+               Continuing work is primary, starting new work is secondary, and
+               the lifecycle actions are one deliberate reach away. Nothing is
+               removed: every action keeps its handler, its disabled state and
+               its confirmation. -->
           <div class="project-actions">
-            <button
-              type="button"
-              class="btn btn-sm"
-              onclick={() => startInBuild(p.project_id)}
-            >
-              Start in Build
-            </button>
             <button
               type="button"
               class="btn btn-primary btn-sm"
@@ -615,13 +619,29 @@
             >
               New chat
             </button>
-            <button type="button" class="btn btn-ghost btn-sm" onclick={() => void archiveProject(p.project_id)} disabled={archiving === p.project_id}>
-              Archive
+            <button
+              type="button"
+              class="btn btn-sm"
+              onclick={() => startInBuild(p.project_id)}
+            >
+              Start in Build
             </button>
-            <button type="button" class="btn btn-ghost btn-sm" onclick={() => void startMove(p.project_id)}>
-              Move
-            </button>
-            <button type="button" class="btn btn-ghost btn-sm" onclick={() => void remove(p.project_id, p.root_kind, p.root_label)}>Delete</button>
+            <RowOverflow
+              label={p.name}
+              items={[
+                {
+                  label: archiving === p.project_id ? "Archiving…" : "Archive",
+                  disabled: archiving === p.project_id,
+                  run: () => void archiveProject(p.project_id),
+                },
+                { label: "Move", run: () => void startMove(p.project_id) },
+                {
+                  label: "Delete",
+                  run: () =>
+                    void remove(p.project_id, p.root_kind, p.root_label),
+                },
+              ]}
+            />
           </div>
           {#if dragOverId === p.project_id}
             <p class="drop-hint" role="status">Drop to move chat into “{p.name}”.</p>

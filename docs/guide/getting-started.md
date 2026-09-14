@@ -282,23 +282,43 @@ written and verified an encrypted snapshot. Raiker starts conservatively and ask
 before it takes a governed action, so there is no permissions matrix to fill in
 on first run.
 
+### Unlocking, afterwards
+
+**Unlock Raiker** is the action on the lock screen, and the only one you need.
+Beneath it: **Create a User Account**, which adds another account to *this*
+Raiker, **Forgot password?**, and **Use or create another instance**.
+
+That last one is a different thing from the first, and the screen now says so
+before you take it: a separate instance has its own workspace, its own models and
+its own memory, shares nothing with the one you are unlocking, and opens in its
+own tab. It used to be labelled *Create a User Account* too — the same words as
+the control above it — so the only way to learn that it left this instance was to
+press it.
+
 ## What you get
 
 Destinations are split by how often you go to them. The sidebar carries the
-work; everything you set up once lives behind the gear in the top bar.
+work; everything you set up once lives behind **More** in the top bar.
 
 | Where | Group | Destinations |
 |---|---|---|
 | Sidebar | Core | Workbench, Chat, Build, Design, Threads, Tasks, Projects, Approvals, Messaging |
 | Sidebar | Knowledge | Memory, Knowledge Map |
-| Gear | Manage | Permissions, Models, Extensions |
-| Gear | Observe | Observability |
-| Gear | Support | Guide, Settings |
+| More | — | Settings, directly, as the first row |
+| More | Manage | Permissions, Models, Extensions |
+| More | Observe | Observability |
+| More | Support | Guide |
+| More | Settings | the ten Settings sections, each as a direct link |
+
+**More was a gear**, and it opened a window that could not take you to Settings:
+its ten sections were listed, the destination itself was not. A gear promises the
+settings screen everywhere else you have used a computer, so it is named for what
+it is now, and Settings leads the window.
 
 **Workbench** is the live board: what is running, which agents are standing,
 what is scheduled, and what needs a decision. **Approvals** sits in the sidebar
-rather than behind the gear because a decision waiting on you is the work,
-arriving many times a day, while Permissions and Models are configured once and
+rather than behind More because a decision waiting on you is the work, arriving
+many times a day, while Permissions and Models are configured once and
 revisited.
 
 **Needs your attention** on that board means exactly that. A run that is running
@@ -331,12 +351,12 @@ Old links to the pages these absorbed still resolve and open the right tab, and
 so does the path form — `#/extensions/mcp` opens Extensions on MCP servers,
 exactly as `#/extensions?tab=mcp` does.
 
-The top bar carries the notification bell, the **gear** — Settings and every
+The top bar carries the notification bell, **More** — Settings and every
 destination that is not on the sidebar — the host control, and the **STOP**
 switch.
 
 **STOP** is quiet while nothing is running: an icon, in the row with the bell
-and the gear. When work is under way it turns red and states how many tasks it
+and More. When work is under way it turns red and states how many tasks it
 would reach, and pressing it requests cancellation of every task that is queued,
 running, paused, or waiting for your approval, at the next safe boundary. It is
 governed and audited — not a force-kill. It is in the same place, and one press

@@ -34,7 +34,7 @@
   import type { ModelProfile, ProviderModelList } from "../apiTypes";
   import { providerName } from "../format";
   import { modelName } from "../modelPresentation";
-  import { providerErrorGuidance } from "../providerErrors";
+  import { providerErrorGuidance, unreachableProviderNote } from "../providerErrors";
   import Icon from "./Icon.svelte";
   import ProviderLogo from "./ProviderLogo.svelte";
   import AvailableModels from "../views/models/AvailableModels.svelte";
@@ -640,7 +640,11 @@
     // either surface learns is known to both.
     const guidance = providerErrorGuidance(reasonCode);
     if (guidance !== null) return `${row.label}: ${guidance.message} ${guidance.fix}`;
-    return `${row.label} could not be reached. Check this device's network access.`;
+    // BUG-289 — the same last-resort sentence Models uses, from the same
+    // helper. This branch is only reached for `row.kind === "key"`, so the
+    // destination is always off-machine here; a local runtime took the "is not
+    // running on this device" branch above.
+    return unreachableProviderNote(row.label, true);
   }
 
   // Local runtimes are asked once on open: detection is the row's whole content,

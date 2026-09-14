@@ -171,3 +171,27 @@ export function providerErrorGuidance(
   const known = GUIDANCE[reasonCode];
   return known ? { ...known, code: reasonCode } : null;
 }
+
+/**
+ * BUG-289 — the last-resort sentence, split by where the destination is.
+ *
+ * This branch is reached only when the runtime has *no* classified reason: a
+ * proxy answering `connect_rejected` is genuinely unclassified, and
+ * [BUG-272] is why anything classifiable no longer lands here. What was wrong
+ * was not the diagnosis but the advice. "Check that it is running" was written
+ * for a local runtime — a thing the owner can start on their own machine — and
+ * it was also being handed to somebody whose host cannot reach `openrouter.ai`,
+ * about a service they do not operate and cannot start.
+ *
+ * Neither sentence guesses at a cause. The point of this branch is that there
+ * is not one; what differs is which remedies are available to the owner at all.
+ */
+export function unreachableProviderNote(
+  providerName: string,
+  offMachine: boolean,
+): string {
+  return offMachine
+    ? `${providerName} could not be reached. Check this device's network access, ` +
+        "and any proxy or firewall between it and the provider."
+    : `${providerName} could not be reached. Check that it is running and reachable from this device.`;
+}

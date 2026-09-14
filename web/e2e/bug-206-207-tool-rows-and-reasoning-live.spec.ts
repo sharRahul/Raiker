@@ -21,7 +21,12 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { setThinkingEffort, signInAsOwner, useHostedModel } from "./hosted-provider";
+import {
+  chooseModelForTurn,
+  setThinkingEffort,
+  signInAsOwner,
+  useHostedModel,
+} from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
@@ -74,6 +79,13 @@ test("the provider key is added through the UI and a real turn answers", async (
   });
 
   await page.goto(`${BASE}/#/new-chat`);
+  // BUG-292 — pinning Haiku on the provider card made it *available*; this is
+  // what makes it the model for the turn. Without it, a workspace where no
+  // global model has ever been chosen leaves Send disabled and says why, and
+  // this spec used to wait out its timeout on that disabled button and take the
+  // four scenarios below down with it. `rememberSurfaceModel` persists the
+  // choice, so the rest of this file inherits it.
+  await chooseModelForTurn(page, /Haiku 4\.5/i);
   await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: ROWS LIVE");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("main").getByText("ROWS LIVE", { exact: true })).toBeVisible({

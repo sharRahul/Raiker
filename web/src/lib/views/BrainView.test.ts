@@ -107,9 +107,21 @@ describe("BrainView", () => {
     expect(screen.getByRole("button", { name: /Workspace, workspace record/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Add first source, source record/i })).toBeInTheDocument();
     screen.getByRole("button", { name: "Graph settings" }).click();
-    expect(await screen.findByRole("complementary", { name: "Graph settings" })).toBeInTheDocument();
+    const settings = await screen.findByRole("complementary", { name: "Graph settings" });
+    // REM-MAP-01 — the panel opens on the section that decides which records
+    // are on screen. It used to open all five at once: five checkbox groups and
+    // eleven sliders, five of which are force-simulation constants.
+    expect(settings.querySelector("details[open] > summary")?.textContent).toBe("Filters");
+    for (const section of ["Groups", "Display", "Forces", "Motion"]) {
+      const summary = [...settings.querySelectorAll("summary")].find(
+        (node) => node.textContent === section,
+      );
+      expect(summary?.closest("details")).not.toHaveAttribute("open");
+    }
+    // Nothing is removed and nothing is reset — every control is one click away.
     expect(screen.getByText("Centre force")).toBeInTheDocument();
     expect(screen.getByText("Always alive")).toBeInTheDocument();
+    expect(within(settings).getByText("Advanced display")).toBeInTheDocument();
   });
 
   it("opens on the boundary, browses one root, and reviews before adding", async () => {

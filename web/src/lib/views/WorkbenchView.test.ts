@@ -185,6 +185,48 @@ describe("WorkbenchView", () => {
     expect(within(schedules).queryByText("Watch the release branch")).not.toBeInTheDocument();
   });
 
+  it("shows a standing agent whose cycle is running as one row, with its cadence", async () => {
+    // REM-HOME-01 — Workbench deliberately placed a repeating task in *both*
+    // Running now and Standing agents, on the reasoning that "a cycle is
+    // running" and "an agent is standing" are two different facts. They are.
+    // What the board actually rendered was the same row twice, under two
+    // headings, with two Stop buttons acting on the same run — so one nightly
+    // routine read as two pieces of work and nothing said otherwise.
+    const runningAgent = task({
+      task_id: "t_agent",
+      title: "Watch the release branch",
+      status: "running",
+      current_step: "Fetching origin",
+      recurrence: "hourly",
+      scheduled_at: "2099-01-01T00:00:00Z",
+    });
+    stubFetch(routes({ "GET /api/tasks": [runningAgent] }));
+    render(WorkbenchView);
+
+    const running = await screen.findByRole("region", { name: "Running now" });
+    expect(within(running).getByText("Watch the release branch")).toBeInTheDocument();
+    // One row, so one Stop.
+    expect(within(running).getAllByRole("button", { name: /^Stop$/ })).toHaveLength(1);
+    // Nothing the standing row carried is lost: the cadence and the next slot
+    // travel with the attempt.
+    expect(within(running).getByText("Runs hourly")).toBeInTheDocument();
+    expect(within(running).getByText(/next cycle/i)).toBeInTheDocument();
+    // And the section that would have repeated it is not rendered at all.
+    expect(screen.queryByRole("region", { name: "Standing agents" })).toBeNull();
+  });
+
+  it("still stands an armed agent that is between cycles", async () => {
+    // The other half: dedupe must not swallow the standing row for a repeating
+    // task that is waiting rather than running, which is the state most of them
+    // are in most of the time.
+    stubFetch(routes({ "GET /api/tasks": [AGENT] }));
+    render(WorkbenchView);
+
+    const agents = await screen.findByRole("region", { name: "Standing agents" });
+    expect(within(agents).getByText("Watch the release branch")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Running now" })).toBeNull();
+  });
+
   it("says nothing is running once, rather than in four places", async () => {
     // This used to assert the opposite, and the concern behind it was right: a
     // card with nothing in it is worse than a sentence. Removing the card is

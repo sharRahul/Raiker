@@ -26,6 +26,7 @@
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { createFileDrop } from "../fileDrop.svelte";
   import { api, ApiError } from "../api";
+  import { resumeRun, startRunNow, stopRun } from "../taskLifecycle";
   import { rememberSurfaceModel, surfaceModel, type Surface } from "../surfaceModel.svelte";
   import { takeScheduleRequest } from "../scheduleHandoff";
   import type {
@@ -377,6 +378,12 @@
     finally { creating = false; }
   }
 
+  // REM-TASK-02 — all three lifecycle controls below go through the shared
+  // controller, so one run has one Stop, one Resume and one Run-now meaning
+  // wherever the owner presses it. This page's Stop used to discard the
+  // runtime's reason entirely, and reported a refusal and a lost response with
+  // the same five words.
+  //
   // BUG-25/BUG-39 — the owner's retry. Granting the approval now signals the
   // host directly, so a parked scheduled run starts continuing immediately and
   // this is purely the recovery path: what to press when that could not proceed
@@ -387,46 +394,25 @@
   async function resumeTask(task: TaskView) {
     busyTask = task.task_id;
     notice = null;
-    try {
-      const result = await api.resumeTask(task.task_id);
-      notice = result.ok
-        ? `Continuing “${task.title}”.`
-        : result.reason_code === "no_resolved_approval"
-          ? "No decision has been recorded yet, so there is nothing to continue."
-          : `Could not continue this run (${result.reason_code ?? "unknown reason"}).`;
-      await load();
-    } catch (error) {
-      notice = error instanceof ApiError
-        ? `Could not continue this run (${error.reasonCode ?? error.status}).`
-        : "Could not continue this run.";
-    } finally {
-      busyTask = null;
-    }
+    notice = (await resumeRun(task)).notice;
+    await load();
+    busyTask = null;
   }
 
   async function runTask(task: TaskView) {
     busyTask = task.task_id;
     notice = null;
-    try {
-      await api.runTask(task.task_id);
-      notice = `Starting “${task.title}”.`;
-      await load();
-    } catch (error) {
-      notice = error instanceof ApiError
-        ? `Could not run this task (${error.reasonCode ?? error.status}).`
-        : "Could not run this task.";
-    } finally {
-      busyTask = null;
-    }
+    notice = (await startRunNow(task)).notice;
+    await load();
+    busyTask = null;
   }
 
   async function stopTask(task: TaskView) {
-    busyTask = task.task_id; notice = null;
-    try {
-      await api.interrupt({ session_id: task.session_id, task_id: task.task_id, action_type: "cancel", reason: "user stopped this task (web UI)" });
-      notice = `Requested a safe-boundary stop for “${task.title}”.`; await load();
-    } catch { notice = "Could not request the stop."; }
-    finally { busyTask = null; }
+    busyTask = task.task_id;
+    notice = null;
+    notice = (await stopRun(task, "user stopped this task (web UI)")).notice;
+    await load();
+    busyTask = null;
   }
 
   $effect(() => { void projectId; void sessionId; void load(); });

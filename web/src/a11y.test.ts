@@ -35,7 +35,7 @@ describe("accessibility landmarks", () => {
     window.location.hash = "#/capabilities";
     render(App);
     await signIn();
-    await fireEvent.click(await screen.findByRole("button", { name: "Settings and pages" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "More pages and settings" }));
     await waitFor(() => {
       // Permissions moved behind the gear, so the marked link lives in that
       // window rather than the rail.

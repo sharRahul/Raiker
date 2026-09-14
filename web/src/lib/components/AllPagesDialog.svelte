@@ -16,6 +16,18 @@
    *
    * Settings' own sections are listed too, so this answers "where is that
    * setting" without making the owner open Settings and then hunt its rail.
+   *
+   * **REM-POPUP-01 — it is `More`, and it says so.** The trigger was a gear and
+   * the heading was "Settings & pages", which is one control making two
+   * promises: a gear means "the settings screen" everywhere else an owner has
+   * used a computer, and this opens a route launcher whose largest group is
+   * pages that are not settings at all. Worse, the one thing the icon named was
+   * the one row deliberately missing — Settings itself was omitted because its
+   * sections are listed below, so pressing a gear could not open Settings.
+   *
+   * The control is an overflow control, so it is named after what it is, and a
+   * direct link to Settings leads the window. Nothing about the routes, the
+   * groups or the deep links changed.
    */
   import Icon from "./Icon.svelte";
   import { HUB_GROUPS, HUB_TABS } from "../nav";
@@ -134,13 +146,34 @@
   <button type="button" class="scrim" aria-label="Close" onclick={close}></button>
   <div class="panel" bind:this={panel} role="dialog" aria-modal="true" aria-labelledby="all-pages-h">
     <header>
-      <h2 id="all-pages-h">Settings &amp; pages</h2>
+      <h2 id="all-pages-h">More</h2>
       <button type="button" class="btn btn-ghost btn-sm" onclick={close}>Close</button>
     </header>
     <label class="find">
       <Icon name="search" size="sm" />
       <input bind:value={query} placeholder="Find a page or setting" aria-label="Find a page or setting" />
     </label>
+    <!-- REM-POPUP-01 — the one destination the old gear icon promised and the
+         window would not go to. Its ten sections are still listed below as deep
+         links, which is how an owner finds *a* setting; this is how they open
+         *Settings*. Above the search box rather than in a group, because it is
+         the answer to "I pressed this to change something" and a row in the
+         last group is not. Hidden while a query is running: a search is a
+         request to see matches, and a fixed row that is not one of them is the
+         same noise the groups fold away to avoid. -->
+    {#if query.trim() === ""}
+      <a
+        class="direct"
+        href="#/settings"
+        class:active={current === "settings"}
+        aria-current={current === "settings" ? "page" : undefined}
+        onclick={close}
+      >
+        <Icon name="settings" size="md" />
+        <span class="label">Settings</span>
+        <span class="direct-hint">General, security, privacy, account and the rest</span>
+      </a>
+    {/if}
     <div class="groups">
       {#each groups as group (group.id)}
         <section aria-labelledby={`all-pages-${group.id}`}>
@@ -189,6 +222,17 @@
   a:hover { background:var(--sunken); color:var(--text-1); text-decoration:none; }
   a.active { background:var(--accent-soft); color:var(--accent); font-weight:650; }
   .label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .direct {
+    display:flex; align-items:center; gap:.6rem; min-height:2.6rem; padding:.5rem .6rem;
+    border:1px solid var(--border); border-radius:var(--r-sm); background:var(--sunken);
+    color:var(--text-1); font-size:var(--text-sm); font-weight:600; text-decoration:none;
+  }
+  .direct:hover { border-color:var(--border-strong); text-decoration:none; }
+  .direct.active { border-color:var(--accent); background:var(--accent-soft); color:var(--accent); }
+  .direct-hint {
+    flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    color:var(--text-3); font-size:var(--text-xs); font-weight:400; text-align:right;
+  }
   .none { margin:0; color:var(--text-3); font-size:var(--text-sm); }
   @media (max-width:720px) {
     .panel { right:var(--space-2); left:var(--space-2); width:auto; }

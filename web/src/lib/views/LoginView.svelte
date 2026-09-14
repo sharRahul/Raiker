@@ -314,8 +314,11 @@
       {/if}
 
       {#if instanceSetup}
-        <h1 id="unlock-title">Create a User Account</h1>
-        <p class="intro">Your account will have its own Raiker workspace and open in a new tab.</p>
+        <h1 id="unlock-title">Another instance</h1>
+        <p class="intro">
+          A separate Raiker with its own workspace, models and memory. Nothing is
+          shared with the instance you are unlocking, and it opens in its own tab.
+        </p>
         <form onsubmit={(event) => { event.preventDefault(); void createUserInstance(); }}>
           <label for="instance-name">Instance name</label>
           <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="projects" size="md" /></span><input id="instance-name" bind:value={instanceName} placeholder="for example, alex" pattern={"[a-z0-9][a-z0-9-]{0,62}"} required disabled={busy} /></div>
@@ -438,11 +441,25 @@
             </button>
           {/if}
 
+          <!-- REM-LAUNCH-02 — a separate instance is a different thing from a
+               user account, and this button said the second while doing the
+               first. It sat at the same weight as "Forgot password?" beneath
+               the unlock form, labelled exactly as the register control above
+               it is, so the only way to learn that pressing it opens a *new
+               workspace with its own database in a new tab* was to press it.
+               Named for what it does, with the isolation stated where the
+               decision is made rather than after it. -->
           {#if !bootstrapAllowed && !isRegister}
-            <button type="button" class="secondary instance-button" onclick={() => { instanceSetup = true; error = null; }} disabled={formDisabled}>
-              <Icon name="projects" size="md" />
-              Create a User Account
-            </button>
+            <div class="instance-option">
+              <button type="button" class="secondary instance-button" onclick={() => { instanceSetup = true; error = null; }} disabled={formDisabled}>
+                <Icon name="projects" size="md" />
+                Use or create another instance
+              </button>
+              <p class="instance-note">
+                A separate instance has its own workspace, models and memory.
+                Nothing is shared with this one, and it opens in its own tab.
+              </p>
+            </div>
           {/if}
         {/if}
 
@@ -748,6 +765,19 @@
   }
   .secondary:hover {
     border-color: var(--accent-border);
+  }
+  /* REM-LAUNCH-02 — the isolation explanation belongs to the control, so it is
+     grouped with it rather than floating as a fourth item in the stack. */
+  .instance-option {
+    display: grid;
+    gap: var(--space-2);
+  }
+  .instance-note {
+    margin: 0;
+    color: var(--text-3);
+    font-size: var(--text-xs);
+    line-height: 1.45;
+    text-align: center;
   }
   .eye-toggle:focus-visible,
   .secondary:focus-visible,

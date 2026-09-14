@@ -805,8 +805,15 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     }),
+  // BUG-296 — this probe answers 200 even when the Hub is unreachable, and
+  // names the reason in the body. A 503 here was an uncaught console error on
+  // every Models visit for a host with no route to huggingface.co, which is the
+  // budget that exists to catch real ones.
   trendingHuggingFace: () =>
-    request<{ items: HuggingFaceSearchResult[] }>("/api/hugging-face/trending"),
+    request<{
+      items: HuggingFaceSearchResult[];
+      unreachable?: { reason_code: string; repository_url: string | null };
+    }>("/api/hugging-face/trending"),
   searchHuggingFace: (query: string) =>
     request<{ items: HuggingFaceSearchResult[] }>(
       withQuery("/api/hugging-face/search", { query }),

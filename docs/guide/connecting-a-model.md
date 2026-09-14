@@ -170,8 +170,17 @@ week uses the model it was scheduled with rather than whatever you have selected
 by then.
 
 **Models → Runtime & routing** holds the same facts as a table, with **Default**
-and **Effective now** as separate columns, above the fallback sequence that
-produces the difference between them.
+and **Effective now** as separate columns. The fallback sequence that produces
+the difference between them is one section further down, under **Advanced
+routing** — folded, because most of the time the question is which model is
+serving rather than what happens when it cannot. What is *never* folded away is
+the substitution itself: a fallback that displaced your selection is named in
+that table, above the disclosure, because it changes which provider your words
+reach.
+
+**A model you have not chosen is never described as selected.** On a workspace
+where you have set no default, the picker says **Not selected** and means it.
+Raiker ships with profiles it can offer, and none of them is a choice you made.
 
 ---
 
@@ -380,9 +389,10 @@ catalogue is for an outage, not for an account Raiker may no longer reach.
 
 ## Fallback sequence
 
-Below the provider grid, **Model fallback sequence** orders the backends Raiker
-tries when the selected one is unavailable. Listing a hosted provider there
-grants nothing on its own — each candidate is still gated by the same policy.
+Under **Advanced routing** on **Runtime & routing**, **Model fallback sequence**
+orders the backends Raiker tries when the selected one is unavailable. Listing a
+hosted provider there grants nothing on its own — each candidate is still gated
+by the same policy.
 Point it at your local runtimes so a turn never dead-ends when a hosted API is
 down.
 
@@ -395,10 +405,10 @@ than silently choosing a backend you did not pick.
 
 ## Advisor model
 
-When you run a local model, it can consult one advisor — typically a hosted
-model — through the governed `consult_advisor` tool. It is the way to keep a
-small local model as your default and still reach for a larger one on the
-questions that need it.
+Under the same **Advanced routing** disclosure: when you run a local model, it
+can consult one advisor — typically a hosted model — through the governed
+`consult_advisor` tool. It is the way to keep a small local model as your
+default and still reach for a larger one on the questions that need it.
 
 **Picking an advisor grants nothing on its own.** Every consult is gated at call
 time by all of:

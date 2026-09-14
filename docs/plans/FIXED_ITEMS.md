@@ -545,6 +545,17 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-521](#fixed-521--build-named-what-a-turn-would-touch-and-not-where-it-would-run) | Medium | Build | Fixed 2026-09-14 (closes REM-BUILD-02) |
 | [FIXED-522](#fixed-522--messaging-called-one-object-a-channel-and-a-connector-and-led-with-neither) | Low | Messaging | Fixed 2026-09-14 (closes REM-MSG-01, REM-MSG-02) |
 | [FIXED-523](#fixed-523--a-quarter-of-the-permissions-page-was-controls-that-control-nothing) | Medium | Permissions | Fixed 2026-09-14 |
+| [FIXED-524](#fixed-524--three-authority-gates-decided-their-own-capability-by-default-rather-than-by-classification) | Low | Governance / Permissions | Fixed 2026-09-14 (closes BUG-297) |
+| [FIXED-525](#fixed-525--a-composer-with-no-default-chosen-opened-naming-a-model-nobody-had-chosen) | Low | Chat / model decision | Fixed 2026-09-14 (closes BUG-286) |
+| [FIXED-526](#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running) | Low | Models / provider errors | Fixed 2026-09-14 (closes BUG-289) |
+| [FIXED-527](#fixed-527--an-outage-raiker-had-already-reported-also-reported-itself-to-the-console) | Low | Models / Hugging Face | Fixed 2026-09-14 (closes BUG-296) |
+| [FIXED-528](#fixed-528--a-gear-opened-a-window-that-could-not-take-you-to-settings) | Medium | Navigation | Fixed 2026-09-14 (closes REM-POPUP-01, UX-SETPOP-01) |
+| [FIXED-529](#fixed-529--delete-was-the-same-size-and-one-click-away-as-new-chat) | Medium | Projects | Fixed 2026-09-14 (closes REM-PROJ-01, UX-PROJ-02) |
+| [FIXED-530](#fixed-530--the-routing-tab-opened-on-five-force-simulation-constants) | Low | Models / Knowledge Map | Fixed 2026-09-14 (closes REM-MODEL-02, REM-MAP-01, UX-MODEL-05) |
+| [FIXED-531](#fixed-531--one-nightly-routine-read-as-two-pieces-of-work) | Low | Home | Fixed 2026-09-14 (closes REM-HOME-01) |
+| [FIXED-532](#fixed-532--a-button-labelled-create-a-user-account-opened-a-different-raiker) | Medium | Launch / unlock | Fixed 2026-09-14 (closes REM-LAUNCH-02) |
+| [FIXED-533](#fixed-533--one-run-three-stop-buttons-and-two-of-them-threw-the-reason-away) | Low | Tasks | Fixed 2026-09-14 (closes REM-TASK-02) |
+| [FIXED-534](#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | Fixed 2026-09-14 (closes BUG-291, BUG-292, BUG-295) |
 
 ---
 
@@ -23086,3 +23097,457 @@ still carries it in its per-turn tightening set, which is a different mechanism.
 gate table: every one of the fourteen gates still exists, still holds whatever
 state it held, and is still served by `/api/capability-gates`. This is what the
 page renders, not what the runtime keeps.
+
+---
+
+## FIXED-524 — Three authority gates decided their own capability by default rather than by classification
+
+**Severity: Low. Area: Governance / Permissions. Status: Fixed 2026-09-14.
+Closes [BUG-297](TO_BE_FIXED.md).**
+
+**Observed.** `admin_mutation`, `policy_mutation` and `role_mutation` were absent
+from `CAPABILITY_ENTRY_PATHS`. `RuntimeControlService._build_gate_view` reads
+`own_gate` for a capability with no row — the correct fail-safe for *rendering*
+and the wrong answer for *governance* — so all three reported themselves as
+deciding their own capability, and the Permissions page gave each a full set of
+decision-mode buttons.
+
+This is the last shape of the failure
+[FIXED-523](#fixed-523--a-quarter-of-the-permissions-page-was-controls-that-control-nothing)
+closed: not a mis-traced row, but **no row at all**. GEP-04's invariant asserts
+the table against `REAL_EXECUTOR_CAPABILITIES`, and an identity mutation is
+*recorded* rather than executed, so none of the three is in that set and nothing
+required them to be traced.
+
+**What the trace found — three answers, not one.**
+
+| Capability | Reality | What constructs a governed action for it |
+|---|---|---|
+| `admin_mutation` | `own_gate` | `cli/commands.py::_govern_admin_mutation`, raised by `/user create`, `/user deactivate` and `/principal create` |
+| `role_mutation` | `own_gate` | the same helper, raised by `/role create`, `/role grant` and `/role revoke` |
+| `policy_mutation` | **`no_path`** | nothing. `CAPABILITY_GATE_MAP` names the gate so a future proposal would be routed; policy changes are made by editing the policy configuration, which the runtime reads rather than governs |
+
+Two of the three deserved the answer they were taking by default. The third did
+not, and on the page it looked identical to the two that did.
+
+**Fixed.** All three are classified, and `policy_mutation` moves off the decision
+surface into the read-only **Not decided here** list with the sentence that is
+the actual answer. Seven more were classified with them — the sensitive domains
+(`finance`, `investment`, `medical`, `pregnancy_baby`, `cctv`, `home_security`,
+`hardware_operator`), each of which has a `not_implemented` executor class that
+is deliberately never registered. They render no control either way, because
+`has_executor` is false and the page already shows them as futures; they are
+classified because they are *routed*, and the point of this change is that a
+routed gate is traced rather than assumed.
+
+**The invariant moved with it.** `test_every_real_executor_capability_is_classified`
+now asserts the table against `REAL_EXECUTOR_CAPABILITIES | CAPABILITY_GATE_MAP.values()`,
+and a new invariant — **I3c** in
+[`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md) §5 — asserts that nothing
+the router can route a decision onto is missing a row. The fallback in
+`gate_is_effective` stays, because a page that will not render is worse than a
+row that fails closed; what changed is that it is now unreachable for anything
+the Permissions page can offer a control for.
+
+A third test names the three deliberately. The general rule would still pass if
+someone classified all three `own_gate` to make it green, and the whole finding
+is that one of them is not.
+
+**Verification.** `tests/test_governance_entry_paths.py` (15 cases, including the
+two new invariants), `tests/test_control_service.py`, `tests/test_runtime_authority.py`.
+
+---
+
+## FIXED-525 — A composer with no default chosen opened naming a model nobody had chosen
+
+**Severity: Low. Area: Chat / model decision. Status: Fixed 2026-09-14.
+Closes [BUG-286](TO_BE_FIXED.md).**
+
+**Observed.** On a workspace with Anthropic connected and no default chosen, the
+Chat picker's trigger read **Not selected** — correct — while the menu directly
+above it opened with a decision note naming `Gemma 4:31B Cloud` as **Selected ·
+unavailable**. Nothing had selected that model: it is the shipped Ollama
+profile's declared model, on a host with no Ollama.
+
+The two statements were in the same menu and disagreed with each other, which is
+worse than either being wrong alone — an owner cannot tell a product that has
+*forgotten* their choice from one that never had it.
+
+**Root cause.** `ModelDecisionService.selected_for` resolved a selection from the
+profile registry when the owner had stored none, and reported that pair in the
+field named `selected`. It did distinguish the case — the `source` read
+`native_default` rather than `global_default` — but that made every consumer
+responsible for knowing that one of three sources means *this is not actually a
+choice*, and the composer's menu did not.
+
+**Fixed.** A selection nobody made is not a selection. `selected` is now empty
+when the owner has stored nothing; `decide()` turns that into the existing
+`no_model_selected` problem, and the picker's `selectedIsUnavailable` predicate —
+which already required a non-empty `profile_id` — stops firing. The Models
+overview and Work defaults tables already had a `No model yet` / `Not set` branch
+for exactly this state, so both now take it, and the third branch that said
+"Raiker's default" is deleted as unreachable rather than left as dead copy.
+
+What a turn sent *without* a model would run is a different question, asked of
+the gateway's own router (`agent_gateway.py`) and unchanged by this.
+
+**Verification.** Two cases in `tests/test_model_decision.py`: an owner who has
+chosen nothing has nothing selected and carries the `no_model_selected` problem;
+and — the mirror-image defect this must not introduce — a stored global choice is
+still reported, with `global_default` on it. Live on a running host: the trigger
+reads `Not selected` and the menu above it carries no `Selected · unavailable`
+note, at `docs/screenshots/2026-09-14-simplification/composer-nothing-selected.png`.
+
+---
+
+## FIXED-526 — An owner was told to check that OpenRouter was running
+
+**Severity: Low. Area: Models / provider errors. Status: Fixed 2026-09-14.
+Closes [BUG-289](TO_BE_FIXED.md).**
+
+**Observed.** Pressing **Test connection** on an OpenRouter card, on a host whose
+egress policy refuses `CONNECT openrouter.ai`, reported:
+
+> OpenRouter could not be reached. Check that it is running and reachable from
+> this device.
+
+Honest about *what* happened and wrong about *what to do*. Reaching this branch
+was correct — a proxy's `connect_rejected` is genuinely unclassified, and
+[FIXED-388](#fixed-388--a-valid-key-was-answered-with-check-your-network) is why
+anything classifiable no longer lands in it. The advice it carried was written
+for a *local* runtime: "check that it is running" is a thing an owner can do
+about llama.cpp on their own machine and not a thing they can do about somebody
+else's service.
+
+**Root cause.** One fallback sentence for two kinds of destination.
+
+**Fixed.** `unreachableProviderNote(providerName, offMachine)` in
+`providerErrors.ts`, shared by Models and the provider matrix. A local runtime
+keeps today's wording. A hosted one names the remedies that are actually
+available — *"Check this device's network access, and any proxy or firewall
+between it and the provider."* Neither guesses at a cause; the point of the
+branch is that there is not one. The provider matrix's own copy of the sentence
+now comes from the same helper, so the two surfaces cannot drift.
+
+**Verification.** Three cases in `web/src/lib/providerErrors.test.ts`, including
+that the local remedy survives — replacing both sentences with the network one
+would swap the defect for its mirror image — and that both still name the
+provider (BUG-47's rule). Live on a host whose proxy answers `CONNECT
+openrouter.ai` with 403, at
+`docs/screenshots/2026-09-14-simplification/openrouter-unreachable.png`.
+
+---
+
+## FIXED-527 — An outage Raiker had already reported also reported itself to the console
+
+**Severity: Low. Area: Models / Hugging Face. Status: Fixed 2026-09-14.
+Closes [BUG-296](TO_BE_FIXED.md).**
+
+**Observed.** Opening Models on a host with no route to `huggingface.co` put
+`GET /api/hugging-face/trending — 503` in the browser console, every visit. The
+page itself handled it correctly and said *"Hugging Face could not be reached.
+Search and download need a route to huggingface.co. Everything already in your
+local library still works."* — the right sentence in the right place.
+
+The console entry was the whole defect, and only because of what depends on it:
+the live manual test plan requires a round to end with **zero uncaught console
+errors**, and several live specs assert exactly that. An expected, handled,
+correctly-reported outage was spending the budget that exists to catch real ones,
+and a round that learns to ignore one console error has learned to ignore the
+next.
+
+**Fixed.** `trending` is the one Hugging Face route **nobody asks for** — it runs
+on every visit so the panel has somewhere to start — so it answers 200 with no
+items and the reason it has none. The request to *Raiker* did succeed; "the Hub
+is not reachable from this host" is the true answer to it. The panel reads that
+answer instead of inferring an outage from a throw, and keeps its catch branch
+for a request that never got an answer at all.
+
+**Every other Hugging Face route keeps its 503**, and that is the point rather
+than an omission: search, variants and download are things an owner asked for,
+and there a failed request is a failed request. Turning them all into 200s is how
+the next real outage would become invisible.
+
+**Verification.** Two cases in `tests/test_api_huggingface_models.py` — the probe
+answers 200 with `unreachable.reason_code`, and an owner-driven search still
+fails loudly with 503. Live: the whole 2026-09-14 round ended with zero uncaught
+console errors on a host with no route to the Hub, asserted by the round's own
+final spec.
+
+---
+
+## FIXED-528 — A gear opened a window that could not take you to Settings
+
+**Severity: Medium. Area: Navigation. Status: Fixed 2026-09-14.
+Closes REM-POPUP-01 and UX-SETPOP-01 of the release-readiness review.**
+
+**Observed.** The top bar's last control before the host cluster was a **gear**,
+labelled *Settings and pages*, opening a dialog headed *Settings & pages*.
+
+A gear is a universal promise: press it and you are on the settings screen. What
+it actually opened was a route launcher — Permissions, Models, Extensions,
+Observability, Approvals, Messaging and Guide — with the ten Settings sections as
+one group among several. So the control said "Settings" and delivered navigation.
+
+And the one destination its icon named was the one row deliberately missing.
+Settings itself was omitted, for a good reason written into the source: every one
+of its sections is a row in the group below, so a bare link would open General
+while sitting above a row that says General. The consequence was that **pressing
+a gear could not open Settings**.
+
+**Fixed.** It is an overflow control, so it is named after what it is. The trigger
+is **More** with the `more` icon; the dialog is headed **More**; and a direct
+**Settings** link leads the window, above the search box, with the ten sections
+still listed below as deep links. The direct link hides while a query is running,
+for the same reason the groups fold away: a search is a request to see matches,
+and a fixed row that is not one of them is noise.
+
+Nothing about the routes, the groups, the deep links, the keyboard handling or
+the mobile sheet changed.
+
+**Verification.** `App.test.ts` asserts the direct link resolves to `#/settings`
+and that `Security & sign-in` still deep-links to `#/settings?tab=security`;
+`a11y.test.ts` follows the renamed trigger. Live at
+`docs/screenshots/2026-09-14-simplification/more-window.png`.
+
+---
+
+## FIXED-529 — Delete was the same size and one click away as New chat
+
+**Severity: Medium. Area: Projects. Status: Fixed 2026-09-14.
+Closes REM-PROJ-01 and UX-PROJ-02 of the release-readiness review.**
+
+**Observed.** A project card carried five actions in one row at equal weight:
+**Start in Build**, **New chat**, **Archive**, **Move**, **Delete**. Each looked
+like the thing to press next, so the two an owner wants many times a day sat
+beside three they want a handful of times ever — one of which erases a project
+and, for a managed one, its folder.
+
+**Fixed.** New chat is primary, Start in Build is secondary, and Archive, Move
+and Delete move into the card's overflow menu through the existing shared
+`RowOverflow` component — the same idiom MODEL-15 established for provider cards,
+rather than a second overflow idiom on a second page.
+
+Nothing is removed. Every action keeps its handler, its disabled state and its
+confirmation, including the typed confirmation and the exact managed-versus-attached
+deletion impact.
+
+**Verification.** `ProjectsView.test.ts`: the two work actions are on the card and
+none of the three lifecycle actions is; all three are in the menu. The two
+deletion-wording cases go through the menu now, which is both of the steps the
+change introduced — a test that could still reach Delete in one click would no
+longer be testing what the row promises. Live at
+`docs/screenshots/2026-09-14-simplification/project-card.png` and
+`…/project-lifecycle-menu.png`.
+
+---
+
+## FIXED-530 — The routing tab opened on five force-simulation constants
+
+**Severity: Low. Area: Models / Knowledge Map. Status: Fixed 2026-09-14.
+Closes REM-MODEL-02, REM-MAP-01 and UX-MODEL-05 of the release-readiness review.**
+
+**Observed, twice, in the same shape.**
+
+**Models → Runtime & routing** opened on four things at once: what is serving,
+what is on disk, what each surface starts on, and then two orchestration
+controls — the fallback sequence and the advisor model — at the same weight as
+all of it. Most owners need the selected model, where it runs and what it costs
+long before they need a fallback order.
+
+**The Knowledge Map's Graph settings** opened all five of its disclosures, so one
+press produced a column of five checkbox groups and eleven sliders, of which
+*Centre force*, *Repel force*, *Link force*, *Link distance* and *Collision
+radius* are simulation constants — visualisation tuning with nothing to do with
+what an owner keeps in their knowledge map.
+
+**Fixed.** Both default to the thing the surface is for.
+
+* Fallback order and the advisor live in one closed **Advanced routing**
+  disclosure, in the same `<details class="advanced">` shape Memory's *Advanced
+  memory management* already uses.
+* Graph settings opens on **Filters** — which records are on screen — with
+  Groups closed and Display, Forces and Motion closed under an **Advanced
+  display** divider.
+
+**What is deliberately *not* folded away**: `Work defaults`, which names a
+fallback that displaced the owner's selection, stays above the disclosure. A
+substitution that changes provider changes where the owner's words go, and that
+disclosure is not tuning.
+
+**And a raw identifier stops being a primary label.** The provider usage rows
+printed `anthropic-hosted` in mono directly under the provider's name, making an
+internal identifier the second thing an owner reads on a page about money. It is
+still exactly there for anyone correlating a row with a log or an export — as the
+row's title attribute, and in the connection detail — and no longer first.
+
+**Verification.** `ModelsView.test.ts` asserts the disclosure exists, is closed,
+contains both controls, and that `Work defaults` is *not* inside it;
+`BrainView.test.ts` asserts exactly one open disclosure and that it is Filters,
+with every control still present. Live at
+`docs/screenshots/2026-09-14-simplification/runtime-routing-folded.png`,
+`…/runtime-routing-open.png` and `…/knowledge-map-settings.png`.
+
+---
+
+## FIXED-531 — One nightly routine read as two pieces of work
+
+**Severity: Low. Area: Home. Status: Fixed 2026-09-14.
+Closes REM-HOME-01 of the release-readiness review.**
+
+**Observed.** Workbench placed a repeating task in **both** *Running now* and
+*Standing agents* whenever a cycle was in flight. The reasoning was written into
+the source and is sound as far as it goes — "a cycle is running" and "an agent is
+standing" are two different facts, and the board answers both.
+
+What the board actually rendered was the same row twice, under two headings, with
+two Stop buttons acting on the same run, and nothing on either row to say so. An
+owner scanning Home counted one nightly routine as two pieces of work.
+
+**Fixed.** The cycle wins the row while it is in flight, and **carries the
+schedule with it**: the running row now states the cadence and the next slot, so
+nothing the standing row held is lost. *Standing agents* lists the repeating work
+that is waiting for its next cycle — which is what the heading has always meant
+to somebody reading it. The board's own summary line stops double-counting as a
+consequence rather than as a second change.
+
+**Verification.** Two cases in `WorkbenchView.test.ts`: a running recurring task
+appears once, with one Stop, its cadence and its next cycle, and the *Standing
+agents* section is not rendered at all; and — the half a dedupe could easily
+swallow — an armed agent between cycles still stands.
+
+---
+
+## FIXED-532 — A button labelled "Create a User Account" opened a different Raiker
+
+**Severity: Medium. Area: Launch / unlock. Status: Fixed 2026-09-14.
+Closes REM-LAUNCH-02 of the release-readiness review.**
+
+**Observed.** Beneath the unlock form, at the same weight as *Forgot password?*,
+sat a button reading **Create a User Account**. The register control above it —
+which makes an account on *this* instance — is labelled identically. This one
+creates a **separate instance**: its own workspace, its own database, opened in a
+new tab. The dialog it opened was headed *Create a User Account* too, and said
+only that the account "will have its own Raiker workspace and open in a new tab".
+
+So the only way to learn that pressing it leaves the instance you were unlocking
+was to press it.
+
+**Fixed.** Named for what it does — **Use or create another instance** — with the
+isolation stated where the decision is made rather than after it: *"A separate
+instance has its own workspace, models and memory. Nothing is shared with this
+one, and it opens in its own tab."* The dialog is headed **Another instance** and
+repeats the same sentence. Unlock stays the primary action, which it already was
+and which this protects.
+
+First-owner bootstrap, MFA and recovery are untouched; the control still hides on
+first run, where there is no account for it to act beside.
+
+**Verification.** `LoginView.test.ts` asserts Unlock is still `btn-primary`, the
+isolation sentence is on screen before the branch is taken, and the flow
+completes through the renamed control. Live at
+`docs/screenshots/2026-09-14-simplification/unlock.png`.
+
+---
+
+## FIXED-533 — One run, three Stop buttons, and two of them threw the reason away
+
+**Severity: Low. Area: Tasks. Status: Fixed 2026-09-14.
+Closes REM-TASK-02 of the release-readiness review.**
+
+**Observed.** Home, the Tasks page and Build's side panel each carried their own
+copy of "stop this task". They agreed on the request they sent and on nothing
+else:
+
+| Surface | On success | On failure |
+|---|---|---|
+| Workbench | "Asked X to stop at its next safe boundary." | named the reason code |
+| Tasks | "Requested a safe-boundary stop for X." | "Could not request the stop." — reason discarded |
+| Build | "Asked X to stop at its next safe boundary." | "Could not request the stop." — reason discarded |
+
+Presentation may differ between surfaces; what a control *means* must not, and
+two of the three were throwing away the one thing an owner needs when a stop does
+not take.
+
+**And all three reported two outcomes for three different situations.** The third
+is the one that matters: a request that left and got no answer **may have been
+applied**. "Could not request the stop" is a claim nobody is in a position to
+make, and an owner who believes it presses Stop again — or assumes the work is
+still running when it is not.
+
+**Fixed.** One controller, `web/src/lib/taskLifecycle.ts`, owning stop, resume and
+run-now, and reporting a settlement rather than a boolean:
+
+* **requested** — the runtime accepted it. Not "stopped": a cycle already in
+  flight finishes its current step, by design, and the notice says *asked*.
+* **completed** — the runtime refused and said why. Nothing changed, and the
+  reason reaches the owner on all three surfaces now.
+* **outcome_unknown** — no answer came back, or the runtime accepted the request
+  and did not apply it to this task. The notice says so and says to refresh.
+
+Each surface keeps its own audit reason string, because *where* the owner pressed
+Stop is a real fact about the decision. Nothing renders in the controller.
+
+**Verification.** Seven cases in `web/src/lib/taskLifecycle.test.ts`, asserted at
+the controller rather than on any one surface — the whole point is that no
+surface owns this meaning — including that a lost response is never reported as
+"nothing changed".
+
+---
+
+## FIXED-534 — A live helper that found nothing let a later assertion take the blame
+
+**Severity: Low. Area: Live test harness. Status: Fixed 2026-09-14.
+Closes [BUG-291](TO_BE_FIXED.md), [BUG-292](TO_BE_FIXED.md) and the open
+remainder of [BUG-295](TO_BE_FIXED.md).**
+
+Three harness defects with one failure mode between them: **the suite reported a
+product defect where it had a harness defect**, which is the failure that makes a
+live suite stop being evidence.
+
+**BUG-295 — a dialog that was visible and had not answered.** The model dialog
+mounts immediately and asks the provider for its catalogue afterwards.
+`offeredModelIds` read its checkboxes the instant it appeared, saw an empty
+fieldset, and returned `[]`; the spec that had asked for `offered[0]` then looked
+for `input[value="undefined"]`, waited its full timeout for an element that could
+never exist, and failed far away as though a model had gone missing.
+
+Fixed in three places, because a silent empty answer needs all three:
+`openModelDialog` waits for the *"Loading models from …"* note to clear — the one
+thing on that dialog that means "the answer has not arrived"; `offeredModelIds`
+throws, naming the note the dialog is showing, rather than handing back an empty
+list; and `keepOffered` refuses a non-string model id rather than building a
+valid selector for nothing.
+
+**BUG-291 — a spec that only passed when the key was broken.**
+`anthropic-key-live` asserted that the model dialog reports an *identity-linked*
+refusal. That was true of one round's credential and is not a property of the
+product: the next round's key authenticated normally, and the spec spent ninety
+seconds waiting for a refusal that was not coming.
+
+Raiker's half is worth keeping and has moved to where it can be produced on
+demand — a stubbed `provider_workspace_required` response in `ModelsView.test.ts`,
+asserting the refusal is named in words and never reported as the provider being
+unreachable. The live spec now asserts what only a live key can prove: the key
+goes in through the UI, the connection saves, and the provider publishes a
+catalogue. Against an identity-linked key it **says which it is looking at** and
+skips, rather than failing as though the product were broken.
+
+**BUG-292 — a spec that never chose a model.** `bug-206-207-tool-rows-and-reasoning-live`
+pinned Haiku on the provider card and pressed Send. Pinning makes a model
+*available*; choosing it in the composer's picker makes it the model for the
+turn, and they are two different decisions by design. On a workspace where no
+global model had ever been chosen, Send was correctly disabled and said why, and
+the spec waited out its timeout on that disabled button, taking four scenarios
+with it.
+
+`chooseModelForTurn` now lives beside `useHostedModel` — one copy, so the next
+change to the picker is one edit rather than a sweep — and it asserts the
+trigger stopped reading *Not selected*, so a missed click fails there rather than
+as a disabled Send three lines later.
+
+**Verification.** The 2026-09-14 live round drives all three through a real host
+and a real Anthropic key: the catalogue is read after it has arrived, a model is
+kept offered, chosen for the turn, and answers. Captures at
+`docs/screenshots/2026-09-14-simplification/anthropic-catalogue.png` and
+`…/anthropic-turn.png`.

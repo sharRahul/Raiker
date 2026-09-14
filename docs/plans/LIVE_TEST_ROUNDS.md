@@ -105,6 +105,12 @@ closed with it.
 7. **Privacy is an inventory**, and its outbound rows print the availability
    sentence in the Permissions vocabulary — read from the same gate list, so the
    two pages cannot disagree about whether something can leave.
+8. **The page decides 37 permissions, not 51.** The fourteen gates whose own
+   switch changes nothing are read-only under **Not decided here**, with no mode
+   control and no selection box anywhere in that section, each naming what really
+   governs it or why nothing runs. `GIT` holds Git writes, Git push and the
+   GitHub connector; no group is named `Other tools`
+   (`permissions-git-grouped.png`, `permissions-not-decided-here.png`).
 
 **What the round found.**
 
@@ -130,6 +136,12 @@ closed with it.
   /api/hugging-face/trending — 503` on a host with no route to huggingface.co.
   The page says the right thing in the right place; the console entry spends the
   zero-console-errors budget that exists to catch real faults. **BUG-296**.
+* **Ten more specs waited on the dead placeholder**, found by grepping for the
+  string rather than by a failing run — which is the point: a wait that finds
+  nothing expires rather than failing. All ten now wait on the field's label.
+* **Three authority gates were never classified** by the entry-path audit, so
+  they report `own_gate` by default rather than by finding. Left on the page
+  deliberately and recorded as **BUG-297**.
 
 ## 2026-09-07 — The clock, the read catalogue, and two silent harness defects
 

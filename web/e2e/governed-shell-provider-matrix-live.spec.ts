@@ -76,7 +76,7 @@ async function signIn(): Promise<void> {
 
 async function setCapability(label: string, reason: string): Promise<void> {
   await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByPlaceholder("Search capabilities…");
+  const search = page.getByLabel("Search capabilities");
   await expect(search).toBeVisible({ timeout: 30_000 });
   await search.fill(label);
   const card = page.locator(".cap.card").filter({ hasText: label }).first();

@@ -20,6 +20,9 @@
     isDecisionMode,
     isDeferred,
     isInherent,
+    governsItsOwnCapability,
+    realityLabel,
+    realityNote,
     authorityMatrixGates,
     requiresStepUpToken,
     type DecisionMode,
@@ -120,6 +123,33 @@
   const effective = $derived(effectiveGates(gates ?? [], confirmedModes));
   const controlModes = $derived(confirmedModeValues(confirmedModes));
 
+  const withControls = $derived(
+    effective.filter((gate) => !isDeferred(gate) && !isInherent(gate)),
+  );
+  /**
+   * The permissions this page actually decides.
+   *
+   * GEP-04 established that fourteen of these gates decide nothing when
+   * flipped — nothing in the product reaches the executor, or the work runs
+   * under a different named control — and answered it with a chip on the row.
+   * A chip is honest and insufficient: they still carried a mode control, still
+   * joined a bulk selection, and still counted toward the page's own summary of
+   * what an owner had decided. Everything on this page below this line is a
+   * decision; what is not is listed, read-only, at the foot.
+   */
+  const governedGates = $derived(withControls.filter(governsItsOwnCapability));
+  const notDecidedHere = $derived(
+    withControls
+      .filter((gate) => !governsItsOwnCapability(gate))
+      .map((gate) => ({
+        capability: gate.capability,
+        label: capabilityLabel(gate.capability),
+        reality: realityLabel(gate),
+        note: realityNote(gate),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+  );
+
   /**
    * The two sections that come before the registry.
    *
@@ -130,8 +160,8 @@
    * a state the list below contradicts. A search is a request to see matches, so
    * both fold away while one is running.
    */
-  const attention = $derived(permissionAttention(effective));
-  const common = $derived(commonGates(effective));
+  const attention = $derived(permissionAttention(governedGates));
+  const common = $derived(commonGates(governedGates));
 
   /** Record a mode the server has confirmed, for every presentation at once. */
   function recordConfirmed(capability: string, mode: DecisionMode) {
@@ -249,7 +279,7 @@
       const fresh = await api.capabilityGates();
       if (read !== loadSeq) return;
       gates = fresh;
-      const editable = new Set(fresh.filter(g => g.can_current_principal_change && !isDeferred(g) && !isInherent(g)).map(g => g.capability));
+      const editable = new Set(fresh.filter(g => g.can_current_principal_change && !isDeferred(g) && !isInherent(g) && governsItsOwnCapability(g)).map(g => g.capability));
       selectedCaps = new Set([...selectedCaps].filter(cap => editable.has(cap)));
       confirmedModes = survivingModes(confirmedModes, confirmedBefore);
     } catch (e) {
@@ -271,12 +301,8 @@
   // (FIX-05). We detect it as gates whose default is runtime-enabled but whose
   // effective state is not.
   const integratedButOff = $derived(
-    effective.filter(
-      (g) =>
-        g.default_state === "enabled_runtime" &&
-        g.state !== "enabled_runtime" &&
-        !isDeferred(g) &&
-        !isInherent(g),
+    governedGates.filter(
+      (g) => g.default_state === "enabled_runtime" && g.state !== "enabled_runtime",
     ).length,
   );
 
@@ -307,9 +333,6 @@
   // are capabilities nobody has an opinion about, so on a fresh account the
   // summary said nothing at all. Ranked by authority instead — see
   // `authorityMatrixGates`.
-  const governedGates = $derived(
-    effective.filter((gate) => !isDeferred(gate) && !isInherent(gate)),
-  );
   const authorityGates = $derived(authorityMatrixGates(governedGates));
   const domains = $derived(groupByDomain(governedGates).map(group => group.domain));
   const posture = $derived(permissionPosture(governedGates));
@@ -360,8 +383,8 @@
    * only helped the half of the page that uses a mouse.
    */
   async function revealCapability(capability: string) {
-    const gate = effective.find((entry) => entry.capability === capability);
-    if (gate === undefined || isDeferred(gate) || isInherent(gate)) {
+    const gate = governedGates.find((entry) => entry.capability === capability);
+    if (gate === undefined) {
       // Never a dead action: a capability with no registry row says so instead
       // of scrolling to nothing.
       notice = {
@@ -742,6 +765,43 @@
     {/each}
   </section>
 
+  {#if notDecidedHere.length > 0}
+    <!--
+      GEP-04, second answer. These gates exist, and flipping them decides
+      nothing: either nothing in the product reaches the executor, or the work
+      runs under a different named control. They used to sit in the registry
+      with a grey chip and a full set of mode buttons, so a quarter of a page of
+      decisions was not decisions — and an owner could set one, select it for a
+      bulk change, and come away believing they had closed something.
+
+      They are not hidden. Hiding a capability an owner can ask about is its own
+      dishonesty, and the note is the answer they actually need: what really
+      governs this, or why nothing runs.
+    -->
+    <details class="panel not-decided">
+      <summary>
+        Not decided here
+        <span class="not-decided-count">{notDecidedHere.length}</span>
+      </summary>
+      <p class="not-decided-lead">
+        Raiker reports a gate for each of these, and this page does not decide them: the work runs
+        under a different control, or nothing in Raiker reaches it yet. They are listed so the
+        answer is here rather than missing.
+      </p>
+      <ul class="not-decided-list">
+        {#each notDecidedHere as item (item.capability)}
+          <li>
+            <span class="not-decided-head">
+              <span class="cap-label">{item.label}</span>
+              <span class="cap-reality">{item.reality}</span>
+            </span>
+            <p>{item.note}</p>
+          </li>
+        {/each}
+      </ul>
+    </details>
+  {/if}
+
   {#if authorityGates.length > 0}
     <!-- REM-PERM-01 — evidence, not the owner's first task. The read-only
          table used to sit above every control on the page; it is reference for
@@ -1004,11 +1064,63 @@
   .phase-select-all input {
     accent-color: var(--accent);
   }
+  /* The read-only list of gates this page does not decide. Drawn as reference —
+     no control, no selection — because that is exactly what it is. */
+  .not-decided summary,
   .authority-disclosure summary {
     cursor: pointer;
     color: var(--text-2);
     font-size: var(--text-md);
     font-weight: 650;
+  }
+  .not-decided-count {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--text-3);
+    margin-left: var(--space-2);
+  }
+  .not-decided-lead {
+    margin: var(--space-3) 0 0;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    max-width: var(--prose-measure);
+  }
+  .not-decided-list {
+    list-style: none;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-3);
+  }
+  .not-decided-list li {
+    display: grid;
+    gap: var(--space-1);
+    padding-inline-start: var(--space-3);
+    border-inline-start: 2px solid var(--border);
+  }
+  .not-decided-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+  .not-decided-list p {
+    margin: 0;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    max-width: var(--prose-measure);
+  }
+  .cap-reality {
+    font-size: var(--text-2xs);
+    font-weight: 700;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 0.05rem 0.35rem;
+    white-space: nowrap;
   }
   @media (max-width: 700px) {
     .perm-head,

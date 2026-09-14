@@ -167,21 +167,45 @@ its own short-lived signed machine identity, so Activity and Approvals can name
 the machine actor separately from you, the owner.
 
 Raiker's registry contains 66 capability gates. **Permissions** displays the
-owner-operable subset, grouped as follows; deliberately unavailable domains are
-kept out of the interactive list altogether, and named in
+subset this page actually decides, grouped as follows; deliberately unavailable
+domains are kept out of the interactive list altogether, and named in
 [Capabilities with no enable path](#capabilities-with-no-enable-path) below.
 
 | Group | Examples |
 |---|---|
-| Workspace | Audit export, Code map, Language intelligence, File writes, Git writes, Memory store/forget, Patch apply, Task creation, Project assignment, Semantic memory, Vector embeddings, Graph indexing |
-| Local execution | Shell commands, Processes, Container execution, Subagents, Multi-agent teams |
-| Network | Web fetch, Git push, Telemetry export, External channels, Channel approval relay |
+| Workspace | Audit export, Code map, Language intelligence, File writes, Memory store/forget, Patch apply, Task creation, Project assignment, Vector embeddings, Graph indexing, Checkpoint restore |
+| Git | Git writes, Git push, GitHub connector |
+| Execution | Shell commands, Subagents, Remote execution, Cloud execution |
+| Network | Web fetch, Telemetry export, External channels, Image generation |
 | Models | Hosted models, Home-lab models, Advisor model, Provider embeddings |
-| Connectors | GitHub, Gmail, Google Calendar, Slack, Calendar (local), Email drafts, Reminders, plugin lifecycle |
+| Connectors | Gmail, Google Calendar, Slack, Plugin install |
 | MCP | MCP builder, MCP connector |
-| Automation | Scheduled routines, Approval execution relay, Admin/policy/role mutation |
+| Automation | Approval execution relay, Admin/policy/role mutation |
 
 Expand a row for its description and current decision mode, then **Turn on**.
+
+**Git is one group** because a branch, a commit, a push and the account the push
+authenticates to are one decision about your repository. A push is still the one
+of them that leaves this machine — its own row says so, and
+**Settings → Privacy** lists it alongside everything else that can.
+
+### Not decided here
+
+Fourteen gates in the registry are not decisions this page makes, and they are
+listed read-only at the foot of it rather than as rows with controls. Each is one
+of two things, and each says which:
+
+* **Governed elsewhere** — the work happens, and a different named control
+  decides it. A scheduled task, for example, runs as one whole governed turn, so
+  every action inside it answers to that action's own gate; pausing the host is
+  what stops new scheduled work. The note names the real control.
+* **No route yet** — nothing in Raiker constructs an action for it. The executor
+  exists and nothing invokes it.
+
+They used to be rows like any other, carrying a mode control, a selection box and
+a small grey chip. The chip was true and it was not enough: a control that
+changes nothing still invites you to set it, and still leaves you believing
+afterwards that you closed something.
 
 ### Off, and on by default
 

@@ -88,7 +88,7 @@ async function ask(prompt: string) {
  * a snapshot of several capabilities navigates once and filters in place.
  */
 async function openCapability(label: string, fresh = true) {
-  const search = page.getByPlaceholder("Search capabilities…");
+  const search = page.getByLabel("Search capabilities");
   if (fresh || !(await search.isVisible().catch(() => false))) {
     await page.goto(`${BASE}/#/capabilities`);
     await expect(search).toBeVisible({ timeout: 30_000 });
@@ -146,8 +146,13 @@ async function disableCapability(label: string, reason: string) {
 async function standingWriteModes(): Promise<Record<string, string>> {
   const modes: Record<string, string> = {};
   await page.goto(`${BASE}/#/capabilities`);
-  await expect(page.getByPlaceholder("Search capabilities…")).toBeVisible({ timeout: 30_000 });
-  for (const capability of ["File writes", "Patch apply", "Shell commands", "Processes"]) {
+  await expect(page.getByLabel("Search capabilities")).toBeVisible({ timeout: 30_000 });
+  // `Processes` is not read here. GEP-04 classified `process_execution` as
+  // **no route**: no tool names it and no approval relays it, so Permissions
+  // lists it read-only rather than as a decision with a standing mode. Build
+  // still carries it in its per-turn tightening set, which is a different
+  // mechanism and is what the rest of this spec measures.
+  for (const capability of ["File writes", "Patch apply", "Shell commands"]) {
     const card = await openCapability(capability, false);
     for (const mode of ["Ask", "Allow", "Auto", "Deny"]) {
       const button = card.getByRole("button", { name: mode, exact: true });

@@ -23,8 +23,6 @@
     capabilityLabel,
     isAvailable,
     isOnByDefault,
-    realityLabel,
-    realityNote,
     unsetResolutionNote,
     type DecisionMode,
   } from "../capabilityModel";
@@ -73,8 +71,14 @@
    * REM-PERM-03 — the card used to stack up to three separate paragraphs of
    * prose about the same capability. They are answers to one question, so they
    * are one answer: what this switch really decides, said once.
+   *
+   * The `Governed elsewhere` / `No route yet` half of that explanation is not
+   * read here any more, and not because it stopped mattering: a gate that does
+   * not decide its own capability is no longer rendered as a row at all. It is
+   * in the page's read-only **Not decided here** list, where the note is the
+   * whole content rather than a caveat under a control that should not exist.
    */
-  const why = $derived([realityNote(gate), unsetResolutionNote(gate)].filter(Boolean).join(" "));
+  const why = $derived(unsetResolutionNote(gate));
 </script>
 
 <div class="cap card" class:open>
@@ -104,9 +108,6 @@
              leaving the summary to contradict a chip beside it. -->
         {#if isOnByDefault(gate)}
           <span class="cap-reality cap-default-on">On by default</span>
-        {/if}
-        {#if realityLabel(gate)}
-          <span class="cap-reality">{realityLabel(gate)}</span>
         {/if}
       </span>
       <!-- Availability and behaviour, on the closed row: a permission list that
@@ -239,20 +240,18 @@
   .cap-label {
     font-weight: 600;
   }
-  .cap-reality {
+  /* BUG-239 — being on because nothing is stored is a different fact from being
+     switched on, so it is said rather than left to contradict the summary. */
+  .cap-default-on {
     font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: var(--tracking-wide);
     text-transform: uppercase;
-    color: var(--text-3);
-    border: 1px solid var(--border);
     border-radius: var(--r-sm);
     padding: 0.05rem 0.35rem;
     white-space: nowrap;
-  }
-  .cap-default-on {
     color: var(--accent);
-    border-color: var(--accent-border);
+    border: 1px solid var(--accent-border);
   }
   /* The row's answer, at metadata weight and in its own column, so the eye can
      run down it instead of hunting for it after a name of varying length. */

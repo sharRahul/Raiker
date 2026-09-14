@@ -81,6 +81,32 @@ test("Permissions leads with posture and actions, and keeps the table as evidenc
   await expect(shell.getByText(/Raiker (may|cannot) use this on this account/)).toBeVisible();
   await capture(page, `${SHOTS}/permissions-row-detail.png`, shell);
 
+  // Git is one group, not three. A branch, a commit, a push and the account the
+  // push authenticates to were filed under Workspace, Network and Connectors.
+  const git = registry.locator(".cap-list").filter({ hasText: "GIT" }).first();
+  for (const label of ["Git writes", "Git push", "GitHub connector"]) {
+    await expect(git.getByText(label, { exact: true })).toBeVisible();
+  }
+  await capture(page, `${SHOTS}/permissions-git-grouped.png`, git);
+
+  // And nothing is left in the fallback bucket, whose name means "nobody filed
+  // this": both execution destinations have a real home.
+  await expect(registry.getByText("OTHER TOOLS")).toHaveCount(0);
+
+  // GEP-04's second answer: the gates this page does not decide are read-only
+  // reference, with no mode control and no selection box.
+  const reference = page.locator("details.not-decided");
+  await expect(reference).toBeVisible();
+  await reference.getByText("Not decided here").click();
+  await expect(reference.getByText("Container execution", { exact: true })).toBeVisible();
+  await expect(reference.getByText("Processes", { exact: true })).toBeVisible();
+  await expect(reference.getByRole("group", { name: /when Raiker wants to use/i })).toHaveCount(0);
+  await expect(reference.getByRole("checkbox")).toHaveCount(0);
+  // Every one of them names what really governs it, or why nothing runs.
+  await expect(reference.getByText(/Governed elsewhere/).first()).toBeVisible();
+  await expect(reference.getByText(/No route yet/).first()).toBeVisible();
+  await capture(page, `${SHOTS}/permissions-not-decided-here.png`, reference);
+
   // The filter chips really filter, and the count line follows them.
   await status.getByRole("button", { name: /Available/ }).click();
   await expect(registry.getByText(/^Showing \d+ of \d+ permissions$/)).toBeVisible();

@@ -45,7 +45,7 @@ test.beforeEach(async ({ page }) => {
 test("memory authority and all four saved provider paths survive a host restart", async ({ page }) => {
   test.setTimeout(300_000);
   await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByPlaceholder("Search capabilities…");
+  const search = page.getByLabel("Search capabilities");
   await expect(search).toBeVisible({ timeout: 30_000 });
   await search.fill("Memory store");
   const memory = page.locator(".cap.card", { hasText: "Memory store" }).first();

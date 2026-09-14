@@ -544,6 +544,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-520](#fixed-520--privacy-was-one-toggle-under-a-heading-that-named-the-whole-subject) | Medium | Settings / Privacy | Fixed 2026-09-14 (closes REM-SET-PRIVACY) |
 | [FIXED-521](#fixed-521--build-named-what-a-turn-would-touch-and-not-where-it-would-run) | Medium | Build | Fixed 2026-09-14 (closes REM-BUILD-02) |
 | [FIXED-522](#fixed-522--messaging-called-one-object-a-channel-and-a-connector-and-led-with-neither) | Low | Messaging | Fixed 2026-09-14 (closes REM-MSG-01, REM-MSG-02) |
+| [FIXED-523](#fixed-523--a-quarter-of-the-permissions-page-was-controls-that-control-nothing) | Medium | Permissions | Fixed 2026-09-14 |
 
 ---
 
@@ -22997,3 +22998,91 @@ messages stop being refused, or check routing and send a test before turning it
 on. The line disappears once the channel is delivering, and the buttons are
 unchanged.
 
+
+---
+
+## FIXED-523 — A quarter of the Permissions page was controls that control nothing
+
+**Severity: Medium. Area: Permissions. Status: Fixed 2026-09-14.**
+
+**Observed.** Fifty-one rows, each with a selection box and four mode buttons.
+**Fourteen of them decided nothing when pressed**, and `entry_paths.py` — which
+a test asserts against the executor registry — already said so:
+
+| What the gate is | How many | What it means |
+|---|---:|---|
+| `no_path` | 9 | Nothing in Raiker constructs an action for it. The executor exists and nothing invokes it. |
+| `governed_elsewhere` | 5 | The work happens, and a different named control decides it. The gate is never consulted. |
+
+`Processes`, `Channel approval relay`, `Calendar (local)`, `Email drafts
+(local)`, `Reminders (local)` and four plugin lifecycle gates reach nothing.
+`Container execution`, `Multi-agent teams`, `Scheduled routines`, `Plugin reads`
+and `Semantic memory runtime` are decided somewhere else.
+
+GEP-04 had already found this and answered it with a small grey chip on the row
+— `No route yet`, `Governed elsewhere`. The chip is true and it is not enough. A
+control that changes nothing still invites an owner to set it, still joins a bulk
+selection, still counts toward the page's own summary of what they have decided,
+and still leaves them believing afterwards that they closed something. One of
+these rows even carried a full step-up dialog: a live spec turned **Container
+execution** on with a typed confirmation phrase and a threat-model
+acknowledgement, and the gate it wrote is read by nothing.
+
+**Fixed.** The registry renders only gates that decide their own capability — 37
+rather than 51. The other fourteen are a read-only **Not decided here** list at
+the foot of the page, each with its badge and the sentence that is the actual
+answer: what really governs this, or why nothing runs.
+
+They are **not hidden**. Hiding a capability an owner can ask about is its own
+dishonesty, and "can Raiker send email?" deserves *"Local email drafts have no
+owner surface and no model tool. Nothing drafts, and nothing has ever sent"*
+rather than silence. What is removed is the pretence that it is a lever.
+
+Everything downstream follows from one predicate: the posture sentence counts
+decisions, the status chips count decisions, `Needs your attention` and `Common
+permissions` can no longer offer a Review button that reveals a row the registry
+does not have, a refresh cannot leave an inert capability in a bulk selection,
+and the row component no longer carries the branches that rendered the chip.
+
+**And Git is one group.** Its three capabilities were filed in three places —
+`git_write_execution` under Workspace, `git_push_execution` under Network
+because a push leaves the machine, `connector_github_runtime` under Connectors —
+so an owner deciding what Raiker may do with their repository had to find the
+answer in three parts of a fifty-one-row list and know in advance that it was in
+three parts. The reason the push sat under Network is not lost: its own
+description says a push leaves this machine and still needs the remote's host on
+the egress allowlist, and
+[FIXED-520](#fixed-520--privacy-was-one-toggle-under-a-heading-that-named-the-whole-subject)
+gave the whole outbound inventory a page of its own, which answers "what can
+reach the network" better than one row's position in a list ever did.
+
+`Local execution` becomes `Execution`, and `cloud_execution_cap` and
+`remote_execution_cap` are filed into it. They had no mapping at all, so they
+landed in `Other tools` — a bucket whose name means *nobody filed this*. The
+fallback stays for a capability a future build forgets to file; nothing reaches
+it today, which is what a fallback should look like.
+
+**Verification.** Two rewritten cases in `CapabilitiesView.test.ts`: a
+`governed_elsewhere` gate is absent from the registry, absent from the count, and
+present in the reference list with the control it names; a `no_path` gate the
+same, with no mode control anywhere on the page. Four cases in
+`capabilityModel.test.ts` for the grouping, including that the fallback still
+exists for an unfiled capability.
+
+Live, against a running host: the page reads **37**, `GIT` holds all three rows,
+no group is named `Other tools`, and the reference section carries fourteen
+entries with no mode control and no checkbox in it. Captures at
+`docs/screenshots/2026-09-14-permissions-overhaul/permissions-git-grouped.png`
+and `…/permissions-not-decided-here.png`.
+
+**Two live specs changed with it, and both were doing something that had stopped
+meaning anything.** `add-01-container-providers-live` pressed **Turn on** for
+Container execution before configuring the profile that is the real
+authorisation; it reads the gate in the reference list now. `bug-68-71-73-82-live`
+read a standing mode for `Processes` among Build's write capabilities; Build
+still carries it in its per-turn tightening set, which is a different mechanism.
+
+**What this does not change.** Nothing about enforcement, and nothing about the
+gate table: every one of the fourteen gates still exists, still holds whatever
+state it held, and is still served by `/api/capability-gates`. This is what the
+page renders, not what the runtime keeps.

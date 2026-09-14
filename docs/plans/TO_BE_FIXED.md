@@ -1802,6 +1802,12 @@ Three were found and fixed in this pass:
   Raiker is ready”*, which is now *“Setup saved”* on a run that defers the model
   ([FIXED-514](FIXED_ITEMS.md#fixed-514--first-run-called-an-instance-ready-above-a-summary-that-said-decide-later)).
 
+**Fixed since, on the same day.** Ten further specs waited on the same dead
+placeholder directly — `getByPlaceholder("Search capabilities…")` — and every one
+of them now waits on the field's label. They were found by grepping for the
+string rather than by a failing run, which is the point: a wait that finds
+nothing does not fail, it expires.
+
 **What remains open.** `offeredModelIds` and `keepOffered` read the model
 picker's checkboxes immediately after opening the dialog, before the provider's
 list has arrived, so they see an empty fieldset and a spec then asks for
@@ -1839,3 +1845,41 @@ learned to ignore the next.
 has already told the owner it cannot reach does not also report itself as an
 uncaught error to the console, and a console-error assertion in a live spec
 means what it says.
+
+
+---
+
+## BUG-297 — Three authority gates were never classified by the entry-path audit
+
+**Severity: Low. Area: Governance / Permissions. Raised 2026-09-14.**
+
+**Observed.** `admin_mutation`, `policy_mutation` and `role_mutation` are absent
+from `CAPABILITY_ENTRY_PATHS` in `raiker/runtime/authority/entry_paths.py`. That
+table is what GEP-04 built so no capability could ship without answering "what
+constructs a governed action for this, and does its own gate decide whether it
+runs". `RuntimeControlService` falls back to `OWN_GATE` for a capability with no
+entry, so all three report themselves as deciding their own capability **by
+default rather than by classification**, and the Permissions page renders each
+with a full set of decision-mode buttons.
+
+They may well be `own_gate`: `router.py` maps `user_create`, `user_deactivate`,
+`role_create`, `role_grant` and `role_revoke` onto them, so a governed action of
+those kinds does check them. What is missing is the finding rather than the
+answer — nothing has traced whether any surface or model tool constructs one of
+those actions, which is the difference between a decision an owner makes and a
+row that looks like one.
+
+The entry-path test asserts the table against `REAL_EXECUTOR_CAPABILITIES`, and
+these three are not in that set, so the invariant that would have caught this
+does not reach them.
+
+They were deliberately left on the page when
+[FIXED-523](FIXED_ITEMS.md#fixed-523--a-quarter-of-the-permissions-page-was-controls-that-control-nothing)
+removed the fourteen gates the product itself declares inert. Removing a real
+authority gate from the only page that shows it, on a guess, would be the
+opposite of what that change was for.
+
+**Interface outcome that has to be true before this closes.** Every capability
+the Permissions page offers a control for has a traced entry path and a recorded
+reality, and `OWN_GATE` is something a capability is classified as rather than
+something it defaults to.

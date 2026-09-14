@@ -93,7 +93,7 @@ async function ask(prompt: string) {
 /** Open one capability's card on the Permissions page. */
 async function openCapability(label: string) {
   await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByPlaceholder("Search capabilities…");
+  const search = page.getByLabel("Search capabilities");
   await expect(search).toBeVisible({ timeout: 30_000 });
   await search.fill(label);
   const card = page.locator(".cap.card").filter({ hasText: label }).first();
@@ -272,7 +272,7 @@ test("the web bullet — fetch withholds by default and search is not configured
 test("the shell/network/process bullet — Permissions carries all three, told apart", async () => {
   test.setTimeout(120_000);
   await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByPlaceholder("Search capabilities…");
+  const search = page.getByLabel("Search capabilities");
   await expect(search).toBeVisible({ timeout: 30_000 });
 
   // The README distinguishes shell (approvals execute) from network and process

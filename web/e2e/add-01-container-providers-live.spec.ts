@@ -92,21 +92,23 @@ test("Ollama gemma4:31b-cloud answers a real turn", async () => {
 
 test("container profile is enabled, configured, selected, and visibly bounded", async () => {
   test.setTimeout(180_000);
+  /*
+   * The container gate is not switched on first, and that is the point rather
+   * than an omission.
+   *
+   * GEP-04 classified `container_execution_cap` as **governed elsewhere**: every
+   * tool call inside a container is still brokered under that tool's own gate,
+   * and configuring the profile below is the owner's act of authorisation. The
+   * gate is never consulted, so the step this spec used to perform — open the
+   * row, press Turn on, step up — changed nothing and proved nothing. Permissions
+   * lists it read-only now, under **Not decided here**, and this spec reads it
+   * there instead of ceremonially flipping it.
+   */
   await page.goto(`${BASE}/#/capabilities`);
-  const capability = page.locator(".cap.card").filter({ hasText: "Container execution" });
-  await capability.locator("button.cap-toggle").click();
-  const turnOn = capability.getByRole("button", { name: "Turn on" });
-  if (await turnOn.isVisible()) {
-    await turnOn.click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Reason (required)").fill("Live validation of the approved container boundary");
-    const token = dialog.getByLabel(/Confirmation token/);
-    if (await token.isVisible()) await token.fill("ADD01 LIVE CONFIRM");
-    const acknowledgement = dialog.getByLabel(/reviewed the threat model/);
-    if (await acknowledgement.isVisible()) await acknowledgement.check();
-    await dialog.getByRole("button", { name: "Confirm change" }).click();
-    await expect(dialog).toBeHidden({ timeout: 30_000 });
-  }
+  const reference = page.locator("details.not-decided");
+  await expect(reference).toBeVisible({ timeout: 60_000 });
+  await reference.getByText("Not decided here").click();
+  await expect(reference.getByText("Container execution")).toBeVisible();
 
   await page.goto(`${BASE}/#/settings?tab=runtime`);
   const profileName = `Docker repository review ${Date.now()}`;

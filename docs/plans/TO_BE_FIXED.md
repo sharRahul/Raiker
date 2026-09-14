@@ -1773,3 +1773,69 @@ behind it — is in
 [`FIXED_ITEMS.md`](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace).
 
 With it, every finding in §18.5 of that review is closed.
+
+---
+
+## BUG-295 — Three live-test helpers waited for strings the product had stopped printing
+
+**Severity: Low. Area: Live test harness. Raised and partly fixed 2026-09-14.**
+
+Found while running the live suite against the Permissions overhaul, and worth a
+row of its own because the failure mode is the one that makes a live suite stop
+being evidence: a helper that cannot find its element does not always fail — it
+times out and walks on, and the assertion that fails is two hundred lines later
+and reads as a product defect.
+
+Three were found and fixed in this pass:
+
+* `enableCapability` waited on `getByPlaceholder(/Search capabilities/)`. The
+  placeholder has read *“Search permissions, actions or groups…”* since the
+  page's vocabulary changed, so every live spec that turns a capability on spent
+  sixty seconds waiting for a string the product does not print. It waits on the
+  field's **label** now, which is the stable half. Three specs waited on the same
+  stale placeholder directly and were changed with it.
+* `bug-239-unset-gate-honesty-live` asserted an exact `Off` element inside a
+  row. Availability and the mode were merged into one summary some time ago, so
+  the element it wanted no longer exists and the spec had been failing on the
+  harness rather than on the product. It reads the row's summary now.
+* `first-launch-live` and `dismissFirstRunModelSetup` both waited for *“Your
+  Raiker is ready”*, which is now *“Setup saved”* on a run that defers the model
+  ([FIXED-514](FIXED_ITEMS.md#fixed-514--first-run-called-an-instance-ready-above-a-summary-that-said-decide-later)).
+
+**What remains open.** `offeredModelIds` and `keepOffered` read the model
+picker's checkboxes immediately after opening the dialog, before the provider's
+list has arrived, so they see an empty fieldset and a spec then asks for
+`value="undefined"`. Waiting for the first checkbox to attach fixes it; the
+helper was not changed in this pass because no committed spec currently fails on
+it, and changing a shared helper without a failing spec to prove it is how the
+next stale wait gets introduced.
+
+**Interface outcome that has to be true before this closes.** A live helper that
+cannot find what it is waiting for fails saying so, rather than timing out and
+letting a later assertion take the blame. The suite's own selectors are label-
+and role-based wherever the product offers one, so a wording change cannot
+silently disarm a scenario.
+
+---
+
+## BUG-296 — Models reports a Hugging Face 503 into the browser console on every visit
+
+**Severity: Low. Area: Models / Hugging Face. Raised 2026-09-14.**
+
+**Observed.** Opening Models on a host with no route to `huggingface.co` puts
+`GET /api/hugging-face/trending — 503` in the browser console. The page itself
+handles it correctly and says *“Hugging Face could not be reached. Search and
+download need a route to huggingface.co. Everything already in your local
+library still works.”* — which is the right sentence in the right place.
+
+The console entry is the problem, and only because of what depends on it: the
+live manual test plan requires a round to end with **zero uncaught console
+errors**, and several live specs assert exactly that. An expected, handled,
+correctly-reported unreachable service therefore spends the budget that exists
+to catch real ones, and a round that learns to ignore one console error has
+learned to ignore the next.
+
+**Interface outcome that has to be true before this closes.** A service Raiker
+has already told the owner it cannot reach does not also report itself as an
+uncaught error to the console, and a console-error assertion in a live spec
+means what it says.

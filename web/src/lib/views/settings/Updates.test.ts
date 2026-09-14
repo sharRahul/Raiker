@@ -86,7 +86,13 @@ it("names the version, channel and recovery point a signed package would use", a
   // is about.
   expect(screen.getAllByText("1.0.0", { selector: "dd" })).toHaveLength(2);
   expect(screen.getByText("stable", { selector: "dd" })).toBeInTheDocument();
-  expect(screen.getByText(/Version 2\.0\.0 is ready to install/)).toBeInTheDocument();
+  // REM-SET-UPDATES — "ready to install" claimed a download and a verification
+  // that a channel *check* has not done. What the check establishes is that the
+  // release is offered.
+  expect(screen.getByText(/Version 2\.0\.0 is offered on the channel/)).toBeInTheDocument();
+  expect(screen.queryByText(/ready to install/)).toBeNull();
+  // And the state is named as itself, beside when the channel was last asked.
+  expect(screen.getByText("A newer release is offered", { selector: "dd" })).toBeInTheDocument();
 });
 
 it("requires a second confirmation when an update would interrupt work", async () => {
@@ -109,5 +115,10 @@ it("requires a second confirmation when an update would interrupt work", async (
 
   await fireEvent.click(screen.getByRole("button", { name: /Confirm update and restart/ }));
   await waitFor(() => expect(apply).toHaveBeenLastCalledWith(true));
-  expect(await screen.findByText(/Installing 2.0.0/)).toBeInTheDocument();
+  // REM-SET-UPDATES — the response says a helper started, not that an install
+  // happened: it waits for this process to exit before it verifies or replaces
+  // anything, and an owner who reads "Installing" and force-quits believes they
+  // interrupted an install rather than a handover.
+  expect(await screen.findByText(/helper for 2\.0\.0 has started/)).toBeInTheDocument();
+  expect(screen.getByText(/Nothing on this installation has changed yet/)).toBeInTheDocument();
 });

@@ -121,12 +121,15 @@ test("a connected MCP server says what each of its tools takes (backlog #16, MCP
   await page.goto(`${BASE}/#/extensions?tab=mcp`);
   await page.waitForLoadState("networkidle");
 
-  // Scoped to the server list: an unscoped text match finds "Sample echo server
-  // (safe starter)" in the template dropdown and skips the creation entirely.
+  // Scoped to the server list: an unscoped text match finds the example's own
+  // template name in the picker and skips the creation entirely.
   const card = page.getByRole("listitem").filter({ hasText: "Command" }).first();
   if ((await card.count()) === 0) {
+    // REM-MCP-01 — the sample generator is a developer example below the list,
+    // not the page's opening move, so it is opened before it is used.
+    await page.getByText("Developer example", { exact: false }).click();
     await page.getByLabel("Server name").fill("echo");
-    await page.getByRole("button", { name: "Create server" }).click();
+    await page.getByRole("button", { name: "Generate example server" }).click();
   }
   await expect(card).toBeVisible({ timeout: 60_000 });
 

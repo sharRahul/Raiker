@@ -37,7 +37,7 @@
   import { rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import type {
     CapabilityGate,
-    ImageGeneration,
+    ImageGenerationsView,
     ModelsView,
     ProjectsList,
   } from "../apiTypes";
@@ -51,7 +51,7 @@
     projects = null,
   }: { projects?: ProjectsList | null } = $props();
 
-  let view = $state<{ sizes: string[]; generations: ImageGeneration[] } | null>(null);
+  let view = $state<ImageGenerationsView | null>(null);
   let loadError = $state<string | null>(null);
   let gates = $state<CapabilityGate[]>([]);
   let models = $state<ModelsView | null>(null);
@@ -144,6 +144,21 @@
   );
 
   /**
+   * REM-DESIGN-01 — whether the size control decides anything for this choice.
+   *
+   * Read from the runtime's own list rather than from a provider name kept
+   * here, so a provider that gains or loses a sized endpoint changes one tuple
+   * in `tier2_image.py` and this follows. A host that predates the field makes
+   * no claim, and an absent claim is not read as "no provider takes a size" —
+   * that would disable a working control on every older host.
+   */
+  const sizeIsSent = $derived.by(() => {
+    const declared = view?.sized_providers;
+    if (declared === undefined || choice === null) return true;
+    return declared.includes(choice.provider);
+  });
+
+  /**
    * COMPOSER-09 — the same composer grammar as Chat and Build.
    *
    * Design's bar carried a model select and a size select permanently: two of
@@ -153,13 +168,17 @@
    *
    * The menus are deliberately short, and short *honestly*. COMPOSER-09
    * describes edit, variations, outpaint, reference images and version compare;
-   * Raiker's governed image endpoint takes a prompt, a size and a model and
-   * returns one picture. The review's own acceptance test settles what to do
-   * about the gap — "every exposed composer action reaches an actual
-   * backend/runtime path or is omitted" — so those entries are absent rather
-   * than present and inert, and the missing runtime is recorded in
-   * docs/plans/TO_BE_FIXED.md instead of implied by a control that does
-   * nothing.
+   * of those, **edit and variations are implemented** — the governed endpoint
+   * takes a source generation and a count (BUG-277), and this composer sends
+   * both, so they are controls on the bar rather than menu entries. Outpaint and
+   * reference images have no governed path and are therefore absent rather than
+   * present and inert, which is the review's own acceptance test: "every exposed
+   * composer action reaches an actual backend/runtime path or is omitted".
+   *
+   * REM-DESIGN-01 — this paragraph used to say the endpoint "takes a prompt, a
+   * size and a model and returns one picture", which had been untrue since the
+   * lineage work landed. A comment that describes a retired endpoint is read as
+   * a statement about the product by the next person to change this file.
    */
   const HANDLED = new Set([
     "set-project",
@@ -491,6 +510,7 @@
       loading={view === null}
       {loadError}
       {readable}
+      sizedProviders={view?.sized_providers}
       bind:selectedId
     />
   </div>
@@ -557,13 +577,27 @@
         onchoose={runComposerAction}
       />
       <!-- Size is the one visual parameter changed often enough to stay at
-           rest. Everything the review lists beside it — aspect, count, seed,
-           quality — belongs in Options, and none of them exist in the governed
-           image endpoint yet, so none of them are drawn. -->
+           rest. Of the rest the review lists — aspect, seed, quality — none has
+           a governed path, so none is drawn; count does, and is next to it.
+
+           REM-DESIGN-01 — and it is offered only where it decides anything. The
+           select was drawn for every provider and the chosen value recorded on
+           the row, including for one whose governed request carries no size at
+           all: the owner picked a shape, Raiker filed it, and the provider never
+           heard it. Which providers take one is read from the runtime
+           (`sized_providers`), not kept as a second copy here. -->
       {#if (view?.sizes ?? []).length > 0}
         <label class="composer-scope">
           <span class="sr-only">Size</span>
-          <select class="bar-select" bind:value={size} aria-label="Size" disabled={busy}>
+          <select
+            class="bar-select"
+            bind:value={size}
+            aria-label="Size"
+            disabled={busy || !sizeIsSent}
+            title={sizeIsSent
+              ? "The size Raiker asks the provider for"
+              : `${choice?.provider ?? "This provider"} chooses the size itself — Raiker does not send one.`}
+          >
             {#each view!.sizes as option (option)}
               <option value={option}>{option}</option>
             {/each}

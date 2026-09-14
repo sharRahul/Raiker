@@ -150,6 +150,31 @@
     ).then(() => (routingFor = null));
   }
 
+  /**
+   * REM-MSG-01 — the one step that stands between this channel and a delivery.
+   *
+   * A linked channel offered Turn on, Send a test delivery, Routing and Unpair
+   * as four buttons of equal weight, and an owner connecting a messaging account
+   * for the first time had to know that the order matters: an allowlisted
+   * sender, then how inbound messages are routed, then a test through the real
+   * outbound path, then on. The buttons are unchanged — this names which of them
+   * comes next, and says nothing once the channel is delivering.
+   */
+  function nextStep(profile: ChannelProfile): string {
+    if (!profile.linked) {
+      return profile.requires_sender_allowlist
+        ? "Pair this channel with the senders it may accept messages from."
+        : "Pair this channel to connect the account.";
+    }
+    if (profile.requires_sender_allowlist && profile.sender_count === 0) {
+      return "No sender is allowed yet, so inbound messages are refused. Re-pair with a sender.";
+    }
+    if (!profile.enabled) {
+      return "Paired and off. Check its routing, send a test delivery, then turn it on.";
+    }
+    return "";
+  }
+
   onMount(loadChannels);
 </script>
 
@@ -160,74 +185,19 @@
   <div class="notice notice-ok" role="status">{channelNotice}</div>
 {/if}
 
-<section class="card" data-testid="channel-posture">
-  <h2>Channels</h2>
-  <p>
-    A channel message is <strong>untrusted content with a named sender who is not you</strong>.
-    It cannot raise a turn's authority.
-  </p>
-  <p class="note">
-    Linked, enabled, trusted, and reachable are separate.
-    <GuideLink route="messaging" label="How a channel is governed" />
-  </p>
-  {#if channels !== null}
-    <ul class="event-list">
-      <li class:event-dead={!channels.outbound.runtime_enabled}>
-        <strong>Outbound</strong>
-        <span class="hook-tag" class:hook-tag-dead={!channels.outbound.runtime_enabled}>
-          {channels.outbound.runtime_enabled ? "Capability on" : "Capability off"}
-        </span>
-        <span class="note">
-          {channels.outbound.runtime_enabled
-            ? "Governed and audited."
-            : "Turn on external channel runtime in Permissions."}
-        </span>
-      </li>
-      <li class:event-dead={!channels.outbound.egress_configured}>
-        <strong>Egress</strong>
-        <span class="hook-tag" class:hook-tag-dead={!channels.outbound.egress_configured}>
-          {channels.outbound.egress_configured
-            ? `${channels.outbound.egress_host_count} host${channels.outbound.egress_host_count === 1 ? "" : "s"}`
-            : "None allowlisted"}
-        </span>
-        <span class="note">
-          Set <code>RAIKER_CHANNEL_EGRESS_ALLOWLIST</code>; empty denies all hosts.
-        </span>
-      </li>
-      <li class:event-dead={!channels.outbound.signing_configured}>
-        <strong>Signing</strong>
-        <span class="hook-tag" class:hook-tag-dead={!channels.outbound.signing_configured}>
-          {channels.outbound.signing_configured ? "Signed" : "Unsigned"}
-        </span>
-        <span class="note">
-          Set <code>RAIKER_CHANNEL_OUTBOUND_SECRET</code> for HMAC-signed delivery.
-        </span>
-      </li>
-      <li class:event-dead={!channels.inbound.secret_configured}>
-        <strong>Inbound</strong>
-        <span class="hook-tag" class:hook-tag-dead={!channels.inbound.secret_configured}>
-          {channels.inbound.secret_configured ? "Secret set" : "Refusing everything"}
-        </span>
-        <span class="note">
-          Set <code>RAIKER_CHANNEL_INBOUND_SECRET</code>; unset refuses every message.
-        </span>
-      </li>
-      <li>
-        <strong>Rate limit</strong>
-        <span class="hook-tag">
-          {channels.inbound.rate_limit_per_minute ?? 60}/min
-        </span>
-        <span class="note">
-          Per sender and channel; refusals are recorded. Override with
-          <code>RAIKER_CHANNEL_INBOUND_RATE</code>.
-        </span>
-      </li>
-    </ul>
-  {/if}
-</section>
-
 <section class="card" data-testid="channel-profiles">
-  <h2>Connectors</h2>
+  <!-- REM-MSG-02 — one name for the thing an owner connects. The page called
+       the same object a Channel in one heading and a Connector in the next, so
+       "pair the connector" and "turn on the channel" read as two objects with
+       two lifecycles. Channels is the user-facing name; the connector id stays
+       internal, and the extension behind it is a link for diagnostics. -->
+  <h2>Channels</h2>
+  <p class="note">
+    A channel message is <strong>untrusted content with a named sender who is not you</strong>,
+    and cannot raise a turn's authority. Linked, enabled, trusted and reachable are separate —
+    each channel says which of them it has. The extension behind one is in
+    <a href="#/extensions?tab=connectors">Extensions → Connectors</a>.
+  </p>
   {#if channels === null}
     <p class="note">{channelsError ?? "Reading connector profiles…"}</p>
   {:else if channels.error}
@@ -256,6 +226,9 @@
               ? " · needs network"
               : " · local only"}
           </span>
+          {#if nextStep(profile)}
+            <p class="next-step">{nextStep(profile)}</p>
+          {/if}
 
           <!-- What this transport needs from the environment, declared on the
                connector profile rather than left to the guide. It answers the
@@ -440,6 +413,76 @@
   {/if}
 </section>
 
+<!-- REM-MSG-01 — the operator's environment, below the channels rather than
+     in front of them. These five rows are process configuration read back:
+     which variable is set, what an empty one refuses. They are real and they
+     are kept, and they were the first thing an owner met on this page — so
+     connecting a messaging account began with a briefing on HMAC signing and
+     an inbound secret. -->
+<details class="card advanced" data-testid="channel-posture">
+  <summary>Delivery environment</summary>
+  <p class="note">
+    Set outside this app, in the host process. Raiker reads whether each variable is set and
+    never its value.
+    <GuideLink route="messaging" label="How a channel is governed" />
+  </p>
+  {#if channels !== null}
+    <ul class="event-list">
+      <li class:event-dead={!channels.outbound.runtime_enabled}>
+        <strong>Outbound</strong>
+        <span class="hook-tag" class:hook-tag-dead={!channels.outbound.runtime_enabled}>
+          {channels.outbound.runtime_enabled ? "Capability on" : "Capability off"}
+        </span>
+        <span class="note">
+          {channels.outbound.runtime_enabled
+            ? "Governed and audited."
+            : "Turn on external channel runtime in Permissions."}
+        </span>
+      </li>
+      <li class:event-dead={!channels.outbound.egress_configured}>
+        <strong>Egress</strong>
+        <span class="hook-tag" class:hook-tag-dead={!channels.outbound.egress_configured}>
+          {channels.outbound.egress_configured
+            ? `${channels.outbound.egress_host_count} host${channels.outbound.egress_host_count === 1 ? "" : "s"}`
+            : "None allowlisted"}
+        </span>
+        <span class="note">
+          Set <code>RAIKER_CHANNEL_EGRESS_ALLOWLIST</code>; empty denies all hosts.
+        </span>
+      </li>
+      <li class:event-dead={!channels.outbound.signing_configured}>
+        <strong>Signing</strong>
+        <span class="hook-tag" class:hook-tag-dead={!channels.outbound.signing_configured}>
+          {channels.outbound.signing_configured ? "Signed" : "Unsigned"}
+        </span>
+        <span class="note">
+          Set <code>RAIKER_CHANNEL_OUTBOUND_SECRET</code> for HMAC-signed delivery.
+        </span>
+      </li>
+      <li class:event-dead={!channels.inbound.secret_configured}>
+        <strong>Inbound</strong>
+        <span class="hook-tag" class:hook-tag-dead={!channels.inbound.secret_configured}>
+          {channels.inbound.secret_configured ? "Secret set" : "Refusing everything"}
+        </span>
+        <span class="note">
+          Set <code>RAIKER_CHANNEL_INBOUND_SECRET</code>; unset refuses every message.
+        </span>
+      </li>
+      <li>
+        <strong>Rate limit</strong>
+        <span class="hook-tag">
+          {channels.inbound.rate_limit_per_minute ?? 60}/min
+        </span>
+        <span class="note">
+          Per sender and channel; refusals are recorded. Override with
+          <code>RAIKER_CHANNEL_INBOUND_RATE</code>.
+        </span>
+      </li>
+    </ul>
+  {/if}
+</details>
+
+
 <style>
   .hook-list, .event-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
   .hook-list > li, .event-list > li { display: grid; gap: 0.3rem; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--r-md); }
@@ -458,5 +501,8 @@
   .env { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: var(--space-2); }
   .env li { display: grid; gap: 0.2rem; padding: var(--space-2); border-left: 2px solid var(--border); }
   .env li.env-missing { border-left-color: var(--warn); }
+  /* REM-MSG-01 — which of the four equal buttons comes next. */
+  .next-step { margin: 0.2rem 0 0; color: var(--text-2); font-size: var(--text-sm); }
+  .advanced summary { cursor: pointer; color: var(--text-2); font-weight: 650; }
   .env code { font-size: var(--text-xs); }
 </style>

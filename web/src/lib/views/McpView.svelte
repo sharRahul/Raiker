@@ -17,11 +17,30 @@
     Notification,
   } from "../apiTypes";
 
-  // Reviewed server templates the builder can generate. `id` is the backend
-  // template key; `label` is the plain-English name shown to the user. Kept in
-  // sync with the backend `available_mcp_templates()` (currently one safe
-  // starter server that just echoes text back).
-  const TEMPLATES = [{ id: "python-stdio-echo", label: "Sample echo server (safe starter)" }];
+  /*
+   * Server templates the builder can generate, kept in sync with the backend's
+   * `available_mcp_templates()`.
+   *
+   * REM-MCP-02 — this one was labelled "safe starter". A sample's safety is not
+   * a property of the sample: it depends on package integrity, on the boundary
+   * the process runs inside, on the environment it inherits and on the grants
+   * the owner gives the server afterwards. "Safe" said as a blanket adjective
+   * teaches an owner to read the next one the same way, including one that
+   * opens a socket. What is actually reviewable is the scope, so the label and
+   * the note state that instead: what it exposes, where it runs, and what it
+   * does not reach.
+   */
+  const TEMPLATES = [
+    {
+      id: "python-stdio-echo",
+      label: "Local Python sample — echo and ping only",
+      scope:
+        "Generates a dependency-free Python script Raiker runs as a local stdio process on this " +
+        "machine. It declares two tools — echo and workspace_ping — and the generated file opens " +
+        "no socket, writes no file and runs no shell. It inherits the account Raiker runs as, so " +
+        "read it before you extend it into anything that does.",
+    },
+  ];
 
   function templateLabel(id: string | null): string {
     if (!id) return "None";
@@ -353,30 +372,13 @@
 {#if notice}<div class="notice notice-ok"><Icon name="check" size="sm" /> {notice}</div>{/if}
 <NotificationCenter {notifications} />
 
-<form class="create" onsubmit={create}>
-  <div class="field">
-    <label class="field-label" for="mcp-name">Server name</label>
-    <input id="mcp-name" class="input" bind:value={newName} placeholder="e.g. My notes helper" autocomplete="off" disabled={!builderEnabled} />
-  </div>
-  <div class="field">
-    <label class="field-label" for="mcp-template">Template</label>
-    <select id="mcp-template" class="select" bind:value={newTemplate} disabled={!builderEnabled}>
-      {#each TEMPLATES as t (t.id)}<option value={t.id}>{t.label}</option>{/each}
-    </select>
-  </div>
-  <!-- Creating a server needs the builder capability; keep the control disabled
-       while it is off rather than firing a request that can only 403 (FIX-04). -->
-  <button class="btn btn-primary" type="submit" disabled={busy === "create" || !newName.trim() || !builderEnabled} title={builderEnabled ? undefined : "Enable the MCP builder capability to create a server."}>
-    {busy === "create" ? "Creating…" : "Create server"}
-  </button>
-</form>
-
 {#if offers.length > 0}
   <section class="offers" aria-labelledby="mcp-offers-heading">
     <h3 id="mcp-offers-heading">Offered by your plugins</h3>
     <p class="offers-lead">
       A plugin can describe a server it works with. Nothing here is connected or reachable —
-      adding one runs the same governed create path as filling in the form above.
+      adding one runs the ordinary governed create path, so it goes through the trust gate
+      rather than around it.
     </p>
     <ul class="offer-list">
       {#each offers as offer (offer.plugin_id + "/" + offer.name)}
@@ -422,8 +424,8 @@
        contradiction. When a plugin has offered one, that is the shortest route. -->
   <div class="empty">
     {offers.length > 0
-      ? "No MCP servers yet. Add one your plugins offer above, or create one from a template."
-      : "No MCP servers yet. Create one from a template above."}
+      ? "No MCP servers yet. Add one your plugins offer above, or generate the developer example below."
+      : "No MCP servers yet. Install a plugin that offers one, or generate the developer example below."}
   </div>
 {:else}
   <ul class="list">
@@ -540,7 +542,47 @@
   </ul>
 {/if}
 
+<!--
+  REM-MCP-01 — a demonstrator does not define normal integration setup.
+
+  This form led the page: the first thing an owner met on MCP was a name field
+  and a template picker offering one sample, which frames "generate an example
+  and point Raiker at it" as the way MCP is used here. What a plugin offers, and
+  what is already connected, are the real flows; this is how you see the protocol
+  working on your own machine before you trust anything else to it.
+
+  It is a `<details>` rather than a separate page because the capability it needs
+  is the same one, and because hiding it entirely would leave the empty state
+  pointing at nothing.
+-->
+<details class="example">
+  <summary>Developer example — generate a local sample server</summary>
+  <!-- REM-MCP-02 — the reviewed scope, not an adjective. -->
+  <p class="example-scope">{TEMPLATES.find((t) => t.id === newTemplate)?.scope}</p>
+  <form class="create" onsubmit={create}>
+    <div class="field">
+      <label class="field-label" for="mcp-name">Server name</label>
+      <input id="mcp-name" class="input" bind:value={newName} placeholder="e.g. Protocol sample" autocomplete="off" disabled={!builderEnabled} />
+    </div>
+    <div class="field">
+      <label class="field-label" for="mcp-template">Example</label>
+      <select id="mcp-template" class="select" bind:value={newTemplate} disabled={!builderEnabled}>
+        {#each TEMPLATES as t (t.id)}<option value={t.id}>{t.label}</option>{/each}
+      </select>
+    </div>
+    <!-- Creating a server needs the builder capability; keep the control disabled
+         while it is off rather than firing a request that can only 403 (FIX-04). -->
+    <button class="btn btn-primary" type="submit" disabled={busy === "create" || !newName.trim() || !builderEnabled} title={builderEnabled ? undefined : "Enable the MCP builder capability to create a server."}>
+      {busy === "create" ? "Creating…" : "Generate example server"}
+    </button>
+  </form>
+</details>
+
 <style>
+  .example { margin-top: var(--space-4); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); padding: var(--space-3) var(--space-4); }
+  .example summary { cursor: pointer; color: var(--text-2); font-size: var(--text-md); font-weight: 650; }
+  .example-scope { margin: var(--space-3) 0 0; color: var(--text-2); font-size: var(--text-sm); line-height: 1.5; max-width: var(--prose-measure); }
+  .example .create { margin-bottom: 0; border: 0; padding: var(--space-3) 0 0; background: transparent; }
   .header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
   .icon { display: grid; place-items: center; border: 0; background: transparent; color: var(--text-2); padding: 0.45rem; cursor: pointer; }
   .notice { display: flex; align-items: center; gap: 0.5rem; margin-bottom: var(--space-3); }

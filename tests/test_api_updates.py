@@ -9,6 +9,7 @@ verify.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -121,3 +122,36 @@ def test_a_pinned_channel_is_reported_without_its_key(
     assert body["channel"]["channel"] == "stable"
     assert "public_key" not in body["channel"]
     assert len(body["channel"]["public_key_fingerprint"]) == 16
+
+
+def test_a_host_that_never_checked_is_not_reported_as_up_to_date(tmp_path: Path) -> None:
+    """REM-SET-UPDATES — "nobody looked" is not "there is nothing newer".
+
+    A packaged installation with a pinned channel that has never contacted it
+    returned ``up_to_date`` carrying the sentence "Not checked yet on this
+    host." Every consumer that reads the *state* — the host control's tone map,
+    and any future one — therefore drew an installation nobody had checked in
+    the same colour as one that had asked and been told it was current. Only one
+    of those is an assurance.
+    """
+    from raiker.app.installation import (
+        detect_installation,
+        update_status,
+        write_channel_config,
+    )
+
+    write_channel_config(
+        tmp_path,
+        url="https://example.invalid/index.json",
+        public_key=("6b" * 32),
+    )
+    install = replace(detect_installation(), packaged=True, signed=True, version="1.0.0")
+
+    status = update_status(tmp_path, installation=install, fetched_index=None)
+
+    assert status.state == "not_checked"
+    assert status.state != "up_to_date"
+    assert status.available is None
+    assert status.checked_at is None
+    # And it says which of the two it is, rather than sounding like the other.
+    assert "unknown" in status.message

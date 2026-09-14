@@ -195,8 +195,9 @@ test("B8 — MCP: a connected server says whether the agent can call it, then do
   await expect(page.getByRole("heading", { name: "MCP Servers" })).toBeVisible({ timeout: 30_000 });
   const card = page.locator("li.card").filter({ hasText: "echo" }).first();
   if (!(await card.isVisible().catch(() => false))) {
+    await page.getByText("Developer example", { exact: false }).click();
     await page.getByLabel("Server name").fill("echo");
-    await page.getByRole("button", { name: "Create server" }).click();
+    await page.getByRole("button", { name: "Generate example server" }).click();
   }
   await expect(card).toBeVisible({ timeout: 30_000 });
   await card.getByRole("button", { name: "Test" }).click();

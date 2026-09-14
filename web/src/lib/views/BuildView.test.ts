@@ -1096,3 +1096,47 @@ describe("Build inline diff review", () => {
     expect(screen.queryByText("src/app.py")).toBeNull();
   });
 });
+
+/*
+ * REM-BUILD-02 — one execution context, said in one place.
+ *
+ * Build's boundary line named the Project, the repository and the attachments:
+ * everything about what a turn touches and nothing about where it runs. An
+ * owner who switched execution environment and returned to a half-written
+ * prompt had no way to see it from the surface they were about to submit from.
+ */
+describe("the execution boundary Build names", () => {
+  it("names where the turn would run, beside what it would touch", async () => {
+    stubFetch(
+      baseRoutes({
+      "GET /api/execution-environments": {
+        selected_profile_id: "env_container",
+        environments: [
+          {
+            profile_id: "env_container",
+            kind: "container",
+            name: "Docker sandbox",
+            enabled: true,
+            configured: true,
+            available: true,
+            status: "ready",
+            selected: true,
+            credential_configured: false,
+            budget: null,
+          },
+        ],
+      },
+      }),
+    );
+    await renderBuildWithProject();
+    await waitFor(() => expect(screen.getByText(/Docker sandbox/)).toBeInTheDocument());
+  });
+
+  it("says nothing rather than guessing when the runtime cannot be read", async () => {
+    // Claiming a destination because a probe failed is the silent retarget this
+    // row exists to prevent.
+    stubFetch(baseRoutes({ "GET /api/execution-environments": { __status: 503 } }));
+    await renderBuildWithProject();
+    await waitFor(() => expect(screen.queryByText("Runs on")).toBeNull());
+  });
+});

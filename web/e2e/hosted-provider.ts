@@ -105,7 +105,11 @@ export async function enableCapability(
   reason: string,
 ): Promise<void> {
   await page.goto(`${base}/#/capabilities`);
-  await page.getByPlaceholder(/Search capabilities/).waitFor({ timeout: 60_000 });
+  // By label rather than by placeholder: the placeholder has said "Search
+  // permissions, actions or groups…" since the page's own vocabulary changed,
+  // so this waited sixty seconds for a string the product no longer prints and
+  // then walked on with the list unrendered. The label is the stable half.
+  await page.getByLabel("Search capabilities").waitFor({ timeout: 60_000 });
   const card = page.locator(".cap.card").filter({ hasText: label }).first();
   await expect(card).toBeVisible({ timeout: 60_000 });
   await card.locator("button.cap-toggle").click();
@@ -196,7 +200,10 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
       await page.getByRole("button", { name: "Balanced" }).click();
     } else if (heading.startsWith("Create your first backup")) {
       await page.getByRole("button", { name: "Set up later" }).click();
-    } else if (heading.startsWith("Your Raiker is ready")) {
+    } else if (heading.startsWith("Your Raiker is ready") || heading.startsWith("Setup saved")) {
+      // REM-LAUNCH-01 — the last stage now says which of the two it is: a run
+      // that deferred the model reads "Setup saved" and names what is missing.
+      // Both are the final stage and both finish the same way.
       await page.getByRole("button", { name: "Start using Raiker" }).click();
       await expect(title).toBeHidden({ timeout: 30_000 });
       return true;

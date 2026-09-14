@@ -9,6 +9,31 @@
   let notice = $state<string | null>(null);
   let confirm = $state(false);
 
+  /**
+   * The states, named as the different things they are.
+   *
+   * REM-SET-UPDATES — the page printed only the backend's sentence, so an
+   * installation nobody had ever checked and one confirmed current a minute ago
+   * both read as a paragraph of reassuring prose. Offered, verified, installed
+   * and restart-required are not the same state, and the first of them is as far
+   * as a *check* can get.
+   */
+  const STATE_LABELS: Record<string, string> = {
+    source_checkout: "Not an installed release",
+    no_channel: "No channel pinned",
+    unsigned_build: "Unsigned build — not eligible",
+    not_checked: "Not checked yet",
+    up_to_date: "Checked — nothing newer offered",
+    available: "A newer release is offered",
+    unreachable: "Channel unreachable — unknown",
+  };
+
+  const checkedLabel = $derived(
+    update === null || update.checked_at === null
+      ? "Never on this host"
+      : new Date(update.checked_at).toLocaleString(),
+  );
+
   async function load() {
     try { update = await api.hostUpdate(); }
     catch { notice = "Update status could not be read."; }
@@ -24,8 +49,21 @@
     try {
       const result = await api.applyHostUpdate(confirm);
       update = result;
-      if (result.ok) notice = `Installing ${result.version}. Raiker will close and restart shortly.`;
-      else if (result.reason_code === "waiting_work") {
+      if (result.ok) {
+        /*
+         * REM-SET-UPDATES — what this response actually establishes is that a
+         * detached helper was started. It said "Installing …", which is a claim
+         * about an installation that has not begun: the helper waits for this
+         * process to exit before it re-checks the channel, verifies the bundle
+         * and replaces any files. An owner who reads "Installing" and then
+         * force-quits believes they interrupted an install rather than a
+         * handover.
+         */
+        notice =
+          `The verified update helper for ${result.version} has started. Raiker will close, ` +
+          "and the helper verifies the signed bundle before it replaces anything. " +
+          "Nothing on this installation has changed yet.";
+      } else if (result.reason_code === "waiting_work") {
         confirm = true;
         notice = "An update would interrupt work in progress. Select Update and restart again to confirm.";
       } else notice = result.message;
@@ -51,8 +89,26 @@
            this is where the rest of the facts about the installation are. -->
       <div><dt>Licence</dt><dd>Apache License, Version 2.0</dd></div>
     </dl>
+    <!-- REM-SET-UPDATES — five different states, said as five different
+         things. `Checked` is the one an owner cannot get from anywhere else:
+         without it, "This is the newest release" reads the same whether it was
+         confirmed a minute ago or never asked at all. -->
+    <dl>
+      <div>
+        <dt>Update state</dt>
+        <dd>{STATE_LABELS[update.state] ?? update.state}</dd>
+      </div>
+      <div>
+        <dt>Channel last checked</dt>
+        <dd>{checkedLabel}</dd>
+      </div>
+    </dl>
     {#if update.available}
-      <p class="description">Version {update.available.version} is ready to install. Its release metadata and bundle are verified before Raiker replaces files.</p>
+      <p class="description">
+        Version {update.available.version} is offered on the channel. Nothing has been downloaded
+        yet: Raiker verifies the release metadata and the bundle's signature during the update,
+        and replaces files only if both verify.
+      </p>
       <button class="btn btn-primary" type="button" disabled={busy !== null} onclick={() => void apply()}>
         <Icon name="refresh" size="sm" /> {busy === "applying" ? "Starting update…" : confirm ? "Confirm update and restart" : "Update and restart"}
       </button>

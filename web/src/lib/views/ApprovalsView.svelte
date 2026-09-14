@@ -7,6 +7,7 @@
   import IdentityChip from "../components/IdentityChip.svelte";
   import PageState from "../components/PageState.svelte";
   import GuideLink from "../components/GuideLink.svelte";
+  import { consequenceFacts, destinationHost } from "../approvalConsequence";
   import { api, auth, getToken, setToken, ApiError } from "../api";
   import { alreadyResumedElsewhere, publishApprovalResolved } from "../approvalResume";
   import type { ApprovalDetailView, ApprovalView, OwnerQuestion } from "../apiTypes";
@@ -152,6 +153,14 @@
   );
   let picked = $state<Record<string, string[]>>({});
   let ownWords = $state("");
+
+  /*
+   * REM-APPROVAL — what the proposal says it would do, above the payload that
+   * says it in JSON. Derived, never invented: a key the arguments do not carry
+   * produces no row, and everything lifted is still in the payload below.
+   */
+  const consequence = $derived(consequenceFacts(selected?.arguments));
+  const host = $derived(destinationHost(selected?.arguments));
 
   function toggle(question: OwnerQuestion, label: string) {
     const current = picked[question.question] ?? [];
@@ -634,14 +643,49 @@
       {/if}
       <pre class="diff">{selected.diff ?? "(nothing to rewind)"}</pre>
     {:else if selected.preview_kind === "connector_request"}
-      <h3>Proposed outbound request (redacted)</h3>
+      <!-- REM-APPROVAL — the destination first. It decides whether this request
+           leaves the machine, and it was a line inside a JSON body. -->
+      <h3>Proposed outbound request</h3>
+      {#if consequence.length > 0}
+        <dl class="consequence">
+          {#each consequence as fact (fact.label)}
+            <div><dt>{fact.label}</dt><dd class="mono">{fact.value}</dd></div>
+          {/each}
+          {#if host}<div><dt>Reaches host</dt><dd class="mono">{host}</dd></div>{/if}
+        </dl>
+      {/if}
       {#if selected.diff_path}
         <p class="diff-path mono">{selected.diff_path}</p>
       {/if}
-      <pre class="diff">{selected.diff ?? "{}"}</pre>
+      <details class="payload">
+        <summary>Request body (redacted)</summary>
+        <pre class="diff">{selected.diff ?? "{}"}</pre>
+      </details>
     {:else if !isQuestion}
-      <h3>Proposed arguments (redacted)</h3>
-      <pre class="diff">{JSON.stringify(selected.arguments, null, 2)}</pre>
+      <!-- REM-APPROVAL — this branch used to be the whole answer: a `<pre>` of
+           the request body, with nothing above it saying what approving would
+           cause. A payload is evidence, and evidence reads after the decision
+           it supports, not instead of it. Nothing here is inferred — every row
+           is a value the proposal itself names, and all of them are still in the
+           payload below. -->
+      <h3>What approving would do</h3>
+      {#if consequence.length > 0}
+        <dl class="consequence">
+          {#each consequence as fact (fact.label)}
+            <div><dt>{fact.label}</dt><dd class="mono">{fact.value}</dd></div>
+          {/each}
+          {#if host}<div><dt>Reaches host</dt><dd class="mono">{host}</dd></div>{/if}
+        </dl>
+      {:else}
+        <p class="notice">
+          This proposal names no path, destination or command Raiker can summarise. Read the
+          arguments below before deciding.
+        </p>
+      {/if}
+      <details class="payload">
+        <summary>Proposed arguments (redacted)</summary>
+        <pre class="diff">{JSON.stringify(selected.arguments, null, 2)}</pre>
+      </details>
     {/if}
 
     <!-- Kept, moved. None of this is wrong to record; it is wrong to read
@@ -1016,6 +1060,19 @@
     min-width: 0;
     overflow-wrap: anywhere;
   }
+  /* REM-APPROVAL — the consequence rows, drawn like the provenance list so the
+     page has one shape for "label, value" rather than a new one per section. */
+  .consequence {
+    display: grid;
+    grid-template-columns: minmax(7rem, auto) minmax(0, 1fr);
+    gap: var(--space-1) var(--space-4);
+    margin: 0 0 var(--space-3);
+  }
+  .consequence > div { display: contents; }
+  .consequence dt { color: var(--text-3); font-size: var(--text-xs); }
+  .consequence dd { margin: 0; color: var(--text-1); font-size: var(--text-sm); word-break: break-word; }
+  .payload summary { cursor: pointer; color: var(--text-2); font-size: var(--text-sm); }
+  .payload { margin-bottom: var(--space-3); }
   .diff-path {
     color: var(--text-2);
     font-size: var(--text-sm);

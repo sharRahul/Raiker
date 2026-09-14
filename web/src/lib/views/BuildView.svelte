@@ -65,6 +65,7 @@
     CodeReposView,
     CapabilityGate,
     ContextUsage,
+    ExecutionEnvironment,
     ModelDecision,
     ProjectsList,
     SessionDetail,
@@ -789,6 +790,33 @@
     return Math.min(100, (used / window_) * 100);
   });
 
+  /*
+   * REM-BUILD-02 — where the work would run, in the boundary summary rather
+   * than on a separate page.
+   *
+   * Build's context line named the Project, the repository and the attachments
+   * — everything about *what* the turn touches and nothing about *where* it
+   * executes. Those are one execution context, and the review's point is that
+   * simplifying it must make a wrong-destination write less likely rather than
+   * more: an owner who changed their execution environment and came back to a
+   * half-written prompt had no way to see it from here.
+   *
+   * Read once per mount and refreshed when the runtime settings say so. A read
+   * that fails leaves it `null`, and the fact is then absent rather than
+   * guessed — claiming "Local" because a probe timed out is exactly the
+   * silent retarget this row exists to prevent.
+   */
+  let runtimeEnvironment = $state<ExecutionEnvironment | null>(null);
+
+  async function loadRuntimeEnvironment() {
+    try {
+      const view = await api.executionEnvironments();
+      runtimeEnvironment = view.environments.find((item) => item.selected) ?? null;
+    } catch {
+      runtimeEnvironment = null;
+    }
+  }
+
   const contextFacts = $derived([
     ...(selectedProject !== null
       ? [
@@ -807,6 +835,17 @@
             label: "Repository",
             value: activeRepo.label,
             short: activeRepo.label,
+          },
+        ]
+      : []),
+    ...(runtimeEnvironment !== null
+      ? [
+          {
+            label: "Runs on",
+            value: `${runtimeEnvironment.name}${runtimeEnvironment.available ? "" : " — setup required"}`,
+            short: runtimeEnvironment.name,
+            href: "#/settings?tab=runtime",
+            action: "Change",
           },
         ]
       : []),
@@ -898,6 +937,7 @@
     filesOpen = readExplorerOpen() && !compactRail;
     void loadRepos();
     void refreshModels();
+    void loadRuntimeEnvironment();
     // Build keeps its own model. Coding work and conversation rarely want the
     // same one, and before this both surfaces shared the global default.
     void surfaceModel("build").then((remembered) => {

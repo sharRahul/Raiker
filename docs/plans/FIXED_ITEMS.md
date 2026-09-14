@@ -534,6 +534,16 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-510](#fixed-510--a-projects-pictures-could-not-be-opened-from-the-project) | Low | Projects / Design continuity | Fixed 2026-09-14 (closes NEW-PROJ-02) |
 | [FIXED-511](#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace) | Medium | Threads / work index | Fixed 2026-09-14 (closes NEW-THREAD-01, REM-THREAD-01/02) |
 | [FIXED-512](#fixed-512--one-policy-three-sets-of-words-on-one-screen) | Low | Permissions / vocabulary | Fixed 2026-09-14 (closes REM-PERM-02) |
+| [FIXED-513](#fixed-513--the-permissions-page-answered-what-am-i-looking-at-twice-and-led-with-neither) | Medium | Permissions | Fixed 2026-09-14 (closes REM-PERM-01, REM-PERM-03) |
+| [FIXED-514](#fixed-514--first-run-called-an-instance-ready-above-a-summary-that-said-decide-later) | Medium | First run | Fixed 2026-09-14 (closes REM-LAUNCH-01) |
+| [FIXED-515](#fixed-515--an-installation-nobody-had-checked-reported-itself-up-to-date) | Medium | Updates | Fixed 2026-09-14 (closes REM-SET-UPDATES) |
+| [FIXED-516](#fixed-516--a-sample-server-was-called-safe-and-defined-what-normal-mcp-setup-looks-like) | Medium | MCP | Fixed 2026-09-14 (closes REM-MCP-01, REM-MCP-02) |
+| [FIXED-517](#fixed-517--design-recorded-a-size-it-never-sent) | Medium | Design | Fixed 2026-09-14 (closes REM-DESIGN-01) |
+| [FIXED-518](#fixed-518--last-used-collapsed-five-events-into-one-word) | Low | Memory | Fixed 2026-09-14 (closes REM-MEM-02) |
+| [FIXED-519](#fixed-519--an-approval-with-no-diff-answered-what-would-this-do-with-a-request-body) | Medium | Approvals | Fixed 2026-09-14 (closes REM-APPROVAL) |
+| [FIXED-520](#fixed-520--privacy-was-one-toggle-under-a-heading-that-named-the-whole-subject) | Medium | Settings / Privacy | Fixed 2026-09-14 (closes REM-SET-PRIVACY) |
+| [FIXED-521](#fixed-521--build-named-what-a-turn-would-touch-and-not-where-it-would-run) | Medium | Build | Fixed 2026-09-14 (closes REM-BUILD-02) |
+| [FIXED-522](#fixed-522--messaging-called-one-object-a-channel-and-a-connector-and-led-with-neither) | Low | Messaging | Fixed 2026-09-14 (closes REM-MSG-01, REM-MSG-02) |
 
 ---
 
@@ -22638,3 +22648,352 @@ on the workspace. Capture at
 where the whole page reads one vocabulary: `On · Ask me` in the summary, `Ask
 me` in the agent column, and `Ask me / Allow / Automatic / Never` on every
 control below.
+
+---
+
+## FIXED-513 — The Permissions page answered “what am I looking at” twice, and led with neither
+
+**Severity: Medium. Area: Permissions. Status: Fixed 2026-09-14.
+Closes [REM-PERM-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#models-popup-and-permissions)
+and [REM-PERM-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#models-popup-and-permissions).**
+
+**Observed.** Seven stacked bands stood between arriving at Permissions and
+reaching a permission:
+
+1. a second `<h1>` reading **Permissions**, directly under the one the top bar
+   already draws — the only view in the product that did this;
+2. four page-width tiles reading `51 / 1 / 50 / 0`, the same list counted four
+   ways, with no sentence saying what any of it meant;
+3. a closed disclosure holding the read-only authority table;
+4. an accent-filled banner about fail-closed defaults;
+5. a bulk toolbar;
+6. a search row;
+7. two headed sections — and only then the registry, which carried a *second*
+   filter system: a `Group` select and a `Show` select doing the same job as the
+   tiles at the top.
+
+So the page filtered one list from two places in two idioms, and the most
+valuable space on it was spent restating the list rather than acting on it.
+`50 Unavailable` in particular reads as fifty problems, when an account where
+almost nothing is switched on is Raiker's fail-closed default working correctly.
+
+Below that, each of fifty-one rows was a bordered, rounded card inside a
+bordered panel — three nested frames around one line of text — and an opened row
+stacked up to four paragraphs that each looked like a different kind of thing.
+
+**Fixed.** One column of four panels, in the order an owner needs them:
+
+| Panel | What it answers |
+|---|---|
+| **Posture** | One sentence — *“1 of 51 permissions are available to Raiker on this account. Every one of them stops and asks you first.”* — and the counts beneath it as the page's **one** status filter |
+| **Needs your attention** | Only what is set to act without asking, each with the control that changes it |
+| **Common permissions** | The handful people arrive to change |
+| **All permissions** | The registry, with one toolbar: search, group, fold, reset |
+
+The read-only authority table moves **below** all of them, closed
+(REM-PERM-01): it is evidence for a question an owner asks second, and it had
+been sitting above every control it summarises. The duplicate `<h1>` is gone;
+the fail-closed note is one line at note weight inside the posture panel rather
+than a full-width banner; and the `Permission status` select is deleted, because
+the chips are that control.
+
+The row is extracted to `PermissionRow.svelte` and drawn as a row rather than a
+card: a hairline separator, a three-column grid — select, identity, control — so
+fifty rows read as a list instead of fifty differently ragged flex rows. Its
+detail is one shape (REM-PERM-03): **Can Raiker use this?**, **When Raiker wants
+to use it**, and a single **Why** that merges what used to be up to three
+separate paragraphs about the same capability.
+
+**Nothing about enforcement changed, and nothing about the page's contracts
+did.** The two questions, the one merged view model behind every presentation
+(NEW-PERM-02), the shortcuts that move keyboard focus to a real control
+(NEW-PERM-01), the honest `Unknown` (NEW-PERM-03) and the one owner vocabulary
+(REM-PERM-02) are all kept, and every one of their tests still passes unchanged.
+
+**Verification.** `CapabilitiesView.test.ts` (24 cases) passes with only the two
+status-filter assertions rewritten to press the chip the select replaced.
+`permissionLanguage.test.ts` gains four cases for `permissionPosture` and
+`availabilityAnswer` — including that a fail-closed account is not described as
+a page full of problems, and that “nothing is stored and it ships on” stays a
+different sentence from “you turned this on”.
+
+Live, against a running host
+(`web/e2e/removal-review-permissions-2026-09-14-live.spec.ts`): exactly one
+level-1 heading; the posture sentence present and the `Permission status`
+combobox absent; the authority table below the registry by measured geometry;
+a closed row stating `On|Off · mode`; an opened row asking both questions and
+answering the first in a sentence; and no sideways scroll at 390 px. Captures in
+`docs/screenshots/2026-09-14-permissions-overhaul/`. Axe finds no WCAG 2.1 AA
+violation in the registry at 390 px or 1440 px (`web/e2e/composer.spec.ts`).
+
+---
+
+## FIXED-514 — First run called an instance ready above a summary that said “Decide later”
+
+**Severity: Medium. Area: First run. Status: Fixed 2026-09-14.
+Closes [REM-LAUNCH-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#launch-unlock-setup-and-home).**
+
+**Observed.** The last stage of setup was headed **“Your Raiker is ready”**
+unconditionally. Two lines below it, the same screen's summary could read
+`Model — Decide later`. First run is the one place an owner has nothing to check
+a readiness claim against, so the claim is taken at face value; the first thing
+they do with it is press **Chat** and meet a composer that cannot send.
+
+**Fixed.** The heading is scoped to what was actually set up: **“Setup saved”**
+when the model was deferred, with a sentence naming what is missing. Readiness
+is per work mode, because the prerequisites differ — Chat and Build need a model
+to answer with, Design needs a provider that returns images — so a run that
+connected a chat model is not told it must also connect an image provider before
+anything is ready.
+
+**Nothing is blocked.** Exploring a mode with no model connected is how an owner
+finds out what it is, so all three tiles still open. A tile that cannot do its
+work yet says so underneath and links the exact page that supplies the missing
+piece.
+
+**Verification.** Two cases in `ModelSetupView.test.ts`: a deferred model reads
+*Setup saved*, every mode stays enabled, and the remedy link points at
+`#/models?tab=add`; and with a chat model chosen, only Design reports a missing
+prerequisite. `first-launch-live.spec.ts` asserts the deferring run reaches
+*Setup saved* rather than *Your Raiker is ready*.
+
+---
+
+## FIXED-515 — An installation nobody had checked reported itself up to date
+
+**Severity: Medium. Area: Updates. Status: Fixed 2026-09-14.
+Closes [REM-SET-UPDATES](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#settings-pages-and-remaining-destinations).**
+
+**Observed.** `update_status()` answered a packaged installation with a pinned
+channel that had never contacted it by returning state **`up_to_date`**, with
+the message “Not checked yet on this host.” Every consumer that reads the state
+rather than the sentence therefore treated it as current — including the host
+control's tone map, which drew it in the same `ok` tone as an installation that
+had asked and been told there was nothing newer.
+
+Two more claims on the Settings page were ahead of their evidence. A channel
+*check* produced “Version 2.0.0 is **ready to install**”, which asserts a
+download and a verification that a check does not perform; and a successful
+apply produced “**Installing** 2.0.0”, when what the response establishes is
+that a detached helper was started — the helper waits for this process to exit
+before it re-checks the channel, verifies the bundle and replaces anything.
+
+**Fixed.** `not_checked` is its own state with its own sentence — *whether a
+newer release exists is unknown* — and a neutral tone in the host control.
+The Settings page names the five states as five different things and shows when
+the channel was last asked, which is the fact that separates “checked, nothing
+newer” from “nobody looked”. “Ready to install” becomes “offered on the
+channel”, and the apply notice says the helper has started and that **nothing on
+this installation has changed yet**.
+
+**Verification.** A Python case in `tests/test_api_updates.py` asserts the state
+is `not_checked`, is not `up_to_date`, carries no available version, has no
+`checked_at`, and says “unknown”. The two web cases in `Updates.test.ts` are
+rewritten to the claims that are now true.
+
+---
+
+## FIXED-516 — A sample server was called “safe”, and defined what normal MCP setup looks like
+
+**Severity: Medium. Area: MCP. Status: Fixed 2026-09-14.
+Closes [REM-MCP-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#messaging-mcp-and-extensions)
+and [REM-MCP-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#messaging-mcp-and-extensions).**
+
+**Observed.** The MCP page opened with a name field and a template picker whose
+one entry read **“Sample echo server (safe starter)”**. Two problems, and the
+second is the one that lasts.
+
+A demonstrator as the page's opening move frames “generate an example and point
+Raiker at it” as how MCP is used here, ahead of the two real flows: what an
+installed plugin offers, and what is already connected.
+
+And *safe* is not a property of a sample. It depends on package integrity, on
+the boundary the process runs inside, on the environment it inherits and on the
+grants the owner gives the server afterwards. A blanket adjective teaches an
+owner to read the next one the same way, including one that opens a socket.
+
+**Fixed.** Plugin offers and configured servers lead the page. The generator
+moves below the list into a closed **Developer example** disclosure, and the
+label states the reviewed scope instead of an adjective: a dependency-free
+Python script run as a local stdio process, declaring `echo` and
+`workspace_ping`, opening no socket, writing no file and running no shell —
+and inheriting the account Raiker runs as, which is the caveat the word “safe”
+was hiding.
+
+**Verification.** `McpView.test.ts` drives the renamed action.
+`removal-review-permissions-2026-09-14-live.spec.ts` asserts against a running
+host that the name field is hidden until the disclosure is opened, that the
+scope sentence is shown, and that the string “safe starter” appears nowhere.
+
+---
+
+## FIXED-517 — Design recorded a size it never sent
+
+**Severity: Medium. Area: Design. Status: Fixed 2026-09-14.
+Closes [REM-DESIGN-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#chat-build-and-design).**
+
+**Observed.** The size select was drawn for every image provider, and the chosen
+value was validated and written to the generation row. Raiker's Gemini request
+carries prompt parts and a candidate count and **no size at all**. So the owner
+picked a shape, Raiker filed it, and the provider never heard it — and the
+canvas inspector then printed that shape beside the returned picture under the
+heading **Size**, as though it described the image on screen.
+
+Two comments in the same surface also described a retired endpoint, claiming
+that the governed image endpoint “takes a prompt, a size and a model and returns
+one picture” and that a count has no runtime path — both untrue since BUG-277
+added lineage and variations, and both sitting a few lines above the controls
+that use them. A comment describing a retired endpoint is read as a statement
+about the product by the next person to change the file.
+
+**Fixed.** `SIZED_PROVIDERS` is declared in `tier2_image.py` beside the code
+that does or does not send the size, and `GET /api/images` reports it, so the
+page reads the fact from the runtime rather than keeping a copy of it. The size
+control is disabled with a truthful reason for a provider that chooses its own,
+and the inspector prints *chosen by \<provider\>* rather than a requested value.
+A host that predates the field makes no claim, and an absent claim is not read
+as “no provider takes a size”. The stale comments are corrected to say which
+of the composer actions are implemented and which have no governed path.
+
+**Verification.** Three cases in `DesignView.test.ts`: a Gemini generation
+prints *chosen by gemini* and not the recorded value; an OpenAI one prints the
+recorded value; and an older host that omits the field keeps printing it.
+
+---
+
+## FIXED-518 — “Last used” collapsed five events into one word
+
+**Severity: Low. Area: Memory. Status: Fixed 2026-09-14.
+Closes [REM-MEM-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#memory-knowledge-map-and-usage).**
+
+**Observed.** A memory card's advanced metadata read **“Last used: 3 days ago”**
+or **“Never recalled”**. What the store actually holds is the most recent
+`recall` lifecycle event — the moment the record was put into a model's context.
+Whether the model then relied on it, quoted it, or ignored it is not recorded
+anywhere. Created, verified, included in context, cited and expires are five
+different facts, and *used* quietly claimed the strongest of them. An owner
+deciding whether to forget a fact reads that claim as evidence the fact is
+load-bearing.
+
+**Fixed.** The line reads *“Last included in a model's context”*, and says in
+the same breath that being recalled is not evidence the answer relied on it.
+`MemoryView`'s `last_used_at` field carries that meaning in its type
+documentation, so the next surface to render it does not have to rediscover what
+it holds.
+
+---
+
+## FIXED-519 — An approval with no diff answered “what would this do?” with a request body
+
+**Severity: Medium. Area: Approvals. Status: Fixed 2026-09-14.
+Closes [REM-APPROVAL](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#settings-pages-and-remaining-destinations).**
+
+**Observed.** For a file change or a patch, the approval shows the change
+itself, which is the decision. For everything else — a command, an outbound
+request, a message, a push — the detail fell through to a single `<pre>` of
+`JSON.stringify(arguments)`. A payload is evidence. It is not a consequence, and
+it was the only thing on screen above the Approve button.
+
+**Fixed.** The salient facts the proposal itself names — command, working
+directory, path, destination, host, repository, branch, recipients, scope — are
+lifted into a `label: value` list above the payload, and the payload moves into
+a disclosure below them. Three rules keep it safe to show, and all three are
+tested: it **never invents** (a key that is not present produces no row, and an
+unparseable URL yields no host), it **never authorises** (presentation over a
+payload the server already redacted; nothing here is read by anything that
+enforces), and it **never replaces the payload** (everything lifted is still in
+the arguments below). A proposal that names nothing liftable says so rather than
+rendering an empty list that reads as an empty consequence.
+
+**Verification.** Six cases in `approvalConsequence.test.ts` covering each rule,
+including truncation of a value long enough to be a payload wearing a label.
+`ApprovalsView.test.ts` (35 cases) passes unchanged.
+
+---
+
+## FIXED-520 — Privacy was one toggle under a heading that named the whole subject
+
+**Severity: Medium. Area: Settings / Privacy. Status: Fixed 2026-09-14.
+Closes [REM-SET-PRIVACY](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#settings-pages-and-remaining-destinations).**
+
+**Observed.** Settings → Privacy answered one real question — whether the
+model's working is written to disk (BUG-215) — and nothing else. An owner
+arriving there to find out what Raiker holds about them, or what has left the
+machine, met a single checkbox about reasoning traces and a page that looked
+complete.
+
+**Fixed.** An inventory, not a longer slogan. *“Everything stays on this
+machine”* would be shorter and would be false the moment a hosted provider is
+connected.
+
+**Kept on this machine** lists conversations, retained working, approved
+memories, checkpoints, audit events and generated images, each linking the page
+that reviews, exports or forgets it — and states the limit an owner must know
+before relying on deletion: forgetting removes a record from the workspace, not
+from a backup already written.
+
+**What can leave this machine** is one row per capability that can put content
+on somebody else's machine, saying what it would carry and where it would go.
+Availability is read from the **same gate list the Permissions page reads, in
+the same words**, so the two pages cannot disagree about whether something can
+leave. A gate list that has not arrived says *Reading permissions…*; one that
+failed says *Unknown — permissions not read*, because a shorter inventory reads
+as a smaller footprint, which is the failure this page exists to avoid.
+
+**Verification.** Three cases in `Privacy.test.ts` for the local inventory, the
+outbound rows in the Permissions vocabulary, and the unread-is-unknown rule.
+Live in `removal-review-permissions-2026-09-14-live.spec.ts`.
+
+---
+
+## FIXED-521 — Build named what a turn would touch, and not where it would run
+
+**Severity: Medium. Area: Build. Status: Fixed 2026-09-14.
+Closes [REM-BUILD-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#chat-build-and-design).**
+
+**Observed.** Build's boundary line named the Project, the repository, the
+attachments and the conversation size — everything about *what* a turn touches
+and nothing about *where* it executes. Those are one execution context. An owner
+who changed their execution environment and came back to a half-written prompt
+had no way to see it from the surface they were about to submit from.
+
+**Fixed.** The execution destination joins the same one-line summary, with a
+link to Runtime settings. A read that fails leaves the fact absent rather than
+guessed: claiming *Local* because a probe timed out is exactly the silent
+retarget this row exists to prevent.
+
+The snapshot-at-submission half of the row was already in place and is recorded
+here so it is not re-reported as missing — `submit()` reads the project, model
+profile and model at press time and sends them with the turn, and the server
+re-checks them.
+
+**Verification.** Two cases in `BuildView.test.ts`: the destination appears in
+the boundary summary, and nothing is claimed when the runtime read fails.
+
+---
+
+## FIXED-522 — Messaging called one object a Channel and a Connector, and led with neither
+
+**Severity: Low. Area: Messaging. Status: Fixed 2026-09-14.
+Closes [REM-MSG-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#messaging-mcp-and-extensions)
+and [REM-MSG-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#messaging-mcp-and-extensions).**
+
+**Observed.** The page opened with five rows of process configuration —
+outbound capability, egress allowlist, HMAC signing, inbound secret, rate limit
+— so connecting a messaging account began with a briefing on environment
+variables. Underneath, the list of channels was headed **Connectors**, while the
+section above it was headed **Channels**: the same object named twice, so “pair
+the connector” and “turn on the channel” read as two objects with two
+lifecycles. And a linked channel offered **Turn on**, **Send a test delivery**,
+**Routing** and **Unpair** as four buttons of equal weight, with nothing saying
+that the order matters.
+
+**Fixed.** The channel list leads and is headed **Channels**, with the extension
+behind one linked for diagnostics. The environment rows move below it into a
+closed **Delivery environment** disclosure — they are real, they are kept, and
+they are not the first thing an owner needs. Each channel carries one line
+naming the step that actually comes next: pair it, allow a sender before inbound
+messages stop being refused, or check routing and send a test before turning it
+on. The line disappears once the channel is delivering, and the buttons are
+unchanged.
+

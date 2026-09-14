@@ -130,7 +130,23 @@ the owner account. Monitoring records lifecycle status and redacted findings,
 not unbounded copies of all traffic. Local scans inspect only configured
 workspace paths.
 
-Under **Settings → Privacy**, choose whether model reasoning is retained.
+**Settings → Privacy** is the inventory of both halves. **Kept on this machine**
+lists what Raiker writes to the encrypted store — conversations and their turns,
+retained working, approved memories, checkpoints, audit events and generated
+images — and links the page that reviews, exports or forgets each one. It also
+states the limit worth knowing before you rely on forgetting: a record removed
+from the workspace is not removed from a backup already written, so re-verify a
+backup after a deletion that has to be permanent.
+
+**What can leave this machine** is one row per capability that can put your
+content somewhere else — hosted models, image generation, web fetch, channels,
+git push, MCP servers and telemetry export — saying what each would carry, where
+it would go, and whether it can happen at all. That last part is read from your
+permissions and printed in the same words **Permissions** uses, so the two pages
+cannot disagree; a permission list that has not been read says so rather than
+implying a smaller footprint.
+
+The same page is where you choose whether model reasoning is retained.
 Incognito conversations switch off ambient recall for that conversation.
 Voice dictation stores prompt provenance but not microphone audio.
 

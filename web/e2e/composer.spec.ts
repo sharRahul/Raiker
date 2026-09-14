@@ -855,7 +855,12 @@ for (const width of [390, 1440]) {
     const registry = page.getByRole("region", { name: "All permissions", exact: true });
     await expect(registry).toBeVisible();
     await expect(page.getByText("Showing 3 of 3 permissions")).toBeVisible();
-    await page.getByRole("combobox", { name: "Permission status" }).selectOption("off");
+    // The posture chips are the page's one status filter — they were four
+    // page-width tiles at the top *and* a select down here, both setting it.
+    await page
+      .getByRole("group", { name: "Filter permissions by status" })
+      .getByRole("button", { name: /Unavailable/ })
+      .click();
     await expect(registry.getByRole("button", { name: /Shell commands/i })).toBeVisible();
     await expect(registry.getByRole("button", { name: /Web fetch/i })).toHaveCount(0);
     await page.getByRole("searchbox").fill("no-such-permission");
@@ -863,7 +868,10 @@ for (const width of [390, 1440]) {
     await page.getByRole("button", { name: "Clear filters" }).click();
     await registry.getByRole("button", { name: /Shell commands/i }).click();
     await expect(registry.getByRole("button", { name: "Turn on", exact: true })).toBeVisible();
-    const audit = await new AxeBuilder({ page }).include(".cap-registry").withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+    const audit = await new AxeBuilder({ page })
+      .include('section[aria-label="All permissions"]')
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .analyze();
     expect(audit.violations).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await capture(page, join(shots, `permissions-overhaul-${width}.png`));

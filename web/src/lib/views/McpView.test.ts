@@ -249,7 +249,7 @@ describe("McpView", () => {
     render(McpView);
     await waitFor(() => expect(screen.getByText(/No MCP servers yet/)).toBeInTheDocument());
     await fireEvent.input(screen.getByLabelText("Server name"), { target: { value: "my-tools" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Create server" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Generate example server" }));
     await waitFor(() =>
       expect(mock).toHaveBeenCalledWith(
         expect.stringContaining("/api/mcp/servers"),

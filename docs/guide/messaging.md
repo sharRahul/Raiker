@@ -59,11 +59,24 @@ Full contract: [`docs/architecture/CHANNELS_SPEC.md`](../architecture/CHANNELS_S
 
 ## What a channel needs from your environment
 
-Each connector declares the environment variables it needs, and the page shows
-them on the connector itself: the variable's name, what it is for, where to get
+**Channels** leads the page, and each one carries a line naming the step that
+actually comes next — pair it, allow a sender before inbound messages stop being
+refused, or check its routing and send a test delivery before turning it on. The
+line disappears once the channel is delivering. **Turn on**, **Send a test
+delivery**, **Routing** and **Unpair** stay where they were; the sentence says
+which of them the channel is waiting for.
+
+Each channel declares the environment variables it needs, and the page shows
+them on the channel itself: the variable's name, what it is for, where to get
 it, and **whether it is set** — never what it is set to. Raiker takes the name
 of a variable and reads it at the moment it is used; that holds on this surface
 too, so a card can tell you a token is missing without ever having seen one.
+
+**Delivery environment**, at the foot of the page, is the host process's own
+configuration read back: the outbound capability, the egress allowlist, HMAC
+signing, the inbound secret and the per-sender rate limit. All five are set
+outside the app and all five are real — they are below the channels because
+connecting a messaging account should not begin with a briefing on them.
 
 ## Telegram
 

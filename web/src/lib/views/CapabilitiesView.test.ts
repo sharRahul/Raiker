@@ -67,6 +67,11 @@ async function registryWhenLoaded() {
   return within(await screen.findByRole("region", { name: "All permissions" }));
 }
 
+/** The posture chips, which are the page's one status filter. */
+function status() {
+  return within(screen.getByRole("group", { name: "Filter permissions by status" }));
+}
+
 // GEP-04 — a switch beside a running feature that it does not govern tells the
 // owner something untrue about their own control. The card has to say so.
 describe("CapabilitiesView — what each switch actually decides", () => {
@@ -493,7 +498,10 @@ describe("Permissions workspace", () => {
     await fireEvent.change(screen.getByRole("combobox", { name: "Permission group" }), { target: { value: "Network" } });
     expect(registry().queryByRole("button", { name: /Shell commands/i })).not.toBeInTheDocument();
     expect(registry().getByRole("button", { name: /Web fetch/i })).toBeInTheDocument();
-    await fireEvent.change(screen.getByRole("combobox", { name: "Permission status" }), { target: { value: "off" } });
+    // REM-PERM-01 — the status filter is the posture chips, which are also the
+    // page's one statement of what is on. It used to be both four page-width
+    // tiles at the top and a select two-thirds of the way down.
+    await fireEvent.click(status().getByRole("button", { name: /Unavailable/ }));
     expect(screen.getByText("No matching permissions")).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     expect(screen.getByText("Showing 2 of 2 permissions")).toBeInTheDocument();
@@ -510,7 +518,8 @@ describe("Permissions workspace", () => {
     expect(list.getByRole("checkbox", { name: "Select Web fetch" })).toBeDisabled();
     expect(list.getByRole("checkbox", { name: "Select all Network capabilities" })).toBeDisabled();
     await fireEvent.click(list.getByRole("checkbox", { name: "Select Shell commands" }));
-    await fireEvent.change(screen.getByRole("combobox", { name: "Permission status" }), { target: { value: "selected" } });
+    // The Selected chip appears only once there is a selection to filter to.
+    await fireEvent.click(status().getByRole("button", { name: /Selected/ }));
     expect(screen.getByText("Showing 1 of 2 permissions")).toBeInTheDocument();
     expect(registry().queryByRole("checkbox", { name: "Select Web fetch" })).not.toBeInTheDocument();
   });

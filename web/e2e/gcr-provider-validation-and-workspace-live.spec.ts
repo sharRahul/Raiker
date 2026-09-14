@@ -125,7 +125,7 @@ test("the hosted gate the validation consults is the one Permissions reports", a
   // one factory, so the gate that refuses a hosted provider is a single fact —
   // and Permissions must state the same one (FIXED-322).
   await page.goto(`${BASE}/#/capabilities`);
-  await page.getByPlaceholder(/Search capabilities/).waitFor({ timeout: 60_000 });
+  await page.getByLabel("Search capabilities").waitFor({ timeout: 60_000 });
   const hosted = page.locator(".cap.card").filter({ hasText: /Hosted models/ }).first();
   await expect(hosted).toBeVisible({ timeout: 60_000 });
   await capture(

@@ -53,6 +53,18 @@ SUPPORTED_PROVIDERS = ("openai", "gemini")
 #: forwards to a provider without understanding it.
 SUPPORTED_SIZES = ("1024x1024", "1536x1024", "1024x1536")
 
+#: Providers whose governed request actually carries the size.
+#:
+#: REM-DESIGN-01 — a control unsupported by the selected endpoint should not be
+#: drawn as though it decided anything. OpenAI's images endpoints take `size`;
+#: the Gemini call below sends prompt parts and a candidate count and no size at
+#: all, so a size chosen for a Gemini generation was accepted by the form,
+#: validated against the list above, recorded on the row, and never sent. The
+#: gallery then printed it beside the picture as though it were the picture's
+#: size. Named here, beside the code that does or does not send it, so the page
+#: reads the fact from the runtime rather than keeping its own copy of it.
+SIZED_PROVIDERS = ("openai",)
+
 def declared_image_models(profile: dict[str, Any]) -> tuple[str, ...]:
     """Every image model this profile offers, default first.
 

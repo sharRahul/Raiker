@@ -65,6 +65,10 @@
     source_checkout: "neutral",
     no_channel: "neutral",
     unsigned_build: "warn",
+    // REM-SET-UPDATES — an installation nobody has checked is unknown, not
+    // current. It reached this map as `up_to_date` and was drawn in the same
+    // tone as a host that had asked and been told there was nothing newer.
+    not_checked: "neutral",
     up_to_date: "ok",
     available: "warn",
     unreachable: "warn",

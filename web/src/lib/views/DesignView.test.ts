@@ -153,3 +153,70 @@ describe("arriving at Design from a project", () => {
     expect(await screen.findByText(/Enter generates/)).toBeInTheDocument();
   });
 });
+
+/*
+ * REM-DESIGN-01 — a control that decides nothing, and a record that says it did.
+ *
+ * The size select was drawn for every provider and its value recorded on the
+ * row. Raiker's Gemini request carries prompt parts and a candidate count and no
+ * size at all, so the owner picked a shape, Raiker filed it, and the provider
+ * never heard it — and the gallery then printed that shape beside the returned
+ * picture as though it described it.
+ */
+describe("the size control says what it decides", () => {
+  it("prints a provider-chosen size as chosen by the provider", async () => {
+    stubFetch(
+      routes({
+        "GET /api/images": {
+          sizes: ["1024x1024"],
+          sized_providers: ["openai"],
+          generations: [
+            generation({ generation_id: "img_g", provider: "gemini", size: "1024x1536" }),
+          ],
+        },
+      }),
+    );
+    arriveAt("#/design?asset=img_g");
+    render(DesignView);
+
+    await waitFor(() => expect(screen.getByText("chosen by gemini")).toBeInTheDocument());
+    expect(screen.queryByText("1024x1536")).toBeNull();
+  });
+
+  it("prints the recorded size for a provider the size is sent to", async () => {
+    stubFetch(
+      routes({
+        "GET /api/images": {
+          sizes: ["1024x1024"],
+          sized_providers: ["openai"],
+          generations: [
+            generation({ generation_id: "img_o", provider: "openai", size: "1536x1024" }),
+          ],
+        },
+      }),
+    );
+    arriveAt("#/design?asset=img_o");
+    render(DesignView);
+
+    await waitFor(() => expect(screen.getByText("1536x1024")).toBeInTheDocument());
+  });
+
+  it("makes no claim on a host that does not report the field", async () => {
+    // An older host says nothing about which providers take a size, and an
+    // absent claim must not be read as "none of them do".
+    stubFetch(
+      routes({
+        "GET /api/images": {
+          sizes: ["1024x1024"],
+          generations: [
+            generation({ generation_id: "img_g", provider: "gemini", size: "1024x1536" }),
+          ],
+        },
+      }),
+    );
+    arriveAt("#/design?asset=img_g");
+    render(DesignView);
+
+    await waitFor(() => expect(screen.getByText("1024x1536")).toBeInTheDocument());
+  });
+});

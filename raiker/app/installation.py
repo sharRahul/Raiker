@@ -304,9 +304,18 @@ class UpdateStatus:
 #: ``source_checkout``  this Raiker was not installed from a release artifact.
 #: ``no_channel``       packaged, but no update channel has been pinned.
 #: ``unsigned_build``   packaged from a build that never ran platform signing.
+#: ``not_checked``      packaged and pinned, but nothing has asked the channel.
 #: ``up_to_date``       the channel has nothing newer.
 #: ``available``        a newer, signed release exists for this target.
 #: ``unreachable``      the channel could not be read; nothing was changed.
+#:
+#: REM-SET-UPDATES — ``not_checked`` is its own state because it used to be
+#: ``up_to_date`` carrying the message "Not checked yet on this host."  Every
+#: consumer that reads the state rather than the sentence — the host control's
+#: tone map among them — therefore rendered a host that had never contacted its
+#: channel as *current*, in the same green as one that had asked and been told
+#: it was.  "Nobody has looked" and "there is nothing newer" are different
+#: facts, and only one of them is an assurance.
 STATE_MESSAGES = {
     "source_checkout": _SOURCE_NOTE,
     "no_channel": (
@@ -316,6 +325,10 @@ STATE_MESSAGES = {
     "unsigned_build": (
         "This build was produced without platform signing, so it is not eligible "
         "for automatic updates. Reinstall from a signed release artifact."
+    ),
+    "not_checked": (
+        "Nothing has asked the update channel on this host yet, so whether a "
+        "newer release exists is unknown. Check for updates to find out."
     ),
     "up_to_date": "This is the newest release on the configured channel.",
     "unreachable": (
@@ -360,7 +373,7 @@ def update_status(
     if config is None:
         return status("no_channel")
     if fetched_index is None:
-        return status("up_to_date", message="Not checked yet on this host.")
+        return status("not_checked")
 
     index, signature = fetched_index
     detected = current_target()

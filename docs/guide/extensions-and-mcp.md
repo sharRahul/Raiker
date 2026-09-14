@@ -48,14 +48,27 @@ Raiker can build, connect to, and monitor Model Context Protocol servers.
 be at a **runtime** state — turn each on in **Permissions**. Until then the form
 is disabled and the page says which of the two is missing.
 
-To create one:
+The page leads with the two real ways a server gets here: **Offered by your
+plugins**, where an installed plugin describes a server it works with, and the
+list of servers already configured. Adding an offered one runs the ordinary
+governed create path, so a plugin goes *through* the trust gate rather than
+around it.
 
-1. Enter a server name.
-2. Pick a template — *Sample echo server (safe starter)* ships with Raiker.
-3. **Create server**. The generated file lands at
+**Developer example**, at the foot of the page, generates a sample server so you
+can watch the protocol work on your own machine. It is a demonstrator rather
+than how integration normally starts, which is why it reads after the list:
+
+1. Open **Developer example** and enter a server name.
+2. Pick an example. One ships with Raiker: *Local Python sample — echo and ping
+   only*. It generates a dependency-free script Raiker runs as a local stdio
+   process, declaring `echo` and `workspace_ping`; the generated file opens no
+   socket, writes no file and runs no shell. It inherits the account Raiker runs
+   as, so read it before extending it into anything that does — which is the
+   whole reason the label states its scope instead of calling it safe.
+3. **Generate example server**. The generated file lands at
    `.raiker/mcp/servers/<name>.py`; writing it goes through the normal file-write
    approval path.
-4. **Test** connects and discovers tools. The echo template exposes `echo` and
+4. **Test** connects and discovers tools. The example exposes `echo` and
    `workspace_ping`.
 
 Each server card shows its command, template, last connection, and recent

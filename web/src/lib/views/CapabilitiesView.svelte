@@ -3,14 +3,13 @@
   import AuthorityMatrix from "../components/AuthorityMatrix.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
+  import PermissionRow from "../components/PermissionRow.svelte";
   import StepUpDialog from "../components/StepUpDialog.svelte";
-  import ToolControlBoard from "../components/ToolControlBoard.svelte";
   import type { StepUpValues } from "../components/StepUpDialog.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
   import type { CapabilityGate } from "../apiTypes";
   import {
-    canDisable,
     canEnable,
     capabilityDescription,
     capabilityDomain,
@@ -22,22 +21,15 @@
     isDeferred,
     isInherent,
     authorityMatrixGates,
-    isOnByDefault,
-    realityLabel,
-    realityNote,
-    unsetResolutionNote,
     requiresStepUpToken,
     type DecisionMode,
   } from "../capabilityModel";
   import { explainReasonCode } from "../reasonCodes";
   import {
-    AVAILABILITY_QUESTION,
     BEHAVIOUR_COPY,
-    BEHAVIOUR_QUESTION,
-    CANNOT_CHANGE_HERE,
-    behaviourCopy,
     commonGates,
     permissionAttention,
+    permissionPosture,
     rowSummary,
   } from "../permissionLanguage";
   import {
@@ -48,6 +40,30 @@
     survivingModes,
     type ConfirmedModes,
   } from "../permissionViewModel";
+
+  /*
+   * Permissions, rebuilt 2026-09-14.
+   *
+   * Nothing about what the runtime enforces changed here, and nothing about the
+   * page's contracts did either: the two questions, the one merged view model
+   * behind every summary (NEW-PERM-02), the shortcuts that move focus to a real
+   * control (NEW-PERM-01), the honest Unknown (NEW-PERM-03) and the one owner
+   * vocabulary (REM-PERM-02) are all kept. What changed is the shape an owner
+   * meets them in.
+   *
+   * The page had grown seven stacked bands before the first permission: a
+   * heading that repeated the one in the top bar, four page-width tiles
+   * restating the list as counts, a disclosure, a banner, a bulk bar, a search
+   * row, and then two more headed sections. Two of those bands filtered the same
+   * list in two different idioms — tiles at the top, selects two-thirds of the
+   * way down — so the page had two answers to "what am I looking at" and no
+   * obvious place to change one permission.
+   *
+   * It is one column of four panels now: posture and filters, what needs the
+   * owner, what they usually come for, and the registry — with the read-only
+   * authority table demoted below all of them (REM-PERM-01) rather than sitting
+   * above the controls it summarises.
+   */
 
   let { principal = "—" }: { principal?: string } = $props();
 
@@ -296,7 +312,25 @@
   );
   const authorityGates = $derived(authorityMatrixGates(governedGates));
   const domains = $derived(groupByDomain(governedGates).map(group => group.domain));
-  const onCount = $derived(governedGates.filter(isAvailable).length);
+  const posture = $derived(permissionPosture(governedGates));
+
+  /**
+   * The status filters, as one control instead of two.
+   *
+   * These counts were four page-width tiles at the top of the page and a
+   * `<select>` two-thirds of the way down it, both setting `statusFilter`. One
+   * idiom, in one place, beside the sentence they are counts of. `Selected`
+   * appears only once there is a selection to filter to.
+   */
+  const statusFilters = $derived([
+    { id: "all", label: "All", count: governedGates.length },
+    { id: "on", label: "Available", count: posture.available },
+    { id: "off", label: "Unavailable", count: governedGates.length - posture.available },
+    { id: "attention", label: "Needs review", count: attention.length },
+    ...(selectedCaps.size > 0
+      ? [{ id: "selected", label: "Selected", count: selectedCaps.size }]
+      : []),
+  ]);
 
   function toggleExpand(capability: string) {
     expanded = expanded === capability ? null : capability;
@@ -351,8 +385,9 @@
     control.scrollIntoView?.({ block: "center" });
   }
 
-  async function setMode(gate: CapabilityGate, mode: DecisionMode) {
-    const capability = gate.capability;
+  async function setMode(capability: string, mode: DecisionMode) {
+    const gate = effective.find((entry) => entry.capability === capability);
+    if (gate === undefined) return;
     if (modeFor(gate) === mode || mutationBusy || !gate.can_current_principal_change) return;
     // Tightening modes (ask/deny) apply immediately; loosening modes (allow/auto)
     // require the step-up window with an explicit reason.
@@ -404,6 +439,12 @@
       requireThreatAck: ackNeeded,
       ackNeeded,
     };
+    dialogError = null;
+  }
+
+  function startDisable(gate: CapabilityGate) {
+    if (mutationBusy) return;
+    pending = { kind: "disable_cap", capability: gate.capability };
     dialogError = null;
   }
 
@@ -484,95 +525,82 @@
   onMount(load);
 </script>
 
-<header class="permissions-header">
-  <div>
-    <h1>Permissions</h1>
-    <p>Choose what Raiker can use and when it should ask you.</p>
+<!-- One page title, and it is the one in the top bar that every other page
+     uses. This view carried a second `<h1>` reading "Permissions" directly
+     under it — the only view in the product that did. -->
+<header class="perm-head">
+  <p class="lede">Choose what Raiker can use, and when it should ask you.</p>
+  <div class="head-actions">
+    <button
+      type="button"
+      class="btn btn-ghost btn-sm"
+      onclick={load}
+      disabled={refreshing || mutationBusy}
+      aria-label="Refresh capabilities"
+    >
+      <Icon name="refresh" size="sm" />
+      {refreshing ? "Refreshing…" : "Refresh"}
+    </button>
+    <GuideLink route="capabilities" />
   </div>
-  <GuideLink route="capabilities" />
 </header>
 
 {#if notice}
   <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
 {/if}
 
-{#if gates !== null && authorityGates.length > 0}
-  <div class="permission-stats" role="group" aria-label="Filter permissions by status">
-    {#each [{id: "all", label: "All permissions", count: governedGates.length}, {id: "on", label: "Available", count: onCount}, {id: "off", label: "Unavailable", count: governedGates.length - onCount}, {id: "attention", label: "Needs review", count: attention.length}] as item}
-      <button type="button" class:active={statusFilter === item.id} aria-pressed={statusFilter === item.id} onclick={() => statusFilter = item.id}>
-        <strong>{item.count}</strong><span>{item.label}</span>
-      </button>
-    {/each}
-  </div>
-  <details class="authority-disclosure">
-    <summary>How your permissions apply</summary>
-    <AuthorityMatrix gates={authorityGates} total={governedGates.length} />
-  </details>
-{/if}
-
-{#if integratedButOff > 0}
-  <div class="runtime-note" role="note">
-    <Icon name="info" size="md" />
-    <!-- Five lines teaching the fail-closed model, on a page that already links
-         to the guide section that teaches it. What is left is the one fact this
-         page must state about its own rows, and the one route it is not. -->
-    <span>
-      Capabilities with a real executor start <strong>off</strong> on this account until you turn
-      them on. To stop all work instead, use
-      <a href="#/settings">Settings → Runtime configuration</a>.
-    </span>
-  </div>
-{/if}
-
-{#if selectedCaps.size > 0}
-  <div class="bulk-bar" role="toolbar" aria-label="Bulk capability actions">
-    <span class="bulk-count">{selectedCaps.size} selected</span>
-    <button type="button" class="btn btn-ghost btn-sm" onclick={() => (selectedCaps = new Set())} disabled={mutationBusy}>Clear</button>
-    <span class="bulk-label">Set all to:</span>
-    <!-- REM-PERM-02 — the same words the controls below use. These two said
-         "Ask" and "Deny" about the values every other control on the page calls
-         "Ask me" and "Never", so one policy had two names on one screen. -->
-    <button type="button" class="btn btn-sm" onclick={() => void bulkSetMode("ask")} disabled={mutationBusy}>{BEHAVIOUR_COPY.ask.label}</button>
-    <button type="button" class="btn btn-sm btn-danger" onclick={() => void bulkSetMode("deny")} disabled={mutationBusy}>{BEHAVIOUR_COPY.deny.label}</button>
-  </div>
-{/if}
-
-<div class="toolbar">
-  <div class="search">
-    <Icon name="search" size="sm" />
-    <label class="sr-only" for="cap-search">Search capabilities</label>
-    <input
-      id="cap-search"
-      class="search-input"
-      type="search"
-      placeholder="Search permissions, actions or groups…"
-      bind:value={search}
-    />
-  </div>
-  <button type="button" class="btn btn-ghost btn-sm" onclick={load} disabled={refreshing || mutationBusy} aria-label="Refresh capabilities">
-    <Icon name="refresh" size="sm" />
-    {refreshing ? "Refreshing…" : "Refresh"}
-  </button>
-</div>
-
 {#if loadError}
   <PageState state="error" title="Couldn't load capabilities" detail={loadError} />
 {:else if gates === null}
   <PageState state="loading" title="Loading capabilities…" />
 {:else}
+  <!-- One posture summary, with the counts as the page's single status filter
+       (REM-PERM-01). -->
+  <section class="panel posture" aria-label="Permission posture">
+    <p class="posture-line">{posture.sentence}</p>
+    <div class="chip-row" role="group" aria-label="Filter permissions by status">
+      {#each statusFilters as item (item.id)}
+        <button
+          type="button"
+          class="chip"
+          aria-pressed={statusFilter === item.id}
+          onclick={() => (statusFilter = item.id)}
+        >
+          <span class="chip-count">{item.count}</span>
+          {item.label}
+        </button>
+      {/each}
+    </div>
+    {#if integratedButOff > 0}
+      <!-- Why a fresh account shows almost everything off. One sentence, at
+           note weight: it was a full-width accent banner competing with the
+           controls under it. -->
+      <p class="posture-note">
+        <Icon name="info" size="sm" />
+        <span>
+          Capabilities with a real executor start <strong>off</strong> on this account until you
+          turn them on. To stop all work instead, use
+          <a href="#/settings">Settings → Runtime configuration</a>.
+        </span>
+      </p>
+    {/if}
+  </section>
+
   {#if !filtering && attention.length > 0}
-    <!-- VIS2-18's hierarchy, on this page: what needs a decision comes before
-         what is merely configured. Narrow on purpose — a capability sitting at
-         its default is not attention, and a page that calls everything
-         attention has said nothing. -->
-    <section class="cap-attention" aria-label="Needs your attention">
+    <!-- What needs a decision comes before what is merely configured. Narrow on
+         purpose — a capability sitting at its default is not attention, and a
+         page that calls everything attention has said nothing. -->
+    <section class="panel panel-attention" aria-label="Needs your attention">
       <h2>Needs your attention</h2>
-      <ul>
+      <ul class="shortcuts">
         {#each attention as item (item.capability)}
           <li>
-            <span class="shortcut-text"><strong>{item.label}</strong> — {item.reason}</span>
-            <!-- NEW-PERM-01 — the section says a decision wants a second look,
-                 so it offers the place to make it. -->
+            <span class="shortcut-text">
+              <span class="cap-label">{item.label}</span>
+              <span class="cap-summary">{item.reason}</span>
+            </span>
+            <!-- The section says a decision wants a second look, so it offers
+                 the place to make it (NEW-PERM-01). -->
             <button
               type="button"
               class="btn btn-ghost btn-sm"
@@ -591,9 +619,9 @@
     <!-- The handful people actually come to change, above the registry that
          holds everything. Same gates, same controls: this is an ordering, not a
          second copy of the page's state. -->
-    <section class="cap-common" aria-label="Common permissions">
+    <section class="panel" aria-label="Common permissions">
       <h2>Common permissions</h2>
-      <ul>
+      <ul class="shortcuts">
         {#each common as gate (gate.capability)}
           <li>
             <span class="shortcut-text">
@@ -611,190 +639,118 @@
           </li>
         {/each}
       </ul>
-
     </section>
   {/if}
 
   <!-- The registry: everything, grouped by domain. It keeps the full list an
        owner may need to audit, and sits under the two sections that answer the
        questions people actually arrive with. -->
-  <section class="cap-registry" aria-label="All permissions">
-  <div class="registry-heading">
-    <div><h2>All permissions</h2><p aria-live="polite">Showing {visibleCount} of {governedGates.length} permissions</p></div>
-    <div class="registry-filters">
-      <label>Group
-        <select bind:value={domainFilter} aria-label="Permission group">
+  <section class="panel registry" aria-label="All permissions">
+    <div class="registry-heading">
+      <div>
+        <h2>All permissions</h2>
+        <p aria-live="polite">Showing {visibleCount} of {governedGates.length} permissions</p>
+      </div>
+      <!-- One toolbar: find, narrow, fold, reset. The search sat in a band of
+           its own two sections above this heading, so the control and the list
+           it filtered were not on screen together. -->
+      <div class="registry-filters">
+        <div class="search">
+          <Icon name="search" size="sm" />
+          <label class="sr-only" for="cap-search">Search capabilities</label>
+          <input
+            id="cap-search"
+            class="search-input"
+            type="search"
+            placeholder="Search permissions, actions or groups…"
+            bind:value={search}
+          />
+        </div>
+        <label class="sr-only" for="cap-group">Permission group</label>
+        <select id="cap-group" bind:value={domainFilter}>
           <option value="all">All groups</option>
           {#each domains as domain}<option value={domain}>{domain}</option>{/each}
         </select>
-      </label>
-      <label>Show
-        <select bind:value={statusFilter} aria-label="Permission status">
-          <option value="all">All permissions</option>
-          <option value="on">Available</option>
-          <option value="off">Unavailable</option>
-          <option value="attention">Needs review</option>
-          <option value="selected">Selected</option>
-        </select>
-      </label>
-      <button type="button" class="btn btn-ghost btn-sm" onclick={() => collapsedDomains = []}>Expand groups</button>
-      <button type="button" class="btn btn-ghost btn-sm" disabled={searching} onclick={() => collapsedDomains = [...domains]}>Collapse groups</button>
-      {#if filtering}<button type="button" class="btn btn-ghost btn-sm" onclick={clearFilters}>Clear filters</button>{/if}
-    </div>
-  </div>
-  {#if visibleCount === 0}
-    <PageState state="empty" title={governedGates.length === 0 ? "No permissions available" : "No matching permissions"} detail={governedGates.length === 0 ? "This runtime has not reported any configurable tools." : "Try a different search, group or status filter."} />
-  {/if}
-  {#each filtered as group (group.domain)}
-    <div class="cap-list">
-      <div class="phase-head">
-        <label class="phase-select-all">
-          <input
-            type="checkbox"
-            disabled={mutationBusy || selectable(group.gates).length === 0}
-            indeterminate={selectable(group.gates).some(cap => selectedCaps.has(cap)) && !allSelectedInGroup(selectable(group.gates))}
-            checked={allSelectedInGroup(selectable(group.gates))}
-            onchange={() => toggleSelectAllInGroup(selectable(group.gates))}
-            aria-label={`Select all ${group.domain} capabilities`}
-          />
-          {group.domain}
-        </label>
-        <button
-          type="button"
-          class="phase-fold"
-          aria-expanded={!isCollapsed(group.domain)}
-          onclick={() => toggleDomain(group.domain)}
-        >
-          <span class="phase-count">{group.gates.length}</span>
-          <Icon name={isCollapsed(group.domain) ? "chevron-right" : "chevron-down"} size="sm" />
-          <span class="sr-only">
-            {isCollapsed(group.domain) ? "Show" : "Hide"}
-            {group.domain} capabilities
-          </span>
-        </button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick={() => collapsedDomains = []}>Expand groups</button>
+        <button type="button" class="btn btn-ghost btn-sm" disabled={searching} onclick={() => collapsedDomains = [...domains]}>Collapse groups</button>
+        {#if filtering}<button type="button" class="btn btn-ghost btn-sm" onclick={clearFilters}>Clear filters</button>{/if}
       </div>
-      {#each isCollapsed(group.domain) ? [] : group.gates as gate (gate.capability)}
-        {@const isOpen = expanded === gate.capability}
-        <div class="cap card" class:open={isOpen}>
-          <div class="cap-row">
+    </div>
+
+    {#if selectedCaps.size > 0}
+      <div class="bulk-bar" role="toolbar" aria-label="Bulk capability actions">
+        <span class="bulk-count">{selectedCaps.size} selected</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick={() => (selectedCaps = new Set())} disabled={mutationBusy}>Clear</button>
+        <span class="bulk-label">Set all to:</span>
+        <!-- REM-PERM-02 — the same words the controls below use. These two said
+             "Ask" and "Deny" about the values every other control on the page
+             calls "Ask me" and "Never", so one policy had two names on one
+             screen. -->
+        <button type="button" class="btn btn-sm" onclick={() => void bulkSetMode("ask")} disabled={mutationBusy}>{BEHAVIOUR_COPY.ask.label}</button>
+        <button type="button" class="btn btn-sm btn-danger" onclick={() => void bulkSetMode("deny")} disabled={mutationBusy}>{BEHAVIOUR_COPY.deny.label}</button>
+      </div>
+    {/if}
+
+    {#if visibleCount === 0}
+      <PageState state="empty" title={governedGates.length === 0 ? "No permissions available" : "No matching permissions"} detail={governedGates.length === 0 ? "This runtime has not reported any configurable tools." : "Try a different search, group or status filter."} />
+    {/if}
+
+    {#each filtered as group (group.domain)}
+      <div class="cap-list">
+        <div class="phase-head">
+          <label class="phase-select-all">
             <input
               type="checkbox"
-              class="cap-check"
-              disabled={mutationBusy || !gate.can_current_principal_change}
-              checked={selectedCaps.has(gate.capability)}
-              onchange={() => toggleCapSelected(gate.capability)}
-              aria-label={`Select ${capabilityLabel(gate.capability)}`}
+              disabled={mutationBusy || selectable(group.gates).length === 0}
+              indeterminate={selectable(group.gates).some(cap => selectedCaps.has(cap)) && !allSelectedInGroup(selectable(group.gates))}
+              checked={allSelectedInGroup(selectable(group.gates))}
+              onchange={() => toggleSelectAllInGroup(selectable(group.gates))}
+              aria-label={`Select all ${group.domain} capabilities`}
             />
-            <button
-              type="button"
-              class="cap-toggle"
-              id={rowToggleId(gate.capability)}
-              aria-expanded={isOpen}
-              onclick={() => toggleExpand(gate.capability)}
-            >
-              <span class="chev" aria-hidden="true">
-                <Icon name={isOpen ? "chevron-down" : "chevron-right"} size="sm" />
-              </span>
-              <span class="cap-name">
-                <span class="cap-label">{capabilityLabel(gate.capability)}</span>
-                <!-- Whether the capability is on was only discoverable by
-                     opening the card and reading which buttons appeared, while
-                     the decision mode beside it showed on every row on or off.
-                     A permission list that cannot be scanned for what is on is
-                     not a permission list. -->
-                <!-- Availability and behaviour on the closed row, in the order
-                     the page asks them: a list that has to be opened row by row
-                     to learn what is on cannot be scanned.
-
-                     One statement of availability, not two. This row carried a
-                     separate "Off" chip beside the summary, which said the same
-                     thing twice — and on a capability that is on by default the
-                     two disagreed, the chip reading "On by default" next to a
-                     summary reading "Off". BUG-239's distinction is kept: being
-                     on because nothing is stored is a different fact from being
-                     switched on, and it is said here rather than contradicted. -->
-                {#if isOnByDefault(gate)}
-                  <span class="cap-reality cap-default-on">On by default</span>
-                {/if}
-                <span class="cap-summary">
-                  {rowSummary(gate, isAvailable(gate))}
-                </span>
-                {#if realityLabel(gate)}
-                  <span class="cap-reality">{realityLabel(gate)}</span>
-                {/if}
-              </span>
-            </button>
-
-            <ToolControlBoard
-              gates={[gate]}
-              showLabel={false}
-              modes={controlModes}
-              busyCapability={mutationBusy ? gate.capability : null}
-              onDecision={(_capability, m) => setMode(gate, m)}
-            />
-          </div>
-
-          {#if isOpen}
-            <div class="cap-detail">
-              <p class="cap-desc">{capabilityDescription(gate.capability)}</p>
-              {#if realityNote(gate)}
-                <!--
-                  GEP-04 — this switch does not decide whether the capability
-                  runs. Saying so, and naming what does, is the whole point: a
-                  toggle beside a running feature that it does not govern tells
-                  the owner something untrue about their own control.
-                -->
-                <p class="cap-reality-note">
-                  <strong>{realityLabel(gate)}.</strong>
-                  {realityNote(gate)}
-                </p>
-              {/if}
-              {#if unsetResolutionNote(gate)}
-                <!-- BUG-239 — three capabilities read an empty gate table as
-                     something other than "off", and which one applies is not
-                     guessable from the switch. The card says it rather than
-                     leaving an owner to discover it from behaviour. -->
-                <p class="cap-reality-note">{unsetResolutionNote(gate)}</p>
-              {/if}
-              <!-- NEW-PERM-03 — an unrecognised mode used to drop this block
-                   entirely, so the card answered the behaviour question with
-                   silence. It is answered as Unknown instead. -->
-              <p class="question">{BEHAVIOUR_QUESTION}</p>
-              <p class="mode-hint">{behaviourCopy(gate.decision_mode).hint}</p>
-
-              <p class="question">{AVAILABILITY_QUESTION}</p>
-              <div class="cap-actions">
-                {#if canEnable(gate)}
-                  <button type="button" class="btn btn-soft btn-sm" disabled={mutationBusy} onclick={() => startEnable(gate)}>
-                    Turn on
-                  </button>
-                {/if}
-                {#if canDisable(gate)}
-                  <button
-                    type="button"
-                    class="btn btn-danger btn-sm"
-                    disabled={mutationBusy}
-                    onclick={() => {
-                      pending = { kind: "disable_cap", capability: gate.capability };
-                      dialogError = null;
-                    }}
-                  >
-                    Turn off
-                  </button>
-                {/if}
-                {#if !gate.can_current_principal_change}
-                  <!-- The fact is unchanged; the sentence is about the owner's
-                       account rather than about our vocabulary. -->
-                  <span class="muted">{CANNOT_CHANGE_HERE}</span>
-                {/if}
-              </div>
-            </div>
-          {/if}
+            {group.domain}
+          </label>
+          <button
+            type="button"
+            class="phase-fold"
+            aria-expanded={!isCollapsed(group.domain)}
+            onclick={() => toggleDomain(group.domain)}
+          >
+            <span class="phase-count">{group.gates.length}</span>
+            <Icon name={isCollapsed(group.domain) ? "chevron-right" : "chevron-down"} size="sm" />
+            <span class="sr-only">
+              {isCollapsed(group.domain) ? "Show" : "Hide"}
+              {group.domain} capabilities
+            </span>
+          </button>
         </div>
-      {/each}
-    </div>
-  {/each}
+        {#each isCollapsed(group.domain) ? [] : group.gates as gate (gate.capability)}
+          <PermissionRow
+            {gate}
+            open={expanded === gate.capability}
+            selected={selectedCaps.has(gate.capability)}
+            busy={mutationBusy}
+            modes={controlModes}
+            toggleId={rowToggleId(gate.capability)}
+            onToggleOpen={toggleExpand}
+            onToggleSelect={toggleCapSelected}
+            onDecision={(capability, mode) => void setMode(capability, mode)}
+            onEnable={startEnable}
+            onDisable={startDisable}
+          />
+        {/each}
+      </div>
+    {/each}
   </section>
+
+  {#if authorityGates.length > 0}
+    <!-- REM-PERM-01 — evidence, not the owner's first task. The read-only
+         table used to sit above every control on the page; it is reference for
+         a question an owner asks second, so it reads second, and closed. -->
+    <details class="panel authority-disclosure">
+      <summary>How your permissions apply</summary>
+      <AuthorityMatrix gates={authorityGates} total={governedGates.length} />
+    </details>
+  {/if}
 {/if}
 
 {#if pending !== null}
@@ -817,32 +773,137 @@
 {/if}
 
 <style>
-  .permissions-header { display: flex; align-items: start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); }
-  .permissions-header h1 { margin: 0; font-size: var(--text-xl); }
-  .permissions-header p { margin: var(--space-2) 0 0; color: var(--text-2); }
-  .permission-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
-  .permission-stats button { display: flex; flex-direction: column; align-items: start; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); font: inherit; cursor: pointer; text-align: left; }
-  .permission-stats strong { font-size: var(--text-xl); color: var(--text-1); font-variant-numeric: tabular-nums; }
-  .permission-stats button.active { border-color: var(--accent); background: var(--accent-soft); }
-  .authority-disclosure { margin-bottom: var(--space-4); }
-  .authority-disclosure summary { cursor: pointer; color: var(--text-2); padding: var(--space-2) 0; }
-  .registry-heading { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-4); }
-  .registry-heading h2 { font-size: var(--text-md); margin: 0; }
-  .registry-heading p { font-size: var(--text-sm); color: var(--text-3); margin: var(--space-2) 0 0; }
-  .registry-filters { display: flex; align-items: end; gap: var(--space-2); flex-wrap: wrap; }
-  .registry-filters label { display: grid; gap: var(--space-1); font-size: var(--text-xs); color: var(--text-2); }
-  .registry-filters select { font: inherit; font-size: var(--text-sm); color: var(--text-1); background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: var(--space-2); max-width: 100%; }
-  @media (max-width: 600px) {
-    .permission-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .permissions-header { flex-wrap: wrap; }
-    .registry-filters { width: 100%; }
+  /* One column of panels, each with the same padding, radius and border, so the
+     page reads as one surface rather than as seven bands that each invented
+     their own. */
+  .perm-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+    flex-wrap: wrap;
   }
-  .toolbar {
+  .lede {
+    margin: 0;
+    color: var(--text-2);
+    font-size: var(--text-md);
+  }
+  .head-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .panel {
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+  .panel h2 {
+    margin: 0 0 var(--space-3);
+    font-size: var(--text-md);
+  }
+  .posture {
+    display: grid;
+    gap: var(--space-3);
+  }
+  .posture-line {
+    margin: 0;
+    color: var(--text-1);
+    font-size: var(--text-base);
+  }
+  .chip-count {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    margin-right: 0.3rem;
+  }
+  .posture-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin: 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+  .posture-note a {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  /* The one panel that is about something unresolved keeps a marker, in text
+     weight rather than in a fill: a page where a section shouts is a page where
+     the shout stops meaning anything. */
+  .panel-attention {
+    border-inline-start: 3px solid var(--warn);
+  }
+  .shortcuts {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+  }
+  .shortcuts li {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    margin-bottom: var(--space-4);
+    flex-wrap: wrap;
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .shortcuts li:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .shortcut-text {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+    flex: 1 1 12rem;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+  .cap-label {
+    font-weight: 600;
+  }
+  .cap-summary {
+    color: var(--text-3);
+    font-size: var(--text-xs);
+  }
+  .registry-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+  .registry-heading h2 {
+    margin: 0;
+  }
+  .registry-heading p {
+    font-size: var(--text-sm);
+    color: var(--text-3);
+    margin: var(--space-1) 0 0;
+  }
+  .registry-filters {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+  .registry-filters select {
+    font: inherit;
+    font-size: var(--text-sm);
+    color: var(--text-1);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm);
+    padding: var(--space-2);
+    max-width: 100%;
   }
   .search {
     display: flex;
@@ -853,8 +914,7 @@
     border-radius: var(--r-pill);
     padding: 0.3rem 0.8rem;
     color: var(--text-3);
-    max-width: 22rem;
-    flex: 1;
+    min-width: 14rem;
   }
   .search:focus-within {
     border-color: var(--focus-ring);
@@ -870,168 +930,97 @@
   .search-input:focus {
     outline: none;
   }
-  .cap-list {
+  .bulk-bar {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: var(--space-2);
-    margin-bottom: var(--space-2);
-  }
-  .phase-head { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding: 0 0.9rem 0.3rem; }
-  .phase-fold { display:flex; align-items:center; gap:0.35rem; border:0; padding:0.15rem 0.2rem; background:transparent; color:var(--text-3); cursor:pointer; }
-  .phase-fold:hover { color: var(--text-1); }
-  .phase-count { font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
-  /* VIS-06 — this is a control the owner clicks, not a status chip. */
-  .phase-select-all { display:flex; align-items:center; gap:0.4rem; font-size:var(--text-xs); font-weight:650; color:var(--text-3); cursor:pointer; }
-  .phase-select-all input { accent-color: var(--accent); }
-  .cap-check { accent-color: var(--accent); flex:0 0 auto; }
-  .bulk-bar { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; padding:0.55rem 0.9rem; border:1px solid var(--accent-border); border-radius:var(--r-md); background:var(--accent-soft); margin-bottom:var(--space-4); }
-  .bulk-count { font-weight:700; color:var(--accent); font-size:var(--text-sm); }
-  .bulk-label { color:var(--text-3); font-size:var(--text-sm); margin-left:0.3rem; }
-  .cap {
-    padding: 0;
-    overflow: hidden;
-  }
-  .cap.open {
-    border-color: var(--accent-border);
-  }
-  .cap-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 0.9rem;
     flex-wrap: wrap;
-  }
-  .cap-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex: 1;
-    min-width: 12rem;
-    font: inherit;
-    text-align: left;
-    background: transparent;
-    border: none;
-    padding: 0.15rem 0;
-    cursor: pointer;
-    color: var(--text-1);
-  }
-  .cap-toggle:hover {
-    color: var(--accent);
-  }
-  .chev {
-    color: var(--text-3);
-    display: grid;
-    place-items: center;
-  }
-  .cap-name {
-    display: flex;
-    align-items: baseline;
-    gap: 0.6rem;
-    min-width: 0;
-    flex-wrap: wrap;
-  }
-  .cap-label {
-    font-weight: 600;
-  }
-  /* GEP-04 — a switch that does not govern its own capability says so in the
-     row, before the owner opens the card. Text, not colour alone. */
-  .cap-reality {
-    font-size: var(--text-2xs);
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--text-3);
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    padding: 0.05rem 0.35rem;
-    white-space: nowrap;
-  }
-  /* On by default is not the same claim as Off, so it must not look like it:
-     the accent border carries the difference and the words carry it alone if
-     colour is unavailable. */
-  .cap-default-on {
-    color: var(--accent);
-    border-color: var(--accent-border, var(--accent));
-  }
-  .cap-reality-note {
-    font-size: var(--text-sm);
-    color: var(--text-2);
-    margin: 0 0 0.5rem;
-    padding: 0.5rem 0.6rem;
-    border-left: 2px solid var(--border-strong, var(--border));
-    background: var(--raised, transparent);
-    border-radius: var(--r-sm);
-  }
-  .cap-reality-note strong {
-    color: var(--text-1);
-  }
-  .cap-detail {
-    border-top: 1px solid var(--border);
-    padding: var(--space-3) var(--space-4) var(--space-4);
-    background: var(--sunken);
-  }
-  .cap-desc {
-    font-size: var(--text-md);
-    color: var(--text-2);
-    margin: 0 0 0.4rem;
-  }
-  .mode-hint {
-    font-size: var(--text-sm);
-    color: var(--text-3);
-    margin: 0 0 var(--space-3);
-  }
-  /* The two questions, as headings rather than as labels on controls: an owner
-     reading down the card meets "Can Raiker use this?" and then "When Raiker
-     wants to use it", which is the order the answers depend on. */
-  .cap-attention, .cap-common {
-    margin-bottom: var(--space-4);
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border);
-    border-radius: var(--r-lg);
-    background: var(--surface);
-  }
-  .cap-attention h2, .cap-common h2 { margin: 0 0 var(--space-2); font-size: var(--text-md); }
-  .cap-attention ul, .cap-common ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
-  .cap-attention li { color: var(--text-2); font-size: var(--text-sm); }
-  /* NEW-PERM-01 — each entry is a fact and the action on it, so the row reads
-     left to right and the buttons line up down the right-hand edge. Wraps
-     rather than truncates at a phone width: the name of the permission is the
-     part that must survive. */
-  .cap-attention li, .cap-common li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
-  .shortcut-text { display: flex; align-items: baseline; gap: var(--space-3); flex: 1 1 12rem; min-width: 0; flex-wrap: wrap; }
-  .question {
-    margin: var(--space-3) 0 0.35rem;
-    color: var(--text-2);
-    font-size: var(--text-xs);
-    font-weight: 650;
-  }
-  /* Availability and behaviour on the closed row, at metadata weight: the row
-     is scanned, so this reads without competing with the capability's name. */
-  .cap-summary { color: var(--text-3); font-size: var(--text-xs); white-space: nowrap; }
-  .cap-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-  .muted {
-    color: var(--text-3);
-    font-size: var(--text-sm);
-  }
-  .runtime-note {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-    padding: 0.6rem 0.9rem;
-    margin-bottom: var(--space-4);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--accent-border);
     border-radius: var(--r-md);
     background: var(--accent-soft);
-    color: var(--text-2);
+    margin-bottom: var(--space-3);
+  }
+  .bulk-count {
+    font-weight: 700;
+    color: var(--accent);
     font-size: var(--text-sm);
   }
-  .runtime-note a {
-    color: var(--accent);
-    font-weight: 600;
+  .bulk-label {
+    color: var(--text-3);
+    font-size: var(--text-sm);
+    margin-left: 0.3rem;
+  }
+  .cap-list {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: var(--space-4);
+  }
+  /* The group's last hairline would double the next group heading's rule. */
+  .cap-list :global(.cap.card:last-child) {
+    border-bottom: 0;
+  }
+  .cap-list:last-child {
+    margin-bottom: 0;
+  }
+  /* A group heading, not another card: the rows underneath carry the surface. */
+  .phase-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-1) var(--space-2);
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .phase-fold {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 0;
+    padding: 0.15rem 0.2rem;
+    background: transparent;
+    color: var(--text-3);
+    cursor: pointer;
+  }
+  .phase-fold:hover {
+    color: var(--text-1);
+  }
+  .phase-count {
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+  }
+  /* VIS-06 — this is a control the owner clicks, not a status chip. */
+  .phase-select-all {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: var(--text-xs);
+    font-weight: 650;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-3);
+    cursor: pointer;
+  }
+  .phase-select-all input {
+    accent-color: var(--accent);
+  }
+  .authority-disclosure summary {
+    cursor: pointer;
+    color: var(--text-2);
+    font-size: var(--text-md);
+    font-weight: 650;
+  }
+  @media (max-width: 700px) {
+    .perm-head,
+    .registry-heading {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .registry-filters {
+      width: 100%;
+    }
+    .search {
+      flex: 1 1 100%;
+    }
   }
 </style>

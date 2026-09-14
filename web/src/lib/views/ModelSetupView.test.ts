@@ -450,7 +450,14 @@ describe("first-run setup", () => {
     // FIRST-08/09 — a NAS path asked for before first use is friction in front
     // of the work, and "Open Workbench" named a place nothing else calls that.
     stubFetch({
-      "GET /api/setup": { ...required, status: "in_progress", stage: "finish", privacy_mode: "local_first" },
+      "GET /api/setup": {
+        ...required,
+        status: "in_progress",
+        stage: "finish",
+        privacy_mode: "local_first",
+        selected_model: "claude-sonnet-4",
+        selected_profile_id: "p",
+      },
       "GET /api/models": { profiles: [], chat_profiles: [] },
     });
     render(ModelSetupView);
@@ -464,6 +471,61 @@ describe("first-run setup", () => {
     // Still offered, and still real: nothing claims a backup until one verifies.
     expect(screen.getByRole("button", { name: "Set up backup" })).toBeInTheDocument();
     expect(screen.getByText("Recommended")).toBeInTheDocument();
+  });
+
+  /*
+   * REM-LAUNCH-01 — the last stage may not claim a readiness it has not got.
+   *
+   * "Your Raiker is ready" was unconditional, and sat directly above a summary
+   * whose Model row could read "Decide later". First run is the one place an
+   * owner has nothing to check the claim against.
+   */
+  it("says setup is saved, not ready, when the model was deferred", async () => {
+    stubFetch({
+      "GET /api/setup": {
+        ...required,
+        status: "in_progress",
+        stage: "finish",
+        model_deferred: true,
+        privacy_mode: "balanced",
+      },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByRole("heading", { name: "Setup saved" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Your Raiker is ready" })).toBeNull();
+    // Exploration is still permitted — every mode opens — and the one that
+    // cannot do its work yet names the page that fixes it.
+    for (const mode of ["Chat", "Build", "Design"]) {
+      expect(screen.getByRole("button", { name: mode })).toBeEnabled();
+    }
+    expect(screen.getAllByText("Needs a model to answer with.")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "Connect an image provider" })).toHaveAttribute(
+      "href",
+      "#/models?tab=add",
+    );
+  });
+
+  it("keeps Design's prerequisite separate from Chat's", async () => {
+    // A chat model is not an image model, and a launch screen that requires
+    // every optional service before it will call anything ready is the defect
+    // in the other direction.
+    stubFetch({
+      "GET /api/setup": {
+        ...required,
+        status: "in_progress",
+        stage: "finish",
+        selected_model: "claude-sonnet-4",
+        selected_profile_id: "p",
+      },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+    });
+    render(ModelSetupView);
+
+    await screen.findByRole("heading", { name: "Your Raiker is ready" });
+    expect(screen.queryByText("Needs a model to answer with.")).toBeNull();
+    expect(screen.getByText("Needs a provider that returns images.")).toBeInTheDocument();
   });
 
   it("never calls a deferred backup protected", async () => {

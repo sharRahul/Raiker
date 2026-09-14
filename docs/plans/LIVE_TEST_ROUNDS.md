@@ -108,11 +108,19 @@ closed with it.
 
 **What the round found.**
 
-* **The key works.** Seven previous rounds recorded an identity-linked key that
-  could authenticate only with a workspace id its owner had not supplied. This
-  one lists eleven models through the product's own picker. That makes
-  `anthropic-key-live.spec.ts` assert a refusal this key will never produce —
-  already recorded as **BUG-291**, now observed rather than predicted.
+* **The key works, and a turn completed.** Seven previous rounds recorded an
+  identity-linked key that could authenticate only with a workspace id its owner
+  had not supplied, and every one of them had to stop short of a provider turn.
+  This one lists eleven models through the product's own picker, and a chat turn
+  on `Haiku 4.5` — prompt typed into the composer, model chosen from the
+  composer's own menu, answer streamed back through the governed path — returned
+  the exact string it was asked for
+  (`anthropic-turn-end-to-end.png`). That is the first end-to-end provider turn
+  in this ledger, and it settles the premise **BUG-273** was waiting on.
+
+  It also makes `anthropic-key-live.spec.ts` assert a refusal this key will
+  never produce — already recorded as **BUG-291**, now observed rather than
+  predicted.
 * **Three live helpers had gone stale**, and the first of them had been
   disarming scenarios silently: `enableCapability` waited on a placeholder the
   Permissions page stopped printing, so every spec that turns a capability on

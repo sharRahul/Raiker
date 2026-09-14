@@ -2,13 +2,24 @@
 
 ## Status, scope and non-implementation boundary
 
-This is a **documentation-only review** of Raiker at `main` commit
-`327610ad0816cb5ce90590e29ef30179b7caa5a5`. It does not implement, fix, enable,
+This is a **documentation-only review**, originally based on Raiker `main` commit
+`327610ad0816cb5ce90590e29ef30179b7caa5a5`.
+
+**Latest removal/simplification review:** Section 18 reviews commit
+`05404bf28a5958c2e5d33a81b6f901f8c996f6f9`, including Launch/Home, Threads,
+Knowledge Map, Projects and remaining pages. Read its status corrections before
+treating earlier findings as current. It contains 55 removal/move/merge/replace
+decisions, six additional source-derived findings and retained security/feature contracts.
+
+This document does not implement, fix, enable,
 disable, or reconfigure any application, runtime, installer, security control,
 workflow, or user interface behavior.
 
 The review covers:
 
+- Launch, unlock, first-run setup and Home;
+- Threads and technical session history;
+- Knowledge Map and source management;
 - Permissions;
 - Chat, Build and Design;
 - Models;
@@ -2525,3 +2536,267 @@ Documentation review does not certify the first release. The verdict remains: do
 | Every page and popup | Buttons, links, summaries and status labels are truthful, reachable and useful in loading/error/empty states. | Control inventory with no unexplained inert affordances; authenticated 390×844 and 1920×1080 checks, keyboard/focus, zoom and screen-reader evidence. |
 
 **Release interpretation:** These are implementation requirements, not a promise that consistency is already achieved. The known Permissions defects are part of the first-release UX/correctness backlog. Optional feature breadth can still be phased; any feature exposed in a release must satisfy this consistency gate within its declared supported scope.
+
+
+# 18. Removal and simplification review — current-source follow-up
+
+## 18.1 Scope, evidence and precedence
+
+This follow-up reviews Raiker at **`05404bf28a5958c2e5d33a81b6f901f8c996f6f9`**. It supersedes older present-tense claims only where the status table below supplies newer source evidence. Earlier decision history remains intact. This is a documentation-only source and interaction-contract review; no application code, policy, configuration, stored user data or workflow is removed by this change. No fresh browser screenshots, live provider calls, screen-reader session or installer execution were performed.
+
+“Launch” is interpreted as the first-run/unlock/setup journey plus the default Home destination: the inspected route registry has Home, not a separate Launch route. Sources are `LoginView.svelte`, `ModelSetupView.svelte`, `WorkbenchView.svelte`, `nav.ts` and `App.svelte`. Threads is `SearchChatView.svelte`; session evidence is `SessionsView.svelte` within Observability. Knowledge Map is `BrainView.svelte`. Distinguishing these prevents reviewing a filename as if it were a user destination.
+
+The review reads the requested simplification and feature breadth together: **remove unnecessary interaction and duplicated implementation; preserve useful capabilities and enforceable security**. Detailed proposals below are not usability-test results or proof of complete parity with the reference ecosystems.
+
+### Updated status of earlier findings
+
+| Earlier finding/claim | Current source evidence | Updated disposition |
+| --- | --- | --- |
+| NEW-PERM-01: top lists have no actions | CapabilitiesView now renders Review/Manage buttons calling `revealCapability`. | Source-level remediation present. Do not report these as still missing; verify keyboard, filter and mobile journeys live. Remaining simplification is hierarchy and duplication. |
+| NEW-PERM-02: summaries ignore local confirmed modes | CapabilitiesView derives `effectiveGates` from confirmed modes; attention/common/table consume that model. `permissionViewModel.ts` centralizes reconciliation and partial-bulk reporting. | Source-level remediation present; concurrent-client/end-to-end evidence remains separate. |
+| NEW-PERM-03: unknown mode displayed as Direct | AuthorityMatrix explicitly handles Unknown and known modes; shared availability/readiness helpers and revised attention copy exist. | The specific unknown-as-Direct defect is superseded. Minor vocabulary drift remains: table Ask/Denied versus Ask me/Never. |
+| NEW-SET-01: save acknowledges all subsequent edits | SettingsView now guards in-flight save, tracks per-key edits and disables Save/Discard during persistence. | Earlier unconditional-save critique is no longer an accurate description of this source. Verify concurrent tabs/server revision conflict handling separately. |
+| Design is only generation history | DesignView now submits source generation IDs and variation counts; ProjectsView includes Images; Design context says generated images are filed to Project. | Do not remove working edits/variations or repeat blanket absence claims. Verify endpoint/provider/version persistence before asserting complete visual-workspace support. Some explanatory comments still describe the older endpoint. |
+| RR-PROJECT-01 / UX-PROJ-01: New chat does not set Project | ProjectsView::newChatInProject now calls setWorkProject before routing. | Source-level handoff remediation present; cross-mode filing still needs end-to-end verification. |
+| NEW-PROJ-01: detail responses mix Projects | ProjectsView::open and child loads now use selectionSeq and clear prior panels. | The specific unguarded selection race is superseded at source level. Do not remove this guard during decomposition. |
+| Storage is a current Settings page | Storage.svelte exists but SettingsView does not import/render it, and it is not in the inspected route-component map. | Treat it as a candidate unused module, not a demonstrated current user-facing page. Verify all imports/tooling before deleting it. Its “Everything stays on this machine” copy must not be reused for hosted services. |
+
+### Removal vocabulary and safety rules
+
+- **Remove:** delete redundant UI/copy or proven unused code after reference checks.
+- **Merge:** retain one canonical controller/view and route other entry points to it.
+- **Move:** retain functionality in Details, Advanced or a contextual inspector.
+- **Replace:** exchange a misleading or inefficient interaction for an explicit working one.
+- **Keep:** retain visible consequence, consent, scope, recovery and evidence needed for a decision.
+
+No recommendation authorizes removal of authentication, step-up, approvals, effective capability checks, runtime isolation, endpoint policy, secret scoping, owner filtering, audit records, provenance, retention/tombstones, cancellation, restore verification or accessible alternatives. Backend enforcement must continue if every convenience summary is hidden.
+
+## 18.2 DEC-27 — Reduce places to learn, not things Raiker can do
+
+**Decision:** Use Home for the next useful action; Chat/Build/Design for creating work; Threads for finding/resuming conversations; Tasks for scheduling and managing execution; Projects for grouping work. Knowledge and management surfaces remain available contextually and through navigation/search. Keep a global, counted approval entry and an accessible emergency-stop path. Avoid adding a navigation item for each new service or worker.
+
+**Reason:** New capabilities should appear in an existing task flow whenever possible. Users should not have to learn the internal service topology before asking for work. At the same time, hiding a control required for informed consent would reduce safety, not complexity.
+
+**Implementation:** Define a route/action catalogue with one canonical destination and explicit legacy aliases. Share resource IDs, presentation identity, capability descriptors and state selectors across pages. Move specialist panels without changing API authority. Record preference migrations and preserve bookmarked routes. Use a shared task/attempt event model instead of copying state into every dashboard.
+
+**Acceptance:** An owner can start work, find it later, understand why it paused, approve or refuse it, inspect its evidence and recover after failure without repeating configuration or guessing its location. CAP-01–16 remain in scope under the service contracts in section 16.
+
+## 18.3 Page-by-page removal decisions
+
+All rows are proposed. Priorities P1/P2 indicate relative product/correctness importance; effort S/M/L is a planning estimate, not a delivery promise. Complete the more specific tests in section 18.5 as dependencies. Within a priority, do lower-effort work first unless a shared contract must land first.
+
+### Launch, unlock, setup and Home
+
+| ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
+| --- | --- | --- | --- |
+| REM-LAUNCH-01 / P1 / S | Replace unconditional “Your Raiker is ready” when model selection was deferred. | Say “Setup saved” and name the remaining prerequisite; readiness must be scoped to the intended mode. ModelSetup renders Ready while its summary permits Decide later. | Derive each Chat/Build/Design next action from readiness; route an unavailable action to its exact setup remedy while permitting exploration. Test deferred model, unavailable image model and disconnected runtime. Do not require all optional services before launch. |
+| REM-LAUNCH-02 / P2 / S | Move instance creation out of the ordinary unlock form's competing actions. | Keep Unlock primary; place separate-instance creation under “Use or create another instance” with a short isolation explanation. LoginView currently exposes instance creation as a secondary branch. | Preserve first-owner bootstrap, MFA and recovery. Verify the alternate-instance path opens the correct origin and does not reuse another instance's session. Do not delete multi-instance capability. |
+| REM-HOME-01 / P2 / M | Merge repeated appearances of the same running recurring task. | Workbench deliberately places it in both Running now and Standing agents. Prefer one active-work row with cadence/next-run metadata; show the standing configuration only on demand. | Deduplicate by task ID, distinguish current attempt from schedule, and link to canonical Tasks detail. Test running, waiting, armed and completed recurrence without losing next-run information. |
+| REM-HOME-02 / P1 / M | Remove healthy running work from “Needs your attention”; remove all-clear inference from missing diagnostics. | Running is not automatically a request for intervention; unavailable health is unknown. See NEW-HOME-01. | Build actionable attention selectors and independent health loading/error state. Healthy active work belongs in activity. Verify diagnostics outage, real approval, failed work and no-work states. |
+| REM-HOME-03 / P2 / S | Move repeated greeting/explanation and platform-health detail below the primary action. | Existing welcome/continue sections should answer “What next?” before teaching governance. | Keep one greeting, next action and concise exceptions; link to Guide/Observability. Verify first-run and returning-user mobile views; do not hide authentication or unresolved safety decisions. |
+
+### Chat, Build and Design
+
+| ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
+| --- | --- | --- | --- |
+| REM-CHAT-01 / P2 / M | Move routine tool payloads, IDs and governance explanation into per-turn Evidence. | ChatView coordinates many domains; answers and requested decisions deserve the primary reading order. | Keep active approval, failure, source count and runtime destination visible when relevant. Use a shared expandable turn inspector with deep links and redacted payloads; test long streams and focus preservation. |
+| REM-CHAT-02 / P2 / M | Merge duplicated conversation menus and model-selection logic into shared commands/controllers. | Different entry points should invoke the same rename, archive, branch, retry and model override semantics. | Inventory handlers in Chat, Threads and session detail; retain context-specific permissions and explicit destructive confirmation. Test retry after an ambiguous external effect and archived conversation discovery. |
+| REM-BUILD-01 / P2 / M | Remove simultaneous default exposure of every file/artifact/command/evidence pane. | BuildView carries repository, transcript and multiple inspectors; the next action should determine which inspector is open. | Keep file tree optional and one primary inspector, preserving panel state and accessible toggles. Show approval diff before a write and failed test output when diagnosing; test narrow viewport and unsaved edits. |
+| REM-BUILD-02 / P1 / M | Replace competing Project/repository/runtime/model selectors with one boundary summary and targeted edit actions. | These are distinct concepts but form one execution context. Simplification must make wrong-destination writes less likely. | Snapshot selection at submission; preview changed destination/scope before executing; use the same model override contract as Chat. Verify navigation and runtime loss cannot silently retarget work. |
+| REM-DESIGN-01 / P1 / S | Remove stale absence claims in comments/help and any controls unsupported by the selected endpoint/provider. | Current source includes edit source IDs and variation requests; preserve implemented functionality instead of removing it based on the old review. | Audit DesignView, shared Design components and routes_images together; generate controls from capability metadata. Test supported edits/variations and unsupported combinations, with truthful disabled reasons. |
+| REM-DESIGN-02 / P2 / M | Move generation history into an asset strip/library and advanced options into one inspector. | The selected artifact and prompt should stay central; a growing gallery should not push current work away. | Maintain version lineage, reference provenance, destination and undo/revert semantics. Reopen assets through Projects and Design and verify consistent identity after reload. Never hide provider disclosure for references. |
+
+### Models, popup and Permissions
+
+| ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
+| --- | --- | --- | --- |
+| REM-MODEL-01 / P2 / M | Merge duplicated provider readiness/default-model presentations across tabs and setup. | Five tabs already organize Models; adding more categories would recreate the old fragmentation. | One profile readiness controller powers onboarding, overview and composers. Keep tab-specific tasks; do not repeat an editable connection form in each. Test credential expiry and global/per-work override consistency. |
+| REM-MODEL-02 / P2 / S | Move fallback/advisor routing and raw profile IDs to advanced detail. | Most users need selected model, locality, capability and cost before orchestration tuning. | Preserve explicit disclosure for a fallback that changes provider or data destination. Test no silent local-to-cloud fallback and inspectable routing evidence. |
+| REM-POPUP-01 / P2 / S | Replace “Settings & pages” and the overloaded gear contract with one clear navigation contract. | AllPagesDialog combines page navigation with every Settings subsection. Choose More as the launcher and provide direct Settings separately. | Keep destinations searchable, group them once, and maintain deep links. Verify keyboard focus, Escape/Back and mobile sheet behavior. Do not remove Command Palette execution features merely because page navigation overlaps. |
+| REM-PERM-01 / P2 / S | Move the large read-only authority matrix below actionable permissions or collapse it into Details. | Top shortcuts now work; removing them would regress the repair. The matrix is useful evidence but not the owner's first task. | Keep one short effective-posture summary, actionable attention and Common permissions; full registry remains reachable. Verify matrix removal from default view cannot alter controls or hide denial explanations. |
+| REM-PERM-02 / P1 / S | Remove remaining Ask/Deny vocabulary drift and raw keys as primary matrix labels. | Bulk buttons and table still differ from Ask me/Never used elsewhere. One policy should not have three user vocabularies. | Reuse shared copy/presentation helpers; IDs remain in Details and exports. Exhaustively render known/unknown modes and disabled/readiness states. No policy values are renamed in persistence merely to change labels. |
+| REM-PERM-03 / P2 / M | Replace repeated per-row explanations with concise summaries plus contextual Why. | Keep availability and behavior distinct while reducing repeated prose. | Use one effective gate selector across summaries, controls and MCP. Preserve scope, pending mutation and step-up flows; test permissions while work is paused and after revocation. |
+
+### Threads, Tasks and Projects
+
+| ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
+| --- | --- | --- | --- |
+| REM-THREAD-01 / P1 / M | Remove the implicit board-to-global-search scope switch. | SearchChatView hides board filters and calls unscoped search on typing. Users should explicitly control whether search spans all work. | Preserve visible Project/kind filters in query mode; add an explicit Search all action. Implement owner-scoped server filters before paginating; test switching query modes with a Project selected. |
+| REM-THREAD-02 / P1 / M | Replace the first-100 list masquerading as a complete filtered inventory. | workThreads defaults to 100 and the view derives Project choices from those results. Older projects can disappear. | Add bounded cursor pagination and independent authorized filter facets; show loading/has-more and empty-match versus empty-account states. Test over 100 threads and older-project results. Do not remove request bounds. |
+| REM-THREAD-03 / P2 / M | Move technical session/turn inspection out of ordinary Threads results. | Threads resumes work; Observability Sessions verifies execution history. They should share detail links without becoming duplicate conversation libraries. | Route result rows to the proper work mode and matching turn; add Evidence to open the technical inspector. Preserve legacy session URLs and archived lookup. |
+| REM-TASK-01 / P2 / M | Separate timing from run mode; move parent/priority/internal orchestration controls into Details. | Keep Project and When visible because they materially change scope and execution. | Human schedule builder with timezone/preview; shared task commands power Home and Messaging. Verify cadence changes, missed runs and approval pauses without duplicate execution. |
+| REM-TASK-02 / P2 / M | Merge competing Home/Tasks/live-board task lifecycle controls. | One run must have one Stop/Resume/Retry meaning; presentation may differ. | Shared controller reports requested versus completed cancellation and outcome_unknown. Keep live visualization optional; test repeated clicks and reconnects. |
+| REM-PROJ-01 / P2 / M | Move Archive/Move/Delete from equal-weight card actions into a lifecycle menu. | Open/Continue and New work are primary; rare destructive actions need deliberate access. | Preserve typed/fresh confirmation where required, archive restore and exact managed-versus-attached deletion impact. Test continuing an archived project and moving without hierarchy cycles. |
+| REM-PROJ-02 / P2 / M | Replace the long detail stack with Overview plus Files/Work/Assets/Evidence sections. | ProjectsView currently stacks context, sessions, images, tasks and checkpoints. | Reuse Threads, artifact and evidence components scoped to the Project; avoid copied databases or mutation logic. Verify selection races, unsaved context and asset filing. |
+
+### Memory, Knowledge Map and usage
+
+| ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
+| --- | --- | --- | --- |
+| REM-MEM-01 / P2 / M | Move card-level lifecycle/score controls into one record drawer. | Keep Edit, Pin and More plus provenance/expiry summary; avoid seven equally prominent actions. | Drawer uses canonical memory revision and exposes archive/expiry/delete consequences separately. Test conflict recovery and old bookmarked records. |
+| REM-MEM-02 / P1 / M | Remove ambiguous “age” or “used” claims that collapse separate timestamps/events. | Created, verified, included in context, cited and expires are distinct; retrieval is not proof the model relied on a fact. | Extend existing usage data rather than duplicating counters. Show meaningful labels and source turns; treat pinned stale facts as review candidates, not immortal truth. |
+| REM-MEM-03 / P2 / M | Move embedding/backend controls from personal review into engine settings; merge source administration with Map. | Memory owns approved facts/retention, Map explains relationships, and one source controller owns scope/indexing. | Keep recall health and repair link in Memory; share add/revoke/import flows. Verify revocation/tombstones suppress recall and graph output without deleting original external files. |
+| REM-MAP-01 / P2 / S | Move Groups/Display/Forces/Motion from all-open panels into advanced display settings. | BrainView opens five settings disclosures simultaneously; force constants are visualization tuning, not knowledge management. | Default to search, filters, Fit and selected record; preserve advanced preferences. Keep reduced-motion behavior and test keyboard graph navigation. |
+| REM-MAP-02 / P2 / M | Replace synthetic starter graph nodes with a clear empty state and optional labelled illustration. | Existing nodes are flagged is_real:false and Starter view, so they are not covert fabricated records. Removing their selectable record-like behavior reduces confusion. | Offer Add source and Open Memory; exclude instructional objects from counts, search, provenance, export and selection actions. Verify truly empty versus filtered-empty states. |
+| REM-MAP-03 / P1 / M | Replace stale “Live workspace graph” and overlapping source-review state. | See NEW-MAP-01/02; these are correctness changes, not cosmetic simplification. | Timestamp actual successful data, discard outdated requests, snapshot reviewed source identity and show stale/error state. Test slow responses, changing source and closing the dialog. |
+| REM-MAP-04 / P2 / M | Move visualization-only animation away from the default knowledge-review experience; provide a list/relationship-table alternative. | Motion and graph geometry should not be prerequisites for finding provenance or rejecting a link. | Respect reduced motion; expose the same authorized records/actions in a virtualized list. Preserve relationship evidence and rejection history. |
+
+### Messaging, MCP and Extensions
+
+| ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
+| --- | --- | --- | --- |
+| REM-MSG-01 / P1 / M | Replace raw sender/route/test-destination setup as the default journey with Connect channel. | MessagingView separates Channels and Connectors; users need account, conversation scope and readiness. | Authenticate account, pair owner, choose allowed conversations, preview routing, test through real outbox, enable. Keep raw operator fields in Advanced and maintain egress policy. |
+| REM-MSG-02 / P2 / S | Remove duplicate Connector naming for the user-facing messaging account. | Use Channels here and link to the underlying extension for diagnostics. | Keep connector IDs stable internally. Verify disconnect, re-pair and existing route migration without losing delivery history. |
+| REM-MCP-01 / P2 / M | Move the sample echo-server template builder out of the primary add flow. | McpView currently leads with a single sample template. A demonstrator should not define normal integration setup. | Lead with supported plugin offers/configured servers, then Local command/Remote service as real supported flows; put sample generation under Developer examples. Never expose a fake catalogue or URL form without an implementation. |
+| REM-MCP-02 / P1 / S | Replace “safe starter” as a blanket safety label with the precise reviewed scope. | A sample's safety depends on package integrity, runtime boundary, environment and grants. | Display example purpose, executable/digest and scope preview; preserve environment isolation, network policy, testing and containment controls. Verify unknown publishers and unavailable runtime behavior. |
+| REM-EXT-01 / P2 / M | Move hook event catalogues, handler types and supply-chain explanation into Details/Guide. | ExtensionsView exposes useful operator reference alongside operational state. Installed, connected, permitted and usable need clear precedence. | Show installed inventory, actionable exceptions and Add first; reuse lifecycle controller across Connectors/MCP/Skills/Plugins. Preserve audit and signed manifest inspection. |
+| REM-SKILL-01 / P2 / M | Merge Upload/Import from link/Build one into a single Add skill entry with deliberate choices. | Multiple full forms compete before the user has chosen acquisition mode. | Shared staged preview, provenance/license check, permission diff and rollback receipt; skill learning produces reviewable versions. Test malicious metadata and upgrade requesting new grants. |
+
+### Settings pages and remaining destinations
+
+| ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
+| --- | --- | --- | --- |
+| REM-SET-GENERAL / P2 / S | Remove repeated setup teaching; move weather/location to optional personalization. | Language, timezone and startup should be short and explicit about UI versus model context. | Preserve IANA timezone and data-egress consent; test locale changes do not shift stored schedules. |
+| REM-SET-NOTIFY / P2 / S | Remove generic alert controls that cannot explain their actual scope; do not add dummy per-channel switches. | Notification.svelte is sparse; prefer a small working contract over apparent unsupported breadth. | Label existing alert effects accurately and link delivery history. Introduce per-channel controls only with the outbox/preferences implementation; muting never approves actions. |
+| REM-SET-APPEARANCE / P2 / S | Move density/font tuning under Appearance details, retain Theme and reversible preview. | Preferences should not require understanding design tokens. | Preserve accessibility-safe options, zoom/reflow and system theme behavior; Cancel restores confirmed state. |
+| REM-SET-SECURITY / P2 / M | Split the long Security & sign-in stack into sign-in/devices, vault, findings and standing access. | Encryption, TOTP, scanning and grants have different operational lifecycles. | Use contextual sections without weakening controls; emergency pause stays readily available. Verify revocation, recovery and redacted secrets. |
+| REM-SET-PRIVACY / P1 / M | Replace broad privacy slogans with specific retained-data and outbound-data inventory. | Privacy.svelte focuses on retained working; hosted model and channel behavior must remain explicit. | Link retention/recall controls and per-service destinations; distinguish local records from external copies and backup limits. |
+| REM-SET-ACCOUNT / P1 / S | Remove internal principal language and misleading cancellation during deletion. | Use authorized display name/username while ownership stays immutable; fresh confirmation remains. | Recheck current Account deletion handling before editing; test pending deletion, lost response and account rename across surfaces. Do not repeat an already fixed defect as current. |
+| REM-SET-WEB / P2 / M | Move immutable deployment configuration into read-only Details; retain editable destination rules and a bounded check. | WebAccess's “Set outside this app” should explain who can remedy it, not appear as editable policy. | Show source/effective revision and private-service grant policy. Test redirects, denied probes and stale rules. |
+| REM-SET-GIT / P2 / M | Move manual token entry and standing command grants behind guided credential setup. | Repository/host/operation scope should precede secret entry. | Prefer supported OAuth/credential manager, preserve scoped token fallback; test expiry, revoke and wrong-host requests. |
+| REM-SET-RUNTIME / P2 / M | Move ports/host keys/TTL internals into Advanced; merge duplicated readiness displays with Models/Observability. | Runtime settings should guide execution target and access boundary, not teach all adapter internals first. | Keep host-key verification and scope preview mandatory when applicable; test remote loss with no silent host fallback. |
+| REM-SET-UPDATES / P1 / S | Remove any success wording based only on a version check. | Available, downloaded, verified, installed and restart-required are different states. | Preserve signed verification, release notes, schema compatibility and supported rollback. Test interrupted installation and tampered artifact. |
+| REM-SET-STORAGE / P2 / S | Delete Storage.svelte only if full reference checks prove it unused; remove its misleading copy wherever reused. | Current module presents record counts as Local usage and claims everything stays on one machine. Neither establishes storage bytes or global privacy. | Search imports, tests, generated routes and packaging; if retained, rename to record counts and state actual data location. Do not delete user databases or migrations. |
+| REM-APPROVAL / P1 / M | Move raw payloads below consequence previews; merge duplicated prompt/detail mutation handlers. | Approval must remain prominent and decision-quality, with destination/diff/scope/expiry visible before confirmation. | One decision controller resolves exactly one revision; test changed arguments, expired request and deny/revoke. Keep redacted full evidence available. |
+| REM-OBSERVE / P2 / M | Remove repeated healthy status panels from the default overview; preserve diagnostics as specialist views. | ObserveView asks several useful operational questions; show exceptions and recent changes first. | Canonical health records drive Home and Observe, with explicit stale/unknown. Do not hide failing security containment among optional telemetry errors. |
+| REM-SESSIONS / P2 / M | Merge ordinary resume actions into Threads; keep Sessions as an evidence inspector. | SessionsView exposes turn IDs and technical detail needed for audit, not an alternate everyday chat history. | Retain route aliases and turn anchors; tests open original events/checkpoints from Threads and approvals without duplication. |
+| REM-ACTIVITY / P2 / S | Move raw event filters/export forms into an advanced toolbar. | Everyday audit questions should open a filtered timeline from the relevant task. | Keep complete redacted exports, chain/provenance verification and retention controls; test filters and export completeness. |
+| REM-CHECKPOINT / P1 / S | Remove equal prominence of restore beside ordinary inspection. | Restore changes real files and must remain a deliberate action after an impact preview. | Keep browse/diff primary, restore in explicit action with fresh authority and compatibility checks. Verify managed/attached paths and partial failures. |
+| REM-LIVE / P2 / M | Move animated Workstations out of the default operational dashboard. | WorkInActionView's characters reflect records, but duplicate Tasks/Threads progress. Keep it optional rather than deleting delegation support. | Use shared run state and reduced motion; no synthetic work or invented progress. Provide direct task links and a nonanimated equivalent. |
+| REM-GUIDE / P2 / S | Remove duplicated inline manual chapters; keep one contextual help link and short essential warnings. | GuideView remains the canonical explanation of how features work. | Preserve searchable guide/deep links and update it with canonical vocabulary; decision-critical consequences remain on the action screen. |
+
+## 18.4 What should not be removed
+
+Retain Chat/Build/Design as peer work modes; their outcomes differ. Retain Threads and Tasks as distinct user jobs while sharing data and controllers. Retain Memory and Knowledge Map as different representations of authorized knowledge while sharing sources, provenance and deletion rules. Retain specialist Observability and full Permissions even if they leave the default viewport. Retain local, home-lab, private and hosted model/runtime choice.
+
+Do not remove a service because its current UI is technical. Replace the setup journey and expose it contextually. Do not simplify approvals by auto-allowing previously denied actions, suppressing required step-up, treating a paired sender as owner, importing foreign grants or granting a learned skill new powers. Do not remove bounds merely to show every record; implement pagination and bounded server queries.
+
+
+## 18.5 Additional code and UX findings requiring changes
+
+These findings are derived from the pinned source, not live reproductions. “Remove” below refers to misleading behavior or unsafe assumptions; suggested repairs remain unimplemented by this review.
+
+### NEW-HOME-01 — Missing health data becomes zero issues
+
+**Evidence:** `WorkbenchView.svelte::load` catches a diagnostics failure and sets diagnostics to null. `runtimeIssues` maps null to 0; `nothingNeedsAttention` can then become true when approvals and active work are empty. The page renders “Nothing needs you right now.” The same attention rail includes all active work regardless of whether it requires action.
+
+**Decision / rationale:** P1, M. Remove unknown-as-healthy and healthy-work-as-attention mappings. Missing data must not imply a passing readiness check, and a running task should not create alert fatigue.
+
+**Implementation:** Model health as loading/known/stale/unavailable with last-success timestamp; distinguish actionable blockers from ordinary progress. Keep independently loaded healthy sections visible when a supplementary service fails. Replace broad all-clear with a scoped statement such as “No pending approvals; runtime health unavailable.” Single-flight refresh or request generations prevent older responses replacing new state.
+
+**Acceptance:** Successful empty workspace, diagnostics 500, slow stale responses, real missing configuration, healthy recurring task and pending approval. Verify no unknown value becomes zero issues or a green readiness claim.
+
+### NEW-THREAD-01 — Filters only cover a truncated list and disappear during search
+
+**Evidence:** `SearchChatView.svelte` lines 49–65 derives Project choices and filtered results solely from loaded threads. Lines 70–102 fetch workThreads with no pagination; typed query calls searchChats without Project/kind. Lines 122–148 hide filter controls in search mode. `api.ts::workThreads` defaults to limit 100. `routes_dashboard.py::list_work_threads` forwards that limit; `DashboardService.list_work_threads` sorts and returns threads[:limit].
+
+**Decision / rationale:** P1, M. Remove the impression of a complete all-project inventory and the implicit search-scope switch. Preserve bounded queries; fetching everything into the browser is not the remedy.
+
+**Implementation:** Add authenticated Project/kind/query filters and bounded cursor pagination to the canonical work index. Filter before pagination and return independently scoped facets, next cursor and optional accurate totals. Preserve selected filters while typing; offer explicit “Search all work.” Use a stable sort with a tie-breaker and bind cursors to owner/query context. Until complete, label the result window accurately and link to an alternative search.
+
+**Acceptance:** More than 100 threads, a Project present only in older entries, mixed task/chat threads, concurrent insertions, invalid cursor, owner isolation and clearing the query. A valid Project must not disappear merely because its newest thread is outside the first page.
+
+### NEW-MAP-01 — Stale graph remains labelled Live
+
+**Evidence:** `BrainView.svelte::load` retains prior brain/updatedAt after failure. The graph-meta label checks only whether updatedAt exists to render “Live workspace graph.” A 15-second interval and manual loads have no request-generation check in that function.
+
+**Decision / rationale:** P1, S/M. Remove unconditional Live branding; a stale graph must remain inspectable without implying current knowledge or permission state.
+
+**Implementation:** Track last-success, current fetch state and data revision; label Updated at / Refreshing / Stale. Use single-flight or generation-checked loads, pause unnecessary polling for hidden views, and reconcile on return. Do not use graph state to authorize any action.
+
+**Acceptance:** Initial error, success then error, long-running poll, out-of-order responses and reconnect. Earlier results cannot overwrite newer graph state; provenance actions revalidate the actual resource.
+
+### NEW-MAP-02 — Source review responses are not bound to the current selection
+
+**Evidence:** `BrainView.svelte::reviewSource` awaits reviewBrainSource(sourcePath.trim()) then assigns sourceReview. The source input remains editable and clears sourceReview on input, but an older pending response can assign it again. addSource then uses sourceReview.path. Browse responses also write shared selection state without request generations.
+
+**Decision / rationale:** P1, M. Remove acceptance of a review response for a superseded selection. The source being added must be the source the user reviewed.
+
+**Implementation:** Capture dialog generation, canonical source identity and selection revision. Reject mismatched responses and invalidate them on close/reopen. Display the canonical reviewed path next to confirmation. Revalidate current owner grant and path containment at commit. If preview is merely advisory, say so; if it authorizes an exact file set, add a server-issued review token bound to manifest/digest, scope and expiry. A path-only preview does not establish a frozen snapshot.
+
+**Acceptance:** Review A, select B before A resolves, close/reopen during review, revoke folder access, change files after preview and submit twice. Never add A while presenting B as the reviewed selection. Existing backend owner/path validation is real; this finding is not evidence of a cross-owner access bypass.
+
+### NEW-MAP-03 — Review entry cap does not bound all traversal work
+
+**Evidence:** `DashboardService.review_brain_source` uses path.rglob("*"). It checks scanned >= 5000, but increments scanned only after resolving entries, skipping directories/hidden or excluded paths, checking file status and stat. Therefore skipped entries do not consume the stated entry budget. The traversal can walk substantially more than 5,000 entries, including excluded subtrees, before the counter reaches its limit.
+
+**Decision / rationale:** P1, M. Remove the assumption that a supported-file counter bounds filesystem traversal. This is a resource-bound weakness in an authenticated review path, not a demonstrated unauthenticated denial of service.
+
+**Implementation:** Use a prunable directory walker with separate visited-entry, accepted-file, depth, byte and elapsed-time budgets. Prune excluded directories before descent; count attempts including skipped entries; support cancellation and execute blocking traversal outside the async request loop. Preserve canonical root/owner checks and safe symlink handling. Return truncated reason and partial counts explicitly.
+
+**Acceptance:** Wide excluded trees, many empty directories, symlink cycles, permission failures, slow filesystem and cancellation. Verify actual entries/time are bounded while legitimate partial reviews state their limits accurately. Do not remove the review step to avoid its cost.
+
+### NEW-PROJ-02 — Project Images cannot open the selected asset directly
+
+**Evidence:** `ProjectsView.svelte` renders up to eight projectImages as image/span elements without a per-asset action; the only continuation link is generic #/design. The source already files and displays images by Project, so the missing part is precise continuation.
+
+**Decision / rationale:** P1/P2, M. Replace the generic-only link with explicit asset navigation, and retain a separate View all action. The user should not have to search the global Design history to find an image just selected in a Project.
+
+**Implementation:** Define a typed Design route state carrying Project and generation/asset version identity. Click/keyboard activation opens the selected authorized asset; View all preserves the Project filter. Validate resource ownership server-side and handle archived, removed, failed or unsupported assets with a recoverable message. Preserve historical Design URLs. Render genuine asset counts or “Showing 8” when the strip is truncated.
+
+**Acceptance:** Two Projects with similar prompts, more than eight assets, missing/deleted generation, direct URL refresh, and switching Project while Design loads. Verify selection does not default to another owner's or another Project's image, and new edits remain filed to the intended destination.
+
+## 18.6 Services and feature breadth with fewer UI surfaces
+
+**Decision:** Keep section 16's capability outcomes and shared governance contracts. The removal plan changes where users encounter them, not whether they can be implemented. One user request may use multiple services, but should produce one coherent Project/work history, approval flow and outcome.
+
+The two requested reference repositories' README and security policy were re-read for this pass. Their capabilities are advertised/reference evidence, not runtime verification of Raiker. Anonymous evidence tokens retain the requested naming constraint. Source snapshots: REF-A overview `c05112266746ff99a3326a62c38c33fbc08ecd23`, trust `cea2a9a2e8869ac7a4b7307332b974a27e9fd27a`; REF-B overview `02d592da6f9715de203af9d0dc41988ed0524b14`, trust `383cfaafe78a281899e1f52cbfc9f5c9627cbf0a`. Section 16 retains earlier deeper source anchors. No external code is copied in this documentation change.
+
+| Service family / earlier contract | Simplified entry and what disappears | Concrete implementation order | Security and completion decision |
+| --- | --- | --- | --- |
+| Learning, skill improvement, personal recall / CAP-01–02 | Memory Suggestions and skill version review; remove a separate learning dashboard. | Capture outcome evidence → propose version/fact → show provenance/diff → evaluate → approve activation → support revert. Share source IDs and retention/tombstones. | Learned text is untrusted and cannot change grants. Test poisoned sources, rejected suggestions and rollback without resurrecting forgotten facts. |
+| Session search, compaction, branching, commands / CAP-03 | Threads + Chat/Build command actions; remove separate session libraries for ordinary work. | One session command API → indexed owner-scoped search → typed mode/turn links → revision-bound checkpoint/branch → compaction provenance. | A branch/undo changes conversation state, not an already sent external message. Preserve evidence and explain irreversible effects. |
+| Delegation and programmatic tool composition / CAP-04–05 | Task child progress under the parent; remove automatic sidebar entries for each internal worker. | Persist parent/child/run IDs → issue narrowed grants and aggregate budgets → execute in worker isolation → broker every nested RPC → settle durable completion receipts. | Session separation is not containment; all spawned code paths need the intended filesystem/network/process boundary. Test revoke/stop propagation and duplicate settlement. |
+| Scheduling, proactive work and channel delivery / CAP-06–07 | Schedule from existing work; manage in Tasks; connect accounts in Messaging. Remove repeated timing/routing forms elsewhere. | Shared schedule schema with timezone/misfires → durable attempt leases → identity/routing validation → governed execution → transactional outbox → reconciliation. | Standing authorization must be explicit and bounded. Pairing is identity proof, not owner authority. Test replay, group scope, pause and uncertain delivery. |
+| Voice/media and provider services / CAP-08–09 | Attachment/microphone controls and one provider readiness wizard. Remove a dedicated setup page per tool backend. | Capability registry → optional scoped auth → bounded media worker → service-specific adapter → artifact provenance → per-work override and lawful data destination selection. | One login does not grant every service access to every secret. No silent cloud fallback or device recording; test revocation and malformed media. |
+| Runtime targets and hibernation / CAP-10–11 | One execution destination in work context; Advanced handles transport internals. | Negotiate enforceable capabilities → prepare sandbox → scope credentials → execute/stream/cancel → checkpoint → revoke transient access → restore and reauthorize. | A failed remote adapter never silently falls back to host execution. Resume reconciles incomplete external effects and changed policy. |
+| Plugins/MCP/skills and compatibility gateway / CAP-12,16 | One Extensions lifecycle and common action catalogue; remove competing policy controls in each adapter. | Manifest/digest/compatibility inventory → scope preview → staged install → isolated lifecycle → broker translation → audit/event integration → versioned rollback. | Imported policy is not automatically trusted. Client scope claims cannot expand server authority; plugin-supplied UI/text is untrusted. |
+| Device actions and canvas / CAP-13 | Device choice in a relevant work action, durable assets in Design/Projects; remove a permanent page for every device capability. | Confirm pairing → bind device key/owner/scopes → implement revocable action adapter → persist artifact/version → isolated preview UI. | Camera/screen permissions remain explicit. Optional release phasing does not delete long-term capability scope. |
+| Migration, diagnosis and evaluation / CAP-14–15 | One import preview and scoped diagnostic export; move specialist evaluation into developer tools. | Stage import → validate schema/provenance → preview conflicts → explicit secret handling → commit batch receipt → reversible data mapping; separately consent evaluation export. | Never import foreign standing grants, execute imported hooks during preview or export personal trajectories by default. Preserve source licenses where code is reused. |
+
+### Service-level removal decisions
+
+Remove duplicate credential stores, duplicated authorization interpretations, copied task state and independent sidebar registration by plugins **only after inventory proves where they exist and migration preserves compatibility**. These are architectural prohibitions/proposals, not claims that every duplicate is present in Raiker today.
+
+Keep one broker/control plane as the authority issuer; run untrusted execution in explicitly constrained workers. A runtime-issued handle is useful against accidental bypass but not a security boundary against malicious code running inside the issuer process. Host execution, optional sandboxing or shared-operator trust assumptions from a reference must not silently replace Raiker's declared security philosophy.
+
+Every adapter uses the same owner identity, policy revision, resource scope, action digest, idempotency, secret references and audit correlation contracts from section 16. UI simplification must not create an “easy mode” API with weaker enforcement. Compatibility is complete only when every externally visible capability/variant has an adopted, adapted, deferred or unsupported disposition with rationale and tests. This pass does not establish exhaustive parity across both evolving ecosystems.
+
+## 18.7 Implementation sequence, migration and rollback
+
+1. **P1/S first:** correct misleading readiness/live/copy claims and remaining permission vocabulary; preserve repaired shortcuts and shared state. Add no new feature breadth in these fixes.
+2. **P1/M foundations:** canonical paginated work index, generation-safe data loads, bounded source traversal, precise Project asset routing and shared actionable-attention selectors.
+3. **P1/M security invariants:** regression-test owner isolation, grant revocation, nested tool mediation, secret scope, actual resource limits and ambiguous-effect recovery before consolidating UI entry points.
+4. **P2/S presentation:** collapse read-only/specialist explanation, group lifecycle menus, clarify popup naming and preserve every contextual link.
+5. **P2/M composition:** reuse Threads/Tasks/artifact/source/permission controllers across Projects, Home, work modes and management views; then retire duplicate components.
+6. **Larger service expansion:** deliver CAP-01–16 through those contracts, one verified adapter at a time. Preserve a long-term capability inventory rather than claiming that reduced navigation means reduced scope.
+
+For each removal PR, record old component/route/config key, replacement, retained feature, migrated preference, compatibility alias, evidence and rollback. Search imports/tests/dynamic registrations/docs before deleting files; do not infer unused from one absent import. Preserve old route parameters and durable resource identifiers. Stage preference migrations with defaults and tolerate old clients or reject them explicitly. Rollback restores UI availability without restoring revoked grants, expired approvals or forgotten records.
+
+Avoid giant mixed refactors: first make state canonical and contract-tested, then move presentation, then delete proven duplicates. Keep policy behavior changes separate and reviewable. A CSS-only removal that leaves hidden background polling, duplicate subscriptions or authority code alive does not complete the engineering simplification.
+
+## 18.8 Acceptance and release assurance for the removal plan
+
+| Gate | Pass criterion |
+| --- | --- |
+| Functional coverage | Each REM row has an owner, changed paths, retained capability and passing primary/error/recovery journey. No dead affordance or orphaned route remains. |
+| Cross-page consistency | One task, Project, account, permission and artifact has consistent identity/state everywhere; back/forward/reload preserves explicit scope and focus. |
+| Security invariants | Hiding summaries or moving actions cannot widen grants. Owner filtering, step-up, revocation, egress/secret/process boundaries and audit continue to work independently of UI. |
+| Completeness and scale | Threads/source/asset histories disclose truncation and paginate safely; older data remains discoverable; skipped filesystem entries still consume traversal budgets. |
+| Accessibility | 390×844 and 1920×1080 live evidence, keyboard/zoom/screen-reader journeys, reduced motion and a non-graph path for knowledge tasks. No 4K/8K requirement. |
+| User effort | Record baseline and after-change results for start work, resume older thread, change permission, connect channel, find memory source and open a Project asset. Target no duplicate data entry or unnecessary return to generic Settings; do not invent measured improvements. |
+| Recovery | Offline/slow/out-of-order responses show stale/unknown rather than success; retries do not duplicate external effects; imports/updates have accurate rollback limits. |
+| Documentation | Remove obsolete present-tense absence claims once verified, retain decision history with source dates, and do not call source-only remediation live-verified. |
+| CI/release | Verify checks on the exact removal implementation commit and release artifact. A documentation PR's checks do not certify application/runtime or installer behavior. |
+
+**Assessment:** Raiker can present substantial feature breadth through fewer, clearer interactions. Prioritize removing misleading state and duplicated concepts, then move advanced controls and consolidate controllers. The current source includes meaningful fixes to earlier findings, but the new completeness, freshness, source-review and continuation gaps still need implementation and live acceptance before claiming a seamless experience.

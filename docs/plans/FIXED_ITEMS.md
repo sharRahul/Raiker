@@ -556,6 +556,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-532](#fixed-532--a-button-labelled-create-a-user-account-opened-a-different-raiker) | Medium | Launch / unlock | Fixed 2026-09-14 (closes REM-LAUNCH-02) |
 | [FIXED-533](#fixed-533--one-run-three-stop-buttons-and-two-of-them-threw-the-reason-away) | Low | Tasks | Fixed 2026-09-14 (closes REM-TASK-02) |
 | [FIXED-534](#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | Fixed 2026-09-14 (closes BUG-291, BUG-292, BUG-295) |
+| [FIXED-535](#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read) | Medium | Tasks | Fixed 2026-09-15 (closes BUG-299 / UX-TASK-04) |
 
 ---
 
@@ -23551,3 +23552,103 @@ and a real Anthropic key: the catalogue is read after it has arrived, a model is
 kept offered, chosen for the turn, and answers. Captures at
 `docs/screenshots/2026-09-14-simplification/anthropic-catalogue.png` and
 `…/anthropic-turn.png`.
+
+---
+
+## FIXED-535 — A task's history of attempts, pauses and retries had nowhere to be read
+
+**Severity: Medium. Area: Tasks. Status: Fixed 2026-09-15.
+Closes [BUG-299](TO_BE_FIXED.md) and **UX-TASK-04** of the release-readiness
+review, and makes good on the two changes that had already promised it.**
+
+**Observed.** A task had a status and a current step. That was all of it: no
+per-task destination, no attempt list, no record of the approval a cycle parked
+on or the continuation that followed it.
+
+Two shipped changes were already depending on a page that did not exist:
+
+* [FIXED-533](#fixed-533--one-run-three-stop-buttons-and-two-of-them-threw-the-reason-away)
+  gave Stop, Resume and Run-now one meaning across Home, Tasks and Build, and
+  with it an honest third settlement — `outcome_unknown`, whose remedy read
+  *"refresh to see the run's current state"*. **There was nowhere to refresh
+  to.** The controller could now tell an owner truthfully that it did not know
+  what happened, and could not then show them.
+* [FIXED-531](#fixed-531--one-nightly-routine-read-as-two-pieces-of-work)'s
+  acceptance asked a deduplicated Home row to "link to the canonical Tasks
+  detail". The dedupe landed without the link, because there was no such route.
+
+**Root cause, and why it was a read rather than a new store.** Everything needed
+to answer this was already being written. `TaskManager` appends a governed event
+for every transition a task makes, and `events_index` carries `task_id` on each
+of them. Two things were genuinely missing from that record, and both were
+missing *beginnings*:
+
+1. **`task_started` was declared in the event vocabulary and never written.** A
+   task's trail was therefore a list of endings — a completion, a failure, a
+   parked decision — with nothing saying when the work that produced them began.
+2. **A routine's cycle settled silently.** `_land_outcome` reschedules a
+   recurring task instead of completing it, so none of the terminal events ever
+   fires for one. What Tuesday's cycle did was a summary string Wednesday's
+   cycle overwrote.
+
+**Fixed.**
+
+* `raiker/tasks/manager.py` gains `mark_task_started` (written before the turn
+  is submitted, so a cycle that dies inside the gateway still has a beginning)
+  and `record_cycle_outcome`, writing the new `task_cycle_landed` event — the
+  *cycle's* settlement, carrying its outcome and the slot the next cycle was
+  moved to, while the task itself stays armed. `mark_task_continuing` now
+  records **which** approval is being replayed.
+* `raiker/tasks/history.py` groups one task's ordered events into the attempts
+  they describe. An attempt opens on a start or a continuation and closes on the
+  first event that settles it; events belonging to no run — the filing, an owner
+  pressing Run now, a parked task being stopped — keep their own segment, because
+  attributing an owner's act to a cycle that had already ended is the same class
+  of untruth this record exists to remove. A run whose settlement never arrived
+  is reported as **still running**, which is the honest answer and exactly the
+  row `outcome_unknown` asked for somewhere to look.
+* `GET /api/tasks/{task_id}` serves it, scoped by the store's own
+  `load_task_for_user` — the same visibility rule the board applies, so a task
+  absent from this account's list is a 404 at its address rather than a readable
+  record at a guessable id. The read is bounded at 400 transitions and **says
+  when it was**, rather than silently showing the most recent few as though they
+  were all of them.
+* `#/tasks?task=…` is the address. `taskId` joins `routeState.ts` as a
+  coordinate like the session, turn and asset ids beside it. The panel opens
+  *above* the board rather than instead of it, so following a link never costs
+  the owner the page they were on, and a change of task clears it first — the
+  same selection-generation discipline
+  [FIXED-497](#fixed-497--a-projects-header-could-stand-over-another-projects-work)
+  gave Projects, for the same reason.
+* Every surface links to it through one function, `taskDetailHref`: the Tasks
+  board's cards and finished rows, all three of Home's boards, and Build's side
+  panel. And the `outcome_unknown` notice now carries the link, so the sentence
+  that says "go and look" says where.
+
+**Verification.** Eleven cases in `tests/test_task_attempt_history.py` covering
+the grouping (filing as its own segment, a parked run and its continuation as
+two attempts, an unsettled run reported as running, a cycle landing carrying its
+own outcome, an owner's act never folded into a settled run, a payload that
+could not be read back still getting a sentence) and the events the runtime now
+writes, including that a routine records each cycle and stays armed. Two route
+cases in `tests/test_api_dashboard.py`, and `/api/tasks/task_x` added to the
+protected-route sweep. Twelve in `web/src/lib/taskHistory.test.ts` and three in
+`web/src/lib/views/TasksView.test.ts`.
+
+**Live.** `web/e2e/bug-299-task-attempt-history-live.spec.ts` drives the whole
+path against a running host and a real Anthropic key
+(`claude-haiku-4-5-20251001`): plan a task, choose the model the composer is
+right to insist on, follow the board's own link, read the attempt the scheduler
+recorded, and confirm Home's rows point at the same address. It asserts zero
+console errors **before** its last step, which deliberately asks for a task that
+does not exist — a budget spent by the spec's own probe stops measuring
+anything ([FIXED-527](#fixed-527--an-outage-raiker-had-already-reported-also-reported-itself-to-the-console)).
+Capture at `docs/screenshots/2026-09-15-task-history/task-attempt-history.png`.
+
+**Found while closing it.** `chooseModelForTurn` knew one composer's label
+("Message composer") and Tasks labels its own "Plan work", so the helper looked
+for a picker that was there under another name — the same harness drift
+[FIXED-534](#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame)
+records. It takes the label now, in the one place that knows where the control
+lives.
+

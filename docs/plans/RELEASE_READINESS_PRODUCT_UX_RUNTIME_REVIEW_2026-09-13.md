@@ -466,7 +466,7 @@ it must not be advertised as a shipped setting.
 | UX-TASK-01 | P1 | “Now”, “Schedule once”, “Routine” and “Background” combine timing and execution style. | Separate “When” from “Run mode”; explain that background is still governed and may pause for the owner. |
 | UX-TASK-02 | P1 | A recurrence select cannot express timezone, weekdays, end conditions, missed-run policy or next-run preview. | Use a human schedule builder with timezone and the next three occurrences. Keep cron/raw recurrence in Advanced. |
 | UX-TASK-03 | P1 | Project, parent, priority, work method and model are hidden together under Details despite different importance. | Keep Project and When visible; group orchestration details separately. |
-| UX-TASK-04 | P1 | Users need one history of run attempts, approval pauses, retries and deliveries. | Open a task detail timeline with current state, next action, output and evidence. |
+| ~~UX-TASK-04~~ **closed** — [FIXED-535](FIXED_ITEMS.md#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read) | P1 | Users need one history of run attempts, approval pauses, retries and deliveries. | Open a task detail timeline with current state, next action, output and evidence. |
 | UX-TASK-05 | P1 | Destructive, duplicate, pause, resume, run-now and edit semantics need a consistent lifecycle. | Define Draft → Scheduled/Queued → Running → Waiting → Completed/Failed/Stopped, with retry/idempotency rules. |
 | UX-TASK-06 | P2 | Parent/child tasks are powerful but advanced. | Hide hierarchy unless requested; visualize child progress and define parent settlement. |
 
@@ -2242,7 +2242,7 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 | UX-TASK-01 | Separate “When” from “Run mode”; explain that background is still governed and may pause for the owner. | Timing and execution style are independent; background execution does not grant unattended authority. |
 | UX-TASK-02 | Use a human schedule builder with timezone and the next three occurrences. Keep cron/raw recurrence in Advanced. | Persist timezone and missed-run policy because local time and DST otherwise create surprises. |
 | UX-TASK-03 | Keep Project and When visible; group orchestration details separately. | Show scope and timing before commit because both materially change the requested work. |
-| UX-TASK-04 | Open a task detail timeline with current state, next action, output and evidence. | One attempt timeline distinguishes execution success from delivery success. |
+| ~~UX-TASK-04~~ **closed** — [FIXED-535](FIXED_ITEMS.md#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read) | Open a task detail timeline with current state, next action, output and evidence. | One attempt timeline distinguishes execution success from delivery success. |
 | UX-TASK-05 | Define Draft → Scheduled/Queued → Running → Waiting → Completed/Failed/Stopped, with retry/idempotency rules. | Explicit transitions prevent retries from creating duplicate external actions. |
 | UX-TASK-06 | Hide hierarchy unless requested; visualize child progress and define parent settlement. | Progressive disclosure keeps simple work simple while parent settlement remains deterministic. |
 
@@ -2593,11 +2593,20 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 > round ended with zero uncaught console errors — see
 > [`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md).
 >
-> Two defects were found while closing them and are open in
+> Two defects were found while closing them and were filed in
 > [`TO_BE_FIXED.md`](TO_BE_FIXED.md): `policy_mutation` is a routed gate nothing
-> proposes (BUG-298), and a task has no per-attempt history to link to or refresh
-> into (BUG-299) — which is **UX-TASK-04**, and which two of these closures now
-> depend on.
+> proposes (BUG-298, still open), and a task had no per-attempt history to link
+> to or refresh into (BUG-299) — which is **UX-TASK-04**, and which two of these
+> closures depended on.
+>
+> **BUG-299 closed 2026-09-15** as
+> [FIXED-535](FIXED_ITEMS.md#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read),
+> as a read of the governed events a task's lifecycle already writes rather than
+> a new store. `#/tasks?task=…` is the address REM-HOME-01's deduplicated row
+> and REM-TASK-02's `outcome_unknown` settlement were both promising, and both
+> now point at it. Driven live against a real Anthropic key; the round's last
+> step deliberately asks for a task that does not exist, so its console-error
+> budget is asserted before it rather than spent by it.
 
 > **Implementation status, 2026-09-14.** A second pass closed **every open P1
 > row in this section** and the two P2 rows that shared a surface with one.

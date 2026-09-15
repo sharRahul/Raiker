@@ -373,7 +373,76 @@ class TaskManager:
                 parent_id, f"All {len(states)} delegated tasks completed."
             )
 
-    def mark_task_continuing(self, task_id: str, tool_name: str = "") -> TaskRecord | None:
+    def mark_task_started(self, task_id: str, *, trigger: str = "schedule") -> TaskRecord | None:
+        """Record that one cycle of this task has begun (BUG-299).
+
+        ``task_started`` was declared in the event vocabulary and never written,
+        so a task's history had ends without beginnings: a completion, a failure
+        and a parked decision, with nothing saying when the work that produced
+        them started or what set it going. The claim itself is still the store's
+        atomic transition — this does not start anything, it states that a
+        claimed cycle is now running, which is what the attempt timeline reads
+        as the top of an attempt.
+
+        ``trigger`` is how the cycle came to run: ``schedule`` for the
+        scheduler's own tick, ``owner`` for a run the owner asked for. The
+        record never infers it; the caller that knows states it.
+        """
+        task = self.get_task(task_id)
+        if task is None:
+            return None
+        self.writer.append(
+            make_event(
+                session_id=task.session_id,
+                turn_id=task.parent_turn_id,
+                event_type="task_started",
+                actor="task_scheduler",
+                payload={
+                    "task_id": task_id,
+                    "trigger": trigger,
+                    "status": task.status,
+                    "run_session_id": task.run_session_id,
+                    "current_step": task.current_step or "",
+                },
+            )
+        )
+        return task
+
+    def record_cycle_outcome(
+        self, task_id: str, *, outcome: str, summary: str, next_run_at: str | None = None
+    ) -> TaskRecord | None:
+        """Record how one cycle of a *routine* settled (BUG-299).
+
+        A recurring task is rescheduled rather than completed, so none of the
+        terminal events ever fires for it and its attempt timeline would show
+        every cycle as still running. This is the cycle's own settlement: it
+        says nothing about the task's status, which stays armed, and it carries
+        the slot the next cycle was moved to so the record answers "and then
+        what" without the reader deriving it from a cadence.
+        """
+        task = self.get_task(task_id)
+        if task is None:
+            return None
+        self.writer.append(
+            make_event(
+                session_id=task.session_id,
+                turn_id=task.parent_turn_id,
+                event_type="task_cycle_landed",
+                actor="task_scheduler",
+                payload={
+                    "task_id": task_id,
+                    "outcome": outcome,
+                    "summary": summary,
+                    "next_run_at": next_run_at or "",
+                    "recurrence": task.recurrence or "",
+                },
+            )
+        )
+        return task
+
+    def mark_task_continuing(
+        self, task_id: str, tool_name: str = "", *, approval_id: str = ""
+    ) -> TaskRecord | None:
         """A granted approval is being replayed into this task's parked turn.
 
         The card moves off *waiting for approval* the moment the continuation
@@ -393,7 +462,16 @@ class TaskManager:
                 turn_id=task.parent_turn_id,
                 event_type="task_resume_started",
                 actor="task_scheduler",
-                payload={"task_id": task_id, "tool_name": tool_name, "status": task.status},
+                payload={
+                    "task_id": task_id,
+                    "tool_name": tool_name,
+                    "status": task.status,
+                    # BUG-299 — *which* decision is being replayed. Without it a
+                    # continuation could be read back but not tied to the
+                    # approval that released it, which is half the question an
+                    # attempt timeline is opened to answer.
+                    "approval_id": approval_id,
+                },
             )
             self.writer.append(event)
         return task

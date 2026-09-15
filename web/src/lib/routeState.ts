@@ -27,11 +27,28 @@ export interface RouteState {
    * somebody else resolves to nothing at all.
    */
   assetId: string | null;
+  /**
+   * BUG-299 — the task a link is pointing at. The same kind of coordinate as
+   * the session and asset ids beside it: it names a task the reader may already
+   * open, and grants nothing, because the detail route is scoped to the
+   * account's own visible tasks on the server. A task belonging to somebody
+   * else resolves to nothing at all.
+   */
+  taskId: string | null;
   filter: string | null;
   tab: string | null;
 }
 
-const ROUTE_STATE_KEYS = ["project", "session", "turn", "record", "asset", "filter", "tab"] as const;
+const ROUTE_STATE_KEYS = [
+  "project",
+  "session",
+  "turn",
+  "record",
+  "asset",
+  "task",
+  "filter",
+  "tab",
+] as const;
 
 function safeValue(value: string | null): string | null {
   if (value === null || value.length === 0 || value.length > 256) return null;
@@ -50,6 +67,7 @@ export function routeStateFromHash(hash: string): RouteState {
     turnId: values.turn,
     recordId: values.record,
     assetId: values.asset,
+    taskId: values.task,
     filter: values.filter,
     tab: values.tab,
   };

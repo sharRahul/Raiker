@@ -1942,8 +1942,18 @@ process configuration and `policy_mutation` is gone from the gate map with it.
 
 ## BUG-299 — A task's history of attempts, pauses and retries has nowhere to be read
 
-**Severity: Low. Area: Tasks. Raised 2026-09-14 while implementing
-REM-TASK-02.**
+**Severity: Medium. Area: Tasks. Status: Closed 2026-09-15 as
+[FIXED-535](FIXED_ITEMS.md#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read).
+Raised 2026-09-14 while implementing REM-TASK-02.**
+
+Closed as a *read* rather than a new store: every transition a task makes was
+already a governed event carrying its `task_id`, so the attempts are the audit
+log grouped at the scope of one task. Two beginnings were genuinely missing and
+were added — `task_started`, which was in the event vocabulary and never
+written, and `task_cycle_landed`, without which a routine's every cycle read as
+still running because a recurring task is rescheduled rather than completed.
+`#/tasks?task=…` is the address; Home's rows, the Tasks board, Build's side
+panel and the `outcome_unknown` notice all point at it.
 
 **Observed.** [FIXED-533](FIXED_ITEMS.md#fixed-533--one-run-three-stop-buttons-and-two-of-them-threw-the-reason-away)
 gave one run one Stop, Resume and Run-now meaning across Home, Tasks and Build,

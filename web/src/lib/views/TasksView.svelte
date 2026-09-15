@@ -23,6 +23,8 @@
     type TaskCadence,
   } from "../taskComposer";
   import GuideLink from "../components/GuideLink.svelte";
+  import TaskHistory from "../components/TaskHistory.svelte";
+  import { taskDetailHref } from "../taskHistory";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { createFileDrop } from "../fileDrop.svelte";
   import { api, ApiError } from "../api";
@@ -35,6 +37,7 @@
     ExecutionEnvironment,
     ProjectsList,
     PromptAttachment,
+    TaskDetailView,
     TaskView,
   } from "../apiTypes";
   import { relativeTime } from "../format";
@@ -49,14 +52,26 @@
     sessionId = null,
     /** The owner's projects, so the composer can name and change the boundary. */
     projects = null,
+    /**
+     * BUG-299 — the task this address is for. Tasks is still the board; with a
+     * task named it opens that task's attempt history above it, so the link
+     * Home and Build now carry lands somewhere rather than on a list the owner
+     * has to search.
+     */
+    taskId = null,
   }: {
     projectId?: string | null;
     sessionId?: string | null;
     projects?: ProjectsList | null;
+    taskId?: string | null;
   } = $props();
   let tasks = $state<TaskView[] | null>(null);
   let loadError = $state<string | null>(null);
   let notice = $state<string | null>(null);
+  // BUG-299 — where to look when the runtime could not say what happened. Held
+  // beside the notice rather than inside it, so the sentence stays a sentence
+  // and the remedy stays a link.
+  let noticeHref = $state<string | null>(null);
   let creating = $state(false);
   let busyTask = $state<string | null>(null);
   /**
@@ -264,6 +279,54 @@
       : `${attachment.type === "image" ? "Image" : "Document"} ${attachment.attachment_id}`;
   }
 
+  // BUG-299 — the named task's attempts. A generation guards it for the same
+  // reason NEW-PROJ-01 made Projects guard theirs: two reads can be in flight
+  // when the owner moves between tasks, and a header standing over another
+  // task's history is the same untruth as a project header over another
+  // project's files.
+  let detail = $state<TaskDetailView | null>(null);
+  let detailError = $state<string | null>(null);
+  let detailLoading = $state(false);
+  let detailGeneration = 0;
+
+  async function loadDetail(id: string) {
+    const generation = ++detailGeneration;
+    detailLoading = true;
+    try {
+      const view = await api.taskDetail(id);
+      if (generation !== detailGeneration) return;
+      detail = view;
+      detailError = null;
+    } catch (error) {
+      if (generation !== detailGeneration) return;
+      detail = null;
+      detailError =
+        error instanceof ApiError && error.status === 404
+          ? "That task is not on this account's board."
+          : error instanceof ApiError
+            ? `Unavailable (${error.status})`
+            : "Unavailable";
+    } finally {
+      if (generation === detailGeneration) detailLoading = false;
+    }
+  }
+
+  // Clears immediately on a change of task, so the panel never shows the
+  // previous task's attempts under the new task's heading while the read runs.
+  $effect(() => {
+    const id = taskId;
+    if (id === null) {
+      detailGeneration += 1;
+      detail = null;
+      detailError = null;
+      detailLoading = false;
+      return;
+    }
+    detail = null;
+    detailError = null;
+    void loadDetail(id);
+  });
+
   async function load() {
     try {
       loadError = null;
@@ -351,7 +414,7 @@
 
   async function createTask() {
     if (!title.trim() || !objective.trim() || modelBlocked || attachStore.uploading || (wantsStartTime && !scheduledAt)) return;
-    creating = true; notice = null;
+    creating = true; notice = null; noticeHref = null;
     const attachments = wireAttachments(attachStore.take());
     try {
       await api.createTask({
@@ -394,7 +457,10 @@
   async function resumeTask(task: TaskView) {
     busyTask = task.task_id;
     notice = null;
-    notice = (await resumeRun(task)).notice;
+    noticeHref = null;
+    const outcome = await resumeRun(task);
+    notice = outcome.notice;
+    noticeHref = outcome.detailHref ?? null;
     await load();
     busyTask = null;
   }
@@ -402,7 +468,10 @@
   async function runTask(task: TaskView) {
     busyTask = task.task_id;
     notice = null;
-    notice = (await startRunNow(task)).notice;
+    noticeHref = null;
+    const outcome = await startRunNow(task);
+    notice = outcome.notice;
+    noticeHref = outcome.detailHref ?? null;
     await load();
     busyTask = null;
   }
@@ -410,7 +479,10 @@
   async function stopTask(task: TaskView) {
     busyTask = task.task_id;
     notice = null;
-    notice = (await stopRun(task, "user stopped this task (web UI)")).notice;
+    noticeHref = null;
+    const outcome = await stopRun(task, "user stopped this task (web UI)");
+    notice = outcome.notice;
+    noticeHref = outcome.detailHref ?? null;
     await load();
     busyTask = null;
   }
@@ -448,7 +520,13 @@
         environment = null;
         environmentUnavailable = true;
       });
-    const timer = window.setInterval(() => void load(), 15_000);
+    const timer = window.setInterval(() => {
+      void load();
+      // BUG-299 — an open history is a live view of the same records the board
+      // is polling, so it moves on the same tick rather than going stale behind
+      // a board that is up to date.
+      if (taskId !== null) void loadDetail(taskId);
+    }, 15_000);
     return () => window.clearInterval(timer);
   });
 </script>
@@ -456,6 +534,23 @@
 <section class="tasks">
   <header>  <GuideLink route="tasks" />
 <button type="button" class="btn btn-ghost btn-sm" onclick={load}><Icon name="refresh" size="sm" /> Refresh</button></header>
+
+  <!-- BUG-299 — the address Home's rows, Build's panel and the Stop control's
+       "refresh to see the run's current state" all needed. It opens above the
+       board rather than replacing it, so following a link never costs the owner
+       the page they were on. -->
+  {#if taskId}
+    <TaskHistory
+      detail={detail}
+      loading={detailLoading}
+      error={detailError}
+      onrefresh={() => void loadDetail(taskId)}
+      onclose={() => {
+        detail = null;
+        detailError = null;
+      }}
+    />
+  {/if}
 
   <!-- COMPOSER-10 — the same shell Chat, Build and Design use. What differs is
        the primary action and the one control that is specific to planning work:
@@ -670,7 +765,10 @@
     {/snippet}
   </Composer>
 
-  {#if notice}<p class="notice" role="status">{notice}</p>{/if}
+  {#if notice}<p class="notice" role="status">
+      {notice}
+      {#if noticeHref}<a href={noticeHref}>Open its history</a>{/if}
+    </p>{/if}
   {#if loadError}<PageState state="error" title="Couldn't load tasks" detail={loadError} />
   {:else if tasks === null}<PageState state="loading" title="Loading tasks…" lines={3} />
   {:else}
@@ -791,6 +889,12 @@
                     Thread · {task.thread_turns}
                   </a>
                 {/if}
+                <!-- BUG-299 — every run's attempts, the decision each waited on
+                     and the continuation that followed, at one address. -->
+                <a class="btn btn-ghost btn-sm thread-link" href={taskDetailHref(task.task_id)}>
+                  <Icon name="activity" size="sm" />
+                  History
+                </a>
                 {#if ACTIVE_TASK_STATES.includes(task.status)}
                   {#if task.status === "queued" && !task.scheduled_at}
                     <button type="button" class="btn btn-primary btn-sm" onclick={() => runTask(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Starting…" : "Run now"}</button>
@@ -803,12 +907,12 @@
         {/each}
       </section>
     {/if}
-    {#if history.length > 0}<section class="history"><h3>Finished work</h3>{#each history as task (task.task_id)}<div class="history-row"><div class="history-main"><span class="history-title">{task.title}</span><p class="outcome">{outcome(task)}</p></div><Badge variant={taskBadge(task.status)} label={taskStatusLabel(task.status)} /><span>{relativeTime(task.updated_at)}</span></div>{/each}</section>{/if}
+    {#if history.length > 0}<section class="history"><h3>Finished work</h3>{#each history as task (task.task_id)}<div class="history-row"><div class="history-main"><a class="history-title" href={taskDetailHref(task.task_id)}>{task.title}</a><p class="outcome">{outcome(task)}</p></div><Badge variant={taskBadge(task.status)} label={taskStatusLabel(task.status)} /><span>{relativeTime(task.updated_at)}</span></div>{/each}</section>{/if}
   {/if}
 </section>
 
 <style>
-  .tasks{width:100%}.tasks header,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.task p{color:var(--text-2);font-size:var(--text-sm);margin:.35rem 0 0}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:var(--text-sm)}.summary strong{color:var(--text-1);font-size:var(--text-base)}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:var(--text-base)}.task-attachments{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}.task-attachments span{align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-2);display:flex;font-size:var(--text-xs);gap:.3rem;max-width:100%;overflow-wrap:anywhere;padding:.35rem .5rem}.step{color:var(--accent)!important}.continuing{align-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.recovery{align-items:center;display:flex;flex-wrap:wrap;gap:.35rem;margin-left:auto}.recovery-note{color:var(--text-3);font-size:var(--text-xs)}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:var(--text-xs);margin-top:.8rem}.task-actions{align-items:center;display:flex;flex-wrap:wrap;gap:.4rem}.thread-link{align-items:center;display:inline-flex;gap:.3rem;text-decoration:none}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:var(--text-sm)}.history-main{display:grid;gap:.15rem;min-width:0}.history-title{color:var(--text-1)}.outcome{color:var(--text-2);font-size:var(--text-sm);margin:.4rem 0 0}.history-main .outcome{margin:0}.notice{color:var(--success);margin:var(--space-3) 0}
+  .tasks{width:100%}.tasks header,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.task p{color:var(--text-2);font-size:var(--text-sm);margin:.35rem 0 0}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:var(--text-sm)}.summary strong{color:var(--text-1);font-size:var(--text-base)}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:var(--text-base)}.task-attachments{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}.task-attachments span{align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-2);display:flex;font-size:var(--text-xs);gap:.3rem;max-width:100%;overflow-wrap:anywhere;padding:.35rem .5rem}.step{color:var(--accent)!important}.continuing{align-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.recovery{align-items:center;display:flex;flex-wrap:wrap;gap:.35rem;margin-left:auto}.recovery-note{color:var(--text-3);font-size:var(--text-xs)}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:var(--text-xs);margin-top:.8rem}.task-actions{align-items:center;display:flex;flex-wrap:wrap;gap:.4rem}.thread-link{align-items:center;display:inline-flex;gap:.3rem;text-decoration:none}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:var(--text-sm)}.history-main{display:grid;gap:.15rem;min-width:0}.history-title{color:var(--text-1);text-decoration:none}.history-title:hover{text-decoration:underline}.outcome{color:var(--text-2);font-size:var(--text-sm);margin:.4rem 0 0}.history-main .outcome{margin:0}.notice{color:var(--success);margin:var(--space-3) 0}
   /* COMPOSER-10 — the details, when asked for. A grid rather than a column so
      four short fields do not become four full-width rows. */
   .task-details{display:grid;gap:var(--space-3);grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));margin:var(--space-2) 0}

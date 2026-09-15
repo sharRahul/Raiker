@@ -21,6 +21,9 @@
   import PageState from "./PageState.svelte";
   import { api, ApiError } from "../api";
   import { stopRun } from "../taskLifecycle";
+  // BUG-299 — the panel could stop a run and report `outcome_unknown`, and had
+  // nowhere to send the owner it told to refresh. This is that address.
+  import { taskDetailHref } from "../taskHistory";
   import type { ProjectsList, TaskView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { AGENT_CADENCES, cadenceLabel } from "../agentCadence";
@@ -42,6 +45,8 @@
   let tasks = $state<TaskView[] | null>(null);
   let loadError = $state<string | null>(null);
   let notice = $state<string | null>(null);
+  // BUG-299 — where to look when the runtime could not say what happened.
+  let noticeHref = $state<string | null>(null);
   let busyTask = $state<string | null>(null);
 
   // Scheduled agent form.
@@ -82,8 +87,10 @@
   async function stopTask(task: TaskView) {
     busyTask = task.task_id;
     notice = null;
+    noticeHref = null;
     const outcome = await stopRun(task, "stopped from the Build workspace");
     notice = outcome.notice;
+    noticeHref = outcome.detailHref ?? null;
     await load();
     busyTask = null;
   }
@@ -173,7 +180,10 @@
     </div>
   </header>
 
-  {#if notice}<p class="notice" role="status">{notice}</p>{/if}
+  {#if notice}<p class="notice" role="status">
+      {notice}
+      {#if noticeHref}<a href={noticeHref}>Open its history</a>{/if}
+    </p>{/if}
 
   {#if tab === "running"}
     <div id="build-panel-running" role="tabpanel" aria-labelledby="build-tab-running" class="panel">
@@ -201,7 +211,7 @@
           {#each running as task (task.task_id)}
             <li class="task">
               <div class="task-head">
-                <span class="task-title">{task.title}</span>
+                <a class="task-title" href={taskDetailHref(task.task_id)}>{task.title}</a>
                 <Badge variant={taskBadge(task.status)} label={task.status} />
               </div>
               {#if task.current_step}<p class="step">{task.current_step}</p>{/if}
@@ -244,7 +254,7 @@
           <ul>
             {#each finished as task (task.task_id)}
               <li>
-                <span class="task-title">{task.title}</span>
+                <a class="task-title" href={taskDetailHref(task.task_id)}>{task.title}</a>
                 <Badge variant={taskBadge(task.status)} label={task.status} />
               </li>
             {/each}
@@ -473,7 +483,9 @@
     font-weight: 650;
     color: var(--text-1);
     overflow-wrap: anywhere;
+    text-decoration: none;
   }
+  .task-title:hover { text-decoration: underline; }
   .step {
     margin: 0.3rem 0 0;
     font-size: var(--text-xs);

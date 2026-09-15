@@ -558,4 +558,115 @@ describe("TasksView blocked-on-approval pointer", () => {
       description: "Summarise security news. Flag anything urgent.",
     });
   });
+  // ── BUG-299 — a task's attempts have an address ──────────────────────────
+
+  const TASK_ROW = {
+    task_id: "task_1",
+    session_id: "sess_inbox_owner",
+    status: "completed",
+    title: "Nightly digest",
+    objective: "Summarise the day",
+    current_step: null,
+    progress_percent: null,
+    created_at: "2026-09-15T08:00:00Z",
+    updated_at: "2026-09-15T09:05:00Z",
+    completed_at: null,
+    summary: "Digest sent.",
+    project_id: null,
+  };
+
+  const TASK_DETAIL = {
+    task: TASK_ROW,
+    approvals: [],
+    truncated: false,
+    attempts: [
+      {
+        index: 0,
+        kind: "record",
+        started_at: "2026-09-15T08:00:00Z",
+        ended_at: null,
+        outcome: "recorded",
+        summary: "Filed.",
+        approval_id: null,
+        events: [
+          {
+            event_id: "evt_1",
+            event_type: "task_created",
+            timestamp: "2026-09-15T08:00:00Z",
+            actor: "task_manager",
+            detail: "Filed.",
+            turn_id: null,
+            session_id: "sess_inbox_owner",
+          },
+        ],
+      },
+      {
+        index: 1,
+        kind: "run",
+        started_at: "2026-09-15T09:00:00Z",
+        ended_at: "2026-09-15T09:05:00Z",
+        outcome: "failed",
+        summary: "The provider refused.",
+        approval_id: null,
+        events: [
+          {
+            event_id: "evt_2",
+            event_type: "task_started",
+            timestamp: "2026-09-15T09:00:00Z",
+            actor: "task_scheduler",
+            detail: "This cycle started.",
+            turn_id: null,
+            session_id: "sess_inbox_owner",
+          },
+          {
+            event_id: "evt_3",
+            event_type: "task_failed",
+            timestamp: "2026-09-15T09:05:00Z",
+            actor: "task_manager",
+            detail: "The provider refused.",
+            turn_id: null,
+            session_id: "sess_inbox_owner",
+          },
+        ],
+      },
+    ],
+  };
+
+  it("opens one task's attempts at its own address, newest first", async () => {
+    stubFetch({
+      "GET /api/tasks": [TASK_ROW],
+      "GET /api/approvals": [],
+      "GET /api/tasks/task_1": TASK_DETAIL,
+    });
+    render(TasksView, { props: { taskId: "task_1" } });
+
+    // The heading is the task, and the lead counts the attempts rather than
+    // repeating the status the badge already carries.
+    await screen.findByRole("heading", { name: "Nightly digest", level: 3 });
+    expect(screen.getByText("1 attempt · 1 did not complete.")).toBeInTheDocument();
+    // The run states what settled it, and the stated reason is the row.
+    expect(screen.getByRole("heading", { name: "Attempt 1", level: 4 })).toBeInTheDocument();
+    expect(screen.getAllByText("The provider refused.").length).toBeGreaterThan(0);
+    // The board is still under it — following a link never costs the page.
+    expect(screen.getByLabelText("What should Raiker do?")).toBeInTheDocument();
+  });
+
+  it("says a task is not this account's rather than showing an empty history", async () => {
+    stubFetch({
+      "GET /api/tasks": [],
+      "GET /api/approvals": [],
+      "GET /api/tasks/task_missing": { __status: 404, detail: { reason_code: "task_not_found" } },
+    });
+    render(TasksView, { props: { taskId: "task_missing" } });
+
+    await screen.findByText("That task is not on this account's board.");
+  });
+
+  it("links every task on the board to its own history", async () => {
+    stubFetch({ "GET /api/tasks": [TASK_ROW], "GET /api/approvals": [] });
+    render(TasksView);
+
+    const link = await screen.findByRole("link", { name: "Nightly digest" });
+    expect(link).toHaveAttribute("href", "#/tasks?task=task_1");
+  });
 });

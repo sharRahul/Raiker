@@ -43,6 +43,10 @@
   import { cadenceLabel } from "../agentCadence";
   import GuideLink from "../components/GuideLink.svelte";
   import { stopRun } from "../taskLifecycle";
+  // REM-HOME-01 asked a deduplicated row to "link to the canonical Tasks
+  // detail", and the dedupe landed without the link because there was no such
+  // route. BUG-299 built it; this is the row honouring the promise.
+  import { taskDetailHref } from "../taskHistory";
   import { isActiveTask, isBlockedTask, taskBadge, taskStatusLabel } from "../statusMaps";
   import {
     type Freshness,
@@ -72,6 +76,8 @@
   let updatedAt = $state<Date | null>(null);
   let busyTask = $state<string | null>(null);
   let notice = $state<string | null>(null);
+  // BUG-299 — where to look when the runtime could not say what happened.
+  let noticeHref = $state<string | null>(null);
 
   /**
    * A repeating cadence re-arms after each cycle, so it is a standing agent. The
@@ -230,8 +236,10 @@
   async function stopTask(task: TaskView) {
     busyTask = task.task_id;
     notice = null;
+    noticeHref = null;
     const outcome = await stopRun(task, "stopped from the Workbench board");
     notice = outcome.notice;
+    noticeHref = outcome.detailHref ?? null;
     await load();
     busyTask = null;
   }
@@ -303,7 +311,10 @@
     </a>
   </nav>
 
-  {#if notice}<p class="notice" role="status">{notice}</p>{/if}
+  {#if notice}<p class="notice" role="status">
+      {notice}
+      {#if noticeHref}<a href={noticeHref}>Open its history</a>{/if}
+    </p>{/if}
 
   <div class="columns">
     <div class="main-column">
@@ -333,7 +344,7 @@
               {#each runningNow as task (task.task_id)}
                 <li>
                   <div class="row-main">
-                    <strong>{task.title}</strong>
+                    <a class="row-title" href={taskDetailHref(task.task_id)}>{task.title}</a>
                     <span>{detail(task)}</span>
                   </div>
                   <!-- REM-HOME-01 — the schedule travels with the attempt.
@@ -377,7 +388,7 @@
               {#each agents as task (task.task_id)}
                 <li>
                   <div class="row-main">
-                    <strong>{task.title}</strong>
+                    <a class="row-title" href={taskDetailHref(task.task_id)}>{task.title}</a>
                     <span>{detail(task)}</span>
                   </div>
                   <div class="row-meta">
@@ -412,7 +423,7 @@
               {#each scheduled as task (task.task_id)}
                 <li>
                   <div class="row-main">
-                    <strong>{task.title}</strong>
+                    <a class="row-title" href={taskDetailHref(task.task_id)}>{task.title}</a>
                     <span>{detail(task)}</span>
                   </div>
                   <div class="row-meta">
@@ -616,7 +627,11 @@
     padding: var(--row-y) 0;
   }
   .row-main { display: grid; gap: 0.15rem; min-width: 0; }
-  .row-main strong { color: var(--text-1); }
+  /* The row's own title is the link to its attempt history (BUG-299). It keeps
+     the weight a title had so the board does not suddenly read as a list of
+     links, and underlines on hover so it is discoverable as one. */
+  .row-title { color: var(--text-1); font-weight: 600; text-decoration: none; }
+  .row-title:hover { text-decoration: underline; }
   .row-main span { color: var(--text-2); font-size: var(--text-sm); overflow-wrap: anywhere; }
   .row-meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; color: var(--text-3); font-size: var(--text-xs); }
   .kind, .since { white-space: nowrap; }

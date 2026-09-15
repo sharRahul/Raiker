@@ -653,8 +653,16 @@ export async function signInAsOwner(
  * harness keeps encoding where a control used to be, and one copy is one edit
  * the next time the picker changes.
  */
-export async function chooseModelForTurn(page: Page, model: RegExp): Promise<void> {
-  const composer = page.getByRole("group", { name: "Message composer" });
+export async function chooseModelForTurn(
+  page: Page,
+  model: RegExp,
+  composerLabel = "Message composer",
+): Promise<void> {
+  // Chat, Build and Design label their composer "Message composer"; Tasks
+  // labels its own "Plan work", because what it composes is a plan rather than
+  // a message. Same control, same decision, one helper — a second copy here is
+  // exactly the drift FIXED-503 describes.
+  const composer = page.getByRole("group", { name: composerLabel });
   await composer.getByRole("button", { name: /^Model for this turn:/ }).click();
   const menu = page.getByRole("menu", { name: "Models" });
   await expect(menu).toBeVisible({ timeout: 30_000 });

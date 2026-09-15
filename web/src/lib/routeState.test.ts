@@ -4,13 +4,13 @@ import { routeStateFromHash } from "./routeState";
 describe("route state contract", () => {
   it("accepts only documented non-secret selection state", () => {
     expect(routeStateFromHash("#/sessions?project=proj_1&session=sess_1&filter=open&token=nope")).toEqual({
-      projectId: "proj_1", sessionId: "sess_1", turnId: null, recordId: null, assetId: null, filter: "open", tab: null,
+      projectId: "proj_1", sessionId: "sess_1", turnId: null, recordId: null, assetId: null, taskId: null, filter: "open", tab: null,
     });
   });
 
   it("drops empty and oversized values", () => {
     expect(routeStateFromHash(`#/home?session=&record=${"x".repeat(257)}`)).toEqual({
-      projectId: null, sessionId: null, turnId: null, recordId: null, assetId: null, filter: null, tab: null,
+      projectId: null, sessionId: null, turnId: null, recordId: null, assetId: null, taskId: null, filter: null, tab: null,
     });
   });
 
@@ -24,6 +24,7 @@ describe("route state contract", () => {
       turnId: "turn_9",
       recordId: null,
       assetId: null,
+      taskId: null,
       filter: null,
       tab: null,
     });
@@ -39,6 +40,23 @@ describe("route state contract", () => {
       turnId: null,
       recordId: null,
       assetId: "img_7",
+      taskId: null,
+      filter: null,
+      tab: null,
+    });
+  });
+
+  // BUG-299 — the task a link points at. Same rule again: a coordinate the
+  // reader may already open, resolved against this account's own tasks on the
+  // server, carrying no payload, credential or decision.
+  it("carries the task a history link points at", () => {
+    expect(routeStateFromHash("#/tasks?task=task_9")).toEqual({
+      projectId: null,
+      sessionId: null,
+      turnId: null,
+      recordId: null,
+      assetId: null,
+      taskId: "task_9",
       filter: null,
       tab: null,
     });

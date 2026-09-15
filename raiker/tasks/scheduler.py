@@ -276,7 +276,9 @@ class TaskScheduler:
             if current is None or current.status in NON_RESUMABLE_TASK_STATES:
                 break
             approval_id = str(turn["approval_id"])
-            manager.mark_task_continuing(task_id, str(turn.get("tool_name") or ""))
+            manager.mark_task_continuing(
+                task_id, str(turn.get("tool_name") or ""), approval_id=approval_id
+            )
             try:
                 response = await AgentGateway(
                     self.workspace_root, principal_id=principal_id
@@ -310,10 +312,18 @@ class TaskScheduler:
         outcome, summary = run_outcome(status, message)
         interval = RECURRING_INTERVALS.get(task.recurrence or "")
         if interval is not None and task.scheduled_at:
+            next_run_at = next_run_after(task.scheduled_at, interval)
             manager.store.reschedule_task(
                 task_id,
-                next_run_after(task.scheduled_at, interval),
+                next_run_at,
                 summary if outcome == "completed" else f"Last run did not complete: {summary}",
+            )
+            # BUG-299 - a routine never reaches a terminal state, so without
+            # this the only trace of what Tuesday's cycle did was a summary
+            # string Wednesday's cycle overwrote. The cycle settles; the task
+            # stays armed.
+            manager.record_cycle_outcome(
+                task_id, outcome=outcome, summary=summary, next_run_at=next_run_at
             )
         elif outcome == "completed":
             manager.complete_task(task_id, summary)
@@ -381,6 +391,12 @@ class TaskScheduler:
                     owner_principal_id=principal_id,
                     turn_id=turn_id,
                 )
+        # BUG-299 - the top of this attempt. Written before the turn is
+        # submitted so a cycle that dies inside the gateway still has a
+        # beginning in its own history rather than only an end.
+        TaskManager(self.store, EventLogWriter(self.store)).mark_task_started(
+            task.task_id, trigger="schedule"
+        )
         response = await AgentGateway(self.workspace_root, principal_id=principal_id).submit_prompt_async(
             PromptEnvelope(
                 request_id=new_id("req_"), session_id=run_session_id, turn_id=turn_id,

@@ -120,6 +120,7 @@ import type {
   SkillView,
   StandingGrant,
   StreamEvent,
+  TaskDetailView,
   TaskView,
   TranscriptExportManifest,
   TurnDetail,
@@ -2265,6 +2266,11 @@ export const api = {
   tasks: (
     params: { session_id?: string; status?: string; project_id?: string } = {},
   ) => request<TaskView[]>(withQuery("/api/tasks", params)),
+  // BUG-299 — one task at its own address, with the attempts behind its status.
+  // Home's deduplicated rows, Build's task panel and the Stop control's honest
+  // "refresh to see the run's current state" all point here.
+  taskDetail: (taskId: string) =>
+    request<TaskDetailView>(`/api/tasks/${encodeURIComponent(taskId)}`),
   createTask: (body: {
     title: string;
     description: string;

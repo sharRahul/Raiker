@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-15 | Targeted | `2026-09-15-task-history/` | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | A task's attempts read at an address the task did not have — the run the scheduler claimed, how it settled, and the three surfaces that now link to it |
 | 2026-09-14 (second) | Targeted | `2026-09-14-simplification/` | Anthropic, the same eighth key — a catalogue, a model kept offered, a model chosen for the turn, and an answer | Nine owner-facing changes of the simplification pass, driven through the product's own controls on a workspace that started empty, ending with **zero uncaught console errors** on a host that can reach neither `huggingface.co` nor `openrouter.ai` |
 | 2026-09-14 | Targeted | `2026-09-14-permissions-overhaul/` | Anthropic, an eighth key entered through the Connect dialog — the first of the eight that authenticates and lists models | The rebuilt Permissions page measured on the running product, the §18.3 rows that closed with it, and three live-test helpers that had been waiting on strings the product stopped printing |
 | 2026-09-07 | Targeted | `env-01-` … `env-05-` | Anthropic, a **seventh** identity-linked key entered through the interface; no local runtime on the host | The clock, the weather and the global read catalogue as runtime facts — and two harness defects that had been silent since the `apps/web` → `web` move: every live round writing its captures outside the repository, and every provider spec waiting for a tab the Models redesign removed |
@@ -70,6 +71,61 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-09-15 — A task, and everywhere it had already been promised
+
+**Tier: Targeted. Build: production `npm run build`. Provider: Anthropic
+(`claude-haiku-4-5-20251001`), the key entered through the Connect dialog.
+Owner: the shared `OWNER_CREDENTIALS`. Workspace: a fresh scratch directory
+(`scripts/reset_live_workspace.py`). Spec:
+`web/e2e/bug-299-task-attempt-history-live.spec.ts` — 1 case, passing.
+Screenshots: `docs/screenshots/2026-09-15-task-history/`.**
+
+BUG-299 / UX-TASK-04 was the last thing two already-shipped changes were waiting
+on: REM-HOME-01's deduplicated Home row, whose acceptance asks it to "link to the
+canonical Tasks detail", and REM-TASK-02's `outcome_unknown` settlement, whose
+remedy reads *"refresh to see the run's current state"*. Neither had anywhere to
+point. This round drove the page that answers both through the product's own
+controls.
+
+1. **The composer was right to refuse, and said so.** With Anthropic connected
+   and a model pinned, **Create task** stayed disabled until a model was chosen
+   for the turn from the composer's own picker — the two decisions BUG-292
+   records as genuinely separate. The task was created only after that.
+2. **The board links every task to its own history.** The card's title resolves
+   to `#/tasks?task=task_…`, and the same href appears on Home's rows.
+3. **The address opens above the board.** Following the link did not cost the
+   page: the Plan-work composer and the open-work list were still under the
+   panel.
+4. **A filing is its own record.** The task opened on *Filed.* before it had run,
+   rather than on an empty page.
+5. **The run the scheduler claimed has a beginning.** After the cycle, the panel
+   showed **Attempt 1**, opening on the step the claim wrote onto the task
+   (*Starting scheduled run*), carrying the model's own answer as the run's
+   stated outcome, and badged **completed**. That beginning is the half of a
+   task's trail that did not exist: `task_started` was in the event vocabulary
+   and had never been written, so every ending had no start.
+6. **A task that is not this account's is said so.** `#/tasks?task=…` for an
+   unknown id answers *“That task is not on this account's board.”* rather than
+   an empty history.
+7. **Zero uncaught console errors** across every step above, asserted *before*
+   the last one. The last step deliberately asks the server for a task that does
+   not exist, and a 404 on a route the owner drove keeps its status by the rule
+   [FIXED-527](FIXED_ITEMS.md#fixed-527--an-outage-raiker-had-already-reported-also-reported-itself-to-the-console)
+   states. A budget spent by the spec's own probe stops measuring anything, so
+   it is asserted where it still means something.
+
+**What it found.** One harness defect, fixed with the work:
+`chooseModelForTurn` knew a single composer label, `Message composer`, and Tasks
+labels its own `Plan work`. The helper waited out its timeout on a picker that
+was present under another name — the same drift
+[FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame)
+records. It takes the label now.
+
+**What it did not cover.** A continuation after an approval, and a routine's
+second cycle, are asserted in `tests/test_task_attempt_history.py` rather than
+here: both need a parked decision or a day's wait, and neither is a claim this
+round makes from the running host.
 
 ## 2026-09-14 (second) — Twelve simplifications, nine of them watched
 

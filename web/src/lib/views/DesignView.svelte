@@ -24,6 +24,11 @@
   import Icon from "../components/Icon.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import DesignCanvasRegion from "../components/DesignCanvasRegion.svelte";
+  // BUG-281 — the research turn already records every page it read; these are
+  // what make those records openable here rather than only in the conversation.
+  import SourceChips from "../components/SourceChips.svelte";
+  import SourceExcerptPanel from "../components/SourceExcerptPanel.svelte";
+  import { citedSourceIds, sentenceAround, sourcesForTurn } from "../citations";
   import { designPrimaryAction, MAX_DESIGN_VARIATIONS } from "../designAssets";
   import { routeStateFromHash } from "../routeState";
   import { densityGap, workSurface } from "../workSurface";
@@ -40,6 +45,8 @@
     ImageGenerationsView,
     ModelsView,
     ProjectsList,
+    TurnSourceExcerptView,
+    TurnSourceView,
   } from "../apiTypes";
 
 
@@ -86,10 +93,59 @@
    * as research, above the composer, for the owner to write a prompt from — not
    * spliced into the prompt on their behalf.
    */
-  let research = $state<{ question: string; answer: string } | null>(null);
+  let research = $state<{ question: string; answer: string; turnId: string } | null>(null);
   let researching = $state(false);
   let researchError = $state<string | null>(null);
   let researchSession = $state<string | null>(null);
+
+  /**
+   * BUG-281 — the pages that research turn actually read, openable here.
+   *
+   * The findings were the model's prose and nothing else. The turn *recorded*
+   * its sources all along — every governed read enters the turn-source ledger,
+   * which is what Chat's citation chips are drawn from — so the only thing
+   * missing was the strip. Without it, opening the page a reference came from
+   * meant leaving Design for the conversation the turn happened to run in.
+   *
+   * Two claims, kept apart exactly as `SourceChips` keeps them elsewhere: the
+   * ledger is a fact about what the runtime read, and a citation is the model's
+   * own claim about which sentence rests on which page.
+   */
+  let researchSources = $state<TurnSourceView[]>([]);
+  let openSourceId = $state<string | null>(null);
+  let openSource = $state<TurnSourceExcerptView | null>(null);
+  let openSourceLoading = $state(false);
+
+  function closeSource() {
+    openSourceId = null;
+    openSource = null;
+    openSourceLoading = false;
+  }
+
+  async function showSource(source: TurnSourceView, quote = "") {
+    if (researchSession === null || !source.openable) return;
+    if (openSourceId === source.source_id) {
+      closeSource();
+      return;
+    }
+    openSourceId = source.source_id;
+    openSource = null;
+    openSourceLoading = true;
+    try {
+      const resolved = await api.turnSourceExcerpt(
+        researchSession,
+        source.turn_id,
+        source.source_id,
+        quote,
+      );
+      if (openSourceId === source.source_id) openSource = resolved;
+    } catch {
+      // A passage that will not resolve costs the panel, never the findings.
+      if (openSourceId === source.source_id) openSource = null;
+    } finally {
+      if (openSourceId === source.source_id) openSourceLoading = false;
+    }
+  }
   const readiness = $derived(readReadiness());
 
 
@@ -284,9 +340,25 @@
         ...(researchSession ? { session_id: researchSession } : {}),
       });
       researchSession = response.session_id ?? researchSession;
-      research = { question: subject, answer: response.message ?? "" };
+      research = {
+        question: subject,
+        answer: response.message ?? "",
+        turnId: response.turn_id ?? "",
+      };
+      // BUG-281 — read after the answer, and scoped to this turn. A failure
+      // here loses the chips and never the findings: provenance for an answer
+      // that has already arrived must not be able to take the answer with it.
+      closeSource();
+      try {
+        const ledger = await api.sessionSources(researchSession ?? "");
+        researchSources = sourcesForTurn(ledger.sources, response.turn_id);
+      } catch {
+        researchSources = [];
+      }
     } catch (error) {
       research = null;
+      researchSources = [];
+      closeSource();
       researchError =
         error instanceof ApiError ? error.message : "That research turn failed.";
     } finally {
@@ -529,6 +601,8 @@
             onclick={() => {
               research = null;
               researchError = null;
+              researchSources = [];
+              closeSource();
             }}>Dismiss</button
           >
         {/if}
@@ -539,6 +613,27 @@
         <p class="research-body error" role="alert">{researchError}</p>
       {:else if research !== null}
         <p class="research-body">{research.answer}</p>
+        <!-- BUG-281 — what the turn read, openable at the passage it used,
+             without leaving Design for the conversation it ran in. -->
+        {#if researchSources.length > 0}
+          <SourceChips
+            sources={researchSources}
+            citedIds={citedSourceIds(research.answer, researchSources)}
+            {openSourceId}
+            onopen={(source) =>
+              void showSource(
+                source,
+                sentenceAround(research?.answer ?? "", source.source_id),
+              )}
+          />
+          {#if openSourceId !== null}
+            <SourceExcerptPanel
+              source={openSource}
+              loading={openSourceLoading}
+              onclose={closeSource}
+            />
+          {/if}
+        {/if}
         <p class="research-note">
           Gathered by a governed research turn. It read pages; it did not draw
           anything, and image generation gained no network access from it.

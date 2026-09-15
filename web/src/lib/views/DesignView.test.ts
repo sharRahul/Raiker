@@ -8,7 +8,7 @@
  * every other route key here follows: they name something the reader may
  * already open, and grant nothing.
  */
-import { render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DesignView from "./DesignView.svelte";
 import { makeGate, stubFetch } from "../test-helpers";
@@ -218,5 +218,102 @@ describe("the size control says what it decides", () => {
     render(DesignView);
 
     await waitFor(() => expect(screen.getByText("1024x1536")).toBeInTheDocument());
+  });
+});
+
+/**
+ * BUG-281 — Design's research findings are text, *and* sources.
+ *
+ * The Tools menu runs a real governed research turn: it searches, reads and
+ * extracts through the global read catalogue, and every governed read enters
+ * the turn-source ledger. What came back on screen was the model's prose alone,
+ * so opening the page a reference came from meant leaving Design for whichever
+ * conversation the turn happened to run in.
+ */
+describe("Design research sources", () => {
+  const SOURCES = {
+    sources: [
+      {
+        source_id: "s1",
+        turn_id: "turn_r1",
+        ordinal: 1,
+        kind: "web",
+        title: "Maple leaf — reference plate",
+        locator: "https://example.test/maple",
+        detail: "",
+        attachment_id: "",
+        openable: true,
+      },
+      {
+        // Another turn's source. The strip is scoped to the turn that answered,
+        // or a second question would show the first one's pages as its own.
+        source_id: "s1",
+        turn_id: "turn_other",
+        ordinal: 1,
+        kind: "web",
+        title: "Something else entirely",
+        locator: "https://example.test/other",
+        detail: "",
+        attachment_id: "",
+        openable: true,
+      },
+    ],
+  };
+
+  function researchRoutes(overrides: Record<string, unknown> = {}) {
+    return routes({
+      "GET /api/read-capabilities": {
+        capabilities: ["web_search"],
+        external: ["web_search"],
+        interactive: [],
+        surfaces: { design: ["web_search"] },
+        administrative_surfaces: [],
+        readiness: [],
+      },
+      "POST /api/prompts": {
+        request_id: "req_1",
+        session_id: "sess_research",
+        turn_id: "turn_r1",
+        status: "completed",
+        message: "Maple leaves are palmate [s1].",
+      },
+      "GET /api/sessions/sess_research/sources": SOURCES,
+      ...overrides,
+    });
+  }
+
+  it("shows the pages the research turn read, scoped to that turn", async () => {
+    stubFetch(researchRoutes());
+    render(DesignView);
+    await screen.findByLabelText("Describe the image");
+    await fireEvent.input(screen.getByLabelText("Describe the image"), {
+      target: { value: "a maple leaf" },
+    });
+    await fireEvent.click(await screen.findByRole("button", { name: /Tools/ }));
+    await fireEvent.click(await screen.findByRole("menuitem", { name: /Search the web/i }));
+
+    const panel = await screen.findByTestId("design-research");
+    await waitFor(() => expect(panel).toHaveTextContent("Maple leaves are palmate"));
+    // The ledger is a fact; this is the chip for it, openable here.
+    expect(await screen.findByRole("button", { name: /Maple leaf — reference plate/ })).toBeInTheDocument();
+    // Another turn's source is not this turn's provenance.
+    expect(screen.queryByRole("button", { name: /Something else entirely/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps the findings when the ledger read fails", async () => {
+    // Provenance for an answer that already arrived: losing it costs the chips
+    // and must never cost the answer.
+    stubFetch(researchRoutes({ "GET /api/sessions/sess_research/sources": { __status: 500 } }));
+    render(DesignView);
+    await screen.findByLabelText("Describe the image");
+    await fireEvent.input(screen.getByLabelText("Describe the image"), {
+      target: { value: "a maple leaf" },
+    });
+    await fireEvent.click(await screen.findByRole("button", { name: /Tools/ }));
+    await fireEvent.click(await screen.findByRole("menuitem", { name: /Search the web/i }));
+
+    const panel = await screen.findByTestId("design-research");
+    await waitFor(() => expect(panel).toHaveTextContent("Maple leaves are palmate"));
+    expect(screen.queryByRole("button", { name: /reference plate/ })).not.toBeInTheDocument();
   });
 });

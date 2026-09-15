@@ -559,6 +559,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-535](#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read) | Medium | Tasks | Fixed 2026-09-15 (closes BUG-299 / UX-TASK-04) |
 | [FIXED-536](#fixed-536--an-account-wide-alert-setting-governed-a-banner-on-one-page) | Medium | Settings / notifications | Fixed 2026-09-15 (closes REM-SET-NOTIFY) |
 | [FIXED-537](#fixed-537--a-settings-page-nobody-could-reach-said-everything-stays-on-this-machine) | Low | Settings / storage | Fixed 2026-09-15 (closes REM-SET-STORAGE) |
+| [FIXED-538](#fixed-538--designs-research-findings-were-text-and-the-pages-behind-them-were-already-recorded) | Low | Design | Fixed 2026-09-15 (closes BUG-281) |
 
 ---
 
@@ -23748,4 +23749,56 @@ where it is written against what Raiker actually does rather than as a slogan.
 full unit suite, and a live check that the rail offers no **Storage** row, that
 `#/settings?tab=storage` falls back rather than rendering it, and that the
 sentence appears nowhere in the running product.
+
+---
+
+## FIXED-538 — Design's research findings were text, and the pages behind them were already recorded
+
+**Severity: Low. Area: Design. Status: Fixed 2026-09-15. Closes
+[BUG-281](TO_BE_FIXED.md).**
+
+**Observed.** Design's Tools menu runs a real governed research turn on the
+`design` surface — it searches, reads and extracts through the global read
+catalogue — and the findings appear above the composer for the owner to write a
+prompt from. What appeared was the model's prose and nothing else.
+
+The turn had been recording its sources all along. Every governed read enters
+the turn-source ledger, which is exactly what Chat's citation chips are drawn
+from. So the pages were known; they just could not be opened *here*. Following a
+reference meant leaving Design for whichever conversation the research turn had
+run in — for material the owner had asked for thirty seconds earlier, on the
+surface they asked for it on.
+
+**Fixed.** The strip Chat and Build already use, on Design's research panel:
+`SourceChips` over the turn's own ledger entries, and `SourceExcerptPanel`
+underneath, so a reference opens at the passage the turn used without leaving
+the surface. Clicking a chip resolves the excerpt now rather than showing a
+cached copy, so a page that has changed or gone says so.
+
+Three properties are kept rather than re-invented:
+
+* **Scoped to the turn that answered.** `sourcesForTurn` filters by
+  `turn_id`, because the research session is deliberately continuous — a second
+  question continues the first — and without the filter the second question
+  would present the first one's pages as its own provenance.
+* **The ledger is a fact and a citation is a claim.** `citedSourceIds` marks
+  only the chips the model actually cited, exactly as it does in Chat. Nothing
+  is promoted from "the runtime read this" to "the answer rests on this".
+* **Provenance can fail without taking the answer with it.** The ledger read
+  happens after the answer has arrived and is caught on its own: a failure
+  costs the chips and leaves the findings.
+
+**Why it did not wait for VIS2-19.** The deferral's reasoning was that Design's
+workspace shape is still open, and building a source list into a panel about to
+be replaced by a canvas would be work done twice. What landed is not a panel —
+it is two shared components and one ledger read, so whatever shape the canvas
+takes, the chips travel with it as one line rather than as a rewrite.
+
+**Verification.** Two cases in `web/src/lib/views/DesignView.test.ts`: the pages
+the turn read appear as chips and another turn's source does not, and a failed
+ledger read leaves the findings intact. **Not driven live in this round** — the
+host it ran on has no route to a search provider, so a research turn could not
+reach one. That is stated rather than implied: this closure rests on component
+evidence and the shared components' own live history, not on a live Design
+research round.
 

@@ -1401,7 +1401,16 @@ reading is.
 
 ## BUG-281 — Design's research findings are text, not sources
 
-**Severity: Low. Area: Design. Raised while implementing WEB-06.**
+**Severity: Low. Area: Design. Status: Closed 2026-09-15 as
+[FIXED-538](FIXED_ITEMS.md#fixed-538--designs-research-findings-were-text-and-the-pages-behind-them-were-already-recorded).
+Raised while implementing WEB-06.**
+
+Closed without waiting for VIS2-19. The deferral's reasoning was that Design's
+workspace shape is still open and a source list built into a panel about to be
+replaced would be work done twice — but what landed is not a panel: it is the
+same `SourceChips` and `SourceExcerptPanel` Chat and Build already use, reading
+the ledger the turn already wrote. Whatever shape the canvas takes, the chips
+move with it as one line.
 
 **Observed.** Design's Tools menu runs a real governed research turn on the
 `design` surface: it searches, reads and extracts through the global read

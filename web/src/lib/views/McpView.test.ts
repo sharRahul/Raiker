@@ -277,7 +277,10 @@ describe("McpView", () => {
     );
   });
 
-  it("shows live monitoring details, findings, notification, and stop/resume controls", async () => {
+  // REM-SET-NOTIFY — the notification strip moved to the shell, where the
+  // account-wide setting that governs it can mean what it says. This page keeps
+  // what is its own: the monitor state, the finding, and the controls.
+  it("shows live monitoring details, findings, and stop/resume controls", async () => {
     const mock = stubFetch({
       "GET /api/mcp/servers": [server({ monitor_state: "paused", paused_reason: "New host with sensitive data" })],
       "GET /api/capability-gates": ENABLED_GATES,
@@ -291,17 +294,12 @@ describe("McpView", () => {
         summary: "New host with sensitive data", redacted_detail: {}, subject_id: "mcp_1", state: "open",
         created_at: "2026-07-18T10:00:00Z",
       }],
-      "GET /api/notifications": [{
-        notification_id: "note_1", kind: "mcp_anomaly", title: "MCP anomaly detected", body: "New host with sensitive data",
-        finding_id: "find_1", subject_id: "mcp_1", read: false, created_at: "2026-07-18T10:00:00Z",
-      }],
       "POST /api/mcp/servers/mcp_1/resume": { ok: true, monitor_state: "active" },
     });
     render(McpView);
     await waitFor(() => expect(screen.getByText("Paused: New host with sensitive data")).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText(/3 tool calls/i)).toBeInTheDocument());
-    expect(screen.getByText("MCP anomaly detected")).toBeInTheDocument();
-    expect(screen.getByText("New host with sensitive data")).toBeInTheDocument();
+    expect(screen.getByText("high: New host with sensitive data")).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Resume" }));
     await waitFor(() => expect(mock).toHaveBeenCalledWith(
       expect.stringContaining("/api/mcp/servers/mcp_1/resume"),

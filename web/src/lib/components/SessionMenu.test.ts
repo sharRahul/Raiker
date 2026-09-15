@@ -83,15 +83,33 @@ describe("ToolControlBoard", () => {
 });
 
 describe("shared page feedback", () => {
-  it("renders a compact error state and source-neutral unread notifications", () => {
+  it("renders a compact error state", () => {
     render(PageState, { state: "error", title: "Could not load sessions", detail: "Retry from the server." });
-    render(NotificationCenter, {
-      notifications: [
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not load sessions");
+  });
+
+  // REM-SET-NOTIFY — the strip reads its own notices now, because it lives in
+  // the shell rather than on one page. It was mounted on the MCP destination
+  // alone, so the account-wide "In-app popups" setting decided whether a banner
+  // appeared somewhere the owner might never open.
+  it("shows unread notices wherever the owner is, and links the full record", async () => {
+    setToken("control-token");
+    stubFetch({
+      "GET /api/notifications": [
         { notification_id: "ntf_1", kind: "security_alert", title: "Security finding", body: "Review it.", finding_id: null, subject_id: null, read: false, created_at: "2026-07-18T00:00:00Z" },
+        { notification_id: "ntf_2", kind: "task_finished", title: "Nightly digest", body: "Done.", finding_id: null, subject_id: null, read: true, created_at: "2026-07-18T00:00:00Z" },
       ],
     });
-    expect(screen.getByRole("alert")).toHaveTextContent("Could not load sessions");
-    expect(screen.getByRole("region", { name: "Notifications" })).toHaveTextContent("Security finding");
+    render(NotificationCenter);
+
+    const strip = await screen.findByRole("region", { name: "Notifications" });
+    expect(strip).toHaveTextContent("Security finding");
+    // A notice that has been read is a record, not an alert.
+    expect(strip).not.toHaveTextContent("Nightly digest");
+    expect(screen.getByRole("link", { name: "Open notifications" })).toHaveAttribute(
+      "href",
+      "#/observe?tab=notifications",
+    );
   });
 });
 

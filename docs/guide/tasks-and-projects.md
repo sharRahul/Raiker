@@ -214,9 +214,16 @@ check. It appears on the bell and in **Observability → Notifications**, with a
 link to **Tasks**, where the card carries the run's own conversation thread and
 its title opens the attempt history above.
 
-If you have allowed browser notifications and turned **Settings → Notifications
-→ Desktop** on, the same notice reaches you outside the window — but only while
-Raiker is not the window you are looking at, and it never leaves this machine.
+**Settings → Notifications** decides where you see it, and nothing else. *Show
+unread notices inside Raiker* puts up to three unread ones as a banner at the top
+of whatever page you are on, with a link to the rest; *Alert me outside Raiker*
+raises the browser's own notification for the same ones, only while Raiker is not
+the window you are looking at, and it never leaves this machine. If the browser
+has blocked notifications, the page says so rather than leaving a switch that
+silently does nothing.
+
+Every notice is recorded in **Observability → Notifications** whether or not
+either switch showed it, so turning both off loses nothing.
 
 **Only work you were not watching notifies.** An ordinary Chat turn is a task
 too, and a banner behind an answer you are reading is noise, so those are

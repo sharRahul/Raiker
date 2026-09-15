@@ -33,7 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
-| 2026-09-15 | Targeted | `2026-09-15-task-history/` | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | A task's attempts read at an address the task did not have — the run the scheduler claimed, how it settled, and the three surfaces that now link to it |
+| 2026-09-15 | Targeted | `2026-09-15-task-history/` | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | A task's attempts read at an address the task did not have — the run the scheduler claimed, how it settled, and the three surfaces that now link to it; plus two Settings rows that were saying more than they governed |
 | 2026-09-14 (second) | Targeted | `2026-09-14-simplification/` | Anthropic, the same eighth key — a catalogue, a model kept offered, a model chosen for the turn, and an answer | Nine owner-facing changes of the simplification pass, driven through the product's own controls on a workspace that started empty, ending with **zero uncaught console errors** on a host that can reach neither `huggingface.co` nor `openrouter.ai` |
 | 2026-09-14 | Targeted | `2026-09-14-permissions-overhaul/` | Anthropic, an eighth key entered through the Connect dialog — the first of the eight that authenticates and lists models | The rebuilt Permissions page measured on the running product, the §18.3 rows that closed with it, and three live-test helpers that had been waiting on strings the product stopped printing |
 | 2026-09-07 | Targeted | `env-01-` … `env-05-` | Anthropic, a **seventh** identity-linked key entered through the interface; no local runtime on the host | The clock, the weather and the global read catalogue as runtime facts — and two harness defects that had been silent since the `apps/web` → `web` move: every live round writing its captures outside the repository, and every provider spec waiting for a tab the Models redesign removed |
@@ -126,6 +126,24 @@ records. It takes the label now.
 second cycle, are asserted in `tests/test_task_attempt_history.py` rather than
 here: both need a parked decision or a day's wait, and neither is a claim this
 round makes from the running host.
+
+### Two Settings rows, in the same round
+
+`web/e2e/rem-set-notify-live.spec.ts` — 2 cases, passing, no model needed.
+
+8. **Notifications names what each switch reaches.** *Show unread notices inside
+   Raiker* and *Alert me outside Raiker*, each with the scope it really has.
+   The sentence *"cover approvals waiting on you"* — which understated the
+   desktop switch — is absent, and the page states that muting is not deciding.
+   The record is linked, because every notice is kept whether or not either
+   switch showed one. Capture at
+   `docs/screenshots/2026-09-15-task-history/settings-notifications.png`, which
+   also shows the moved strip doing its job: the unread notices from this
+   round's own task runs, on Settings, where the old placement showed nothing.
+9. **Storage is not a destination, by any route.** The rail offers no row,
+   `#/settings?tab=storage` falls back rather than rendering the deleted page,
+   and *“Everything stays on this machine”* appears nowhere in the running
+   product.
 
 ## 2026-09-14 (second) — Twelve simplifications, nine of them watched
 

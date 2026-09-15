@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
-  import NotificationCenter from "../components/NotificationCenter.svelte";
   import { api, ApiError } from "../api";
   import { runtimeBlock } from "../capabilityModel";
   import { endpointRefusal, networkClassLabel } from "../mcpEndpoint";
@@ -14,7 +13,6 @@
     McpServer,
     McpSession,
     McpToolDeclaration,
-    Notification,
   } from "../apiTypes";
 
   /*
@@ -63,7 +61,6 @@
   let renameValue = $state("");
   let sessions = $state<Record<string, McpSession[]>>({});
   let findings = $state<Record<string, McpFinding[]>>({});
-  let notifications = $state<Notification[]>([]);
   // B8 — connecting a server and the agent being able to *use* it are two
   // different facts. The page used to report only the first, so a server could
   // read `connected · 2 tool(s)` while every call was withheld by the decision
@@ -177,21 +174,18 @@
       agentAccess = access;
       offers = offered;
       if (list.length) {
-        const [details, notes] = await Promise.all([
-          Promise.all(list.map(async (server) => ({
+        const details = await Promise.all(
+          list.map(async (server) => ({
             serverId: server.server_id,
             sessions: await api.mcpSessions(server.server_id),
             findings: await api.mcpFindings(server.server_id),
-          }))),
-          api.notifications(),
-        ]);
+          })),
+        );
         sessions = Object.fromEntries(details.map((detail) => [detail.serverId, detail.sessions]));
         findings = Object.fromEntries(details.map((detail) => [detail.serverId, detail.findings]));
-        notifications = notes;
       } else {
         sessions = {};
         findings = {};
-        notifications = [];
       }
     } catch (e) {
       error = reason(e);
@@ -370,7 +364,6 @@
 
 {#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
 {#if notice}<div class="notice notice-ok"><Icon name="check" size="sm" /> {notice}</div>{/if}
-<NotificationCenter {notifications} />
 
 {#if offers.length > 0}
   <section class="offers" aria-labelledby="mcp-offers-heading">

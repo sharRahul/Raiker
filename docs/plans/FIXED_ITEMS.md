@@ -557,6 +557,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-533](#fixed-533--one-run-three-stop-buttons-and-two-of-them-threw-the-reason-away) | Low | Tasks | Fixed 2026-09-14 (closes REM-TASK-02) |
 | [FIXED-534](#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | Fixed 2026-09-14 (closes BUG-291, BUG-292, BUG-295) |
 | [FIXED-535](#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read) | Medium | Tasks | Fixed 2026-09-15 (closes BUG-299 / UX-TASK-04) |
+| [FIXED-536](#fixed-536--an-account-wide-alert-setting-governed-a-banner-on-one-page) | Medium | Settings / notifications | Fixed 2026-09-15 (closes REM-SET-NOTIFY) |
+| [FIXED-537](#fixed-537--a-settings-page-nobody-could-reach-said-everything-stays-on-this-machine) | Low | Settings / storage | Fixed 2026-09-15 (closes REM-SET-STORAGE) |
 
 ---
 
@@ -23651,4 +23653,99 @@ for a picker that was there under another name — the same harness drift
 [FIXED-534](#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame)
 records. It takes the label now, in the one place that knows where the control
 lives.
+
+---
+
+## FIXED-536 — An account-wide alert setting governed a banner on one page
+
+**Severity: Medium. Area: Settings / notifications. Status: Fixed 2026-09-15.
+Closes REM-SET-NOTIFY of the release-readiness review.**
+
+**Observed.** **Settings → Notifications** carried two switches under a heading
+that read **Alerts**, and neither said what it reached.
+
+*In-app popups* governed `NotificationCenter`, and `NotificationCenter` was
+mounted in `McpView.svelte` and nowhere else. So a preference an owner reads as
+"how Raiker alerts me" decided whether a banner appeared on **one destination**
+— Extensions → MCP — which most owners will never open. Every other page showed
+nothing either way, whichever way the switch was set.
+
+*Desktop alerts* did work, and described itself too narrowly: its sentence said
+the notices "cover approvals waiting on you", when what it mirrors is every
+unread notice — a finished routine, a security finding, a decision. A control
+that understates its scope is as misleading as one that overstates it; an owner
+turning it on to catch approvals gets a notice when a nightly digest lands.
+
+And a switch the owner had turned on while the browser had **denied** permission
+silently did nothing. The page never read the permission back, so the way to
+find out was a notice that never arrived.
+
+**Fixed.** The placement, then the words.
+
+* `NotificationCenter` moved to the shell, beside `ApprovalPrompt`, so unread
+  notices appear wherever the owner is and the setting means what it says. It
+  reads its own notifications rather than taking them as a prop, for the reason
+  `ApprovalPrompt` does: the shell has no reason to know about notifications,
+  and the only thing using a read should own it. It shows three and links the
+  rest, so the strip never becomes the page.
+* Each switch is named for what it reaches — **Show unread notices inside
+  Raiker**, **Alert me outside Raiker** — with one sentence each stating the
+  real scope.
+* The desktop switch reads the browser permission back and says so when the
+  browser has blocked, not-yet-asked, or has no notification support at all.
+* **The record is named.** Every notice is recorded in Observability →
+  Notifications whether or not either switch showed it, so the page says that
+  and links it: turning both off loses nothing.
+* **Muting is not approving**, said on the page rather than only in the guide.
+
+**What was deliberately not added.** Per-channel switches. Raiker has no outbox
+and no delivery preferences, and a row of toggles for email, push or a messaging
+channel would be four more controls that decide nothing — the defect
+[FIXED-523](#fixed-523--a-quarter-of-the-permissions-page-was-controls-that-control-nothing)
+removed fourteen of. Two working switches and an honest sentence each is the
+whole contract.
+
+**Verification.** Six cases in
+`web/src/lib/views/settings/Notification.test.ts`, including that the page stays
+quiet about permission while the switch is off and speaks up when it is on and
+blocked. The moved strip is asserted in `SessionMenu.test.ts` — it reads its own
+notices, hides read ones, and links the full record. `McpView.test.ts` no longer
+asserts a notification banner on the MCP page, because that is not the MCP
+page's job. Driven live on 2026-09-15.
+
+---
+
+## FIXED-537 — A Settings page nobody could reach said "everything stays on this machine"
+
+**Severity: Low. Area: Settings / storage. Status: Fixed 2026-09-15.
+Closes REM-SET-STORAGE of the release-readiness review.**
+
+**Observed.** `web/src/lib/views/settings/Storage.svelte` rendered a card headed
+**Local usage** listing session, event, task and checkpoint *counts*, under the
+sentence *"Live counts from the local runtime. Everything stays on this
+machine."*
+
+Two claims, neither established by what is on the card. Record counts are not
+storage usage — they say nothing about bytes — and "everything stays on this
+machine" is a global privacy claim made by a page that had measured four
+tables. Raiker connects to hosted providers; a sentence that broad is the kind
+of reassurance the security posture exists to avoid making.
+
+**Fixed by deletion, after a full reference check.** The module was unreachable:
+absent from `SETTINGS_SECTIONS` (which is the rail *and* the tab registry, so
+there is only one list to check), imported by nothing, named by no route, and
+`SettingsView.test.ts` already asserted no **Storage** button exists. Nothing in
+packaging referenced it. So the page was not a destination to redesign — it was
+a file whose copy could be reused by accident.
+
+Nothing was deleted but the component. No database, no migration, no record.
+
+The counts it showed are not lost: Observability → Overview reads the same
+diagnostics, and `Privacy.svelte` already carries the data-location statement,
+where it is written against what Raiker actually does rather than as a slogan.
+
+**Verification.** `npm run check` across 724 files with the module gone, the
+full unit suite, and a live check that the rail offers no **Storage** row, that
+`#/settings?tab=storage` falls back rather than rendering it, and that the
+sentence appears nowhere in the running product.
 

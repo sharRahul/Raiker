@@ -27,6 +27,10 @@
   import { prefetchRoutes } from "./lib/routeComponents";
   import { startReadinessRevalidation } from "./lib/modelReadiness.svelte";
   import ApprovalPrompt from "./lib/components/ApprovalPrompt.svelte";
+  // REM-SET-NOTIFY — unread notices belong wherever the owner is. The strip was
+  // mounted on the MCP page alone, so the account-wide "In-app popups" setting
+  // decided whether a banner appeared on one destination.
+  import NotificationCenter from "./lib/components/NotificationCenter.svelte";
   import ModelSetupDialog from "./lib/components/ModelSetupDialog.svelte";
   import ModelOperationTray from "./lib/components/ModelOperationTray.svelte";
 
@@ -289,6 +293,7 @@
         onClose={() => (allPagesOpen = false)}
       />
       <main id="main" class="content" tabindex="-1">
+        <NotificationCenter />
         <!-- The topbar already shows the route title + hint; the page itself
            opens with its own lead so nothing is said twice. -->
         <ResponsivePage layout={pageLayout}>

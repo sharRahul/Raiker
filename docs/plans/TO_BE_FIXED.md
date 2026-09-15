@@ -901,6 +901,21 @@ written from memory is exactly the drift it exists to catch.
 Raised 2026-08-30, and it is the first thing found by actually running a round
 against one workspace rather than re-seeding one per spec.**
 
+**2026-09-15 — it bit again, and the third half is naming what a spec owns.**
+Running `priority-round-real-turn-live` against a workspace this round had
+already worked in, `Overnight research` resolved to **three** threads: the one
+under test and two left by the same spec's earlier attempts. The assertion did
+not fail wrongly — it refused to choose, which is Playwright's strict mode
+behaving correctly — but a spec that has to disambiguate its own subject is one
+that can pass on somebody else's evidence, which is the whole of this entry.
+
+The answer that spec took is cheap and general: **name the thing the round
+creates with a per-run suffix**, so its own leftovers cannot be mistaken for it.
+`const ROUTINE = \`Overnight research ${Date.now().toString(36)}\`` — no
+workspace reset, no skip, and re-runnable against a workspace with a year of
+history in it. It is worth applying to every spec that creates a named record,
+and that is the remaining work here.
+
 **2026-09-04 — both halves of the proposal below now exist.**
 
 **Half one: the specs that need their own instance say so.**

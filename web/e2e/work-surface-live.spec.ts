@@ -1,5 +1,5 @@
 /**
- * VIS2-21 — the Work contract, read off the three running surfaces.
+ * The Work contract, read off the three running surfaces.
  *
  * The contract's claim is that Chat, Build and Design share every answer an
  * owner needs and differ in exactly one thing: what they are about. That is a

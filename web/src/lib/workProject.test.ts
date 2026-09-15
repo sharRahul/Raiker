@@ -1,4 +1,4 @@
-// VIS2-11 / COMPOSER-11 — one Work project, and the three rules that keep it
+// COMPOSER-11 — one Work project, and the three rules that keep it
 // from becoming the account-level "active project" that used to exist.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetWorkProject, setWorkProject, startInBuild, workProject } from "./workProject.svelte";

@@ -6,7 +6,7 @@ import LocalLibraryPanel from "./LocalLibraryPanel.svelte";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("LocalLibraryPanel", () => {
-  // MODEL-06 — the library answers "what is on disk"; the runtime slot rows
+  // The library answers "what is on disk"; the runtime slot rows
   // answer "what is serving". Deploy was the one control that crossed the two,
   // so a card here could put a model into a slot without ever showing which
   // slot it took or what it displaced. Serving is chosen where the slots are,

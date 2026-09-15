@@ -112,14 +112,14 @@
   .brand { display:flex; align-items:center; gap:.6rem; padding:.25rem .5rem var(--space-3); text-decoration:none; }
   .brand:hover { text-decoration:none; }
   .brand-text { display:flex; flex-direction:column; line-height:1.15; }
-  /* VIS-07 — the brand should not rest on a letter-spaced wordmark. .45em was
+  /* The brand should not rest on a letter-spaced wordmark. .45em was
      spacing the name out until it read as a logotype by force; the mark beside
      it is the identity. */
   .brand-name { font-weight:800; font-size:var(--text-sm); letter-spacing:.14em; text-transform:uppercase; color:var(--text-1); }
   .brand-sub { font-size:var(--text-2xs); font-weight:600; letter-spacing:normal; color:var(--text-3); }
   .navigation-sections { display:grid; gap:var(--space-2); }
   .group { position:relative; }
-  /* VIS-06 — a navigation group label in caps at 2xs with .09em tracking is
+  /* A navigation group label in caps at 2xs with .09em tracking is
      four typographic devices doing one job. Sentence case at xs, and the colour
      and weight are what separate it from the rows beneath. */
   .group-label,.group-toggle { width:100%; min-height:2rem; margin:0; padding:.35rem .55rem; color:var(--text-3); font-size:var(--text-xs); font-weight:650; letter-spacing:normal; }
@@ -129,7 +129,7 @@
   ul { list-style:none; margin:0; padding:0; display:grid; gap:2px; }
   .nav-link { display:flex; align-items:center; gap:.65rem; min-height:2.35rem; padding:.42rem .55rem; border-radius:var(--r-sm); color:var(--text-2); font-size:var(--text-md); font-weight:550; text-decoration:none; transition:background var(--motion-fast) var(--ease),color var(--motion-fast) var(--ease); }
   .nav-link:hover { background:var(--sunken); color:var(--text-1); text-decoration:none; }
-  /* VIS2-08 — the current row carried five cues at once: a group bar in the
+  /* The current row carried five cues at once: a group bar in the
      gutter, a tinted background, accent text, a heavier weight, and the word
      "Current" beside the group name. Five ways of saying one thing is not
      emphasis, it is noise, and the row still had to be read to find out which

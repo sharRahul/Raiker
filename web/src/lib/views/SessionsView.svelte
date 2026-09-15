@@ -384,7 +384,7 @@
                 </span>
               </td>
               <td onclick={() => openSession(s.session_id)}>
-                <!-- VIS2-13 — a running session is what an owner scans this
+                <!-- A running session is what an owner scans this
                      list for; idle is every other row, and archiving is
                      reversible organisation rather than a state to act on. -->
                 {#each tokens.badges as token (token.label)}
@@ -540,7 +540,7 @@
 {/if}
 
 <style>
-  /* VIS2-13 — the row's remaining facts, at one quiet weight. */
+  /* The row's remaining facts, at one quiet weight. */
   .row-fact { color: var(--text-3); font-size: var(--text-xs); white-space: nowrap; }
   @media (max-width: 720px) {
   }

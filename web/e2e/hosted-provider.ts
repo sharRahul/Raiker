@@ -228,7 +228,7 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
  * shows a stage that has neither of the buttons this used to wait for.
  *
  * **Found live on 2026-09-07, and it had taken every live spec down with it.**
- * MODEL-03/MODEL-07 folded Local and Hosted into one **Add model** tab, and
+ * The Models rebuild folded Local and Hosted into one **Add model** tab, and
  * `?tab=hosted` became an alias that lands on the *inventory* — a page with no
  * provider cards on it at all. This helper still waited for a `Hosted` tab, so
  * eighteen specs timed out before their first assertion, and the failure looked
@@ -262,7 +262,7 @@ export async function hostedProviderCard(
 /**
  * Open one provider's **Details**, wherever the row happens to keep it.
  *
- * A connected card offers one primary action and one overflow (MODEL-15), so
+ * A connected card offers one primary action and one overflow, so
  * Details is a menu item; an unconnected card has historically carried it
  * directly. Both are tried, in that order, so a spec never has to know which
  * shape of row it is looking at.
@@ -290,7 +290,7 @@ export async function connectHostedProvider(
   // not what the card is for. A provider with no connection still offers Connect
   // on the card, which is the path a fresh workspace takes.
   //
-  // **Found live on 2026-09-12.** MODEL-15 then moved Details itself: a
+  // **Found live on 2026-09-12.** Details then moved into the overflow: a
   // repeated row gets one primary action and one overflow, so a *connected*
   // card offers `Select models…` and a `More actions` menu, and nothing named
   // Details is on the card at all. This branch waited five minutes for a button
@@ -331,7 +331,7 @@ export async function connectHostedProvider(
 /**
  * Press one of a provider card's actions, wherever the card keeps it.
  *
- * **Found live on 2026-09-13.** MODEL-15 gave a repeated row one primary action
+ * **Found live on 2026-09-13.** A repeated row gained one primary action
  * and one overflow, and the row has gone on tightening since: a connected card
  * now offers `Select` and a `More actions` menu holding **Select models…**,
  * **Test connection** and **Details**. Every helper below looked for a button

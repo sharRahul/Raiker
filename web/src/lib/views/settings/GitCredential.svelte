@@ -198,7 +198,7 @@
   .card h3 { margin: 0 0 0.3rem; font-size: var(--text-lg); }
   .lead { color: var(--text-2); font-size: var(--text-sm); margin: 0 0 var(--space-3); }
   .state { font-size: var(--text-sm); color: var(--text-2); margin: 0 0 var(--space-2); }
-  /* VIS2-16 — a persistent normal state is neutral. Success colour is spent on
+  /* A persistent normal state is neutral. Success colour is spent on
      something that just happened or on a decision that was just confirmed; used
      as the standing representation of "connected", "enabled", "verified" or
      "ready" it is on screen constantly, which is the one condition under which

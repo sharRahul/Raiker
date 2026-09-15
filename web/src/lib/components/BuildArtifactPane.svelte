@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * VIS2-12 — Build's third pane, as the object of work.
+   * Build's third pane, as the object of work.
    *
    * The pane existed; what it lacked was a subject. Two unrelated things were
    * stacked into one column — background work and the governed terminal — each
@@ -165,7 +165,7 @@
           onclick={() => (tab = entry.id)}
         >
           {entry.label}
-          <!-- VIS2-13 — one token, and only when it is not the ordinary
+          <!-- One token, and only when it is not the ordinary
                state. A count of changed files is the exception worth seeing;
                "0 changes" beside a tab called Changes is noise. -->
           {#if entry.id === "changes" && summary.count > 0}
@@ -389,7 +389,7 @@
     font-size: var(--text-2xs);
     min-width: 4.5rem;
   }
-  /* VIS2-18 — a deletion is the one working-tree state worth a second glance;
+  /* A deletion is the one working-tree state worth a second glance;
      the rest are information, and colouring all five would make none of them
      mean anything. */
   .state[data-state="deleted"] { color: var(--danger); }

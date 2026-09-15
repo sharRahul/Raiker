@@ -156,6 +156,37 @@ Raiker. Nothing is fetched to colour a keyword, and a code block can never
 execute — the renderer escapes every character of model output before it emits
 any markup.
 
+### Tables and charts
+
+Some of a reply is not prose. When part of an answer is genuinely a table or a
+series to plot, Raiker asks the model to **declare** it rather than describe it,
+and renders what comes back as the thing it says it is.
+
+A declared table is a real table. It has a caption, states its row count, and
+**sorts by any column** — click a heading once for ascending, twice for
+descending, and a third time to get the model's own order back. A screen reader
+announces it as a table and reads the sort direction with it, which a paragraph
+that merely looks like a table cannot do.
+
+A declared chart is drawn as a bar, line or area chart on your machine — no
+library is fetched and nothing leaves — and **the numbers are always underneath
+it**, one fold down, as an ordinary table. Colour and geometry are not a channel
+everyone has, so the chart is never the only way to read the answer. The vertical
+axis always includes zero, so a difference cannot be exaggerated by the choice of
+scale.
+
+Raiker checks a declared block before it draws it, on the same terms as anything
+else a model proposes: bounded in size, every row the width of its columns, every
+series the length of its labels, every plotted value a real number. A block that
+does not meet that is **shown as refused**, with the reason, rather than quietly
+repaired or dropped — a row is never padded with a cell nobody wrote, and a
+section of an answer never disappears because the model made a formatting
+mistake.
+
+An ordinary Markdown table in a reply is still an ordinary Markdown table.
+Raiker does not promote one to a sortable table, because that would be guessing,
+and guessing is what this replaces.
+
 ### What Raiker did
 
 When a turn uses a tool, each call gets one line above the answer, in the order

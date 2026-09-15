@@ -187,7 +187,7 @@
                 file{model.expected_shards === 1 ? "" : "s"}</small
               >
             </div>
-            <!-- MODEL-06 — the library answers "what is on disk"; the slot
+            <!-- The library answers "what is on disk"; the slot
                  rows above answer "what is serving". Deploy was the one control
                  that crossed the two, so a card here could put a model into a
                  runtime slot without ever showing which slot it took or what it
@@ -219,7 +219,7 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 18px;
   }
-  /* VIS2-16 — "on disk and complete" is the resting state of every row here,
+  /* "on disk and complete" is the resting state of every row here,
      so it is plain metadata; the incomplete card already carries its own
      treatment. */
   .model-state {

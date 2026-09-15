@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * VIS-14 — one object vocabulary for a piece of work.
+   * One object vocabulary for a piece of work.
    *
    * Threads, Tasks and Projects are three views of the same thing: work the
    * owner has going. They described it three different ways. A thread said
@@ -61,7 +61,7 @@
     color: var(--text-3);
     font-size: var(--text-xs);
   }
-  /* VIS-15 — a project is a neutral fact about where work lives, not a status,
+  /* A project is a neutral fact about where work lives, not a status,
      so it is a quiet chip rather than another coloured one. */
   .tag {
     padding: 0.05rem 0.4rem;

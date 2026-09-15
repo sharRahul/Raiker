@@ -230,7 +230,7 @@ describe("WorkbenchView", () => {
   it("says nothing is running once, rather than in four places", async () => {
     // This used to assert the opposite, and the concern behind it was right: a
     // card with nothing in it is worse than a sentence. Removing the card is
-    // the stronger form of the same rule (VIS-13/VIS-05). An idle Home showed
+    // the stronger form of the same rule (the empty-board rule). An idle Home showed
     // three bordered rectangles reading "Nothing is running", "No agent is
     // standing" and "Nothing is scheduled", above a lead sentence that already
     // said all three — four containers to report an absence.
@@ -250,7 +250,7 @@ describe("WorkbenchView", () => {
   });
 
   it("says nothing needs you, rather than three tiles reading zero", async () => {
-    // VIS-13 — "do not show healthy subsystem status by default". Under a
+    // "do not show healthy subsystem status by default". Under a
     // heading that says *Needs your attention*, three big zeros were the
     // largest thing on an idle Home: a report that there is nothing to report.
     stubFetch(routes());

@@ -463,7 +463,7 @@
                 <button type="button" class="btn btn-sm" onclick={() => (renamingId = null)}>Cancel</button>
               {:else}
                 <span class="name">{skill.name}</span>
-                <!-- VIS2-13 — the row carried three badges of equal weight: a
+                <!-- The row carried three badges of equal weight: a
                      lifecycle state, a command trigger and a conformance
                      measurement. `rowTokens.ts` decides which of a row's facts
                      is worth a badge, so switched-on, a version, a trigger and
@@ -752,7 +752,7 @@
   }
   .name-block { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .name { font-weight: 650; }
-  /* VIS2-13 — every fact on a row that did not earn a badge. One weight, so a
+  /* Every fact on a row that did not earn a badge. One weight, so a
      version, a trigger and a provenance note cannot compete with each other or
      with the state beside them. */
   .row-fact { color: var(--text-3); font-size: var(--text-xs); white-space: nowrap; }

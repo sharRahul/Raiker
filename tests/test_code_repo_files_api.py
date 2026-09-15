@@ -73,7 +73,7 @@ class TestAuthentication:
             .status_code
             == 401
         )
-        # VIS2-12's working-tree read is the third, and it answers about a
+        # the Build artifact pane's's working-tree read is the third, and it answers about a
         # repository's uncommitted state — which is exactly as private as its
         # files. This client has never opened a session, which is what makes the
         # assertion mean anything: a fixture that had would carry its cookie.
@@ -310,7 +310,7 @@ class TestDiagnostics:
 
 
 class TestWorkingTreeChanges:
-    """VIS2-12 — the third pane's `Changes` tab, and what it must never claim.
+    """the Build artifact pane — the third pane's `Changes` tab, and what it must never claim.
 
     The property that matters is not "it lists files". It is that this read and
     the commit proposal describe **one** change set: they call the same two

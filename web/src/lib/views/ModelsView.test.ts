@@ -1,5 +1,5 @@
 // Coverage for the Models view: its tabs (Overview, My models, Add model,
-// Runtime & routing, Usage — MODEL-03), provider selection and catalogue, and
+// Runtime & routing, Usage), provider selection and catalogue, and
 // the fallback-sequence and advisor editors on Runtime & routing. The read is the single GET
 // /api/models; writes go to PUT /api/model-fallback, /api/model-selection, and
 // /api/model-advisor (human gate-manager only, enforced server-side).
@@ -20,7 +20,7 @@ afterEach(() => vi.unstubAllGlobals());
 /**
  * Press a row action, wherever this row's state put it.
  *
- * MODEL-15 gives a repeated provider row one visible action and one overflow,
+ * A repeated provider row has one visible action and one overflow,
  * and *which* action is visible depends on the row: a provider with no model
  * named shows "Select models…" outright, while a connected one keeps it in the
  * menu beside Test connection and Details. Both are the same action to the
@@ -175,7 +175,7 @@ describe("BUG-270 — a card never claims a runtime that is not here", () => {
       ),
     );
     // Not "installed": Raiker opened a download, and whether it was run is the
-    // owner's to say. MODEL-14 changed *who does the asking* — the owner comes
+    // owner's to say. What changed is *who does the asking* — the owner comes
     // back and Raiker looks again on its own, rather than telling them to press
     // a button — but the claim is still bounded to what was actually observed.
     expect(
@@ -184,7 +184,7 @@ describe("BUG-270 — a card never claims a runtime that is not here", () => {
   });
 
   it("looks again by itself when the owner comes back from the vendor page", async () => {
-    // MODEL-14 — the trip to a vendor site is unavoidable for a local runtime;
+    // The trip to a vendor site is unavoidable for a local runtime;
     // "come back and press Look again" is not. The owner's part ends at
     // installing the thing, and Raiker asks itself the rest.
     const mock = stubFetch({
@@ -273,7 +273,7 @@ describe("BUG-270 — a card never claims a runtime that is not here", () => {
   });
 
   it("offers no setup for a runtime with no reviewed vendor source", async () => {
-    // vLLM is a Python package and MLX ships with its own toolchain, so
+    // VLLM is a Python package and MLX ships with its own toolchain, so
     // Raiker has no reviewed vendor download for either. A button here would
     // be one that cannot work.
     stubFetch({
@@ -582,7 +582,7 @@ describe("ModelsView state grammar", () => {
       endpoint_kind: "hosted",
     });
 
-  // MODEL-03/MODEL-07 — Local and Hosted were peers because that is how the
+  // Local and Hosted were peers because that is how the
   // profiles are stored, not because it is a choice anyone makes: an owner
   // arrives wanting *a model*, and where it runs is an attribute of the answer.
   // Both sections live under Add model, each keeping its own heading and its own
@@ -1487,7 +1487,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
             }),
           } as Response;
         }
-        // MODEL-05/MODEL-06 put the local library on this tab, and a mock
+        // The local library lives on this tab, and a mock
         // that answers every GET with the models payload hands it a body with
         // no `roots`, which fails the whole panel render rather than only the
         // panel that asked. Route by path.
@@ -1518,7 +1518,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
 });
 
 describe("ModelsView action-category tabs", () => {
-  // MODEL-03 — the six tabs this replaces named where a model was *stored*
+  // The six tabs this replaces named where a model was *stored*
   // (Local, Hosted, Hugging Face) or which table a fact came out of (Activity,
   // Routing, Pricing). None of them answered the question every owner arrives
   // with, which is what is running their work.
@@ -1586,7 +1586,7 @@ describe("ModelsView action-category tabs", () => {
     expect(defaults.closest("details")).toBeNull();
   });
 
-  // MODEL-12 — what you spent and what it costs were two top-level tabs, so an
+  // What you spent and what it costs were two top-level tabs, so an
   // owner checking a bill read the rate on one page and the usage on another
   // and did the multiplication themselves.
   it("puts pricing and usage on one tab", async () => {
@@ -1765,7 +1765,7 @@ describe("ModelsView provider test feedback", () => {
       connection_configured: true,
     });
 
-  // The second provider is LM Studio rather than llama.cpp: MODEL-05 moved the
+  // The second provider is LM Studio rather than llama.cpp: the rebuild moved the
   // framework slot rows to Runtime & routing, and the claim under test is about
   // two ordinary local rows on one tab, not about which two.
   it("shows one provider's result only under that provider", async () => {
@@ -1782,7 +1782,7 @@ describe("ModelsView provider test feedback", () => {
     });
     render(ModelsView, { tab: "add" });
 
-    // MODEL-15 — Test is troubleshooting, so it is inside each row's overflow
+    // Test is troubleshooting, so it is inside each row's overflow
     // rather than a standing invitation to re-prove a working connection. Two
     // rows, two overflows, and the one that ran the check is still the one that
     // shows the answer, which is the whole claim here.
@@ -1892,7 +1892,7 @@ describe("ModelsView provider test feedback", () => {
 // Found live, 2026-09-07. The model picker could be dismissed by clicking its
 // backdrop or its Done button and by nothing else, so an owner who opened a
 // provider's catalogue and reached for the key every other dialog in the
-// product answers to was left holding a modal that would not go. VIS2-17 asks
+// product answers to was left holding a modal that would not go. the overlay vocabulary asks
 // for one overlay vocabulary, and this is the part of it a keyboard user
 // actually depends on.
 describe("Models modals answer to Escape", () => {

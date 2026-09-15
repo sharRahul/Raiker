@@ -2752,6 +2752,56 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             return cursor.rowcount == 1
 
+    def apply_account_capability_baseline(
+        self,
+        principal_id: str,
+        now: str,
+        *,
+        connection: sqlite3.Connection | None = None,
+    ) -> None:
+        """Seed a newly created account's versioned capability baseline (BUG-239).
+
+        ``INSERT OR IGNORE``, deliberately: this runs inside account creation,
+        where nothing can already be stored, and the weaker write is what makes
+        it harmless if it is ever reached twice. A row an owner wrote is never
+        replaced by one of these, which is the property the whole decision rests
+        on — an expanded default is for accounts that do not exist yet.
+
+        The import is local because ``raiker.runtime.authority`` reaches back
+        into this module; the table it reads is pure data with no store of its
+        own, so the cycle exists only at import time.
+        """
+        from raiker.runtime.authority.baseline import baseline_rows
+
+        owns_connection = connection is None
+        if connection is None:
+            connection = self.connect()
+        try:
+            for record in baseline_rows(now):
+                connection.execute(
+                    """INSERT OR IGNORE INTO principal_capability_gate_state
+                    (principal_id, capability, state, requested_by, requested_at,
+                     activated_by, activated_at, reason, readiness_snapshot_json,
+                     created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        principal_id,
+                        record["capability"],
+                        record["state"],
+                        record["requested_by"],
+                        record["requested_at"],
+                        record["activated_by"],
+                        record["activated_at"],
+                        record["reason"],
+                        record["readiness_snapshot_json"],
+                        record["created_at"],
+                        record["updated_at"],
+                    ),
+                )
+        finally:
+            if owns_connection:
+                connection.commit()
+
     def create_initial_account_atomic(
         self,
         *,
@@ -2837,6 +2887,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 self._backfill_owned_context_data(connection)
                 self._backfill_owned_memory_metadata(connection)
                 self.initialize_principal_controls(principal_id, connection=connection)
+                self.apply_account_capability_baseline(
+                    principal_id, user.created_at, connection=connection
+                )
                 checkpoint("migration")
                 connection.commit()
                 return True
@@ -11501,7 +11554,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     ) -> list[str]:
         """Record what a provider published, so the next failure is not a loss.
 
-        GLOBAL-MODEL-01/08. A catalogue was probed on demand and never written
+        A catalogue was probed on demand and never written
         down, so a provider that was briefly unreachable made its models vanish
         from every picker — the only copy was the one in flight. This is the
         last answer the provider actually gave, in the order it gave it.

@@ -1,4 +1,4 @@
-// MODEL-01/MODEL-02 — the client half of the one authoritative model decision.
+// The client half of the one authoritative model decision.
 //
 // Two claims, and the second was found the hard way. The first is that `design`
 // is a surface like the others: it was missing from the backend allowlist while
@@ -35,7 +35,7 @@ const DECISION = {
 
 describe("the Work surfaces", () => {
   it("names all three Work modes", () => {
-    // MODEL-02. The union in this module mirrors `raiker.models.decision.SURFACES`
+    // The union in this module mirrors `raiker.models.decision.SURFACES`
     // exactly; a surface added on one side and not the other is the same defect.
     expect([...WORK_SURFACES]).toEqual(["chat", "build", "design"]);
   });

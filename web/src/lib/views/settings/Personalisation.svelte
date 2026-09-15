@@ -1,6 +1,23 @@
 <script lang="ts">
   import Icon from "../../components/Icon.svelte";
+  import { WEATHER_LOCATION_KEY } from "../../environment";
   import { applyTheme, loadThemeChoice, saveThemeChoice, type ThemeChoice } from "../../theme";
+
+  /*
+   * REM-SET-APPEARANCE / REM-SET-GENERAL — the page an owner changes in a
+   * second, and the tuning they change once.
+   *
+   * Theme is why anyone opens this page, and it sat level with two controls
+   * that ask the owner to have an opinion about interface density and about a
+   * typeface. Density and font are under a disclosure now: still here, still
+   * reversible, still previewed — one fold away instead of in front of the
+   * choice everybody came for.
+   *
+   * The default weather location arrives from General in the same pass. It is
+   * optional, it never affects the runtime, and it belongs with the other
+   * preferences about the answers Raiker gives rather than with the time zone
+   * every turn is told.
+   */
 
   let { settings, save }: { settings: Record<string, unknown>; save: (p: Record<string, unknown>) => void } =
     $props();
@@ -19,6 +36,9 @@
 
   const spacing = $derived((settings["personalisation.spacing"] as string) ?? "comfortable");
   const font = $derived((settings["personalisation.font"] as string) ?? "sans");
+  const weatherLocation = $derived((settings[WEATHER_LOCATION_KEY] as string) ?? "");
+  /** Open when the owner has tuned either of them, so a non-default is never hidden. */
+  const tuned = $derived(spacing !== "comfortable" || font !== "sans");
 
   // BUG-37 — density as a named mode with its consequence stated, rather than a
   // "Layout spacing" dropdown whose effect an owner had to discover by trying
@@ -57,7 +77,30 @@
 </section>
 
 <section class="settings-card">
-  <div class="card-heading"><h3>Layout &amp; type</h3><p>Adjust interface density and the primary typeface.</p></div>
+  <div class="card-heading"><h3>Weather</h3><p>Optional.</p></div>
+  <label>
+    <span>Default weather location</span>
+    <small>
+      Used only when you ask about the weather without naming a place. Raiker never
+      works one out from your network address.
+    </small>
+    <input
+      class="settings-input"
+      type="text"
+      aria-label="Default weather location"
+      placeholder="London, United Kingdom"
+      value={weatherLocation}
+      onchange={(e) => save({ [WEATHER_LOCATION_KEY]: e.currentTarget.value.trim() })}
+    />
+  </label>
+</section>
+
+<section class="settings-card">
+  <details class="tuning" open={tuned}>
+    <summary>
+      <span class="summary-title">Layout &amp; type</span>
+      <span class="summary-hint">Density and typeface</span>
+    </summary>
   <div class="density" role="radiogroup" aria-label="Density">
     <p class="density-lead">Density</p>
     <div class="density-options">
@@ -88,6 +131,7 @@
       <option value="mono">Monospace</option>
     </select>
   </label>
+  </details>
 </section>
 
 <style>
@@ -148,4 +192,33 @@
   .density-preview[data-density="compact"] { gap: 2px; }
   .density-preview[data-density="spacious"] { gap: 6px; }
   .density-preview i:last-child { width: 62%; }
+
+  /* REM-SET-APPEARANCE — the fold. A summary that reads as a card heading, so
+     the page keeps one shape whether the section is open or closed. */
+  .tuning > summary {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    cursor: pointer;
+    list-style: none;
+  }
+  .tuning > summary::-webkit-details-marker { display: none; }
+  .tuning > summary::before {
+    content: "";
+    width: 0; height: 0;
+    border-inline-start: 5px solid var(--text-3);
+    border-block: 4px solid transparent;
+    transition: transform var(--motion-fast) var(--ease);
+  }
+  .tuning[open] > summary::before { transform: rotate(90deg); }
+  .tuning > summary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+  .summary-title { font-weight: 650; }
+  .summary-hint { color: var(--text-2); font-size: var(--text-sm); }
+  .settings-input {
+    width: 100%; min-height: 44px; padding: 0 .8rem;
+    border: 1px solid var(--border-strong); border-radius: var(--r-md);
+    background: var(--surface); color: var(--text-1); font: inherit; box-sizing: border-box;
+  }
+  .settings-input:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 </style>

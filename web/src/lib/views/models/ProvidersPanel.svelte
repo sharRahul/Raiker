@@ -47,7 +47,7 @@
       await new Promise<void>((resolve) => window.setTimeout(resolve, 2_000));
     }
   }
-  /** MODEL-14 — the return listener this panel armed, cancelled on unmount. */
+  /** The return listener this panel armed, cancelled on unmount. */
   let cancelReturnDetect: (() => void) | null = null;
 
   async function openInstaller(runtime: string) {
@@ -58,7 +58,7 @@
       // BUG-270 — the provider row offers this too, so the scheme check that
       // guards `window.open` lives in one place rather than in two that drift.
       await openRuntimeInstaller(runtime);
-      // MODEL-14 — "come back and press Refresh" is Raiker asking the owner to
+      // "come back and press Refresh" is Raiker asking the owner to
       // do a job Raiker can do itself. Install it; the detection is ours.
       message = `Opened the official ${vendor} download. Install it and come back — Raiker will look again.`;
       cancelReturnDetect?.();

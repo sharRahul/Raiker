@@ -1,13 +1,31 @@
 <script lang="ts">
   import {
     TIMEZONE_KEY,
-    WEATHER_LOCATION_KEY,
     localTimeIn,
     resolvedTimezone,
     timezoneOptions,
     timezoneProposal,
     timezoneSourceLabel,
   } from "../../environment";
+
+  /*
+   * REM-SET-GENERAL — General says what it decides, once.
+   *
+   * The page carried three cards of setup teaching: a paragraph on the header, a
+   * paragraph on each card heading, and a sentence under most controls, several
+   * of them restating each other. An owner reading a settings page is looking
+   * for the control, and prose between them is what made a short page long.
+   *
+   * What is kept is the distinction that actually changes the answer, and it is
+   * now said in one line per card rather than three: **language and region are
+   * interface formatting; the time zone is what every model turn is told.**
+   * Those are different kinds of setting that happened to sit under one word,
+   * and confusing them is how somebody sets a region to fix a schedule.
+   *
+   * The default weather location moved to Personalisation, where the review put
+   * it. It is optional, it is a preference about answers rather than about the
+   * runtime, and it was the only control on this page that was neither.
+   */
 
   let { settings, save }: {
     settings: Record<string, unknown>;
@@ -19,7 +37,7 @@
   const startupRoute = $derived((settings["general.startup_route"] as string) ?? "workbench");
   const speechLanguage = $derived((settings["general.speech_language"] as string) ?? "auto");
 
-  // ENV-02 — the time zone is not a formatting preference here. It is the one
+  // The time zone is not a formatting preference here. It is the one
   // owner-level value every model turn reasons from, so the control shows what
   // is actually in force, where that came from, and what the owner's clock reads
   // in it right now. A select whose effect you cannot see is a select nobody
@@ -32,7 +50,6 @@
   // schedule; rewriting it silently would move every recurring task to fix a
   // problem they do not have.
   const proposal = $derived(timezoneProposal(settings));
-  const weatherLocation = $derived((settings[WEATHER_LOCATION_KEY] as string) ?? "");
 
   // Ticks so the sample clock stays true while the page is open. A frozen
   // timestamp under a control that claims to set the clock is worse than none.
@@ -46,17 +63,16 @@
 
 <header class="section-heading">
   <h2>General</h2>
-  <p>Choose how Raiker displays information and where your day begins.</p>
 </header>
 
 <section class="settings-card" aria-labelledby="language-region">
   <div class="card-heading">
     <h3 id="language-region">Language and region</h3>
-    <p>These preferences control interface text, dates, times, and regional formatting.</p>
+    <p>Interface text and formatting only. These do not change what Raiker tells a model.</p>
   </div>
   <label>
     <span>Speech language</span>
-    <small>Used for dictation and read-aloud in both Chat and Build.</small>
+    <small>Dictation and read-aloud, in Chat and Build.</small>
     <select aria-label="Speech language" value={speechLanguage} onchange={(e) => save({ "general.speech_language": e.currentTarget.value })}>
       <option value="auto">Auto (device language)</option>
       <option value="en">English</option>
@@ -75,7 +91,6 @@
   </label>
   <label>
     <span>Language</span>
-    <small>Controls the language used throughout Raiker.</small>
     <select value={language} onchange={(e) => save({ "general.language": e.currentTarget.value })}>
       <option value="en-GB">English (United Kingdom)</option>
       <option value="en-US">English (United States)</option>
@@ -87,7 +102,7 @@
   </label>
   <label>
     <span>Country or region</span>
-    <small>Used for regional formatting only. Scheduling is decided under Time and place.</small>
+    <small>Formatting only. Scheduling is decided under Time and place.</small>
     <select value={region} onchange={(e) => save({ "general.region": e.currentTarget.value })}>
       <option value="GB">United Kingdom</option>
       <option value="US">United States</option>
@@ -102,10 +117,7 @@
 <section class="settings-card" aria-labelledby="time-and-place">
   <div class="card-heading">
     <h3 id="time-and-place">Time and place</h3>
-    <p>
-      Raiker tells every model turn the current date, day and time in this zone. Nothing
-      is left to the model to remember, and no web connection is needed to know it.
-    </p>
+    <p>Every model turn is told the date, day and time in this zone. No web connection needed.</p>
   </div>
   <label>
     <span>Time zone</span>
@@ -137,26 +149,12 @@
       </button>
     </p>
   {/if}
-  <label>
-    <span>Default weather location</span>
-    <small>
-      Optional. Used only when you ask about the weather without naming a place. Raiker
-      never works one out from your network address.
-    </small>
-    <input
-      type="text"
-      aria-label="Default weather location"
-      placeholder="London, United Kingdom"
-      value={weatherLocation}
-      onchange={(e) => save({ [WEATHER_LOCATION_KEY]: e.currentTarget.value.trim() })}
-    />
-  </label>
 </section>
 
 <section class="settings-card" aria-labelledby="startup-behaviour">
   <div class="card-heading">
     <h3 id="startup-behaviour">Startup behaviour</h3>
-    <p>Choose the first page displayed when Raiker starts. Links and bookmarks are unaffected.</p>
+    <p>The first page Raiker opens. Links and bookmarks are unaffected.</p>
   </div>
   <label>
     <span>Default startup view</span>
@@ -174,11 +172,11 @@
 <style>
   .section-heading { margin-bottom: var(--space-4); }
   .section-heading h2, .card-heading h3 { margin: 0; }
-  .section-heading p, .card-heading p { color: var(--text-2); margin: .3rem 0 0; }
+  .card-heading p { color: var(--text-2); margin: .3rem 0 0; }
   .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--card-pad-y) var(--card-pad-x); margin-bottom: var(--space-4); }
   label { display: grid; gap: .3rem; max-width: 34rem; margin-top: var(--space-5); font-weight: 650; }
   label small { color: var(--text-2); font-weight: 400; }
-  select, input[type="text"] { width: 100%; }
+  select { width: 100%; }
   .resolved { color: var(--text-2); margin: var(--space-3) 0 0; max-width: 34rem; }
   .resolved strong { color: var(--text-1); }
   .clock { font-variant-numeric: tabular-nums; }

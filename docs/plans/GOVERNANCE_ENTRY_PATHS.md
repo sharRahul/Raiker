@@ -352,7 +352,7 @@ which is GEP-01 closed.
 | `raiker/context/gatherer.py` | every gate it reports | **Describes rather than enforces** |
 | `raiker/memory/query_embedding.py` | `model_provider_runtime` | **Egress admission precheck, followed by chokepoint B** |
 | `raiker/control/service.py` | every gate it reports | **Describes rather than enforces** (BUG-239) |
-| `raiker/runtime/read_capabilities.py` | `web_fetch` | **Describes rather than enforces** — typed readiness for the global read set (WEB-04) |
+| `raiker/runtime/read_capabilities.py` | `web_fetch` | **Describes rather than enforces** — typed readiness for the global read set |
 
 **This is defensible and it is not free.** The design intent is stated in
 `raiker/policy/engine.py:132–138`: a projected MCP tool is *read-shaped at the

@@ -1,5 +1,5 @@
 /*
- * VIS2-21 — the shared Work contract.
+ * The shared Work contract.
  *
  * Chat, Build and Design have to feel like one product without becoming one
  * layout. The review states the rule in one line — *shared controls should look

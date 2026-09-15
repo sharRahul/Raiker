@@ -43,7 +43,7 @@ installStorage("sessionStorage");
 // briefly show a stale "selected" model until its own refresh resolves). Clear
 // it after every test so each case starts from the empty default.
 //
-// The shared Work project (VIS2-11) is the same shape of thing and leaks the
+// The shared Work project (the Work project) is the same shape of thing and leaks the
 // same way: a case that chose a project left Build already inside one, so the
 // case asserting that Build refuses to send *without* a project passed or
 // failed depending on what ran before it.

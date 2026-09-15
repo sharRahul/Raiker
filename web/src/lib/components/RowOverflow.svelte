@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * MODEL-15 / VIS2-18 — the second half of "one primary action per row".
+   * The second half of "one primary action per row".
    *
    * A rule that says "at most one visible action" is only half a design; the
    * other half is where the rest go. Without a shared answer each surface

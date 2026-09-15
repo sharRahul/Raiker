@@ -244,7 +244,7 @@ def _build_registry() -> dict[str, ActivationRequirement]:
                       notes="High-sensitivity domain; per-domain threat model required.")
 
     # Governance
-    for cap in ("admin_mutation", "policy_mutation", "role_mutation"):
+    for cap in ("admin_mutation", "role_mutation"):
         r[cap] = _req(cap, "gov", executor=False, threat_ack=True,
                       notes="Governed mutation; AI never allowed; no executor needed.")
     r["audit_export"] = _req("audit_export", "gov", executor=False,

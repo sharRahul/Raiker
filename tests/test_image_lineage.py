@@ -3,7 +3,7 @@
 BUG-277. The governed image endpoint took a prompt, a size and a model and
 returned one picture. There was no subject for "edit this" to be about, no
 relationship between a variation and its original, and no versions for a version
-picker to show — so VIS2-19's canvas had nothing to compose, and the composer
+picker to show — so the Design canvas's canvas had nothing to compose, and the composer
 redesign's edit/variation controls had nothing to reach.
 
 Three things are held here, and the first is the one that matters most:

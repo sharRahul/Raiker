@@ -148,7 +148,7 @@
   // that will not move again until a person acts belongs here.
   const blocked = $derived(active.filter((task) => isBlockedTask(task.status)));
 
-  // VIS-13 — the rail is called "Needs your attention"; when nothing does, it
+  // The rail is called "Needs your attention"; when nothing does, it
   // should say so once rather than in three tiles reading zero. Declared after
   // `runtimeIssues` because it reads it: a `$derived` re-runs lazily so the
   // earlier position worked, and named a binding in its own temporal dead zone.
@@ -263,29 +263,25 @@
 </script>
 
 <section class="workbench" aria-labelledby="workbench-title">
+  <!-- REM-HOME-03 — the next action, before the commentary.
+       Home opened with a greeting, a sentence restating counts the boards
+       below state exactly, and a platform-state strip, so an owner met three
+       rows of Raiker describing itself before the thing they came to do. One
+       greeting stays; the counts sentence is gone, because the boards *are*
+       the count; the exceptions that change what to do next — a failed read,
+       a first run with nothing in it — stay, because those are the cases where
+       the page has something to say the boards cannot. The freshness strip and
+       the guide link moved below the start row: they are true, and they are
+       not the reason anybody opened this page. -->
   <div class="intro">
-    <div>
-      <h2 id="workbench-title" class="display">{hasActivity ? "Welcome back" : "Welcome to your Work Dashboard"}</h2>
-      <p class="lead">
-        {#if unavailable}
-          Raiker could not read what is running. Nothing was started or changed.
-        {:else if tasks === null}
-          Reading what is running…
-        {:else if runningNow.length === 0 && agents.length === 0 && scheduled.length === 0}
-          Nothing is running, standing, or scheduled. Start a conversation, a build, or a task.
-        {:else}
-          {runningNow.length} running · {agents.length} standing agent{agents.length === 1 ? "" : "s"} ·
-          {scheduled.length} scheduled · {approvals?.length ?? 0} waiting on you
-        {/if}
-      </p>
-    </div>
-    <div class="refresh-state">
-      <GuideLink route="home" />
-      <span aria-live="polite">{updatedAt ? `Updated ${relativeTime(updatedAt.toISOString())}` : "Updating…"}</span>
-      <button class="btn btn-ghost btn-sm" aria-label="Refresh Workbench" type="button" onclick={load}>
-        <Icon name="refresh" size="sm" /> Refresh
-      </button>
-    </div>
+    <h2 id="workbench-title" class="display">{hasActivity ? "Welcome back" : "Welcome to your Work Dashboard"}</h2>
+    {#if unavailable}
+      <p class="lead">Raiker could not read what is running. Nothing was started or changed.</p>
+    {:else if tasks === null}
+      <p class="lead">Reading what is running…</p>
+    {:else if runningNow.length === 0 && agents.length === 0 && scheduled.length === 0}
+      <p class="lead">Nothing is running, standing, or scheduled. Start a conversation, a build, or a task.</p>
+    {/if}
   </div>
 
   <!-- The shell calls Chat, Build and Design three peer Work modes; this row
@@ -311,6 +307,14 @@
     </a>
   </nav>
 
+  <div class="refresh-state">
+    <GuideLink route="home" />
+    <span aria-live="polite">{updatedAt ? `Updated ${relativeTime(updatedAt.toISOString())}` : "Updating…"}</span>
+    <button class="btn btn-ghost btn-sm" aria-label="Refresh Workbench" type="button" onclick={load}>
+      <Icon name="refresh" size="sm" /> Refresh
+    </button>
+  </div>
+
   {#if notice}<p class="notice" role="status">
       {notice}
       {#if noticeHref}<a href={noticeHref}>Open its history</a>{/if}
@@ -327,7 +331,7 @@
       {:else if tasks === null}
         <PageState state="loading" title="Loading status…" lines={3} />
       {:else}
-        <!-- VIS-13/VIS-05 — a board that is empty is not a board. Each of these
+        <!-- A board that is empty is not a board. Each of these
              three rendered as a full card whatever the state, so a fresh
              install opened on three bordered rectangles saying "Nothing is
              running", "No standing agents" and "Nothing is scheduled" — three
@@ -480,7 +484,7 @@
       {:else if approvals === null || tasks === null}
         <PageState state="loading" title="Loading status…" lines={3} />
       {:else if nothingNeedsAttention}
-        <!-- VIS-13 — "Do not show healthy subsystem status by default." Under a
+        <!-- "Do not show healthy subsystem status by default." Under a
              heading that says *Needs your attention*, three tiles reading 0 are
              a report that there is nothing to report, and they were the largest
              thing on an idle Home. One line instead, and each tile comes back
@@ -569,14 +573,16 @@
 
 <style>
   .workbench { display: grid; gap: var(--space-5); }
-  .intro { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+  .intro { display: grid; gap: var(--space-2); }
   /* BUG-37 — the greeting is display type: Raiker speaking to the owner, not a
      control label. Size, face and tracking come from the shared `.display` rule
      so this page cannot drift from the spec. */
   .intro h2 { margin: 0.15rem 0; }
   .lead { color: var(--text-2); max-width: 62ch; margin: 0; }
   .all-clear { color: var(--text-3); font-size: var(--text-sm); margin: 0; }
-  .refresh-state { display: flex; align-items: center; gap: var(--space-3); color: var(--text-3); font-size: var(--text-sm); flex-wrap: wrap; justify-content: flex-end; }
+  /* Below the start row now: freshness and a guide link are true and are not
+     what anybody opened Home for. */
+  .refresh-state { display: flex; align-items: center; gap: var(--space-3); color: var(--text-3); font-size: var(--text-sm); flex-wrap: wrap; justify-content: flex-end; margin-top: var(--space-3); }
   /* Starting work is a link to the surface that owns the composer, so the board
      never becomes a second send path. */
   /* Three peer Work modes on the first row; the two workflow entries on a
@@ -609,7 +615,7 @@
   .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
   .card-head h3 { margin: 0; }
   .card-head a { font-size: var(--text-sm); }
-  /* VIS2-16 — a persistent normal state is neutral. Success colour is spent on
+  /* A persistent normal state is neutral. Success colour is spent on
      something that just happened or on a decision that was just confirmed; used
      as the standing representation of "connected", "enabled", "verified" or
      "ready" it is on screen constantly, which is the one condition under which

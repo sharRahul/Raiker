@@ -1,6 +1,6 @@
 <script lang="ts">
   /*
-   * VIS2-19 — Design's canvas, now that there is something to compose.
+   * Design's canvas, now that there is something to compose.
    *
    * This component used to be one region and said so: "five of them describe a
    * canvas runtime Raiker does not have", because the governed image endpoint
@@ -155,7 +155,7 @@
     </aside>
 
     <!-- The canvas. The largest region whenever an asset exists, which is the
-         one composition rule VIS2-19 states outright. -->
+         one composition rule the Design canvas states outright. -->
     <section class="canvas" aria-label="Canvas">
       <!-- Above the object, not below it. The canvas takes the room the shell
            gives it, so a control placed under the picture is one the owner has
@@ -279,7 +279,7 @@
     margin: 0;
     padding: 0;
     display: grid;
-    /* VIS2-21 — density, from the Work contract. An asset is looked at, so it
+    /* Density, from the Work contract. An asset is looked at, so it
        takes the middle: room around the object without a transcript's air. */
     gap: var(--surface-gap, var(--space-5));
   }
@@ -298,7 +298,7 @@
     font-size: var(--text-sm);
     overflow-wrap: anywhere;
   }
-  /* VIS2-14 — the asset is the object, so it is not put in a card. A returned
+  /* The asset is the object, so it is not put in a card. A returned
      picture sits on the page with its own hairline boundary; only a *refusal*
      draws a box, because a refusal is a message rather than an image and needs
      somewhere to be said. */
@@ -348,9 +348,9 @@
 
   /* ── The canvas workspace ── */
 
-  /* VIS2-19 — "the canvas must dominate whenever an asset exists", which is a
+  /* "the canvas must dominate whenever an asset exists", which is a
      statement about column widths: the rail and the inspector are sized to
-     their content and the canvas takes what is left. VIS2-15 — on a spatial
+     their content and the canvas takes what is left. On a spatial
      page the room a large display adds goes here, to the space. */
   .workspace {
     display: grid;
@@ -505,7 +505,7 @@
     font-size: var(--text-xs);
   }
 
-  /* VIS2-19's mobile rule: do not squeeze three desktop panes onto a small
+  /* the Design canvas's mobile rule: do not squeeze three desktop panes onto a small
      screen. The canvas stays the object; the rail becomes a horizontal strip
      above it and the inspector follows underneath. */
   @media (max-width: 60rem) {

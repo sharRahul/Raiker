@@ -114,7 +114,7 @@
   --grid-gap: var(--space-4);
   --content-gutter: clamp(1.25rem, 2vw, 2.5rem);
 
-  /* VIS2-15 — the widths above are the 1080p–1440p composition. A 4K or 8K
+  /* The widths above are the 1080p–1440p composition. A 4K or 8K
      monitor is a different composition, not the same one scaled up: see the
      `min-width` blocks below, which move these two tokens and nothing else. */
 
@@ -128,7 +128,7 @@
      The scale is a token set rather than a set of element rules so a view can
      reach for a step by name instead of inventing 0.83rem.
 
-     VIS2-01 — `--text-lg` resolved to exactly `--text-base`, so the step a view
+     `--text-lg` resolved to exactly `--text-base`, so the step a view
      reached for when it wanted "one size up from body" gave it body text in a
      heavier weight. A named step that resolves to its neighbour is worse than a
      missing one: the call site reads as deliberate hierarchy and renders as
@@ -288,6 +288,21 @@
   --neutral-soft: #efefef;
   --neutral-border: #d3d3d4;
 
+  /* ── Chart series (BUG-288) ──────────────────────────────────────────────
+     Six colours for the typed chart part, defined here for the reason every
+     other colour is: a component that picks its own cannot follow the theme.
+     Ordered so the first two — the pair a two-series chart uses — are the
+     furthest apart in both hue and lightness, which is what keeps them
+     distinguishable in greyscale and to a red-green colour-blind reader. The
+     shapes carry a legend and a data table as well, because colour alone is
+     never the only channel. */
+  --chart-1: #2779a7;
+  --chart-2: #b4670f;
+  --chart-3: #137333;
+  --chart-4: #7b4fa8;
+  --chart-5: #a3324f;
+  --chart-6: #4f6470;
+
   /* Aliases for the names a handful of views reached for before the token set
      was settled. They resolve to the palette rather than to a hard-coded
      fallback, so a colour that used to escape the theme now follows it. Both
@@ -313,7 +328,7 @@
   --overlay: rgba(15, 23, 42, 0.48);
   --focus-ring: #365F7D;
 
-  /* VIS2-14 — the two themes are composed separately, without redesigning the
+  /* The two themes are composed separately, without redesigning the
      palette. On a light ground a shadow is a real cue and a border is cheap, so
      elevation is carried by the shadow and edges stay restrained. `--canvas-edge`
      is the hairline that keeps an image's boundary obvious *without* putting the
@@ -322,7 +337,7 @@
   --canvas-edge: rgba(15, 23, 42, 0.14);
   --canvas-lift: var(--shadow-1);
 
-  /* VIS2-17 — the overlay vocabulary, as a stacking ladder.
+  /* The overlay vocabulary, as a stacking ladder.
      ------------------------------------------------------
      Thirteen different z-index numbers were in use across the views — 30, 40,
      45, 46, 55, 60, 70, 80, 90, 95, 100, 120, 200 — each chosen locally to sit
@@ -373,7 +388,7 @@
   --raised: #171C26;
   --border: #1F242F;
   --border-strong: #303847;
-  /* VIS-21 — dark separates a card from the ground by luminance: the ground
+  /* Dark separates a card from the ground by luminance: the ground
      is #0B0D10 and the card #12161F. An outline on top of that step is a
      second edge doing a job the step already did, and it is what made a page
      of cards read as a grid of boxes rather than as raised paper. */
@@ -415,9 +430,18 @@
   --neutral-soft: rgba(156, 156, 156, 0.11);
   --neutral-border: rgba(156, 156, 156, 0.3);
 
+  /* The same six, lifted for a near-black ground: the light ramp's mid-tones
+     sit too close to the canvas to read as marks. */
+  --chart-1: #7ab6d8;
+  --chart-2: #e6a75c;
+  --chart-3: #86d6a4;
+  --chart-4: #c3a5e6;
+  --chart-5: #eb9aae;
+  --chart-6: #a8b8c2;
+
   --success: var(--ok);
 
-  /* VIS2-14 — the dark composition, same palette. A drop shadow on a near-black
+  /* The dark composition, same palette. A drop shadow on a near-black
      ground carries almost nothing, so elevation moves to the edge: a raised
      surface is told apart by a stronger border rather than by a shadow that is
      not visible. The canvas hairline lightens for the same reason — against
@@ -441,7 +465,7 @@
 }
 
 /* System preference drives the default when the user hasn't chosen. */
-/* ── VIS2-15 — 4K/8K as composition classes ──
+/* ── 4K/8K as composition classes ──
    A large monitor gives a *spatial* surface more room to hold its object: more
    of a diff beside more of a file tree, more of a graph, more of an
    operational table. It gives prose nothing — a 200-character line is harder
@@ -516,9 +540,18 @@
     --neutral-soft: rgba(156, 156, 156, 0.11);
     --neutral-border: rgba(156, 156, 156, 0.3);
 
+    /* The same six, lifted for a near-black ground: the light ramp's mid-tones
+       sit too close to the canvas to read as marks. */
+    --chart-1: #7ab6d8;
+    --chart-2: #e6a75c;
+    --chart-3: #86d6a4;
+    --chart-4: #c3a5e6;
+    --chart-5: #eb9aae;
+    --chart-6: #a8b8c2;
+
     --success: var(--ok);
 
-    /* VIS2-14 — the dark composition, same palette. A drop shadow on a near-black
+    /* The dark composition, same palette. A drop shadow on a near-black
        ground carries almost nothing, so elevation moves to the edge: a raised
        surface is told apart by a stronger border rather than by a shadow that is
        not visible. The canvas hairline lightens for the same reason — against
@@ -898,7 +931,7 @@ code,
   z-index: 1;
 }
 
-/* VIS-21 — a card is separated from the ground by one device, not two.
+/* A card is separated from the ground by one device, not two.
    `--card-edge` is that device, and each theme picks the one it can afford:
    light has almost no luminance to spend (white card on a near-white ground)
    so it keeps the outline; dark already climbs 0B0D10 → 12161F → 171C26, and
@@ -1180,7 +1213,7 @@ code,
   border-collapse: collapse;
   font-size: var(--text-sm);
 }
-/* VIS-06 — a column heading is a label, not a status chip. Uppercase plus wide
+/* A column heading is a label, not a status chip. Uppercase plus wide
    tracking at 2xs made every table in the product read like a monitoring
    console, and it costs legibility at exactly the size that can least afford
    it. Sentence case, one step larger, and the weight does the separating. */
@@ -1216,7 +1249,7 @@ code,
   text-align: right;
 }
 
-/* A kicker is the one thing VIS-06 leaves in uppercase: tiny metadata sitting
+/* A kicker is the one thing the uppercase rule leaves in uppercase: tiny metadata sitting
    above a heading, where the caps *are* the hierarchy. The tracking comes down,
    because 0.09em at this size is decoration rather than legibility. */
 .kicker {
@@ -1234,7 +1267,7 @@ code,
    Four views each carried a private `.eyebrow` meaning exactly this, at four
    different weights (600, 750, 750, 800) and four different trackings (wide,
    0.08, 0.09, 0.12em). None of them disagreed on purpose; they were written
-   separately, which is all it takes (VIS-04, VIS-06). */
+   separately, which is all it takes (the surface archetypes, the uppercase rule). */
 .eyebrow {
   font-size: var(--text-2xs);
   font-weight: 700;
@@ -1244,7 +1277,7 @@ code,
   margin: 0 0 var(--space-1);
 }
 
-/* VIS-23/VIS-04 — one page-header contract, defined once.
+/* One page-header contract, defined once.
    ┌──────────────────────────────────────────────┐
    │ Title / lead                  Primary action │
    └──────────────────────────────────────────────┘

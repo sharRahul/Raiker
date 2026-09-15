@@ -111,7 +111,7 @@ test.beforeEach(async ({ page }) => {
       // in the route audit — which passed, because an error state is still a
       // laid-out page, so the surface was never actually exercised. One good
       // generation and one refusal, which are the two halves of the transcript.
-      // MODEL-01 — the one authoritative answer about which model is selected
+      // the one authoritative answer about which model is selected
       // and which one will really run. Answered here because every Work surface
       // and the whole Models page read it, and because the unrouted default
       // below is an empty object: a 200 whose shape is wrong is exactly the
@@ -362,7 +362,7 @@ test("minimal composers fit representative iPhone, Android, and tablet viewports
       expect(geometry.sendHeight, `${device} ${route} send height`).toBeGreaterThanOrEqual(44);
 
       if (route === "build") {
-        // VIS2-05 — compact does not mean contextless. The three zone toggles
+        // Compact does not mean contextless. The three zone toggles
         // stay reachable on a phone; what a narrow window drops is their
         // visible words, not the control. Each keeps its `aria-label`, so the
         // button is still nameable by voice and readable by a screen reader on
@@ -426,7 +426,7 @@ test("every Work mode composes the same way, simple at rest", async ({ page }) =
     // Design draws a Tools control as of 2026-09-07, and it is the registry
     // working rather than the rule loosening. It was absent because Raiker's
     // governed image endpoint takes a prompt, a size and a model and there was
-    // no capability for the menu to invoke; WEB-06 gave Design a research layer,
+    // no capability for the menu to invoke; Design later gained a research layer,
     // so the four reads behind it now run a real governed turn on the `design`
     // surface. The *image* controls COMPOSER-09 lists are still absent for the
     // original reason, and are still recorded in docs/plans/TO_BE_FIXED.md.
@@ -535,7 +535,7 @@ test("the Hooks tab tells an enforcing rule from a dead one and a broken file", 
 });
 
 test("a list badges the row that needs you, not the rows that are ordinary", async ({ page }) => {
-  // VIS2-13 / VIS2-18 — the rule this checks is about *scanning*, so it needs a
+  // The rule this checks is about *scanning*, so it needs a
   // list with more than one row on it, which is what a fixture can give and a
   // unit test cannot. Four decisions: three at routine risk, one critical.
   const approval = (id: string, risk: string) => ({
@@ -632,7 +632,14 @@ test("Settings presents one section rail rather than a wall of fields", async ({
 
   // Personalisation is where the density and typography choices live (BUG-37),
   // so a redesign that drops them takes this test with it.
+  //
+  // REM-SET-APPEARANCE folded them under **Layout & type**, one reach from
+  // Theme — which is why anybody opens this page. Still here, still reversible,
+  // still previewed; the fold is what this now opens, and a redesign that
+  // *removes* them still fails here.
   await rail.getByRole("button", { name: "Personalisation" }).click();
+  await expect(page.getByRole("radiogroup", { name: "Theme" })).toBeVisible();
+  await page.getByText("Layout & type").click();
   const density = page.getByRole("radiogroup", { name: "Density" });
   await expect(density).toBeVisible();
   for (const mode of ["Compact", "Comfortable", "Spacious"]) {
@@ -642,13 +649,13 @@ test("Settings presents one section rail rather than a wall of fields", async ({
 });
 
 test("Models names providers in plain language and offers a real model list", async ({ page }) => {
-  // MODEL-03 — Local and Hosted were peers because that is how profiles are
+  // Local and Hosted were peers because that is how profiles are
   // stored; both are the same errand, so both are under "Add model" now.
   await page.goto("http://raiker.test/#/models?tab=add");
   await expect(page.getByRole("heading", { name: "Choose where Raiker thinks" })).toBeVisible();
   // The internal profile id is never the thing the owner is shown.
   await expect(page.getByText("anthropic-hosted")).toHaveCount(0);
-  // MODEL-15 — one visible action per provider row. Browsing a provider's
+  // One visible action per provider row. Browsing a provider's
   // catalogue is either that action or the first item of the row's overflow,
   // depending on whether a model is already named.
   const picker = page.getByRole("button", { name: /^Select models/ }).first();
@@ -664,7 +671,7 @@ test("Models names providers in plain language and offers a real model list", as
 });
 
 test("Models opens on what is running the work, not on a filing system", async ({ page }) => {
-  // MODEL-03 — the six tabs this replaces named where a model was stored or
+  // The six tabs this replaces named where a model was stored or
   // which table a fact came out of. None answered the question every owner
   // arrives with, which is what is powering Chat, Build and Design.
   await page.goto("http://raiker.test/#/models");
@@ -677,7 +684,7 @@ test("Models opens on what is running the work, not on a filing system", async (
     "Usage",
   ]);
   await expect(page.getByRole("heading", { name: "What powers your work" })).toBeVisible();
-  // Scoped to the section that answers the question. MODEL-13's "Needs
+  // Scoped to the section that answers the question. The overview's "Needs
   // attention" names the same surfaces when one of them cannot run, which is
   // the design working rather than a duplicate to disambiguate around.
   const powers = page.getByLabel("What powers your work");
@@ -688,7 +695,7 @@ test("Models opens on what is running the work, not on a filing system", async (
   }
   await capture(page, join(shots, "models-overview.png"));
 
-  // MODEL-11 — Default and Effective are separate columns, because the page
+  // Default and Effective are separate columns, because the page
   // used to call both of them "active".
   await page.goto("http://raiker.test/#/models?tab=runtime");
   await expect(page.getByRole("heading", { name: "Work defaults" })).toBeVisible();
@@ -696,12 +703,12 @@ test("Models opens on what is running the work, not on a filing system", async (
   await expect(page.getByRole("columnheader", { name: "Effective now" })).toBeVisible();
   await capture(page, join(shots, "models-work-defaults.png"));
 
-  // MODEL-04 — one inventory, one primary action per row.
+  // One inventory, one primary action per row.
   await page.goto("http://raiker.test/#/models?tab=models");
   await expect(page.getByLabel("Filter models")).toBeVisible();
   await capture(page, join(shots, "models-inventory.png"));
 
-  // A pre-MODEL-03 deep link still resolves to the panel that took its content.
+  // A deep link from before the rebuild still resolves to the panel that took its content.
   await page.goto("http://raiker.test/#/models?tab=pricing");
   await expect(page.locator('[role="tab"][data-tab="usage"]')).toHaveAttribute(
     "aria-selected",
@@ -718,7 +725,7 @@ test("new-account Workbench is a board over the work, not a second composer", as
   // composer. What is left is the live answer to "what is Raiker doing".
   await expect(page.getByLabel("What would you like Raiker to do?")).toHaveCount(0);
   await expect(page.getByRole("tablist", { name: "Work mode" })).toHaveCount(0);
-  // VIS-05 — a fresh install used to open on three bordered rectangles saying
+  // A fresh install used to open on three bordered rectangles saying
   // "Nothing is running", "No standing agents" and "Nothing is scheduled":
   // three containers explaining an absence one sentence already states. The
   // boards appear when they have something in them.

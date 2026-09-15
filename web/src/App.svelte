@@ -68,7 +68,7 @@
     allPagesTrigger = trigger;
     allPagesOpen = !allPagesOpen;
   }
-  // VIS-22 — the launcher that lets the rail be short. Ctrl/Cmd+K from
+  // The launcher that lets the rail be short. Ctrl/Cmd+K from
   // anywhere, including from inside a field, because that is the one shortcut
   // people expect to work while they are typing.
   let paletteOpen = $state(false);
@@ -168,7 +168,7 @@
       document.getElementById("main")?.focus();
     };
     window.addEventListener("hashchange", handler);
-    // VIS-22 — Ctrl/Cmd+K opens the palette from anywhere. Deliberately not
+    // Ctrl/Cmd+K opens the palette from anywhere. Deliberately not
     // gated on "is a field focused": this is the one shortcut people press
     // *while* typing, and a launcher that refuses mid-sentence is not a
     // launcher. `preventDefault` stops the browser's own find-in-page binding.

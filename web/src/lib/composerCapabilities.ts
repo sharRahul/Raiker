@@ -63,7 +63,7 @@ export interface ComposerCapability {
    */
   enableHref?: string;
   /**
-   * WEB-04 — the runtime tool whose readiness this entry reports, when it has
+   * The runtime tool whose readiness this entry reports, when it has
    * one. Readiness is a *different question* from the gate above: a search tool
    * the owner has permitted and has not configured a provider for is `Ready` by
    * the gate and `Needs provider` in fact, and a menu that shows one grey row
@@ -299,7 +299,7 @@ export const READINESS_LABELS: Record<ToolReadiness["state"], string> = {
 export interface ComposerMenuItem extends ComposerCapability {
   blocked: CapabilityBlock | null;
   /**
-   * WEB-04 — the operational state, when the entry names a runtime tool. Kept
+   * The operational state, when the entry names a runtime tool. Kept
    * beside `blocked` rather than folded into it: an entry can be permitted and
    * not ready, and the row has to be able to say so without claiming the owner
    * turned something off.

@@ -50,7 +50,7 @@
   } from "../apiTypes";
 
 
-  /** VIS2-21 — what this mode is about, and how tightly it packs it. */
+  /** What this mode is about, and how tightly it packs it. */
   const surface = workSurface("design");
 
   let {
@@ -69,7 +69,7 @@
   const draft = $derived(workDraft(workProject()));
   let size = $state("1024x1024");
   /*
-   * VIS2-19 — the object the next instruction is about, and how many pictures
+   * The object the next instruction is about, and how many pictures
    * it asks for. Both are BUG-277's doing: until a request could name a prior
    * generation there was no subject to select, and until it could ask for
    * several there was no count to set.
@@ -78,7 +78,7 @@
   let variations = $state(1);
 
   /**
-   * WEB-06 — Design's research layer.
+   * Design's research layer.
    *
    * The architecture the plan asks for is `Design composer → planning/research
    * agent → global read capabilities → image model`, and the important word in
@@ -182,7 +182,7 @@
   let choiceKey = $state("");
 
   /**
-   * MODEL-02 — Design remembers its own model.
+   * Design remembers its own model.
    *
    * Every other Work surface did. Design's picker started on whatever happened
    * to be first in the list of image models on every load, so an owner with two
@@ -251,7 +251,7 @@
 
   /** COMPOSER-06 — the parameters this press will use, as one inspectable line. */
   /**
-   * VIS2-11 — the Work project, named here as it is in Chat and Build.
+   * The Work project, named here as it is in Chat and Build.
    *
    * Named, and honestly bounded. Design's research turns run inside this
    * project like any other governed turn; the *image* endpoint takes a prompt,
@@ -304,7 +304,7 @@
 
   function runComposerAction(id: string) {
     if (id === "set-project") {
-      // VIS2-11 — chosen here rather than on another page. Sending the owner to
+      // Chosen here rather than on another page. Sending the owner to
       // Projects to pick one and back again is the re-choosing this item exists
       // to remove.
       projectPickerOpen = !projectPickerOpen;
@@ -449,7 +449,7 @@
     } catch {
       gates = [];
     }
-    // WEB-07 — from the shared snapshot, so configuring a search provider
+    // From the shared snapshot, so configuring a search provider
     // elsewhere reaches this still-mounted view without a reload.
     await refreshReadCapabilities();
     try {
@@ -536,7 +536,7 @@
   });
 </script>
 
-<!-- VIS2-21 — the Work contract. Design shares its terms with Chat and Build
+<!-- The Work contract. Design shares its terms with Chat and Build
      and differs in its object: an asset is looked at, so it takes the middle
      density rather than the transcript's air or the workbench's pack. -->
 <div
@@ -574,7 +574,7 @@
       </p>
     {/if}
 
-    <!-- VIS2-20 — the region that holds this surface's object, as its own
+    <!-- The region that holds this surface's object, as its own
          component. What Design shows *is* the asset, so how an asset is
          presented lives in one file rather than in the middle of the view. -->
     <DesignCanvasRegion

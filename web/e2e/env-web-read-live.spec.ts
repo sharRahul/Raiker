@@ -44,12 +44,21 @@ test("Settings makes the time zone the visible owner-level source of truth", asy
   await expect(resolved).toContainText("You chose this.");
   await expect(resolved).toContainText("Right now that reads");
 
-  // WEATHER-02 — a default place, held separately from the zone.
-  await page.getByLabel("Default weather location").fill("Edinburgh, United Kingdom");
   await page.getByRole("button", { name: /^Save/ }).click();
   await expect(page.getByText(/Saved/i).first()).toBeVisible({ timeout: 30_000 });
 
   await capture(page, `${SHOTS}/env-01-timezone-and-weather-location.png`, resolved);
+
+  // A default weather place is held separately from the zone, and REM-SET-GENERAL
+  // moved it to Personalisation: the zone is what every turn is told, and a
+  // default place is an optional preference about one kind of answer.
+  await page.goto(`${BASE}/#/settings?tab=personalisation`);
+  const place = page.getByLabel("Default weather location");
+  await expect(place).toBeVisible({ timeout: 30_000 });
+  await place.fill("Edinburgh, United Kingdom");
+  await place.press("Tab");
+  await page.getByRole("button", { name: /^Save/ }).click();
+  await expect(page.getByText(/Saved/i).first()).toBeVisible({ timeout: 30_000 });
 });
 
 test("the runtime's own clock is what the API reports", async ({ page }) => {
@@ -105,7 +114,7 @@ test("the weather capability is reachable and fails in a typed state, not silent
 }) => {
   await signInAsOwner(page, BASE);
 
-  // WEATHER-03 — the honest failure. This host's egress policy refuses
+  // The honest failure. This host's egress policy refuses
   // `api.open-meteo.com`, and what matters is that the refusal is *typed*: a
   // capability that quietly returns nothing is indistinguishable from one that
   // returned "no weather", and a scheduling rule cannot tell those apart.
@@ -171,7 +180,7 @@ test("the Hugging Face flow states its steps and hides the token behind a reason
   await expect(rail.getByText("Find model")).toBeVisible({ timeout: 60_000 });
   await expect(rail.getByText("Choose variant")).toBeVisible();
   await expect(rail.getByText("Review download")).toBeVisible();
-  // MODEL-09 — the token control is for gated repositories, not for everyone.
+  // The token control is for gated repositories, not for everyone.
   // As a permanent hero button it told every owner that signing in to Hugging
   // Face was a normal part of downloading a public model.
   await expect(page.getByRole("button", { name: "Set access token" })).toHaveCount(0);
@@ -183,7 +192,7 @@ test("Build's workbench is one pane over four views, and focuses itself", async 
   await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/build`);
 
-  // VIS2-12 — the column used to mean "whatever you last switched on". The
+  // The column used to mean "whatever you last switched on". The
   // control that opens it names the view it opens on, and the other three are a
   // tab away rather than behind a second control in the header.
   const terminal = page.getByRole("button", { name: "Show the governed terminal" });
@@ -215,7 +224,7 @@ test("Extensions opens on what Raiker can reach, not on a category", async ({ pa
   await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/extensions`);
 
-  // VIS2-10 — the page used to open on Connectors, which is a filing system by
+  // The page used to open on Connectors, which is a filing system by
   // kind of thing rather than an answer to why anyone came.
   const heading = page.getByRole("heading", { name: "What Raiker can reach" });
   await expect(heading).toBeVisible({ timeout: 60_000 });

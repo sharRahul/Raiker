@@ -1,5 +1,5 @@
 /**
- * VIS2-13 / VIS2-18 — the token budget, checked on the real screens.
+ * The token budget, checked on the real screens.
  *
  * The claim these two items make is about *scanning*: a list is readable when
  * an ordinary row looks ordinary, so the one row that needs the owner can be
@@ -42,7 +42,7 @@ test("a skill that is switched on and conformant spends no badge", async ({ page
 test("the sessions list badges the running session and nothing else", async ({ page }) => {
   test.setTimeout(120_000);
   await signInAsOwner(page, BASE);
-  // Sessions is a tab of the Observability hub (VIS2-10), not a route of its
+  // Sessions is a tab of the Observability hub (the hub Overview), not a route of its
   // own: the list is identified by its own table, not by a page title.
   await page.goto(`${BASE}/#/observe?tab=sessions`);
   await expect(

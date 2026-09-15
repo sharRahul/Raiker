@@ -130,6 +130,14 @@ class TestCapabilityGateView:
             # runtime would run it.
             "unset_resolution": "off",
             "enforced_enabled": False,
+            # BUG-293 — what this would cost if it ran without the owner, and
+            # what stands in the way. Empty on the DTO's own defaults, because
+            # the record is looked up by the service: a capability with no real
+            # executor has no cost to state, and an empty cell is the honest
+            # answer rather than a missing one.
+            "side_effect": "",
+            "ungoverned_consequence": "",
+            "authority_requirement": "",
         }
 
     def test_to_dict_no_secrets(self) -> None:
@@ -267,6 +275,12 @@ class TestRuntimeReadinessView:
                     "governance_note": "",
                     "unset_resolution": "off",
                     "enforced_enabled": False,
+                    # BUG-293 — empty on the DTO's own defaults, as above: the
+                    # record is looked up by the service, and a capability with
+                    # no real executor has no cost to state.
+                    "side_effect": "",
+                    "ungoverned_consequence": "",
+                    "authority_requirement": "",
                 },
             ],
             "summary": {"owner_bootstrapped": True, "dangerous_caps_disabled": True},

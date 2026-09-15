@@ -1,5 +1,5 @@
 /**
- * VIS2-10 — what the Extensions page should say before it says anything else.
+ * What the Extensions page should say before it says anything else.
  *
  * The page opened on five equal tabs — Connectors, MCP servers, Skills, Hooks,
  * Plugins — which is a filing system by *kind of thing*, not an answer to why
@@ -17,7 +17,7 @@
  *
  * This module derives the answers from the readiness the page already loads, so
  * the overview cannot disagree with the tab underneath it. It is deliberately
- * *exception-led* (VIS2-18): a working extension gets a count, not a card. A
+ * *exception-led* (the exception-led rule): a working extension gets a count, not a card. A
  * wall of green cards reports "nothing is wrong" in the most expensive way
  * available, and it trains the owner to skim past the one card that is not
  * green.

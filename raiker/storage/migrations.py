@@ -2267,7 +2267,7 @@ CREATE INDEX IF NOT EXISTS idx_principal_configured_models_owner
 """
 
 
-# GLOBAL-MODEL-01/08 — the last catalogue a provider actually published.
+# The last catalogue a provider actually published.
 #
 # Provider catalogues were probed on demand and never written down, so two
 # things followed. A model only reached a composer by being "kept available",
@@ -3885,7 +3885,7 @@ CREATE TABLE IF NOT EXISTS background_worker_health (
 # The governed image endpoint took a prompt, a size and a model and returned one
 # picture. Nothing recorded what a picture was made *from*, so there was no
 # subject for "edit this" to be about, no relationship between a variation and
-# its original, and no versions for a version picker to show. VIS2-19's canvas
+# its original, and no versions for a version picker to show. the Design canvas's canvas
 # had nothing to compose because the runtime beneath it had nothing to say.
 #
 # `source_generation_id` is the generation this one came from, and it is the

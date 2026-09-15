@@ -76,13 +76,13 @@ describe("App shell", () => {
     // still routes — `nav.ts` still holds them — but the sidebar no longer
     // carries a standing row for work that happens on a handful of days.
     //
-    // VIS-01 — and neither do Approvals and Messaging. Nine peers in one group
+    // and neither do Approvals and Messaging. Nine peers in one group
     // asked the owner to learn nine product nouns before starting. Approvals is
     // a counted button in the top bar, which is *more* available than a sidebar
     // row; Messaging is reached from the gear or the palette, and both are
     // still live routes.
     //
-    // VIS2-03 took Design back out of this list: it is a Work mode, so it is on
+    // the three Work modes took Design back out of this list: it is a Work mode, so it is on
     // the rail and in the top bar's mode switch beside Chat and Build.
     for (const label of [
       "Permissions", "Models", "Extensions", "Observability", "Settings",

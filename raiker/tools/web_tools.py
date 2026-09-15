@@ -75,7 +75,7 @@ def web_extract(
     store: SQLiteStore | None = None,
     principal_id: str | None = None,
 ) -> dict[str, Any]:
-    """Read one page's structure, brokered as the ``web_extract`` tool (WEB-05).
+    """Read one page's structure, brokered as the ``web_extract`` tool.
 
     The same governed boundary as :func:`web_fetch` — the same capability gate,
     the same decision mode, the same owner blocklist, the same HTTPS-only public-
@@ -100,7 +100,7 @@ def weather_lookup(
     store: SQLiteStore | None = None,
     principal_id: str | None = None,
 ) -> dict[str, Any]:
-    """Structured current conditions and forecast (WEATHER-01).
+    """Structured current conditions and forecast.
 
     Governed by the same ``web_fetch`` gate as the reads above, because it is
     one: a request to a third party carrying the owner's IP. Availability is not

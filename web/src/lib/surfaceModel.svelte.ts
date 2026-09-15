@@ -20,7 +20,7 @@ import type { ModelDecision } from "./apiTypes";
 /**
  * The surfaces that may hold a default of their own.
  *
- * MODEL-02 — `design` was missing while the product model was Chat | Build |
+ * `design` was missing while the product model was Chat | Build |
  * Design, so an owner who put Chat on a small local model had their image
  * prompts follow it there. The union mirrors `raiker.models.decision.SURFACES`
  * exactly; a surface added on one side and not the other is the same defect.
@@ -72,7 +72,7 @@ export async function rememberSurfaceModel(
 }
 
 /**
- * MODEL-01 — the authoritative decision for this surface.
+ * The authoritative decision for this surface.
  *
  * `surfaceModel()` above answers "where should the picker start", which is a
  * preference. This answers the harder question the interface actually has to

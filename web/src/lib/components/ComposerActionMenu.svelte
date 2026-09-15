@@ -118,7 +118,7 @@
                     : item.hint}
                 </span>
               </span>
-              <!-- WEB-04 — readiness, printed only when it is not the plain
+              <!-- Readiness, printed only when it is not the plain
                    `Ready` state. A row that says Ready on every entry is a row
                    nobody reads, and the one entry that is *not* ready then
                    reads as one more identical chip. -->
@@ -252,7 +252,7 @@
     font-size: var(--text-2xs);
     overflow-wrap: anywhere;
   }
-  /* VIS2-16 — the one toned line, because it is the one that is not ordinary. */
+  /* The one toned line, because it is the one that is not ordinary. */
   .blocked-hint {
     color: var(--warn);
   }

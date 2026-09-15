@@ -1,5 +1,5 @@
 /**
- * VIS-14 — Threads, Tasks and Projects are three views of the same thing, and
+ * Threads, Tasks and Projects are three views of the same thing, and
  * they described it three different ways: "3 turns · 2h ago" with a bare tag,
  * "Runs hourly · updated 2h ago" with a Badge, "4 sessions". Same facts, three
  * orders, three spellings. A task thread read as though it belonged to a

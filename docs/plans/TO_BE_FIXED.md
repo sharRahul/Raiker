@@ -136,7 +136,7 @@ names.
 | [BUG-261, BUG-262](FIXED_ITEMS.md#fixed-359--first-run-could-detect-a-missing-runtime-and-not-offer-to-install-it) | Medium | Models / first run | **Closed 2026-09-03 (FIXED-359)** — install a runtime and choose a model without leaving first run |
 | [BUG-265](FIXED_ITEMS.md#fixed-360--a-policy-refusal-was-reported-as-a-wrong-password) | Medium | Authentication / web UI | **Closed 2026-09-03 (FIXED-360)** — "Authentication failed." for a one-owner-per-instance refusal |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (18 complete, 2 partial; B14 closed 2026-09-04 as [FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one), B10 2026-09-03 as FIXED-366, B13 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, B16 by BUG-206 slice D. B15 and B20 remain partial on [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution)) |
-| [VIS](VISUAL_UI_UX_REVIEW_2026-09-06.md) | — | Visual / information hierarchy | Analysis (24 findings; 22 closed 2026-09-06, VIS-19 open, VIS-07 an owner decision — see below) |
+| VIS | — | Visual / information hierarchy | **Complete.** 24 findings; the document was removed 2026-09-15 when its last implementation item closed |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (16 complete, 1 partial, 1 open; C15 closed by C1/C4, C11 2026-09-03 as FIXED-367, C18 as FIXED-368, C17 2026-08-29 as FIXED-311. C10 is partial — the notification half ships as [FIXED-374](FIXED_ITEMS.md#fixed-374--a-routine-ran-all-night-and-told-nobody); C12 stays an architecture decision) |
 
 The memory audit of **2026-08-11** has its own document,
@@ -200,40 +200,25 @@ seven tests asserted what Raiker reports when no local runtime is installed and
 obtained that condition by assuming the host had none, so they passed on CI and
 failed on any machine with Ollama.
 
-The visual UI/UX review of **2026-09-06** has its own document,
-[`VISUAL_UI_UX_REVIEW_2026-09-06.md`](VISUAL_UI_UX_REVIEW_2026-09-06.md)
-(VIS-01 … VIS-24). Its findings are design defects rather than functional ones,
-so they are not duplicated here; that document carries each one's status.
+The visual UI/UX review of **2026-09-06** had its own document, and it is
+**complete**. All twenty-four findings are accounted for: twenty-two closed on
+2026-09-06, VIS-07 was an owner decision rather than a defect — its three
+suggestions invent brand behaviours the product does not have, and two overlap
+work already done — and VIS-19, the typed output vocabulary, closed on
+2026-09-15 as
+[FIXED-545](FIXED_ITEMS.md#fixed-545--a-turn-could-only-answer-in-prose).
 
-**Twenty-two of the twenty-four are closed as of 2026-09-06.** The whole of
-Wave 1 (VIS-01, VIS-02, VIS-08, VIS-12, VIS-15, VIS-22, VIS-23), the whole of
-Wave 2 except VIS-19 (VIS-09, VIS-10, VIS-11, VIS-13, VIS-14), and Wave 3 apart
-from VIS-07 (VIS-05, VIS-06, VIS-17, VIS-18, VIS-20, VIS-21, VIS-24), plus
-VIS-03, VIS-04 and VIS-16.
+Two of the twenty-two closed without a code change, and each said so for its own
+reason: the Knowledge Map was already 94% of its page with zero cards, and every
+infinite animation in the product is a progress indicator already covered by the
+global `prefers-reduced-motion` guard.
 
-Of the two that are not closed, **VIS-07 is an owner decision rather than a
-defect** and so is not open work: its three suggestions invent brand behaviours
-the product does not have, and two of them overlap work already done — VIS-15
-spent the gold deliberately on pending and authority, and `LifecycleTrack` is
-the plan visualization. It is left to the owner in the same way GEP-02 and
-BUG-239's remainder are.
-
-Two of the twenty-two closed without a code change, and each says so for its
-own reason:
-
-* **VIS-18** was already satisfied — measured live, the graph is 94% of the
-  page and the page carries zero cards. The finding was written from the
-  screenshot catalogue and the implementation already matched it.
-* **VIS-20** needed no change: every infinite animation in the product is a
-  progress indicator, and the global `prefers-reduced-motion` guard already
-  collapses all of them.
-**That leaves one genuinely open.** [VIS-19](VISUAL_UI_UX_REVIEW_2026-09-06.md#pass-1-status-summary)
-— the typed output vocabulary. Nine of its ten blocks already exist as
-components and only a chart block is absent; what is missing is the typed
-channel that lets a turn address them, which is a backend contract (a block
-schema, a producer, and a renderer that refuses what it does not recognise)
-rather than a visual pass. The catalogue of what exists is in
-[`VISUAL_DESIGN_SPEC.md`](../architecture/VISUAL_DESIGN_SPEC.md).
+The document was removed on 2026-09-15 under the governance rule in
+[`README.md`](README.md): a topic review goes once every item in it has closed,
+and what survives is its `FIXED_ITEMS.md` entries plus git history. The
+catalogue of what the visual vocabulary contains is
+[`VISUAL_DESIGN_SPEC.md`](../architecture/VISUAL_DESIGN_SPEC.md), which is a
+specification rather than a review and stays.
 
 **Still open in the third-pass document, in its own priority order:** GCR-24 and
 GCR-26 (P1), then GCR-32, GCR-34, GCR-35, GCR-36, GCR-37, GCR-41, GCR-42,
@@ -418,57 +403,25 @@ navigation at 375 / 768 / 1024 / 1440 px with no horizontal overflow, correct
 
 ## BUG-239 — An empty gate table means three different things
 
-**Severity: Low. Area: capability gates / owner decision. Status: Open — raised
-2026-08-24 while closing [GEP-01](GOVERNANCE_ENTRY_PATHS.md).**
+**Closed 2026-09-15 as
+[FIXED-544](FIXED_ITEMS.md#fixed-544--a-new-account-was-fail-closed-about-reading-its-owners-own-repository).**
 
-**Observed.** On a workspace where nothing has been persisted for a capability,
-three different answers are given to *is this on?*, and which one applies depends
-on the capability:
+The owner's decision was that the three resolutions stay — each is individually
+justified, and collapsing either way changes behaviour without looking at what
+each capability is for. What was worth acting on was the *other* question the
+entry raised: a brand-new account could not read symbols out of a file the agent
+was already authorised to open.
 
-| Resolution | Nothing persisted means | Used by |
-|---|---|---|
-| `off` | Off. Nothing decided is not consent | Everything not named below |
-| `shipped_default_unscoped` | An account is fail-closed; a caller with no account gets the shipped table | `code_map_indexing`, `subagents` |
-| `shipped_default` | Any caller gets the shipped table | `web_fetch` |
-
-So on a **fresh account** with an untouched gate table, `web_fetch` is on and
-`shell_execution` is off, and nothing on the Capabilities page explains why the
-two behave differently.
-
-**Why it is recorded rather than fixed.** Each resolution is individually
-justified and two of them are documented in the entries that introduced them —
-`web_fetch`'s is RAIKER-2021 (*an owner who turns web access off writes a row; an
-empty table on a fresh install is not a refusal*), and the code map's matches
-`RuntimeAuthority.check_capability_gate` exactly. Collapsing them is not a
-refactor:
-
-* Making everything `off` **tightens `web_fetch`** for the terminal client and
-  for a fresh account, and reintroduces the defect RAIKER-2021 closed.
-* Making everything fall back **loosens seven paths**, including three egress
-  ones, on any workspace whose owner has not yet visited Permissions.
-
-Both are owner-visible behaviour changes, and neither is an implementer's call.
-
-**What shipped first (FIXED-279).** The fork is a named table,
-`CAPABILITY_UNSET_RESOLUTION` in
-[`raiker/runtime/authority/admission.py`](../../raiker/runtime/authority/admission.py),
-read by the enforcing paths and by the model's context bundle — which used to be
-told `web_fetch: disabled` on an install where the tool would have fetched.
-
-**What shipped on 2026-08-30
-([FIXED-322](FIXED_ITEMS.md#fixed-322--permissions-said-off-about-a-capability-that-would-have-run)).**
-The table had not reached `get_effective_capability_gate`, which is what the gate
-*view* is built from — so **Permissions**, the one surface an owner decides from,
-still said *Web fetch* was **Off** while the tool would have run. The view now
-reports `unset_resolution` and `enforced_enabled` beside `state`, the page reads
-**On by default** where they disagree, the card names which rule applies, and the
-only action such a row offers is **Turn off**. Nothing was loosened or tightened;
-the behaviour is described rather than changed.
-
-**What is left, and it is the whole of the owner's question.** Whether the three
-resolutions should be one. Collapsing them is not a refactor — the two paragraphs
-above this say what each direction costs — and it stays an owner decision. It is
-no longer *invisible*, which was the part an implementer could fix.
+So fresh-account defaults expanded **selectively and explicitly**, through a
+versioned baseline written at account creation rather than through a change to
+what a missing row means: `language_intelligence` and `code_map_indexing` first,
+then `task_management_runtime`, `project_assignment_runtime` and `audit_export`.
+It runs at account creation only, never replaces a row an owner wrote, writes
+gates and nothing else so every one of them still asks, and cannot admit anything
+classified external, destructive or critical. Build is a preset rather than a
+default, because writing to somebody's files is a decision. The full record,
+including the Permissions copy that had to change with it, is in the closure
+entry.
 
 ---
 
@@ -897,99 +850,15 @@ written from memory is exactly the drift it exists to catch.
 
 ## BUG-250 — A shared live workspace carries state between specs
 
-**Severity: Low. Area: live test harness. Status: Open — reduced 2026-09-04.
-Raised 2026-08-30, and it is the first thing found by actually running a round
-against one workspace rather than re-seeding one per spec.**
+**Closed 2026-09-15 as
+[FIXED-549](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject).**
 
-**2026-09-15 — it bit again, and the third half is naming what a spec owns.**
-Running `priority-round-real-turn-live` against a workspace this round had
-already worked in, `Overnight research` resolved to **three** threads: the one
-under test and two left by the same spec's earlier attempts. The assertion did
-not fail wrongly — it refused to choose, which is Playwright's strict mode
-behaving correctly — but a spec that has to disambiguate its own subject is one
-that can pass on somebody else's evidence, which is the whole of this entry.
-
-The answer that spec took is cheap and general: **name the thing the round
-creates with a per-run suffix**, so its own leftovers cannot be mistaken for it.
-`const ROUTINE = \`Overnight research ${Date.now().toString(36)}\`` — no
-workspace reset, no skip, and re-runnable against a workspace with a year of
-history in it. It is worth applying to every spec that creates a named record,
-and that is the remaining work here.
-
-**2026-09-04 — both halves of the proposal below now exist.**
-
-**Half one: the specs that need their own instance say so.**
-`requireFirstRunWorkspace` in `hosted-provider.ts` reads the signal that *is*
-freshness rather than a proxy for it — a workspace with no owner offers "Confirm
-password" on the sign-in form, because the form is creating an account rather
-than unlocking one — and skips with a stated reason otherwise. Nothing is
-inferred from a file, a timestamp, or an environment variable a runner has to
-remember to set. It is on `bug-58-known-limits`, `workbench` and
-`review-first-run-honesty`; `wizard-workbench-composer` asks it once in a
-`beforeAll` instead, because its three tests share one owner and asking per test
-would answer *yes* once and *no* twice, skipping the two tests the file exists to
-run. `default-ollama` was re-read this pass and is **not** on the list: its
-assertions are that a runtime which is not installed is not named, which is as
-true on the fifth run as on the first.
-
-**Half two: three assertions were made re-runnable, and finding them was the
-point.** Each is recorded under
-[BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body)
-because that is where the conversion that surfaced it lives: a seeding step that
-was a comment, an assertion scoped to the page instead of to the inventory it was
-about, and a missing network precondition reported as a three-minute timeout on a
-click.
-
-**What is left.** The same work, spec by spec, for the twelve files
-[BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body)
-still names — each of which has to be re-run against a used workspace to be
-worth anything, which is what makes this slow rather than difficult.
-
-**Observed.** With
-[FIXED-327](FIXED_ITEMS.md#fixed-327--the-setup-wizard-trapped-every-live-spec-after-the-first-one)
-and [FIXED-328](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite)
-in, a round finally *can* share a workspace — and three specs then failed for a
-reason none of them is about. Every one is a spec asserting the state a first
-run leaves rather than the behaviour it is named for:
-
-* `bug-74-84-known-limits-live` asserted the readiness window still reads `5`,
-  the shipped default, in a spec that sets it to `30`. Fixed here: it asserts
-  the bound the control states and round-trips a value that differs from the
-  stored one, the same re-runnable shape the readiness chip beside it already
-  used.
-* `bug-74-84-known-limits-live` also clicked **Connect**/**Reconnect** on the
-  provider card. Reconnect moved into Details (BUG-208 slice E), so a card that
-  is already connected offers neither and the spec hung for its full ten-minute
-  timeout. Fixed here by going through `connectHostedProvider`, which knows both
-  routes.
-* `bug-58-known-limits-live` needs three seeded marker files and, in its own
-  preamble, a fresh workspace: two of its claims are about what a gate does
-  *before the owner has touched it*, and the run itself turns `web_fetch` on.
-  That one is correct as written and simply cannot share a workspace.
-
-**And one that is the product working as designed.** `read_file` was contained
-after three consecutive `not_found` failures from an earlier spec's turns, so a
-later spec's read batch met a paused tool. Containment is owner-visible,
-persistent and exactly what it should be; what is missing is that the harness
-has no notion of *resetting the workspace's earned state* between specs that
-need a clean one.
-
-**Proposed fix.** Not one flag. Two separate things, in this order:
-
-1. Mark the specs that genuinely require a first-run workspace, so a round can
-   run them in their own instance rather than discovering it by failing.
-   `bug-58-known-limits-live`, `default-ollama-live` and the three sign-in specs
-   BUG-248 names are the known set.
-2. For the rest, make each assertion re-runnable the way the two above now are:
-   assert the behaviour and the stated bounds, not the value a fresh install
-   happens to hold.
-
-**Why this is not a defect in the product.** Nothing here is Raiker behaving
-wrongly. It is the suite having been written, spec by spec, against a workspace
-that was always new — which is the assumption BUG-229, BUG-247 and BUG-248 have
-been peeling away one layer at a time, and this is the layer under them.
-
-**Required user-interface outcome.** None; harness-only.
+Both halves of the original proposal shipped on 2026-09-04 —
+`requireFirstRunWorkspace` for the specs that genuinely need their own instance,
+and re-runnable assertions for the rest. The third half was naming: a spec that
+creates **Overnight research** and asserts on **Overnight research** is asserting
+on its own leftovers too. `web/e2e/naming.ts` gives the round one rule and the
+seven specs that create a named record now use it.
 
 ---
 
@@ -1477,7 +1346,7 @@ the conversation.
 
 **Why it was left.** The ledger and the reader both exist; what is missing is
 the panel that shows them here, and Design's own workspace shape is still open
-under [VIS2-19](VISUAL_UI_UX_REVIEW_2026-09-06.md). Building a source list into
+under the Design-canvas row of the visual review. Building a source list into
 a panel that is about to be replaced by a canvas would be work done twice.
 
 **Proposed fix.** Render the research turn's sources as the same chips Chat
@@ -1561,6 +1430,14 @@ selected.
 
 ## BUG-287 — The image provider round trip is unverified against a real provider
 
+> **2026-09-15 — what the round trip now has to prove changed.**
+> [FIXED-542](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all)
+> found that `image_generation` had no key in `CAPABILITY_GATE_MAP`, so the
+> owner's switch reached no gate: the action was approval-required by policy and
+> nothing else. The row is there now, which means a live round has a second thing
+> to measure — that turning **Image generation** off actually refuses a
+> generation, not only that a key produces an image.
+
 **Severity: Medium. Area: Design / image runtime / live evidence. Raised while
 closing [BUG-277](#bug-277--design-is-a-one-shot-generator-so-most-of-its-composer-has-nothing-to-reach),
 2026-09-13.**
@@ -1600,38 +1477,17 @@ canvas as the chain they are — with the captures to prove it.
 
 ## BUG-288 — A turn can only answer in prose, and the components to answer otherwise already exist
 
-**Severity: Low. Area: Chat / typed output. Raised 2026-09-13 while closing out
-[`VISUAL_UI_UX_REVIEW_2026-09-06.md`](VISUAL_UI_UX_REVIEW_2026-09-06.md); it is
-VIS-19, the last implementation item in that review.**
+**Closed 2026-09-15 as
+[FIXED-545](FIXED_ITEMS.md#fixed-545--a-turn-could-only-answer-in-prose).**
+VIS-19, and the last implementation item in
+the visual UI/UX review of 2026-09-06, which was removed when it closed.
 
-**Observed.** Raiker's renderer already speaks a fair vocabulary — headings,
-fenced code with highlighting, lists, tables, citation chips, links
-(`web/src/lib/markdown.ts`) — and the product has purpose-built panes beside it
-(`CommandOutputPane`, `ReasoningBlock`, `FileInspector`'s table preview, Build's
-artifact pane). What it does not have is a *typed channel*: a model's answer is
-one Markdown string, and everything above is inferred from the characters in it.
-
-Two consequences. A turn cannot say *this part of my answer is a table of these
-columns* or *this is a series to plot* — only write something that happens to
-parse as a table. And there is no chart at all, so a turn whose answer is
-genuinely a shape has to describe the shape in words.
-
-**Why nothing was built for it here.** A chart component with no runtime
-producing chart data is the dead-button problem this product refuses everywhere
-else, and it is the same trap [BUG-277](#bug-277--design-is-a-one-shot-generator-so-most-of-its-composer-has-nothing-to-reach)
-set for Design: the interface cannot come first. The order is the same one that
-worked there — the channel, then the components that draw it.
-
-**Proposed fix.** A typed content part on a message, carried from the runtime
-through `MessageView` to the renderer, so a block declares what it is rather
-than being guessed at; the existing table and code renderers become the first
-two types it can name; a chart type third, with the series bounded and validated
-like every other action argument, because a payload a model proposes is a thing
-a model can propose.
-
-**Interface outcome that has to be true before this closes.** A turn answers
-with a table Raiker knows is a table — sortable, and legible to a screen reader
-as one — and with a chart, and neither is a string that happened to parse.
+The channel came first, as it did for Design: a turn declares a part with a
+` ```raiker:table ` or ` ```raiker:chart ` fence, the runtime validates it the
+way it validates any action argument — bounded, and refused rather than repaired
+— and the response carries typed parts the client renders directly. A real
+Anthropic turn answers with a sortable table and a bar chart that carries its own
+numbers.
 
 ---
 
@@ -1783,46 +1639,24 @@ chosen.
 
 ## BUG-293 — A side-effect capability's threat model and bypass test are not mechanically required
 
-**Severity: Medium. Area: Governance / release assurance. Raised 2026-09-13 as
-the remainder of [RR-AUTHORITY-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#what-blocks-a-public-first-release)
-after [FIXED-505](FIXED_ITEMS.md#fixed-505--the-four-capabilities-that-reach-furthest-into-an-owners-accounts-explained-themselves-least).**
+**Closed 2026-09-15 as
+[FIXED-542](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all).**
 
-**Observed.** [DEC-16](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-16--require-one-opaque-runtime-authority-context)
-step 8 asks for a CI registry check that every real side-effect capability has
-*an executor, a threat model, a Permissions description, an authority requirement
-and a negative bypass test.* Three of those five are now mechanical:
+`CAPABILITY_AUTHORITY` carries the two columns that had no home — what a
+capability would cost if it ran ungoverned, and what stands in the way — beside a
+per-capability negative bypass test, and CI asserts the table complete against
+`REAL_EXECUTOR_CAPABILITIES` in both directions. Permissions renders both, and a
+reach chip on the closed row.
 
-| Column | Enforced by |
-|---|---|
-| Executor | `REAL_EXECUTOR_CAPABILITIES` and the registry assertion in `raiker/runtime/executors/__init__.py` |
-| How it is reached | `tests/test_governance_entry_paths.py` against `CAPABILITY_ENTRY_PATHS` |
-| Permissions description | `tests/test_capability_permissions_copy.py` |
-| **Threat model** | **nothing** |
-| **Authority requirement** | **nothing** |
-| **Negative bypass test** | **nothing per capability** |
+Writing it out found `image_generation`: a real executor, an owner-facing switch,
+an activation requirement and a docstring promising the gate applied, with **no
+key in `CAPABILITY_GATE_MAP`** — so the gate check found nothing to check and the
+owner's off switch decided nothing. Measured, fixed, and kept closed by a general
+assertion.
 
-The bypass property is established *structurally* today — `route_action`'s callers
-are enumerated and asserted, and the agent gateway is constructed only by named
-surfaces — which is a genuine boundary and is not the same claim. It says no
-current path bypasses the chokepoint; it does not say each of the forty-eight
-capabilities has a test proving its own executor refuses an ungoverned call.
-
-**Root cause.** The capability registry grew a column at a time, each with its own
-home, and the two columns nobody has a home for are the two that need a sentence
-written per capability rather than a set intersection.
-
-**Proposed fix.** One `CAPABILITY_AUTHORITY` table beside `CAPABILITY_ENTRY_PATHS`
-carrying, per capability, its side-effect class (read / reversible / external /
-destructive / critical), one sentence on what goes wrong if it runs ungoverned,
-and the test that proves it will not. Assert completeness against
-`REAL_EXECUTOR_CAPABILITIES`, that the sentence is not a restatement of the
-capability name — the bar `test_an_inert_gate_says_what_really_governs_it`
-already sets for entry-path notes — and that every named test exists and is
-collected.
-
-**Interface outcome that has to be true before this closes.** Permissions can show
-an owner what a capability would cost if it were reached without governance, and
-a new executor cannot ship without answering that question.
+**What remains of [RR-AUTHORITY-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#what-blocks-a-public-first-release)**
+is its other half: the opaque runtime authority context DEC-16 asks for, which is
+a type/issuer boundary rather than a registry column. That is not this entry.
 
 ---
 
@@ -1971,35 +1805,15 @@ something it defaults to.
 
 ## BUG-298 — `policy_mutation` has a gate, a name in the router, and nothing that proposes one
 
-**Severity: Low. Area: Governance / policy. Raised 2026-09-14 while closing
-[BUG-297](#bug-297--three-authority-gates-were-never-classified-by-the-entry-path-audit).**
+**Closed 2026-09-15 as
+[FIXED-543](FIXED_ITEMS.md#fixed-543--a-routed-gate-nothing-could-propose).**
 
-**Observed.** Tracing the three untraced authority gates found that two are real
-— `admin_mutation` and `role_mutation` are routed by the CLI's identity commands
-and their gates decide whether the mutation is recorded — and the third reaches
-nothing. `CAPABILITY_GATE_MAP` names `policy_mutation` so a proposal would be
-routed if one existed; no surface, tool or approval constructs the action.
-
-Policy is changed by editing the policy configuration, which the runtime *reads*.
-So the one kind of change an owner might most want a governed record of — a
-change to the rules themselves — is the one that does not produce one.
-
-This is not a hole in the sense of something running ungoverned: the policy file
-is process configuration, on the same footing as the model egress allowlist, and
-deliberately not editable from a browser session. It is a gap in the *record*: a
-policy edit leaves no governed action, no approval and no audit row of its own,
-and `policy_mutation` is the gate that was presumably meant to carry one.
-
-It is filed rather than fixed because the answer is a design decision rather than
-a repair. Either policy edits become governed actions — which means a surface, an
-approval path and a threat model for changing the rules from inside the product —
-or the capability is removed and the configuration-file boundary is stated
-outright as the answer. Both are defensible; a routed gate nothing proposes is
-not.
-
-**Interface outcome that has to be true before this closes.** Either a policy
-change is a governed action with a record, or Raiker says plainly that policy is
-process configuration and `policy_mutation` is gone from the gate map with it.
+The owner's decision was the first of the two the entry named: state the
+boundary and remove the gate. Policy is process configuration the runtime reads,
+on the same footing as the model egress allowlist and deliberately not editable
+from a browser session; a switch over a change nothing can construct was a switch
+over nothing. Two tests hold the name out rather than merely not mentioning it,
+so re-adding it is a decision somebody makes.
 
 ---
 
@@ -2040,3 +1854,41 @@ depend on it: one promises a place to look and the other promises a link.
 address that shows its attempts in order — each with its outcome, the approval it
 waited on, the retry that followed and the evidence it produced — and the rows on
 Home and in Build link to it.
+
+---
+
+## BUG-300 — A typed answer is typed in Chat and Build, and is characters everywhere else
+
+**Severity: Low. Area: Chat / typed output / export. Raised 2026-09-15 while
+closing [BUG-288](#bug-288--a-turn-can-only-answer-in-prose-and-the-components-to-answer-otherwise-already-exist).**
+
+**Observed.** `AgentResponse.content_parts` reaches the two surfaces that render
+a live turn. Three places read the answer as one string and still do:
+
+* **Export conversation** (`TranscriptExportMessage` carries `role`, `text`,
+  `timestamp`, `status`). An exported HTML, Markdown or PDF transcript of a turn
+  that declared a table shows the raw ` ```raiker:table ` fence with its JSON,
+  which is honest — the fence is what the model wrote — and is not the table the
+  owner was looking at when they pressed Export.
+* **Threads and Observability → Sessions**, which reopen a stored turn from the
+  event log rather than from a live response.
+* **Read aloud**, which speaks the answer text and would read a JSON payload
+  aloud rather than skipping it the way it already skips fenced-code bodies.
+
+**Root cause.** The channel was built where a turn is produced. `content_parts`
+is derived in `AgentResponse.__post_init__`, so every response carries it — but
+the three paths above do not read a response, they read a persisted message.
+
+**Why it is filed rather than fixed.** The splitter is pure and deterministic
+(`content_parts(message)`), so each of the three can obtain the parts from the
+text it already holds, and none of them needs a schema change. What each needs is
+its own decision about what a *table* means in its own medium: a real `<table>`
+in an HTML export, a GFM table in a Markdown one, a page-width table in a PDF,
+and — for read aloud — a stated summary rather than a payload. Those are four
+different answers, and doing them as one change would give the same answer to
+four different questions.
+
+**Interface outcome that has to be true before this closes.** An exported
+conversation shows a table where the conversation showed a table, a reopened
+thread does the same, and read aloud says what a declared block was rather than
+reading it out.

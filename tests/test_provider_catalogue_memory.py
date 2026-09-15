@@ -1,14 +1,14 @@
 """The catalogue a provider published, remembered between listings.
 
-GLOBAL-MODEL-01 and GLOBAL-MODEL-08. A provider's catalogue was probed on
+A provider's catalogue was probed on
 demand and never written down, so it existed exactly as long as the HTTP
 response that carried it. Two consequences followed, and both were read by
 owners as Raiker losing their models:
 
-* a model reached a composer only by being "kept available", which made
+* A model reached a composer only by being "kept available", which made
   curation a prerequisite for visibility rather than the convenience the plan
   describes;
-* a provider that was briefly unreachable emptied every picker, because the one
+* A provider that was briefly unreachable emptied every picker, because the one
   copy of its catalogue was the one in flight.
 
 These tests are about the second, and about the honesty constraint on fixing

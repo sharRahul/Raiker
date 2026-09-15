@@ -77,7 +77,7 @@ def _get_active_owner_principals(store: SQLiteStore) -> list[dict[str, Any]]:
 
 def _pre_ack_gov_caps(store: SQLiteStore, principal_id: str, now: str) -> None:
     with store.connect() as connection:
-        for cap in ("admin_mutation", "policy_mutation", "role_mutation"):
+        for cap in ("admin_mutation", "role_mutation"):
             connection.execute(
                 "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
                 (cap, principal_id, now, "system_bootstrap"),
@@ -125,7 +125,7 @@ def bootstrap_owner(
     principal_id = f"principal_{user_id}"
     # Seed global bootstrap gates before scoped controls are copied into the
     # initial owner. Missing scoped controls remain fail-closed.
-    for cap in ("admin_mutation", "role_mutation", "policy_mutation"):
+    for cap in ("admin_mutation", "role_mutation"):
         store.upsert_capability_gate_state({
             "capability": cap,
             "state": "enabled_runtime",

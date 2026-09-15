@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * VIS-08 — governance, summarized to one control, expanded on request.
+   * Governance, summarized to one control, expanded on request.
    *
    * Governance is Raiker's strongest differentiator and the composer was the
    * place it cost the most. Chat and Build each carried the approval-mode
@@ -19,7 +19,7 @@
    * is removed and nothing is one click further away than it was: the chip is a
    * click, and so was opening the approval menu.
    *
-   * VIS2-07 — the chip used to open with the constant word "Protected", so a
+   * the chip used to open with the constant word "Protected", so a
    * workspace set to approve everything automatically read
    *
    *     Protected · Local · Auto-approve
@@ -117,7 +117,7 @@
     return "Declines unattended";
   });
 
-  // VIS-15 — the resting state is neutral. This turns amber only for a posture
+  // The resting state is neutral. This turns amber only for a posture
   // that is genuinely less careful than the default, so the colour means
   // something the one time it appears.
   const relaxed = $derived(mode === "auto" || mode === "skip");
@@ -185,7 +185,7 @@
         </div>
       {/if}
 
-      <!-- VIS2-07 — what holds in *every* posture, named rather than summarised
+      <!-- What holds in *every* posture, named rather than summarised
            as an adjective on the chip. This is the half of "Protected" that was
            worth keeping: it says which protections do not depend on the
            approval mode, so relaxing that mode does not read as switching

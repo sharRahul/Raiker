@@ -1,12 +1,12 @@
 /**
- * VIS2-15 and VIS2-14 — the two claims that only a real browser can settle.
+ * the large-display classes and the dark composition — the two claims that only a real browser can settle.
  *
- * VIS2-15 says a large monitor gives a *spatial* surface more room and gives
+ * the large-display classes says a large monitor gives a *spatial* surface more room and gives
  * prose and controls nothing. That is a statement about computed widths at a
  * viewport size, so it is checked at 3840×2160 rather than argued from the
  * stylesheet.
  *
- * VIS2-14 says the two themes are composed separately without redesigning the
+ * the dark composition says the two themes are composed separately without redesigning the
  * palette. The composition tokens are read back under each theme, and the
  * Design canvas — the surface the review names — is captured in both.
  */

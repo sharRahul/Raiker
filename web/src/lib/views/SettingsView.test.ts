@@ -52,7 +52,7 @@ function stubApi(options: { failPut?: boolean } = {}) {
 
 describe("supported-preferences settings", () => {
   it("separates the three subjects into labelled groups", async () => {
-    // VIS-17 — "Personal" held six of the ten sections, so it was the flat list
+    // "Personal" held six of the ten sections, so it was the flat list
     // the grouping was meant to break up: appearance sat beside sign-in and
     // beside the account itself. Three groups, each with one subject.
     stubApi();

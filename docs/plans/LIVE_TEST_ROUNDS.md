@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-15 (second) | Targeted | `docs/screenshots/` (seven captures, no prefix) | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | Eight scenarios on a workspace reset for the round: the two authority columns a permission could not answer before, a fresh account's capability baseline and the Build preset, a **real model answering with a declared table and chart**, four presentation rows, and `policy_mutation` proved absent. One product defect found by the work and fixed in it — the Permissions posture note still said every capability starts off — and one model behaviour that changed the system prompt rather than the test |
 | 2026-09-15 | Targeted | `2026-09-15-task-history/` | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | Three scenarios unrun since 2026-09-03 finally run; a task's attempts read at an address the task did not have — the run the scheduler claimed, how it settled, and the three surfaces that now link to it; plus two Settings rows that were saying more than they governed, and the first generation of the `docs/screenshots/pages/` catalogue — 176 files, which caught a composer 385px below the fold |
 | 2026-09-14 (second) | Targeted | `2026-09-14-simplification/` | Anthropic, the same eighth key — a catalogue, a model kept offered, a model chosen for the turn, and an answer | Nine owner-facing changes of the simplification pass, driven through the product's own controls on a workspace that started empty, ending with **zero uncaught console errors** on a host that can reach neither `huggingface.co` nor `openrouter.ai` |
 | 2026-09-14 | Targeted | `2026-09-14-permissions-overhaul/` | Anthropic, an eighth key entered through the Connect dialog — the first of the eight that authenticates and lists models | The rebuilt Permissions page measured on the running product, the §18.3 rows that closed with it, and three live-test helpers that had been waiting on strings the product stopped printing |
@@ -71,6 +72,65 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-09-15 (second) — What a switch would cost, and a turn that answers in shapes
+
+**Tier: Targeted. Build: production `npm run build`. Provider: Anthropic
+(`claude-haiku-4-5-20251001`), the key entered through the product's own Connect
+dialog. Owner: the shared `OWNER_CREDENTIALS`. Workspace: reset for the round
+(`scripts/reset_live_workspace.py`), because four of the eight scenarios are
+about what a **new account** does. Spec:
+`web/e2e/round-2026-09-15-typed-and-authority-live.spec.ts`. Eight scenarios,
+all passing, **zero uncaught console errors**.**
+
+**What it proved.**
+
+* **A permission says what it would cost.** *Shell commands* carries a **Cannot
+  be undone** chip on its closed row and, opened, answers *If it ran without
+  you* and *What stands in the way* — from the same runtime table CI asserts the
+  negative bypass test against (FIXED-542). `web_fetch` reads **Leaves this
+  machine** and names what the request itself discloses.
+  `permissions-capability-authority.png`.
+* **A new account can read its owner's repository.** The five baseline
+  capabilities come back `enabled_runtime` from `/api/capability-gates` on an
+  account created minutes earlier; `shell_execution` and `git_push_execution` do
+  not. The Build preset lists its four before acting, disappears once they are
+  on, and leaves all four in `ask`. `permissions-build-preset.png`.
+* **`policy_mutation` is gone from the product, not hidden in it.** Absent from
+  the gate list; `admin_mutation` and `role_mutation`, which the CLI's identity
+  commands do route, are present.
+* **A real turn answered with shapes.** Asked for three cities and their
+  populations *in this conversation*, `claude-haiku-4-5-20251001` used the
+  declared channel: a real `<table>` with a caption and `3 rows`, sorting to
+  *sorted by City, ascending* on one click, and a bar chart with **The numbers
+  behind this chart** beneath it. `chat-typed-table-and-chart.png`.
+* **Four presentation rows, each where an owner meets it.** General's teaching
+  gone and the weather location moved; Personalisation's density and typeface one
+  fold away with Theme in front; Activity's raw forms behind **Filters and
+  export** with the scope strip that never folds; Home's start row above the
+  freshness strip — asserted geometrically rather than by reading the markup.
+
+**What it found.**
+
+* **The Permissions posture note had stopped being true.** It read *"Capabilities
+  with a real executor start **off** on this account until you turn them on"*,
+  and five of them no longer do. A page saying off about something that is on is
+  the exact defect Permissions exists to prevent, so the sentence was fixed in
+  the round: it says *most*, names the exception, and says the exception still
+  asks.
+* **The typed channel competes with `create_document`, and lost.** Asked for
+  "this as a table and a bar chart", the first run called `create_document` and
+  wrote a file — the right tool for a file, the wrong one for an answer, with
+  nothing having told it which question it was being asked. Fixed in the system
+  prompt rather than in the test: these blocks are how you answer *in the
+  conversation*, and `create_document` is for a file the user asked to keep.
+  The re-run passed.
+* **Two harness facts worth recording.** This host's Playwright ships a Chromium
+  whose build number does not match the runner's, so the round is driven with
+  `PLAYWRIGHT_CHROMIUM_EXECUTABLE` — the config has supported that since it was
+  written. And a settings text field commits on `change`, which needs a blur, so
+  a spec that fills a field and immediately presses **Save** is waiting for a
+  control that has not rendered yet; two specs now press Tab first.
 
 ## 2026-09-15 — A task, and everywhere it had already been promised
 

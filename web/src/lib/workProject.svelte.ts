@@ -1,7 +1,7 @@
 /**
  * The Project the owner is working in, shared by Chat, Build and Design.
  *
- * VIS2-11 / COMPOSER-11 — *"switching Chat → Build → Design should retain
+ * COMPOSER-11 — *"switching Chat → Build → Design should retain
  * Project identity"*. Before this, each surface answered that question
  * separately: Build kept a stored id, Chat kept whichever project the current
  * conversation happened to be filed under, and Design had none at all. So

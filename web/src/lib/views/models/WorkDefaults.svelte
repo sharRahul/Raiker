@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * MODEL-11 — Default, Selected, Effective and Fallback, told apart.
+   * Default, Selected, Effective and Fallback, told apart.
    *
    * The page called all four "active". That single word is why the review could
    * not describe the bug precisely and why an owner could not either: a model
@@ -18,7 +18,7 @@
    *   Fallback   the ordered list the runtime tries when the first choice
    *              cannot serve. Edited below this table, not in it.
    *
-   * Every fact comes from `/api/model-decisions` (MODEL-01), so this table and
+   * Every fact comes from `/api/model-decisions`, so this table and
    * the composer picker cannot disagree; before that contract they were two
    * separate calculations over the same five stores.
    */

@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * MODEL-04 / MODEL-15 — every model the owner has, as one inventory.
+   * Every model the owner has, as one inventory.
    *
    * The page listed models inside provider cards, which put the same model in a
    * different visual container depending on who serves it: a local GGUF was a
@@ -17,12 +17,12 @@
    *     selected and ready          nothing
    *
    * Everything else — details, connection test, the three per-surface defaults,
-   * provider configuration, stop — is in the overflow. That is MODEL-15's rule,
+   * provider configuration, stop — is in the overflow. That is the one-primary-action rule,
    * and it is a rule about attention rather than about tidiness: five controls
    * repeated down forty rows is two hundred controls, and the owner has to read
    * all of them to find the one that changes what they came to change.
    *
-   * The row states come from the MODEL-01 contract, so "selected" here is the
+   * The row states come from the model-decision contract, so "selected" here is the
    * same fact the composer picker draws and not a second calculation.
    */
   import Icon from "../../components/Icon.svelte";
@@ -235,7 +235,7 @@
           </div>
 
           <div class="marks">
-            <!-- VIS2-13 — one primary status token per row, and at most one
+            <!-- One primary status token per row, and at most one
                  contextual one. "Selected" and the surface defaults are the
                  contextual half; readiness is the primary. -->
             <span class="state" data-tone={rowState.tone}>{rowState.label}</span>
@@ -381,7 +381,7 @@
     flex-wrap: wrap;
     justify-content: flex-end;
   }
-  /* VIS2-16 — the ordinary state is plain metadata. Only a row that wants
+  /* The ordinary state is plain metadata. Only a row that wants
      something from the owner is toned. */
   .state {
     font-size: var(--text-2xs);

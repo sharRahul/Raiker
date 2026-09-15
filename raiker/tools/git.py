@@ -265,7 +265,7 @@ def working_tree_changes(root: Path) -> list[dict[str, str]]:
     """Every uncommitted change in *root*, as the commit proposal sees them.
 
     A public name for :func:`_porcelain`, added when Build's artifact pane
-    needed the same list (VIS2-12). It delegates rather than reimplementing for
+    needed the same list (the Build artifact pane). It delegates rather than reimplementing for
     one reason: the pane that shows "Changes" and the commit that records them
     have to describe one change set. A second `git status` written for the
     browser could disagree with the proposal, and nothing in the interface would

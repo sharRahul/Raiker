@@ -6,7 +6,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
-  import Markdown from "../components/Markdown.svelte";
+  import AnswerParts from "../components/AnswerParts.svelte";
   import FileInspector from "../components/FileInspector.svelte";
   import RewindPanel from "../components/RewindPanel.svelte";
   import PostureControl from "../components/PostureControl.svelte";
@@ -125,7 +125,7 @@
   }
 
 
-  /** VIS2-21 — what this mode is about, and how tightly it packs it. */
+  /** What this mode is about, and how tightly it packs it. */
   const surface = workSurface("chat");
 
   let {
@@ -190,7 +190,7 @@
   // estimate until the server has something real to report.
   let contextUsage = $state<ContextUsage | null>(null);
   /**
-   * VIS2-11 — the project this conversation is filed under.
+   * The project this conversation is filed under.
    *
    * A conversation that already exists owns its own answer, and changing it
    * moves the session. A conversation that does not exist yet has no answer of
@@ -272,7 +272,7 @@
   let modelProfile = $state("");
   let model = $state("");
   /**
-   * MODEL-01 — the authoritative answer for this surface.
+   * The authoritative answer for this surface.
    *
    * `null` until the first read, and `null` again if that read fails: the
    * composer renders identically without it, minus the line explaining a
@@ -387,7 +387,7 @@
     "schedule",
     "use-memory",
   ]);
-  // WEB-04/WEB-07 — the readiness half comes from the shared snapshot, so a
+  // The readiness half comes from the shared snapshot, so a
   // search provider configured on another page reaches this still-mounted view
   // without a reload, and the menu never prints `Ready` for a call the runtime
   // is about to refuse.
@@ -852,7 +852,7 @@
       modelProfile = remembered.profileId;
       model = remembered.model;
     });
-    // MODEL-01 — the authoritative decision for this surface: what is selected,
+    // The authoritative decision for this surface: what is selected,
     // what will actually run, and why they differ when they do. The picker
     // needs it to keep an unavailable selection visible instead of quietly
     // re-rendering as the fallback.
@@ -1822,7 +1822,7 @@
 <!-- One detail panel at a time: the inspector and the rewind preflight share
      the right-hand column, so opening either never stacks a second panel under
      the composer where nobody looks for it. -->
-<!-- VIS2-21 — the Work contract, declared where it can be seen. The mode and
+<!-- The Work contract, declared where it can be seen. The mode and
      its density are on the shell itself, so what this surface is *about* and how
      tightly it packs are readable from the page rather than asserted in a
      comment; `workSurface.ts` is the one place either can change. -->
@@ -2046,8 +2046,12 @@
             <div class="message-bubble message-bubble-raiker">
               <!-- C6 — `[s1]` becomes a chip only when this turn's ledger has an
                    s1. A marker the model invented stays the characters it is. -->
-              <Markdown
+              <!-- BUG-288 — the answer's declared parts, when it declared
+                   any. A turn that declared none renders exactly as before,
+                   through the same Markdown component. -->
+              <AnswerParts
                 text={answer}
+                parts={turn.response?.content_parts ?? []}
                 citations={renderableCitations(turnSourceList)}
                 oncite={(sourceId) => openSourceById(turn.response?.turn_id ?? "", sourceId, answer)}
               />
@@ -2560,7 +2564,7 @@
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    /* VIS2-21 — density, from the Work contract rather than from this file. A
+    /* Density, from the Work contract rather than from this file. A
        transcript is read in order and wants air between its turns. */
     gap: var(--surface-gap, var(--space-4));
     padding-bottom: var(--space-4);

@@ -1,5 +1,5 @@
 /**
- * VIS2-17 — the overlay ladder, checked where stacking actually happens.
+ * The overlay ladder, checked where stacking actually happens.
  *
  * A z-index is only ever true in a browser: a value that reads correctly in a
  * stylesheet still loses to a sibling in another stacking context. The rubric

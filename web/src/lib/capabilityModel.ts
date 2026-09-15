@@ -210,6 +210,69 @@ export function unsetResolutionNote(gate: CapabilityGate): string {
   return "";
 }
 
+// ── The Build setup preset (BUG-239) ─────────────────────────────────────────
+//
+// The other half of the capability-defaults decision. A fresh account is seeded
+// with the local, reversible baseline the runtime writes at account creation —
+// it never includes anything that writes to the owner's files. Turning Build on
+// means four switches, and finding four rows in a list of sixty-seven is how an
+// owner ends up either giving up or turning on more than they meant to.
+//
+// It is a preset and not a default for one reason: writing to somebody's files
+// is a decision, so it is offered, shown in full, and taken once — rather than
+// arriving with the account. It drives the same per-capability route the row's
+// own **Turn on** uses, so there is no second, weaker path to enabling a
+// capability, and it changes no decision mode: every one of these still asks.
+
+/** The four capabilities a governed coding loop needs, and what each one is. */
+export const BUILD_PRESET: readonly { capability: string; what: string }[] = [
+  { capability: "file_write_execution", what: "Write and edit files in the workspace" },
+  { capability: "patch_apply_execution", what: "Apply a reviewed patch" },
+  { capability: "git_write_execution", what: "Branch and commit locally" },
+  { capability: "checkpoint_restore_execution", what: "Rewind the workspace to a checkpoint" },
+];
+
+/** True when every capability in the preset is already available. */
+export function buildPresetSatisfied(gates: CapabilityGate[]): boolean {
+  const byName = new Map(gates.map((g) => [g.capability, g]));
+  return BUILD_PRESET.every((row) => {
+    const gate = byName.get(row.capability);
+    return gate !== undefined && isAvailable(gate);
+  });
+}
+
+/** The preset rows that are not on yet — what pressing the button would change. */
+export function buildPresetPending(gates: CapabilityGate[]): CapabilityGate[] {
+  const byName = new Map(gates.map((g) => [g.capability, g]));
+  return BUILD_PRESET.map((row) => byName.get(row.capability)).filter(
+    (gate): gate is CapabilityGate => gate !== undefined && !isAvailable(gate),
+  );
+}
+
+// ── How far the side effect reaches (BUG-293) ────────────────────────────────
+//
+// The runtime classifies every capability that can actually run, and the page
+// renders the class rather than inventing one: a chip on the closed row, so a
+// list of sixty-seven switches can be read for *reach* and not only for on/off.
+// A capability with no real executor has no class, and the chip is absent —
+// which is the honest answer, not a missing one.
+
+/** The owner-facing name for a side-effect class, and how urgent it looks. */
+const SIDE_EFFECT_COPY: Record<string, { label: string; tone: string }> = {
+  read: { label: "Reads", tone: "calm" },
+  reversible: { label: "Changes", tone: "calm" },
+  external: { label: "Leaves this machine", tone: "warn" },
+  destructive: { label: "Cannot be undone", tone: "warn" },
+  critical: { label: "Changes what Raiker may do", tone: "hot" },
+};
+
+/** `{ label, tone }` for the gate's side-effect class, or `null` when it has none. */
+export function sideEffectChip(
+  gate: CapabilityGate,
+): { label: string; tone: string } | null {
+  return SIDE_EFFECT_COPY[gate.side_effect ?? ""] ?? null;
+}
+
 // ── The delegated-authority summary ──────────────────────────────────────────
 // The matrix at the top of Permissions shows eight rows out of sixty-seven, and
 // it used to show the *alphabetically first* eight — `admin_mutation` through
@@ -378,7 +441,6 @@ const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   scheduled_routines: "Automation",
   approval_execution_relay: "Automation",
   admin_mutation: "Automation",
-  policy_mutation: "Automation",
   role_mutation: "Automation",
 };
 
@@ -661,7 +723,6 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
     description: "Execute an action after approval (disabled: approvals stay metadata-only).",
   },
   admin_mutation: { label: "Admin mutations", description: "Administrative changes to runtime records." },
-  policy_mutation: { label: "Policy mutations", description: "Change policy rules (owner-only, off by default)." },
   role_mutation: { label: "Role mutations", description: "Grant or revoke principal roles (human-only)." },
   // Models.
   model_provider_runtime: {

@@ -215,7 +215,7 @@ async function renderBuildWithProject(props: Record<string, unknown> = {}) {
 
 describe("Build's artifact zone", () => {
   it("opens the governed terminal beside the conversation, not under it", async () => {
-    // VIS-10 — the third zone. Expanded, the terminal used to stack between the
+    // The third zone. Expanded, the terminal used to stack between the
     // transcript and the composer and take the conversation's height in the
     // same column, so the two things the owner reads at once competed for one
     // column of room.
@@ -249,7 +249,7 @@ describe("Build's artifact zone", () => {
   });
 
   it("is one pane over four views, not two panels sharing a column", async () => {
-    // VIS2-12 — the column used to mean "whatever you last switched on".
+    // The column used to mean "whatever you last switched on".
     stubFetch(baseRoutes());
     await renderBuildWithProject();
 
@@ -341,7 +341,7 @@ describe("Build's artifact zone", () => {
     const listed = await screen.findByRole("list", { name: "Changed files" });
     expect(within(listed).getByText("src/main.ts")).toBeInTheDocument();
     expect(within(listed).getByText("NEW.md")).toBeInTheDocument();
-    // VIS2-13 — one token, and only because it is not the ordinary state.
+    // One token, and only because it is not the ordinary state.
     expect(within(tabs).getByRole("tab", { name: /^Changes/ })).toHaveTextContent("2");
   });
 
@@ -406,7 +406,7 @@ describe("Build composer modes", () => {
     await screen.findByLabelText("Describe the change");
     expect(screen.queryByRole("group", { name: "Chat or Build" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Model context capacity")).not.toBeInTheDocument();
-    // COMPOSER-12 — VIS-08 reduced two permanent governance surfaces to one
+    // COMPOSER-12 — the active-state rule reduced two permanent governance surfaces to one
     // chip; this removes the chip from the resting state as well. At the
     // careful default the composer says nothing about policy, because nothing
     // about policy is what the owner is doing. The posture stays inspectable

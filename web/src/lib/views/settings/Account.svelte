@@ -33,6 +33,23 @@
    * happening, and the form stays on screen, because the owner watching an
    * irreversible operation finish is the honest version of this moment.
    */
+  /*
+   * REM-SET-ACCOUNT — and the half of it that was still open: a lost response.
+   *
+   * A request that never came back is not a request that failed. The delete had
+   * one error path for both, so an owner whose connection dropped after the
+   * server had already destroyed the account was told "Could not delete
+   * account" and left looking at a Retry for something that had happened. On an
+   * irreversible operation that is the worst possible thing to be wrong about.
+   *
+   * So a refusal the server actually sent is reported as one, and anything else
+   * is *asked about* before it is described: `bootstrap-status` answers
+   * `can_register: true` only when no account exists, which is the server's own
+   * statement that the deletion landed. If the probe cannot reach the host
+   * either, the honest answer is that it is unknown — never a retry, because a
+   * second delete of an account that is already gone is not the harmless thing
+   * a Retry button implies.
+   */
   async function deleteAccount() {
     if (busy) return;
     busy = true;
@@ -46,11 +63,32 @@
       setToken(null);
       window.location.reload();
     } catch (e) {
-      setToken(control);
-      notice = {
-        kind: "error",
-        text: e instanceof ApiError ? `Could not delete account (${e.status}).` : "Could not delete account.",
-      };
+      // A password the server rejected, or a request it refused: definite, and
+      // the account is still here. Restore the session and say so.
+      if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+        setToken(control);
+        notice = { kind: "error", text: `Could not delete account (${e.status}).` };
+        return;
+      }
+      setToken(null);
+      try {
+        const { can_register } = await auth.bootstrapStatus();
+        if (can_register) {
+          // It landed. Nothing here is the owner's account any more.
+          window.location.reload();
+          return;
+        }
+        setToken(control);
+        notice = { kind: "error", text: "Could not delete account. It is still here." };
+      } catch {
+        setToken(control);
+        notice = {
+          kind: "error",
+          text:
+            "Raiker could not be reached, so whether the account was deleted is " +
+            "unknown. Reload this page to find out before trying again.",
+        };
+      }
     } finally {
       busy = false;
     }

@@ -89,7 +89,7 @@ def main() -> int:
         "shell_execution", "process_execution",
         "file_write_execution", "patch_apply_execution",
         "memory_write_execution", "memory_forget_execution",
-        "admin_mutation", "policy_mutation", "role_mutation",
+        "admin_mutation", "role_mutation",
         "email_runtime", "finance_runtime", "investment_runtime",
         "medical_runtime", "cctv_runtime", "plugin_execution_cap",
         "plugin_install", "plugin_revocation_cap", "plugin_runtime_cap",
@@ -259,7 +259,7 @@ def main() -> int:
     except Exception as exc:  # pragma: no cover - import guard
         REAL_EXECUTOR_CAPABILITIES = frozenset()
         errors.append(f"cannot_import_real_executor_capabilities:{exc}")
-    # reminder/calendar/email are local-only Tier-6 executors (no network / no
+    # Reminder/calendar/email are local-only Tier-6 executors (no network / no
     # external delivery); the remaining sensitive domains stay executor-less.
     must_not_have_default_executor = {
         "finance_runtime", "investment_runtime",

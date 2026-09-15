@@ -1,4 +1,4 @@
-// VIS2-10 / VIS2-18 — the overview is exception-led, and never invents a state.
+// The overview is exception-led, and never invents a state.
 import { describe, expect, it } from "vitest";
 import {
   extensionExceptions,

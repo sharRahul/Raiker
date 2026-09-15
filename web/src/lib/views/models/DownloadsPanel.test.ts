@@ -13,7 +13,7 @@ afterEach(() => {
 /**
  * Press "Delete partial files" wherever this job's state put it.
  *
- * MODEL-10/MODEL-15 give a job row one visible action: Cancel while it runs,
+ * A job row has one visible action: Cancel while it runs,
  * Retry once it has failed in a way that can be started again. Deleting the
  * bytes a job left behind is the visible action only when it is the *recovery*
  * task — a job that cannot be retried — and otherwise sits in the overflow

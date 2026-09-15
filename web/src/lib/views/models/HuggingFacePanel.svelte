@@ -141,7 +141,7 @@
   let conversionDone = $state(false);
 
   /**
-   * MODEL-09 — where the owner is in the six-step flow.
+   * Where the owner is in the six-step flow.
    *
    * Derived from the state above rather than counted alongside it. A counter
    * kept on the side is a second source of truth about the flow, and it will
@@ -164,7 +164,7 @@
     }),
   );
 
-  /** MODEL-09 — the token control is for gated repositories, not for everyone. */
+  /** The token control is for gated repositories, not for everyone. */
   const selectedResult = $derived(
     results.find((item) => item.repo_id === selectedRepo) ?? null,
   );
@@ -207,7 +207,7 @@
     if (item.state === "complete") {
       stopFollowing();
       downloadingOperationId = null;
-      // MODEL-09 — the rail advances off the same fact the notice below is
+      // The rail advances off the same fact the notice below is
       // written from, so the step shown and the sentence read cannot disagree.
       downloadComplete = true;
       notice =
@@ -341,7 +341,7 @@
     </div>
   </section>
 
-  <!-- MODEL-09 — the flow, said out loud. Six controls on one screen with
+  <!-- The flow, said out loud. Six controls on one screen with
        nothing naming the sequence is what made this panel hard to start: the
        rail does not hide anything, it says which of them is your next move. -->
   <ol class="step-rail" aria-label="Adding a local model">
@@ -367,7 +367,7 @@
       onclick={() => void chooseRepo("nomic-ai/nomic-embed-text-v1.5-GGUF")}
     >Review variants</button>
   </section>
-  <!-- MODEL-09 — this appears when the repository in front of the owner
+  <!-- This appears when the repository in front of the owner
        actually needs it. As a permanent hero button beside the search box it
        told every owner that signing in to Hugging Face was a normal part of
        downloading a public model, which it is not. -->
@@ -605,7 +605,7 @@
 </div>
 
 <style>
-  /* MODEL-09 — a rail, not a wizard. It states the sequence and where the owner
+  /* A rail, not a wizard. It states the sequence and where the owner
      is in it; every control stays reachable, which is what keeps a person who
      already knows the flow from having to click through it. */
   .step-rail {

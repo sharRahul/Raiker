@@ -37,7 +37,7 @@ export function readinessForProfile(profile: ModelProfile): ModelReadinessView {
  * The readiness of whatever the surface currently has selected.
  *
  * The no-selection case is two different situations, and saying the same thing
- * about both became wrong in one of them the moment GLOBAL-MODEL-06 landed. An
+ * about both became wrong in one of them the moment the shared catalogue landed. An
  * instance with no provider connected genuinely has no model to run; an
  * instance whose provider is connected has a catalogue full of them and is
  * missing only a choice. Sending the second owner to the Models page to

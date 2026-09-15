@@ -23,6 +23,7 @@
     capabilityLabel,
     isAvailable,
     isOnByDefault,
+    sideEffectChip,
     unsetResolutionNote,
     type DecisionMode,
   } from "../capabilityModel";
@@ -79,6 +80,15 @@
    * whole content rather than a caveat under a control that should not exist.
    */
   const why = $derived(unsetResolutionNote(gate));
+  /**
+   * BUG-293 — how far this capability's side effect reaches.
+   *
+   * On the closed row, because it is the fact that decides how much attention a
+   * switch deserves and it does not change when the switch does. A row with no
+   * chip is a capability with no real executor: nothing to reach, so nothing to
+   * classify.
+   */
+  const reach = $derived(sideEffectChip(gate));
 </script>
 
 <div class="cap card" class:open>
@@ -108,6 +118,12 @@
              leaving the summary to contradict a chip beside it. -->
         {#if isOnByDefault(gate)}
           <span class="cap-reality cap-default-on">On by default</span>
+        {/if}
+        <!-- BUG-293 — reach, not state. "Leaves this machine" is true of
+             `web_fetch` whether it is on or off, and it is what tells an owner
+             which of sixty-seven rows to read first. -->
+        {#if reach}
+          <span class="cap-reach" data-tone={reach.tone}>{reach.label}</span>
         {/if}
       </span>
       <!-- Availability and behaviour, on the closed row: a permission list that
@@ -161,6 +177,23 @@
                than by dropping the row's behaviour half in silence. -->
           <dd>{behaviourCopy(gate.decision_mode).hint}</dd>
         </div>
+        <!-- BUG-293 / RR-AUTHORITY-01 — the two questions a switch could not
+             answer before. The threat model and the authority requirement come
+             from the same runtime table the negative bypass test is asserted
+             against, so what an owner reads here and what CI proves are one
+             record rather than two descriptions of it. -->
+        {#if gate.ungoverned_consequence}
+          <div>
+            <dt>If it ran without you</dt>
+            <dd>{gate.ungoverned_consequence}</dd>
+          </div>
+        {/if}
+        {#if gate.authority_requirement}
+          <div>
+            <dt>What stands in the way</dt>
+            <dd>{gate.authority_requirement}</dd>
+          </div>
+        {/if}
         {#if why}
           <div>
             <!-- GEP-04 — a switch that does not decide whether its own
@@ -252,6 +285,27 @@
     white-space: nowrap;
     color: var(--accent);
     border: 1px solid var(--accent-border);
+  }
+  /* BUG-293 — reach. Same chip shape as the one beside it so the row keeps one
+     vocabulary, and three tones rather than five: an owner scanning the list is
+     deciding what to look at, not memorising a taxonomy. */
+  .cap-reach {
+    font-size: var(--text-2xs);
+    font-weight: 650;
+    letter-spacing: var(--tracking-wide);
+    border-radius: var(--r-sm);
+    padding: 0.05rem 0.35rem;
+    white-space: nowrap;
+    color: var(--text-3);
+    border: 1px solid var(--border);
+  }
+  .cap-reach[data-tone="warn"] {
+    color: var(--warn-text);
+    border-color: var(--warn-border);
+  }
+  .cap-reach[data-tone="hot"] {
+    color: var(--danger);
+    border-color: var(--danger-border);
   }
   /* The row's answer, at metadata weight and in its own column, so the eye can
      run down it instead of hunting for it after a name of varying length. */

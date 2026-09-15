@@ -1,5 +1,5 @@
 /**
- * MODEL-14 — coming back from a vendor page should not require pressing anything.
+ * Coming back from a vendor page should not require pressing anything.
  *
  * Some setup genuinely happens outside Raiker: a local runtime is somebody
  * else's installer, and Raiker will not download and execute it. What must not

@@ -1,5 +1,5 @@
 /*
- * GLOBAL-MODEL-06 — what a picker can reach, as opposed to what it offers at
+ * What a picker can reach, as opposed to what it offers at
  * rest.
  *
  * "Keep available" decided whether a model appeared in any composer at all, so
@@ -55,7 +55,7 @@ function haystackFor(choice: CatalogueChoice): string {
  * The quick list is included even when it is not in a stored catalogue, because
  * a provider that has never been listed successfully still has the models the
  * owner selected in the past, and dropping those would be the disappearance
- * GLOBAL-MODEL-08 exists to prevent.
+ * the remembered catalogue exists to prevent.
  */
 export function catalogueChoices(
   quickList: ModelProfile[],

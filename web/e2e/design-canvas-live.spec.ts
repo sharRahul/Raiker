@@ -1,5 +1,5 @@
 /*
- * VIS2-19 — Design as a canvas workspace, driven against a real runtime.
+ * Design as a canvas workspace, driven against a real runtime.
  *
  * The review's composition is Assets │ Canvas │ Inspector, with the canvas
  * dominating whenever an asset exists. Every part of that needs a relationship
@@ -56,7 +56,7 @@ test("selecting an asset composes the three regions around it", async ({ page })
   await expect(page.getByRole("complementary", { name: "Assets" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Inspector" })).toBeVisible();
 
-  // VIS2-19's one stated composition rule: the canvas dominates.
+  // the Design canvas's one stated composition rule: the canvas dominates.
   const canvasBox = await canvas.boundingBox();
   const railBox = await page.getByRole("complementary", { name: "Assets" }).boundingBox();
   const inspectorBox = await page.getByRole("complementary", { name: "Inspector" }).boundingBox();

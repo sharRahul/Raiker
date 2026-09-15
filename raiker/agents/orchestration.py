@@ -319,7 +319,7 @@ class SubagentRunner:
                         "max_runtime_seconds": budget.max_runtime_seconds,
                         "max_tokens": budget.max_tokens,
                     },
-                    # ENV-04 — the subagent's own clock, derived when it
+                    # The subagent's own clock, derived when it
                     # finished rather than inherited from the parent turn that
                     # delegated it. A delegated search that runs across
                     # midnight, or that was queued behind an approval, has a

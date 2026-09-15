@@ -179,7 +179,7 @@
     }[id] as string,
   }));
 
-  // VIS2-10 — what Raiker can reach, and what is installed and broken. Derived
+  // What Raiker can reach, and what is installed and broken. Derived
   // from the same readiness the tabs render, so the overview cannot disagree
   // with the row underneath it.
   const reach = $derived(extensionReach(overview?.extensions));
@@ -300,7 +300,7 @@
       {:else if overview === null}
         <PageState state="loading" title="Reading what is installed…" />
       {:else if exceptions.length === 0 && reach.installed > 0}
-        <!-- VIS2-18 — nothing needs a person, said once. A card per working
+        <!-- Nothing needs a person, said once. A card per working
              extension would report "nothing is wrong" in the most expensive way
              available, and train the owner to skim past the one that is not.
              And only when there is something to say it about: with nothing
@@ -376,7 +376,7 @@
         <PageState state="loading" title="Reading extension readiness…" />
       {:else}
         <div class="tiles">
-          <!-- VIS2-16 — "some extensions work" is the resting state of any
+          <!-- "some extensions work" is the resting state of any
                install that has been set up, so it is plain metadata beside the
                three counts next to it. -->
           <StatTile
@@ -849,7 +849,7 @@
 {/if}
 
 <style>
-  /* VIS2-10 — the composed lead. It shares the page's card language rather
+  /* The composed lead. It shares the page's card language rather
      than inventing a second one: what differs is that it answers a question
      instead of listing a category. */
   .hub-overview {
@@ -1180,7 +1180,7 @@
      pill so the row stays one line at every width the list is used at. */
   .fact .mark { margin-right: 0.28rem; font-weight: 700; }
   .empty-row { color: var(--text-3); padding: var(--space-4); }
-  /* VIS2-16 — a persistent normal state is neutral. Success colour is spent on
+  /* A persistent normal state is neutral. Success colour is spent on
      something that just happened or on a decision that was just confirmed; used
      as the standing representation of "connected", "enabled", "verified" or
      "ready" it is on screen constantly, which is the one condition under which

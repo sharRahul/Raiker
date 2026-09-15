@@ -65,7 +65,7 @@ def list_model_connections(store: SQLiteStore, principal_id: str) -> list[str]:
 def clear_model_connection(store: SQLiteStore, principal_id: str, profile_id: str) -> None:
     """Forget one provider connection, and the catalogue it published.
 
-    GLOBAL-MODEL-08 remembers what a provider last served so a brief outage does
+    Raiker remembers what a provider last served so a brief outage does
     not empty every picker. Disconnecting is not an outage: the owner has said
     Raiker may no longer reach that account, and leaving its models behind would
     offer a list nothing can serve, drawn exactly like one that can.

@@ -73,7 +73,7 @@ describe("ModelPicker", () => {
     expect(trigger).toHaveFocus();
   });
 
-  it("reaches a model the owner never curated (GLOBAL-MODEL-06)", async () => {
+  it("reaches a model the owner never curated", async () => {
     // "Keep available" decided whether a model appeared in any composer at all,
     // so a provider serving forty offered whichever few were ticked and the
     // rest may as well not have been published. The quick list is still short —

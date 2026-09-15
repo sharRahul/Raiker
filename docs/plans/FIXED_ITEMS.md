@@ -563,6 +563,14 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-539](#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here) | Low | Runtime / environment context | Fixed 2026-09-15 (closes the clock half of BUG-280) |
 | [FIXED-540](#fixed-540--the-two-surfaces-that-kept-their-own-composer-had-stopped-keeping-it) | Low | Composer | Fixed 2026-09-15 (closes BUG-278) |
 | [FIXED-541](#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more) | Low | Live test harness / evidence | Fixed 2026-09-15 (closes BUG-273) |
+| [FIXED-542](#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all) | **High** | Governance / Permissions | Fixed 2026-09-15 (closes BUG-293, reduces RR-AUTHORITY-01) |
+| [FIXED-543](#fixed-543--a-routed-gate-nothing-could-propose) | Low | Governance / policy | Fixed 2026-09-15 (closes BUG-298) |
+| [FIXED-544](#fixed-544--a-new-account-was-fail-closed-about-reading-its-owners-own-repository) | Low | Capability defaults / Permissions | Fixed 2026-09-15 (closes BUG-239) |
+| [FIXED-545](#fixed-545--a-turn-could-only-answer-in-prose) | Low | Chat / typed output | Fixed 2026-09-15 (closes BUG-288 / VIS-19) |
+| [FIXED-546](#fixed-546--four-pages-that-explained-themselves-before-they-did-anything) | Low | Settings / Activity / Home | Fixed 2026-09-15 (closes four §18.3 rows) |
+| [FIXED-547](#fixed-547--a-lost-response-was-reported-as-a-failed-deletion) | Low | Account | Fixed 2026-09-15 (closes REM-SET-ACCOUNT) |
+| [FIXED-548](#fixed-548--two-hundred-and-twenty-four-comments-citing-documents-that-are-not-there) | Low | Codebase hygiene | Fixed 2026-09-15 |
+| [FIXED-549](#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject) | Low | Live test harness | Fixed 2026-09-15 (closes BUG-250) |
 
 ---
 
@@ -19975,7 +19983,7 @@ tell you whether the next change broke something.
 ## FIXED-444 — A named type step that resolved to its neighbour
 
 **Severity: Low. Area: design system. Status: Fixed 2026-09-07. Raised as
-[VIS2-01](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-01--repair-the-dead-type-scale-step-and-strengthen-optical-hierarchy).**
+VIS2-01.**
 
 **Observed.** `--text-lg` resolved to exactly `--text-base`. A view that
 reached for "one size up from body" got body text in a heavier weight, and the
@@ -19998,7 +20006,7 @@ prose under them, and display type has somewhere to go above them.
 ## FIXED-445 — Two lines of standing prose under every page of the product
 
 **Severity: Low. Area: navigation. Status: Fixed 2026-09-07. Raised as
-[VIS2-02](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-02--remove-developerproject-metadata-from-permanent-sidebar-chrome).**
+VIS2-02.**
 
 **Observed.** The navigation rail ended in "Local & loopback-only" and "Apache
 License, Version 2.0". Both are facts about the installation, read once, and
@@ -20018,9 +20026,9 @@ are still reachable, in the one place each belongs.
 
 **Severity: High. Area: navigation / product model. Status: Fixed 2026-09-07.
 Raised as
-[VIS2-03](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-03--make-work-mode-explicit-as-chat--build--design-and-reduce-top-bar-saturation)
+VIS2-03
 and
-[VIS2-09](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-09--give-permanent-destinations-unique-icon-identities).**
+VIS2-09.**
 
 **Observed.** Raiker's Work model is **Chat | Build | Design**. The top bar's
 mode switch drew two of them and the rail drew two of them; Design was reachable
@@ -20047,7 +20055,7 @@ Raiker without opening anything, on a phone as well as a desktop.
 ## FIXED-447 — `Ctrl K` printed to a keyboard that has no Ctrl there
 
 **Severity: Low. Area: shortcuts. Status: Fixed 2026-09-07. Raised as
-[VIS2-04](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-04--render-platform-appropriate-shortcut-labels).**
+VIS2-04.**
 
 **Observed.** The command palette's hint read `Ctrl K` to every owner. The
 handler has always accepted either modifier, so the label was the only part
@@ -20066,7 +20074,7 @@ all by others.
 ## FIXED-448 — The posture chip said "Protected" while its colour said otherwise
 
 **Severity: Medium. Area: governance copy. Status: Fixed 2026-09-07. Raised as
-[VIS2-07](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-07--make-governance-wording-state-aware).**
+VIS2-07.**
 
 **Observed.** The chip opened with the constant word "Protected", so a
 workspace set to approve everything automatically read
@@ -20096,7 +20104,7 @@ posture no longer describes itself as protection.
 ## FIXED-449 — Five ways of saying which row you are on
 
 **Severity: Low. Area: navigation. Status: Fixed 2026-09-07. Raised as
-[VIS2-08](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-08--simplify-sidebar-active-state-language).**
+VIS2-08.**
 
 **Observed.** The current rail row carried a bar in the gutter, a tinted
 background, accent text, a heavier weight, and the word "Current" beside its
@@ -20114,7 +20122,7 @@ width, without the rail shouting it five times.
 ## FIXED-450 — Success colour as the standing state of everything that is merely fine
 
 **Severity: Low. Area: visual system. Status: Fixed 2026-09-07. Raised as
-[VIS2-16](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-16--persistent-normal-state-is-neutral).**
+VIS2-16.**
 
 **Observed.** Green was the resting representation of connected, enabled,
 verified and ready — on the execution-environment badge under every message, on
@@ -20755,7 +20763,7 @@ Models page.
 ## FIXED-467 — Build's third pane showed tools, not the work
 
 **Severity: Medium. Area: build. Status: Fixed 2026-09-07. Found in
-[VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+the visual UI/UX review of 2026-09-06
 (VIS2-12).**
 
 **Observed.** Build's right-hand pane carried a file tree and a terminal — two
@@ -20790,7 +20798,7 @@ code.
 ## FIXED-468 — Extensions opened on a category instead of on what Raiker can reach
 
 **Severity: Medium. Area: extensions. Status: Fixed 2026-09-07. Found in
-[VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+the visual UI/UX review of 2026-09-06
 (VIS2-10).**
 
 **Observed.** Extensions opened on **Connectors** — one kind of extension out of
@@ -20816,7 +20824,7 @@ of reach and an exceptions list; every row opens the kind that owns it.
 ## FIXED-469 — The project was chosen again on every surface
 
 **Severity: Medium. Area: chat / build / design. Status: Fixed 2026-09-07. Found
-in [VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+in the visual UI/UX review of 2026-09-06
 (VIS2-11) and COMPOSER-11.**
 
 **Observed.** Chat, Build and Design each kept their own idea of the current
@@ -20906,7 +20914,7 @@ reads "Apply"; `BuildView.test.ts` asks for the action by what it does.
 
 **Severity: Medium. Area: skills / sessions / approvals. Status: Fixed
 2026-09-07. Found in
-[VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md) (VIS2-13,
+the visual UI/UX review of 2026-09-06 (VIS2-13,
 VIS2-18).**
 
 **Observed.** Each list that repeats an entity argued the badge question in its
@@ -20997,7 +21005,7 @@ is where `.gitignore`'s `output/` rule expects the evidence to be.
 ## FIXED-474 — Thirteen z-index numbers and no way to say what was above what
 
 **Severity: Medium. Area: shell / overlays. Status: Fixed 2026-09-07. Found in
-[VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+the visual UI/UX review of 2026-09-06
 (VIS2-17).**
 
 **Observed.** Thirty-odd overlay surfaces each picked their own stacking number,
@@ -21151,7 +21159,7 @@ then filters to and captures that exact record in the Memory page.
 ## FIXED-481 — One elevation for two grounds, and a picture inside a card
 
 **Severity: Low. Area: theme / design / shell. Status: Fixed 2026-09-07. Found
-in [VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+in the visual UI/UX review of 2026-09-06
 (VIS2-14, VIS2-15).**
 
 **Observed.** Two composition faults, both the same mistake in different
@@ -21226,7 +21234,7 @@ size on the rendered bar; reverting the fix fails it with two.
 ## FIXED-483 — Three Work modes agreeing by habit rather than by contract
 
 **Severity: Medium. Area: chat / build / design. Status: Fixed 2026-09-07. Found
-in [VISUAL_UI_UX_REVIEW_2026-09-06.md](VISUAL_UI_UX_REVIEW_2026-09-06.md)
+in the visual UI/UX review of 2026-09-06
 (VIS2-21, VIS2-20).**
 
 **Observed.** Chat, Build and Design shared a composer and nothing else that was
@@ -21619,7 +21627,7 @@ composer with a connected provider and no default chosen.
 ## FIXED-491 — Design was a one-shot generator, so most of its composer had nothing to reach
 
 **Severity: Medium. Area: Design / image runtime. Status: Fixed 2026-09-13.
-Closes [BUG-277](TO_BE_FIXED.md), [VIS2-19](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-19--design-must-be-a-first-class-canvas-workspace-not-a-third-chat-variant)
+Closes [BUG-277](TO_BE_FIXED.md), VIS2-19
 and VIS2-20's Design remainder.**
 
 **Observed.** The composer redesign asks Design to understand create, edit,
@@ -21711,7 +21719,7 @@ word), and a live round against a running server with real rows read back throug
 
 **Severity: Medium. Area: Design / projects. Status: Fixed 2026-09-13. Closes
 [BUG-282](TO_BE_FIXED.md) and the last of
-[VIS2-11](VISUAL_UI_UX_REVIEW_2026-09-06.md#vis2-11--make-project-the-persistent-context-across-chat-build-and-design).**
+VIS2-11.**
 
 **Observed.** The Work project persists across Chat, Build and Design, and
 Design named it in the composer's context line — narrowly, and honestly:
@@ -23966,3 +23974,375 @@ identity-linked refusal still reads as itself, the meter moves when a provider
 is connected, the routine's cycle answers `ACKNOWLEDGED` **in the task's own
 conversation**, the card links to it, and Threads lists it under **Routines**.
 
+---
+
+## FIXED-542 — Every side-effect capability now says what it would cost, and one of them had no gate at all
+
+**Severity: High. Area: governance / Permissions. Status: Fixed 2026-09-15.
+Closes [BUG-293](TO_BE_FIXED.md), and reduces
+[RR-AUTHORITY-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#what-blocks-a-public-first-release)
+to its authority-context half.**
+
+**Observed.** [DEC-16](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-16--require-one-opaque-runtime-authority-context)
+step 8 asks for a CI check that every real side-effect capability carries five
+things. Three were mechanical and two had no home anywhere:
+
+| Column | Enforced by, before |
+|---|---|
+| Executor | `REAL_EXECUTOR_CAPABILITIES` + the registry assertion |
+| How it is reached | `tests/test_governance_entry_paths.py` against `CAPABILITY_ENTRY_PATHS` |
+| Permissions description | `tests/test_capability_permissions_copy.py` |
+| **Threat model** | **nothing** |
+| **Authority requirement** | **nothing** |
+| **Negative bypass test** | **nothing per capability** |
+
+The bypass property was established *structurally* — `route_action`'s callers
+are enumerated and the agent gateway is constructed only by named surfaces — and
+that is a genuine boundary making a different claim. It says *no current path
+bypasses the chokepoint*. It does not say *each of the forty-eight capabilities
+has a test proving its own gate refuses before its executor runs*.
+
+**Fixed.** [`raiker/runtime/authority/capability_authority.py`](../../raiker/runtime/authority/capability_authority.py)
+is one row per capability carrying a side-effect class
+(read / reversible / external / destructive / critical), one sentence on what
+goes wrong if it runs ungoverned, what stands in the way, and the pytest node id
+that proves the refusal. `tests/test_capability_authority.py` asserts
+completeness against `REAL_EXECUTOR_CAPABILITIES` in both directions, that the
+threat sentence is not the humanised capability name, that the named test exists
+and — where it is the generic proof — that its parameter is *this* capability
+rather than another one's.
+
+The proof itself is parameterised over the capability rather than asserted once
+over a set, because that distinction is the whole of the finding: a test id
+carrying the capability's own name is a per-capability claim and an intersection
+of two sets is not. Each of the forty-eight probes **every** action type that
+maps to it — `web_fetch` has four doors, `file_write_execution` has four — with
+an allow-everything policy, so the only thing that can refuse is the gate.
+
+**What writing it out found, and it is why this entry is High.**
+`image_generation` had a real executor, a switch on Permissions, an activation
+requirement, a threat-model acknowledgement, and a docstring in
+`RuntimeControlService.run_image_generation` saying in as many words that "the
+``image_generation`` gate … appl[ies]". It had **no key in
+`CAPABILITY_GATE_MAP`**, so `check_capability_gate` found no gate for the action,
+returned `None`, and the owner's off switch decided nothing. Policy made the
+action approval-required, which is exactly why nothing ever looked wrong: the
+owner was asked every time, and turning the capability **off** changed neither
+the asking nor the answer.
+
+Measured rather than reasoned about — with the row removed, routing an
+`image_generation` action on a workspace where the owner had turned it **off**
+entered the executor. The row is added, and
+`test_every_capability_that_can_run_has_a_gate_to_refuse_it` keeps the general
+case closed: a capability with a real executor and no name in the gate map now
+fails CI.
+
+**Interface outcome.** A permission's detail answers two questions it could not
+answer before — **If it ran without you** and **What stands in the way** — and
+its closed row carries a reach chip (*Reads*, *Changes*, *Leaves this machine*,
+*Cannot be undone*, *Changes what Raiker may do*) so a list of sixty-seven
+switches can be read for consequence and not only for on/off. A new executor
+cannot reach that page without answering both questions.
+
+**Live.** `round-2026-09-15-typed-and-authority-live.spec.ts` drives it against a
+running host: `permissions-capability-authority.png` shows *Shell commands* with
+its **Cannot be undone** chip and both sentences; `web_fetch` shows **Leaves this
+machine** and names what a request discloses. Zero console errors.
+
+---
+
+## FIXED-543 — A routed gate nothing could propose
+
+**Severity: Low. Area: governance / policy. Status: Fixed 2026-09-15.
+Closes [BUG-298](TO_BE_FIXED.md).**
+
+**Observed.** `CAPABILITY_GATE_MAP` named `policy_mutation`, the Permissions page
+offered a full set of decision-mode buttons for it, and **no surface, tool or
+approval ever constructed the action.** Policy is changed by editing the policy
+configuration, which the runtime *reads* — the same footing as the model egress
+allowlist, and deliberately not editable from a browser session.
+
+It was filed rather than fixed because the answer was a decision rather than a
+repair: either policy edits become governed actions, which means a surface, an
+approval path and a threat model for changing the rules from inside the product,
+or the capability goes and the configuration-file boundary is stated outright.
+
+**The owner's decision, recorded 2026-09-15: state the boundary, remove the
+gate.** `policy_mutation` is gone from the gate map, the phase gates, the
+entry-path table, the activation registry, the bootstrap seeding and the
+Permissions copy. Two tests hold it out rather than merely not mentioning it —
+`test_high_risk_capabilities_in_runtime_domain` asserts its *absence*, and
+`test_the_governance_gates_are_traced` asserts that neither the entry-path table
+nor the router carries it — so re-adding the name is a decision somebody makes
+rather than a line that drifts back.
+
+**Interface outcome.** Permissions no longer offers a control over something no
+part of the product can propose. The boundary is stated where an owner looks
+rather than implied by a switch.
+
+**Live.** The round reads `/api/capability-gates` and asserts `policy_mutation`
+is absent while `admin_mutation` and `role_mutation` — the two that *are* routed,
+by the CLI's identity commands — are present.
+
+---
+
+## FIXED-544 — A new account was fail-closed about reading its owner's own repository
+
+**Severity: Low. Area: capability defaults / Permissions. Status: Fixed
+2026-09-15. Closes [BUG-239](TO_BE_FIXED.md).**
+
+**Observed.** Three rules decide what an empty gate table means — `off`,
+`shipped_default_unscoped` and `shipped_default` — and the open question was
+whether they should be one. Collapsing is not a refactor: everything-`off`
+tightens `web_fetch` and reopens the defect RAIKER-2021 closed; everything-
+fallback loosens seven paths, three of them egress, on any workspace whose owner
+has not visited Permissions.
+
+**The owner's decision, recorded 2026-09-15: keep all three, and expand the
+fresh-account defaults selectively and explicitly instead.** The two are
+different questions, and the second is the one worth acting on: a brand-new
+account could not read symbols out of a file the agent was already authorised to
+open, which is not a security posture so much as a first five minutes nobody
+enjoys.
+
+**Fixed.** [`raiker/runtime/authority/baseline.py`](../../raiker/runtime/authority/baseline.py)
+is a **versioned** baseline written at account creation — `language_intelligence`
+and `code_map_indexing` first, then `task_management_runtime`,
+`project_assignment_runtime` and `audit_export`. Three properties make it
+defensible, and each is a test rather than a promise:
+
+* **It only ever runs at account creation**, inside the one atomic path that
+  creates an account, as `INSERT OR IGNORE`. An existing workspace is never
+  re-seeded and a row an owner wrote is never replaced.
+* **Enabled means available through governance, not unattended.** It writes
+  gates and nothing else, so every baseline capability still asks.
+* **Nothing external, destructive or authority-changing can get into it** —
+  checked against FIXED-542's side-effect class rather than against a second
+  copy of the list, so somebody adding `git_push_execution` does not have to
+  remember why they should not.
+
+Each row records its reason and the baseline version on the gate row itself, so
+an owner can see *why* something is on and a later migration can find exactly the
+rows a baseline wrote.
+
+**And the other half of the decision: a Build setup preset.** Writing to
+somebody's files is a decision, so it is offered rather than defaulted. **Set up
+for Build** turns on file writes, patch application, local git writes and
+checkpoint restoration in one deliberate step, shows the four before it takes it,
+drives the same per-capability route the row's own **Turn on** uses — there is no
+bulk endpoint and inventing one would be the "easy mode API with weaker
+enforcement" §18.6 refuses — reports per capability, and changes no decision
+mode.
+
+**One defect found while closing it.** The page's own posture note read
+*"Capabilities with a real executor start **off** on this account until you turn
+them on"*, which stopped being true the moment a new account had a baseline. A
+page that says off about five capabilities that are on is the exact failure
+Permissions exists to prevent, so the sentence now says *most*, names the
+exception, and says that the exception still asks.
+
+**Interface outcome.** A new owner can ask about their repository without
+visiting Permissions first, and can turn Build on without finding four rows in a
+list of sixty-seven. Nothing that leaves the machine or cannot be undone moved.
+
+**Live.** The round reads the gates on a freshly created account: the five are
+`enabled_runtime`, `shell_execution` and `git_push_execution` are not, the preset
+lists its four before acting, disappears once they are on, and all four come out
+in `ask`. `permissions-build-preset.png`.
+
+---
+
+## FIXED-545 — A turn could only answer in prose
+
+**Severity: Low. Area: Chat / typed output. Status: Fixed 2026-09-15.
+Closes [BUG-288](TO_BE_FIXED.md), which is VIS-19 — the last implementation item
+in the visual UI/UX review of 2026-09-06 (removed when it closed).**
+
+**Observed.** Raiker's renderer already spoke a fair vocabulary — headings,
+fenced code with highlighting, lists, tables, citation chips — and every bit of
+it was *inferred from the characters*. A turn could not say *this part of my
+answer is a table of these columns*, only write something that happened to parse
+as one, so nothing could sort it or announce it as a table. And there was no
+chart at all, so a turn whose answer was genuinely a shape described the shape in
+words.
+
+**Fixed, in the order that worked for Design (FIXED-491): the channel first,
+then the components.** A turn declares a part by opening a fence with a Raiker
+type — ` ```raiker:table ` or ` ```raiker:chart ` — and
+[`raiker/runtime/typed_parts.py`](../../raiker/runtime/typed_parts.py) validates
+it the way any action argument is validated: bounded on every dimension, and
+**refused rather than repaired**. A row short of a cell is refused, not padded,
+because a padded row is a cell nobody wrote in a table an owner may act on; a
+series short of a point is refused, not aligned, because aligning it means
+guessing which points correspond.
+
+Nothing is ever truncated silently — a table cut to twenty rows without saying so
+is a wrong answer presented as a right one — and a refused block becomes a
+visible `refused` part carrying its reason. A part that vanished would be a turn
+whose answer silently lost a section, and a model able to make a section
+disappear by writing bad JSON is a worse failure than a message the owner can
+see.
+
+The parts are derived in `AgentResponse.__post_init__` rather than at the six
+places that build a response, because the invariant worth having is that the
+parts and the message are the same answer: a site that forgot to call the
+splitter would ship a turn whose typed half had disappeared.
+
+**Interface outcome, and it is the one the entry asked for.** A turn answers with
+a table Raiker *knows* is a table: a real `<table>` with a caption and its row
+count, sortable by any column with `aria-sort` announcing the order, and a third
+press returns the turn's own order — a table an owner has sorted three ways and
+cannot un-sort is one they have lost the answer in. And with a chart: inline SVG,
+no library, six series colours from a new shared ramp defined in both themes,
+zero always in range so a model choosing the data does not also get to choose an
+axis that exaggerates it. The chart **always** carries the same numbers as a
+table underneath, because colour and geometry are not a channel everyone has.
+
+**One thing found live, and it changed the product rather than the test.** Asked
+for "this as a table and a bar chart", the model called `create_document` and
+wrote a file. That is the right tool for a file and the wrong one for an answer,
+and nothing had told it which question it was being asked. The system prompt now
+says these blocks are how you answer *in the conversation*, and that
+`create_document` is for a file the user asked to keep or to send.
+
+**Live.** Driven by a real Anthropic turn on `claude-haiku-4-5-20251001`, because
+"the model used the channel" is a claim only a real turn can support:
+`chat-typed-table-and-chart.png` shows three cities as a sortable table — caption,
+`3 rows`, *sorted by City, ascending* after one click — and the same three as a
+bar chart with **The numbers behind this chart** open beneath it. Zero console
+errors.
+
+---
+
+## FIXED-546 — Four pages that explained themselves before they did anything
+
+**Severity: Low. Area: Settings / Activity / Home. Status: Fixed 2026-09-15.
+Closes **REM-SET-GENERAL**, **REM-SET-APPEARANCE**, **REM-ACTIVITY** and
+**REM-HOME-03** of
+[§18.3](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+
+**General** carried three cards of setup teaching: a paragraph on the header, a
+paragraph on each card heading, and a sentence under most controls, several
+restating each other. What is kept is the distinction that changes the answer,
+said once per card: **language and region are interface formatting; the time zone
+is what every model turn is told.** Those are different kinds of setting that
+happened to sit under one word, and confusing them is how somebody sets a region
+to fix a schedule. The resolved-zone line and the device proposal stay, because
+they are state rather than teaching.
+
+**Personalisation** is where Theme lives, and Theme sat level with two controls
+that ask an owner to have an opinion about interface density and a typeface.
+Density and font are behind a disclosure now — still here, still reversible,
+still previewed at their own row height, and open automatically when either has
+been changed so a non-default is never hidden. The default weather location
+arrived here from General: it is optional, it never affects the runtime, and it
+was the only control on that page that was neither.
+
+**Activity** opened with a session-id box, an event-type box and a row limit
+above the record — three controls in the runtime's vocabulary in front of the
+answer. They share one **Filters and export** toolbar with the export now. The
+one thing that is never folded is *that a filter is on*: a filtered timeline read
+as the whole record is the single way this page could mislead, so the scope and
+the control that clears it stay on screen whatever the toolbar is doing.
+
+**Home** opened with a greeting, a sentence restating counts the boards below
+state exactly, and a freshness strip — three rows of Raiker describing itself
+before the thing anybody came to do. One greeting stays; the counts sentence is
+gone because the boards *are* the count; the exceptions that change what to do
+next — a failed read, a first run with nothing in it — stay, because those are
+the cases the page knows something the boards cannot. The freshness strip and the
+guide link moved below the start row.
+
+**Live.** Each verified where an owner meets it, with the Home ordering asserted
+geometrically rather than by reading the markup:
+`settings-general-trimmed.png`, `settings-personalisation-folded.png`,
+`activity-advanced-toolbar.png`, `home-action-first.png`.
+
+---
+
+## FIXED-547 — A lost response was reported as a failed deletion
+
+**Severity: Low. Area: Account. Status: Fixed 2026-09-15. Closes
+**REM-SET-ACCOUNT** of §18.3.**
+
+**Observed.** The row's first two halves were already closed —
+[FIXED-501](#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name)
+took the internal principal language out, and
+[FIXED-498](#fixed-498--cancel-stayed-live-while-an-account-was-being-deleted)
+removed Cancel for the duration of the request. Re-read in source on 2026-09-15,
+both hold. What was still open is the third thing the row asks for: *handle lost
+responses by checking account/session status before presenting a retry.*
+
+A request that never came back is not a request that failed, and the delete had
+one error path for both. An owner whose connection dropped **after** the server
+had already destroyed the account was told "Could not delete account" and left
+looking at a Retry for something that had happened. On an irreversible operation
+that is the worst possible thing to be wrong about.
+
+**Fixed.** A refusal the server actually sent — any 4xx — is reported as one and
+the session is restored. Anything else is *asked about* before it is described:
+`bootstrap-status` answers `can_register: true` only when no account exists,
+which is the server's own statement that the deletion landed. If that probe
+cannot reach the host either, the honest answer is that it is unknown — never a
+retry, because a second delete of an account that may already be gone is not the
+harmless thing a Retry button implies.
+
+**Interface outcome.** Three outcomes where there was one: it failed and the
+account is still here, it landed and Raiker returns to the sign-in screen, or
+nobody knows and the owner is told to reload and find out before trying again.
+
+---
+
+## FIXED-548 — Two hundred and twenty-four comments citing documents that are not there
+
+**Severity: Low. Area: codebase hygiene. Status: Fixed 2026-09-15.**
+
+**Observed.** `docs/plans/README.md` records that a topic review is deleted once
+every item in it closes, and seven were removed on 2026-09-12 and 2026-09-13.
+Their item IDs stayed in the code: **224 references** across **73 files** to
+`MODEL-xx`, `GLOBAL-MODEL-xx`, `WEB-xx`, `ENV-xx` and `WEATHER-xx`, each opening a
+comment by sending the reader to a document that is not in the tree.
+
+A citation nobody can follow is worse than no citation: it reads as though the
+reasoning lives somewhere else, when in every case the sentence after the dash
+was already the whole explanation.
+
+**Fixed.** The citation goes and the sentence stays. 113 leading citations were
+stripped mechanically and the remaining 111 in-prose references were rewritten
+one at a time to name the thing rather than the review — "the one authoritative
+model decision" rather than `MODEL-01`, "the shared catalogue" rather than
+`GLOBAL-MODEL-06`. IDs whose documents still exist are untouched, including
+`REM-MODEL-xx` and `UX-MODEL-xx`, which only look like the stale ones. One
+dangling `WEB-04` in `GOVERNANCE_ENTRY_PATHS.md` went with them.
+
+**Verification.** No `MODEL-`, `GLOBAL-MODEL-`, `WEB-`, `ENV-` or `WEATHER-`
+numbered reference remains in `raiker/`, `tests/`, `web/src/` or `web/e2e/`
+outside the `REM-`/`UX-` prefixes that still resolve. `ruff`, `mypy`,
+`svelte-check`, `eslint` and both test suites green afterwards.
+
+---
+
+## FIXED-549 — A spec that had to disambiguate its own subject
+
+**Severity: Low. Area: live test harness. Status: Fixed 2026-09-15.
+Closes [BUG-250](TO_BE_FIXED.md).**
+
+**Observed.** The live suite shares one workspace — that was the point of
+FIXED-327, FIXED-328 and the conversions after them — and the layer underneath
+was that a spec creating **Overnight research** and then asserting on
+**Overnight research** is asserting on whatever its own earlier runs left behind.
+On 2026-09-15 that resolved to three threads and Playwright's strict mode refused
+to choose, which is the *good* failure. The bad one is the same spec passing on
+somebody else's evidence.
+
+**Fixed.** [`web/e2e/naming.ts`](../../web/e2e/naming.ts) gives the round one
+rule — `roundName("Repo work")` → `Repo work k2f9h1` — and seven specs that
+create a record the product stores under a name now use it: a checkpoint, a task
+and five projects. No workspace reset, no skip, and each is re-runnable against a
+workspace with a year of history in it.
+
+**Two specs are deliberately not on the list.** The collector specs reuse an
+existing collector when one is there, which is already re-runnable; a per-run
+name would make every round leave another collector behind, which is the problem
+rather than the fix. The module says which kind of value the rule is for — a
+record the product stores under a name, never a prompt, a path or a key.

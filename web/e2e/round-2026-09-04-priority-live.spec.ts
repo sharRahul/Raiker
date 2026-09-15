@@ -9,6 +9,13 @@ import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
 
+import { roundName } from "./naming";
+
+// BUG-250 — named per run, so a round that has already worked in this
+// workspace cannot find its own leftovers and assert on them. The suite shares
+// one workspace by design; this is what keeps a shared workspace honest.
+const PROJECT = roundName("Repo work");
+
 const BASE = "http://127.0.0.1:8765";
 
 test.describe.configure({ mode: "serial" });
@@ -24,9 +31,9 @@ test("a Build task says so on the board, and a Chat one stays quiet (backlog #23
   await page.goto(`${BASE}/#/projects`);
   await page.waitForLoadState("networkidle");
   const nameField = page.getByLabel(/Project name|Name/i).first();
-  await nameField.fill("Repo work");
+  await nameField.fill(PROJECT);
   await page.getByRole("button", { name: /^(Create project|Create)$/ }).first().click();
-  await expect(page.getByText("Repo work").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(PROJECT).first()).toBeVisible({ timeout: 30_000 });
 
   await page.goto(`${BASE}/#/tasks`);
   await page.waitForLoadState("networkidle");

@@ -55,7 +55,7 @@ describe("SkillsView", () => {
     expect(await screen.findByText(/No skills installed yet/i)).toBeInTheDocument();
   });
 
-  it("does not badge a working skill's own facts (VIS2-13)", async () => {
+  it("does not badge a working skill's own facts (the badge budget)", async () => {
     // A row carried a lifecycle badge, a `/command` badge and a conformance
     // badge at once. On a skill with nothing wrong, none of those is a state to
     // act on, so the row now spends no badge at all and says the same facts

@@ -90,7 +90,28 @@ describe("ActivityView", () => {
     await waitFor(() => {
       expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("session_id=sess_alpha"))).toBe(true);
     });
+    // REM-ACTIVITY — the raw session-id box is in the Filters and export
+    // toolbar now, so the scope is read from the strip that is never folded.
+    expect(screen.getByTestId("activity-scope")).toHaveTextContent(/showing part of the record/i);
+    await fireEvent.click(screen.getByRole("button", { name: /filters and export/i }));
     expect(screen.getByLabelText("Session id")).toHaveValue("sess_alpha");
+  });
+
+  it("says when it is showing part of the record, and can be cleared", async () => {
+    // A filtered timeline read as the whole record is the one way this page
+    // could mislead, so the scope and the control that clears it are on screen
+    // whatever the toolbar is doing.
+    const fetchMock = stubFetch({ "GET /api/events": [] });
+    render(ActivityView, { sessionId: "sess_alpha" });
+
+    await waitFor(() => expect(screen.getByTestId("activity-scope")).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("button", { name: /show everything/i }));
+
+    await waitFor(() => {
+      const last = String(fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0]);
+      expect(last).not.toContain("session_id=");
+    });
+    expect(screen.queryByTestId("activity-scope")).toBeNull();
   });
 
   // BUG-231 — evidence that cannot leave the product is evidence that cannot be
@@ -113,7 +134,7 @@ describe("ActivityView", () => {
     });
     render(ActivityView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /^export$/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /filters and export/i }));
 
     expect(screen.getByText(/your account only/i)).toBeInTheDocument();
     expect(screen.getByText(/manifest hash over\s+the event ids it covers/i)).toBeInTheDocument();
@@ -130,7 +151,7 @@ describe("ActivityView", () => {
     });
     render(ActivityView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /^export$/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /filters and export/i }));
     await fireEvent.click(screen.getByRole("button", { name: /export and download/i }));
 
     const alert = await screen.findByRole("alert");

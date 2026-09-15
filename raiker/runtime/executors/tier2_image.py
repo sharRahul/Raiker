@@ -84,7 +84,7 @@ def declared_image_models(profile: dict[str, Any]) -> tuple[str, ...]:
 #: How many pictures one variation request may ask for. Bounded for the same
 #: reason `MAX_IMAGE_BYTES` is: a count is an action argument, and an action
 #: argument is a thing a model can propose. Four is a 2x2 compare grid, which is
-#: what VIS2-19 asks the canvas to draw.
+#: what the Design canvas asks the canvas to draw.
 MAX_VARIATIONS = 4
 
 MAX_PROMPT_CHARS = 4_000

@@ -94,6 +94,15 @@ class CapabilityGateView:
     # would run, which is the defect FIXED-279 closed for the model's context
     # bundle and left standing on the screen the owner decides from.
     enforced_enabled: bool = False
+    # BUG-293 — the two columns DEC-16 step 8 asked for that had no home. Read
+    # from `CAPABILITY_AUTHORITY`, so the page answering *what would this cost
+    # if it ran without me* and the test proving it will not are the same row.
+    # Empty for a capability with no real executor: there is no cost to state
+    # for something that cannot run, and a filled cell is always a claim
+    # somebody wrote.
+    side_effect: str = ""
+    ungoverned_consequence: str = ""
+    authority_requirement: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -115,6 +124,9 @@ class CapabilityGateView:
             "governance_note": self.governance_note,
             "unset_resolution": self.unset_resolution,
             "enforced_enabled": self.enforced_enabled,
+            "side_effect": self.side_effect,
+            "ungoverned_consequence": self.ungoverned_consequence,
+            "authority_requirement": self.authority_requirement,
         }
 
 

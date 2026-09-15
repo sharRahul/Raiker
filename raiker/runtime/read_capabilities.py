@@ -1,4 +1,4 @@
-"""The one catalogue of Raiker's global agentic read capabilities (WEB-01).
+"""The one catalogue of Raiker's global agentic read capabilities.
 
 Every model-backed work surface — Chat, Build, Design's planning layer, Tasks,
 Schedule, agents — is supposed to see the same set of ways to read the world.

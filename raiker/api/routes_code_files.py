@@ -12,7 +12,7 @@ These are the two reads that fix it, and they are deliberately only reads:
   care which kind of root it is over.
 * ``GET /api/code/repos/{repo_id}/file`` — one bounded text file.
 * ``GET /api/code/repos/{repo_id}/changes`` — the working tree's own uncommitted
-  changes (VIS2-12), read through the *same* helpers the commit proposal is
+  changes (the Build artifact pane), read through the *same* helpers the commit proposal is
   built from, so what Build shows as "Changes" and what a commit would record
   cannot describe different change sets.
 
@@ -289,7 +289,7 @@ async def read_code_repo_changes(
 ) -> dict[str, Any]:
     """What has changed in this repository's working tree, and not yet been committed.
 
-    VIS2-12 asks Build's third pane to be *the object of work*. For a coding
+    the Build artifact pane asks Build's third pane to be *the object of work*. For a coding
     turn that object is the change: which files moved, and what the diff says.
     Until now the only diff Build could show was a *proposed* one, attached to
     an approval — so once a change was applied, the workspace had nothing to

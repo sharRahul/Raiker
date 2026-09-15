@@ -165,7 +165,7 @@ describe("background revalidation", () => {
 
 describe("what the composer says when nothing is selected", () => {
   /**
-   * Two different situations wore the same sentence, and GLOBAL-MODEL-06 made
+   * Two different situations wore the same sentence, and the shared catalogue made
    * the difference visible: an instance with no provider connected has no model
    * to run, and an instance whose provider is connected has a catalogue full of
    * them and is missing only a choice. Telling the second owner to go and

@@ -32,10 +32,34 @@
     }
   }
 
+  /*
+   * REM-ACTIVITY — the timeline first, the raw forms one press away.
+   *
+   * Everyday audit questions arrive here already scoped: a task links to its
+   * own events, an approval links to the turn that raised it. The page
+   * nevertheless opened with a session-id box, an event-type box and a row
+   * limit above the record — three controls phrased in the runtime's
+   * vocabulary, in front of the answer the owner came for.
+   *
+   * They are not removed: a raw session id is exactly what a person verifying
+   * an incident needs, and so is the export beside it. They share one
+   * **Filters and export** toolbar now, and the one thing that must never be
+   * behind a fold is *that a filter is on* — a filtered timeline read as the
+   * whole record is the way this page could lie. That stays on screen, with the
+   * control that clears it.
+   */
   let sessionFilter = $state("");
   let typeFilter = $state("");
   let limit = $state("100");
   let loadedSessionId = $state<string | null | undefined>(undefined);
+  let advancedOpen = $state(false);
+  const scoped = $derived(sessionFilter.trim() !== "" || typeFilter.trim() !== "");
+
+  async function clearScope() {
+    sessionFilter = "";
+    typeFilter = "";
+    await load();
+  }
 
   async function load() {
     loadError = null;
@@ -59,7 +83,6 @@
   let exports = $state<AuditExportView[] | null>(null);
   let exportBusy = $state(false);
   let exportError = $state<string | null>(null);
-  let exportPanelOpen = $state(false);
 
   async function loadExports() {
     try {
@@ -89,9 +112,9 @@
     }
   }
 
-  function toggleExportPanel() {
-    exportPanelOpen = !exportPanelOpen;
-    if (exportPanelOpen && exports === null) void loadExports();
+  function toggleAdvanced() {
+    advancedOpen = !advancedOpen;
+    if (advancedOpen && exports === null) void loadExports();
   }
 
   function riskTone(risk: string | null): string {
@@ -123,12 +146,12 @@
     <button
       type="button"
       class="btn btn-ghost btn-sm"
-      onclick={toggleExportPanel}
-      aria-expanded={exportPanelOpen}
-      aria-controls="audit-export-panel"
+      onclick={toggleAdvanced}
+      aria-expanded={advancedOpen}
+      aria-controls="activity-advanced"
     >
-      <Icon name="download" size="sm" />
-      Export
+      <Icon name="search" size="sm" />
+      Filters and export
     </button>
     <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh events">
       <Icon name="refresh" size="sm" />
@@ -150,8 +173,49 @@
   </section>
 {/if}
 
-{#if exportPanelOpen}
-  <div class="card export-card" id="audit-export-panel">
+<!-- The one thing that is never folded away. A filtered timeline read as the
+     whole record is how this page could mislead, so the scope and the control
+     that clears it stay on screen whatever the toolbar is doing. -->
+{#if scoped}
+  <p class="scope" role="status" data-testid="activity-scope">
+    Showing part of the record:
+    {#if sessionFilter.trim()}session <span class="mono">{shortId(sessionFilter.trim())}</span>{/if}
+    {#if sessionFilter.trim() && typeFilter.trim()}, {/if}
+    {#if typeFilter.trim()}type <strong>{typeFilter.trim()}</strong>{/if}.
+    <button type="button" class="link" onclick={() => void clearScope()}>Show everything</button>
+  </p>
+{/if}
+
+{#if advancedOpen}
+  <div class="card export-card" id="activity-advanced">
+    <h2>Filters</h2>
+    <form
+      class="filters"
+      onsubmit={(e) => {
+        e.preventDefault();
+        void load();
+      }}
+    >
+      <div>
+        <label class="field-label" for="ev-session">Session id</label>
+        <input id="ev-session" class="input mono" type="text" placeholder="sess_…" bind:value={sessionFilter} />
+      </div>
+      <div>
+        <label class="field-label" for="ev-type">Event type</label>
+        <input id="ev-type" class="input" type="text" placeholder="Filter by type…" bind:value={typeFilter} />
+      </div>
+      <div>
+        <label class="field-label" for="ev-limit">Limit</label>
+        <select id="ev-limit" class="select" bind:value={limit}>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="250">250</option>
+          <option value="500">500</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-sm apply">Apply</button>
+    </form>
+
     <h2>Export this record</h2>
     <p class="quiet">
       Your account only, redacted exactly as this page is. Each file carries a manifest hash over
@@ -187,33 +251,6 @@
     {/if}
   </div>
 {/if}
-
-<form
-  class="filters"
-  onsubmit={(e) => {
-    e.preventDefault();
-    void load();
-  }}
->
-  <div>
-    <label class="field-label" for="ev-session">Session id</label>
-    <input id="ev-session" class="input mono" type="text" placeholder="sess_…" bind:value={sessionFilter} />
-  </div>
-  <div>
-    <label class="field-label" for="ev-type">Event type</label>
-    <input id="ev-type" class="input" type="text" placeholder="Filter by type…" bind:value={typeFilter} />
-  </div>
-  <div>
-    <label class="field-label" for="ev-limit">Limit</label>
-    <select id="ev-limit" class="select" bind:value={limit}>
-      <option value="50">50</option>
-      <option value="100">100</option>
-      <option value="250">250</option>
-      <option value="500">500</option>
-    </select>
-  </div>
-  <button type="submit" class="btn btn-sm apply">Apply</button>
-</form>
 
 {#if loadError}
   <PageState state="error" title="Couldn't load events" detail={loadError} />
@@ -333,6 +370,18 @@
   }
   .apply {
     margin-bottom: 2px;
+  }
+  /* REM-ACTIVITY — the scope strip. Never folded, because reading a filtered
+     timeline as the whole record is the one way this page could mislead. */
+  .scope {
+    margin: 0 0 var(--space-3);
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+  .scope strong { color: var(--text-1); }
+  .link {
+    background: none; border: 0; padding: 0; font: inherit; font-weight: 650;
+    color: var(--accent); cursor: pointer; text-decoration: underline;
   }
   .list-card {
     padding: var(--space-2) var(--space-3);

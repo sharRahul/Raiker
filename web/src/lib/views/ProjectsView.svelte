@@ -33,7 +33,7 @@
 
   let newName = $state("");
   let creating = $state(false);
-  // VIS-12 — the empty state's primary action. The create field is already on
+  // The empty state's primary action. The create field is already on
   // the page, above the empty state; the button that says "start here" should
   // put the cursor in it rather than describe where it is.
   let nameField = $state<HTMLInputElement>();
@@ -589,10 +589,10 @@
                 <Badge variant="read-only" label="attached folder" />
               {/if}
             </span>
-            <!-- VIS-16 — the path is what this project *is* on disk, and it
+            <!-- The path is what this project *is* on disk, and it
                  is the technical identifier, so it reads below the name in mono
                  rather than inside the sentence about the work.
-                 VIS-14 — the counts and the age use the shared vocabulary, in
+                 The counts and the age use the shared work vocabulary, in
                  the order a thread and a task use. -->
             <code class="project-root mono">{p.root_kind === "attached" ? p.root_label : p.root_subpath}</code>
             <WorkMeta
@@ -753,7 +753,7 @@
             {/each}
           </ul>
         {/if}
-        <!-- BUG-282 / VIS2-11 — "generated images belong to the Project
+        <!-- BUG-282 / the Work project — "generated images belong to the Project
              automatically when created there". They are material, so they sit
              with the files rather than in a gallery of their own. -->
         <h3 class="kicker">Images</h3>
@@ -1026,7 +1026,7 @@
   }
   /* A strip rather than a grid: this is the project's material at a glance,
      and Design is where a picture is worked on. The hairline is the same one
-     Design's asset carries (VIS2-14) so a thumbnail reads as a picture on both
+     Design's asset carries (the dark composition) so a thumbnail reads as a picture on both
      grounds without a card around it. */
   .image-strip {
     list-style: none;

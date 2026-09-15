@@ -1,5 +1,5 @@
 /*
- * VIS2-19 — what Design's canvas is a canvas *of*.
+ * What Design's canvas is a canvas *of*.
  *
  * The review asks for Assets, Canvas and Inspector around an object, with a
  * version strip and a variation grid. Every one of those needs a relationship

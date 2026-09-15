@@ -260,7 +260,7 @@
               {#if thread.kind === "routine"}<Icon name="tasks" size="sm" />{/if}
               {thread.title}
             </span>
-            <!-- VIS-14 — project, state, last activity, in the one order every
+            <!-- Project, state, last activity, in the one order every
                  surface that draws a piece of work now uses. -->
             <WorkMeta
               project={thread.project_name}
@@ -359,7 +359,7 @@
   .day-group {
     margin-top: var(--space-5);
   }
-  /* VIS-06 — a day heading in a list of threads is a section label. Size and
+  /* A day heading in a list of threads is a section label. Size and
      colour separate it from the rows; caps and wide tracking were a third and
      fourth device for the same job. */
   h3 {

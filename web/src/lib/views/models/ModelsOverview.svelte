@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * MODEL-03 — what the Models page should say before it says anything else.
+   * What the Models page should say before it says anything else.
    *
    * The page opened on six equal tabs — Local, Hosted, Hugging Face, Activity,
    * Routing, Pricing — which is a filing system for the data rather than an
@@ -15,12 +15,12 @@
    *   5. Where do I go when I want to change something deliberately?
    *
    * This panel answers 1–4 above the fold and leaves 5 to the tabs. Everything
-   * it renders comes from `/api/model-decisions` (MODEL-01), so it cannot
+   * it renders comes from `/api/model-decisions`, so it cannot
    * disagree with the composer picker about which model is in force — before
    * that contract existed, the page and the composer assembled separate answers
    * from the same five stores and agreed by coincidence.
    *
-   * MODEL-13 — health is exception-led. A healthy provider gets no card and no
+   * health is exception-led. A healthy provider gets no card and no
    * Test button: a wall of green cards each offering a check is a page that
    * reports "nothing is wrong" in the most expensive way available, and it
    * trains the owner to ignore the one card that is not green. Only what needs
@@ -53,7 +53,7 @@
    * The Work modes, in product order, and the two surfaces that capture a model
    * onto the thing they create rather than holding a live default.
    *
-   * MODEL-11's rule is enforced by this shape: `Default`, `Selected`,
+   * The four-word vocabulary is enforced by this shape: `Default`, `Selected`,
    * `Effective` and `Fallback` are four different words for four different
    * facts, and the page used to call all of them "active".
    */
@@ -91,7 +91,7 @@
   }
 
   /**
-   * One line per surface, in the four-word vocabulary MODEL-11 insists on.
+   * One line per surface, in the four-word vocabulary the page insists on.
    *
    * `Default` is what the surface starts on. `Effective` is what will really
    * answer. They are the same in the ordinary case and the row says nothing
@@ -181,7 +181,7 @@
   {:else if !read}
     <PageState state="loading" title="Reading your model setup…" />
   {:else}
-    <!-- MODEL-13 — exceptions only. When this section is absent, that is the
+    <!-- Exceptions only. When this section is absent, that is the
          report: there is nothing to fix. -->
     {#if attention.length > 0}
       <section class="card attention" aria-labelledby="attention-h">
@@ -244,7 +244,7 @@
                   {/if}
                 </span>
                 {#if row.displaced !== null}
-                  <!-- MODEL-01's invariant, rendered: the choice stays, and the
+                  <!-- The model decision's invariant, rendered: the choice stays, and the
                        model that will really answer is named beside it rather
                        than quietly replacing it. -->
                   <span class="displaced">
@@ -310,7 +310,7 @@
   .attention h3 {
     margin: 0;
   }
-  /* MODEL-13 — the one section allowed a tone, because it is the one that is
+  /* The one section allowed a tone, because it is the one that is
      absent when nothing is wrong. */
   .attention {
     border-color: var(--warn-border);
@@ -402,7 +402,7 @@
     color: var(--warn);
     font-weight: 650;
   }
-  /* VIS2-16 — ready is the resting state and stays plain metadata; the one that
+  /* Ready is the resting state and stays plain metadata; the one that
      needs a person keeps the tone. */
   .state {
     flex: none;

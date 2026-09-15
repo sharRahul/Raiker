@@ -1,5 +1,5 @@
 /**
- * VIS-12 — an empty state that names what is missing and stops is a dead end.
+ * An empty state that names what is missing and stops is a dead end.
  *
  * The component has carried an `action` slot for a while and, before this pass,
  * *not one* of the thirteen call sites used it. Every zero-data screen in a

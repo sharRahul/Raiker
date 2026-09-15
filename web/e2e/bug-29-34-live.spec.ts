@@ -3,6 +3,13 @@ import { capture } from "./capture";
 import { join } from "node:path";
 import { OWNER_CREDENTIALS, hostedProviderCard, keepModelAvailable } from "./hosted-provider";
 
+import { roundName } from "./naming";
+
+// BUG-250 — named per run, so a round that has already worked in this
+// workspace cannot find its own leftovers and assert on them. The suite shares
+// one workspace by design; this is what keeps a shared workspace honest.
+const PROJECT = roundName("Review build host");
+
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const PASSWORD = OWNER_CREDENTIALS.password;
@@ -55,7 +62,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   await page.goto(`${BASE}/#/settings`);
   await page.getByRole("button", { name: "Runtime configuration" }).click();
   await page.getByText("Add SSH or Daytona profile").click();
-  await page.getByLabel("Display name").fill("Review build host");
+  await page.getByLabel("Display name").fill(PROJECT);
   await page.getByRole("textbox", { name: "Host", exact: true }).fill("build.example.com");
   await page.getByLabel("Remote user").fill("raiker");
   await page.getByLabel("Credential environment variable").fill("RAIKER_REVIEW_SSH_KEY");

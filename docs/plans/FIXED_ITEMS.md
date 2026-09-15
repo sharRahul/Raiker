@@ -560,6 +560,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-536](#fixed-536--an-account-wide-alert-setting-governed-a-banner-on-one-page) | Medium | Settings / notifications | Fixed 2026-09-15 (closes REM-SET-NOTIFY) |
 | [FIXED-537](#fixed-537--a-settings-page-nobody-could-reach-said-everything-stays-on-this-machine) | Low | Settings / storage | Fixed 2026-09-15 (closes REM-SET-STORAGE) |
 | [FIXED-538](#fixed-538--designs-research-findings-were-text-and-the-pages-behind-them-were-already-recorded) | Low | Design | Fixed 2026-09-15 (closes BUG-281) |
+| [FIXED-539](#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here) | Low | Runtime / environment context | Fixed 2026-09-15 (closes the clock half of BUG-280) |
 
 ---
 
@@ -23820,4 +23821,52 @@ host it ran on has no route to a search provider, so a research turn could not
 reach one. That is stated rather than implied: this closure rests on component
 evidence and the shared components' own live history, not on a live Design
 research round.
+
+---
+
+## FIXED-539 — A real turn now answers from Raiker's clock, and the weather half still cannot be measured here
+
+**Severity: Low. Area: runtime / environment context. Status: the clock half
+fixed 2026-09-15; the weather half stays open in
+[BUG-280](TO_BE_FIXED.md).**
+
+**Observed.** The 2026-09-07 round proved the whole environment contract against
+the runtime — the bundle a turn is given, the event it records, the precedence,
+the DST behaviour, the stale-refresh note, and every governed refusal — and
+recorded honestly that two halves were unmeasured:
+
+* **No model reasoned from the bundle.** That round's key was identity-linked
+  and the host had no local runtime, so no provider on it could complete a turn.
+* **No weather request left the machine.**
+
+The first is the one that mattered most and was the easiest to mistake for
+evidence. That the bundle is correct is a fact about the orchestrator, asserted
+where it belongs. That the *model* answers from it is a different claim, and a
+model with training knowledge of dates is exactly the thing that can make a
+wrong answer look right.
+
+**Fixed (the clock half).**
+`web/e2e/bug-280-clock-from-a-real-turn-live.spec.ts` drives a real Anthropic
+turn (`claude-haiku-4-5-20251001`) through the product's own composer and asks
+for today's date and day. It passes: the answer carries the runtime's date and
+day name.
+
+**It never hardcodes a date.** The expectation is read from `/api/environment`
+— the same derivation the orchestrator uses to build a turn's bundle — so the
+spec measures agreement between the runtime and the model rather than agreement
+between the model and whatever day the suite was written on. A spec with a date
+in it would start lying the following morning.
+
+The second case is the one that separates "the model was told" from "the model
+guessed": the owner's zone is changed to `Pacific/Auckland`, and the same
+question is asked again. The answer names Auckland. It restores the zone
+afterwards, because a spec that leaves a shared workspace on another continent
+is the state-leak BUG-250 is about.
+
+**Still open, and stated rather than implied.** The weather round trip. Every
+attempt to reach `api.open-meteo.com` from this host is cut by the environment's
+egress policy — re-verified on 2026-09-15 — so the tool answers
+`weather_provider_unavailable`. That is the correct typed answer to an
+unreachable provider and it is not evidence that a reachable one is read
+correctly. It needs a host with egress, not a change to Raiker.
 

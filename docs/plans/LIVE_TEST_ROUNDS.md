@@ -176,6 +176,34 @@ contain obsolete states". So two trees each claimed to be the catalogue, the
 historical one was the one being kept current, and the canonical one was empty.
 That sweep writes to the run's own `output/` directory now.
 
+### A real turn reading Raiker's clock (BUG-280, the half this host can measure)
+
+`web/e2e/bug-280-clock-from-a-real-turn-live.spec.ts` — 2 cases, passing,
+Anthropic `claude-haiku-4-5-20251001`.
+
+The 2026-09-07 round proved the environment contract against the runtime and
+recorded honestly that *"no model reasoned from the bundle"*, because that
+round's key was identity-linked and the host had no local runtime. With a
+working key this round could ask, and did:
+
+11. **Today's date, from the runtime.** With the owner's zone on `Europe/London`
+    and `timezone_source` reading `owner_setting`, a real turn asked for the
+    date and day answered with the runtime's own. The spec reads the expectation
+    from `/api/environment` rather than hardcoding one, so it measures agreement
+    between the runtime and the model rather than agreement with the day it was
+    written on.
+12. **The zone is the owner's.** With the zone moved to `Pacific/Auckland`, the
+    same question answers Auckland. It is put back afterwards, because a spec
+    that leaves a shared workspace on another continent is the state leak
+    BUG-250 is about.
+
+**The weather half is still unmeasured, for the reason BUG-280 records.** Every
+attempt to reach `api.open-meteo.com` from this host is cut by the environment's
+egress policy — re-verified with `curl` through the proxy's tunnel, which
+returns no status at all — so the tool answers `weather_provider_unavailable`.
+That is the right typed answer to an unreachable provider and it is not evidence
+that a reachable one is read correctly.
+
 ## 2026-09-14 (second) — Twelve simplifications, nine of them watched
 
 **Tier: Targeted. Build: production `npm run build`. Providers: Anthropic

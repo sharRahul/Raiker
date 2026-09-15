@@ -1360,6 +1360,22 @@ appear only once the owner asks for them.
 **Severity: Low. Area: runtime / environment context, weather. Raised while
 implementing ENV-01…05 and WEATHER-01…03.**
 
+**Half of this closed 2026-09-15 as
+[FIXED-539](FIXED_ITEMS.md#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here).**
+The clock half was measurable the moment a host had a working key: a real
+Anthropic turn names the runtime's date and day, and follows the owner's zone
+when it changes. The spec reads the expectation from `/api/environment` rather
+than hardcoding a date, so it measures agreement between the runtime and the
+model rather than agreement with whatever day it was written on.
+
+**The weather half is still open, and still for the same reason.** Every attempt
+to reach `api.open-meteo.com` from this host is cut by the environment's egress
+policy — verified again on 2026-09-15, `curl` returns no status through the
+proxy's tunnel — so the tool answers `weather_provider_unavailable`, which is the
+correct typed answer to an unreachable provider and is not evidence that a
+reachable one is read correctly. Closing it needs a host with egress, not a
+change to Raiker.
+
 **Observed.** The 2026-09-07 round proved the whole of the environment and
 weather contract against the runtime: the bundle a turn is given, the event it
 records, the precedence, the DST behaviour, the stale-refresh note, and every

@@ -23687,8 +23687,22 @@ find out was a notice that never arrived.
   notices appear wherever the owner is and the setting means what it says. It
   reads its own notifications rather than taking them as a prop, for the reason
   `ApprovalPrompt` does: the shell has no reason to know about notifications,
-  and the only thing using a read should own it. It shows three and links the
-  rest, so the strip never becomes the page.
+  and the only thing using a read should own it.
+* **It is docked, not in the flow, and the sweep is why.** The first placement
+  put it inside `main#main` above the routed page, and
+  `ui-sweep-responsive-live` failed on its first run: Chat, Build and Design
+  size themselves to `--content-h` — the room between the topbar and the bottom
+  of the viewport — so anything added above them pushes their composer below the
+  fold, and at 390×844 Build's composer ended **385px past the bottom edge**. It
+  docks like `ApprovalPrompt` now, at the opposite corner, taking no part in any
+  page's height.
+* **One notice, and reading it clears it.** Three docked cards covered Home's
+  primary actions at 1080p and most of the screen at 390px — a worse obstruction
+  than the banner nobody could see — and a docked notice that nothing dismisses
+  is permanent. It shows the newest unread one; opening it marks it read through
+  the same route the bell's **Mark all read** uses and lands the owner on what
+  it is about, so the strip, the bell's count and the record cannot disagree. A
+  link counts the rest.
 * Each switch is named for what it reaches — **Show unread notices inside
   Raiker**, **Alert me outside Raiker** — with one sentence each stating the
   real scope.
@@ -23709,10 +23723,15 @@ whole contract.
 **Verification.** Six cases in
 `web/src/lib/views/settings/Notification.test.ts`, including that the page stays
 quiet about permission while the switch is off and speaks up when it is on and
-blocked. The moved strip is asserted in `SessionMenu.test.ts` — it reads its own
-notices, hides read ones, and links the full record. `McpView.test.ts` no longer
-asserts a notification banner on the MCP page, because that is not the MCP
-page's job. Driven live on 2026-09-15.
+blocked. Two in `SessionMenu.test.ts`: the strip reads its own notices and hides
+read ones, and opening one marks it read and lands on the work.
+`McpView.test.ts` no longer asserts a notification banner on the MCP page,
+because that is not the MCP page's job.
+
+**Live, 2026-09-15.** `web/e2e/rem-set-notify-live.spec.ts` — three cases,
+passing — and the full responsive sweep at `mobile` and `1080p` in both themes
+across every destination, which is what caught the placement defect above and
+what proves the docked version costs no page its layout.
 
 ---
 

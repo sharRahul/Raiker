@@ -65,6 +65,27 @@ test("notification settings name what each switch reaches", async ({ page }) => 
   expect(consoleErrors).toEqual([]);
 });
 
+test("a docked notice clears by being read", async ({ page }) => {
+  // A docked notice nothing dismisses is a permanent obstruction — a worse
+  // defect than the banner nobody could see. Opening it marks it read through
+  // the same route the bell's Mark all read uses, so the strip, the bell's
+  // count and the record cannot disagree.
+  test.setTimeout(180_000);
+  await signInAsOwner(page, BASE);
+  await page.goto(`${BASE}/#/home`);
+
+  const strip = page.getByRole("region", { name: "Notifications" });
+  const visible = await strip.isVisible().catch(() => false);
+  test.skip(!visible, "This workspace has no unread notice to read, so there is nothing to clear.");
+
+  const notice = strip.getByRole("button").first();
+  const title = ((await notice.textContent()) ?? "").trim();
+  await notice.click();
+  // The same notice does not come back: the poll that follows the mark reads it
+  // as read, which is what it now is.
+  await expect(strip.getByRole("button", { name: title })).toHaveCount(0, { timeout: 30_000 });
+});
+
 test("Storage is not a Settings destination, by any route", async ({ page }) => {
   // REM-SET-STORAGE — `Storage.svelte` presented record counts as "Local usage"
   // and claimed everything stays on one machine. Neither establishes storage

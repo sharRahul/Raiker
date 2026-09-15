@@ -293,7 +293,6 @@
         onClose={() => (allPagesOpen = false)}
       />
       <main id="main" class="content" tabindex="-1">
-        <NotificationCenter />
         <!-- The topbar already shows the route title + hint; the page itself
            opens with its own lead so nothing is said twice. -->
         <ResponsivePage layout={pageLayout}>
@@ -396,6 +395,7 @@
   </div>
   <ModelSetupDialog />
   <ApprovalPrompt />
+  <NotificationCenter />
   <ModelOperationTray />
 {/if}
 

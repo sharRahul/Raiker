@@ -85,8 +85,9 @@
     Show unread notices inside Raiker
   </label>
   <p class="sub detail">
-    Up to three unread notices as a banner at the top of whatever page you are
-    on, with a link to the rest.
+    The newest unread notice, docked in the corner of whatever page you are on.
+    Opening it marks it read and takes you to what it is about. The bell in the
+    top bar counts them whether this is on or off.
   </p>
 
   <label class="toggle">

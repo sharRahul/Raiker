@@ -215,8 +215,9 @@ link to **Tasks**, where the card carries the run's own conversation thread and
 its title opens the attempt history above.
 
 **Settings → Notifications** decides where you see it, and nothing else. *Show
-unread notices inside Raiker* puts up to three unread ones as a banner at the top
-of whatever page you are on, with a link to the rest; *Alert me outside Raiker*
+unread notices inside Raiker* docks the newest unread one in the corner of
+whatever page you are on — opening it marks it read and takes you to what it is
+about, and the bell in the top bar counts them either way; *Alert me outside Raiker*
 raises the browser's own notification for the same ones, only while Raiker is not
 the window you are looking at, and it never leaves this machine. If the browser
 has blocked notifications, the page says so rather than leaving a switch that

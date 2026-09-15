@@ -33,7 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
-| 2026-09-15 | Targeted | `2026-09-15-task-history/` | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | A task's attempts read at an address the task did not have — the run the scheduler claimed, how it settled, and the three surfaces that now link to it; plus two Settings rows that were saying more than they governed |
+| 2026-09-15 | Targeted | `2026-09-15-task-history/` | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | A task's attempts read at an address the task did not have — the run the scheduler claimed, how it settled, and the three surfaces that now link to it; plus two Settings rows that were saying more than they governed, and the first generation of the `docs/screenshots/pages/` catalogue — 176 files, which caught a composer 385px below the fold |
 | 2026-09-14 (second) | Targeted | `2026-09-14-simplification/` | Anthropic, the same eighth key — a catalogue, a model kept offered, a model chosen for the turn, and an answer | Nine owner-facing changes of the simplification pass, driven through the product's own controls on a workspace that started empty, ending with **zero uncaught console errors** on a host that can reach neither `huggingface.co` nor `openrouter.ai` |
 | 2026-09-14 | Targeted | `2026-09-14-permissions-overhaul/` | Anthropic, an eighth key entered through the Connect dialog — the first of the eight that authenticates and lists models | The rebuilt Permissions page measured on the running product, the §18.3 rows that closed with it, and three live-test helpers that had been waiting on strings the product stopped printing |
 | 2026-09-07 | Targeted | `env-01-` … `env-05-` | Anthropic, a **seventh** identity-linked key entered through the interface; no local runtime on the host | The clock, the weather and the global read catalogue as runtime facts — and two harness defects that had been silent since the `apps/web` → `web` move: every live round writing its captures outside the repository, and every provider spec waiting for a tab the Models redesign removed |
@@ -140,10 +140,41 @@ round makes from the running host.
    `docs/screenshots/2026-09-15-task-history/settings-notifications.png`, which
    also shows the moved strip doing its job: the unread notices from this
    round's own task runs, on Settings, where the old placement showed nothing.
-9. **Storage is not a destination, by any route.** The rail offers no row,
-   `#/settings?tab=storage` falls back rather than rendering the deleted page,
-   and *“Everything stays on this machine”* appears nowhere in the running
-   product.
+9. **A docked notice clears by being read.** Opening it marks it read through
+   the same route the bell's **Mark all read** uses, and the same notice does
+   not come back.
+10. **Storage is not a destination, by any route.** The rail offers no row,
+    `#/settings?tab=storage` falls back rather than rendering the deleted page,
+    and *“Everything stays on this machine”* appears nowhere in the running
+    product.
+
+### The page catalogue, generated at last
+
+`docs/screenshots/README.md` has said since the 2026-09-07 audit that
+regenerating `docs/screenshots/pages/` "remains a live-test step before the
+screenshot refresh can be called complete". It ran here:
+`ui-sweep-responsive-live` against this host, every destination the nav registry
+declares, at `mobile` (390×844) and `1080p` (1920×1080), in light and dark —
+176 files, all four cases passing.
+
+**It caught a defect on its first run, which is the argument for having it.**
+The notification strip of item 8 had been placed above the routed page, and
+Chat, Build and Design size themselves to `--content-h`. At 390×844 Build's
+composer ended **385px past the bottom edge**. Nothing in a component test could
+have seen it; the sweep measures the real thing at the real size. The strip is
+docked now, and the same sweep passes.
+
+Two further placement facts came from reading the captures rather than from an
+assertion, and both were fixed before the catalogue was kept: three docked
+notices covered Home's primary actions at 1080p and most of the screen at 390px,
+and a docked notice that nothing dismisses is permanent.
+
+**One generator writes that catalogue now.** `all-pages-live` had been writing a
+second page catalogue into `docs/plans/screenshots/pages/` — the tree
+`docs/plans/README.md` calls *historical* evidence that "may intentionally
+contain obsolete states". So two trees each claimed to be the catalogue, the
+historical one was the one being kept current, and the canonical one was empty.
+That sweep writes to the run's own `output/` directory now.
 
 ## 2026-09-14 (second) — Twelve simplifications, nine of them watched
 

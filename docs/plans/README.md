@@ -22,6 +22,14 @@ IDs went out of the codebase with it
 did the same for five earlier removals), so no comment cites a file that is not
 in the tree.
 
+The typed channel's other half closed on 2026-09-16 as
+[FIXED-551](FIXED_ITEMS.md#fixed-551--a-declared-table-was-a-table-in-the-conversation-and-json-everywhere-else):
+an exported, reopened or spoken answer is the same answer the conversation
+showed. Proving it live found
+[FIXED-550](FIXED_ITEMS.md#fixed-550--a-turn-that-wrote-anything-before-calling-a-tool-stored-a-different-answer-than-it-showed),
+which is wider than the channel — every turn that narrated its work before
+calling a tool had been storing a different answer than it showed.
+
 ## Current status entry point
 
 Start with:

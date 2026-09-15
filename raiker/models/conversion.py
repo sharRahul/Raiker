@@ -1,10 +1,39 @@
+"""Converting a model the owner already has into one this machine can serve.
+
+**Cancel means cancel, while it is running (GCR-24).** The two steps are Docker
+containers and the isolation budget allows six hours, and the worker used to
+check the cancellation flag immediately before starting the first one and
+immediately after the last finished. In between there was nothing to check it:
+``subprocess.run`` blocks until the child exits. So pressing **Cancel** on a
+conversion that had just started left the operation at ``cancel_requested``, with
+the CPU still committed, potentially for the rest of the day.
+
+Three things make it answer now:
+
+* **A handle instead of a wait.** Each step runs under ``Popen`` and is polled,
+  so the flag is read on a cadence rather than at two instants.
+* **A name for the container.** Killing the ``docker run`` client does not stop
+  the container it started — the work goes on without anything watching it. Each
+  step is given a deterministic name, derived from the preview, and cancelling
+  stops *that container* by name. Deterministic rather than random on purpose:
+  the preview is what is persisted with the operation, so the names can be
+  recomputed by anything that has to clean up after a host restart, without
+  storing a second identity that could drift from the first.
+* **A cancellation is not a failure.** It raises
+  :class:`ConversionCancelled` rather than the generic refusal, so the owner is
+  told their conversion stopped because they stopped it, and not that it broke.
+"""
+
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
 import shutil
 import subprocess
+import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -32,6 +61,26 @@ SUPPORTED_QUANTIZATIONS = frozenset({"Q4_K_M", "Q5_K_M", "Q6_K", "Q8_0"})
 
 class ConversionRefused(ValueError):
     pass
+
+
+class ConversionCancelled(ConversionRefused):
+    """The owner stopped this conversion while it was running (GCR-24).
+
+    A subclass, so a caller that only knows about refusals still catches it, and
+    a caller that cares can tell the two apart. They are different sentences to
+    an owner: one says the work broke, the other says they stopped it.
+    """
+
+
+#: How often a running step is asked whether it should stop. Short enough that
+#: Cancel feels immediate, long enough that a six-hour conversion spends no
+#: measurable time being asked. The container stop below is what actually takes
+#: a moment.
+CANCEL_POLL_SECONDS = 1.0
+
+#: How long a stopped container is given to exit before it is killed outright.
+#: Docker's own default is ten seconds and the toolchain has nothing to flush.
+CONTAINER_STOP_SECONDS = 10
 
 
 @dataclass(frozen=True)
@@ -79,7 +128,17 @@ class ConversionProvenance:
 
 
 class DockerConversionRunner:
-    def run(self, preview: ConversionPreview) -> ConversionProvenance:
+    def run(
+        self,
+        preview: ConversionPreview,
+        should_cancel: Callable[[], bool] | None = None,
+    ) -> ConversionProvenance:
+        """Convert, answering ``should_cancel`` throughout rather than at the ends.
+
+        ``should_cancel`` is optional so every existing caller and test keeps
+        working unchanged; without one the steps run to completion exactly as
+        they did, and with one a conversion stops when the owner says so.
+        """
         docker = shutil.which("docker")
         if not docker:
             raise ConversionRefused("isolated_conversion_worker_unavailable")
@@ -90,17 +149,10 @@ class DockerConversionRunner:
         clean_env = {"PATH": str(Path(docker).parent)}
         if os.name == "nt" and os.environ.get("SYSTEMROOT"):
             clean_env["SYSTEMROOT"] = os.environ["SYSTEMROOT"]
-        for argv in (convert, quantize):
-            completed = subprocess.run(
-                argv,
-                shell=False,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=preview.isolation.timeout_seconds,
-                env=clean_env,
-            )
-            if completed.returncode != 0:
+        names = conversion_container_names(preview)
+        for argv, name in zip((convert, quantize), names, strict=True):
+            returncode = self._step(argv, name, docker, clean_env, preview, should_cancel)
+            if returncode != 0:
                 raise ConversionRefused("isolated_conversion_failed")
         metadata = read_gguf_metadata(result)
         if metadata.architecture.strip() == "":
@@ -119,6 +171,74 @@ class DockerConversionRunner:
         )
         intermediate.unlink(missing_ok=True)
         return provenance
+
+    def _step(
+        self,
+        argv: list[str],
+        container: str,
+        docker: str,
+        env: dict[str, str],
+        preview: ConversionPreview,
+        should_cancel: Callable[[], bool] | None,
+    ) -> int:
+        """Run one container to completion, cancellation or the isolation deadline.
+
+        Output goes to ``DEVNULL`` rather than to pipes. It was captured and
+        never read, and a step that is *waited on* rather than drained can fill
+        a pipe buffer and block — which for a converter that prints a line per
+        tensor is not hypothetical. Nothing that was used is lost.
+        """
+        process = subprocess.Popen(  # noqa: S603 - fixed argv, no shell, cleaned env
+            argv,
+            shell=False,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=env,
+        )
+        deadline = time.monotonic() + preview.isolation.timeout_seconds
+        while True:
+            try:
+                return process.wait(timeout=CANCEL_POLL_SECONDS)
+            except subprocess.TimeoutExpired:
+                pass
+            if should_cancel is not None and should_cancel():
+                self._stop(process, container, docker, env)
+                raise ConversionCancelled("conversion_cancelled_by_owner")
+            if time.monotonic() >= deadline:
+                self._stop(process, container, docker, env)
+                raise ConversionRefused("isolated_conversion_timed_out")
+
+    def _stop(
+        self, process: subprocess.Popen[bytes], container: str, docker: str, env: dict[str, str]
+    ) -> None:
+        """Stop the container, then the client that is waiting on it.
+
+        In that order, and both: terminating the ``docker run`` client alone
+        leaves the container running with nothing watching it, which is the
+        worst of the three outcomes — the owner is told it stopped and the CPU
+        is still committed.
+        """
+        # Docker itself may be unreachable. The client below is still killed in
+        # that case, so the worker settles rather than waiting for ever on
+        # something it has no way to stop.
+        with contextlib.suppress(OSError, subprocess.SubprocessError):
+            subprocess.run(  # noqa: S603 - fixed argv, no shell, cleaned env
+                [docker, "stop", "--time", str(CONTAINER_STOP_SECONDS), container],
+                shell=False,
+                check=False,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=CONTAINER_STOP_SECONDS + 20,
+                env=env,
+            )
+        process.terminate()
+        try:
+            process.wait(timeout=CONTAINER_STOP_SECONDS)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=CONTAINER_STOP_SECONDS)
 
 
 class ModelConversionService:
@@ -179,14 +299,41 @@ class ModelConversionService:
             isolation=ConversionIsolation(),
         )
 
-    def convert(self, preview: ConversionPreview) -> ConversionProvenance:
-        return self.runner.run(preview)
+    def convert(
+        self,
+        preview: ConversionPreview,
+        should_cancel: Callable[[], bool] | None = None,
+    ) -> ConversionProvenance:
+        return self.runner.run(preview, should_cancel)
+
+
+def conversion_container_names(preview: ConversionPreview) -> tuple[str, str]:
+    """The two containers this conversion runs, named ``(convert, quantize)``.
+
+    Derived from the preview rather than generated, which is what makes the
+    identity *recoverable* (GCR-24): the preview is persisted with the
+    operation, so anything cleaning up after a host restart can recompute these
+    names and remove the containers, without a second stored identity that could
+    disagree with the first.
+
+    The digest covers everything that decides what the container does, so two
+    conversions the owner could reasonably run at once — the same source at two
+    quantizations, or the same model into two libraries — never collide on a
+    name and stop each other.
+    """
+    digest = hashlib.sha256(
+        "\x00".join(
+            (preview.source, preview.output, preview.revision, preview.quantization)
+        ).encode("utf-8")
+    ).hexdigest()[:16]
+    return (f"raiker-convert-{digest}", f"raiker-quantize-{digest}")
 
 
 def docker_command_plan(preview: ConversionPreview, docker: str) -> tuple[list[str], list[str]]:
     source = Path(preview.source)
     output = Path(preview.output)
     intermediate, result = _output_paths(preview)
+    convert_name, quantize_name = conversion_container_names(preview)
     base = [
         docker,
         "run",
@@ -207,7 +354,11 @@ def docker_command_plan(preview: ConversionPreview, docker: str) -> tuple[list[s
         "--mount",
         f"type=bind,src={output},dst=/models/output",
     ]
+    # GCR-24 — a named container is one Cancel can reach. Without it the only
+    # handle is the `docker run` client, and killing that leaves the work going.
     convert = base + [
+        "--name",
+        convert_name,
         "--entrypoint",
         "python",
         preview.toolchain_image,
@@ -216,6 +367,8 @@ def docker_command_plan(preview: ConversionPreview, docker: str) -> tuple[list[s
         *preview.convert_argv[-2:],
     ]
     quantize = base + [
+        "--name",
+        quantize_name,
         "--entrypoint",
         "/app/llama-quantize",
         preview.toolchain_image,
@@ -254,12 +407,41 @@ def conversion_artifacts(preview: ConversionPreview) -> tuple[Path, ...]:
 
 
 def _source_fingerprint(source: Path, revision: str) -> str:
-    digest = hashlib.sha256(revision.encode("ascii"))
+    """What this conversion was made from, as a content-integrity claim (GCR-26).
+
+    It used to hash the declared revision, each relative filename and each
+    file's *byte size*, and never the bytes. A path and a length are not an
+    identity: edit a weights file in place, keep its length, and the fingerprint
+    is unchanged — so the provenance record recorded a different model under the
+    same value, which is the one thing a fingerprint exists not to do.
+
+    Now every included file's content is hashed. Three details that matter:
+
+    * **Each file's own digest goes in**, rather than the bytes being streamed
+      into one running hash, so two files whose contents could be re-split
+      across a boundary cannot produce the same value.
+    * **The length of each field is written before it**, so a filename ending
+      where the next one begins cannot be rearranged into the same byte stream.
+    * **The order is the sorted relative path**, so the same tree fingerprints
+      the same way wherever it is mounted.
+
+    The cost is one full read of the snapshot. That is a fraction of a
+    conversion that has just read all of it several times, and it is what makes
+    the recorded value mean what the record says it means.
+    """
+    digest = hashlib.sha256()
+    _feed(digest, b"raiker.conversion.source.v2")
+    _feed(digest, revision.encode("ascii"))
     for path in sorted(item for item in source.rglob("*") if item.is_file()):
-        relative = path.relative_to(source).as_posix()
-        digest.update(relative.encode("utf-8"))
-        digest.update(str(path.stat().st_size).encode("ascii"))
+        _feed(digest, path.relative_to(source).as_posix().encode("utf-8"))
+        _feed(digest, _sha256_file(path).encode("ascii"))
     return digest.hexdigest()
+
+
+def _feed(digest: Any, field: bytes) -> None:
+    """Length-prefix one field, so the concatenation cannot be re-partitioned."""
+    digest.update(len(field).to_bytes(8, "big"))
+    digest.update(field)
 
 
 def _sha256_file(path: Path) -> str:

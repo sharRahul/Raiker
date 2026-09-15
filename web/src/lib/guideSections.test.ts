@@ -9,6 +9,7 @@ import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { guideSectionFor, mappedRoutes } from "./guideSections";
+import { NAV_ITEMS } from "./nav";
 
 const GUIDE = resolve(process.cwd(), "..", "docs", "guide");
 
@@ -39,5 +40,40 @@ describe("guide section map", () => {
 
   it("has no target for a route the guide does not cover", () => {
     expect(guideSectionFor("no-such-route")).toBeNull();
+  });
+});
+
+// REM-GUIDE — the trade this map exists for is "remove the inline manual
+// chapter, keep one contextual link". It only works where the link exists, so a
+// navigable page with no guide target is a page that has to keep teaching on
+// itself — which is the duplication the finding is about.
+//
+// Build was the one that showed why this needs an assertion rather than a
+// habit: the product shipped `working-in-build.md` and had no way to open it,
+// so the surface with the most to explain was the one that could only explain
+// itself inline.
+describe("every page the product navigates to can reach the guide", () => {
+  // Guide itself is the destination, so it does not link to itself.
+  const NOT_EXPLAINED_ELSEWHERE = new Set(["guide"]);
+
+  it("gives every navigation destination a guide target", () => {
+    const missing = NAV_ITEMS.map((item) => item.id)
+      .filter((id) => !NOT_EXPLAINED_ELSEWHERE.has(id))
+      .filter((id) => guideSectionFor(id) === null);
+    expect(missing).toEqual([]);
+  });
+
+  it("leaves no guide chapter about a surface unreachable from that surface", () => {
+    // Chapters that explain the product rather than one page are reached from
+    // the guide's own index, which is what it is for.
+    const GENERAL = new Set([
+      "getting-started",
+      "known-limits",
+      "managing-the-host",
+      "security-and-privacy",
+    ]);
+    const linked = new Set(mappedRoutes().map((route) => guideSectionFor(route)!.slug));
+    const unreachable = [...slugs].filter((slug) => !GENERAL.has(slug) && !linked.has(slug));
+    expect(unreachable).toEqual([]);
   });
 });

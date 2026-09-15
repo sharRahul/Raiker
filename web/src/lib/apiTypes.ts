@@ -985,6 +985,8 @@ export interface TranscriptExportMessage {
   text: string;
   timestamp: string | null;
   status: string | null;
+  /** BUG-300 — the parts this answer declared. Empty when it declared none. */
+  parts?: ContentPart[];
 }
 
 export interface TranscriptExportFile {
@@ -1004,6 +1006,10 @@ export interface TranscriptExportManifest {
   redaction_policy: string;
   formats: string[];
   messages: TranscriptExportMessage[];
+  /** BUG-300 — declared tables and charts across the conversation, so the
+   *  review says they will be rendered rather than leaving the owner to find
+   *  out from the file. */
+  typed_part_count?: number;
 }
 
 /** BUG-24 — parked turns this account may continue, ids only. */
@@ -1734,6 +1740,15 @@ export interface TurnSummary {
    * sources merge into one row rather than two.
    */
   tool_rows?: Array<Record<string, unknown>>;
+  /**
+   * BUG-300 — the parts this answer declared, derived server-side from the
+   * stored text by the same splitter a live turn goes through.
+   *
+   * Empty for every answer that declared nothing. Without it a reopened turn
+   * rendered the raw ` ```raiker:table ` fence and its JSON, which is a
+   * different answer from the one the conversation showed.
+   */
+  content_parts?: ContentPart[];
 }
 
 // GET /api/sessions/{id} — raiker/control/dashboard.py SessionDetailView.to_dict()

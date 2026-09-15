@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-16 | Targeted | `docs/screenshots/` (five captures, no prefix) | Anthropic (`claude-haiku-4-5-20251001`), the key entered through the Connect dialog | Five scenarios on a workspace reset for the round: a declared table surviving an export, a reopened turn in the evidence inspector, a Knowledge Map that says it is empty instead of drawing three records nobody made, the same records as a list with the canvas stopped, and Build opening the guide chapter the product had been shipping and could not reach. **The first attempt found a High-severity runtime defect** — a turn that wrote anything before calling a tool stored a different answer than it showed — which is why the round had nothing to export until it was fixed |
 | 2026-09-15 (second) | Targeted | `docs/screenshots/` (seven captures, no prefix) | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | Eight scenarios on a workspace reset for the round: the two authority columns a permission could not answer before, a fresh account's capability baseline and the Build preset, a **real model answering with a declared table and chart**, four presentation rows, and `policy_mutation` proved absent. One product defect found by the work and fixed in it — the Permissions posture note still said every capability starts off — and one model behaviour that changed the system prompt rather than the test |
 | 2026-09-15 | Targeted | `2026-09-15-task-history/` | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | Three scenarios unrun since 2026-09-03 finally run; a task's attempts read at an address the task did not have — the run the scheduler claimed, how it settled, and the three surfaces that now link to it; plus two Settings rows that were saying more than they governed, and the first generation of the `docs/screenshots/pages/` catalogue — 176 files, which caught a composer 385px below the fold |
 | 2026-09-14 (second) | Targeted | `2026-09-14-simplification/` | Anthropic, the same eighth key — a catalogue, a model kept offered, a model chosen for the turn, and an answer | Nine owner-facing changes of the simplification pass, driven through the product's own controls on a workspace that started empty, ending with **zero uncaught console errors** on a host that can reach neither `huggingface.co` nor `openrouter.ai` |
@@ -70,6 +71,79 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-09-16 — One answer, wherever it is read back
+
+**Tier: Targeted. Build: production `npm run build`. Provider: Anthropic
+(`claude-haiku-4-5-20251001`), the key entered through the product's own Connect
+dialog. Owner: the shared `OWNER_CREDENTIALS`. Workspace: reset for the round
+(`scripts/reset_live_workspace.py`), because the first scenario is about what a
+**new account's** Knowledge Map says. Spec:
+`web/e2e/round-2026-09-16-typed-export-and-map-live.spec.ts`. Five scenarios,
+all passing, **zero uncaught console errors**.**
+
+**What it found, before it proved anything.** The first press of **Send** in this
+round produced the defect the round existed to close evidence for, from the other
+direction. Asked for three cities as a table, the model wrote a
+` ```raiker:table ` block, called `update_plan`, and then wrote *"Done. The table
+shows the three cities…"*. The browser showed both. The stored turn was the
+second sentence alone, because `final_text` was only ever assigned on the round
+that came back with no tool calls — so the declared table never reached
+`content_parts`, and the renderer drew the fence as a code block above a sentence
+claiming a table had been shown.
+
+That is
+[FIXED-550](FIXED_ITEMS.md#fixed-550--a-turn-that-wrote-anything-before-calling-a-tool-stored-a-different-answer-than-it-showed),
+and it is much wider than the table: **every turn that narrated its work stored a
+different answer than it showed.** A reopened conversation had been losing those
+paragraphs, an export had been losing them, and the audit summary had been taken
+from the short half. It was invisible in a unit test because a test turn answers
+in one round; it took a real model choosing to call a tool.
+
+**What it proved, after that.**
+
+* **A declared table survives an export.** The review names what the file will
+  carry — *1 table or chart* — before a format is chosen, and the downloaded
+  Markdown holds a GFM table with `City` and `Millions` and no ` raiker:table `
+  fence anywhere in it. `export-review-declared-parts.png`.
+* **A reopened turn is the same answer.** Observability → Sessions renders the
+  turn's table as a table, from parts the server derived from the stored text
+  with the same splitter. The governed events listed under it still quote the raw
+  record, which is correct — and which is also
+  [BUG-302](TO_BE_FIXED.md#bug-302--four-audit-summaries-quote-the-whole-answer-including-a-payload),
+  because four of them quote the *same* raw record instead of saying what each
+  event did. `sessions-reopened-typed-answer.png`.
+* **A Knowledge Map with nothing in it says so.** No **Workspace** node, no **Add
+  first source** node, no *Starter view* pill: *"Nothing in the map yet"*, the
+  count pill reading *"Nothing recorded yet"*, and **Add source** / **Open
+  Memory** in the empty state rather than inside a node the owner has to work out
+  is not a record. `knowledge-map-empty-state.png`.
+* **The same records, without the graph.** The **List** view shows every record
+  with its type, status and connection count, its relationships with their
+  evidence and the same **Reject link** control — with `.graph-workspace.hidden`
+  asserted, so the simulation is stopped rather than ticking behind a table. The
+  choice survives a reload. `knowledge-map-list-view.png`.
+* **Build can open the chapter the product ships about it.** *How Build works on
+  a repository* lands on **Working in Build**, which had been in the tree and
+  unreachable from the product since it was written.
+  `guide-working-in-build.png`.
+
+**Three defects found by the round and filed:**
+[FIXED-550](FIXED_ITEMS.md#fixed-550--a-turn-that-wrote-anything-before-calling-a-tool-stored-a-different-answer-than-it-showed)
+(fixed in the round),
+[BUG-301](TO_BE_FIXED.md#bug-301--the-guides-own-cross-references-are-not-links)
+— the guide's own chapter-to-chapter links render as literal text, visible in
+`guide-working-in-build.png` — and
+[BUG-302](TO_BE_FIXED.md#bug-302--four-audit-summaries-quote-the-whole-answer-including-a-payload).
+
+**Two things the harness learned.** A `viewMode` the server's preference
+allowlist did not name was accepted, dropped and returned at its default, which
+is the failure mode an allowlist produces when it is not kept in step with the
+page. And the first version of this spec read the count pill with
+`isVisible()`, which does not wait, so it skipped the scenario it was written to
+run against a page that had not finished drawing.
 
 ---
 

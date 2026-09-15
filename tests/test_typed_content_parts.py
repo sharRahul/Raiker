@@ -216,3 +216,55 @@ def test_the_model_is_told_the_channel_exists() -> None:
 
     assert "raiker:table" in _SYSTEM_PROMPT
     assert "raiker:chart" in _SYSTEM_PROMPT
+
+
+def test_a_surface_that_renders_parts_takes_the_typed_route_for_a_refusal() -> None:
+    """BUG-300 — the refusal is the difference between the two predicates.
+
+    ``has_typed_part`` answers "is there content here", and a refusal is not
+    content: nothing was accepted. ``renders_as_parts`` answers the question
+    every reopening surface actually asks — "do I render the parts or the raw
+    text" — and there a refusal must count, or a surface silently prints the
+    fence the runtime already refused.
+    """
+    from raiker.runtime.typed_parts import renders_as_parts
+
+    refused = content_parts(_fence("table", {"columns": ["a"], "rows": [["x", "y"]]}))
+    assert [part.type for part in refused] == [PART_REFUSED]
+    assert has_typed_part(refused) is False
+    assert renders_as_parts(refused) is True
+
+    plain = content_parts("Nothing declared here.")
+    assert renders_as_parts(plain) is False
+
+
+class TestAStoredTurnIsReopenedAsThePartsItDeclared:
+    """BUG-300 — a reopened turn answers in the shapes it answered in.
+
+    ``AgentResponse`` derives the parts, so a *live* turn always carried them.
+    Every surface that reads the record — a reloaded conversation, the Sessions
+    inspector — held a string, and printed the fence with its JSON where the
+    conversation had shown a table. The split is the runtime's either way.
+    """
+
+    def test_a_stored_answer_that_declared_a_table_carries_its_parts(self) -> None:
+        from raiker.control.dashboard import _stored_content_parts
+
+        parts = _stored_content_parts(f"Spending so far.\n\n{_fence('table', TABLE)}")
+        assert [part["type"] for part in parts] == [PART_TEXT, PART_TABLE]
+        assert parts[1]["data"]["columns"] == ["Provider", "Spend"]
+
+    def test_a_stored_answer_that_declared_nothing_carries_nothing(self) -> None:
+        """An ordinary turn's payload is what it always was, byte for byte."""
+        from raiker.control.dashboard import _stored_content_parts
+
+        assert _stored_content_parts("A plain answer.") == ()
+        assert _stored_content_parts(None) == ()
+        assert _stored_content_parts("") == ()
+
+    def test_a_stored_refusal_is_carried_rather_than_printed_as_a_fence(self) -> None:
+        from raiker.control.dashboard import _stored_content_parts
+
+        parts = _stored_content_parts(_fence("chart", {"kind": "pie", "labels": ["a"]}))
+        assert [part["type"] for part in parts] == [PART_REFUSED]
+        assert parts[0]["reason_code"] == "chart_kind_unsupported"

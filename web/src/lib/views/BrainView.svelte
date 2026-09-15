@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation, type SimulationNodeDatum } from "d3-force";
+  import EmptyState from "../components/EmptyState.svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
@@ -15,7 +17,7 @@
   import type { BrainEdge, BrainNode, BrainSourceBrowse, BrainSourceReview, BrainView as BrainData } from "../apiTypes";
 
   type MotionMode = "paused" | "activity" | "alive";
-  type GraphNode = BrainNode & SimulationNodeDatum & { degree: number; virtual?: boolean; color?: string; pinned?: boolean };
+  type GraphNode = BrainNode & SimulationNodeDatum & { degree: number; color?: string; pinned?: boolean };
   type GraphLink = BrainEdge & { source: string | GraphNode; target: string | GraphNode };
   type Group = { name: string; query: string; color: string };
 
@@ -86,6 +88,32 @@
   let sourceBrowse = $state<BrainSourceBrowse | null>(null);
   let sourceReview = $state<BrainSourceReview | null>(null);
   let motion = $state<MotionMode>("alive");
+
+  /**
+   * REM-MAP-04 — two things this page owes a reader who is not reading a graph.
+   *
+   * **A list.** Finding where a memory came from, or rejecting a relationship
+   * Raiker inferred, are decisions about records. The canvas made them
+   * decisions about geometry: you had to locate a dot by eye, at whatever zoom
+   * the simulation had settled on, before you could act on it. The list offers
+   * the same records with the same actions and the same evidence, and it is a
+   * peer of the map rather than a fallback — the choice is remembered with the
+   * owner's other display preferences.
+   *
+   * **Stillness.** The force simulation is JavaScript, so the global
+   * `prefers-reduced-motion` rule in `app.css` never reached it: "Always alive"
+   * held `alphaTarget` above zero and the graph never stopped moving. The
+   * setting is left exactly as the owner set it — what changes is that the
+   * system preference is honoured over it, the same way it is for every CSS
+   * animation in the product, and the Motion section says so.
+   */
+  let viewMode = $state<"map" | "list">("map");
+  let reducedMotion = $state(false);
+  /** What the simulation actually does, once the device has had its say. */
+  const effectiveMotion = $derived<MotionMode>(
+    reducedMotion && motion === "alive" ? "activity" : motion,
+  );
+
   let centerStrength = $state(0.08);
   let chargeStrength = $state(-220);
   let linkStrength = $state(0.35);
@@ -176,6 +204,7 @@
       if (raw.positions && typeof raw.positions === "object") savedPositions = raw.positions as typeof savedPositions;
       if (raw.filters && typeof raw.filters === "object") enabledTypes = { ...enabledTypes, ...(raw.filters as Record<string, boolean>) };
       if (typeof raw.motion === "string" && ["paused", "activity", "alive"].includes(raw.motion)) motion = raw.motion as MotionMode;
+      if (raw.viewMode === "list" || raw.viewMode === "map") viewMode = raw.viewMode;
     } catch { /* Older runtimes simply start with the documented defaults. */ }
     finally { preferencesLoaded = true; }
   }
@@ -184,7 +213,18 @@
     void loadPreferences();
     void load();
     const timer = window.setInterval(() => void load(), 15_000);
-    return () => { window.clearInterval(timer); simulation?.stop(); };
+    // REM-MAP-04 — subscribed rather than read once, because the preference can
+    // change while the page is open and a graph that keeps moving after the
+    // owner has asked the system for stillness is the defect, not the default.
+    const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    reducedMotion = query?.matches ?? false;
+    const onPreferenceChange = (event: MediaQueryListEvent) => (reducedMotion = event.matches);
+    query?.addEventListener?.("change", onPreferenceChange);
+    return () => {
+      window.clearInterval(timer);
+      query?.removeEventListener?.("change", onPreferenceChange);
+      simulation?.stop();
+    };
   });
 
   /**
@@ -217,7 +257,9 @@
     const settings = {
       transform, display: { showOrphans, showLabels, showArrows, showParticles, nodeScale, linkThickness, labelThreshold },
       forces: { centerStrength, chargeStrength, linkStrength, linkDistance, collisionPadding },
-      groups, positions: savedPositions, filters: enabledTypes, motion,
+      // REM-MAP-04 - the list is a way of working, not a temporary escape,
+      // so which view the owner chose survives a reload with the rest.
+      groups, positions: savedPositions, filters: enabledTypes, motion, viewMode,
     };
     const timer = window.setTimeout(() => { void api.saveBrainPreferences(settings).catch(() => undefined); }, 500);
     return () => window.clearTimeout(timer);
@@ -233,13 +275,42 @@
     }
     return values;
   });
-  // The instructional graph a brand-new workspace is given: three placeholder
-  // nodes and two placeholder edges that stand in for records nobody has made
-  // yet. One derived flag decides both the overlay that says the graph is empty
-  // and what the count pill claims, because they used to disagree — the pill
-  // counted the placeholders as workspace records and read "3 nodes · 2
-  // relationships" directly above "Build your knowledge graph".
-  const showingStarter = $derived(rawNodes.length <= 1 && search === "" && graphMode === "global");
+  // REM-MAP-02 — a workspace with nothing in it says so, and draws nothing.
+  //
+  // A brand-new workspace used to be given an instructional graph: three
+  // placeholder nodes and two placeholder edges standing in for records nobody
+  // had made. They were flagged `is_real: false` and the pill called them a
+  // *Starter view*, so they were never covert — but they were still selectable,
+  // hoverable, centreable objects that opened an inspector, in the one surface
+  // whose whole job is to show what the workspace actually knows. A map that
+  // draws things that are not there teaches the owner to distrust the map.
+  //
+  // So the graph is now empty when the workspace is, and the way out — Add
+  // source, Open Memory — is in the empty state rather than inside a node the
+  // owner has to work out is not a record.
+  //
+  // The two emptinesses are different answers and are told apart deliberately:
+  // nothing recorded is not the same as nothing matching, and offering "Add a
+  // source" to somebody who has forty records and a typo in the search field is
+  // the wrong instruction.
+  //
+  // The owner's own principal node is a real record and is hidden from nothing
+  // that counts records — but it is not something they *recorded*, so a map
+  // holding only "You" is a map with nothing in it, and says so.
+  const hasNoRecords = $derived(rawNodes.every((node) => node.node_type === "user"));
+  const filtersAreNarrowing = $derived(
+    search !== "" || graphMode !== "global" || !showOrphans
+      || Object.values(enabledTypes).some((on) => on === false),
+  );
+  /** Everything back on, so "no records match" has a way out of itself. */
+  function resetFilters() {
+    search = "";
+    enabledTypes = Object.fromEntries(FILTER_TYPES.map((type) => [type, true]));
+    showOrphans = true;
+    graphMode = "global";
+    centreId = null;
+  }
+
   const sourceRoots = $derived(rawNodes.filter((node) => ["file", "folder"].includes(node.node_type) && node.status === "selected"));
   const summary = $derived([
     ["Records", rawNodes.length], ["Relationships", rawEdges.length],
@@ -278,19 +349,24 @@
   });
 
   const visibleData = $derived.by(() => {
+    // REM-MAP-02 — a map with nothing in it draws nothing. The owner's own
+    // principal node is a real record and is not hidden from anything that
+    // counts records, but alone on a canvas it is an unlabelled dot with no
+    // relationships, sitting under the sentence that says the map is empty.
+    // Drawing it there would be the starter graph's mistake in miniature: a
+    // mark that looks like knowledge and is not.
+    if (hasNoRecords) return { nodes: [] as BrainNode[], edges: [] as BrainEdge[] };
     let nodes = rawNodes.filter((node) => {
       const typeOn = enabledTypes[node.node_type] ?? true;
       return typeOn && localIds.has(node.node_id) && matchesQuery(node, search);
     });
     if (!showOrphans) nodes = nodes.filter((node) => (degrees.get(node.node_id) ?? 0) > 0);
-    let edges = rawEdges.filter((edge) => nodes.some((node) => node.node_id === edge.source) && nodes.some((node) => node.node_id === edge.target));
-    if (showingStarter) {
-      const principal = nodes[0] ?? { node_id: "starter:user", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: false };
-      nodes = [principal, { node_id: "starter:workspace", node_type: "workspace", label: "Workspace", status: "active", detail: "Your governed workspace", progress_percent: null, is_real: false }, { node_id: "starter:add", node_type: "source", label: "Add first source", status: "instruction", detail: "Instructional prompt", progress_percent: null, is_real: false }];
-      edges = [{ source: principal.node_id, target: "starter:workspace", relationship: "owns", is_active: false }, { source: "starter:workspace", target: "starter:add", relationship: "instruction", is_active: false }];
-    }
+    const edges = rawEdges.filter((edge) => nodes.some((node) => node.node_id === edge.source) && nodes.some((node) => node.node_id === edge.target));
     return { nodes, edges };
   });
+
+  /** REM-MAP-02 — records exist, and the filters have selected none of them. */
+  const filteredToNothing = $derived(!hasNoRecords && visibleData.nodes.length === 0);
 
   function radius(node: GraphNode): number { return Math.max(4, Math.min(20, 4 + Math.sqrt(node.degree) * 2.5)) * nodeScale; }
   function nodeId(value: string | GraphNode): string { return typeof value === "string" ? value : value.node_id; }
@@ -309,7 +385,7 @@
   $effect(() => {
     const data = visibleData;
     const nodes: GraphNode[] = data.nodes.map((node) => ({
-      ...node, degree: degrees.get(node.node_id) ?? (node.node_id === "starter:workspace" ? 2 : 1),
+      ...node, degree: degrees.get(node.node_id) ?? 1,
       color: groupColorFor(node), x: positionCache.get(node.node_id)?.x ?? savedPositions[node.node_id]?.x ?? graphWidth / 2 + (Math.random() - 0.5) * 80,
       y: positionCache.get(node.node_id)?.y ?? savedPositions[node.node_id]?.y ?? graphHeight / 2 + (Math.random() - 0.5) * 80,
       fx: savedPositions[node.node_id]?.pinned ? savedPositions[node.node_id].x : undefined,
@@ -328,8 +404,11 @@
       // The layout has stopped moving, which is the only moment a fit means
       // anything. `alive` motion never reaches it; the timer covers that.
       .on("end", () => autoFit());
-    if (motion === "paused") simulation.stop();
-    else if (motion === "alive") simulation.alphaTarget(0.015).restart();
+    // REM-MAP-04 - the list is not a graph with the pixels hidden. A force
+    // simulation ticking behind a table is the visualisation-only motion this
+    // finding is about, still running where nobody can see it.
+    if (viewMode === "list" || effectiveMotion === "paused") simulation.stop();
+    else if (effectiveMotion === "alive") simulation.alphaTarget(0.015).restart();
     else simulation.alphaTarget(0).restart();
     renderedNodes = nodes; renderedLinks = links;
     const currentSimulation = simulation;
@@ -338,7 +417,6 @@
 
   function selectNode(event: MouseEvent, node: GraphNode) {
     event.stopPropagation(); contextMenu = null;
-    if (node.node_id === "starter:add") { void openSourcePicker(); return; }
     selectedIds = event.shiftKey ? (selectedIds.includes(node.node_id) ? selectedIds.filter((id) => id !== node.node_id) : [...selectedIds, node.node_id]) : [node.node_id];
     inspectorOpen = true;
   }
@@ -362,9 +440,13 @@
   function centreNode(node: GraphNode) { centreId = node.node_id; graphMode = "local"; selectedIds = [node.node_id]; inspectorOpen = true; }
   function dragStart(event: PointerEvent, node: GraphNode) { event.stopPropagation(); (event.currentTarget as Element).setPointerCapture(event.pointerId); node.fx = node.x; node.fy = node.y; simulation?.alphaTarget(0.1).restart(); }
   function dragMove(event: PointerEvent, node: GraphNode) { if (!(event.currentTarget as Element).hasPointerCapture(event.pointerId)) return; node.fx = (event.offsetX - transform.x) / transform.k; node.fy = (event.offsetY - transform.y) / transform.k; }
-  function dragEnd(event: PointerEvent, node: GraphNode) { (event.currentTarget as Element).releasePointerCapture(event.pointerId); node.pinned = true; savedPositions = { ...savedPositions, [node.node_id]: { x: node.fx ?? node.x ?? 0, y: node.fy ?? node.y ?? 0, pinned: true } }; simulation?.alphaTarget(motion === "alive" ? 0.015 : 0); }
+  function dragEnd(event: PointerEvent, node: GraphNode) { (event.currentTarget as Element).releasePointerCapture(event.pointerId); node.pinned = true; savedPositions = { ...savedPositions, [node.node_id]: { x: node.fx ?? node.x ?? 0, y: node.fy ?? node.y ?? 0, pinned: true } }; simulation?.alphaTarget(effectiveMotion === "alive" ? 0.015 : 0); }
   function unpin(node: GraphNode) { node.fx = null; node.fy = null; node.pinned = false; const next = { ...savedPositions }; delete next[node.node_id]; savedPositions = next; simulation?.alpha(0.25).restart(); contextMenu = null; }
-  async function rejectRelationship(edge: GraphLink) {
+  // REM-MAP-04 — takes a `BrainEdge` rather than a `GraphLink`, because the
+  // list rejects the same relationship from the same record without the
+  // simulation having turned it into a link first. One rejection path, two
+  // places to reach it.
+  async function rejectRelationship(edge: BrainEdge) {
     if (!edge.relationship_id || !edge.owner_can_reject) return;
     const reason = window.prompt("Why is this relationship incorrect?", "Incorrect relationship");
     if (!reason?.trim()) return;
@@ -625,6 +707,34 @@
   function statusLabel(status: string): string { return status.replaceAll("_", " ").replace(/^./, (value) => value.toUpperCase()); }
   const selected = $derived(renderedNodes.find((node) => node.node_id === selectedIds[0]) ?? null);
   const selectedConnections = $derived(selected ? renderedLinks.filter((edge) => nodeId(edge.source) === selected.node_id || nodeId(edge.target) === selected.node_id) : []);
+
+  // ── REM-MAP-04 — the list ──────────────────────────────────────────────────
+  //
+  // Built from `visibleData` rather than from `renderedNodes`, so it holds the
+  // records the filters selected whether or not a simulation has ever run over
+  // them. That is the point: the list is what this page is when nothing is
+  // moving.
+  const listRows = $derived(
+    [...visibleData.nodes]
+      .map((node) => ({
+        node,
+        degree: degrees.get(node.node_id) ?? 0,
+        relationships: rawEdges.filter(
+          (edge) => edge.source === node.node_id || edge.target === node.node_id,
+        ),
+      }))
+      // Most-connected first, then alphabetical: a stable order that does not
+      // depend on where a force put something.
+      .sort((left, right) => right.degree - left.degree || left.node.label.localeCompare(right.node.label)),
+  );
+  let expandedRow = $state<string | null>(null);
+
+  function labelFor(nodeIdValue: string): string {
+    return rawNodes.find((node) => node.node_id === nodeIdValue)?.label ?? nodeIdValue;
+  }
+  function otherEnd(edge: BrainEdge, nodeIdValue: string): string {
+    return edge.source === nodeIdValue ? edge.target : edge.source;
+  }
 </script>
 
 <!-- NEW-MAP-01 — a *refresh* that fails used to replace the whole map with
@@ -641,6 +751,8 @@
   <section class="knowledge-shell" aria-label="Knowledge Map">
     <header class="graph-toolbar">
       <div class="title-block"><span class="eyebrow">Workspace intelligence</span><h2>Knowledge Map</h2></div>
+      <!-- REM-GUIDE — one contextual link, on a page that had none. -->
+      <GuideLink route="brain" />
       <!-- Global/Local was a segmented control that spent most of its life half
            disabled: `centreNode()` already switches to local when you focus a
            node, so the switch's only unique job was getting back out again. That
@@ -651,12 +763,118 @@
            Fullscreen went too. The graph fills the content area already, and the
            browser's own fullscreen took the sidebar and topbar away without
            putting anything in their place. -->
+      <!-- REM-MAP-04 — the same records, either as a map or as a list. Two
+           buttons rather than a menu: which one you are looking at is the thing
+           the control has to say, and a menu hides that behind a press. -->
+      <div class="view-switch" role="group" aria-label="How to show records">
+        <button type="button" aria-pressed={viewMode === "map"} onclick={() => (viewMode = "map")}>
+          <Icon name="map" size="sm" /> Map
+        </button>
+        <button type="button" aria-pressed={viewMode === "list"} onclick={() => (viewMode = "list")}>
+          <Icon name="sessions" size="sm" /> List
+        </button>
+      </div>
       <button class="icon-button" aria-label="Add workspace source" title="Add source" onclick={() => void openSourcePicker()}>+</button>
       <button class="icon-button" aria-label="Graph settings" aria-expanded={settingsOpen} onclick={() => settingsOpen = !settingsOpen}><Icon name="settings" size="md" /></button>
       <label class="search"><Icon name="search" size="md" /><input bind:value={search} placeholder="Search records or use type:, status:…" aria-label="Search records" /></label>
     </header>
 
-    <div class="graph-workspace" bind:this={graphElement} use:graphInteractions role="application" aria-label="Interactive force-directed knowledge graph">
+    {#if viewMode === "list"}
+      <!-- REM-MAP-04 — the same authorised records, the same actions, the same
+           evidence, without needing to read geometry or wait for a layout to
+           settle. Rejection history is preserved: an inactive relationship is
+           still listed and still says so. -->
+      <div class="record-list">
+        {#if hasNoRecords}
+          <EmptyState
+            icon="map"
+            title="Nothing in the map yet"
+            body="Add a source, or let a conversation, an approved memory or a task record something."
+          >
+            {#snippet action()}
+              <button type="button" class="btn btn-primary btn-sm" onclick={() => void openSourcePicker()}>
+                <Icon name="plus" size="sm" /> Add source
+              </button>
+              <a class="btn btn-ghost btn-sm" href="#/memory"><Icon name="memory" size="sm" /> Open Memory</a>
+            {/snippet}
+          </EmptyState>
+        {:else if listRows.length === 0}
+          <EmptyState
+            icon="search"
+            serif={false}
+            title="No records match these filters"
+            body={`This workspace has ${rawNodes.length} record${rawNodes.length === 1 ? "" : "s"}. None of them matches what is selected.`}
+          >
+            {#snippet action()}
+              <button type="button" class="btn btn-sm" disabled={!filtersAreNarrowing} onclick={resetFilters}>
+                Clear filters
+              </button>
+            {/snippet}
+          </EmptyState>
+        {:else}
+          <table class="table">
+            <caption class="sr-only">Workspace records and their relationships</caption>
+            <thead>
+              <tr>
+                <th scope="col">Record</th>
+                <th scope="col">Type</th>
+                <th scope="col">Status</th>
+                <th scope="col">Connections</th>
+                <th scope="col"><span class="sr-only">Relationships</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each listRows as row (row.node.node_id)}
+                <tr>
+                  <th scope="row"><span class="record-label">{row.node.label}</span>{#if row.node.detail}<small>{row.node.detail}</small>{/if}</th>
+                  <td>{row.node.node_type}</td>
+                  <td>{statusLabel(row.node.status)}</td>
+                  <td class="numeric">{row.degree}</td>
+                  <td class="row-action">
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm"
+                      aria-expanded={expandedRow === row.node.node_id}
+                      onclick={() => (expandedRow = expandedRow === row.node.node_id ? null : row.node.node_id)}
+                    >
+                      {expandedRow === row.node.node_id ? "Hide" : "Relationships"}
+                    </button>
+                  </td>
+                </tr>
+                {#if expandedRow === row.node.node_id}
+                  <tr class="detail-row">
+                    <td colspan="5">
+                      {#if row.relationships.length === 0}
+                        <p class="muted">No stored relationships yet.</p>
+                      {:else}
+                        <ul class="relationship-list">
+                          {#each row.relationships as edge (`${edge.source}:${edge.target}:${edge.relationship}`)}
+                            <li>
+                              <span class="rel-kind">{edge.relationship.replaceAll("_", " ")}</span>
+                              <b>{labelFor(otherEnd(edge, row.node.node_id))}</b>
+                              {#if !edge.is_active}<span class="rel-state">rejected</span>{/if}
+                              {#if edge.evidence_memory_id}<small>Evidence: {edge.evidence_memory_id}</small>{/if}
+                              {#if edge.owner_can_reject}
+                                <button type="button" class="btn btn-ghost btn-sm" onclick={() => void rejectRelationship(edge)}>
+                                  Reject link
+                                </button>
+                              {/if}
+                            </li>
+                          {/each}
+                        </ul>
+                      {/if}
+                    </td>
+                  </tr>
+                {/if}
+              {/each}
+            </tbody>
+          </table>
+        {/if}
+        {#if actionError}<p class="action-error" role="alert">{actionError}<button onclick={() => (actionError = null)} aria-label="Dismiss">×</button></p>{/if}
+      </div>
+    {/if}
+
+    <div class="graph-workspace" class:hidden={viewMode === "list"} bind:this={graphElement} use:graphInteractions role="application" aria-label="Interactive force-directed knowledge graph">
       <div class="vignette"></div>
       <svg class="graph-stage" width={graphWidth} height={graphHeight} aria-label={`${renderedNodes.length} node${renderedNodes.length === 1 ? "" : "s"} and ${renderedLinks.length} relationship${renderedLinks.length === 1 ? "" : "s"}`}>
         <defs><marker id="arrow" viewBox="0 -5 10 10" refX="16" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="rgba(180,188,205,.55)" /></marker></defs>
@@ -667,11 +885,11 @@
             {#if source && target}
               {@const active = highlighted.has(source.node_id) && highlighted.has(target.node_id)}
               <line class:highlighted={active} class:instruction={edge.relationship === "instruction"} x1={source.x ?? 0} y1={source.y ?? 0} x2={target.x ?? 0} y2={target.y ?? 0} style={`--link-width:${linkThickness}`} marker-end={showArrows && edge.relationship !== "instruction" ? "url(#arrow)" : undefined} />
-              {#if showParticles && edge.is_active}<circle class="particle" r="2" fill={source.color}><animateMotion dur="1.8s" repeatCount="indefinite" path={`M ${source.x ?? 0} ${source.y ?? 0} L ${target.x ?? 0} ${target.y ?? 0}`} /></circle>{/if}
+              {#if showParticles && edge.is_active && !reducedMotion}<circle class="particle" r="2" fill={source.color}><animateMotion dur="1.8s" repeatCount="indefinite" path={`M ${source.x ?? 0} ${source.y ?? 0} L ${target.x ?? 0} ${target.y ?? 0}`} /></circle>{/if}
             {/if}
           {/each}
           {#each renderedNodes as node (node.node_id)}
-            <g class="graph-node" class:dimmed={highlighted.size > 0 && !highlighted.has(node.node_id)} class:selected={selectedIds.includes(node.node_id)} class:virtual={node.node_id.startsWith("starter:")} transform={`translate(${node.x ?? 0},${node.y ?? 0})`} role="button" tabindex="0" aria-label={`${node.label}, ${node.node_type} record, ${node.degree} connections`} onpointerenter={() => hoveredId = node.node_id} onpointerleave={() => hoveredId = null} onpointerdown={(event) => dragStart(event, node)} onpointermove={(event) => dragMove(event, node)} onpointerup={(event) => dragEnd(event, node)} onclick={(event) => selectNode(event, node)} ondblclick={(event) => { event.stopPropagation(); centreNode(node); }} oncontextmenu={(event) => { event.preventDefault(); event.stopPropagation(); contextMenu = { x: event.clientX, y: event.clientY, node }; }} onkeydown={(event) => { if (event.key === "Enter") selectNode(event as unknown as MouseEvent, node); }}>
+            <g class="graph-node" class:dimmed={highlighted.size > 0 && !highlighted.has(node.node_id)} class:selected={selectedIds.includes(node.node_id)} transform={`translate(${node.x ?? 0},${node.y ?? 0})`} role="button" tabindex="0" aria-label={`${node.label}, ${node.node_type} record, ${node.degree} connections`} onpointerenter={() => hoveredId = node.node_id} onpointerleave={() => hoveredId = null} onpointerdown={(event) => dragStart(event, node)} onpointermove={(event) => dragMove(event, node)} onpointerup={(event) => dragEnd(event, node)} onclick={(event) => selectNode(event, node)} ondblclick={(event) => { event.stopPropagation(); centreNode(node); }} oncontextmenu={(event) => { event.preventDefault(); event.stopPropagation(); contextMenu = { x: event.clientX, y: event.clientY, node }; }} onkeydown={(event) => { if (event.key === "Enter") selectNode(event as unknown as MouseEvent, node); }}>
               <circle class="halo" r={radius(node) + 7} fill={node.color} />
               <!-- A cited source whose file is gone is drawn hollow with a dashed
                    outline, the way an unresolved link renders in a vault: the work
@@ -684,11 +902,42 @@
         </g>
       </svg>
 
-      {#if showingStarter}
-        <div class="empty-copy"><strong>Build your knowledge graph</strong><span>Add sources, complete conversations, approve memories, or create tasks. Relationships will appear automatically.</span></div>
+      <!-- REM-MAP-02 — the two emptinesses, told apart. Nothing recorded offers
+           the way to record something; nothing matching offers the way back to
+           everything. Neither draws a node that is not a record. -->
+      {#if hasNoRecords}
+        <div class="empty-overlay">
+          <EmptyState
+            icon="map"
+            title="Nothing in the map yet"
+            body="Add a source, or let a conversation, an approved memory or a task record something. Relationships appear on their own."
+          >
+            {#snippet action()}
+              <button type="button" class="btn btn-primary btn-sm" onclick={() => void openSourcePicker()}>
+                <Icon name="plus" size="sm" /> Add source
+              </button>
+              <a class="btn btn-ghost btn-sm" href="#/memory"><Icon name="memory" size="sm" /> Open Memory</a>
+            {/snippet}
+          </EmptyState>
+        </div>
+      {:else if filteredToNothing}
+        <div class="empty-overlay">
+          <EmptyState
+            icon="search"
+            serif={false}
+            title="No records match these filters"
+            body={`This workspace has ${rawNodes.length} record${rawNodes.length === 1 ? "" : "s"}. None of them matches what is selected.`}
+          >
+            {#snippet action()}
+              <button type="button" class="btn btn-sm" disabled={!filtersAreNarrowing} onclick={resetFilters}>
+                Clear filters
+              </button>
+            {/snippet}
+          </EmptyState>
+        </div>
       {/if}
 
-      <button class="summary-pill" aria-expanded={summaryOpen} onclick={(event) => { event.stopPropagation(); summaryOpen = !summaryOpen; }}>{#if showingStarter}<span>Starter view</span><i></i><span>nothing recorded yet</span>{:else}<span>{renderedNodes.length} node{renderedNodes.length === 1 ? "" : "s"}</span><i></i><span>{renderedLinks.length} relationship{renderedLinks.length === 1 ? "" : "s"}</span>{/if}<span aria-hidden="true">{summaryOpen ? "⌃" : "⌄"}</span></button>
+      <button class="summary-pill" aria-expanded={summaryOpen} onclick={(event) => { event.stopPropagation(); summaryOpen = !summaryOpen; }}>{#if hasNoRecords}<span>Nothing recorded yet</span>{:else}<span>{renderedNodes.length} node{renderedNodes.length === 1 ? "" : "s"}</span><i></i><span>{renderedLinks.length} relationship{renderedLinks.length === 1 ? "" : "s"}</span>{/if}<span aria-hidden="true">{summaryOpen ? "⌃" : "⌄"}</span></button>
       {#if summaryOpen}<section class="summary-popover"><h3>Workspace summary</h3>{#each summary as item}<p><span>{item[0]}</span><b>{item[1]}</b></p>{/each}<small><Icon name="shield" size="sm" /> Governed workspace boundary</small></section>{/if}
 
       <div class="viewport-controls"><button aria-label="Fit graph" onclick={fitGraph}>Fit</button><button aria-label="Zoom out" onclick={() => transform = { ...transform, k: Math.max(.35, transform.k - .15) }}>−</button><span>{Math.round(transform.k * 100)}%</span><button aria-label="Zoom in" onclick={() => transform = { ...transform, k: Math.min(3, transform.k + .15) }}>+</button></div>
@@ -719,7 +968,8 @@
           <p class="panel-divider">Advanced display</p>
           <details><summary>Display</summary><label class="check-row"><input type="checkbox" bind:checked={showArrows} /><span>Direction arrows</span></label><label class="check-row"><input type="checkbox" bind:checked={showLabels} /><span>Node labels</span></label><label class="check-row"><input type="checkbox" bind:checked={showParticles} /><span>Relationship particles</span></label><label class="range-row"><span>Text fade threshold</span><input type="range" min="0.35" max="1.5" step="0.05" bind:value={labelThreshold} /></label><label class="range-row"><span>Node size</span><input type="range" min="0.7" max="1.7" step="0.1" bind:value={nodeScale} /></label><label class="range-row"><span>Link thickness</span><input type="range" min="0.5" max="2.5" step="0.1" bind:value={linkThickness} /></label></details>
           <details><summary>Forces</summary><label class="range-row"><span>Centre force</span><input type="range" min="0" max="0.3" step="0.01" bind:value={centerStrength} /></label><label class="range-row"><span>Repel force</span><input type="range" min="-500" max="-40" step="10" bind:value={chargeStrength} /></label><label class="range-row"><span>Link force</span><input type="range" min="0" max="1" step="0.05" bind:value={linkStrength} /></label><label class="range-row"><span>Link distance</span><input type="range" min="30" max="220" step="5" bind:value={linkDistance} /></label><label class="range-row"><span>Collision radius</span><input type="range" min="0" max="30" step="1" bind:value={collisionPadding} /></label></details>
-          <details><summary>Motion</summary><div class="motion-options">{#each [["paused", "Paused"], ["activity", "Activity only"], ["alive", "Always alive"]] as option}<label><input type="radio" name="motion" value={option[0]} bind:group={motion} /><span>{option[1]}</span></label>{/each}</div></details>
+          <details><summary>Motion</summary><div class="motion-options">{#each [["paused", "Paused"], ["activity", "Activity only"], ["alive", "Always alive"]] as option}<label><input type="radio" name="motion" value={option[0]} bind:group={motion} /><span>{option[1]}</span></label>{/each}</div>{#if reducedMotion}<!-- REM-MAP-04 - the setting keeps the value the owner gave it; the device preference is honoured over it, and says so rather than looking broken. -->
+            <small class="motion-note">This device asks for reduced motion, so the graph settles instead of staying alive. Your choice is kept.</small>{/if}</details>
         </aside>
       {/if}
 
@@ -821,9 +1071,78 @@
   .graph-stage { position:absolute; inset:0; z-index:2; overflow:visible; }
   line { stroke:color-mix(in srgb, var(--text-3) 55%, transparent); stroke-width:calc(var(--link-width) * 1px); transition:opacity .15s, stroke .15s; } line.highlighted { stroke:var(--accent); stroke-width:calc(var(--link-width) * 1.8px); } line.instruction { stroke-dasharray:3 7; stroke:color-mix(in srgb, var(--text-3) 70%, transparent); }
   .particle { filter:drop-shadow(0 0 3px currentColor); opacity:.8; }
-  .graph-node { cursor:pointer; outline:none; transition:opacity .15s; } .graph-node.dimmed { opacity:.12; } .node-circle { stroke-width:1.2px; filter:drop-shadow(0 0 3px color-mix(in srgb, var(--text-1) 14%, transparent)); transition:r .15s, filter .15s, stroke-width .15s; } .halo { opacity:.06; transition:opacity .15s; } .graph-node:hover .halo,.graph-node.selected .halo { opacity:.24; } .graph-node:hover .node-circle,.graph-node.selected .node-circle { stroke:var(--accent-strong); stroke-width:2px; filter:drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 72%, transparent)); } .graph-node.virtual .node-circle { opacity:.8; } .node-circle.unresolved { stroke-dasharray:2.5 2.5; stroke-width:1.6px; }
+  .graph-node { cursor:pointer; outline:none; transition:opacity .15s; } .graph-node.dimmed { opacity:.12; } .node-circle { stroke-width:1.2px; filter:drop-shadow(0 0 3px color-mix(in srgb, var(--text-1) 14%, transparent)); transition:r .15s, filter .15s, stroke-width .15s; } .halo { opacity:.06; transition:opacity .15s; } .graph-node:hover .halo,.graph-node.selected .halo { opacity:.24; } .graph-node:hover .node-circle,.graph-node.selected .node-circle { stroke:var(--accent-strong); stroke-width:2px; filter:drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 72%, transparent)); } .node-circle.unresolved { stroke-dasharray:2.5 2.5; stroke-width:1.6px; }
   .node-label { fill:var(--text-1); paint-order:stroke; stroke:var(--surface); stroke-width:3px; stroke-linejoin:round; font-size:11px; font-family:var(--font-sans); pointer-events:none; }
-  .empty-copy { position:absolute; z-index:4; left:50%; top:20px; transform:translateX(-50%); display:grid; gap:4px; width:min(520px, 80%); text-align:center; pointer-events:none; } .empty-copy strong { font-size:var(--text-md); } .empty-copy span { color:var(--text-2); font-size:var(--text-xs); line-height:1.45; }
+  /* REM-MAP-02 — the empty state sits in the middle of the canvas it replaces,
+     rather than as a caption above a graph of things that are not there. It
+     takes pointer events because, unlike the old copy, it offers the next
+     step. */
+  /* REM-MAP-04 — the list is a peer of the map, so it gets the page rather
+     than a panel inside it. `display: none` on the canvas rather than removing
+     it from the tree keeps the owner's pan, zoom and pinned positions across a
+     switch: the two views are two readings of one workspace. */
+  .graph-workspace.hidden { display: none; }
+  .record-list {
+    overflow-x: auto;
+    padding: var(--space-3);
+  }
+  /* Block children rather than a grid on the `th` itself: a table cell that
+     becomes a grid container leaves the table layout algorithm, and every
+     column after it stops lining up with its header. */
+  .record-list th[scope="row"] { font-weight: 400; }
+  .record-list .record-label { display: block; font-weight: 650; }
+  .record-list th[scope="row"] small { display: block; margin-top: 0.1rem; color: var(--text-2); font-size: var(--text-xs); }
+  .record-list td.row-action { text-align: right; white-space: nowrap; }
+  .record-list .detail-row > td { background: var(--sunken); }
+  .relationship-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+  .relationship-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--text-sm);
+  }
+  .relationship-list .rel-kind { color: var(--text-2); }
+  .relationship-list .rel-state {
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 0 0.35rem;
+    color: var(--text-3);
+    font-size: var(--text-xs);
+  }
+  .relationship-list small { color: var(--text-2); font-size: var(--text-xs); }
+  .view-switch { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+  .view-switch button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 0;
+    background: transparent;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+  }
+  .view-switch button[aria-pressed="true"] { background: var(--accent-soft); color: var(--text-1); font-weight: 650; }
+  .motion-note { display: block; margin-top: 0.4rem; color: var(--text-2); font-size: var(--text-xs); line-height: 1.4; }
+  .empty-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    padding: var(--space-4);
+    /* Only the way out takes clicks, so the viewport controls beneath stay
+       reachable. */
+    pointer-events: none;
+  }
+  .empty-overlay :global(.empty-action) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    justify-content: center;
+    pointer-events: auto;
+  }
   .summary-pill,.viewport-controls,.graph-meta,.depth-control { position:absolute; z-index:5; display:flex; align-items:center; border:1px solid var(--border-strong); background:color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter:blur(14px); color:var(--text-2); box-shadow:var(--shadow-2); }
   .summary-pill { left:16px; top:16px; gap:8px; border-radius:20px; padding:7px 11px; font:inherit; font-size:var(--text-2xs); cursor:pointer; } .summary-pill i { width:3px; height:3px; border-radius:50%; background:var(--text-3); }
   .summary-popover { position:absolute; z-index:8; left:16px; top:56px; width:230px; padding:14px; border:1px solid var(--border-strong); border-radius:10px; background:color-mix(in srgb, var(--raised) 96%, transparent); box-shadow:var(--shadow-2); } .summary-popover h3 { margin:0 0 10px; font-size:var(--text-sm); } .summary-popover p { display:flex; justify-content:space-between; margin:6px 0; color:var(--text-2); font-size:var(--text-xs); } .summary-popover p b { color:var(--text-1); } .summary-popover small { display:flex; gap:5px; align-items:center; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); color:var(--accent); font-size:var(--text-2xs); }

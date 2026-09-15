@@ -59,7 +59,10 @@ Use **Observability** when you need evidence rather than a summary:
   *Preview rewind* opens the same preflight **Rewind to before this** opens from
   a message in Chat or Build.
 - **Work** shows live background activity.
-- **Notifications** collects events that need attention.
+- **Notifications** collects events that need attention. It is the record: a
+  notice is kept here whether or not either alert under **Settings →
+  Notifications** showed it, so turning both off loses nothing. The bell in the
+  top bar counts the unread ones from every page.
 
 **Overview** answers the whole of "is this instance in a state I can work in".
 Three tiles at the top give the runtime's readiness, how many capability gates

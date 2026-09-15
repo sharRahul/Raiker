@@ -7383,6 +7383,25 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             return None
         return self._task_from_row(row)
 
+    def load_task_for_user(self, task_id: str, user_id: str | None) -> TaskRecord | None:
+        """One task, only if this account may see it (BUG-299).
+
+        The same visibility rule :meth:`list_tasks` applies — the task's owning
+        session belongs to this account, or to nobody — rather than a second
+        one, so a task that is absent from the board can never be readable at
+        its own address. ``user_id`` of ``None`` is the unattributed
+        single-owner workspace and reads as :meth:`load_task` does.
+        """
+        if user_id is None:
+            return self.load_task(task_id)
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM tasks WHERE task_id = ? AND session_id IN "
+                "(SELECT session_id FROM sessions WHERE user_id = ? OR user_id IS NULL)",
+                (task_id, user_id),
+            ).fetchone()
+        return self._task_from_row(row) if row is not None else None
+
     def list_tasks(
         self,
         session_id: str | None = None,

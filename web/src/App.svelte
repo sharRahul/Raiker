@@ -27,6 +27,10 @@
   import { prefetchRoutes } from "./lib/routeComponents";
   import { startReadinessRevalidation } from "./lib/modelReadiness.svelte";
   import ApprovalPrompt from "./lib/components/ApprovalPrompt.svelte";
+  // REM-SET-NOTIFY — unread notices belong wherever the owner is. The strip was
+  // mounted on the MCP page alone, so the account-wide "In-app popups" setting
+  // decided whether a banner appeared on one destination.
+  import NotificationCenter from "./lib/components/NotificationCenter.svelte";
   import ModelSetupDialog from "./lib/components/ModelSetupDialog.svelte";
   import ModelOperationTray from "./lib/components/ModelOperationTray.svelte";
 
@@ -125,6 +129,13 @@
       ? null
       : routeStateFromHash(window.location.hash).turnId,
   );
+  // BUG-299 — the task a link is pointing at. Only Tasks reads it, and it opens
+  // that task's attempt history over the board rather than instead of it.
+  let openTaskId = $state<string | null>(
+    typeof window === "undefined"
+      ? null
+      : routeStateFromHash(window.location.hash).taskId,
+  );
 
   onMount(() => {
     // BUG-253 — a refresh used to land on the unlock screen, which is exactly
@@ -151,6 +162,7 @@
       currentSection = sectionFromHash(window.location.hash);
       continuedSessionId = routeStateFromHash(window.location.hash).sessionId;
       anchoredTurnId = routeStateFromHash(window.location.hash).turnId;
+      openTaskId = routeStateFromHash(window.location.hash).taskId;
       // Route changes move focus to the main landmark so keyboard and screen
       //-reader users land on the new page content, not mid-shell.
       document.getElementById("main")?.focus();
@@ -322,7 +334,7 @@
           {:else if current === "tasks"}
             <LazyRoute
               route="tasks"
-              props={{ sessionId: continuedSessionId, projects }}
+              props={{ sessionId: continuedSessionId, projects, taskId: openTaskId }}
             />
           {:else if current === "brain"}
             <LazyRoute route="brain" />
@@ -383,6 +395,7 @@
   </div>
   <ModelSetupDialog />
   <ApprovalPrompt />
+  <NotificationCenter />
   <ModelOperationTray />
 {/if}
 

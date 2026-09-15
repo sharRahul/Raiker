@@ -137,7 +137,7 @@ describe("supported-preferences settings", () => {
     const { putBodies } = stubApi();
     render(SettingsView, { props: { principal: "alice" } });
     await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
-    const toggle = await screen.findByLabelText(/in-app popups/i);
+    const toggle = await screen.findByLabelText(/unread notices inside Raiker/i);
     await fireEvent.click(toggle);
     expect(screen.getByText(/you have unsaved changes/i)).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
@@ -151,14 +151,14 @@ describe("supported-preferences settings", () => {
     stubApi({ failPut: true });
     render(SettingsView, { props: { principal: "alice" } });
     await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
-    const toggle = await screen.findByLabelText(/in-app popups/i);
+    const toggle = await screen.findByLabelText(/unread notices inside Raiker/i);
     expect((toggle as HTMLInputElement).checked).toBe(true);
     await fireEvent.click(toggle);
     await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     // The failed write surfaces a page-level error and the control reverts.
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/couldn't save/i));
-    await waitFor(() => expect((screen.getByLabelText(/in-app popups/i) as HTMLInputElement).checked).toBe(true));
+    await waitFor(() => expect((screen.getByLabelText(/unread notices inside Raiker/i) as HTMLInputElement).checked).toBe(true));
   });
 
   it("switches to the Account section and shows account deletion", async () => {
@@ -326,7 +326,7 @@ describe("saving while the owner is still editing", () => {
 
     // Change A, start its save, then change B while the request is out.
     await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
-    await fireEvent.click(await screen.findByLabelText(/in-app popups/i));
+    await fireEvent.click(await screen.findByLabelText(/unread notices inside Raiker/i));
     await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
     await waitFor(() => expect(put.putBodies).toHaveLength(1));
     await editDensity(/Compact/);
@@ -353,7 +353,7 @@ describe("saving while the owner is still editing", () => {
     const put = stubHeldPut();
     render(SettingsView, { props: { principal: "alice" } });
     await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
-    await fireEvent.click(await screen.findByLabelText(/in-app popups/i));
+    await fireEvent.click(await screen.findByLabelText(/unread notices inside Raiker/i));
 
     const saveButton = screen.getByRole("button", { name: /save changes/i });
     await fireEvent.click(saveButton);
@@ -371,7 +371,7 @@ describe("saving while the owner is still editing", () => {
     const put = stubHeldPut();
     render(SettingsView, { props: { principal: "alice" } });
     await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
-    await fireEvent.click(await screen.findByLabelText(/in-app popups/i));
+    await fireEvent.click(await screen.findByLabelText(/unread notices inside Raiker/i));
     await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
     await waitFor(() => expect(put.putBodies).toHaveLength(1));
 
@@ -382,7 +382,7 @@ describe("saving while the owner is still editing", () => {
     // The refused change is rolled back … (the rail item now carries an unsaved
     // mark, which is part of its accessible name, so it is matched loosely.)
     await fireEvent.click(screen.getByRole("button", { name: /^Notifications/ }));
-    expect((screen.getByLabelText(/in-app popups/i) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText(/unread notices inside Raiker/i) as HTMLInputElement).checked).toBe(true);
     // … and the edit that was never part of the refusal is still there.
     await fireEvent.click(screen.getByRole("button", { name: /^Personalisation/ }));
     expect(within(group).getByRole("radio", { name: /Compact/ })).toHaveAttribute(
@@ -396,7 +396,7 @@ describe("saving while the owner is still editing", () => {
     const put = stubHeldPut();
     render(SettingsView, { props: { principal: "alice" } });
     await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
-    await fireEvent.click(await screen.findByLabelText(/in-app popups/i));
+    await fireEvent.click(await screen.findByLabelText(/unread notices inside Raiker/i));
     await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
     await waitFor(() => expect(put.putBodies).toHaveLength(1));
     await editDensity(/Compact/);

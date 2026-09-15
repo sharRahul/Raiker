@@ -30,6 +30,7 @@
  */
 import { ApiError, api } from "./api";
 import type { TaskView } from "./apiTypes";
+import { taskDetailHref } from "./taskHistory";
 
 /** What is known about the request, which is not always what happened. */
 export type TaskSettlement = "requested" | "completed" | "outcome_unknown";
@@ -42,6 +43,12 @@ export interface TaskLifecycleOutcome {
   notice: string;
   /** The governed reason code, when the runtime supplied one. */
   reasonCode?: string;
+  /**
+   * Where the owner can see what actually happened, when the outcome is not
+   * knowable from here (BUG-299). Set only on `outcome_unknown`, because that
+   * is the only settlement whose remedy is "go and look".
+   */
+  detailHref?: string;
 }
 
 /**
@@ -53,7 +60,12 @@ export interface TaskLifecycleOutcome {
  * lost its response on the way back. The two are not the same fact and were
  * being reported with the same sentence.
  */
-function settleFailure(error: unknown, verb: string, title: string): TaskLifecycleOutcome {
+function settleFailure(
+  error: unknown,
+  verb: string,
+  title: string,
+  taskId: string,
+): TaskLifecycleOutcome {
   if (error instanceof ApiError) {
     return {
       ok: false,
@@ -67,7 +79,12 @@ function settleFailure(error: unknown, verb: string, title: string): TaskLifecyc
     settlement: "outcome_unknown",
     notice:
       `Raiker did not answer the request to ${verb} “${title}”, so it may or may ` +
-      "not have been applied. Refresh to see the run's current state before trying again.",
+      "not have been applied. Open this task's history to see the run's current " +
+      "state before trying again.",
+    // BUG-299 — the remedy this settlement names now has somewhere to go. It
+    // was written before a task had an address, so "refresh to see the run's
+    // current state" asked an owner to look at a page that did not exist.
+    detailHref: taskDetailHref(taskId),
   };
 }
 
@@ -97,7 +114,8 @@ export async function stopRun(task: TaskView, reason: string): Promise<TaskLifec
         settlement: "outcome_unknown",
         notice:
           `Raiker accepted the request but did not apply it to “${task.title}”. ` +
-          "The run may have already finished; refresh to see its current state.",
+          "The run may have already finished; open its history to see what it did.",
+        detailHref: taskDetailHref(task.task_id),
       };
     }
     return {
@@ -107,7 +125,7 @@ export async function stopRun(task: TaskView, reason: string): Promise<TaskLifec
       notice: `Asked “${task.title}” to stop at its next safe boundary.`,
     };
   } catch (error) {
-    return settleFailure(error, "stop", task.title);
+    return settleFailure(error, "stop", task.title, task.task_id);
   }
 }
 
@@ -135,7 +153,7 @@ export async function resumeRun(task: TaskView): Promise<TaskLifecycleOutcome> {
           : `Could not continue “${task.title}” (${result.reason_code ?? "unknown reason"}). Nothing changed.`,
     };
   } catch (error) {
-    return settleFailure(error, "continue", task.title);
+    return settleFailure(error, "continue", task.title, task.task_id);
   }
 }
 
@@ -145,6 +163,6 @@ export async function startRunNow(task: TaskView): Promise<TaskLifecycleOutcome>
     await api.runTask(task.task_id);
     return { ok: true, settlement: "requested", notice: `Starting “${task.title}”.` };
   } catch (error) {
-    return settleFailure(error, "run", task.title);
+    return settleFailure(error, "run", task.title, task.task_id);
   }
 }

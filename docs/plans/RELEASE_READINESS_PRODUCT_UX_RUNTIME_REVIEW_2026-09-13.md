@@ -466,7 +466,7 @@ it must not be advertised as a shipped setting.
 | UX-TASK-01 | P1 | “Now”, “Schedule once”, “Routine” and “Background” combine timing and execution style. | Separate “When” from “Run mode”; explain that background is still governed and may pause for the owner. |
 | UX-TASK-02 | P1 | A recurrence select cannot express timezone, weekdays, end conditions, missed-run policy or next-run preview. | Use a human schedule builder with timezone and the next three occurrences. Keep cron/raw recurrence in Advanced. |
 | UX-TASK-03 | P1 | Project, parent, priority, work method and model are hidden together under Details despite different importance. | Keep Project and When visible; group orchestration details separately. |
-| UX-TASK-04 | P1 | Users need one history of run attempts, approval pauses, retries and deliveries. | Open a task detail timeline with current state, next action, output and evidence. |
+| ~~UX-TASK-04~~ **closed** — [FIXED-535](FIXED_ITEMS.md#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read) | P1 | Users need one history of run attempts, approval pauses, retries and deliveries. | Open a task detail timeline with current state, next action, output and evidence. |
 | UX-TASK-05 | P1 | Destructive, duplicate, pause, resume, run-now and edit semantics need a consistent lifecycle. | Define Draft → Scheduled/Queued → Running → Waiting → Completed/Failed/Stopped, with retry/idempotency rules. |
 | UX-TASK-06 | P2 | Parent/child tasks are powerful but advanced. | Hide hierarchy unless requested; visualize child progress and define parent settlement. |
 
@@ -2242,7 +2242,7 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 | UX-TASK-01 | Separate “When” from “Run mode”; explain that background is still governed and may pause for the owner. | Timing and execution style are independent; background execution does not grant unattended authority. |
 | UX-TASK-02 | Use a human schedule builder with timezone and the next three occurrences. Keep cron/raw recurrence in Advanced. | Persist timezone and missed-run policy because local time and DST otherwise create surprises. |
 | UX-TASK-03 | Keep Project and When visible; group orchestration details separately. | Show scope and timing before commit because both materially change the requested work. |
-| UX-TASK-04 | Open a task detail timeline with current state, next action, output and evidence. | One attempt timeline distinguishes execution success from delivery success. |
+| ~~UX-TASK-04~~ **closed** — [FIXED-535](FIXED_ITEMS.md#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read) | Open a task detail timeline with current state, next action, output and evidence. | One attempt timeline distinguishes execution success from delivery success. |
 | UX-TASK-05 | Define Draft → Scheduled/Queued → Running → Waiting → Completed/Failed/Stopped, with retry/idempotency rules. | Explicit transitions prevent retries from creating duplicate external actions. |
 | UX-TASK-06 | Hide hierarchy unless requested; visualize child progress and define parent settlement. | Progressive disclosure keeps simple work simple while parent settlement remains deterministic. |
 
@@ -2593,11 +2593,20 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 > round ended with zero uncaught console errors — see
 > [`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md).
 >
-> Two defects were found while closing them and are open in
+> Two defects were found while closing them and were filed in
 > [`TO_BE_FIXED.md`](TO_BE_FIXED.md): `policy_mutation` is a routed gate nothing
-> proposes (BUG-298), and a task has no per-attempt history to link to or refresh
-> into (BUG-299) — which is **UX-TASK-04**, and which two of these closures now
-> depend on.
+> proposes (BUG-298, still open), and a task had no per-attempt history to link
+> to or refresh into (BUG-299) — which is **UX-TASK-04**, and which two of these
+> closures depended on.
+>
+> **BUG-299 closed 2026-09-15** as
+> [FIXED-535](FIXED_ITEMS.md#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read),
+> as a read of the governed events a task's lifecycle already writes rather than
+> a new store. `#/tasks?task=…` is the address REM-HOME-01's deduplicated row
+> and REM-TASK-02's `outcome_unknown` settlement were both promising, and both
+> now point at it. Driven live against a real Anthropic key; the round's last
+> step deliberately asks for a task that does not exist, so its console-error
+> budget is asserted before it rather than spent by it.
 
 > **Implementation status, 2026-09-14.** A second pass closed **every open P1
 > row in this section** and the two P2 rows that shared a surface with one.
@@ -2751,7 +2760,7 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
 | REM-SET-GENERAL / P2 / S | Remove repeated setup teaching; move weather/location to optional personalization. | Language, timezone and startup should be short and explicit about UI versus model context. | Preserve IANA timezone and data-egress consent; test locale changes do not shift stored schedules. |
-| REM-SET-NOTIFY / P2 / S | Remove generic alert controls that cannot explain their actual scope; do not add dummy per-channel switches. | Notification.svelte is sparse; prefer a small working contract over apparent unsupported breadth. | Label existing alert effects accurately and link delivery history. Introduce per-channel controls only with the outbox/preferences implementation; muting never approves actions. |
+| ~~REM-SET-NOTIFY~~ **closed** — [FIXED-536](FIXED_ITEMS.md#fixed-536--an-account-wide-alert-setting-governed-a-banner-on-one-page) / P2 / S | Remove generic alert controls that cannot explain their actual scope; do not add dummy per-channel switches. | Notification.svelte is sparse; prefer a small working contract over apparent unsupported breadth. | Label existing alert effects accurately and link delivery history. Introduce per-channel controls only with the outbox/preferences implementation; muting never approves actions. |
 | REM-SET-APPEARANCE / P2 / S | Move density/font tuning under Appearance details, retain Theme and reversible preview. | Preferences should not require understanding design tokens. | Preserve accessibility-safe options, zoom/reflow and system theme behavior; Cancel restores confirmed state. |
 | REM-SET-SECURITY / P2 / M | Split the long Security & sign-in stack into sign-in/devices, vault, findings and standing access. | Encryption, TOTP, scanning and grants have different operational lifecycles. | Use contextual sections without weakening controls; emergency pause stays readily available. Verify revocation, recovery and redacted secrets. |
 | ~~REM-SET-PRIVACY~~ **closed** — [FIXED-520](FIXED_ITEMS.md#fixed-520--privacy-was-one-toggle-under-a-heading-that-named-the-whole-subject) | Replace broad privacy slogans with specific retained-data and outbound-data inventory. | Privacy.svelte focuses on retained working; hosted model and channel behavior must remain explicit. | Link retention/recall controls and per-service destinations; distinguish local records from external copies and backup limits. |
@@ -2760,7 +2769,7 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 | REM-SET-GIT / P2 / M | Move manual token entry and standing command grants behind guided credential setup. | Repository/host/operation scope should precede secret entry. | Prefer supported OAuth/credential manager, preserve scoped token fallback; test expiry, revoke and wrong-host requests. |
 | REM-SET-RUNTIME / P2 / M | Move ports/host keys/TTL internals into Advanced; merge duplicated readiness displays with Models/Observability. | Runtime settings should guide execution target and access boundary, not teach all adapter internals first. | Keep host-key verification and scope preview mandatory when applicable; test remote loss with no silent host fallback. |
 | ~~REM-SET-UPDATES~~ **closed** — [FIXED-515](FIXED_ITEMS.md#fixed-515--an-installation-nobody-had-checked-reported-itself-up-to-date) | Remove any success wording based only on a version check. | Available, downloaded, verified, installed and restart-required are different states. | Preserve signed verification, release notes, schema compatibility and supported rollback. Test interrupted installation and tampered artifact. |
-| REM-SET-STORAGE / P2 / S | Delete Storage.svelte only if full reference checks prove it unused; remove its misleading copy wherever reused. | Current module presents record counts as Local usage and claims everything stays on one machine. Neither establishes storage bytes or global privacy. | Search imports, tests, generated routes and packaging; if retained, rename to record counts and state actual data location. Do not delete user databases or migrations. |
+| ~~REM-SET-STORAGE~~ **closed** — [FIXED-537](FIXED_ITEMS.md#fixed-537--a-settings-page-nobody-could-reach-said-everything-stays-on-this-machine) / P2 / S | Delete Storage.svelte only if full reference checks prove it unused; remove its misleading copy wherever reused. | Current module presents record counts as Local usage and claims everything stays on one machine. Neither establishes storage bytes or global privacy. | Search imports, tests, generated routes and packaging; if retained, rename to record counts and state actual data location. Do not delete user databases or migrations. |
 | ~~REM-APPROVAL~~ **closed** — [FIXED-519](FIXED_ITEMS.md#fixed-519--an-approval-with-no-diff-answered-what-would-this-do-with-a-request-body) | Move raw payloads below consequence previews; merge duplicated prompt/detail mutation handlers. | Approval must remain prominent and decision-quality, with destination/diff/scope/expiry visible before confirmation. | One decision controller resolves exactly one revision; test changed arguments, expired request and deny/revoke. Keep redacted full evidence available. |
 | REM-OBSERVE / P2 / M | Remove repeated healthy status panels from the default overview; preserve diagnostics as specialist views. | ObserveView asks several useful operational questions; show exceptions and recent changes first. | Canonical health records drive Home and Observe, with explicit stale/unknown. Do not hide failing security containment among optional telemetry errors. |
 | REM-SESSIONS / P2 / M | Merge ordinary resume actions into Threads; keep Sessions as an evidence inspector. | SessionsView exposes turn IDs and technical detail needed for audit, not an alternate everyday chat history. | Retain route aliases and turn anchors; tests open original events/checkpoints from Threads and approvals without duplication. |

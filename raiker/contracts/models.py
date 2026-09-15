@@ -380,6 +380,13 @@ EVENT_TYPES = {
     # act on it, and — when the attempt could not proceed — the stated reason.
     "task_resume_started",
     "task_resume_blocked",
+    # BUG-299 — one cycle of a routine settled while the task itself stays
+    # armed. Distinct from `task_completed` and `task_failed`, which are the
+    # *task's* terminal states: a daily routine never reaches either, so the
+    # only record of what its Tuesday run did used to be a summary string
+    # overwritten by its Wednesday run. The payload states the cycle's outcome
+    # and the slot it was rescheduled into.
+    "task_cycle_landed",
     "side_question_received",
     "side_question_answered",
     "interrupt_received",

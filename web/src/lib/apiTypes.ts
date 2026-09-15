@@ -1991,6 +1991,54 @@ export interface TaskView {
   attachments?: PromptAttachment[];
 }
 
+// raiker/tasks/history.py TaskEventView.to_dict() — one recorded transition.
+export interface TaskEventView {
+  event_id: string;
+  event_type: string;
+  timestamp: string;
+  actor: string;
+  /** What the runtime stated, never a bare code and never an empty row. */
+  detail: string;
+  /** The governed turn this belongs to, when it had one. */
+  turn_id: string | null;
+  session_id: string | null;
+}
+
+// raiker/tasks/history.py TaskAttemptView.to_dict() — one run of a task.
+export interface TaskAttemptView {
+  /** 1-based across runs and continuations; 0 for a segment that is not a run. */
+  index: number;
+  /** "run", "continuation" or "record". */
+  kind: string;
+  started_at: string;
+  ended_at: string | null;
+  /**
+   * "completed" | "failed" | "waiting_for_approval" | "cancelled" |
+   * "waiting_for_children" | "in_progress" | "recorded".
+   */
+  outcome: string;
+  summary: string;
+  /** The decision this attempt waited on, when the runtime recorded which. */
+  approval_id: string | null;
+  events: TaskEventView[];
+}
+
+/**
+ * GET /api/tasks/{task_id} — raiker/control/dashboard.py TaskDetailView.
+ *
+ * BUG-299 — the address a task did not have. Derived from the governed events
+ * the task's own lifecycle writes, so this can never disagree with the audit
+ * log; it *is* the audit log, grouped into the runs it describes.
+ */
+export interface TaskDetailView {
+  task: TaskView;
+  attempts: TaskAttemptView[];
+  /** Decisions still open on this task's session. */
+  approvals: ApprovalView[];
+  /** True when the read bound cut the history off, so the page says so. */
+  truncated: boolean;
+}
+
 // POST /api/interrupts response (raiker/api/routes_prompts.py).
 export interface InterruptResult {
   applied: { task_id: string; result: string }[];

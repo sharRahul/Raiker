@@ -35,6 +35,14 @@ visual references. Each says whether it is ready before you press it, and an
 entry whose capability is off links to Permissions rather than failing at the
 point of use.
 
+A research result carries the pages it was drawn from, as the same chips Chat
+uses. Press one and the passage the turn read opens under the findings, so a
+reference can be checked without leaving Design. Two different things are being
+said there and Raiker keeps them apart: every chip is a page the runtime really
+read, and a chip marked as cited is the *model* saying a sentence rests on it —
+a claim, not something Raiker can verify. The research turn reads pages; it
+draws nothing, and image generation gains no network access from it.
+
 What is *not* there is still not there: no crop, no mask, no outpaint. Those need
 provider capabilities behind the governed endpoint that this build does not have,
 and a control that named them anyway would be a promise the runtime cannot keep.

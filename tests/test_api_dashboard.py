@@ -18,6 +18,7 @@ from raiker.tasks.manager import TaskManager
 
 PROTECTED_GET_ROUTES = [
     "/api/sessions",
+    "/api/tasks/task_x",
     "/api/turns/turn_x",
     "/api/events",
     "/api/brain",
@@ -235,6 +236,35 @@ class TestReads:
         brain = client.get("/api/brain", headers=_auth_headers(token))
         assert brain.status_code == 200
         assert brain.json()["nodes"][0]["node_type"] == "user"
+
+    def test_a_task_has_an_address_that_shows_its_attempts(
+        self, client: TestClient, app: FastAPI, mark_model_ready: Callable[..., None]
+    ) -> None:
+        """BUG-299 — the destination Home's rows and the Stop control promised."""
+        mark_model_ready(app.state.workspace_root)
+        token = _token(client)
+        created = client.post(
+            "/api/tasks",
+            headers=_auth_headers(token),
+            json={"title": "Plan release", "description": "Prepare the release notes."},
+        )
+        assert created.status_code == 201, created.text
+        task_id = created.json()["task_id"]
+
+        detail = client.get(f"/api/tasks/{task_id}", headers=_auth_headers(token))
+        assert detail.status_code == 200, detail.text
+        body = detail.json()
+        assert body["task"]["task_id"] == task_id
+        assert body["truncated"] is False
+        # Filing is a record in its own right, so a task that has not run yet
+        # opens on "here is when you asked for this" rather than on nothing.
+        assert body["attempts"][0]["events"][0]["event_type"] == "task_created"
+        assert body["attempts"][0]["events"][0]["detail"] != ""
+
+    def test_an_unknown_task_has_no_address(self, client: TestClient) -> None:
+        response = client.get("/api/tasks/task_nope", headers=_auth_headers(_token(client)))
+        assert response.status_code == 404
+        assert response.json()["detail"]["reason_code"] == "task_not_found"
 
     def test_task_create_persists_priority_and_schedule(
         self, client: TestClient, app: FastAPI, mark_model_ready: Callable[..., None]

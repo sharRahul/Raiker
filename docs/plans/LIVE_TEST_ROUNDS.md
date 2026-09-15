@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-15 | Targeted | `2026-09-15-task-history/` | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | Three scenarios unrun since 2026-09-03 finally run; a task's attempts read at an address the task did not have — the run the scheduler claimed, how it settled, and the three surfaces that now link to it; plus two Settings rows that were saying more than they governed, and the first generation of the `docs/screenshots/pages/` catalogue — 176 files, which caught a composer 385px below the fold |
 | 2026-09-14 (second) | Targeted | `2026-09-14-simplification/` | Anthropic, the same eighth key — a catalogue, a model kept offered, a model chosen for the turn, and an answer | Nine owner-facing changes of the simplification pass, driven through the product's own controls on a workspace that started empty, ending with **zero uncaught console errors** on a host that can reach neither `huggingface.co` nor `openrouter.ai` |
 | 2026-09-14 | Targeted | `2026-09-14-permissions-overhaul/` | Anthropic, an eighth key entered through the Connect dialog — the first of the eight that authenticates and lists models | The rebuilt Permissions page measured on the running product, the §18.3 rows that closed with it, and three live-test helpers that had been waiting on strings the product stopped printing |
 | 2026-09-07 | Targeted | `env-01-` … `env-05-` | Anthropic, a **seventh** identity-linked key entered through the interface; no local runtime on the host | The clock, the weather and the global read catalogue as runtime facts — and two harness defects that had been silent since the `apps/web` → `web` move: every live round writing its captures outside the repository, and every provider spec waiting for a tab the Models redesign removed |
@@ -70,6 +71,169 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-09-15 — A task, and everywhere it had already been promised
+
+**Tier: Targeted. Build: production `npm run build`. Provider: Anthropic
+(`claude-haiku-4-5-20251001`), the key entered through the Connect dialog.
+Owner: the shared `OWNER_CREDENTIALS`. Workspace: a fresh scratch directory
+(`scripts/reset_live_workspace.py`). Spec:
+`web/e2e/bug-299-task-attempt-history-live.spec.ts` — 1 case, passing.
+Screenshots: `docs/screenshots/2026-09-15-task-history/`.**
+
+BUG-299 / UX-TASK-04 was the last thing two already-shipped changes were waiting
+on: REM-HOME-01's deduplicated Home row, whose acceptance asks it to "link to the
+canonical Tasks detail", and REM-TASK-02's `outcome_unknown` settlement, whose
+remedy reads *"refresh to see the run's current state"*. Neither had anywhere to
+point. This round drove the page that answers both through the product's own
+controls.
+
+1. **The composer was right to refuse, and said so.** With Anthropic connected
+   and a model pinned, **Create task** stayed disabled until a model was chosen
+   for the turn from the composer's own picker — the two decisions BUG-292
+   records as genuinely separate. The task was created only after that.
+2. **The board links every task to its own history.** The card's title resolves
+   to `#/tasks?task=task_…`, and the same href appears on Home's rows.
+3. **The address opens above the board.** Following the link did not cost the
+   page: the Plan-work composer and the open-work list were still under the
+   panel.
+4. **A filing is its own record.** The task opened on *Filed.* before it had run,
+   rather than on an empty page.
+5. **The run the scheduler claimed has a beginning.** After the cycle, the panel
+   showed **Attempt 1**, opening on the step the claim wrote onto the task
+   (*Starting scheduled run*), carrying the model's own answer as the run's
+   stated outcome, and badged **completed**. That beginning is the half of a
+   task's trail that did not exist: `task_started` was in the event vocabulary
+   and had never been written, so every ending had no start.
+6. **A task that is not this account's is said so.** `#/tasks?task=…` for an
+   unknown id answers *“That task is not on this account's board.”* rather than
+   an empty history.
+7. **Zero uncaught console errors** across every step above, asserted *before*
+   the last one. The last step deliberately asks the server for a task that does
+   not exist, and a 404 on a route the owner drove keeps its status by the rule
+   [FIXED-527](FIXED_ITEMS.md#fixed-527--an-outage-raiker-had-already-reported-also-reported-itself-to-the-console)
+   states. A budget spent by the spec's own probe stops measuring anything, so
+   it is asserted where it still means something.
+
+**What it found.** One harness defect, fixed with the work:
+`chooseModelForTurn` knew a single composer label, `Message composer`, and Tasks
+labels its own `Plan work`. The helper waited out its timeout on a picker that
+was present under another name — the same drift
+[FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame)
+records. It takes the label now.
+
+**What it did not cover.** A continuation after an approval, and a routine's
+second cycle, are asserted in `tests/test_task_attempt_history.py` rather than
+here: both need a parked decision or a day's wait, and neither is a claim this
+round makes from the running host.
+
+### Two Settings rows, in the same round
+
+`web/e2e/rem-set-notify-live.spec.ts` — 2 cases, passing, no model needed.
+
+8. **Notifications names what each switch reaches.** *Show unread notices inside
+   Raiker* and *Alert me outside Raiker*, each with the scope it really has.
+   The sentence *"cover approvals waiting on you"* — which understated the
+   desktop switch — is absent, and the page states that muting is not deciding.
+   The record is linked, because every notice is kept whether or not either
+   switch showed one. Capture at
+   `docs/screenshots/2026-09-15-task-history/settings-notifications.png`, which
+   also shows the moved strip doing its job: the unread notices from this
+   round's own task runs, on Settings, where the old placement showed nothing.
+9. **A docked notice clears by being read.** Opening it marks it read through
+   the same route the bell's **Mark all read** uses, and the same notice does
+   not come back.
+10. **Storage is not a destination, by any route.** The rail offers no row,
+    `#/settings?tab=storage` falls back rather than rendering the deleted page,
+    and *“Everything stays on this machine”* appears nowhere in the running
+    product.
+
+### The page catalogue, generated at last
+
+`docs/screenshots/README.md` has said since the 2026-09-07 audit that
+regenerating `docs/screenshots/pages/` "remains a live-test step before the
+screenshot refresh can be called complete". It ran here:
+`ui-sweep-responsive-live` against this host, every destination the nav registry
+declares, at `mobile` (390×844) and `1080p` (1920×1080), in light and dark —
+176 files, all four cases passing.
+
+**It caught a defect on its first run, which is the argument for having it.**
+The notification strip of item 8 had been placed above the routed page, and
+Chat, Build and Design size themselves to `--content-h`. At 390×844 Build's
+composer ended **385px past the bottom edge**. Nothing in a component test could
+have seen it; the sweep measures the real thing at the real size. The strip is
+docked now, and the same sweep passes.
+
+Two further placement facts came from reading the captures rather than from an
+assertion, and both were fixed before the catalogue was kept: three docked
+notices covered Home's primary actions at 1080p and most of the screen at 390px,
+and a docked notice that nothing dismisses is permanent.
+
+**One generator writes that catalogue now.** `all-pages-live` had been writing a
+second page catalogue into `docs/plans/screenshots/pages/` — the tree
+`docs/plans/README.md` calls *historical* evidence that "may intentionally
+contain obsolete states". So two trees each claimed to be the catalogue, the
+historical one was the one being kept current, and the canonical one was empty.
+That sweep writes to the run's own `output/` directory now.
+
+### A real turn reading Raiker's clock (BUG-280, the half this host can measure)
+
+`web/e2e/bug-280-clock-from-a-real-turn-live.spec.ts` — 2 cases, passing,
+Anthropic `claude-haiku-4-5-20251001`.
+
+The 2026-09-07 round proved the environment contract against the runtime and
+recorded honestly that *"no model reasoned from the bundle"*, because that
+round's key was identity-linked and the host had no local runtime. With a
+working key this round could ask, and did:
+
+11. **Today's date, from the runtime.** With the owner's zone on `Europe/London`
+    and `timezone_source` reading `owner_setting`, a real turn asked for the
+    date and day answered with the runtime's own. The spec reads the expectation
+    from `/api/environment` rather than hardcoding one, so it measures agreement
+    between the runtime and the model rather than agreement with the day it was
+    written on.
+12. **The zone is the owner's.** With the zone moved to `Pacific/Auckland`, the
+    same question answers Auckland. It is put back afterwards, because a spec
+    that leaves a shared workspace on another continent is the state leak
+    BUG-250 is about.
+
+**The weather half is still unmeasured, for the reason BUG-280 records.** Every
+attempt to reach `api.open-meteo.com` from this host is cut by the environment's
+egress policy — re-verified with `curl` through the proxy's tunnel, which
+returns no status at all — so the tool answers `weather_provider_unavailable`.
+That is the right typed answer to an unreachable provider and it is not evidence
+that a reachable one is read correctly.
+
+### The 2026-09-03 scenarios, run at last (BUG-273)
+
+`web/e2e/priority-round-real-turn-live.spec.ts` — 2 cases, passing.
+
+Three scenarios had been written and unrun since 2026-09-03, blocked for **six
+rounds on six identity-linked keys** and a host with no local runtime. The
+seventh key authenticates, so the entry's own instruction finally had an answer:
+
+13. **The meter moves when a provider is connected.** *1 model set up* — the
+    *yes* case of FIXED-365, whose *no* case was proven on an empty host two
+    weeks ago.
+14. **A routine's cycle runs inside its own conversation.** The card grows a
+    **Thread** link once the cycle has written a turn into it; opening it lands
+    in Chat on that conversation with the cycle's `ACKNOWLEDGED` in it.
+15. **And the same thread is on the board**, under **Routines** in Threads.
+
+**Unblocking it found three stale selectors, and each read as a product
+defect.** The spec waited for *"Not installed on this machine"* on whichever tab
+`#/models` opens — that line is on **Add model**; it filled a **Task title**
+field COMPOSER-10 removed; and it pressed a **Run now** button a task on the
+*Task* cadence never offers, because that cadence means the task is already due
+and the button is the recovery path for a parked one. Ten-minute timeouts, each
+reading as Raiker having stopped doing something. Same shape as FIXED-534.
+
+Two corrections came with them: the scenario creates a **routine** rather than a
+one-off, because a one-off leaves Open work the moment it completes and takes
+the Thread link with it before the cycle lands; and the routine carries a
+per-run name, because `Overnight research` resolved to three threads on the run
+that found it — two of them this round's own earlier attempts, which is
+BUG-250 exactly.
 
 ## 2026-09-14 (second) — Twelve simplifications, nine of them watched
 

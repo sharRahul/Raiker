@@ -29,7 +29,9 @@ native/target/
 raiker/native/*/
 output/
 # Playwright writes its last-run marker beside the config unless outputDir
-# covers it; the evidence itself lives in output/ and docs/plans/screenshots.
+# covers it. The evidence itself lives in output/ (one run's own captures) and
+# docs/screenshots/ (the current catalogue, written by the one generator
+# `docs/screenshots/README.md` names). `docs/plans/screenshots/` is historical.
 test-results/
 # The two round-stamped capture folders were removed from the repository on
 # 2026-09-06 (roughly a hundred megabytes of binaries). Sixty-three live specs

@@ -556,6 +556,13 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-532](#fixed-532--a-button-labelled-create-a-user-account-opened-a-different-raiker) | Medium | Launch / unlock | Fixed 2026-09-14 (closes REM-LAUNCH-02) |
 | [FIXED-533](#fixed-533--one-run-three-stop-buttons-and-two-of-them-threw-the-reason-away) | Low | Tasks | Fixed 2026-09-14 (closes REM-TASK-02) |
 | [FIXED-534](#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | Fixed 2026-09-14 (closes BUG-291, BUG-292, BUG-295) |
+| [FIXED-535](#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read) | Medium | Tasks | Fixed 2026-09-15 (closes BUG-299 / UX-TASK-04) |
+| [FIXED-536](#fixed-536--an-account-wide-alert-setting-governed-a-banner-on-one-page) | Medium | Settings / notifications | Fixed 2026-09-15 (closes REM-SET-NOTIFY) |
+| [FIXED-537](#fixed-537--a-settings-page-nobody-could-reach-said-everything-stays-on-this-machine) | Low | Settings / storage | Fixed 2026-09-15 (closes REM-SET-STORAGE) |
+| [FIXED-538](#fixed-538--designs-research-findings-were-text-and-the-pages-behind-them-were-already-recorded) | Low | Design | Fixed 2026-09-15 (closes BUG-281) |
+| [FIXED-539](#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here) | Low | Runtime / environment context | Fixed 2026-09-15 (closes the clock half of BUG-280) |
+| [FIXED-540](#fixed-540--the-two-surfaces-that-kept-their-own-composer-had-stopped-keeping-it) | Low | Composer | Fixed 2026-09-15 (closes BUG-278) |
+| [FIXED-541](#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more) | Low | Live test harness / evidence | Fixed 2026-09-15 (closes BUG-273) |
 
 ---
 
@@ -23551,3 +23558,411 @@ and a real Anthropic key: the catalogue is read after it has arrived, a model is
 kept offered, chosen for the turn, and answers. Captures at
 `docs/screenshots/2026-09-14-simplification/anthropic-catalogue.png` and
 `…/anthropic-turn.png`.
+
+---
+
+## FIXED-535 — A task's history of attempts, pauses and retries had nowhere to be read
+
+**Severity: Medium. Area: Tasks. Status: Fixed 2026-09-15.
+Closes [BUG-299](TO_BE_FIXED.md) and **UX-TASK-04** of the release-readiness
+review, and makes good on the two changes that had already promised it.**
+
+**Observed.** A task had a status and a current step. That was all of it: no
+per-task destination, no attempt list, no record of the approval a cycle parked
+on or the continuation that followed it.
+
+Two shipped changes were already depending on a page that did not exist:
+
+* [FIXED-533](#fixed-533--one-run-three-stop-buttons-and-two-of-them-threw-the-reason-away)
+  gave Stop, Resume and Run-now one meaning across Home, Tasks and Build, and
+  with it an honest third settlement — `outcome_unknown`, whose remedy read
+  *"refresh to see the run's current state"*. **There was nowhere to refresh
+  to.** The controller could now tell an owner truthfully that it did not know
+  what happened, and could not then show them.
+* [FIXED-531](#fixed-531--one-nightly-routine-read-as-two-pieces-of-work)'s
+  acceptance asked a deduplicated Home row to "link to the canonical Tasks
+  detail". The dedupe landed without the link, because there was no such route.
+
+**Root cause, and why it was a read rather than a new store.** Everything needed
+to answer this was already being written. `TaskManager` appends a governed event
+for every transition a task makes, and `events_index` carries `task_id` on each
+of them. Two things were genuinely missing from that record, and both were
+missing *beginnings*:
+
+1. **`task_started` was declared in the event vocabulary and never written.** A
+   task's trail was therefore a list of endings — a completion, a failure, a
+   parked decision — with nothing saying when the work that produced them began.
+2. **A routine's cycle settled silently.** `_land_outcome` reschedules a
+   recurring task instead of completing it, so none of the terminal events ever
+   fires for one. What Tuesday's cycle did was a summary string Wednesday's
+   cycle overwrote.
+
+**Fixed.**
+
+* `raiker/tasks/manager.py` gains `mark_task_started` (written before the turn
+  is submitted, so a cycle that dies inside the gateway still has a beginning)
+  and `record_cycle_outcome`, writing the new `task_cycle_landed` event — the
+  *cycle's* settlement, carrying its outcome and the slot the next cycle was
+  moved to, while the task itself stays armed. `mark_task_continuing` now
+  records **which** approval is being replayed.
+* `raiker/tasks/history.py` groups one task's ordered events into the attempts
+  they describe. An attempt opens on a start or a continuation and closes on the
+  first event that settles it; events belonging to no run — the filing, an owner
+  pressing Run now, a parked task being stopped — keep their own segment, because
+  attributing an owner's act to a cycle that had already ended is the same class
+  of untruth this record exists to remove. A run whose settlement never arrived
+  is reported as **still running**, which is the honest answer and exactly the
+  row `outcome_unknown` asked for somewhere to look.
+* `GET /api/tasks/{task_id}` serves it, scoped by the store's own
+  `load_task_for_user` — the same visibility rule the board applies, so a task
+  absent from this account's list is a 404 at its address rather than a readable
+  record at a guessable id. The read is bounded at 400 transitions and **says
+  when it was**, rather than silently showing the most recent few as though they
+  were all of them.
+* `#/tasks?task=…` is the address. `taskId` joins `routeState.ts` as a
+  coordinate like the session, turn and asset ids beside it. The panel opens
+  *above* the board rather than instead of it, so following a link never costs
+  the owner the page they were on, and a change of task clears it first — the
+  same selection-generation discipline
+  [FIXED-497](#fixed-497--a-projects-header-could-stand-over-another-projects-work)
+  gave Projects, for the same reason.
+* Every surface links to it through one function, `taskDetailHref`: the Tasks
+  board's cards and finished rows, all three of Home's boards, and Build's side
+  panel. And the `outcome_unknown` notice now carries the link, so the sentence
+  that says "go and look" says where.
+
+**Verification.** Eleven cases in `tests/test_task_attempt_history.py` covering
+the grouping (filing as its own segment, a parked run and its continuation as
+two attempts, an unsettled run reported as running, a cycle landing carrying its
+own outcome, an owner's act never folded into a settled run, a payload that
+could not be read back still getting a sentence) and the events the runtime now
+writes, including that a routine records each cycle and stays armed. Two route
+cases in `tests/test_api_dashboard.py`, and `/api/tasks/task_x` added to the
+protected-route sweep. Twelve in `web/src/lib/taskHistory.test.ts` and three in
+`web/src/lib/views/TasksView.test.ts`.
+
+**Live.** `web/e2e/bug-299-task-attempt-history-live.spec.ts` drives the whole
+path against a running host and a real Anthropic key
+(`claude-haiku-4-5-20251001`): plan a task, choose the model the composer is
+right to insist on, follow the board's own link, read the attempt the scheduler
+recorded, and confirm Home's rows point at the same address. It asserts zero
+console errors **before** its last step, which deliberately asks for a task that
+does not exist — a budget spent by the spec's own probe stops measuring
+anything ([FIXED-527](#fixed-527--an-outage-raiker-had-already-reported-also-reported-itself-to-the-console)).
+Capture at `docs/screenshots/2026-09-15-task-history/task-attempt-history.png`.
+
+**Found while closing it.** `chooseModelForTurn` knew one composer's label
+("Message composer") and Tasks labels its own "Plan work", so the helper looked
+for a picker that was there under another name — the same harness drift
+[FIXED-534](#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame)
+records. It takes the label now, in the one place that knows where the control
+lives.
+
+---
+
+## FIXED-536 — An account-wide alert setting governed a banner on one page
+
+**Severity: Medium. Area: Settings / notifications. Status: Fixed 2026-09-15.
+Closes REM-SET-NOTIFY of the release-readiness review.**
+
+**Observed.** **Settings → Notifications** carried two switches under a heading
+that read **Alerts**, and neither said what it reached.
+
+*In-app popups* governed `NotificationCenter`, and `NotificationCenter` was
+mounted in `McpView.svelte` and nowhere else. So a preference an owner reads as
+"how Raiker alerts me" decided whether a banner appeared on **one destination**
+— Extensions → MCP — which most owners will never open. Every other page showed
+nothing either way, whichever way the switch was set.
+
+*Desktop alerts* did work, and described itself too narrowly: its sentence said
+the notices "cover approvals waiting on you", when what it mirrors is every
+unread notice — a finished routine, a security finding, a decision. A control
+that understates its scope is as misleading as one that overstates it; an owner
+turning it on to catch approvals gets a notice when a nightly digest lands.
+
+And a switch the owner had turned on while the browser had **denied** permission
+silently did nothing. The page never read the permission back, so the way to
+find out was a notice that never arrived.
+
+**Fixed.** The placement, then the words.
+
+* `NotificationCenter` moved to the shell, beside `ApprovalPrompt`, so unread
+  notices appear wherever the owner is and the setting means what it says. It
+  reads its own notifications rather than taking them as a prop, for the reason
+  `ApprovalPrompt` does: the shell has no reason to know about notifications,
+  and the only thing using a read should own it.
+* **It is docked, not in the flow, and the sweep is why.** The first placement
+  put it inside `main#main` above the routed page, and
+  `ui-sweep-responsive-live` failed on its first run: Chat, Build and Design
+  size themselves to `--content-h` — the room between the topbar and the bottom
+  of the viewport — so anything added above them pushes their composer below the
+  fold, and at 390×844 Build's composer ended **385px past the bottom edge**. It
+  docks like `ApprovalPrompt` now, at the opposite corner, taking no part in any
+  page's height.
+* **One notice, and reading it clears it.** Three docked cards covered Home's
+  primary actions at 1080p and most of the screen at 390px — a worse obstruction
+  than the banner nobody could see — and a docked notice that nothing dismisses
+  is permanent. It shows the newest unread one; opening it marks it read through
+  the same route the bell's **Mark all read** uses and lands the owner on what
+  it is about, so the strip, the bell's count and the record cannot disagree. A
+  link counts the rest.
+* Each switch is named for what it reaches — **Show unread notices inside
+  Raiker**, **Alert me outside Raiker** — with one sentence each stating the
+  real scope.
+* The desktop switch reads the browser permission back and says so when the
+  browser has blocked, not-yet-asked, or has no notification support at all.
+* **The record is named.** Every notice is recorded in Observability →
+  Notifications whether or not either switch showed it, so the page says that
+  and links it: turning both off loses nothing.
+* **Muting is not approving**, said on the page rather than only in the guide.
+
+**What was deliberately not added.** Per-channel switches. Raiker has no outbox
+and no delivery preferences, and a row of toggles for email, push or a messaging
+channel would be four more controls that decide nothing — the defect
+[FIXED-523](#fixed-523--a-quarter-of-the-permissions-page-was-controls-that-control-nothing)
+removed fourteen of. Two working switches and an honest sentence each is the
+whole contract.
+
+**Verification.** Six cases in
+`web/src/lib/views/settings/Notification.test.ts`, including that the page stays
+quiet about permission while the switch is off and speaks up when it is on and
+blocked. Two in `SessionMenu.test.ts`: the strip reads its own notices and hides
+read ones, and opening one marks it read and lands on the work.
+`McpView.test.ts` no longer asserts a notification banner on the MCP page,
+because that is not the MCP page's job.
+
+**Live, 2026-09-15.** `web/e2e/rem-set-notify-live.spec.ts` — three cases,
+passing — and the full responsive sweep at `mobile` and `1080p` in both themes
+across every destination, which is what caught the placement defect above and
+what proves the docked version costs no page its layout.
+
+---
+
+## FIXED-537 — A Settings page nobody could reach said "everything stays on this machine"
+
+**Severity: Low. Area: Settings / storage. Status: Fixed 2026-09-15.
+Closes REM-SET-STORAGE of the release-readiness review.**
+
+**Observed.** `web/src/lib/views/settings/Storage.svelte` rendered a card headed
+**Local usage** listing session, event, task and checkpoint *counts*, under the
+sentence *"Live counts from the local runtime. Everything stays on this
+machine."*
+
+Two claims, neither established by what is on the card. Record counts are not
+storage usage — they say nothing about bytes — and "everything stays on this
+machine" is a global privacy claim made by a page that had measured four
+tables. Raiker connects to hosted providers; a sentence that broad is the kind
+of reassurance the security posture exists to avoid making.
+
+**Fixed by deletion, after a full reference check.** The module was unreachable:
+absent from `SETTINGS_SECTIONS` (which is the rail *and* the tab registry, so
+there is only one list to check), imported by nothing, named by no route, and
+`SettingsView.test.ts` already asserted no **Storage** button exists. Nothing in
+packaging referenced it. So the page was not a destination to redesign — it was
+a file whose copy could be reused by accident.
+
+Nothing was deleted but the component. No database, no migration, no record.
+
+The counts it showed are not lost: Observability → Overview reads the same
+diagnostics, and `Privacy.svelte` already carries the data-location statement,
+where it is written against what Raiker actually does rather than as a slogan.
+
+**Verification.** `npm run check` across 724 files with the module gone, the
+full unit suite, and a live check that the rail offers no **Storage** row, that
+`#/settings?tab=storage` falls back rather than rendering it, and that the
+sentence appears nowhere in the running product.
+
+---
+
+## FIXED-538 — Design's research findings were text, and the pages behind them were already recorded
+
+**Severity: Low. Area: Design. Status: Fixed 2026-09-15. Closes
+[BUG-281](TO_BE_FIXED.md).**
+
+**Observed.** Design's Tools menu runs a real governed research turn on the
+`design` surface — it searches, reads and extracts through the global read
+catalogue — and the findings appear above the composer for the owner to write a
+prompt from. What appeared was the model's prose and nothing else.
+
+The turn had been recording its sources all along. Every governed read enters
+the turn-source ledger, which is exactly what Chat's citation chips are drawn
+from. So the pages were known; they just could not be opened *here*. Following a
+reference meant leaving Design for whichever conversation the research turn had
+run in — for material the owner had asked for thirty seconds earlier, on the
+surface they asked for it on.
+
+**Fixed.** The strip Chat and Build already use, on Design's research panel:
+`SourceChips` over the turn's own ledger entries, and `SourceExcerptPanel`
+underneath, so a reference opens at the passage the turn used without leaving
+the surface. Clicking a chip resolves the excerpt now rather than showing a
+cached copy, so a page that has changed or gone says so.
+
+Three properties are kept rather than re-invented:
+
+* **Scoped to the turn that answered.** `sourcesForTurn` filters by
+  `turn_id`, because the research session is deliberately continuous — a second
+  question continues the first — and without the filter the second question
+  would present the first one's pages as its own provenance.
+* **The ledger is a fact and a citation is a claim.** `citedSourceIds` marks
+  only the chips the model actually cited, exactly as it does in Chat. Nothing
+  is promoted from "the runtime read this" to "the answer rests on this".
+* **Provenance can fail without taking the answer with it.** The ledger read
+  happens after the answer has arrived and is caught on its own: a failure
+  costs the chips and leaves the findings.
+
+**Why it did not wait for VIS2-19.** The deferral's reasoning was that Design's
+workspace shape is still open, and building a source list into a panel about to
+be replaced by a canvas would be work done twice. What landed is not a panel —
+it is two shared components and one ledger read, so whatever shape the canvas
+takes, the chips travel with it as one line rather than as a rewrite.
+
+**Verification.** Two cases in `web/src/lib/views/DesignView.test.ts`: the pages
+the turn read appear as chips and another turn's source does not, and a failed
+ledger read leaves the findings intact. **Not driven live in this round** — the
+host it ran on has no route to a search provider, so a research turn could not
+reach one. That is stated rather than implied: this closure rests on component
+evidence and the shared components' own live history, not on a live Design
+research round.
+
+---
+
+## FIXED-539 — A real turn now answers from Raiker's clock, and the weather half still cannot be measured here
+
+**Severity: Low. Area: runtime / environment context. Status: the clock half
+fixed 2026-09-15; the weather half stays open in
+[BUG-280](TO_BE_FIXED.md).**
+
+**Observed.** The 2026-09-07 round proved the whole environment contract against
+the runtime — the bundle a turn is given, the event it records, the precedence,
+the DST behaviour, the stale-refresh note, and every governed refusal — and
+recorded honestly that two halves were unmeasured:
+
+* **No model reasoned from the bundle.** That round's key was identity-linked
+  and the host had no local runtime, so no provider on it could complete a turn.
+* **No weather request left the machine.**
+
+The first is the one that mattered most and was the easiest to mistake for
+evidence. That the bundle is correct is a fact about the orchestrator, asserted
+where it belongs. That the *model* answers from it is a different claim, and a
+model with training knowledge of dates is exactly the thing that can make a
+wrong answer look right.
+
+**Fixed (the clock half).**
+`web/e2e/bug-280-clock-from-a-real-turn-live.spec.ts` drives a real Anthropic
+turn (`claude-haiku-4-5-20251001`) through the product's own composer and asks
+for today's date and day. It passes: the answer carries the runtime's date and
+day name.
+
+**It never hardcodes a date.** The expectation is read from `/api/environment`
+— the same derivation the orchestrator uses to build a turn's bundle — so the
+spec measures agreement between the runtime and the model rather than agreement
+between the model and whatever day the suite was written on. A spec with a date
+in it would start lying the following morning.
+
+The second case is the one that separates "the model was told" from "the model
+guessed": the owner's zone is changed to `Pacific/Auckland`, and the same
+question is asked again. The answer names Auckland. It restores the zone
+afterwards, because a spec that leaves a shared workspace on another continent
+is the state-leak BUG-250 is about.
+
+**Still open, and stated rather than implied.** The weather round trip. Every
+attempt to reach `api.open-meteo.com` from this host is cut by the environment's
+egress policy — re-verified on 2026-09-15 — so the tool answers
+`weather_provider_unavailable`. That is the correct typed answer to an
+unreachable provider and it is not evidence that a reachable one is read
+correctly. It needs a host with egress, not a change to Raiker.
+
+---
+
+## FIXED-540 — The two surfaces that kept their own composer had stopped keeping it
+
+**Severity: Low. Area: composer. Status: Fixed 2026-09-15. Closes
+[BUG-278](TO_BE_FIXED.md).**
+
+**Observed, when it was raised.** Chat, Build and Design shared one composer
+shell, one Add menu, one Tools menu, one context line and one model control.
+Tasks did not: task creation carried its own model picker, its own environment
+badge and its own capacity chip, in the layout it had before. The consequence is
+small and real, and it is the one the redesign exists to prevent — a person who
+has learned the composer in Chat meets a different arrangement of the same
+controls when they schedule the same work.
+
+**Why this is a late record rather than a change.** COMPOSER-10 rebuilt task
+creation on `Composer.svelte` while this entry was open, and both surfaces it
+names are the same form: `surface` is `schedule` when the cadence chips say
+*Once* or *Routine* and `tasks` otherwise, so one composer covers both. The
+proposed fix — *"Apply `Composer.svelte` with `+` and Tools to Tasks, and move
+the cadence and notification rules behind the primary action's own
+disclosure"* — is what shipped, and the timing control states what was chosen
+while it is closed, so hiding the details never hides the timing.
+
+What was missing was the **assertion**. A shared shell that nothing checks is a
+shared shell until the next surface-specific change, and this entry would have
+been re-raised rather than closed.
+
+**Fixed.** One case in `web/src/lib/views/TasksView.test.ts` asserts the grammar
+by the names every other surface uses: the **Add to this turn** menu, the
+**Tools** menu, the **Context for this turn** line, the **Model for this turn**
+picker, and the timing control collapsed but still naming the cadence. It fails
+if any of the four drifts back to a copy of its own.
+
+**Live.** The 2026-09-15 page catalogue shows it: `1080p-light-tasks.png` has
+`+ | Tools | Runs now | Chat · Local strict · 200K tokens` on the left and the
+model picker beside **Create task** on the right — the same row Chat draws, with
+the one control planning work needs that asking a question does not.
+
+---
+
+## FIXED-541 — Three scenarios blocked on a key for six rounds, and on three stale selectors for one more
+
+**Severity: Low. Area: live test harness / evidence. Status: Fixed 2026-09-15.
+Closes [BUG-273](TO_BE_FIXED.md).**
+
+**Observed.** `priority-round-real-turn-live.spec.ts` covers the three claims of
+the 2026-09-03 round that need a model to actually answer: the setup meter
+reading **1 model set up** once a provider is connected (the *yes* case of
+[FIXED-365](#fixed-365--a-fresh-install-named-a-model-nobody-had), whose *no*
+case was already proven), a routine's cycle running **inside its own
+conversation** ([FIXED-367](#fixed-367--background-work-finished-into-a-status-line)),
+and that thread appearing on the board
+([FIXED-368](#fixed-368--where-did-i-say-that-was-answered-what-am-i-working-on-was-not)).
+
+None of the three ran. Six rounds supplied six keys and every one of them was
+identity-linked — valid, refused without a workspace id the credential cannot be
+asked for — and no local runtime was ever installed on the host, so no provider
+on the machine could complete a turn.
+
+**Fixed, because the seventh key authenticates.** The entry's own instruction
+was the whole remedy: set `RAIKER_LIVE_ANTHROPIC_KEY` to a key that
+authenticates and run the spec. All three scenarios pass against
+`claude-haiku-4-5-20251001`.
+
+**And a spec that cannot run cannot notice the product changing under it.** Four
+years of product change in the spec's terms; in practice, three controls it named
+no longer exist, and each failed as though Raiker had stopped doing something:
+
+| What it waited for | Where it actually is | How it read |
+|---|---|---|
+| *"Not installed on this machine"* on `#/models` | the **On this device** section, which is on **Add model** | a product that had stopped being honest about a missing runtime |
+| **Task title** and **Instructions** fields | replaced by one instruction, with the title derived from it ([FIXED-470](#fixed-470--tasks-asked-to-be-filled-in-rather-than-instructed)) | a ten-minute timeout on a label nothing prints |
+| a **Run now** button on a just-created task | a task on the *Task* cadence is already due; that button is the recovery path for a **parked** one | a control missing, when its absence is the product working |
+
+Each is the same shape as
+[FIXED-534](#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame):
+**the suite reporting a product defect where it had a harness defect.**
+
+**Two smaller corrections came with them.** The scenario now creates a
+**routine** rather than a one-off, because the claim is about *a routine's
+cycle*: a one-off leaves Open work the moment it completes, so the card carrying
+the Thread link is gone before the cycle that would put a turn in the thread has
+landed. And the routine is named with a per-run suffix, because
+[BUG-250](TO_BE_FIXED.md) is real — on the run that found it,
+`Overnight research` resolved to three threads, two of them left by earlier
+attempts, and a spec that has to disambiguate its own subject can pass on
+somebody else's evidence.
+
+**Verification.** Both cases of the spec passing against a live host: the
+identity-linked refusal still reads as itself, the meter moves when a provider
+is connected, the routine's cycle answers `ACKNOWLEDGED` **in the task's own
+conversation**, the card links to it, and Threads lists it under **Routines**.
+

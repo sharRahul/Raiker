@@ -102,6 +102,7 @@ from raiker.security.credentials import CredentialLifecycle, CredentialLifecycle
 from raiker.security.monitoring import SecurityMonitor
 from raiker.storage.internal_paths import display_path, internal_io_path
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tasks.history import TaskAttemptView, TaskEventView, derive_attempts
 from raiker.tasks.manager import TaskManager
 from raiker.tasks.scheduler import RECURRING_INTERVALS
 from raiker.tools.filesystem import (
@@ -1630,6 +1631,41 @@ class TaskView:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class TaskDetailView:
+    """One task at its own address, with the attempts behind its status.
+
+    BUG-299 / UX-TASK-04. The board says what a task *is* doing; this says what
+    it *has* done — every cycle in order, the decision each waited on, the
+    continuation that followed and the conversation it produced. It exists
+    because two shipped changes promised it: a deduplicated Home row that links
+    to "the canonical Tasks detail", and a stop control that can honestly report
+    ``outcome_unknown`` and tell the owner to refresh to see the run's state.
+
+    Nothing here is stored separately. The attempts are derived from the
+    governed events the task's own lifecycle already writes, so this view can
+    never disagree with the audit log — it *is* the audit log, grouped.
+    """
+
+    task: TaskView
+    attempts: list[TaskAttemptView]
+    #: Decisions still open on this task's session. A parked attempt names the
+    #: one it is waiting on when the runtime recorded which; this is the queue
+    #: the owner can actually act in.
+    approvals: list[ApprovalView] = field(default_factory=list)
+    #: True when the attempt list was cut off by the read bound, so the page
+    #: says "showing the most recent" rather than implying a complete history.
+    truncated: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "task": self.task.to_dict(),
+            "attempts": [attempt.to_dict() for attempt in self.attempts],
+            "approvals": [approval.to_dict() for approval in self.approvals],
+            "truncated": self.truncated,
+        }
 
 
 #: BUG-218 — how a tool is named on the Knowledge Map. The registry's own
@@ -6487,6 +6523,70 @@ class DashboardService:
             for t in rows
         ]
 
+    #: How many of a task's own governed events one detail read will group.
+    #: A bound rather than a page: a task with more transitions than this is
+    #: told so by ``truncated`` instead of being silently shortened, and the
+    #: whole trail stays readable in the audit log, which is where an
+    #: unbounded read belongs.
+    TASK_HISTORY_EVENT_LIMIT = 400
+
+    def get_task_detail(
+        self, task_id: str, *, user_id: str | None = None
+    ) -> TaskDetailView | None:
+        """One task's attempts, in order, or ``None`` when it is not visible.
+
+        BUG-299. Read entirely from records the task's lifecycle already wrote:
+        the governed events indexed against this ``task_id``, grouped into the
+        runs they describe. Ownership is the store's own visibility rule, so a
+        task absent from this account's board is absent from its address too.
+
+        A payload that cannot be read back — a rotated log, a line the index
+        outlived — does not lose the row: the transition is still shown with the
+        sentence its kind carries, because "something happened here and the
+        detail is gone" is a truer history than a gap.
+        """
+        record = self.store.load_task_for_user(task_id, user_id)
+        if record is None:
+            return None
+        rows = self.store.list_event_index(
+            task_id=task_id, limit=self.TASK_HISTORY_EVENT_LIMIT + 1
+        )
+        truncated = len(rows) > self.TASK_HISTORY_EVENT_LIMIT
+        rows = rows[: self.TASK_HISTORY_EVENT_LIMIT]
+        from raiker.events.query import EventViewer
+
+        viewer = EventViewer(self.store)
+        events: list[dict[str, Any]] = []
+        # `list_event_index` answers newest first; a history is read oldest
+        # first, and an attempt cannot be grouped in reverse.
+        for row in reversed(rows):
+            payload = viewer.read_event_payload(str(row.get("event_id", "")))
+            events.append(
+                {
+                    "event_id": row.get("event_id"),
+                    "event_type": row.get("event_type"),
+                    "timestamp": row.get("timestamp"),
+                    "actor": row.get("actor"),
+                    "turn_id": row.get("turn_id"),
+                    "session_id": row.get("session_id"),
+                    "payload": (payload or {}).get("payload", {}) if payload else {},
+                }
+            )
+        turns = self.store.count_turns_by_session([record.thread_session_id or ""])
+        approvals = [
+            approval
+            for approval in self.list_approvals(user_id=user_id)
+            if approval.session_id in {record.session_id, record.run_session_id}
+        ]
+        return TaskDetailView(
+            task=self._task_view(
+                record, thread_turns=turns.get(record.thread_session_id or "", 0)
+            ),
+            attempts=derive_attempts(events),
+            approvals=approvals,
+            truncated=truncated,
+        )
+
     def list_work_threads(
         self,
         *,
@@ -9230,6 +9330,9 @@ __all__ = [
     "ProviderHealthView",
     "SessionDetailView",
     "SessionView",
+    "TaskAttemptView",
+    "TaskDetailView",
+    "TaskEventView",
     "TaskView",
     "TurnDetailView",
     "TurnView",

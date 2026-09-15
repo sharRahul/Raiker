@@ -1658,6 +1658,33 @@ async def list_tasks(
     )
 
 
+@router.get("/api/tasks/{task_id}")
+async def get_task_detail(
+    task_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """One task's attempts, in order (BUG-299).
+
+    The address a task did not have. Home's deduplicated row and Build's task
+    panel link here, and the Stop control's honest `outcome_unknown` settlement
+    finally has somewhere to send an owner who was told to refresh and see the
+    run's current state.
+
+    Scoped by the same visibility rule as `GET /api/tasks`: a task this account
+    cannot list is a 404 here, never a readable record at a guessable id.
+    """
+    view = _service(request).get_task_detail(
+        task_id, user_id=auth_data[1].delegated_by_user_id
+    )
+    if view is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"ok": False, "reason_code": "task_not_found"},
+        )
+    return serialize_dto(view)
+
+
 @router.post("/api/tasks", status_code=status.HTTP_201_CREATED)
 async def create_task(
     body: TaskCreateRequest,

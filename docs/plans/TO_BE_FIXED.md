@@ -901,6 +901,21 @@ written from memory is exactly the drift it exists to catch.
 Raised 2026-08-30, and it is the first thing found by actually running a round
 against one workspace rather than re-seeding one per spec.**
 
+**2026-09-15 — it bit again, and the third half is naming what a spec owns.**
+Running `priority-round-real-turn-live` against a workspace this round had
+already worked in, `Overnight research` resolved to **three** threads: the one
+under test and two left by the same spec's earlier attempts. The assertion did
+not fail wrongly — it refused to choose, which is Playwright's strict mode
+behaving correctly — but a spec that has to disambiguate its own subject is one
+that can pass on somebody else's evidence, which is the whole of this entry.
+
+The answer that spec took is cheap and general: **name the thing the round
+creates with a per-run suffix**, so its own leftovers cannot be mistaken for it.
+`const ROUTINE = \`Overnight research ${Date.now().toString(36)}\`` — no
+workspace reset, no skip, and re-runnable against a workspace with a year of
+history in it. It is worth applying to every spec that creates a named record,
+and that is the remaining work here.
+
 **2026-09-04 — both halves of the proposal below now exist.**
 
 **Half one: the specs that need their own instance say so.**
@@ -1127,8 +1142,22 @@ appear is a control that looks like an amendment to the approval in front of it.
 
 ## BUG-273 — Three live scenarios of the 2026-09-03 round are written and unrun
 
-**Severity: Low. Area: live test harness / evidence. Status: Open — raised
-2026-09-03.**
+**Severity: Low. Area: live test harness / evidence. Status: Closed 2026-09-15
+as [FIXED-541](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more).
+Raised 2026-09-03; blocked on the key for five rounds after that.**
+
+**They ran.** The seventh key authenticates, so the entry's own instruction —
+set `RAIKER_LIVE_ANTHROPIC_KEY` and run the spec — finally had an answer. All
+three scenarios pass: the meter reads **1 model set up** once a provider is
+connected, a routine's cycle runs inside its own conversation and the card links
+to it, and that thread is on the board under **Routines**.
+
+**What the unblocking found.** The spec had been unrunnable for so long that it
+encoded three controls the product no longer has, and each one failed as though
+Raiker had stopped doing something — the harness drift
+[FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame)
+records. All three are in
+[FIXED-541](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more).
 
 **Observed.** `priority-round-real-turn-live.spec.ts` covers the three claims of
 that round which need a model to actually answer:
@@ -1326,8 +1355,17 @@ returns for an edit or a set of variations has not been seen.
 
 ## BUG-278 — Two Work surfaces still keep their own composer
 
-**Severity: Low. Area: composer. Raised while implementing
+**Severity: Low. Area: composer. Status: Closed 2026-09-15 as
+[FIXED-540](FIXED_ITEMS.md#fixed-540--the-two-surfaces-that-kept-their-own-composer-had-stopped-keeping-it).
+Raised while implementing
 [COMPOSER-10 and COMPOSER-11](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md).**
+
+Closed by the work it was raised beside, and recorded late. COMPOSER-10 rebuilt
+task creation on `Composer.svelte`, and both surfaces this entry names — `tasks`
+and `schedule`, which the cadence chips switch between in the same form — have
+carried the shared `+` menu, Tools menu, context line and model picker since.
+What was missing was the assertion, which is now in `TasksView.test.ts`: a test
+that would fail if any of the four drifted back to a copy of its own.
 
 **Observed.** Chat, Build and Design share one composer shell, one Add menu, one
 Tools menu, one context line and one model control. Tasks and Schedule do not:
@@ -1359,6 +1397,22 @@ appear only once the owner asks for them.
 
 **Severity: Low. Area: runtime / environment context, weather. Raised while
 implementing ENV-01…05 and WEATHER-01…03.**
+
+**Half of this closed 2026-09-15 as
+[FIXED-539](FIXED_ITEMS.md#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here).**
+The clock half was measurable the moment a host had a working key: a real
+Anthropic turn names the runtime's date and day, and follows the owner's zone
+when it changes. The spec reads the expectation from `/api/environment` rather
+than hardcoding a date, so it measures agreement between the runtime and the
+model rather than agreement with whatever day it was written on.
+
+**The weather half is still open, and still for the same reason.** Every attempt
+to reach `api.open-meteo.com` from this host is cut by the environment's egress
+policy — verified again on 2026-09-15, `curl` returns no status through the
+proxy's tunnel — so the tool answers `weather_provider_unavailable`, which is the
+correct typed answer to an unreachable provider and is not evidence that a
+reachable one is read correctly. Closing it needs a host with egress, not a
+change to Raiker.
 
 **Observed.** The 2026-09-07 round proved the whole of the environment and
 weather contract against the runtime: the bundle a turn is given, the event it
@@ -1401,7 +1455,16 @@ reading is.
 
 ## BUG-281 — Design's research findings are text, not sources
 
-**Severity: Low. Area: Design. Raised while implementing WEB-06.**
+**Severity: Low. Area: Design. Status: Closed 2026-09-15 as
+[FIXED-538](FIXED_ITEMS.md#fixed-538--designs-research-findings-were-text-and-the-pages-behind-them-were-already-recorded).
+Raised while implementing WEB-06.**
+
+Closed without waiting for VIS2-19. The deferral's reasoning was that Design's
+workspace shape is still open and a source list built into a panel about to be
+replaced would be work done twice — but what landed is not a panel: it is the
+same `SourceChips` and `SourceExcerptPanel` Chat and Build already use, reading
+the ledger the turn already wrote. Whatever shape the canvas takes, the chips
+move with it as one line.
 
 **Observed.** Design's Tools menu runs a real governed research turn on the
 `design` surface: it searches, reads and extracts through the global read
@@ -1942,8 +2005,18 @@ process configuration and `policy_mutation` is gone from the gate map with it.
 
 ## BUG-299 — A task's history of attempts, pauses and retries has nowhere to be read
 
-**Severity: Low. Area: Tasks. Raised 2026-09-14 while implementing
-REM-TASK-02.**
+**Severity: Medium. Area: Tasks. Status: Closed 2026-09-15 as
+[FIXED-535](FIXED_ITEMS.md#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read).
+Raised 2026-09-14 while implementing REM-TASK-02.**
+
+Closed as a *read* rather than a new store: every transition a task makes was
+already a governed event carrying its `task_id`, so the attempts are the audit
+log grouped at the scope of one task. Two beginnings were genuinely missing and
+were added — `task_started`, which was in the event vocabulary and never
+written, and `task_cycle_landed`, without which a routine's every cycle read as
+still running because a recurring task is rescheduled rather than completed.
+`#/tasks?task=…` is the address; Home's rows, the Tasks board, Build's side
+panel and the `outcome_unknown` notice all point at it.
 
 **Observed.** [FIXED-533](FIXED_ITEMS.md#fixed-533--one-run-three-stop-buttons-and-two-of-them-threw-the-reason-away)
 gave one run one Stop, Resume and Run-now meaning across Home, Tasks and Build,

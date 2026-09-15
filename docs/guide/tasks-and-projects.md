@@ -159,8 +159,43 @@ two pieces of work.
 the board, on the Tasks page, or in Build's side panel. *Stop* asks the run to
 stop at its next safe boundary, so a cycle already in flight finishes its current
 step; it is never a force-kill. When Raiker cannot tell whether the request took
-effect it says so and asks you to refresh, rather than reporting that nothing
-happened — a request that lost its answer may well have been applied.
+effect it says so and offers the task's own history, rather than reporting that
+nothing happened — a request that lost its answer may well have been applied.
+
+## One task, and everything it has done
+
+Every task has an address of its own: **`#/tasks?task=…`**, reached by pressing
+its title on the work board, on the Tasks page, or in Build's side panel. It
+opens above the board rather than instead of it, so following a link never costs
+you the page you were on.
+
+What it shows is the task's **attempts**, newest first — not a second account of
+the task, but the governed events its own lifecycle wrote, grouped into the runs
+they describe. So the history and the audit log cannot disagree: it *is* the
+audit log, read at the scope of one task.
+
+- **An attempt** opens when a cycle starts and closes on whatever settled it —
+  completed, did not complete, waiting for approval, stopped, or waiting on
+  delegated work.
+- **A continuation** is numbered alongside the runs and named for what released
+  it, because a parked run being let through is not the same as the work having
+  been tried twice. When the runtime recorded *which* decision released it, the
+  attempt links to that decision.
+- **A run that never settled** says *still running* rather than anything
+  reassuring. That is the row to look for when a Stop or Run now could not be
+  confirmed.
+- **A routine's cycles each get their own attempt.** A repeating task is
+  rescheduled rather than completed, so what Tuesday's cycle did used to be a
+  summary line Wednesday's cycle overwrote.
+- **Filed** is its own record, above the first attempt, so a task that has not
+  run yet opens on when you asked for it rather than on nothing.
+
+A task belonging to another account has no address here: its id answers *"That
+task is not on this account's board"*, which is the same visibility rule the
+board itself applies.
+
+![A task's attempt history, with each run's outcome and the conversation it
+produced](../screenshots/2026-09-15-task-history/task-attempt-history.png)
 
 ## Where to watch work run
 
@@ -176,11 +211,20 @@ filterable by session and event type.
 A scheduled or recurring task that finishes — or fails — writes a notification,
 so a routine that ran overnight is not something you have to remember to go and
 check. It appears on the bell and in **Observability → Notifications**, with a
-link to **Tasks**, where the card carries the run's own conversation thread.
+link to **Tasks**, where the card carries the run's own conversation thread and
+its title opens the attempt history above.
 
-If you have allowed browser notifications and turned **Settings → Notifications
-→ Desktop** on, the same notice reaches you outside the window — but only while
-Raiker is not the window you are looking at, and it never leaves this machine.
+**Settings → Notifications** decides where you see it, and nothing else. *Show
+unread notices inside Raiker* docks the newest unread one in the corner of
+whatever page you are on — opening it marks it read and takes you to what it is
+about, and the bell in the top bar counts them either way; *Alert me outside Raiker*
+raises the browser's own notification for the same ones, only while Raiker is not
+the window you are looking at, and it never leaves this machine. If the browser
+has blocked notifications, the page says so rather than leaving a switch that
+silently does nothing.
+
+Every notice is recorded in **Observability → Notifications** whether or not
+either switch showed it, so turning both off loses nothing.
 
 **Only work you were not watching notifies.** An ordinary Chat turn is a task
 too, and a banner behind an answer you are reading is noise, so those are

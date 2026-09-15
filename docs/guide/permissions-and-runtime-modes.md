@@ -529,8 +529,10 @@ what the agent did. A turn continues at most once per decision.
 A pending decision announces itself wherever you are in Raiker, with **Approve**,
 **Deny** and **Decide later**. When Raiker is not the window you are looking at —
 which is exactly when a background task raises one — it can also raise your
-browser's own notification. That is off until you turn on **Desktop alerts**
-under **Settings → Notifications**, it is only ever raised while Raiker is *not*
-visible, and it announces each decision once. Nothing leaves this machine: it is
+browser's own notification. That is off until you turn on **Alert me outside
+Raiker** under **Settings → Notifications**, it is only ever raised while Raiker
+is *not* visible, and it announces each decision once. Muting is not deciding:
+an approval nobody is alerted about still waits for you, and Raiker still does
+not act. Nothing leaves this machine: it is
 the browser's notification, not an email or a push service. The Approvals inbox
 remains the record, and a decision you defer waits there.

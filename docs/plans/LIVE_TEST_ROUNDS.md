@@ -33,7 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
-| 2026-09-15 | Targeted | `2026-09-15-task-history/` | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | A task's attempts read at an address the task did not have — the run the scheduler claimed, how it settled, and the three surfaces that now link to it; plus two Settings rows that were saying more than they governed, and the first generation of the `docs/screenshots/pages/` catalogue — 176 files, which caught a composer 385px below the fold |
+| 2026-09-15 | Targeted | `2026-09-15-task-history/` | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | Three scenarios unrun since 2026-09-03 finally run; a task's attempts read at an address the task did not have — the run the scheduler claimed, how it settled, and the three surfaces that now link to it; plus two Settings rows that were saying more than they governed, and the first generation of the `docs/screenshots/pages/` catalogue — 176 files, which caught a composer 385px below the fold |
 | 2026-09-14 (second) | Targeted | `2026-09-14-simplification/` | Anthropic, the same eighth key — a catalogue, a model kept offered, a model chosen for the turn, and an answer | Nine owner-facing changes of the simplification pass, driven through the product's own controls on a workspace that started empty, ending with **zero uncaught console errors** on a host that can reach neither `huggingface.co` nor `openrouter.ai` |
 | 2026-09-14 | Targeted | `2026-09-14-permissions-overhaul/` | Anthropic, an eighth key entered through the Connect dialog — the first of the eight that authenticates and lists models | The rebuilt Permissions page measured on the running product, the §18.3 rows that closed with it, and three live-test helpers that had been waiting on strings the product stopped printing |
 | 2026-09-07 | Targeted | `env-01-` … `env-05-` | Anthropic, a **seventh** identity-linked key entered through the interface; no local runtime on the host | The clock, the weather and the global read catalogue as runtime facts — and two harness defects that had been silent since the `apps/web` → `web` move: every live round writing its captures outside the repository, and every provider spec waiting for a tab the Models redesign removed |
@@ -203,6 +203,37 @@ egress policy — re-verified with `curl` through the proxy's tunnel, which
 returns no status at all — so the tool answers `weather_provider_unavailable`.
 That is the right typed answer to an unreachable provider and it is not evidence
 that a reachable one is read correctly.
+
+### The 2026-09-03 scenarios, run at last (BUG-273)
+
+`web/e2e/priority-round-real-turn-live.spec.ts` — 2 cases, passing.
+
+Three scenarios had been written and unrun since 2026-09-03, blocked for **six
+rounds on six identity-linked keys** and a host with no local runtime. The
+seventh key authenticates, so the entry's own instruction finally had an answer:
+
+13. **The meter moves when a provider is connected.** *1 model set up* — the
+    *yes* case of FIXED-365, whose *no* case was proven on an empty host two
+    weeks ago.
+14. **A routine's cycle runs inside its own conversation.** The card grows a
+    **Thread** link once the cycle has written a turn into it; opening it lands
+    in Chat on that conversation with the cycle's `ACKNOWLEDGED` in it.
+15. **And the same thread is on the board**, under **Routines** in Threads.
+
+**Unblocking it found three stale selectors, and each read as a product
+defect.** The spec waited for *"Not installed on this machine"* on whichever tab
+`#/models` opens — that line is on **Add model**; it filled a **Task title**
+field COMPOSER-10 removed; and it pressed a **Run now** button a task on the
+*Task* cadence never offers, because that cadence means the task is already due
+and the button is the recovery path for a parked one. Ten-minute timeouts, each
+reading as Raiker having stopped doing something. Same shape as FIXED-534.
+
+Two corrections came with them: the scenario creates a **routine** rather than a
+one-off, because a one-off leaves Open work the moment it completes and takes
+the Thread link with it before the cycle lands; and the routine carries a
+per-run name, because `Overnight research` resolved to three threads on the run
+that found it — two of them this round's own earlier attempts, which is
+BUG-250 exactly.
 
 ## 2026-09-14 (second) — Twelve simplifications, nine of them watched
 

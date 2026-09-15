@@ -562,6 +562,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-538](#fixed-538--designs-research-findings-were-text-and-the-pages-behind-them-were-already-recorded) | Low | Design | Fixed 2026-09-15 (closes BUG-281) |
 | [FIXED-539](#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here) | Low | Runtime / environment context | Fixed 2026-09-15 (closes the clock half of BUG-280) |
 | [FIXED-540](#fixed-540--the-two-surfaces-that-kept-their-own-composer-had-stopped-keeping-it) | Low | Composer | Fixed 2026-09-15 (closes BUG-278) |
+| [FIXED-541](#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more) | Low | Live test harness / evidence | Fixed 2026-09-15 (closes BUG-273) |
 
 ---
 
@@ -23909,4 +23910,59 @@ if any of the four drifts back to a copy of its own.
 `+ | Tools | Runs now | Chat · Local strict · 200K tokens` on the left and the
 model picker beside **Create task** on the right — the same row Chat draws, with
 the one control planning work needs that asking a question does not.
+
+---
+
+## FIXED-541 — Three scenarios blocked on a key for six rounds, and on three stale selectors for one more
+
+**Severity: Low. Area: live test harness / evidence. Status: Fixed 2026-09-15.
+Closes [BUG-273](TO_BE_FIXED.md).**
+
+**Observed.** `priority-round-real-turn-live.spec.ts` covers the three claims of
+the 2026-09-03 round that need a model to actually answer: the setup meter
+reading **1 model set up** once a provider is connected (the *yes* case of
+[FIXED-365](#fixed-365--a-fresh-install-named-a-model-nobody-had), whose *no*
+case was already proven), a routine's cycle running **inside its own
+conversation** ([FIXED-367](#fixed-367--background-work-finished-into-a-status-line)),
+and that thread appearing on the board
+([FIXED-368](#fixed-368--where-did-i-say-that-was-answered-what-am-i-working-on-was-not)).
+
+None of the three ran. Six rounds supplied six keys and every one of them was
+identity-linked — valid, refused without a workspace id the credential cannot be
+asked for — and no local runtime was ever installed on the host, so no provider
+on the machine could complete a turn.
+
+**Fixed, because the seventh key authenticates.** The entry's own instruction
+was the whole remedy: set `RAIKER_LIVE_ANTHROPIC_KEY` to a key that
+authenticates and run the spec. All three scenarios pass against
+`claude-haiku-4-5-20251001`.
+
+**And a spec that cannot run cannot notice the product changing under it.** Four
+years of product change in the spec's terms; in practice, three controls it named
+no longer exist, and each failed as though Raiker had stopped doing something:
+
+| What it waited for | Where it actually is | How it read |
+|---|---|---|
+| *"Not installed on this machine"* on `#/models` | the **On this device** section, which is on **Add model** | a product that had stopped being honest about a missing runtime |
+| **Task title** and **Instructions** fields | replaced by one instruction, with the title derived from it ([FIXED-470](#fixed-470--tasks-asked-to-be-filled-in-rather-than-instructed)) | a ten-minute timeout on a label nothing prints |
+| a **Run now** button on a just-created task | a task on the *Task* cadence is already due; that button is the recovery path for a **parked** one | a control missing, when its absence is the product working |
+
+Each is the same shape as
+[FIXED-534](#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame):
+**the suite reporting a product defect where it had a harness defect.**
+
+**Two smaller corrections came with them.** The scenario now creates a
+**routine** rather than a one-off, because the claim is about *a routine's
+cycle*: a one-off leaves Open work the moment it completes, so the card carrying
+the Thread link is gone before the cycle that would put a turn in the thread has
+landed. And the routine is named with a per-run suffix, because
+[BUG-250](TO_BE_FIXED.md) is real — on the run that found it,
+`Overnight research` resolved to three threads, two of them left by earlier
+attempts, and a spec that has to disambiguate its own subject can pass on
+somebody else's evidence.
+
+**Verification.** Both cases of the spec passing against a live host: the
+identity-linked refusal still reads as itself, the meter moves when a provider
+is connected, the routine's cycle answers `ACKNOWLEDGED` **in the task's own
+conversation**, the card links to it, and Threads lists it under **Routines**.
 

@@ -1127,8 +1127,22 @@ appear is a control that looks like an amendment to the approval in front of it.
 
 ## BUG-273 — Three live scenarios of the 2026-09-03 round are written and unrun
 
-**Severity: Low. Area: live test harness / evidence. Status: Open — raised
-2026-09-03.**
+**Severity: Low. Area: live test harness / evidence. Status: Closed 2026-09-15
+as [FIXED-541](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more).
+Raised 2026-09-03; blocked on the key for five rounds after that.**
+
+**They ran.** The seventh key authenticates, so the entry's own instruction —
+set `RAIKER_LIVE_ANTHROPIC_KEY` and run the spec — finally had an answer. All
+three scenarios pass: the meter reads **1 model set up** once a provider is
+connected, a routine's cycle runs inside its own conversation and the card links
+to it, and that thread is on the board under **Routines**.
+
+**What the unblocking found.** The spec had been unrunnable for so long that it
+encoded three controls the product no longer has, and each one failed as though
+Raiker had stopped doing something — the harness drift
+[FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame)
+records. All three are in
+[FIXED-541](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more).
 
 **Observed.** `priority-round-real-turn-live.spec.ts` covers the three claims of
 that round which need a model to actually answer:

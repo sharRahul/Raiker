@@ -29,6 +29,13 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:f
 import { join } from "node:path";
 import { refreshHostedReadiness, signInAsOwner, useHostedModel } from "./hosted-provider";
 
+import { roundName } from "./naming";
+
+// BUG-250 — named per run, so a round that has already worked in this
+// workspace cannot find its own leftovers and assert on them. The suite shares
+// one workspace by design; this is what keeps a shared workspace honest.
+const PROJECT = roundName("Staging rotation");
+
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? process.cwd();
@@ -214,13 +221,13 @@ test("Chat creates a project, and a later turn is scoped to it", async () => {
   // structure rather than something a turn should invent for itself.
   const name = page.getByLabel("New project name");
   await expect(name).toBeVisible({ timeout: 30_000 });
-  await name.fill("Staging rotation");
+  await name.fill(PROJECT);
   await page.getByRole("button", { name: "Create project", exact: true }).click();
 
   // By its card, not by its text: the name also appears in a hidden <option> in
   // the project picker, and matching that proved nothing about the list.
   await expect(
-    page.getByRole("button", { name: "Open project Staging rotation" }),
+    page.getByRole("button", { name: `Open project ${PROJECT}` }),
   ).toBeVisible({ timeout: 60_000 });
   await page.screenshot({ path: join(SHOTS, "real-work-project-created.png") });
 });
@@ -275,7 +282,7 @@ test("Build writes a program, the folder changes, and the program actually runs"
   // than assumed, because "Send is disabled" is otherwise a very quiet failure.
   const projectPicker = page.getByLabel("Project for this build");
   await expect(projectPicker).toBeVisible({ timeout: 30_000 });
-  await projectPicker.selectOption({ label: "Staging rotation" });
+  await projectPicker.selectOption({ label: PROJECT });
   await useAutoApprovals(page);
   await send(
     "In the folder 'fizz', write a Python file called fizzbuzz.py. Running it with no arguments " +

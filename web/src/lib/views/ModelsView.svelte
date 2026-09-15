@@ -77,7 +77,7 @@
   // Which provider sections each tab owns. The three groups already existed as
   // headings inside one scroll; the split promotes them to destinations.
   const TAB_SECTIONS: Record<string, readonly ("Local" | "Hosted" | "Advanced")[]> = {
-    // MODEL-03/MODEL-07 — one tab for acquiring a model, whichever kind it is.
+    // One tab for acquiring a model, whichever kind it is.
     // Local and Hosted were peers because that is how the profiles are stored,
     // not because it is a choice anyone makes: an owner arrives wanting *a
     // model*, and "is it on this machine" is an attribute of the answer rather
@@ -95,7 +95,7 @@
 
   let models = $state<ModelsData | null>(null);
   /**
-   * MODEL-01 — every surface's decision, read once for the whole page.
+   * Every surface's decision, read once for the whole page.
    *
    * The inventory needs it to say which rows are a Work default and whether a
    * local one is serving. Assembling that from the profile list would be the
@@ -549,7 +549,7 @@
     try {
       await openRuntimeInstaller(runtime);
       // Deliberately not "installed". Raiker opened a download; whether the
-      // owner ran it is theirs to say — and MODEL-14 is that Raiker should ask
+      // owner ran it is theirs to say — and the rule here is that Raiker should ask
       // itself rather than asking them to press Look again.
       installNotice = `Opened the official ${providerName(provider)} download. Install it and come back — Raiker will look again.`;
       armReturnDetect(providerName(provider));
@@ -561,7 +561,7 @@
   }
 
   /**
-   * MODEL-14 — re-run detection the moment the owner comes back.
+   * Re-run detection the moment the owner comes back.
    *
    * One shot, cancelled on unmount, and honest about the outcome: it reports
    * what detection *found*, so a tab regaining focus can never be mistaken for
@@ -1205,7 +1205,7 @@
    * product answers to was left holding a modal that would not go. The sign-in
    * dialog and the details panel had the same gap.
    *
-   * VIS2-17 asks for one overlay vocabulary; this is the part of that vocabulary
+   * the overlay vocabulary asks for one overlay vocabulary; this is the part of that vocabulary
    * a keyboard user actually depends on, and `ApprovalPrompt`, `StepUpDialog`
    * and the command palette all already had it. Innermost first, so Escape
    * unwinds one layer at a time rather than clearing the stack: the picker can
@@ -1278,7 +1278,7 @@
     </div>
   </section>
 
-  <!-- MODEL-03 — the global choice belongs with the rest of the model
+  <!-- The global choice belongs with the rest of the model
        decision, which is Overview's whole subject. Above the strip it was a
        third statement of the same fact on every tab, competing with the
        per-surface defaults it is only the fallback for. -->
@@ -1410,7 +1410,7 @@
       {#if tab === "add"}<ProvidersPanel onCatalogueChanged={refreshProviderCatalogues} />{/if}
       {#if models.profiles.length === 0}
         <div class="card">
-          <!-- VIS-12/FIXED-436 — this said "Add profiles in
+          <!-- the empty-state rule/FIXED-436 — this said "Add profiles in
                config/model-profiles.json", which named a file Raiker no longer
                reads from the working directory and told the owner to edit
                something they do not have. The shipped registry is never empty,
@@ -1550,7 +1550,7 @@
                         </div>
                       </div>
                       <div class="row-usage"><span>{usageLine(p)}</span></div>
-                      <!-- MODEL-15 — one visible action, and it is whichever
+                      <!-- One visible action, and it is whichever
                            one this row's state actually calls for: name a model
                            when none is named, put it in force when one is, and
                            nothing at all when it already is. Test and Details
@@ -1818,7 +1818,7 @@
                             disabled={selecting}>Select</button
                           >
                         {/if}
-                        <!-- MODEL-07/MODEL-15 — a connected provider used to
+                        <!-- A connected provider used to
                              carry Test, Select models, Select and Details at
                              once, permanently, on every card. Test is
                              troubleshooting: it belongs where you go when
@@ -1895,7 +1895,7 @@
       <!-- Building a local model finishes here: a runtime above, and the GGUF
            files this machine already holds below. Splitting them across two
            tabs made the owner navigate mid-task. -->
-      <!-- MODEL-09 — Hugging Face is a way of adding a local model, not a
+      <!-- Hugging Face is a way of adding a local model, not a
            peer destination to "Local" and "Hosted". It was its own tab, which
            gave a download-and-convert workflow the same weight as the two
            categories every model belongs to. -->
@@ -1912,13 +1912,13 @@
     >
       <p class="tab-lead">
         What is serving, what a turn falls back to, and where models on this
-        machine are found. MODEL-05's separation holds here: choosing a model
+        machine are found. The same separation holds here: choosing a model
         and serving one are different acts, so a model can be selected and
         stopped, running and unselected, or both at once, and each of those
         reads differently.
       </p>
 
-      <!-- MODEL-05 — local serving, in the section about runtime rather than
+      <!-- Local serving, in the section about runtime rather than
            in the middle of the list of things you could add. The slot rows are
            unchanged; what moved is which question they answer. -->
       <div class="local-list local-serving">
@@ -1960,11 +1960,11 @@
         <SpeechRuntimePanel />
       </div>
 
-      <!-- MODEL-06 — the library answers "what is on disk"; the serving rows
+      <!-- The library answers "what is on disk"; the serving rows
            above answer "what is running". They were interleaved. -->
       <LocalLibraryPanel />
 
-      <!-- MODEL-11 — the four words the page used to spell "active", told
+      <!-- The four words the page used to spell "active", told
            apart: what each surface starts on, and what would really answer
            right now. The fallback sequence that produces the second is edited
            directly beneath, so cause and effect are on one screen. -->
@@ -2136,7 +2136,7 @@
         </section>
       </details>
 
-      <!-- MODEL-03/MODEL-10 — downloads, conversions and pulls are what the
+      <!-- Downloads, conversions and pulls are what the
            runtime is *doing*, so they belong to the runtime rather than beside
            Pricing as a sixth peer tab. -->
       <DownloadsPanel />
@@ -2150,7 +2150,7 @@
       id="panel-usage"
       aria-labelledby="tab-usage"
     >
-      <!-- MODEL-12 — what you spent and what it costs are one question asked
+      <!-- What you spent and what it costs are one question asked
            twice. Pricing was a top-level tab of its own, so an owner checking a
            bill read the rate on one page and the usage on another and did the
            multiplication themselves. -->

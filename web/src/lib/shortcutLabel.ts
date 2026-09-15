@@ -1,5 +1,5 @@
 /**
- * VIS2-04 — how a key combination is spelled on the machine reading it.
+ * How a key combination is spelled on the machine reading it.
  *
  * The top bar printed `Ctrl K` to every owner, including the ones whose
  * keyboard has no Ctrl in that position. That is not a cosmetic mismatch: a

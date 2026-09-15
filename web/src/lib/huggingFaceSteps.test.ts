@@ -1,4 +1,4 @@
-// MODEL-09 — the flow says where you are, and cannot drift from the panel.
+// The flow says where you are, and cannot drift from the panel.
 import { describe, expect, it } from "vitest";
 import {
   huggingFaceSteps,

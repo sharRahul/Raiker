@@ -1,4 +1,4 @@
-"""MODEL-01 — one authoritative answer about which model, and which one runs.
+"""One authoritative answer about which model, and which one runs.
 
 The failure this closes is not a missing feature. Every part of the decision was
 already persisted correctly: the global selection, the per-surface default, the
@@ -135,7 +135,7 @@ def _service(
 
 class TestTheSurfacesThatMayHoldADefault:
     def test_the_three_work_modes_are_all_present(self) -> None:
-        # MODEL-02. Design was absent while the product model was Chat | Build |
+        # Design was absent while the product model was Chat | Build |
         # Design, so a Design model choice silently followed whatever Chat had.
         assert "design" in SURFACES
         for mode in ("chat", "build", "design"):
@@ -248,7 +248,7 @@ class TestAnUnavailableSelectionStaysSelected:
             chain=[(HOSTED, "claude-big"), (LOCAL, "small")],
         ).decide(OWNER, "chat")
 
-        # This is the invariant. Before MODEL-01 a picker that could not reach
+        # This is the invariant. Before this contract a picker that could not reach
         # Anthropic re-rendered showing the local model, which is
         # indistinguishable from having lost the owner's choice.
         assert decision.selected.profile_id == HOSTED

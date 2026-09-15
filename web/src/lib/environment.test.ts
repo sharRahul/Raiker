@@ -10,7 +10,7 @@ import {
 } from "./environment";
 
 /**
- * ENV-02 — the page's half of "one owner-level timezone source of truth".
+ * The page's half of "one owner-level timezone source of truth".
  *
  * The failure these guard is the small, plausible one: a browser that helpfully
  * writes its own zone over the owner's choice. It is helpful exactly until

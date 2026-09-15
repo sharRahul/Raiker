@@ -1,5 +1,5 @@
 /**
- * VIS-08 — progressive disclosure only counts if nothing became unreachable.
+ * Progressive disclosure only counts if nothing became unreachable.
  *
  * The composer used to carry the approval-mode control and the execution
  * environment badge open, permanently, under every message the owner typed.
@@ -74,7 +74,7 @@ describe("posture control", () => {
   });
 
   it("colours the chip only for a posture less careful than the default", async () => {
-    // VIS-15 — every normal state neutral, so the one coloured state means
+    // Every normal state neutral, so the one coloured state means
     // something. "Ask first" is the careful default and stays plain.
     stubFetch({
       "GET /api/settings/composer-approval-mode": { approval_mode: "auto" },
@@ -85,13 +85,13 @@ describe("posture control", () => {
 
     const chip = await screen.findByRole("button", { name: /Approves automatically/i });
     expect(chip.className).toContain("relaxed");
-    // VIS2-07 — and it does not simultaneously call itself protected. A chip
+    // And it does not simultaneously call itself protected. A chip
     // that reads "Protected · Auto-approve" in amber is telling the owner two
     // contradictory things about one setting.
     expect(chip.textContent).not.toMatch(/Protected/i);
   });
 
-  // VIS2-07 — what does not depend on the approval mode is stated in the
+  // What does not depend on the approval mode is stated in the
   // popover, in the specific, so relaxing the mode does not read as switching
   // every protection off.
   it("names the protections that hold in every posture", async () => {

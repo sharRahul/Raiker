@@ -1,4 +1,4 @@
-"""ENV-04 — the clock reaches every model-backed turn, whatever else changed.
+"""The clock reaches every model-backed turn, whatever else changed.
 
 The unit tests next door prove the bundle is derived correctly. This proves it
 *arrives*: that a real governed turn carries it into the model's messages, that
@@ -206,7 +206,7 @@ def test_switching_project_does_not_change_the_environment_source(
 
 
 def test_the_turn_records_what_it_was_told(tmp_path: Path) -> None:
-    """ENV-05 — provenance, so a schedule on the wrong day can be diagnosed."""
+    """Provenance, so a schedule on the wrong day can be diagnosed."""
     router = RecordingRouter()
     orchestrator = _orchestrator(tmp_path, router)
     envelope = _envelope()
@@ -267,7 +267,7 @@ def test_no_web_capability_is_needed_to_know_the_date(
     assert "Source: Raiker runtime clock" in text
 
 
-# ── ENV-03: a scheduled run reads the clock when it runs ────────────────────
+# ── A scheduled run reads the clock when it runs ───────────────────────────
 
 
 def test_a_scheduled_execution_derives_its_own_environment_context(
@@ -336,7 +336,7 @@ def test_the_scheduler_stores_no_environment_bundle_on_the_task(tmp_path: Path) 
         assert forbidden not in names
 
 
-# ── ENV-04: a delegated subagent does not inherit its parent's clock ────────
+# ── A delegated subagent does not inherit its parent's clock ───────────────
 
 
 def test_a_subagent_records_its_own_environment_not_the_parent_turn_s(

@@ -33,7 +33,7 @@ function conformance(severity: "error" | "warning" | null): SkillConformance {
   };
 }
 
-describe("the token budget for a repeated row (VIS2-13)", () => {
+describe("the token budget for a repeated row (the badge budget)", () => {
   it("spends a badge only on a fact that is not in its ordinary state", () => {
     const { badges, facts } = rowTokens([
       { label: "active", variant: null },
@@ -74,7 +74,7 @@ describe("the token budget for a repeated row (VIS2-13)", () => {
   });
 });
 
-describe("what each repeated row spends its budget on (VIS2-18)", () => {
+describe("what each repeated row spends its budget on (the exception-led rule)", () => {
   it("reads a switched-on skill as metadata and a switched-off one as a state", () => {
     expect(rowTokens(skillCandidates(skill({ active: true }), false)).badges).toEqual([]);
     expect(rowTokens(skillCandidates(skill({ active: false }), false)).badges).toEqual([

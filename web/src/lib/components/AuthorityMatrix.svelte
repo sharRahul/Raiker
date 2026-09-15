@@ -151,14 +151,14 @@
   table { width:100%; border-collapse:collapse; font-size:var(--text-xs); }
   th, td { padding:.58rem var(--space-4); text-align:left; border-bottom:1px solid var(--border); }
   tbody tr:last-child th, tbody tr:last-child td { border-bottom:0; }
-  /* VIS-06 — a column heading, same as the shared `.table th`. This table is
+  /* A column heading, same as the shared `.table th`. This table is
      not built on `.table`, so it carried its own copy of the old styling. */
   thead th { color:var(--text-2); font-size:var(--text-xs); font-weight:650; }
   tbody th { font-weight:600; }
   code { color:var(--text-3); font-family:var(--font-mono); font-size:var(--text-2xs); }
   /* REM-PERM-02 — the name a person reads, above the identifier they quote. */
   .cap-name { display:block; color:var(--text-1); font-weight:650; }
-  /* VIS2-16 — a persistent normal state is neutral. Success colour is spent on
+  /* A persistent normal state is neutral. Success colour is spent on
      something that just happened or on a decision that was just confirmed; used
      as the standing representation of "connected", "enabled", "verified" or
      "ready" it is on screen constantly, which is the one condition under which

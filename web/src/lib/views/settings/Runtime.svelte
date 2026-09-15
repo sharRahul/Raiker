@@ -449,7 +449,7 @@
   .observations li span, .observations li strong, .environment-grid article small.plain { text-transform:none; }
   .observations li span { color:var(--text-2); }
   .observations li strong { font-size:var(--text-2xs); font-weight:650; white-space:nowrap; }
-  /* VIS2-16 — an enforced boundary is the normal case and reads as plain
+  /* An enforced boundary is the normal case and reads as plain
      fact; the two states that are not normal keep their tone. */
   .observations li.enforced strong { color:var(--text-1); }
   .observations li.unenforced strong { color:var(--danger); }

@@ -1,4 +1,4 @@
-"""WEB-01 … WEB-09 — one read catalogue, shared everywhere, authorised nowhere.
+"""One read catalogue, shared everywhere, authorised nowhere.
 
 The claim under test is deliberately two-sided, because half of it is the part
 that keeps being lost:
@@ -124,7 +124,7 @@ def _page(url: str, rules: Any, headers: dict[str, str]) -> dict[str, Any]:
 
 
 class TestSurfaceParity:
-    """WEB-02 — every model-backed surface sees the same catalogue."""
+    """Every model-backed surface sees the same catalogue."""
 
     @pytest.mark.parametrize(
         "surface", ["chat", "build", "design", "tasks", "schedule", "agent"]
@@ -176,7 +176,7 @@ class TestSurfaceParity:
 
 
 class TestProjectionGrantsNothing:
-    """WEB-03 — the half of the claim that keeps being lost."""
+    """The half of the claim that keeps being lost."""
 
     @pytest.mark.parametrize("tool", ["web_fetch", "web_extract", "weather_lookup"])
     def test_a_projected_tool_still_fails_closed_when_the_gate_is_off(
@@ -214,7 +214,7 @@ class TestProjectionGrantsNothing:
     def test_discovering_a_tool_returns_a_schema_and_nothing_else(
         self, workspace: Path, store: SQLiteStore
     ) -> None:
-        """WEB-13 — a search that returned a tool grants precisely nothing."""
+        """A search that returned a tool grants precisely nothing."""
         from raiker.models.tool_projection import search_tools
 
         _disable_gate(store)
@@ -237,7 +237,7 @@ class TestProjectionGrantsNothing:
 
 
 class TestReadiness:
-    """WEB-04 — readiness and authority are separate fields, not one grey row."""
+    """Readiness and authority are separate fields, not one grey row."""
 
     def test_a_permitted_capability_reads_ready(
         self, workspace: Path, store: SQLiteStore
@@ -305,7 +305,7 @@ class TestReadiness:
 
 
 class TestWebExtract:
-    """WEB-05 — a parser over the bounded fetch, never a second client."""
+    """A parser over the bounded fetch, never a second client."""
 
     def _service(self, workspace: Path, store: SQLiteStore) -> WebAccessService:
         _enable_gate(workspace, store)
@@ -411,7 +411,7 @@ class TestWebExtract:
 
 
 class TestBrowserEscalation:
-    """WEB-08 — a typed statement about a page, not a request for authority."""
+    """A typed statement about a page, not a request for authority."""
 
     def test_a_browser_rendered_page_returns_static_content_insufficient(
         self, workspace: Path, store: SQLiteStore
@@ -448,7 +448,7 @@ class TestBrowserEscalation:
 
 
 class TestDesignIntegration:
-    """WEB-06 — Design researches through the read set; the image model does not."""
+    """Design researches through the read set; the image model does not."""
 
     def test_design_is_a_real_prompt_surface(self) -> None:
         from raiker.contracts.models import PROMPT_SURFACES, normalize_prompt_surface

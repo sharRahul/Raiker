@@ -28,7 +28,7 @@ function profile(partial: Partial<ModelProfile> = {}): ModelProfile {
   } as ModelProfile;
 }
 
-describe("what a picker can reach (GLOBAL-MODEL-06)", () => {
+describe("what a picker can reach", () => {
   it("offers a model the owner never curated", () => {
     // The whole point: "keep available" decided whether a model existed in any
     // composer at all. A provider serving four hundred offered the two dozen

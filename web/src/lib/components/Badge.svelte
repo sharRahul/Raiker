@@ -31,7 +31,7 @@
   .badge-symbol {
     font-weight: 700;
   }
-  /* `tone-safe` went with VIS-15: nothing carries it any more, and a tone with
+  /* `tone-safe` went with the status-colour rule: nothing carries it any more, and a tone with
      no user is a colour waiting to be reached for. */
   .tone-ok {
     --badge-border: var(--ok-border);

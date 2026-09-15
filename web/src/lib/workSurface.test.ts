@@ -19,7 +19,7 @@ const SHELLS: Record<string, string> = {
 /**
  * Where each mode *spends* the density its shell declares. Chat and Build set
  * the gap on the region they own directly; Design's object lives in its own
- * region component (VIS2-20), so that is where its density lands.
+ * region component (the Work-mode density contract), so that is where its density lands.
  */
 const SPENDERS: Record<string, string> = {
   chat: resolve(VIEWS, "ChatView.svelte"),
@@ -27,7 +27,7 @@ const SPENDERS: Record<string, string> = {
   design: resolve(COMPONENTS, "DesignCanvasRegion.svelte"),
 };
 
-describe("the shared Work contract (VIS2-21)", () => {
+describe("the shared Work contract (the Work-mode identity rule)", () => {
   it("holds every Work mode to the same answers", () => {
     // The contract is what a mode owes whatever it is about. Specialising is
     // not a licence to drop one of these: a Design surface that cannot say

@@ -26,6 +26,13 @@ import { join } from "node:path";
 import { capture } from "./capture";
 import { signInAsOwner, useHostedModel } from "./hosted-provider";
 
+import { roundName } from "./naming";
+
+// BUG-250 — named per run, so a round that has already worked in this
+// workspace cannot find its own leftovers and assert on them. The suite shares
+// one workspace by design; this is what keeps a shared workspace honest.
+const CHECKPOINT = roundName("Rewind round");
+
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
@@ -178,7 +185,7 @@ test("Build asks for the rewind at the turn too, in its own layout", async () =>
   await expect(projectSelect).toBeVisible({ timeout: 30_000 });
   if ((await projectSelect.locator("option").count()) < 2) {
     await page.goto(`${BASE}/#/projects`);
-    await page.getByLabel(/name/i).first().fill("Rewind round");
+    await page.getByLabel(/name/i).first().fill(CHECKPOINT);
     await page.getByRole("button", { name: /create project/i }).first().click();
     await page.goto(`${BASE}/#/build`);
     await expect(projectSelect).toBeVisible({ timeout: 30_000 });

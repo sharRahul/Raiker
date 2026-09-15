@@ -534,7 +534,7 @@
             </td>
             <td><IdentityChip identity={a.proposed_by} /></td>
             <td>{capabilityLabel(a.capability)}</td>
-            <!-- VIS2-13 — every row of this queue used to be toned, so the one
+            <!-- Every row of this queue used to be toned, so the one
                  dangerous decision looked like the twenty routine ones above
                  it. Routine risk is metadata; `elevatedRisk` decides. -->
             <td>
@@ -576,7 +576,7 @@
 
     <p class="notice">{selected.metadata_only_notice}</p>
 
-    <!-- VIS-09 — an approval should answer, in this order: what is Raiker
+    <!-- An approval should answer, in this order: what is Raiker
          trying to do, why, what changes or leaves the machine, how far does it
          reach, and then decide.
 
@@ -899,7 +899,7 @@
 {/if}
 
 <style>
-  /* VIS2-13 — a fact that did not earn a badge still reads on the row, at one
+  /* A fact that did not earn a badge still reads on the row, at one
      quiet weight, so the badges beside it keep meaning something. */
   .row-fact { color: var(--text-3); font-size: var(--text-xs); white-space: nowrap; }
   /* ADD-22 — a question reads as a question, not as a softer approval. */
@@ -909,14 +909,14 @@
     padding: 0.6rem 0.75rem;
     margin: 0.5rem 0;
   }
-  /* VIS-06 — the owner reads this to answer the question under it, which
+  /* The owner reads this to answer the question under it, which
      makes it functional text rather than a status marker. */
   .question legend {
     font-size: var(--text-xs);
     font-weight: 650;
     opacity: 0.7;
   }
-  /* VIS-09 — the two facts that stay above the change, on one line. */
+  /* The two facts that stay above the change, on one line. */
   .effect {
     display: flex;
     flex-wrap: wrap;

@@ -22,7 +22,7 @@ from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
 
-# Imported rather than restated: MODEL-02's whole failure was that this list
+# Imported rather than restated: the whole failure it answers was that this list
 # lived in one module and the product model lived in another, so `design` was
 # missing from the first for as long as nobody compared them.
 from raiker.models.decision import SURFACES
@@ -186,7 +186,7 @@ def test_api_clears_a_default_with_an_empty_profile(
 
 
 def test_design_is_one_of_the_surfaces_that_may_hold_a_default() -> None:
-    """MODEL-02 — the product model is Chat | Build | Design.
+    """The product model is Chat | Build | Design.
 
     Two of the three had explicit surface state and the third silently borrowed
     the global default, so an owner who put Chat on a small local model had

@@ -1,4 +1,4 @@
-"""ENV-01 … ENV-05 — the runtime, not the model, is the source of the clock.
+"""The runtime, not the model, is the source of the clock.
 
 The failure these close is quiet and completely convincing: asked what day it
 is, a model answers from training knowledge, from a provider's hidden preamble,
@@ -82,7 +82,7 @@ def _no_host_timezone(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 class TestBundleShape:
-    """ENV-01/ENV-03 — what a turn is handed, and that it is both clocks."""
+    """What a turn is handed, and that it is both clocks."""
 
     def test_bundle_carries_utc_and_owner_local_together(
         self, store: SQLiteStore
@@ -114,7 +114,7 @@ class TestBundleShape:
         assert "Do not infer the current date from training knowledge" in block
 
     def test_each_call_reads_the_clock_again(self, store: SQLiteStore) -> None:
-        """ENV-03 — the mechanism that stops a scheduled run replaying its creation."""
+        """The mechanism that stops a scheduled run replaying its creation."""
         first = environment_context(store, "principal_owner", now=datetime(2026, 9, 7, tzinfo=UTC))
         second = environment_context(store, "principal_owner", now=datetime(2026, 9, 8, tzinfo=UTC))
 
@@ -128,7 +128,7 @@ class TestBundleShape:
 
 
 class TestTimezonePrecedence:
-    """ENV-02/ENV-04 — one source of truth, in a fixed order."""
+    """One source of truth, in a fixed order."""
 
     def test_explicit_owner_setting_wins_over_device(self, store: SQLiteStore) -> None:
         _settings(
@@ -242,7 +242,7 @@ class TestIndependence:
 
 
 class TestWeatherLocationPreference:
-    """WEATHER-02 — a default place, held separately from the timezone."""
+    """A default place, held separately from the timezone."""
 
     def test_absent_by_default(self, store: SQLiteStore) -> None:
         assert owner_weather_location(store, "principal_owner") is None

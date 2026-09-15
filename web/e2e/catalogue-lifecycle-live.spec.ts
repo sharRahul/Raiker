@@ -1,7 +1,7 @@
 /**
  * The two ends of a remembered catalogue, and what a composer says in between.
  *
- * GLOBAL-MODEL-08 remembers what a provider last published so a brief outage
+ * Raiker remembers what a provider last published so a brief outage
  * does not empty every picker. That is right, and it leaves two things to get
  * right at the edges:
  *

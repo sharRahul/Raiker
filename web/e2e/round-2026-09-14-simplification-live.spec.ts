@@ -13,6 +13,13 @@
  */
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
+import { roundName } from "./naming";
+
+// BUG-250 — named per run, so a round that has already worked in this
+// workspace cannot find its own leftovers and assert on them. The suite shares
+// one workspace by design; this is what keeps a shared workspace honest.
+const PROJECT = roundName("Round evidence");
+
 import {
   chooseModelForTurn,
   hostedProviderCard,
@@ -154,7 +161,7 @@ test("BUG-289 — an unreachable hosted provider gets a remedy an owner has", as
     });
   }
 
-  // A connected card keeps one primary action and an overflow (MODEL-15), so
+  // A connected card keeps one primary action and an overflow, so
   // Test lives in the menu. `pressCardAction` is the helper that knows that.
   await pressCardAction(page, card, /^Test/);
 
@@ -229,10 +236,10 @@ test("REM-PROJ-01 — a project card leads with work, lifecycle is one reach awa
   await page.goto(`${BASE}/#/projects`);
   const name = page.getByLabel(/Project name/i).first();
   if (await name.count()) {
-    await name.fill("Round evidence");
+    await name.fill(PROJECT);
     await page.getByRole("button", { name: /^Create project$/ }).first().click();
   }
-  const card = page.locator("article").filter({ hasText: "Round evidence" }).first();
+  const card = page.locator("article").filter({ hasText: PROJECT }).first();
   await expect(card).toBeVisible({ timeout: 30_000 });
 
   await expect(card.getByRole("button", { name: /^New chat$/ })).toBeVisible();
@@ -242,7 +249,7 @@ test("REM-PROJ-01 — a project card leads with work, lifecycle is one reach awa
   await expect(card.getByRole("button", { name: /^Delete$/ })).toHaveCount(0);
   await capture(page, `${SHOTS}/project-card.png`, card);
 
-  await card.getByRole("button", { name: /More actions for Round evidence/ }).click();
+  await card.getByRole("button", { name: new RegExp(`More actions for ${PROJECT}`) }).click();
   for (const action of ["Archive", "Move", "Delete"]) {
     await expect(page.getByRole("menuitem", { name: action })).toBeVisible();
   }

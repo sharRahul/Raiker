@@ -1,5 +1,5 @@
 /**
- * VIS-22 — the launcher that lets the rail be short.
+ * The launcher that lets the rail be short.
  *
  * These are the properties that make it a substitute for permanent rows rather
  * than a second way to do what the sidebar already did: it finds destinations

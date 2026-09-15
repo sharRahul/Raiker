@@ -48,7 +48,7 @@ VOICE_INPUT_MODES = {"typed", "dictated", "mixed"}
 #: protocol the turn is run under and nothing else: a surface can never widen
 #: what a turn may do, and every capability, gate and approval is unchanged by
 #: it. An unknown value is refused rather than silently treated as "chat".
-# WEB-06 — `design` is a third *working method*, not a third product.
+# `design` is a third *working method*, not a third product.
 #
 # Design's picture-making is a separate governed endpoint that takes a prompt, a
 # size and a model; it reaches one image provider and nothing else. What was
@@ -84,7 +84,7 @@ EVENT_TYPES = {
     "prompt_normalised",
     "intent_classified",
     "risk_classified",
-    # ENV-01 — the clock, date, day and timezone this turn actually ran with,
+    # The clock, date, day and timezone this turn actually ran with,
     # and where the timezone came from. Recorded because "the model was told the
     # right date" is the sort of claim that has to be checkable after the fact:
     # a schedule that landed on the wrong day is diagnosed from this row rather
@@ -907,12 +907,32 @@ class AgentResponse:
     client: ClientMetadata | None = None
     approval: dict[str, Any] | None = None
     last_event_id: str | None = None
+    # BUG-288 — the answer as declared parts rather than as characters to guess
+    # at. Empty for every turn that declared nothing, which is most of them, so
+    # a client that ignores this field sees exactly what it saw before. Built by
+    # `raiker.runtime.typed_parts.content_parts`; each entry is that module's
+    # `ContentPart.to_dict()`.
+    content_parts: list[dict[str, Any]] = field(default_factory=list)
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         _schema(self.schema_version)
         _one_of(self.status, RESPONSE_STATUSES, "response_status")
         _require(self.message, "message")
+        # BUG-288 — derived here, and not at the six places that build a
+        # response, because the one invariant worth having is that the parts and
+        # the message are the same answer. A site that forgot to call the
+        # splitter would produce a turn whose typed half silently disappeared,
+        # which is the failure this channel exists to prevent rather than a
+        # smaller version of it. Cheap: one regex over a string already in hand.
+        if not self.content_parts:
+            from raiker.runtime.typed_parts import content_parts
+
+            object.__setattr__(
+                self,
+                "content_parts",
+                [part.to_dict() for part in content_parts(self.message)],
+            )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

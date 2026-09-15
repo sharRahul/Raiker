@@ -1,5 +1,5 @@
 /**
- * VIS2-11 / COMPOSER-11 — the Project survives switching Work mode.
+ * COMPOSER-11 — the Project survives switching Work mode.
  *
  * The behaviour, not the store: choosing a project in one Work composer has to
  * be visible in the next one, and — the part that is easy to get wrong — it must

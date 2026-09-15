@@ -1,4 +1,4 @@
-"""WEATHER-01 … WEATHER-03 — weather as a read, not as a recollection.
+"""Weather as a read, not as a recollection.
 
 Two ways to get "18°C and cloudy" that are indistinguishable in the output and
 completely different in truth: a model answering from training knowledge about a

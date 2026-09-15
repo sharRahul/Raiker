@@ -82,7 +82,7 @@ def _setup(ws: Path) -> dict[str, Any]:
         svc.set_capability_state(cap, "enabled_runtime", None, "e2e")
     # Enable gov caps needed for admin operations
     with store.connect() as connection:
-        for cap in ("admin_mutation", "policy_mutation", "role_mutation"):
+        for cap in ("admin_mutation", "role_mutation"):
             connection.execute(
                 "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
                 (cap, "principal_owner", now, "e2e"),

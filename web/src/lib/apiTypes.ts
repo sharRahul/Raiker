@@ -5,7 +5,7 @@ import type { ApprovalMode } from "./approvalMode";
 // tests/test_api_contract_schemas.py guards the backend against dropping keys the UI reads.
 
 /**
- * WEB-04 — whether a read capability can answer *now*, said separately from
+ * Whether a read capability can answer *now*, said separately from
  * whether the owner has permitted it.
  *
  * `available` is projection — the build has the tool and every agentic surface
@@ -26,7 +26,7 @@ export interface ToolReadiness {
   checked_at: string;
 }
 
-/** WEB-01 — the one global read catalogue every agentic surface derives from. */
+/** The one global read catalogue every agentic surface derives from. */
 export interface ReadCapabilities {
   capabilities: string[];
   external: string[];
@@ -36,7 +36,7 @@ export interface ReadCapabilities {
   readiness: ToolReadiness[];
 }
 
-/** ENV-01 — the runtime clock bundle a model turn receives, as the UI reads it. */
+/** The runtime clock bundle a model turn receives, as the UI reads it. */
 export interface EnvironmentContext {
   generated_at_utc: string;
   timezone: string;
@@ -88,6 +88,15 @@ export interface CapabilityGate {
   // fetch. Optional so older payloads and fixtures stay valid.
   unset_resolution?: "off" | "shipped_default" | "shipped_default_unscoped";
   enforced_enabled?: boolean;
+  // BUG-293 — how far the side effect reaches, what it would cost if it ran
+  // without the owner, and what stands in the way. Read from the runtime's
+  // `CAPABILITY_AUTHORITY` table, which is asserted complete against the set of
+  // capabilities that have a real executor — so a switch on this page either
+  // answers both questions or governs something that cannot run. Empty for the
+  // latter, and optional so older payloads and fixtures stay valid.
+  side_effect?: "" | "read" | "reversible" | "external" | "destructive" | "critical";
+  ungoverned_consequence?: string;
+  authority_requirement?: string;
 }
 
 export interface ComposerApprovalModeSettings {
@@ -1016,7 +1025,7 @@ export interface ModelsView {
   profiles: ModelProfile[];
   chat_profiles?: ModelProfile[];
   /**
-   * GLOBAL-MODEL-01/02 — what each provider last published, keyed by profile.
+   * What each provider last published, keyed by profile.
    *
    * One catalogue, in the read every Work surface already makes, so no composer
    * reconstructs its own idea of what could be chosen. Read from the store
@@ -1752,7 +1761,7 @@ export interface AuthSession {
   expires_at: string | null;
 }
 
-// raiker/control/dashboard.py ApprovalView.to_dict()
+// Raiker/control/dashboard.py ApprovalView.to_dict()
 export interface IdentityView {
   principal_id: string;
   principal_type: string;
@@ -1792,7 +1801,7 @@ export interface ApprovalView {
   queue_total: number;
 }
 
-// raiker/control/dashboard.py ApprovalDetailView.to_dict()
+// Raiker/control/dashboard.py ApprovalDetailView.to_dict()
 export interface ApprovalDetailView {
   approval: ApprovalView;
   arguments: Record<string, unknown>;
@@ -1899,7 +1908,23 @@ export interface ApprovalInfo {
   queued_calls?: number;
 }
 
-// raiker.contracts.models.AgentResponse.to_dict()
+// Raiker.contracts.models.AgentResponse.to_dict()
+/**
+ * One declared piece of a turn's answer (BUG-288).
+ *
+ * `raiker.runtime.typed_parts.ContentPart.to_dict()`. `text` carries prose,
+ * `table` and `chart` carry a payload the runtime has already validated, and
+ * `refused` carries the reason a declared block was not accepted — never
+ * dropped, because a part that vanishes is an answer that silently lost a
+ * section.
+ */
+export interface ContentPart {
+  type: "text" | "table" | "chart" | "refused";
+  text?: string;
+  data?: Record<string, unknown>;
+  reason_code?: string;
+}
+
 export interface AgentResponse {
   request_id: string;
   session_id: string;
@@ -1910,9 +1935,13 @@ export interface AgentResponse {
   checkpoint_path?: string | null;
   approval?: ApprovalInfo | null;
   last_event_id?: string | null;
+  // BUG-288 — the answer as declared parts. Empty for every turn that declared
+  // nothing, which is most of them, so a client that ignores it sees what it
+  // always saw. Optional so older payloads and fixtures stay valid.
+  content_parts?: ContentPart[];
 }
 
-// raiker.contracts.streaming.StreamEvent serialized over SSE (see routes_prompts._sse).
+// Raiker.contracts.streaming.StreamEvent serialized over SSE (see routes_prompts._sse).
 export type StreamKind =
   "lifecycle" | "text_delta" | "reasoning_delta" | "tool" | "final" | "error";
 
@@ -1949,7 +1978,7 @@ export interface StreamEvent {
   turn_id?: string | null;
 }
 
-// raiker/control/dashboard.py TaskView.to_dict()
+// Raiker/control/dashboard.py TaskView.to_dict()
 export interface TaskView {
   task_id: string;
   session_id: string;
@@ -1991,7 +2020,7 @@ export interface TaskView {
   attachments?: PromptAttachment[];
 }
 
-// raiker/tasks/history.py TaskEventView.to_dict() — one recorded transition.
+// Raiker/tasks/history.py TaskEventView.to_dict() — one recorded transition.
 export interface TaskEventView {
   event_id: string;
   event_type: string;
@@ -2004,7 +2033,7 @@ export interface TaskEventView {
   session_id: string | null;
 }
 
-// raiker/tasks/history.py TaskAttemptView.to_dict() — one run of a task.
+// Raiker/tasks/history.py TaskAttemptView.to_dict() — one run of a task.
 export interface TaskAttemptView {
   /** 1-based across runs and continuations; 0 for a segment that is not a run. */
   index: number;
@@ -2474,7 +2503,7 @@ export interface MemorySettingsView {
   vector_search_exact_limit?: number;
 }
 
-// raiker/vector/backends.py embedding_capable_profiles(). A description of what
+// Raiker/vector/backends.py embedding_capable_profiles(). A description of what
 // the model profiles declare — nothing here has performed egress or checked a
 // credential; the run still goes through model_provider_runtime.
 export interface EmbeddingProviderView {
@@ -2492,7 +2521,7 @@ export interface EmbeddingProviderView {
   requires_network: boolean;
 }
 
-// raiker/control/dashboard.py ObservationView.to_dict(). MEM-04 — metadata
+// Raiker/control/dashboard.py ObservationView.to_dict(). MEM-04 — metadata
 // about material the runtime saw while it worked. There is no field carrying
 // the material itself, and there is not meant to be one: an observation exists
 // so recall is possible without a second ungoverned copy of everything read.
@@ -2531,7 +2560,7 @@ export interface ObservationsView {
   due_for_expiry: string[];
 }
 
-// raiker/control/dashboard.py BrainView.to_dict(). Nodes and edges are stored
+// Raiker/control/dashboard.py BrainView.to_dict(). Nodes and edges are stored
 // runtime relationships; the UI may add clearly labelled illustrative motion.
 export interface BrainNode {
   node_id: string;
@@ -3098,12 +3127,12 @@ export interface CodeRepoDiagnosticsView {
 // B13 — one bounded text file for the read-only viewer. A file that cannot be
 // shown says why rather than rendering as empty: `readable` false with the
 // reason the server gave (`binary_file`, `file_too_large`, `not_found`).
-/** VIS2-12 — one uncommitted change in the repository's working tree. */
+/** one uncommitted change in the repository's working tree. */
 export interface CodeRepoChangeEntry {
   path: string;
   /** The old name of a rename; "" otherwise. Both ends of a rename matter. */
   previous_path: string;
-  /** git's own word for it: modified, added, deleted, renamed, untracked. */
+  /** Git's own word for it: modified, added, deleted, renamed, untracked. */
   state: string;
   /** Whether the working tree still differs from the index for this path. */
   unstaged: boolean;
@@ -3293,7 +3322,7 @@ export interface TelemetryDestination {
 }
 
 /**
- * MODEL-01 — the one authoritative answer to "which model is this, and which
+ * The one authoritative answer to "which model is this, and which
  * one will actually run".
  *
  * `selected` is the owner's choice and persists whether or not it can serve;

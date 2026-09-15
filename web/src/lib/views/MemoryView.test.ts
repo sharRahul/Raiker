@@ -73,7 +73,7 @@ describe("MemoryView", () => {
   });
 
   it("does not draw a board of zeroes on a fresh install", async () => {
-    // VIS-13's rule: a board that is empty is not a board. The sentence above
+    // the empty-board rule: a board that is empty is not a board. The sentence above
     // already says Raiker remembers nothing; four tiles reading 0 restate it as
     // four containers.
     stubFetch({ "GET /api/memory": [], "GET /api/memory/settings": { incognito: false } });

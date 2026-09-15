@@ -1,4 +1,4 @@
-// VIS2-12 — the pane focuses itself, and knows when not to.
+// The pane focuses itself, and knows when not to.
 import { describe, expect, it } from "vitest";
 import { ARTIFACT_TABS, changesSummary, focusFor, type ArtifactTab } from "./buildArtifacts";
 

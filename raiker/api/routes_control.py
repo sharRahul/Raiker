@@ -143,7 +143,7 @@ async def list_read_capabilities(
 ) -> dict[str, Any]:
     """The global read catalogue, its per-surface parity, and typed readiness.
 
-    One read for the whole contract (WEB-01/WEB-04). The composer's Tools menu,
+    One read for the whole contract. The composer's Tools menu,
     the diagnostics page and a parity test all answer from this rather than each
     deriving a catalogue of their own — which is the drift the contract exists to
     remove.
@@ -187,7 +187,7 @@ async def get_environment(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    """The same runtime environment bundle a model turn receives (ENV-05).
+    """The same runtime environment bundle a model turn receives.
 
     Not a second clock. This calls the function the orchestrator calls, so the
     Settings screen and the turn cannot disagree about what time it is or which

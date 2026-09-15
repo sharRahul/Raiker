@@ -54,6 +54,17 @@ Use **Observability** when you need evidence rather than a summary:
   provider, pinning a model, changing a permission. Other people's conversations
   are never shown here. It is deliberately the deep-dive view; day-to-day work
   lives in Chat, Approvals, and Tasks.
+
+  The page opens on the record. **Filters and export** holds the session-id,
+  event-type and row-limit controls together with the export, because most
+  arrivals are already scoped — a task links to its own events, an approval to
+  the turn that raised it — and the raw controls are for verifying an incident
+  rather than for reading the log.
+
+  One thing is never folded away: **that a filter is on**. Whenever the timeline
+  is showing part of the record it says so above the rows, names what is
+  narrowing it, and offers **Show everything**. A filtered timeline read as the
+  whole record is the one way this page could mislead you.
 - **Checkpoints** lists recoverable pre-change state and offers governed rewind.
   Each snapshot's **Turn** links back to the exchange it was taken at, and
   *Preview rewind* opens the same preflight **Rewind to before this** opens from
@@ -190,7 +201,7 @@ composer's **Tools** menu:
 | **Search the web** | Finds pages this turn needs |
 | **Read a URL** | Fetches one page as sanitized text |
 | **Extract page content** | Pulls the main text, links, tables, metadata or structured data out of one page |
-| **Check the weather** | Structured conditions and forecast, with the source and how old the reading is |
+| **Check the weather** | Structured conditions and forecast, with the source and how old the reading is. A default place for when you do not name one is optional, under **Settings → Personalisation** |
 
 They are listed separately because they fail differently: search needs a
 provider, a URL read needs an address that resolves to the public internet, and

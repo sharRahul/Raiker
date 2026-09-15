@@ -94,7 +94,7 @@ class TestProviderModelListing:
     def test_every_composer_reads_one_catalogue_from_one_payload(
         self, client: TestClient, workspace: Path, owner_token: str
     ) -> None:
-        """GLOBAL-MODEL-01/02 — one catalogue, in the read every surface makes.
+        """One catalogue, in the read every surface makes.
 
         Each composer used to reconstruct what could be chosen from whatever it
         happened to have, so the answer depended on which surface asked. The
@@ -119,7 +119,7 @@ class TestProviderModelListing:
     def test_an_unreachable_provider_offers_what_it_last_published(
         self, client: TestClient, workspace: Path, owner_token: str
     ) -> None:
-        """GLOBAL-MODEL-08 — a blip must not empty every picker.
+        """A blip must not empty every picker.
 
         The catalogue used to live exactly as long as the response that carried
         it, so a provider that was briefly unreachable made its models vanish

@@ -27,7 +27,7 @@
   }: {
     profiles: ModelProfile[];
     /**
-     * GLOBAL-MODEL-06 — what each provider last published, keyed by profile.
+     * What each provider last published, keyed by profile.
      *
      * `profiles` above is the quick list: what the menu offers at rest, which
      * stays short because a list nobody can scroll is not a choice. This is
@@ -66,7 +66,7 @@
      */
     effort?: string;
     /**
-     * MODEL-01 — the authoritative decision for this surface, when the view has
+     * The authoritative decision for this surface, when the view has
      * read one.
      *
      * The picker's own `profiles` list answers "what could be chosen". It
@@ -121,7 +121,7 @@
         ],
   );
   /**
-   * GLOBAL-MODEL-06 — the search that reaches past the quick list.
+   * The search that reaches past the quick list.
    *
    * Cleared whenever the menu opens: a query left over from the last time is a
    * filter the owner did not type and cannot see the origin of, which is how
@@ -271,7 +271,7 @@
       tabindex="-1"
       onkeydown={closeOnEscape}
     >
-      <!-- MODEL-01 — the owner's choice, and what will actually answer.
+      <!-- The owner's choice, and what will actually answer.
            Two separate facts, and collapsing them is what made persistence look
            broken: a picker that renames itself to the fallback is
            indistinguishable from one that forgot the choice. Shown only when
@@ -297,7 +297,7 @@
         </div>
       {/if}
 
-      <!-- GLOBAL-MODEL-06 — "search must still be able to find the full
+      <!-- "search must still be able to find the full
            provider catalogue". The quick list below is what the owner works
            with; this reaches everything their providers published, so a model
            is no longer invisible for not having been curated. -->
@@ -596,7 +596,7 @@
     height: 1.15rem;
     flex-basis: 1.15rem;
   }
-  /* MODEL-01 — the owner's choice and what will actually answer, stated as two
+  /* The owner's choice and what will actually answer, stated as two
      facts rather than one substitution. Warn-toned because it is an exception:
      a picker that looks like this every day would be telling nobody anything. */
   .decision-note {

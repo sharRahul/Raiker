@@ -21,7 +21,7 @@
   const retryableNow = (item: ModelOperation) =>
     item.retryable && ["failed", "cancelled"].includes(item.state);
   /**
-   * MODEL-10 — whether the adaptive poll below is currently working.
+   * Whether the adaptive poll below is currently working.
    *
    * The panel carried a permanent Refresh button beside a loop that already
    * re-reads every two seconds while anything is running. A control that
@@ -106,7 +106,7 @@
   }
 
   /**
-   * MODEL-10 — running work first, then what failed, then what finished.
+   * Running work first, then what failed, then what finished.
    *
    * The panel is called Activity and answers "what is happening"; a completed
    * download from last week sitting above a stalled conversion answers a
@@ -210,7 +210,7 @@
               >
                 <span style={`width:${item.progress_percent}%`}></span>
               </div>{/if}
-            <!-- MODEL-10/MODEL-15 - one visible action, chosen by state:
+            <!-- One visible action, chosen by state:
                  Cancel while it is running (time-sensitive, so it is never
                  buried), Retry once it has failed in a way that can be started
                  again, and nothing at all for a job that simply finished.

@@ -1,4 +1,4 @@
-"""Weather as a structured, sourced, timestamped read (WEATHER-01).
+"""Weather as a structured, sourced, timestamped read.
 
 Asking a model what the weather is has two failure modes and they look
 identical from the outside. It can answer from training knowledge, which is a

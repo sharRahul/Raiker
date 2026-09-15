@@ -250,13 +250,13 @@ _ENTRIES: tuple[CapabilityEntry, ...] = (
     # earning it.
     _own("admin_mutation", ENTRY_CONTROL_PLANE),
     _own("role_mutation", ENTRY_CONTROL_PLANE),
-    _no_path(
-        "policy_mutation",
-        "Nothing proposes a policy mutation. `CAPABILITY_GATE_MAP` names the "
-        "gate so a future one would be routed, and no surface, tool or approval "
-        "constructs the action today: policy changes are made by editing the "
-        "policy configuration, which the runtime reads rather than governs.",
-    ),
+    # BUG-298 — there used to be a third, `policy_mutation`, classified
+    # `no_path` because nothing proposed one. A routed gate nothing proposes is
+    # not a trace; it is a switch over nothing, and the honest answer was the
+    # boundary rather than the row. Policy is process configuration the runtime
+    # reads — the same footing as the model egress allowlist, and deliberately
+    # not editable from a browser session — so the capability is gone and
+    # `docs/guide/` and `SECURITY_AND_POLICY.md` say so where an owner looks.
     # ── The sensitive domains: registered, fail-closed, and reached by nothing ─
     #
     # Each has an executor class that returns `not_implemented`, and none of them

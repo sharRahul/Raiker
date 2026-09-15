@@ -411,7 +411,7 @@
   <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
     <p class="page-lead">{memorySentence(counts)}</p>
 
-  <!-- VIS-13's rule, applied here too: a board that is empty is not a board.
+  <!-- the empty-board rule, applied here too: a board that is empty is not a board.
        On a fresh install these four tiles all read 0, which is the sentence
        above restated as four containers. They appear when there is something
        in them. -->
@@ -422,7 +422,7 @@
   {/if}
 
     {#if attention.length > 0}
-      <!-- VIS2-18 — the attention half of the hub. Only decisions appear here:
+      <!-- The attention half of the hub. Only decisions appear here:
            an expired memory has already stopped being recalled, so it is a fact
            in the summary above rather than a row saying "act on this" about
            something with nothing to act on. -->

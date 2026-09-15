@@ -23,7 +23,7 @@ describe("nav model", () => {
 
   it("uses one direct Work section plus four discoverable groups", () => {
     expect(NAV_GROUPS.map((g) => [g.id, g.label, g.collapsible])).toEqual([
-      // VIS-01/VIS-06 — "Core" named the group after the architecture. "Work"
+      // "Core" named the group after the architecture. "Work"
       // names it after what is in it, in sentence case like every other label.
       ["core", "Work", false],
       ["knowledge", "Knowledge", true],
@@ -97,7 +97,7 @@ describe("nav model", () => {
     // a hook is something the owner installs, and it can only ever tighten what
     // Permissions already allows.
     expect(HUB_TABS.extensions).toEqual([
-      // VIS2-10 — Overview leads, as it does on Models. Five tabs named for
+      // Overview leads, as it does on Models. Five tabs named for
       // kinds of thing is a filing system; nobody arrives wanting to look at
       // the MCP category.
       "overview",
@@ -170,11 +170,11 @@ describe("nav model", () => {
   // Bookmarks and older builds still emit the pre-split ids. They must land on
   // the panel that now owns their content, not on the default tab.
   //
-  // MODEL-03 replaced six tabs at once, so the alias map has to carry all six
+  // The five-tab rebuild replaced six tabs at once, so the alias map carries all six
   // of those *and* the ids their own predecessors used — a link written before
   // the Providers split is two renames old and must still resolve.
   it("maps a superseded Models tab id onto the panel that replaced it", () => {
-    // The six MODEL-03 replaced. `local` and `hosted` land on the inventory:
+    // The six it replaced. `local` and `hosted` land on the inventory:
     // a link named for where a model lives was almost always followed to look
     // at models the owner already had.
     expect(tabFromHash("#/models?tab=local")).toBe("models");
@@ -268,7 +268,7 @@ describe("a hub tab addressed as a path segment", () => {
 
   it("falls back to the hub's first panel for a segment it does not have", () => {
     expect(routeFromHash("#/extensions/nonsense")).toBe("extensions");
-    // The hub's first panel, which is Overview since VIS2-10 — and a better
+    // The hub's first panel, which is Overview since the hub Overview — and a better
     // landing for a link nobody can resolve than a category chosen at random.
     expect(tabFromHash("#/extensions/nonsense")).toBe("overview");
   });

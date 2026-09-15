@@ -1,5 +1,5 @@
 /**
- * The owner's timezone, as the page reads and proposes it (ENV-02).
+ * The owner's timezone, as the page reads and proposes it.
  *
  * The runtime owns the clock; this module owns two smaller questions the page
  * has to answer honestly beside it.

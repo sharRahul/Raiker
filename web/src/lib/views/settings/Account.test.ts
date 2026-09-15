@@ -27,6 +27,11 @@ function stubHeldDelete() {
   const calls: string[] = [];
   let release: ((value: unknown) => void) | undefined;
   let rejectWith: ((reason: unknown) => void) | undefined;
+  // What `bootstrap-status` answers when the lost-response path asks it whether
+  // the account survived. Unanswerable by default, which is the state the
+  // pre-existing tests were written against.
+  let bootstrapBody: { can_register: boolean } | null = null;
+  let bootstrapUnreachable = false;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -35,6 +40,10 @@ function stubHeldDelete() {
       calls.push(`${method} ${url.replace(/^https?:\/\/[^/]+/, "")}`);
       if (url.includes("/api/auth/elevate")) {
         return new Response(JSON.stringify({ token: "elevated" }), { status: 200 });
+      }
+      if (url.includes("/api/auth/bootstrap-status")) {
+        if (bootstrapUnreachable) throw new TypeError("network");
+        return new Response(JSON.stringify(bootstrapBody ?? {}), { status: 200 });
       }
       if (url.includes("/api/account") && method === "DELETE") {
         return new Promise((resolve, reject) => {
@@ -49,6 +58,12 @@ function stubHeldDelete() {
     calls,
     refuse: () => release?.(new Response(JSON.stringify({ detail: {} }), { status: 500 })),
     drop: () => rejectWith?.(new TypeError("network")),
+    bootstrap: (body: { can_register: boolean }) => {
+      bootstrapBody = body;
+    },
+    bootstrapFails: () => {
+      bootstrapUnreachable = true;
+    },
     deleteCalls: () => calls.filter((call) => call.startsWith("DELETE")).length,
   };
 }
@@ -111,6 +126,61 @@ describe("deleting an account", () => {
     );
     expect(screen.getByRole("button", { name: /^cancel$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /permanently delete/i })).toBeInTheDocument();
+  });
+
+  /*
+   * REM-SET-ACCOUNT — a lost response is not a failure.
+   *
+   * The delete had one error path for "the server said no" and "the server
+   * never answered". An owner whose connection dropped after the account had
+   * already been destroyed was told it had not been, and offered a retry for
+   * something that had happened. These three fix the shape of that window.
+   */
+  it("asks the server what happened when the response is lost", async () => {
+    const server = stubHeldDelete();
+    // The account really is gone: nothing is registered any more.
+    server.bootstrap({ can_register: true });
+    const reload = vi.fn();
+    vi.stubGlobal("location", { ...window.location, reload });
+    mount();
+    await startDeletion();
+    await waitFor(() => expect(server.deleteCalls()).toBe(1));
+
+    server.drop();
+
+    await waitFor(() => expect(reload).toHaveBeenCalled());
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says the account is still here when the server says it is", async () => {
+    const server = stubHeldDelete();
+    server.bootstrap({ can_register: false });
+    mount();
+    await startDeletion();
+    await waitFor(() => expect(server.deleteCalls()).toBe(1));
+
+    server.drop();
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(/it is still here/i),
+    );
+  });
+
+  it("says it does not know rather than offering a retry it cannot justify", async () => {
+    // Neither the delete nor the probe came back. A second delete of an account
+    // that may already be gone is not the harmless thing a Retry implies, so
+    // the honest answer is that it is unknown.
+    const server = stubHeldDelete();
+    server.bootstrapFails();
+    mount();
+    await startDeletion();
+    await waitFor(() => expect(server.deleteCalls()).toBe(1));
+
+    server.drop();
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(/is unknown/i),
+    );
   });
 
   it("still lets the owner back out before anything has been submitted", async () => {

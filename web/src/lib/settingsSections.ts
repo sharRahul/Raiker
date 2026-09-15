@@ -24,7 +24,7 @@ export interface SettingsSection {
  * omission. Two lists can disagree; a list and a reference to it cannot.
  */
 /**
- * VIS-17 — three groups, not two.
+ * Three groups, not two.
  *
  * "Personal" held six of the ten sections, which made it the list it was meant
  * to break up: appearance sat beside sign-in and beside the account itself, so

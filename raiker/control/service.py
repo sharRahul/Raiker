@@ -27,6 +27,11 @@ from raiker.runtime.authority.activation import (
     has_threat_model_ack,
 )
 from raiker.runtime.authority.admission import capability_admission, unset_resolution_for
+from raiker.runtime.authority.capability_authority import (
+    authority_requirement,
+    side_effect_class,
+    ungoverned_consequence,
+)
 from raiker.runtime.authority.entry_paths import OWN_GATE, entry_for
 from raiker.runtime.authority.models import (
     RAIKER_RUNTIME,
@@ -184,6 +189,13 @@ class RuntimeControlService:
             enforced_enabled=self._enforced_enabled(
                 capability, principal.principal_id if principal else None
             ),
+            # BUG-293 — what this would cost if it ran without the owner, and
+            # what stands in the way. Read rather than derived: the table is
+            # asserted complete against `REAL_EXECUTOR_CAPABILITIES`, so a new
+            # executor cannot reach this page without answering both questions.
+            side_effect=side_effect_class(capability),
+            ungoverned_consequence=ungoverned_consequence(capability),
+            authority_requirement=authority_requirement(capability),
         )
 
     def _enforced_enabled(self, capability: str, principal_id: str | None) -> bool:

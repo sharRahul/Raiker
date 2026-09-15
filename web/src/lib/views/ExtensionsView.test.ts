@@ -58,7 +58,7 @@ function overview(extensions: ExtensionView[], counts: Partial<Record<string, nu
   };
 }
 
-describe("the Extensions overview (VIS2-10)", () => {
+describe("the Extensions overview (the hub Overview)", () => {
   it("leads with what Raiker can reach, not with a category", async () => {
     // Five equal tabs named for kinds of thing is a filing system. Nobody
     // arrives here wanting to look at the MCP category.
@@ -76,7 +76,7 @@ describe("the Extensions overview (VIS2-10)", () => {
   });
 
   it("says nothing needs a person once, rather than a card per healthy row", async () => {
-    // VIS2-18 — a wall of green cards reports "nothing is wrong" in the most
+    // A wall of green cards reports "nothing is wrong" in the most
     // expensive way available, and trains the owner to skim past the one that
     // is not green.
     stubFetch(
@@ -124,7 +124,7 @@ describe("the Extensions overview (VIS2-10)", () => {
     ).toBeInTheDocument();
     // And it says it once. Found in the live capture: the lead sentence and a
     // second ticked line underneath were the same sentence twice, which is the
-    // duplication VIS2-18 exists to remove.
+    // duplication the exception-led rule exists to remove.
     expect(screen.queryByText(/Everything installed is usable/)).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-"""Structured reads of a page Raiker has already fetched safely (WEB-05).
+"""Structured reads of a page Raiker has already fetched safely.
 
 `web_fetch` answers one question — *what does this page say?* — and answers it
 as a wall of prose. A turn that needs the links on a documentation index, the

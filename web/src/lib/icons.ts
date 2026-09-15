@@ -45,6 +45,7 @@ export type IconName =
   | "x"
   | "chevron-down"
   | "chevron-right"
+  | "chevron-up"
   | "search"
   | "refresh"
   | "lock"
@@ -105,7 +106,7 @@ export type IconName =
   // rotated `chevron-right`: a bare chevron beside a path reads as "expand this",
   // and the folder is the half that says which direction is meant.
   | "folder-up"
-  // VIS2-09 — three permanent destinations drew the same spark. A rail whose
+  // Three permanent destinations drew the same spark. A rail whose
   // rows are only told apart by their labels is not an icon set, and the spark
   // is Raiker's mark for agent action: spending it on "Home" spends the one
   // glyph that should mean the agent did something.
@@ -184,6 +185,10 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   ],
   "chevron-down": ["M6 9.5 12 15.5 18 9.5"],
   "chevron-right": ["M9.5 6 15.5 12 9.5 18"],
+  // BUG-288 — the ascending half of a sortable column header. The set had
+  // down and right and no up, so a sort direction could only be drawn by
+  // rotating something, which is a different thing from having the glyph.
+  "chevron-up": ["M6 14.5 12 8.5 18 14.5"],
   search: ["M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Z", "M15.5 15.5 21 21"],
   refresh: ["M20 8a8 8 0 1 0 1 6", "M21 3v5h-5"],
   lock: ["M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z", "M8.5 11V8a3.5 3.5 0 0 1 7 0v3"],

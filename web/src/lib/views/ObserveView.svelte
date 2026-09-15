@@ -190,7 +190,7 @@
       <section aria-labelledby="ready-h">
         <h2 id="ready-h" class="section-h">Is Raiker ready?</h2>
         <div class="tiles">
-          <!-- VIS2-16 — the healthy half of this pair is the resting state of a
+          <!-- The healthy half of this pair is the resting state of a
                working install, so it is plain metadata. The colour is spent on
                the half that needs a person, which is what makes it mean
                anything the one time it appears. -->

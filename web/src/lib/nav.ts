@@ -9,7 +9,7 @@ export interface NavGroup { id: NavGroupId; label: string; collapsible: boolean;
 // three competing pages.
 export const NAV_GROUPS: NavGroup[] = [
   { id: "core", label: "Work", collapsible: false, items: [
-    // VIS-13 — "Workbench" was a name for a page whose job is to be the place
+    // "Workbench" was a name for a page whose job is to be the place
     // you land. "Home" is what it is, and it costs the owner no vocabulary.
     { id: "home", label: "Home", icon: "home", hint: "Resume governed work and see what needs attention" },
     { id: "new-chat", label: "Chat", icon: "chat", hint: "Start or continue a governed conversation" },
@@ -71,7 +71,7 @@ export const DEFAULT_ROUTE = "home";
 export const SIDEBAR_GROUP_IDS: NavGroupId[] = ["core", "knowledge"];
 
 /**
- * The destinations the permanent rail draws. VIS-01.
+ * The destinations the permanent rail draws. the rail's row budget.
  *
  * Grouping and route registration are one thing; what the rail is worth
  * spending a permanent row on is another, and they were the same list. Core
@@ -88,7 +88,7 @@ export const SIDEBAR_GROUP_IDS: NavGroupId[] = ["core", "knowledge"];
  * * **Messaging** — a real destination, reached rarely. It keeps its route and
  *   is listed in the gear's window.
  *
- * **VIS2-03 put Design back.** Taking it off the rail was right when Design was
+ * **the three Work modes put Design back.** Taking it off the rail was right when Design was
  * a form over a gallery reached a few times a month. It is a Work mode now —
  * Chat, Build and Design are the three ways to give Raiker something to do —
  * and a Work mode whose only discovery path is a window behind a gear reads as
@@ -113,7 +113,7 @@ export const SIDEBAR_ITEM_IDS: string[] = [
 /**
  * The three Work modes, in the order every surface must list them.
  *
- * VIS2-03. Chat, Build and Design are peers: you say what you want and Raiker
+ * the three Work modes. Chat, Build and Design are peers: you say what you want and Raiker
  * answers with prose, with a change, or with an image. The top bar's mode
  * switch drew two of them, which told a new owner that Design was a lesser
  * kind of thing reached from somewhere else. One array, so the switch, the
@@ -161,7 +161,7 @@ export const HUB_GROUPS: NavGroup[] = NAV_GROUPS.map((group) => ({
  * link, the sidebar, and the hub's own tab strip all resolve to the same panel.
  */
 export const HUB_TABS: Record<string, string[]> = {
-  // MODEL-03 — organised by the questions an owner actually arrives with, not
+  // Organised by the questions an owner actually arrives with, not
   // by which table the data lives in.
   //
   // The six tabs it replaces — Local, Hosted, Hugging Face, Activity, Routing,
@@ -179,7 +179,7 @@ export const HUB_TABS: Record<string, string[]> = {
     "runtime",
     "usage",
   ],
-  // VIS2-10 — Overview leads, for the same reason it does on Models. Five
+  // Overview leads, for the same reason it does on Models. Five
   // equal tabs named for *kinds of thing* is a filing system, and nobody
   // arrives here wanting to look at the MCP category: they want to know what
   // Raiker can reach and whether anything they installed is broken.
@@ -243,7 +243,7 @@ const HUB_TAB_ALIASES: Record<string, Record<string, string>> = {
   // The single "Providers" scroll became Local and Hosted; "Library" was the
   // local GGUF index, now part of Local; "Discover" was the Hub search.
   models: {
-    // The pre-MODEL-03 six, each pointing at whichever panel took over its
+    // The six tabs the rebuild replaced, each pointing at whichever panel took over its
     // content. `local` and `hosted` land on the inventory rather than on Add:
     // a link named for where a model lives was almost always followed to look
     // at models the owner already had.

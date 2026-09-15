@@ -1,5 +1,5 @@
 /**
- * VIS-24 — the parts of a visual review a machine can hold on to.
+ * The parts of a visual review a machine can hold on to.
  *
  * Raiker already has unusually strong responsive and accessibility coverage:
  * the width sweep proves no page overflows, the axe scans prove contrast and
@@ -14,11 +14,11 @@
  * broken* at some point rather than a rule invented to have a test:
  *
  * * an empty state that offers no way out — every one of thirteen call sites,
- *   until VIS-12;
+ *   until the empty-state rule;
  * * a permanent row for a destination reached on a handful of days — nine peers
- *   in the rail, until VIS-01;
+ *   in the rail, until the rail's row budget;
  * * a shared layout re-declared privately per view until the surfaces drift —
- *   eight byte-identical copies of `.head-row`, until VIS-23.
+ *   eight byte-identical copies of `.head-row`, until the page-action rule.
  *
  * A rule nobody can break silently is worth more than a rule everybody agrees
  * with.
@@ -41,11 +41,11 @@ function sources(directory: string): { name: string; text: string }[] {
 
 describe("visual rubric", () => {
   it("keeps the permanent rail short enough to read at a glance", () => {
-    // VIS-01. The number is a judgement, but "no ceiling at all" is how a rail
+    // the rail's row budget. The number is a judgement, but "no ceiling at all" is how a rail
     // reaches nine peers one reasonable addition at a time. Anything above this
     // belongs behind the gear or in the palette, both of which reach everything.
     //
-    // VIS2-03 raised it by one, for Design and for nothing else. The ceiling is
+    // the three Work modes raised it by one, for Design and for nothing else. The ceiling is
     // there to stop a rail growing by convenience; a Work mode is not a
     // convenience. Chat, Build and Design are the three ways to give Raiker
     // something to do, and a rail that draws two of them tells a new owner the
@@ -63,7 +63,7 @@ describe("visual rubric", () => {
   });
 
   it("declares the page-header contract once, not once per view", () => {
-    // VIS-23/VIS-04. Eight views each carried a private, byte-identical copy.
+    // the page-action rule. Eight views each carried a private, byte-identical copy.
     // Nothing had to disagree for the surfaces to drift — only to be edited
     // separately.
     expect(stylesheet).toMatch(/\.head-row\s*\{/);
@@ -74,7 +74,7 @@ describe("visual rubric", () => {
   });
 
   it("gives every empty state a way out", () => {
-    // VIS-12. `EmptyState` has carried an `action` slot for a long time; the
+    // the empty-state rule. `EmptyState` has carried an `action` slot for a long time; the
     // defect was that no call site used it. A zero-data screen that names the
     // absence and stops is a dead end, and a product with this many of them
     // cannot afford thirteen.
@@ -112,7 +112,7 @@ describe("visual rubric", () => {
   });
 
   it("declares each shared label mark once, not once per view", () => {
-    // VIS-04/VIS-06. `.eyebrow` had six private definitions at four weights
+    // the surface archetypes. `.eyebrow` had six private definitions at four weights
     // (600, 750, 750, 800) and five trackings (wide, 0.08, 0.09, 0.12, 0.13em),
     // and `.kicker` had a private copy of the shared rule beside it. None of
     // them disagreed on purpose - they were written separately, which is all
@@ -142,7 +142,7 @@ describe("visual rubric", () => {
   });
 
   it("spends status colour on exceptions, not on the resting state", () => {
-    // VIS-15. `safe` ("low-risk, auto-allowed") and `implemented` ("real,
+    // the status-colour rule. `safe` ("low-risk, auto-allowed") and `implemented` ("real,
     // working capability") are the resting state of most of the gate table, and
     // both were green — so Permissions opened as a wall of colour reporting
     // that nothing was wrong, which is what makes a product read as monitoring
@@ -166,7 +166,7 @@ describe("visual rubric", () => {
   });
 
   it("keeps Chat's composer simpler than Build's", () => {
-    // VIS-11. The two share design primitives and must not share density:
+    // the density contract. The two share design primitives and must not share density:
     // Chat is a conversation, Build is a workbench. The gap is not decoration -
     // it is what tells a first-time owner which of the two they are in.
     //
@@ -242,7 +242,7 @@ describe("visual rubric", () => {
   });
 
   it("gives every step of the type scale a size of its own", () => {
-    // VIS2-01. `--text-lg` resolved to exactly `--text-base`, so a view that
+    // the type-scale audit. `--text-lg` resolved to exactly `--text-base`, so a view that
     // reached for "one size up from body" got body text in a heavier weight and
     // the call site still read as deliberate hierarchy. A named step that
     // resolves to its neighbour is worse than a missing one, because nothing
@@ -263,7 +263,7 @@ describe("visual rubric", () => {
   });
 
   it("names an elevation for every surface that claims one", () => {
-    // VIS2-17. The command palette asked for `--shadow-3` through a fallback,
+    // the overlay vocabulary. The command palette asked for `--shadow-3` through a fallback,
     // which is a token that does not exist wearing the appearance of one that
     // does: the fallback fires silently and every overlay above a dialog
     // rendered at dialog depth. A `var()` with a fallback is still a name the
@@ -274,7 +274,7 @@ describe("visual rubric", () => {
   });
 
   it("spends success colour on what just happened, not on what is merely fine", () => {
-    // VIS2-16. Green as the standing representation of connected / enabled /
+    // the neutral-health rule. Green as the standing representation of connected / enabled /
     // verified / ready is on screen constantly, which is the one condition
     // under which a colour stops carrying information. These are the resting
     // states that were painted with it; each is plain metadata now, and the
@@ -310,7 +310,7 @@ describe("visual rubric", () => {
         .not.toMatch(/var\(--ok\)/);
     }
   });
-  it("decides a repeated row's token budget once, not once per list (VIS2-13)", () => {
+  it("decides a repeated row's token budget once, not once per list (the badge budget)", () => {
     // Each list that repeats an entity used to argue the badge question in its
     // own markup — an inline ternary on a status or a risk level, deciding both
     // *which* badge and *whether* one is warranted. The answers drifted: a
@@ -338,7 +338,7 @@ describe("visual rubric", () => {
       ).not.toMatch(/variant=\{[^}]*(risk_level|\.status)[^}]*\?/);
     }
   });
-  it("names the layer a surface is on, rather than picking a number (VIS2-17)", () => {
+  it("names the layer a surface is on, rather than picking a number (the overlay vocabulary)", () => {
     // Thirteen z-index values were in use across the views — 30, 40, 45, 46,
     // 55, 60, 70, 80, 90, 95, 100, 120, 200 — each chosen locally to sit above
     // whatever its author was looking at. A number picked that way encodes no
@@ -371,7 +371,7 @@ describe("visual rubric", () => {
       }
     }
   });
-  it("gives a bigger monitor more room, not bigger controls (VIS2-15)", () => {
+  it("gives a bigger monitor more room, not bigger controls (the large-display classes)", () => {
     // A 4K display is a different composition, not the same one scaled up. The
     // wide blocks are allowed to move the canvas widths and nothing else: prose
     // measure, the type scale, the spacing scale and every control dimension
@@ -393,7 +393,7 @@ describe("visual rubric", () => {
     }
   });
 
-  it("composes the two themes separately rather than reusing one elevation (VIS2-14)", () => {
+  it("composes the two themes separately rather than reusing one elevation (the dark composition)", () => {
     // Not a palette change — the same colours, composed for the ground they sit
     // on. A drop shadow carries elevation on white and almost nothing on
     // #0B0D10, so the dark theme moves that job to the edge; the canvas hairline
@@ -411,7 +411,7 @@ describe("visual rubric", () => {
       expect(new Set(declarations).size, `${token} is the same in both themes`).toBeGreaterThan(1);
     }
     // Design's asset carries the boundary; the card around it is gone. The
-    // rule lives with the region that presents the asset (VIS2-20), not in the
+    // rule lives with the region that presents the asset (the Work-mode density contract), not in the
     // view that hosts the region.
     const design = readFileSync(resolve(COMPONENTS, "DesignCanvasRegion.svelte"), "utf8");
     expect(design, "Design's image has no boundary of its own").toMatch(

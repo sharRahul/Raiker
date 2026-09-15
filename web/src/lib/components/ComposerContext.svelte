@@ -160,7 +160,7 @@
     display: inline-flex;
     min-width: 0;
   }
-  /* VIS2-16 — this is information, not attention. It stays the quietest thing
+  /* This is information, not attention. It stays the quietest thing
      on the bar until it is opened. */
   .context-summary {
     max-width: 100%;

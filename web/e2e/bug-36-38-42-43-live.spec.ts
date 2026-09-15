@@ -4,6 +4,14 @@ import { capture } from "./capture";
 import { join } from "node:path";
 import { OWNER_CREDENTIALS, hostedProviderCard, keepModelAvailable } from "./hosted-provider";
 
+import { roundName } from "./naming";
+
+// BUG-250 — named per run, so a round that has already worked in this
+// workspace cannot find its own leftovers and assert on them. The suite shares
+// one workspace by design; this is what keeps a shared workspace honest.
+const TASK = roundName("Review attached passage");
+const PROJECT = roundName("Budget evidence sandbox");
+
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const PASSWORD = OWNER_CREDENTIALS.password;
@@ -83,7 +91,7 @@ test("BUG-36, BUG-38, BUG-42, BUG-43 and cross-surface attachments", async ({ pa
 
   await page.goto(`${BASE}/#/tasks`);
   await page.getByRole("button", { name: "Schedule once" }).click();
-  await page.getByLabel("Task title").fill("Review attached passage");
+  await page.getByLabel("Task title").fill(TASK);
   await page.getByLabel("Instructions").fill("Use the attached source without embedding it in these instructions.");
   await page.getByLabel("Attachment path").fill("docs/plans/TO_BE_FIXED.md");
   await page.getByRole("button", { name: "Attach" }).click();
@@ -97,7 +105,7 @@ test("BUG-36, BUG-38, BUG-42, BUG-43 and cross-surface attachments", async ({ pa
   await page.getByRole("button", { name: "Runtime configuration" }).click();
   await page.getByText("Add SSH or Daytona profile").click();
   await page.getByLabel("Environment type").selectOption("daytona");
-  await page.getByLabel("Display name").fill("Budget evidence sandbox");
+  await page.getByLabel("Display name").fill(PROJECT);
   await page.getByLabel("Sandbox ID").fill("budget-evidence-sandbox");
   await page.getByLabel("Maximum run cost (USD)").fill("5");
   await page.getByRole("button", { name: "Save environment" }).click();

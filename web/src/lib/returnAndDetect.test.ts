@@ -1,4 +1,4 @@
-// MODEL-14 — returning to Raiker re-runs detection, once, and reports honestly.
+// Returning to Raiker re-runs detection, once, and reports honestly.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { detectionNotice, onReturnToApp } from "./returnAndDetect";
 

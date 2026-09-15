@@ -26,7 +26,7 @@ export function chatProfiles(): ModelProfile[] {
 }
 
 /**
- * GLOBAL-MODEL-01/02 — the one catalogue, read the same way by every composer.
+ * The one catalogue, read the same way by every composer.
  *
  * `chatProfiles()` above is the quick list: what a picker offers at rest. This
  * is what each provider last published, which is what a picker's *search* may

@@ -72,7 +72,7 @@ LOCAL_GATE_CHECK_MODULES = {
     # MEM-10 reads admission first so Ask can degrade a passive read without
     # parking it, then routes allowed/auto execution through chokepoint B.
     "raiker/memory/query_embedding.py",
-    # WEB-04 — the readiness rows a composer renders. A third describing module,
+    # The readiness rows a composer renders. A third describing module,
     # here for the same reason as `context/gatherer.py` and `control/service.py`:
     # `web_search · Ready` has to be the enforcing path's own answer, or the
     # Tools menu offers a capability the runtime is about to refuse. It decides
@@ -328,17 +328,24 @@ def test_no_routed_gate_is_effective_by_default() -> None:
     )
 
 
-def test_the_three_governance_gates_are_traced() -> None:
+def test_the_governance_gates_are_traced() -> None:
     """BUG-297 — the finding, kept as the regression it came from.
 
-    Deliberately names the three rather than asserting the general rule twice:
-    the general rule above would still pass if someone classified all three as
+    Deliberately names them rather than asserting the general rule twice: the
+    general rule above would still pass if someone classified all of them as
     `own_gate` to make it green, and the point of the finding was that one of
-    them is not.
+    the three was not traceable at all.
+
+    **BUG-298 closed that one by deleting it.** `policy_mutation` had a gate, a
+    name in the router and nothing that proposed one, because policy is process
+    configuration the runtime reads rather than governs. The third assertion is
+    therefore that the capability is *gone* — from the gate map, the phase
+    gates and this table alike — which is the same invariant from the other
+    side: a routed gate is classified, and a gate nothing can route is not kept
+    around classified as unreachable.
     """
     from raiker.runtime.authority.entry_paths import (
         ENTRY_CONTROL_PLANE,
-        NO_PATH,
         OWN_GATE,
         entry_for,
     )
@@ -357,10 +364,18 @@ def test_the_three_governance_gates_are_traced() -> None:
         "`role_mutation` through `_govern_admin_mutation`, so the gate decides."
     )
 
-    policy = entry_for("policy_mutation")
-    assert policy is not None and policy.reality == NO_PATH, (
-        "Nothing constructs a policy mutation. If something now does, trace it "
-        "here — do not classify it `own_gate` to match the two beside it."
+    from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
+
+    assert entry_for("policy_mutation") is None, (
+        "`policy_mutation` is back in the entry-path table. It was removed "
+        "(BUG-298) because nothing constructs a policy mutation — policy is "
+        "process configuration the runtime reads. If something now does propose "
+        "one, that is a new authority path: it needs a surface, an approval and "
+        "a threat model before it needs a row here."
+    )
+    assert "policy_mutation" not in CAPABILITY_GATE_MAP.values(), (
+        "The action router maps a gate onto `policy_mutation` again. A gate no "
+        "surface, tool or approval can reach is a switch over nothing."
     )
 
 

@@ -8,12 +8,12 @@
  *
  * What it is evidence *for*, in the order the review asks the questions:
  *
- *   MODEL-01  the selection an owner makes survives navigation and reload, and
+ *   · the selection an owner makes survives navigation and reload, and
  *             the page and the composer name the same model because they read
  *             the same contract.
- *   MODEL-02  Design has a model default of its own rather than borrowing
+ *   · Design has a model default of its own rather than borrowing
  *             Chat's.
- *   MODEL-03  the page opens on what is running the work, not on a filing
+ *   · the page opens on what is running the work, not on a filing
  *             system for the rows.
  *   COMPOSER-02/03/04  two entry points at rest on all three Work modes, with
  *             everything the four permanent controls used to offer inside them.
@@ -141,7 +141,7 @@ async function pinAModel(provider: string, fallbackModel: string): Promise<strin
   if ((await card.count()) === 0) return null;
   await card.scrollIntoViewIfNeeded();
 
-  // MODEL-15 — one visible action per row, chosen by the row's state, and the
+  // One visible action per row, chosen by the row's state, and the
   // rest in an overflow. Which of the two holds the catalogue depends on
   // whether this provider already names a model, so try the visible one and
   // fall back rather than assuming either.
@@ -190,7 +190,7 @@ async function pinAModel(provider: string, fallbackModel: string): Promise<strin
 test("Models opens on what powers the work, and says so from one contract", async () => {
   await page.goto(`${BASE}/#/models`);
 
-  // MODEL-03 — five tabs named for the questions an owner arrives with.
+  // Five tabs named for the questions an owner arrives with.
   const strip = page.getByRole("tablist", { name: "Model settings" });
   await expect(strip.getByRole("tab")).toHaveText([
     "Overview",
@@ -200,7 +200,7 @@ test("Models opens on what powers the work, and says so from one contract", asyn
     "Usage",
   ]);
   await expect(page.getByRole("heading", { name: "What powers your work" })).toBeVisible();
-  // Scoped to the section that answers the question. MODEL-13's "Needs
+  // Scoped to the section that answers the question. The overview's "Needs
   // attention" names the same surfaces when one of them cannot run, which is
   // the design working rather than a duplicate to disambiguate around.
   const powers = page.getByLabel("What powers your work");
@@ -212,7 +212,7 @@ test("Models opens on what powers the work, and says so from one contract", asyn
   }
   await capture(page, join(SHOTS, "live-models-overview.png"));
 
-  // MODEL-11 — Default and Effective are separate columns.
+  // Default and Effective are separate columns.
   await page.goto(`${BASE}/#/models?tab=runtime`);
   await expect(page.getByRole("heading", { name: "Work defaults" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Default" })).toBeVisible();
@@ -242,14 +242,14 @@ test("each provider connects through the product's own flow", async () => {
     });
   }
 
-  // MODEL-04 — one inventory, whatever a model's provider is.
+  // One inventory, whatever a model's provider is.
   await page.goto(`${BASE}/#/models?tab=models`);
   await expect(page.getByLabel("Filter models")).toBeVisible();
   await capture(page, join(SHOTS, "live-models-inventory.png"));
 });
 
 test("a selection survives navigation and reload, and the composer agrees", async () => {
-  // MODEL-01's acceptance path, exactly as the review writes it: select, move
+  // The model decision's acceptance path, exactly as it was written: select, move
   // between surfaces, reload, and find the same model still selected.
   await page.goto(`${BASE}/#/models?tab=models`);
   await expect(page.getByLabel("Filter models")).toBeVisible();
@@ -269,7 +269,7 @@ test("a selection survives navigation and reload, and the composer agrees", asyn
     timeout: 30_000,
   });
 
-  // MODEL-01's acceptance path: move between the three Work modes and back,
+  // The same acceptance path: move between the three Work modes and back,
   // then reload the whole application.
   for (const route of ["new-chat", "build", "design", "models?tab=models"]) {
     await page.goto(`${BASE}/#/${route}`);
@@ -285,7 +285,7 @@ test("a selection survives navigation and reload, and the composer agrees", asyn
 });
 
 test("Design remembers its own model rather than borrowing Chat's", async () => {
-  // MODEL-02. The product model is Chat | Build | Design; before this, two of
+  // The product model is Chat | Build | Design; before this, two of
   // the three had explicit surface state and the third followed the global
   // default, so an owner who put Chat on a small model had their image prompts
   // follow it there.

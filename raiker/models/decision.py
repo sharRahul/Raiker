@@ -1,6 +1,6 @@
 """One authoritative answer to "which model is this, and which one will run".
 
-MODEL-01. Raiker already persisted every part of this correctly, and that was
+Raiker already persisted every part of this correctly, and that was
 the problem: *global selection*, *surface default*, *readiness*, *fallback
 sequence* and *local runtime state* were five stores read through five paths,
 and each surface assembled its own answer from whichever subset it happened to
@@ -61,7 +61,7 @@ from raiker.models.readiness import ModelReadiness, ModelReadinessService
 #: fires next Tuesday uses the model that was chosen when it was scheduled
 #: rather than whatever the owner has selected by then.
 #:
-#: MODEL-02 added ``design``. Its absence was not a missing feature so much as a
+#: ``design`` was added later. Its absence was not a missing feature so much as a
 #: contradiction: the product model is Chat | Build | Design, and two of the
 #: three had explicit surface state while the third silently borrowed the global
 #: default. An owner who set Chat to a small local model would have had their

@@ -130,7 +130,7 @@ async def check_model_readiness(
 
 # The work surfaces that may hold their own default model.
 #
-# MODEL-01/MODEL-02 — this list used to be declared here and nowhere else, which
+# this list used to be declared here and nowhere else, which
 # is how `design` came to be missing from it while the product model was Chat |
 # Build | Design. It lives beside the decision contract now, so the routes, the
 # read model and the tests cannot hold three different opinions about what a
@@ -202,7 +202,7 @@ def get_model_decision(
 ) -> dict[str, Any]:
     """The one authoritative answer to "which model, and which one will run".
 
-    MODEL-01. Every surface that names a model — the Models page, the composer
+    Every surface that names a model — the Models page, the composer
     picker, Chat, Build, Design and task creation — reads this rather than
     assembling its own answer from the selection store, the surface defaults,
     readiness and the fallback sequence. Those five were each individually
@@ -231,7 +231,7 @@ def get_model_decisions(
 ) -> dict[str, Any]:
     """Every surface's decision in one read.
 
-    MODEL-03's Overview answers "what powers Chat, Build and Design" as its
+    Overview answers "what powers Chat, Build and Design" as its
     first fact, which is five of the read above. Asking five times is five
     round trips and — worse — five separately-timed answers, so the page could
     render a Chat row from before a change and a Build row from after it. One

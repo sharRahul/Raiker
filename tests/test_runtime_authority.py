@@ -372,7 +372,7 @@ def test_critical_risk_requires_human_confirmation(authority: RuntimeAuthority) 
         risk_level=RiskLevelValue.CRITICAL,
     )
     result = authority.route_action(action, principal)
-    # write_file is gated by file_write_execution (disabled), then policy, then critical risk
+    # Write_file is gated by file_write_execution (disabled), then policy, then critical risk
     assert result.decision in ("disabled_by_capability_gate", "deny", "needs_human_confirmation", "needs_approval")
 
 
@@ -411,7 +411,12 @@ def test_all_runtime_domain_capabilities_in_registry() -> None:
     assert "hardware_operator_runtime" in RUNTIME_DOMAIN_CAPABILITIES
     assert "admin_mutation" in RUNTIME_DOMAIN_CAPABILITIES
     assert "role_mutation" in RUNTIME_DOMAIN_CAPABILITIES
-    assert "policy_mutation" in RUNTIME_DOMAIN_CAPABILITIES
+    # BUG-298 — and `policy_mutation` is not, because nothing proposes one.
+    # Policy is process configuration the runtime reads; a gate in front of a
+    # change no surface, tool or approval can construct was a switch over
+    # nothing. Asserted absent rather than deleted, so re-adding the name is a
+    # decision somebody makes rather than a line that drifts back.
+    assert "policy_mutation" not in RUNTIME_DOMAIN_CAPABILITIES
 
 
 def test_high_risk_capabilities_default_disabled() -> None:
@@ -502,7 +507,7 @@ def test_needs_risk_acceptance_returned(authority: RuntimeAuthority) -> None:
         requires_risk_acceptance=True,
     )
     result = authority.route_action(action, principal)
-    # write_file is gated by file_write_execution (disabled), so blocked before risk check
+    # Write_file is gated by file_write_execution (disabled), so blocked before risk check
     assert result.decision in ("disabled_by_capability_gate", "needs_risk_acceptance", "needs_approval")
 
 
@@ -530,7 +535,7 @@ def test_user_create_governed(tmp_path: Path) -> None:
         domain_scope="admin",
         risk_level=RiskLevelValue.MEDIUM,
     )
-    # admin_mutation not in policy config, so currently denied
+    # Admin_mutation not in policy config, so currently denied
     # This shows the governance path works correctly - it passes through authority first
     assert result.decision is not None
 
@@ -707,7 +712,7 @@ def test_govern_admin_mutation_allowed_with_owner(tmp_path: Path) -> None:
     from raiker.cli.commands import _govern_admin_mutation, handle_slash_command
     # Bootstrap an owner first - this also enables admin_mutation capability gate
     handle_slash_command('/bootstrap-owner myuser --display MyUser', workspace_root=str(tmp_path))
-    # admin_mutation is enabled during bootstrap, user_create is in allowed_read_actions
+    # Admin_mutation is enabled during bootstrap, user_create is in allowed_read_actions
     result = _govern_admin_mutation(
         "admin_mutation", "user_create", {"user_id": "test_user"},
         workspace_root=str(tmp_path), risk_level=RiskLevelValue.MEDIUM,
@@ -801,7 +806,7 @@ def test_disabled_capability_blocks_mutation(authority: RuntimeAuthority) -> Non
         domain_scope="admin",
     )
     result = authority.route_action(action, principal)
-    # graph_codemap_indexing is disabled by default, should be blocked
+    # Graph_codemap_indexing is disabled by default, should be blocked
     assert result.decision in ("disabled_by_capability_gate", "deny")
 
 
@@ -819,7 +824,7 @@ def test_enabled_policy_gated_capability_path(authority: RuntimeAuthority) -> No
         domain_scopes=("admin", "coding"),
         is_active=True,
     )
-    # read_file has no capability gate, should proceed to policy
+    # Read_file has no capability gate, should proceed to policy
     action = GovernedAction(
         action_id=new_id("act_"),
         principal_id="test_human",
@@ -856,7 +861,7 @@ def test_risk_acceptance_blocks_without_matching(authority: RuntimeAuthority) ->
         requires_risk_acceptance=True,
     )
     result = authority.route_action(action, principal)
-    # write_file is gated by file_write_execution (disabled), so blocked before risk check
+    # Write_file is gated by file_write_execution (disabled), so blocked before risk check
     assert result.decision in ("disabled_by_capability_gate", "needs_risk_acceptance")
 
 
@@ -906,7 +911,7 @@ def test_risk_acceptance_reusable_not_consumed(authority: RuntimeAuthority, stor
     rid = ra["risk_acceptance_id"]
     assert rid is not None
     store.consume_risk_acceptance(rid)
-    # reusable also gets consumed by consume_risk_acceptance, correct behavior
+    # Reusable also gets consumed by consume_risk_acceptance, correct behavior
     found = store.find_valid_risk_acceptance("ai_2", "read_file", "coding", "low")
     assert found is None  # correctly consumed
 

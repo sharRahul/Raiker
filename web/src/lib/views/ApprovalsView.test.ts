@@ -83,7 +83,7 @@ describe("ApprovalsView", () => {
     expect(screen.getByText("medium")).toBeInTheDocument();
   });
 
-  it("tones the dangerous decision, not every decision in the queue (VIS2-13)", async () => {
+  it("tones the dangerous decision, not every decision in the queue (the badge budget)", async () => {
     // Every row used to carry a toned risk pill, which made a queue of routine
     // decisions look uniformly urgent and left the one critical row indistinct.
     const critical = { ...PENDING, approval_id: "appr_critical", risk_level: "critical" };
@@ -198,7 +198,7 @@ describe("ApprovalsView", () => {
   });
 
   it("puts the proposed change above the provenance, not below it", async () => {
-    // VIS-09 — an approval answers what, why, what changes, how far it reaches,
+    // An approval answers what, why, what changes, how far it reaches,
     // then decide. It used to answer them almost in reverse: eight rows of
     // provenance and the execution evidence came first, and the diff — the one
     // thing the decision turns on — was below all of it.

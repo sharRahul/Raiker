@@ -4,7 +4,7 @@ import { approvalBadge } from "./statusMaps";
 import type { BadgeVariant } from "./types";
 
 /*
- * VIS2-13 / VIS2-18 — the token budget for a repeated row.
+ * The token budget for a repeated row.
  *
  * A list of skills, sessions or approvals is read by scanning it, and scanning
  * only works when the eye can tell *this row is different* from *this row is
@@ -22,7 +22,7 @@ import type { BadgeVariant } from "./types";
  *
  * A candidate whose `variant` is `null` is *the ordinary state of that fact* —
  * a skill that is switched on, an approval at routine risk — and becomes plain
- * metadata rather than a coloured badge. That is the whole of VIS2-13's
+ * metadata rather than a coloured badge. That is the whole of the badge budget's
  * "healthy/default facts should usually be plain metadata": it is decided here,
  * once, instead of re-argued in each view's markup.
  */

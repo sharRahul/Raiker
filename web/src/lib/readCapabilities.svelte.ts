@@ -1,5 +1,5 @@
 /**
- * WEB-01 / WEB-07 — one snapshot of the global read catalogue, shared by every
+ * One snapshot of the global read catalogue, shared by every
  * mounted composer.
  *
  * The catalogue and its readiness are owner-level facts, so a page must not

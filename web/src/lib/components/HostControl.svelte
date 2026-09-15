@@ -183,7 +183,7 @@
 
       {#if host}
         <dl class="property-list">
-          <!-- VIS2-02 — where this workspace runs. It was a line of permanent
+          <!-- Where this workspace runs. It was a line of permanent
                prose at the foot of the navigation rail, which is chrome saying
                the same thing on every page whether or not it is what the owner
                came to check. It belongs with the rest of the host's posture. -->

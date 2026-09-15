@@ -58,7 +58,6 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     **TOOL_CAPABILITY_BY_TOOL,
     "admin_mutation": "admin_mutation",
     "role_mutation": "role_mutation",
-    "policy_mutation": "policy_mutation",
     "user_create": "admin_mutation",
     "user_deactivate": "admin_mutation",
     "role_create": "role_mutation",
@@ -110,7 +109,7 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     # B12/C7 — search is the same capability pointed at an owner-configured
     # endpoint, so it answers to the same gate and the same decision mode.
     "web_search": "web_fetch",
-    # WEB-05/WEATHER-01 — structured extraction and weather are the same
+    # Structured extraction and weather are the same
     # request leaving the same machine, so they answer to the same gate. A
     # separate gate would let an owner who turned web access off still send
     # a request to a third party, which is the opposite of a switch.
@@ -135,6 +134,17 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "semantic_memory": "semantic_memory_runtime",
     "vector_embedding": "vector_embedding_runtime",
     "model_provider": "model_provider_runtime",
+    # FIXED-542 — the Design surface. This row is the whole of the owner's
+    # switch: `run_image_generation` routes an `image_generation` action and
+    # says in its own docstring that "the `image_generation` gate … appl[ies]",
+    # and without a name here `check_capability_gate` found no gate, returned
+    # `None`, and the switch on Permissions decided nothing. Policy made the
+    # action approval-required, which is why nothing looked wrong: the owner was
+    # asked every time, and turning the capability **off** changed neither the
+    # asking nor the answer. Found by writing `CAPABILITY_AUTHORITY` out per
+    # capability (BUG-293) — it is the one real executor the inverted gate map
+    # had no key for.
+    "image_generation": "image_generation",
     "plugin_install": "plugin_install",
     "plugin_execution_cap": "plugin_execution_cap",
     "plugin_revocation_cap": "plugin_revocation_cap",

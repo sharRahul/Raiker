@@ -46,7 +46,7 @@
     /** Put the open file's path in the composer, so reading leads to asking. */
     onmention?: (path: string) => void;
     /**
-     * VIS2-12 — say which file is now open, so the workbench can read it in a
+     * Say which file is now open, so the workbench can read it in a
      * column sized for reading rather than for a tree.
      */
     onopen?: (path: string) => void;

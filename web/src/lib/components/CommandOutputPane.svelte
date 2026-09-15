@@ -261,7 +261,7 @@
   .receipt-rail span { display: flex; align-items: center; gap: .32rem; white-space: nowrap; }
   .receipt-rail i { width: 7px; height: 7px; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface); }
   .receipt-rail span.ready { color: var(--text-2); }
-  /* VIS2-16 — a persistent normal state is neutral. Success colour is spent on
+  /* A persistent normal state is neutral. Success colour is spent on
      something that just happened or on a decision that was just confirmed; used
      as the standing representation of "connected", "enabled", "verified" or
      "ready" it is on screen constantly, which is the one condition under which

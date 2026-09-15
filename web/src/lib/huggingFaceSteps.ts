@@ -1,5 +1,5 @@
 /**
- * MODEL-09 — the Hugging Face flow as steps, not as one screen of controls.
+ * The Hugging Face flow as steps, not as one screen of controls.
  *
  * Adding a local model is a sequence: find something, pick the right build of
  * it, look at what it will cost in bytes and licence, fetch it, convert it if
@@ -92,7 +92,7 @@ function currentIndex(progress: HuggingFaceProgress, total: number): number {
 /**
  * Whether the access-token control belongs on screen right now.
  *
- * MODEL-09 is specific about this one: the token button was a permanent
+ * The flow is specific about this one: the token button was a permanent
  * equal-weight hero action beside the search box, which told every owner that
  * signing in to Hugging Face was a normal part of downloading a public model.
  * It is not — it is needed for a gated or private repository, and for nothing

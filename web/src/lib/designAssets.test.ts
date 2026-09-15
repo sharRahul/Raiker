@@ -1,7 +1,7 @@
 /*
  * What Design's canvas can honestly draw.
  *
- * VIS2-19 asks for a version strip, a variation grid and an inspector that says
+ * the Design canvas asks for a version strip, a variation grid and an inspector that says
  * where an asset came from. Each of those is a claim about a *relationship*
  * between pictures, and the only relationships that exist are the two the
  * runtime records: `source_generation_id` and `kind`. These tests hold the line

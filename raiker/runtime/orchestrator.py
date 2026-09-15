@@ -199,7 +199,26 @@ _SYSTEM_PROMPT = (
     # this is the habit, and the reassurance that asking is free.
     "More tools exist than are listed here: `tool_search` returns any of them by name or by what "
     "they do, and they stay available for the rest of this turn. Asking for one grants nothing, "
-    "so ask rather than assume a capability is missing."
+    "so ask rather than assume a capability is missing. "
+    # BUG-288 — the typed answer channel. A mechanism a model is not told about
+    # is a mechanism it does not use, and the whole point of the channel is that
+    # the turn *declares* the shape rather than writing prose that happens to
+    # parse as one. Bounds are stated because a refusal an owner can see is
+    # better than a table quietly cut to twenty rows.
+    "When part of your answer is genuinely tabular or a series to plot, declare it rather than "
+    "describing it: a ```raiker:table fence containing "
+    '{"caption": …, "columns": [...], "rows": [[...], ...]}, or a ```raiker:chart fence '
+    'containing {"kind": "bar"|"line"|"area", "caption": …, "y_label": …, "labels": [...], '
+    '"series": [{"name": …, "values": [...]}]}. Rows must be the width of the columns and every '
+    "series must be the length of the labels. Raiker renders these as a real table or chart; "
+    "anything malformed is shown to the user as refused, so send the shape only when you have the "
+    "data for it, and write ordinary prose the rest of the time. "
+    # Found live on 2026-09-15: asked for "this as a table and a bar chart", the
+    # model reached for `create_document` and wrote a file. That is the right
+    # tool for a file and the wrong one for an answer, and nothing had told it
+    # which question it was being asked.
+    "These blocks are how you answer *in the conversation*. Use `create_document` only when the "
+    "user asked for a file to keep or to send; do not write one to show a table or a chart."
 )
 
 
@@ -254,7 +273,7 @@ _BUILD_PROCESS_PROMPT = (
 )
 
 
-#: Design's research method (WEB-06).
+#: Design's research method.
 #:
 #: A Design turn is not asked to make a picture — the governed image endpoint
 #: does that, on its own path, and this turn cannot reach it. It is asked to do
@@ -1120,7 +1139,7 @@ class RuntimeOrchestrator:
         self.tool_broker.stream_sink = None
 
     def _environment(self, envelope: PromptEnvelope) -> EnvironmentContext:
-        """This turn's authoritative clock, date, day and timezone (ENV-01).
+        """This turn's authoritative clock, date, day and timezone.
 
         Read fresh every time. That is the whole mechanism: a resumed turn, a
         scheduled execution and a delegated subagent each call this and each
@@ -1272,7 +1291,7 @@ class RuntimeOrchestrator:
                 )
             )
         except Exception:  # noqa: BLE001 — a control channel that cannot be read
-            # must never take the turn down with it; the turn simply carries on.
+            # Must never take the turn down with it; the turn simply carries on.
             return {"stop_requested": False, "stop_reason": None, "steer_texts": []}
 
     def _stop_requested(self, envelope: PromptEnvelope) -> str | None:
@@ -2096,7 +2115,7 @@ class RuntimeOrchestrator:
                 "reasons": [classification.intent],
             },
         )
-        # ENV-01/ENV-04 — the turn's environmental facts, derived here for every
+        # The turn's environmental facts, derived here for every
         # surface alike and before anything that could fail: a turn that loses
         # its web capability, its Project or its provider still knows what day
         # it is, because none of those is where the answer comes from.

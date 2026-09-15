@@ -14,6 +14,13 @@ adaptive-shell design and implementation plan. The page-by-page implementation
 verification followed on 2026-09-13, its last open item — Design's canvas
 workspace — closing as
 [FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach).
+The visual UI/UX review went on 2026-09-15, when VIS-19 — a typed output
+channel and a chart, the one implementation item left in it — closed as
+[FIXED-545](FIXED_ITEMS.md#fixed-545--a-turn-could-only-answer-in-prose). Its
+IDs went out of the codebase with it
+([FIXED-548](FIXED_ITEMS.md#fixed-548--two-hundred-and-twenty-four-comments-citing-documents-that-are-not-there)
+did the same for five earlier removals), so no comment cites a file that is not
+in the tree.
 
 ## Current status entry point
 
@@ -43,7 +50,6 @@ When these disagree with an older topic review's current-status prose, re-verify
 | `RAIKER_LIVE_MANUAL_TEST_PLAN.md` | Active manual verification procedure |
 | `SECURITY_COMPLIANCE_GAP_ASSESSMENT_2026-09-05.md` | Standards/control mapping evidence, not a certification claim |
 | `UNIFIED_COMPOSER_REDESIGN_2026-09-06.md` | Composer design/implementation history |
-| `VISUAL_UI_UX_REVIEW_2026-09-06.md` | Visual review history; current audit supersedes 4K/8K capture work |
 | `screenshots/` | Legacy screenshot evidence only; canonical current screenshots live under `docs/screenshots/` |
 
 ## Documentation governance

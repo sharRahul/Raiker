@@ -1,5 +1,5 @@
 /**
- * VIS2-12 — what Build's third pane can show, declared once.
+ * What Build's third pane can show, declared once.
  *
  * The tabs live here rather than inside the pane for the same reason the
  * composer's capabilities do: two places have to agree about them. The pane

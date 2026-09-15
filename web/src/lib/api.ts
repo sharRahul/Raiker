@@ -257,7 +257,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     try {
       reasonCode = reasonCodeFrom(await resp.json());
     } catch {
-      /* non-JSON error response */
+      /* Non-JSON error response */
     }
     throw new ApiError(
       resp.status,
@@ -281,7 +281,7 @@ async function requestBlob(
       const detail = body?.detail ?? body;
       reasonCode = detail?.reason_code ?? null;
     } catch {
-      /* non-JSON error response */
+      /* Non-JSON error response */
     }
     throw new ApiError(
       resp.status,
@@ -599,12 +599,12 @@ export const api = {
   sessionPlan: (sessionId: string) =>
     request<AgentPlan>(`/api/sessions/${encodeURIComponent(sessionId)}/plan`),
   capabilityGates: () => request<CapabilityGate[]>("/api/capability-gates"),
-  // WEB-01/WEB-04 — one read for the whole contract: the catalogue, its
+  // One read for the whole contract: the catalogue, its
   // per-surface parity, and typed readiness. Every composer answers from this
   // rather than deriving a list of its own, which is the drift the contract
   // exists to remove.
   readCapabilities: () => request<ReadCapabilities>("/api/read-capabilities"),
-  // ENV-05 — the same bundle a model turn is given. Read rather than
+  // The same bundle a model turn is given. Read rather than
   // recomputed, so a page and a turn cannot disagree about what time it is.
   environment: () => request<EnvironmentContext>("/api/environment"),
   capabilityGate: (capability: string) =>
@@ -699,7 +699,7 @@ export const api = {
       body: JSON.stringify({ surface, profile_id, model }),
     }),
   /**
-   * MODEL-01 — which model is selected here, and which one will actually run.
+   * Which model is selected here, and which one will actually run.
    *
    * Read by every surface that names a model. Before this, the Models page, the
    * composer picker, Chat, Build and Design each assembled their own answer
@@ -1982,7 +1982,7 @@ export const api = {
     request<CodeRepoFileView>(
       `/api/code/repos/${encodeURIComponent(repoId)}/file?path=${encodeURIComponent(path)}`,
     ),
-  // VIS2-12 — what has changed in the working tree and not yet been committed.
+  // What has changed in the working tree and not yet been committed.
   // The `Changes` tab of Build's artifact pane reads this; it is the same change
   // set a commit would record, because it comes from the same two helpers.
   readCodeRepoChanges: (repoId: string) =>
@@ -2491,7 +2491,7 @@ async function streamSse(
       try {
         reasonCode = reasonCodeFrom(await resp.json());
       } catch {
-        /* non-JSON error response */
+        /* Non-JSON error response */
       }
     }
     throw new ApiError(

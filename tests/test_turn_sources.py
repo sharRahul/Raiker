@@ -176,7 +176,7 @@ class TestSourceDerivation:
             "connector_read": ({"connector_id": "c", "operation_id": "o"}, {"content": "text"}),
             "web_fetch": ({"url": "https://e.test"}, {"final_url": "https://e.test", "content": "body"}),
             "web_search": ({"query": "x"}, {"result_count": 2, "results": [{"title": "a"}]}),
-            # WEB-05 — a structured read of one page. The mode belongs on the
+            # A structured read of one page. The mode belongs on the
             # row: "the links of this page" and "the prose of this page" are
             # different material, and citing one as the other would point a
             # reader at text that never contained the claim.
@@ -184,7 +184,7 @@ class TestSourceDerivation:
                 {"url": "https://e.test", "mode": "links"},
                 {"final_url": "https://e.test", "title": "Docs", "link_count": 3},
             ),
-            # WEATHER-01 — freshness is the whole point of the row, so it is
+            # Freshness is the whole point of the row, so it is
             # what the citation's detail carries.
             "weather_lookup": (
                 {"location": "Edinburgh"},

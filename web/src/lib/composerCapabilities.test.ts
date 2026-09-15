@@ -134,7 +134,7 @@ describe("the three Work modes each get a composer", () => {
   );
 });
 
-// WEB-04 — readiness, and why it is not the same field as the gate.
+// Readiness, and why it is not the same field as the gate.
 //
 // `Needs provider` is a setup step. `Blocked by policy` is a decision the owner
 // made. One greyed-out row can only send them to one screen, and it will be the

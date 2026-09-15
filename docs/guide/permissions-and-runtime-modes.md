@@ -180,7 +180,7 @@ domains are kept out of the interactive list altogether, and named in
 | Models | Hosted models, Home-lab models, Advisor model, Provider embeddings |
 | Connectors | Gmail, Google Calendar, Slack, Plugin install |
 | MCP | MCP builder, MCP connector |
-| Automation | Approval execution relay, Admin/policy/role mutation |
+| Automation | Approval execution relay, Admin and role mutation |
 
 Expand a row for its description and current decision mode, then **Turn on**.
 
@@ -188,6 +188,65 @@ Expand a row for its description and current decision mode, then **Turn on**.
 authenticates to are one decision about your repository. A push is still the one
 of them that leaves this machine — its own row says so, and
 **Settings → Privacy** lists it alongside everything else that can.
+
+### What a permission would cost, and what stands in the way
+
+Every capability that can actually run carries three things beyond its name, and
+they are what the row is for:
+
+* **Reach**, on the closed row. One of *Reads*, *Changes*, *Leaves this
+  machine*, *Cannot be undone* or *Changes what Raiker may do*. It says how far
+  the side effect goes, and it does not change when the switch does — *Web
+  fetch* leaves this machine whether it is on or off. In a list of sixty-seven
+  rows it is what tells you which ones to read first.
+* **If it ran without you**, in the opened row. One sentence on what you would
+  lose if the capability ran and you had not decided it should. Not a
+  restatement of the name: *Shell commands* says that an arbitrary command would
+  run with your own operating-system privileges, which is every other capability
+  on the page at once and several that are not on it.
+* **What stands in the way.** What has to be true before it runs — the gate, and
+  everything else: workspace confinement, an egress allowlist, an approval
+  carrying the exact argument vector, a live human confirmation for the ones
+  floored to critical.
+
+A capability with no real executor has no reach chip and no sentences, and that
+is the honest answer rather than a missing one: there is no cost to state for
+something that cannot run.
+
+These are not page copy. They come from the same runtime table the tests are
+asserted against, so a new executor cannot reach this page without answering both
+questions, and the answer you read is the one the check enforces.
+
+### What a new account starts with
+
+Most capabilities are off on a new account. A small set is not, and it is
+deliberate: reading symbols out of a file Raiker may already open, indexing the
+repository Build is pointed at, creating a task, filing a session to a project,
+and exporting your own record. All five are local, reversible, and inside what
+you granted by opening the product.
+
+**Available is not unattended.** Every one of them still asks before it acts —
+the baseline writes the gate and nothing else, so the decision mode is untouched.
+Nothing that leaves this machine, cannot be undone, or changes what Raiker may do
+next is ever in it.
+
+It is applied when the account is created and never afterwards. An existing
+workspace is not re-seeded, and a capability you turned off stays off: the
+baseline never replaces a decision you made.
+
+### Set up for Build
+
+Building needs four permissions — file writes, patch application, local git
+writes and checkpoint restoration — and finding four rows in a list of
+sixty-seven is how people end up either giving up or turning on more than they
+meant to. **Set up for Build** is those four, offered once.
+
+It is a shortcut through the registry and not a different kind of decision:
+**What this turns on** lists the four before you press anything, each one goes
+through the same path the row's own **Turn on** uses, and none of their decision
+modes change — every one of them still asks. Writing to your files is a decision,
+which is why it is offered rather than simply arriving with the account. The
+section disappears once all four are on.
 
 ### Not decided here
 
@@ -210,7 +269,10 @@ afterwards that you closed something.
 ### Off, and on by default
 
 Most rows read **Off** until you turn them on: this account is fail-closed, and
-nothing decided is not consent. A few read **On by default** instead. Those are
+nothing decided is not consent. The exception you decided is
+[the baseline above](#what-a-new-account-starts-with), which writes a real row
+rather than changing what a missing one means. A few rows read **On by default**
+instead, which is a third thing again. Those are
 the capabilities whose enforcing path reads an *empty* gate table as the shipped
 default rather than as a refusal — turning web access off is a decision you make,
 and an untouched install is not that decision.

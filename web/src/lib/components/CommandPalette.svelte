@@ -1,8 +1,8 @@
 <script lang="ts">
   /**
-   * VIS-22 — one launcher for everything the product can reach.
+   * One launcher for everything the product can reach.
    *
-   * The rail lost four rows (VIS-01) and the gear's window is a list you have
+   * The rail lost four rows (the rail's row budget) and the gear's window is a list you have
    * to open and read. Neither is how someone who uses Raiker every day wants to
    * move: they know the name of the thing. `Ctrl/Cmd+K` takes the name.
    *
@@ -266,7 +266,7 @@
     overflow-y: auto;
     padding: var(--space-2);
   }
-  /* VIS-06 — sentence case, no tracking. A group label is a quiet signpost, not
+  /* Sentence case, no tracking. A group label is a quiet signpost, not
      a heading that has to shout to be found. */
   .group {
     margin: var(--space-2) var(--space-2) 0.15rem;

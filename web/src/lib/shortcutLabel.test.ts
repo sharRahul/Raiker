@@ -1,4 +1,4 @@
-// VIS2-04 — a shortcut hint is an instruction, so it has to be right on the
+// A shortcut hint is an instruction, so it has to be right on the
 // machine reading it. The top bar printed `Ctrl K` to every owner including the
 // ones whose keyboard has no Ctrl in that position; the palette's handler has
 // always accepted either modifier, so the label was the only part with an

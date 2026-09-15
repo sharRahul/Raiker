@@ -39,7 +39,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import Icon from "../components/Icon.svelte";
-  import Markdown from "../components/Markdown.svelte";
+  import AnswerParts from "../components/AnswerParts.svelte";
   import RepoConnector from "../components/RepoConnector.svelte";
   import PlanChecklist from "../components/PlanChecklist.svelte";
   import ReasoningBlock from "../components/ReasoningBlock.svelte";
@@ -147,7 +147,7 @@
   import { activateModalDrawer, type DeactivateModalDrawer } from "../modalDrawer";
 
 
-  /** VIS2-21 — what this mode is about, and how tightly it packs it. */
+  /** What this mode is about, and how tightly it packs it. */
   const surface = workSurface("build");
 
   let {
@@ -584,7 +584,7 @@
   }
 
   /**
-   * VIS2-12 — the terminal control opens the workbench on the terminal.
+   * The terminal control opens the workbench on the terminal.
    *
    * It used to toggle a pane of its own. Now it names a view: pressing it opens
    * the workbench there, and pressing it again closes the terminal rather than
@@ -660,7 +660,7 @@
   //
   // The choice is remembered locally so returning to Build resumes where the
   // owner left off, and it cannot change mid-turn.
-  // VIS2-11 — the shared Work project, so choosing one here reaches Chat and
+  // the shared Work project, so choosing one here reaches Chat and
   // Design too rather than being re-chosen on each surface.
 
   // A remembered id that no longer names an owned project must not silently
@@ -704,7 +704,7 @@
     "schedule",
     "use-memory",
   ]);
-  // WEB-04/WEB-07 — as in Chat: readiness from the one shared snapshot, so
+  // As in Chat: readiness from the one shared snapshot, so
   // Build and Chat cannot describe the same capability differently.
   const readiness = $derived(readReadiness());
   const addItems = $derived(composerMenu("add", "build", composerGates, HANDLED, readiness));
@@ -884,7 +884,7 @@
   let modelProfile = $state("");
   let model = $state("");
   /**
-   * MODEL-01 — the authoritative answer for this surface.
+   * The authoritative answer for this surface.
    *
    * `null` until the first read, and `null` again if that read fails: the
    * composer renders identically without it, minus the line explaining a
@@ -945,7 +945,7 @@
       modelProfile = remembered.profileId;
       model = remembered.model;
     });
-    // MODEL-01 — what is selected here, what will actually run, and why they
+    // What is selected here, what will actually run, and why they
     // differ when they do. Read once per mount; the picker keeps an
     // unavailable selection visible rather than re-rendering as the fallback.
     void modelDecision("build").then((answer) => (decision = answer));
@@ -1029,13 +1029,13 @@
   // path typed exactly.
   let modelPickerOpen = $state(false);
   let commandPaneOpen = $state(false);
-  // VIS-10 — the third zone is present when something wants it. The terminal
+  // The third zone is present when something wants it. The terminal
   // claims it only on a window wide enough to hold three; narrow, there is no
   // third column and the pane stays under the transcript where it was.
   const artifactZone = $derived(commandPaneOpen && !compactRail);
 
   /**
-   * VIS2-12 — which of the workbench's four views is showing, and what it is of.
+   * Which of the workbench's four views is showing, and what it is of.
    *
    * The tab lives here rather than in the pane because this view is the only
    * thing that knows *what just happened*: a file was opened, a command was
@@ -1049,7 +1049,7 @@
   let workingTreeRevision = $state(0);
 
   /**
-   * VIS2-12 — each header control answers about its own view, not the column.
+   * Each header control answers about its own view, not the column.
    *
    * With two panels sharing a column, "open" was a property of the column and
    * both toggles could read it. With one pane it is not: opening the terminal
@@ -1233,7 +1233,7 @@
    * the turn sees no difference between the two ways of naming a file.
    */
   /**
-   * VIS2-12 — reading a file in the explorer puts it in the workbench too.
+   * Reading a file in the explorer puts it in the workbench too.
    *
    * The explorer shows a file inside itself, in a column sized for a tree. The
    * pane is where a file is actually read, so opening one selects Preview
@@ -1491,7 +1491,7 @@
       // BUG-24 — see ChatView: a turn is only genuinely parked once its stream
       // ends, so that is where it asks whether a decision already exists.
       if (turn.response?.status === "needs_approval") resumeWatcher?.checkNow();
-      // VIS2-12 — a turn that ran has probably changed the working tree, so the
+      // A turn that ran has probably changed the working tree, so the
       // pane re-reads it. Bumped unconditionally rather than gated on a tool
       // name: the pane's read is the thing that knows whether anything actually
       // changed, and guessing from the tools a turn called would be a second,
@@ -1947,7 +1947,7 @@
 
 <svelte:window onclick={onWindowClick} />
 
-<!-- VIS2-21 — the Work contract. Build shares every term of it with Chat and
+<!-- The Work contract. Build shares every term of it with Chat and
      Design and differs in exactly one thing: its object is a change, which is
      why it is the densest of the three. -->
 <div
@@ -2086,7 +2086,7 @@
           <Icon name="folder" size="sm" />
           <span class="rail-label">{filesOpen ? "Hide files" : "Files"}</span>
         </button>
-        <!-- VIS2-12 — two toggles where there were three, because there is one
+        <!-- Two toggles where there were three, because there is one
              pane now rather than two panels sharing a column. Each still opens
              the thing it names: the difference is that the pane it opens has
              the other views a keystroke away instead of behind a second
@@ -2268,8 +2268,12 @@
               <div class="answer">
                 <!-- C6 — `[s1]` becomes a chip only when this turn's ledger has
                      an s1. A marker the model invented stays literal text. -->
-                <Markdown
+                <!-- BUG-288 — parity with Chat: the same typed parts, the
+                     same renderer, so an answer reads the same way in either
+                     conversation. -->
+                <AnswerParts
                   text={answer}
+                  parts={turn.response?.content_parts ?? []}
                   citations={renderableCitations(turnSourceList)}
                   oncite={(sourceId) => showSourceById(turn.response?.turn_id ?? "", sourceId, answer)}
                 />
@@ -2452,7 +2456,7 @@
       {/if}
     </div>
 
-    <!-- VIS-10 — the artifact zone. Expanded, the governed terminal used to
+    <!-- The artifact zone. Expanded, the governed terminal used to
          stack between the transcript and the composer and eat the
          conversation's height in the same column: the two things the owner is
          reading at once competed for one column of room. On a window wide
@@ -2708,7 +2712,7 @@
       aria-label={compactRail && railOpen ? "Background work" : undefined}
       bind:this={railElement}
     >
-      <!-- VIS2-12 — one pane over four views of one workspace, rather than two
+      <!-- One pane over four views of one workspace, rather than two
            unrelated panels stacked in a column that meant "whatever you last
            switched on". -->
       <BuildArtifactPane
@@ -2765,7 +2769,7 @@
   .build {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    /* VIS2-21 — density, from the Work contract. A workbench's panes are
+    /* Density, from the Work contract. A workbench's panes are
        scanned together, so they sit closer than a transcript's turns. */
     gap: var(--surface-gap, var(--space-4));
     /* The room the shell gives a page, so the transcript scrolls inside the
@@ -2785,7 +2789,7 @@
   .build.with-files.with-rail {
     grid-template-columns: var(--explorer-w, 17.5rem) minmax(0, 1fr) 21rem;
   }
-  /* VIS2-15 — on a very wide display the extra room goes to the panes that hold
+  /* On a very wide display the extra room goes to the panes that hold
      the *object* — the file tree and the artifact pane — rather than to the
      transcript, whose lines are already bounded by their own measure. Nothing
      here changes a control's size: the columns get wider, the buttons in them
@@ -2872,7 +2876,7 @@
     min-width: 0;
     gap: var(--space-3);
   }
-  /* VIS-10 — the artifact zone can hold the background-work panel, the governed
+  /* The artifact zone can hold the background-work panel, the governed
      terminal, or both. Column rather than row, and it scrolls, so two occupants
      share the height instead of squashing each other flat. */
   .rail-slot {

@@ -389,7 +389,7 @@
       value: workMethod === "build" ? "Build — reads the project's repository" : "Chat",
       short: workMethod === "build" ? "Build" : "Chat",
     },
-    // VIS2-13 — these two were permanent chips beside the model picker, and
+    // These two were permanent chips beside the model picker, and
     // they are facts rather than actions: where a run executes, and how much
     // the chosen model can hold. In the context line they are still stated and
     // still one click from the page that changes them, without spending two of
@@ -780,7 +780,7 @@
           body="Give Raiker work that can continue after you leave."
         >
           {#snippet action()}
-            <!-- VIS-12 — the plan form is already on this page, above the empty
+            <!-- The plan form is already on this page, above the empty
                  state. Naming where it is would be worse than putting the
                  cursor in it. -->
             <button type="button" class="btn btn-primary" onclick={() => instructionEl?.focus()}>
@@ -859,7 +859,7 @@
               <div class="progress" role="progressbar" aria-valuenow={task.progress_percent} aria-valuemin="0" aria-valuemax="100"><div style={`width:${task.progress_percent}%`}></div></div>
             {/if}
             <footer>
-              <!-- VIS-14 — the same order a thread and a project use: where the
+              <!-- The same order a thread and a project use: where the
                    work lives, what it is doing, when it last moved. The state
                    badge is above, on the title row, because a task's status is
                    the first thing this card is read for.

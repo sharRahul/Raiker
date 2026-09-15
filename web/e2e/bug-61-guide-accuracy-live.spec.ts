@@ -25,6 +25,13 @@ import { capture } from "./capture";
 import { join } from "node:path";
 import { signInAsOwner, useHostedModel } from "./hosted-provider";
 
+import { roundName } from "./naming";
+
+// BUG-250 — named per run, so a round that has already worked in this
+// workspace cannot find its own leftovers and assert on them. The suite shares
+// one workspace by design; this is what keeps a shared workspace honest.
+const TASK = roundName("Guide accuracy task");
+
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
@@ -266,16 +273,16 @@ test("tasks-and-projects — a task run does not appear in RECENT CHATS", async 
   // alongside real conversations (BUG-10)" — closed by FIXED-15.
   await page.goto(`${BASE}/#/tasks`);
   await expect(page.getByRole("heading", { name: "Plan work" })).toBeVisible({ timeout: 30_000 });
-  await page.getByLabel("Task title").fill("Guide accuracy task");
+  await page.getByLabel("Task title").fill(TASK);
   await page.getByLabel("Instructions").fill("Reply with the single word DONE.");
   await page.getByRole("button", { name: "Create task", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Guide accuracy task", exact: true }),
+    page.getByRole("heading", { name: TASK, exact: true }),
   ).toBeVisible({ timeout: 60_000 });
 
   // The session the run creates is a task session, and the sidebar's recent-chat
   // list is conversations only.
-  const recents = page.getByLabel("Recent chats").getByText("Guide accuracy task");
+  const recents = page.getByLabel("Recent chats").getByText(TASK);
   await expect(recents).toHaveCount(0);
   await capture(page, join(SHOTS, "bug-61-task-not-in-recents.png"));
 });

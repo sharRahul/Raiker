@@ -14,6 +14,9 @@
     capabilityDescription,
     capabilityDomain,
     capabilityLabel,
+    BUILD_PRESET,
+    buildPresetPending,
+    buildPresetSatisfied,
     enableableTargets,
     groupByDomain,
     isAvailable,
@@ -171,6 +174,9 @@
   let modeBusyCap = $state<string | null>(null);
   let selectedCaps = $state<Set<string>>(new Set());
   let bulkBusy = $state(false);
+  /** BUG-239 — the Build setup preset's own disclosure and in-flight flag. */
+  let presetOpen = $state(false);
+  let presetBusy = $state(false);
 
   function toggleCapSelected(capability: string) {
     const next = new Set(selectedCaps);
@@ -232,6 +238,7 @@
     }
   }
 
+
   /**
    * The mode a row renders. `gate` already comes from `effective`, so the
    * confirmation is merged in before this is asked — there is no second place
@@ -255,8 +262,62 @@
     | { kind: "set_mode"; capability: string; mode: DecisionMode };
   let pending = $state<Pending | null>(null);
   let busy = $state(false);
-  const mutationBusy = $derived(bulkBusy || modeBusyCap !== null || busy);
+  const mutationBusy = $derived(bulkBusy || presetBusy || modeBusyCap !== null || busy);
   let dialogError = $state<string | null>(null);
+
+  /*
+   * BUG-239 — the Build setup preset.
+   *
+   * The four switches a governed coding loop needs, offered once instead of
+   * hunted for in a list of sixty-seven. It is not a default: writing to
+   * somebody's files is a decision, so the owner sees exactly what it turns on
+   * and takes it deliberately.
+   *
+   * Three things it deliberately does not do. It does not touch a decision
+   * mode, so every one of these still asks. It does not call a bulk endpoint —
+   * there is none, and inventing one would be the "easy mode API with weaker
+   * enforcement" §18.6 refuses; it drives the same per-capability route the
+   * row's own **Turn on** uses, so activation requirements, step-up and audit
+   * are identical. And it reports per capability, for the reason NEW-PERM-02
+   * gave: these are N independent governed mutations and a single sentence
+   * about all of them can be untrue about most of them.
+   */
+  const presetPending = $derived(buildPresetPending(governedGates));
+  const presetDone = $derived(
+    governedGates.length > 0 && buildPresetSatisfied(governedGates),
+  );
+
+  async function applyBuildPreset() {
+    if (mutationBusy || presetPending.length === 0) return;
+    presetBusy = true;
+    notice = null;
+    const applied: string[] = [];
+    const failed: string[] = [];
+    try {
+      for (const gate of presetPending) {
+        const target = enableableTargets(gate)[0];
+        if (!target) {
+          failed.push(gate.capability);
+          continue;
+        }
+        try {
+          await api.setCapabilityState(gate.capability, {
+            target_state: target,
+            reason: "Build setup preset via web UI",
+          });
+          applied.push(gate.capability);
+        } catch {
+          failed.push(gate.capability);
+        }
+      }
+      const outcome = bulkOutcome(applied, failed);
+      if (outcome !== null) notice = outcome;
+      presetOpen = failed.length > 0;
+      await load();
+    } finally {
+      presetBusy = false;
+    }
+  }
 
   /** Counts reads, so an older one cannot land on top of a newer one. */
   let loadSeq = 0;
@@ -595,14 +656,21 @@
       {/each}
     </div>
     {#if integratedButOff > 0}
-      <!-- Why a fresh account shows almost everything off. One sentence, at
-           note weight: it was a full-width accent banner competing with the
-           controls under it. -->
+      <!-- Why a fresh account shows most things off. One sentence, at note
+           weight: it was a full-width accent banner competing with the controls
+           under it.
+
+           BUG-239 — and it used to say *every* capability with a real executor
+           starts off, which stopped being true the moment a new account was
+           given a baseline. A page that says "off" about five capabilities that
+           are on is the exact defect this page exists to prevent, so the
+           sentence says "most" and names the exception. -->
       <p class="posture-note">
         <Icon name="info" size="sm" />
         <span>
-          Capabilities with a real executor start <strong>off</strong> on this account until you
-          turn them on. To stop all work instead, use
+          Most capabilities with a real executor start <strong>off</strong> on this account until
+          you turn them on. A new account starts with a small set of local, reversible ones
+          available — and every one of them still asks. To stop all work instead, use
           <a href="#/settings">Settings → Runtime configuration</a>.
         </span>
       </p>
@@ -635,6 +703,58 @@
           </li>
         {/each}
       </ul>
+    </section>
+  {/if}
+
+  {#if !filtering && !presetDone && presetPending.length > 0}
+    <!-- BUG-239 — the Build setup preset. One deliberate decision instead of
+         four rows to find, and it shows the four before it takes it: a preset
+         an owner cannot read before pressing is a permission change they did
+         not make. Hidden once every row in it is on, because at that point it
+         is a button that would do nothing. -->
+    <section class="panel preset" aria-label="Set up for Build">
+      <div class="preset-head">
+        <div>
+          <h2>Set up for Build</h2>
+          <p class="preset-lede">
+            Building needs four permissions. Raiker still asks before each
+            change — this turns them on, not off.
+          </p>
+        </div>
+        <div class="preset-actions">
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            aria-expanded={presetOpen}
+            onclick={() => (presetOpen = !presetOpen)}
+          >
+            {presetOpen ? "Hide" : "What this turns on"}
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            disabled={mutationBusy}
+            onclick={() => void applyBuildPreset()}
+          >
+            {presetBusy ? "Turning on…" : `Turn on ${presetPending.length}`}
+          </button>
+        </div>
+      </div>
+      {#if presetOpen}
+        <ul class="preset-list">
+          {#each BUILD_PRESET as row (row.capability)}
+            <li>
+              <span class="cap-label">{capabilityLabel(row.capability)}</span>
+              <span class="preset-what">{row.what}</span>
+              <span class="cap-summary">
+                {presetPending.some((g) => g.capability === row.capability)
+                  ? "Off"
+                  : "Already on"}
+              </span>
+            </li>
+          {/each}
+        </ul>
+      {/if}
     </section>
   {/if}
 
@@ -933,6 +1053,53 @@
     color: var(--text-3);
     font-size: var(--text-xs);
   }
+  /* BUG-239 — the Build preset. Deliberately built from the page's existing
+     panel, label and summary vocabulary rather than a banner of its own: it is
+     a shortcut through the registry, not a different kind of object. */
+  .preset-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+  .preset-lede {
+    margin: var(--space-1) 0 0;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    max-width: var(--prose-measure);
+  }
+  .preset-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+  .preset-list {
+    list-style: none;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+    display: grid;
+  }
+  .preset-list li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .preset-list li:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .preset-what {
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    flex: 1 1 14rem;
+    min-width: 0;
+  }
   .registry-heading {
     display: flex;
     justify-content: space-between;
@@ -1049,7 +1216,7 @@
     font-size: var(--text-2xs);
     font-variant-numeric: tabular-nums;
   }
-  /* VIS-06 — this is a control the owner clicks, not a status chip. */
+  /* This is a control the owner clicks, not a status chip. */
   .phase-select-all {
     display: flex;
     align-items: center;

@@ -1981,7 +1981,7 @@ class ProviderModelListView:
     policy denials and unreachable/unsupported backends never fabricate model
     names.
 
-    GLOBAL-MODEL-08 — a failed listing may still carry ``models``, but only ones
+    A failed listing may still carry ``models``, but only ones
     this provider published on a previous, successful call. ``remembered`` says
     which of the two happened, and ``listed_at`` when the provider last spoke, so
     a stale answer is offered as stale rather than as current. The status and
@@ -2079,13 +2079,13 @@ class ModelsView:
     advisor_readiness_summary: str | None = None
     advisor_readiness_remediation: str | None = None
     advisor_readiness_checked_at: str | None = None
-    # GLOBAL-MODEL-01/02 — the one catalogue every composer reads, keyed by
+    # The one catalogue every composer reads, keyed by
     # profile: the last models each provider published, from the store rather
     # than from a probe, so this read stays free of the network.
     #
     # `chat_profiles` above is unchanged and still decides what a picker offers
     # *at rest*. This is what search may reach, which is the distinction
-    # GLOBAL-MODEL-06 asks for: curation orders the quick list, it does not
+    # The rule is: curation orders the quick list, it does not
     # decide what exists.
     catalogues: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
@@ -7257,7 +7257,7 @@ class DashboardService:
                         ),
                     )
                 )
-        # GLOBAL-MODEL-01/02 — the remembered catalogue for every profile the
+        # The remembered catalogue for every profile the
         # owner has listed, read from the store in one pass. No probe and no
         # network: this is what each provider last published, which is exactly
         # what a picker's search should be able to reach.
@@ -8247,7 +8247,7 @@ class DashboardService:
         def _remembered(status: str, reason_code: str | None) -> ProviderModelListView:
             """The failure, plus whatever this provider last published.
 
-            GLOBAL-MODEL-08. A provider that is briefly unreachable used to make
+            A provider that is briefly unreachable used to make
             its whole catalogue vanish from every picker, because the only copy
             was the one in flight. The failure is still reported exactly as it
             happened; the models beside it are the remembered ones, flagged as
@@ -8307,7 +8307,7 @@ class DashboardService:
         # context window, OpenRouter's prices) is cached here for the meter and
         # the cost rows to read without a second round trip.
         if acting_principal_id:
-            # GLOBAL-MODEL-01 — the catalogue itself, written down. This is the
+            # The catalogue itself, written down. This is the
             # only moment Raiker legitimately knows what a provider serves, and
             # until now that knowledge lived exactly as long as the response.
             with contextlib.suppress(Exception):  # remembering never fails a listing

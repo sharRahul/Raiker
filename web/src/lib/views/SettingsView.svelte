@@ -16,7 +16,7 @@
   import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
   import { SETTINGS_SECTIONS as SECTIONS } from "../settingsSections";
-  /** Group names in rail order, taken from the sections themselves (VIS-17). */
+  /** Group names in rail order, taken from the sections themselves (the Settings grouping). */
   const GROUPS = [...new Set(SECTIONS.map((section) => section.group))];
 
   let { principal = "—", tab = "general" }: { principal?: string; tab?: string } = $props();
@@ -199,7 +199,7 @@
 
 <div class="settings-layout">
   <nav class="section-rail" aria-label="Settings sections">
-    <!-- VIS-17 — the group order is derived from the one list rather than
+    <!-- The group order is derived from the one list rather than
          restated here, so a new section joins its group without touching this
          file. Hard-coding the names is exactly the two-lists-that-can-disagree
          shape the section list's own comment warns about. -->
@@ -299,7 +299,7 @@
   .section-body {
     min-width: 0;
   }
-  /* VIS-06 — a navigation group label, which the finding names as a place
+  /* A navigation group label, which the finding names as a place
      for sentence case. Caps at 2xs with .09em tracking was four typographic
      devices doing the job of one. */
   .rail-group { margin: var(--space-2) var(--space-3); color: var(--text-3); font-size: var(--text-xs); font-weight: 650; }

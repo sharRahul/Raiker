@@ -22,7 +22,7 @@ def _insert_gov_acks(root: Path) -> None:
     from raiker.contracts.ids import utc_now
     store = SQLiteStore(root)
     with store.connect() as connection:
-        for cap in ("admin_mutation", "policy_mutation", "role_mutation"):
+        for cap in ("admin_mutation", "role_mutation"):
             connection.execute(
                 "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
                 (cap, "test_fixture", utc_now(), "test_doc"),

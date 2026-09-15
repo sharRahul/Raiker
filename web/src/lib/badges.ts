@@ -14,7 +14,7 @@ export interface BadgeMeta {
 // The security-UX badge set mirrors the governed-runtime status labels; the lifecycle set
 // (active/done/stopped/idle) is generic and usually rendered with a raw-status label override.
 export const BADGES: Record<BadgeVariant, BadgeMeta> = {
-  // VIS-15 — "colour exceptions and actions, not every normal state". A
+  // "colour exceptions and actions, not every normal state". A
   // low-risk auto-allowed capability is the resting state of most of the gate
   // table, and painting it green meant Permissions opened as a wall of green
   // reporting that nothing was wrong. The symbol still says it and the label
@@ -55,7 +55,7 @@ export const BADGES: Record<BadgeVariant, BadgeMeta> = {
     tone: "tone-muted",
     description: "Future / not-yet-built; cannot be enabled in this build.",
   },
-  // VIS-15 — likewise. "This capability works" is the normal case for a
+  // Likewise. "This capability works" is the normal case for a
   // shipped build, not an event worth a colour. `done` keeps its green,
   // because finishing is something that *happened*.
   implemented: {

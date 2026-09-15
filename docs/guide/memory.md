@@ -51,6 +51,33 @@ Approval is not a blanket instruction to the agent. Recalled text is supplied
 as labelled evidence and cannot increase permissions, replace the current
 prompt, or bypass an approval gate.
 
+## The Knowledge Map
+
+**Knowledge → Knowledge Map** shows the records this workspace holds and the
+approved relationships between them. Everything on it is stored — nothing is
+illustrative, and a workspace that has recorded nothing shows an empty map that
+says so rather than a demonstration graph. Adding a source or having a
+conversation is what puts something on it; relationships appear as they are
+approved.
+
+There are two ways to read the same records, and the switch in the toolbar
+remembers which you chose:
+
+- **Map** draws the records and their relationships as a graph, which is the
+  view for seeing how things connect.
+- **List** is the same records as rows — type, status, connection count — and
+  each row opens its relationships with the evidence memory behind each one and
+  the same **Reject link** control. Nothing is map-only: finding where something
+  came from, or rejecting a link Raiker inferred, never requires reading the
+  graph.
+
+If your device asks for reduced motion, the graph settles instead of staying in
+motion, whatever the Motion setting says — your setting is kept, and the device's
+preference is honoured over it.
+
+Rejecting a relationship removes the **link**, not the memories at either end,
+and the rejection is kept: a rejected link is still listed and still says so.
+
 ## What enters a turn
 
 Raiker builds context in layers. The current prompt, task, conversation history,

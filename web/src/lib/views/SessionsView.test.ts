@@ -446,3 +446,88 @@ describe("SessionsView organisation", () => {
     expect(await screen.findByRole("heading", { name: "Second chat" })).toBeInTheDocument();
   });
 });
+
+describe("SessionsView renders a reopened turn as the parts it declared", () => {
+  // BUG-300 — Sessions reads a stored turn, not a live response, so it printed
+  // the raw `raiker:table` fence and its JSON where the conversation showed a
+  // table. The parts arrive already split by the runtime.
+  const ANSWER =
+    'Spending so far.\n\n```raiker:table\n{"caption":"Cost by provider",' +
+    '"columns":["Provider","Spend"],"rows":[["Anthropic","$4.10"]]}\n```\n';
+
+  const withTurn = (contentParts: unknown[]) => ({
+    ...SESSIONS_ROUTE,
+    "GET /api/sessions/sess_b": {
+      session: SESSIONS_ROUTE["GET /api/sessions"][0],
+      turns: [
+        {
+          turn_id: "turn_1",
+          session_id: "sess_b",
+          turn_type: "prompt",
+          status: "completed",
+          prompt_text: "How much did we spend?",
+          created_at: "2026-07-10T00:00:00Z",
+          completed_at: "2026-07-10T00:00:05Z",
+          summary: ANSWER,
+          content_parts: contentParts,
+        },
+      ],
+    },
+    "GET /api/turns/turn_1": {
+      turn: {
+        turn_id: "turn_1",
+        session_id: "sess_b",
+        turn_type: "prompt",
+        status: "completed",
+        prompt_text: "How much did we spend?",
+        created_at: "2026-07-10T00:00:00Z",
+        completed_at: "2026-07-10T00:00:05Z",
+        summary: ANSWER,
+        content_parts: contentParts,
+      },
+      events: [],
+    },
+  });
+
+  const openTheTurn = async () => {
+    render(SessionsView);
+    await fireEvent.click(await screen.findByText("Second chat"));
+    await fireEvent.click(await screen.findByText("How much did we spend?"));
+  };
+
+  it("shows a declared table as a table rather than as its fence", async () => {
+    stubFetch(
+      withTurn([
+        { type: "text", text: "Spending so far.\n\n" },
+        {
+          type: "table",
+          data: {
+            caption: "Cost by provider",
+            columns: ["Provider", "Spend"],
+            rows: [["Anthropic", "$4.10"]],
+          },
+        },
+      ]),
+    );
+    await openTheTurn();
+
+    // Scoped to the turn inspector: the conversation list above it is a table
+    // too, and this is about the answer rather than the page.
+    const table = await screen.findByRole("table", { name: /Cost by provider/i });
+    expect(within(table).getByRole("columnheader", { name: /Provider/ })).toBeInTheDocument();
+    expect(within(table).getByText("$4.10")).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("raiker:table");
+  });
+
+  it("falls back to the stored text when the answer declared nothing", async () => {
+    stubFetch(withTurn([]));
+    await openTheTurn();
+
+    // No parts, so no typed rendering — the stored string is shown as it
+    // always was, fence and all, because that is what the record holds.
+    await waitFor(() =>
+      expect(screen.queryByRole("table", { name: /Cost by provider/i })).not.toBeInTheDocument(),
+    );
+    expect(document.body.textContent).toContain("raiker:table");
+  });
+});

@@ -28,6 +28,7 @@ from raiker.api.schemas import (
 from raiker.api.sessions import ApiSession
 from raiker.models import local_presence
 from raiker.models.conversion import (
+    ConversionCancelled,
     ConversionRefused,
     ModelConversionService,
     conversion_artifacts,
@@ -1245,13 +1246,22 @@ def _run_model_conversion(
         preview = service.preview(
             Path(body.source), Path(body.output), body.revision, body.quantization
         )
-        # Conversion is one bounded subprocess, so it has exactly two points at
-        # which it can co-operate: before it commits the CPU, and after. Both are
-        # checked rather than neither.
+        # GCR-24 — the flag is read before the work starts, throughout it, and
+        # after. It used to be read only at the two ends, and in between sat two
+        # blocking containers under a six-hour budget: pressing Cancel on a
+        # conversion that had just begun left it at `cancel_requested` with the
+        # CPU committed, potentially for the rest of the day. The runner polls
+        # this and stops the container by name.
         if operations.cancel_requested(owner, operation_id):
             operations.cancelled(owner, operation_id)
             return
-        service.convert(preview)
+        try:
+            service.convert(preview, lambda: operations.cancel_requested(owner, operation_id))
+        except ConversionCancelled:
+            # Not a failure. The owner asked for this, and telling them their
+            # conversion broke would be a different and wrong sentence.
+            operations.cancelled(owner, operation_id)
+            return
         if operations.cancel_requested(owner, operation_id):
             operations.cancelled(owner, operation_id)
             return

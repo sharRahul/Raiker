@@ -554,6 +554,29 @@ class McpSessionView:
         return asdict(self)
 
 
+def _stored_content_parts(summary: Any) -> tuple[dict[str, Any], ...]:
+    """A stored answer's declared parts, or nothing when it declared none.
+
+    BUG-300. A live turn carries ``content_parts`` because the response object
+    derives them; a turn read back from the record is just a string, and every
+    surface that reopened one showed the raw ``raiker:table`` fence with its
+    JSON. The splitter is pure, so the answer is the same answer split the same
+    way — what this adds is that the surfaces reading the record get it too.
+
+    Empty when the answer declared nothing, so the payload for an ordinary turn
+    is byte-for-byte what it was and a client that ignores the field sees what
+    it always saw.
+    """
+    from raiker.runtime.typed_parts import content_parts, renders_as_parts
+
+    if not isinstance(summary, str) or not summary:
+        return ()
+    parts = content_parts(summary)
+    if not renders_as_parts(parts):
+        return ()
+    return tuple(part.to_dict() for part in parts)
+
+
 @dataclass(frozen=True)
 class TurnView:
     turn_id: str
@@ -576,6 +599,13 @@ class TurnView:
     # server-side through the same `raiker.tools.presentation` function the live
     # path uses, so a reloaded row can never say more than the one it replaces.
     tool_rows: tuple[dict[str, Any], ...] = ()
+    # BUG-300 - the parts this answer declared, so a turn reopened from the
+    # record renders as the table it was rather than as the fence that declared
+    # one. Derived here rather than in the browser for the same reason the tool
+    # rows above are: the split is part of what the runtime decided the answer
+    # was, and two implementations of it would eventually disagree. Empty for
+    # every answer that declared nothing, which is nearly all of them.
+    content_parts: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -2637,7 +2667,15 @@ class DashboardService:
     def save_brain_preferences(
         self, settings: dict[str, Any], *, owner_principal_id: str
     ) -> dict[str, Any]:
-        allowed = {"transform", "display", "forces", "groups", "positions", "filters", "motion"}
+        # REM-MAP-04 adds `viewMode`: which of the two readings of the
+        # workspace the owner chose. The allowlist is why it has to be named
+        # here — a key the server does not know is dropped in silence, so a
+        # preference that looks saved and comes back at its default is the
+        # failure mode this list produces when it is not kept in step.
+        allowed = {
+            "transform", "display", "forces", "groups", "positions", "filters",
+            "motion", "viewMode",
+        }
         clean = {key: value for key, value in settings.items() if key in allowed}
         serialized = json.dumps(clean, sort_keys=True)
         if len(serialized) > 100_000:
@@ -8656,6 +8694,7 @@ class DashboardService:
             reasoning_chars=int(row.get("reasoning_chars") or 0),
             reasoning=row.get("reasoning_text"),
             tool_rows=self._turn_tool_rows(str(row["session_id"]), str(row.get("turn_id") or "")),
+            content_parts=_stored_content_parts(row.get("summary")),
         )
 
     #: How a stored action's status reads as a transcript row. `proposed` is a

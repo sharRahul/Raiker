@@ -27,6 +27,13 @@ const SECTIONS: Record<string, GuideTarget> = {
   design: { slug: "design", label: "How image generation is governed" },
   connections: { slug: "extensions-and-mcp", label: "How connectors work" },
   "new-chat": { slug: "working-in-chat", label: "How Chat works" },
+  // REM-GUIDE — two surfaces had no way into the guide at all, and one of them
+  // left `working-in-build.md` as a chapter the product shipped and could not
+  // open. The "remove the inline chapter, keep one contextual link" trade only
+  // works where the link exists, so a page with neither is the one place the
+  // explanation has to stay inline. It does not have to be either any more.
+  build: { slug: "working-in-build", label: "How Build works on a repository" },
+  brain: { slug: "memory", label: "How the Knowledge Map works" },
   "search-chat": { slug: "working-in-chat", label: "How threads and chat history work" },
   checkpoints: { slug: "permissions-and-runtime-modes", label: "How checkpoints work" },
   observe: { slug: "troubleshooting", label: "How to read the record" },

@@ -2575,6 +2575,24 @@ class RuntimeOrchestrator:
         # owner saw all of it stream by, so keeping only the last round's would
         # be a different turn than the one they watched.
         turn_reasoning: list[str] = []
+        # BUG-300 — and the same is true of the *answer*, for the same reason.
+        #
+        # `final_text` used to be the last round's text alone, so anything the
+        # model wrote alongside a tool call streamed to the browser and then
+        # vanished: the turn the owner read and the turn Raiker stored were
+        # different strings. A reopened conversation lost those paragraphs, an
+        # export lost them, and — found live on 2026-09-16 — a turn that
+        # declared a ```raiker:table``` before calling `update_plan` had its
+        # table dropped from the response's own parts, so the one surface that
+        # could render it fell back to drawing the fence as a code block.
+        #
+        # Joined with a blank line, because each entry is a separate assistant
+        # message and Markdown's paragraph boundary is what separates two of
+        # them. Empty rounds contribute nothing.
+        answer_segments: list[str] = []
+
+        def answer_so_far() -> str:
+            return "\n\n".join(part for part in (text.strip() for text in answer_segments) if part)
 
         for pending in self._drain_sink():
             yield pending
@@ -2731,7 +2749,7 @@ class RuntimeOrchestrator:
                     },
                 )
                 status = "stopped"
-                message = final_text or "Stopped at your request, at a safe boundary."
+                message = answer_so_far() or "Stopped at your request, at a safe boundary."
                 break
             for pending in self._drain_sink():
                 yield pending
@@ -2770,11 +2788,8 @@ class RuntimeOrchestrator:
                     },
                 )
                 status = "stopped"
-                message = (
-                    response.text.strip()
-                    or final_text
-                    or "Stopped at your request, at a safe boundary."
-                )
+                answer_segments.append(response.text)
+                message = answer_so_far() or "Stopped at your request, at a safe boundary."
                 break
             if response.finish_reason == "error":
                 status = "failed"
@@ -2783,13 +2798,23 @@ class RuntimeOrchestrator:
                 )
                 break
             if not response.tool_calls:
-                final_text = response.text
+                answer_segments.append(response.text)
+                final_text = answer_so_far()
                 break
+
+            # Text written *alongside* a tool call is part of the answer, and is
+            # kept before the call is proposed so a turn that stops, parks or
+            # runs out of budget from here still carries what the owner read.
+            answer_segments.append(response.text)
+            final_text = answer_so_far()
 
             proposals = list(response.tool_calls)
             remaining_budget = max_tool_calls - tool_calls_made
             if remaining_budget <= 0:
-                final_text = "Stopped: reached the maximum number of tool calls for this turn."
+                answer_segments.append(
+                    "Stopped: reached the maximum number of tool calls for this turn."
+                )
+                final_text = answer_so_far()
                 break
             if len(proposals) > remaining_budget:
                 self._event(envelope, "model_tool_calls_dropped", {

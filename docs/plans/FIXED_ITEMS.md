@@ -571,6 +571,13 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-547](#fixed-547--a-lost-response-was-reported-as-a-failed-deletion) | Low | Account | Fixed 2026-09-15 (closes REM-SET-ACCOUNT) |
 | [FIXED-548](#fixed-548--two-hundred-and-twenty-four-comments-citing-documents-that-are-not-there) | Low | Codebase hygiene | Fixed 2026-09-15 |
 | [FIXED-549](#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject) | Low | Live test harness | Fixed 2026-09-15 (closes BUG-250) |
+| [FIXED-550](#fixed-550--a-turn-that-wrote-anything-before-calling-a-tool-stored-a-different-answer-than-it-showed) | **High** | Runtime / turn answer | Fixed 2026-09-16 (found live while closing BUG-300) |
+| [FIXED-551](#fixed-551--a-declared-table-was-a-table-in-the-conversation-and-json-everywhere-else) | Low | Export / Threads / Sessions / voice | Fixed 2026-09-16 (closes BUG-300) |
+| [FIXED-552](#fixed-552--a-brand-new-knowledge-map-was-given-three-records-nobody-had-made) | Low | Knowledge Map | Fixed 2026-09-16 (closes REM-MAP-02) |
+| [FIXED-553](#fixed-553--reading-the-knowledge-map-required-reading-a-moving-picture) | Low | Knowledge Map / accessibility | Fixed 2026-09-16 (closes REM-MAP-04) |
+| [FIXED-554](#fixed-554--the-product-shipped-a-guide-chapter-about-build-and-could-not-open-it) | Low | Guide / navigation | Fixed 2026-09-16 (closes REM-GUIDE) |
+| [FIXED-555](#fixed-555--cancel-on-a-conversion-could-go-unanswered-for-six-hours) | Medium | Models / conversion | Fixed 2026-09-16 (closes GCR-24) |
+| [FIXED-556](#fixed-556--a-source-fingerprint-that-did-not-hash-the-source) | Medium | Models / provenance | Fixed 2026-09-16 (closes GCR-26) |
 
 ---
 
@@ -24346,3 +24353,311 @@ existing collector when one is there, which is already re-runnable; a per-run
 name would make every round leave another collector behind, which is the problem
 rather than the fix. The module says which kind of value the rule is for — a
 record the product stores under a name, never a prompt, a path or a key.
+
+---
+
+## FIXED-550 — A turn that wrote anything before calling a tool stored a different answer than it showed
+
+**Severity: High. Area: runtime / turn answer. Status: Fixed 2026-09-16.
+Found live on the first press of Send while closing
+[BUG-300](TO_BE_FIXED.md#bug-300--a-typed-answer-is-typed-in-chat-and-build-and-is-characters-everywhere-else).**
+
+**Observed.** Asked for three cities as a table, the model answered in two
+rounds: it wrote a ` ```raiker:table ` block, called `update_plan`, and then
+wrote *"Done. The table shows the three cities…"*. The browser showed both,
+because the browser concatenates what it is streamed. The stored turn was the
+second sentence alone.
+
+The declared table therefore never reached
+`AgentResponse.content_parts`, and the one surface that could have rendered it
+fell back to the Markdown renderer, which drew the fence as a code block. The
+capture that found it shows a JSON payload in a grey box above a sentence
+claiming a table had been shown.
+
+**Root cause, and it is older and wider than the table.** `final_text` in
+`raiker/runtime/orchestrator.py` was assigned in exactly one place — the round
+that came back with *no* tool calls:
+
+```python
+if not response.tool_calls:
+    final_text = response.text
+    break
+```
+
+Anything the model wrote alongside a tool call streamed to the browser and then
+went nowhere. So for every turn that narrated its work — which is most turns
+that use a tool — the conversation the owner read and the conversation Raiker
+stored were different strings. A reopened conversation lost those paragraphs, an
+export lost them, the audit summary was taken from the short half, and the
+typed-parts channel never saw the part.
+
+**Fixed.** The turn accumulates `answer_segments` for the same reason
+FIXED-315 accumulates `turn_reasoning`: a turn can call the model many times and
+the owner watched all of it. Text is kept at every point that consumes a
+response — the round that ends the turn, the round that proposes tool calls, the
+stop boundaries and the tool-budget ceiling — and joined with a blank line,
+which is the paragraph boundary between two assistant messages. Empty rounds
+contribute nothing, so an ordinary single-round turn stores exactly what it
+stored before.
+
+**Interface outcome.** The answer in the transcript, the answer in the export,
+the answer in the audit summary and the answer the typed channel splits are one
+string. Proven live: the same prompt now renders a sortable table in Chat, a GFM
+table in the Markdown export and a table in the Sessions inspector.
+
+---
+
+## FIXED-551 — A declared table was a table in the conversation, and JSON everywhere else
+
+**Severity: Low. Area: export / Threads / Sessions / voice. Status: Fixed
+2026-09-16. Closes [BUG-300](TO_BE_FIXED.md).**
+
+**Observed.** [FIXED-545](#fixed-545--a-turn-could-only-answer-in-prose) gave a
+turn a typed channel: a fence declares a table or a chart, the runtime validates
+it, and the response carries parts the client renders. `content_parts` is derived
+on the response, so the two surfaces that render a *live* turn had it. Three
+places read a *persisted* answer and still saw one string:
+
+* an exported HTML, Markdown or PDF transcript showed the raw fence and its JSON;
+* Threads and Observability → Sessions reopened a stored turn and did the same;
+* read aloud matched the generic fence rule and said *"Code block."*, so a
+  listener was told a section of prose existed where a table did.
+
+**Fixed as four answers, because they were four questions.** The splitter is
+pure, so each path obtains the parts from the text it already holds and nothing
+about storage changed.
+
+* **HTML** gets a real `<table>` with a `<caption>` and a header row, so a screen
+  reader announces a table and the browser's own *Save as PDF* keeps it one.
+* **Markdown** gets a GFM table. A cell cannot break out of its row: a pipe would
+  end the cell and a newline would end the table, so both are neutralised rather
+  than left to the reader's renderer.
+* **PDF** gets a page-width table laid out in Courier — the one base-14 font
+  whose columns line up without font metrics — with the header repeated when a
+  table runs over a page break, and column widths shared in proportion to what
+  each column holds. Courier and Courier-Bold are base-14, so a table still
+  embeds nothing. Found on the way: `—`, `…` and `·` were rendering as `?`,
+  because the writer passed ASCII only; they are WinAnsi characters and are
+  written as themselves now.
+* **Read aloud** says what the block *was* — *"Table: Cost by provider. 2
+  columns, 3 rows."* — and never reads the payload. Speaking a JSON object aloud
+  would be worse than saying nothing: a listener cannot skim past it.
+
+**A chart is exported as its own numbers**, in all three media, with its kind and
+caption stated. Drawing it would mean a second chart renderer in Python that
+could disagree with the one in the browser, and a picture of a series is not more
+honest than the series.
+
+**A reopened turn** carries parts derived server-side by the same splitter
+(`_stored_content_parts`), so a reloaded conversation and the Sessions inspector
+cannot produce a different reading of one answer. A **refusal** is carried too:
+`renders_as_parts` exists beside `has_typed_part` because a refusal is not
+*content* — nothing was accepted — but it is something a reopening surface must
+show, or it silently prints the fence the runtime already refused.
+
+**The export review says so first.** The dialog's facts line reports how many
+tables and charts the file will carry, and the redaction policy states what
+happens to them, so the owner knows before the file exists rather than after.
+
+**Live.** Driven by a real Anthropic turn on `claude-haiku-4-5-20251001`:
+`export-review-declared-parts.png` shows the review, the downloaded Markdown
+carries a GFM table and no fence, and
+`sessions-reopened-typed-answer.png` shows the same table in the evidence
+inspector. The governed events listed under it still quote the raw record, which
+is correct — an audit summary is what the runtime saw, verbatim, and a fence
+rendered as a table there would be the evidence log editing itself. Zero console
+errors.
+
+**Found while proving it:**
+[FIXED-550](#fixed-550--a-turn-that-wrote-anything-before-calling-a-tool-stored-a-different-answer-than-it-showed),
+which was the reason the first live attempt had nothing to export.
+
+---
+
+## FIXED-552 — A brand-new Knowledge Map was given three records nobody had made
+
+**Severity: Low. Area: Knowledge Map. Status: Fixed 2026-09-16. Closes
+**REM-MAP-02** of the release-readiness review's §18.3.**
+
+**Observed.** A workspace with nothing in it did not get an empty map. It got a
+*starter graph*: three nodes — **You**, **Workspace**, **Add first source** — and
+two edges between them. They were flagged `is_real: false` and the count pill
+called them a *Starter view*, so they were never covert. They were still
+selectable, hoverable, centreable objects that opened a record inspector, in the
+one surface whose entire job is to show what the workspace actually knows. A map
+that draws things that are not there teaches the owner to distrust the map.
+
+**Fixed.** The placeholders are gone and the canvas draws nothing when there is
+nothing to draw. The shared empty state says *"Nothing in the map yet"* and
+carries the way out — **Add source** and **Open Memory** — instead of hiding it
+inside a node the owner has to work out is not a record. The count pill says
+*"Nothing recorded yet"* rather than counting placeholders as workspace records.
+
+**The owner's own principal node** is a real record and is not hidden from
+anything that counts records. It is not *drawn* on an otherwise empty canvas
+either: alone, it is an unlabelled dot with no relationships sitting under the
+sentence that says the map is empty, which would be the starter graph's mistake
+in miniature.
+
+**Two emptinesses, told apart.** Nothing recorded and nothing matching are
+different answers, and offering "Add a source" to somebody who has forty records
+and a typo in the search field is the wrong instruction. A filtered-empty map
+says how many records the workspace has and offers **Clear filters**.
+
+**Live.** `knowledge-map-empty-state.png`, on a workspace reset for the round.
+Zero console errors.
+
+---
+
+## FIXED-553 — Reading the Knowledge Map required reading a moving picture
+
+**Severity: Low. Area: Knowledge Map / accessibility. Status: Fixed 2026-09-16.
+Closes **REM-MAP-04** of the release-readiness review's §18.3.**
+
+**Observed.** Finding where a memory came from, or rejecting a relationship
+Raiker inferred, are decisions about *records*. The map made them decisions about
+geometry: locate a dot by eye, at whatever zoom a force simulation had settled
+on, before you can act on it. And the simulation is JavaScript, so the global
+`prefers-reduced-motion` rule in `app.css` never reached it — **Always alive**
+held `alphaTarget` above zero and the graph never stopped moving.
+
+**Fixed, in two halves.**
+
+**A list, as a peer of the map rather than a fallback.** A **Map / List** switch
+in the toolbar, and the list offers the same authorised records with the same
+actions: every record with its type, status and connection count, ordered by how
+connected it is rather than by where a force put it, and each row expands to its
+relationships with the evidence memory and the same **Reject link** control.
+Rejection history is preserved — an inactive relationship is still listed and
+still says it was rejected. `rejectRelationship` takes a `BrainEdge` now rather
+than a simulation link, so there is one rejection path reached from two places.
+The choice is stored with the owner's other display preferences, because a way of
+working should survive a reload; `viewMode` had to be added to the server's
+preference allowlist, which is where a key the server does not know is dropped
+in silence.
+
+**Stillness the device asked for.** `prefers-reduced-motion` is subscribed to
+rather than read once, and an *effective* motion mode is what the simulation
+follows: the owner's setting keeps the value they gave it, and the system
+preference is honoured over it exactly as it is for every CSS animation in the
+product. The Motion section says so rather than looking broken. Relationship
+particles stop too. In list mode the simulation is stopped outright — a force
+simulation ticking behind a table is the visualisation-only motion this row is
+about, still running where nobody can see it.
+
+**Live.** `knowledge-map-list-view.png`, with the canvas hidden and the
+preference surviving a reload. Zero console errors.
+
+---
+
+## FIXED-554 — The product shipped a guide chapter about Build and could not open it
+
+**Severity: Low. Area: Guide / navigation. Status: Fixed 2026-09-16. Closes
+**REM-GUIDE** of the release-readiness review's §18.3.**
+
+**Observed.** REM-GUIDE's trade is *remove the inline manual chapter, keep one
+contextual help link*. It only works where the link exists. Two navigation
+destinations had none — **Build** and the **Knowledge Map** — and Build is the
+worst one to be missing: `docs/guide/working-in-build.md` ships in the product
+and nothing in the product could open it, so the surface with the most to explain
+was the one that could only explain itself inline.
+
+**Fixed.** Both routes have a target in `guideSections.ts` and a `GuideLink` on
+the page. Two assertions keep it that way, and they are the point of the change
+rather than a formality:
+
+* every navigation destination has a guide target, with `guide` itself the one
+  named exception, because it *is* the destination;
+* no guide chapter about a surface is unreachable from that surface — the four
+  chapters that explain the product rather than one page are reached from the
+  guide's own index, which is what it is for.
+
+Build's label names the topic rather than the page, which is the rule the module
+already had: *"How Build works on a repository"*.
+
+**Live.** `guide-working-in-build.png` — the link on Build's header opens the
+chapter. Zero console errors.
+
+**Found while proving it, and filed rather than fixed:** the guide's own
+chapter-to-chapter Markdown links render as literal text, because the Markdown
+renderer's URL allowlist is a deliberate boundary for model-authored content and
+a relative `.md` target is not `http(s):`.
+[BUG-301](TO_BE_FIXED.md#bug-301--the-guides-own-cross-references-are-not-links).
+
+---
+
+## FIXED-555 — Cancel on a conversion could go unanswered for six hours
+
+**Severity: Medium. Area: Models / conversion. Status: Fixed 2026-09-16. Closes
+**GCR-24**, the largest remaining piece of owner-visible work in
+[`GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md`](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md).**
+
+**Observed.** `_run_model_conversion` read the cancellation flag immediately
+before starting the conversion and immediately after it finished. In between were
+two `subprocess.run` calls under a six-hour isolation timeout, and
+`subprocess.run` blocks until the child exits. Pressing **Cancel** on a
+conversion that had just started therefore left the operation at
+`cancel_requested`, with the CPU still committed, potentially for the rest of the
+day.
+
+**Fixed, in the three parts the review asked for.**
+
+* **A handle instead of a wait.** Each step runs under `Popen` and is polled once
+  a second, so the flag is read on a cadence rather than at two instants.
+* **A name for the container.** Killing the `docker run` client does not stop the
+  container it started — the work goes on with nothing watching it, which is the
+  worst of the three outcomes. Each step is given a name and cancelling stops
+  *that container* by name. The names are derived from the preview rather than
+  generated: the preview is what is persisted with the operation, so anything
+  cleaning up after a host restart can recompute them without a second stored
+  identity that could drift from the first. The digest covers source, output,
+  revision and quantization, so two conversions an owner could reasonably run at
+  once never collide.
+* **A cancellation is not a failure.** `ConversionCancelled` is raised rather
+  than the generic refusal, and the worker settles the operation as *cancelled*.
+  They are different sentences to an owner: one says the work broke, the other
+  says they stopped it. It subclasses `ConversionRefused`, so a caller that only
+  knows about refusals still catches it.
+
+**Two things fixed on the way.** The isolation deadline now has its own answer —
+`isolated_conversion_timed_out` rather than a `TimeoutExpired` caught by a
+blanket handler and reported as a broken model. And the steps' output goes to
+`DEVNULL`: it was captured and never read, and a child that is *waited on* rather
+than drained can fill a pipe buffer and block, which for a converter that prints
+a line per tensor is not hypothetical.
+
+**Tested against the real `Popen` loop**, with a stand-in `docker` on `PATH`,
+because the defect lived in *how the child was waited on* — a test that stubs the
+runner proves the caller and leaves the wait exactly as it was. The cancellation
+test's real assertion is that the call returns at all: before this it would have
+taken an hour.
+
+---
+
+## FIXED-556 — A source fingerprint that did not hash the source
+
+**Severity: Medium. Area: Models / provenance. Status: Fixed 2026-09-16. Closes
+**GCR-26**.**
+
+**Observed.** `_source_fingerprint` hashed the declared revision, each relative
+filename and each file's **byte size**. A path and a length are not an identity:
+edit a weights file in place, keep its length, and the fingerprint was unchanged
+— so the provenance record written beside every converted model recorded two
+different models under one value, which is the one thing a fingerprint exists not
+to do.
+
+**Fixed.** Every included file's content is hashed. Three details carry the
+claim:
+
+* **each file's own digest goes in**, rather than the bytes being streamed into
+  one running hash, so two files whose contents could be re-split across a
+  boundary cannot produce the same value;
+* **every field is length-prefixed**, so a filename ending where the next begins
+  cannot be rearranged into the same byte stream — without it, `"ab" + "c"` and
+  `"a" + "bc"` agree;
+* **the order is the sorted relative path**, so the same tree fingerprints the
+  same way wherever it is mounted.
+
+The cost is one full read of the snapshot, which is a fraction of a conversion
+that has just read all of it several times, and it is what makes the recorded
+value mean what the record says it means.

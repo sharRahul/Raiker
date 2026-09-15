@@ -180,7 +180,13 @@ def test_model_executes_every_parallel_read_and_returns_every_result(tmp_path: P
     ])
     orchestrator = _orchestrator(tmp_path, router)
     response = _handle(orchestrator, _envelope("compare a and b"))
-    assert response.message == "Compared both files."
+    # FIXED-550 — the answer is everything the model wrote in the turn, not only
+    # the round that ended it. "Reading both." streamed to the browser and used
+    # to go nowhere: the turn the owner read and the turn Raiker stored were
+    # different strings, and a reopened conversation or an export lost the
+    # narration. Joined with a blank line, because each round is a separate
+    # assistant message.
+    assert response.message == "Reading both.\n\nCompared both files."
     follow_up = router.seen_messages[1]
     assistant = next(message for message in follow_up if message.role == "assistant" and message.tool_calls)
     assert [call.call_id for call in assistant.tool_calls] == ["call_a", "call_b"]
@@ -562,3 +568,97 @@ def test_outside_workspace_read_is_denied_even_when_approvals_are_skipped(tmp_pa
     assert response.status == "denied"
     assert "policy_decision" in events
     assert "tool_started" not in events
+
+
+def test_the_answer_is_everything_the_model_wrote_in_the_turn(tmp_path: Path) -> None:
+    """FIXED-550 — a turn that narrates its work stores what it showed.
+
+    `final_text` used to be assigned in exactly one place: the round that came
+    back with no tool calls. Anything the model wrote *alongside* a tool call
+    streamed to the browser and then went nowhere, so for every turn that
+    narrated its work — which is most turns that use a tool — the conversation
+    the owner read and the conversation Raiker stored were different strings.
+
+    Found live on 2026-09-16 by a model that declared a ```raiker:table``` block
+    and then called `update_plan`: the declared table never reached
+    `content_parts`, and the renderer drew the fence as a code block above a
+    sentence claiming a table had been shown. It is invisible in a test whose
+    turn answers in one round, which is why this one does not.
+    """
+    (tmp_path / "a.txt").write_text("alpha", encoding="utf-8")
+    router = FakeRouter([
+        ModelResponse(
+            text="First I will read it.",
+            tool_calls=[ToolCallProposal("call_a", "read_file", {"path": "a.txt"})],
+            finish_reason="tool_calls",
+        ),
+        ModelResponse(
+            text="Now the other one.",
+            tool_calls=[ToolCallProposal("call_b", "read_file", {"path": "a.txt"})],
+            finish_reason="tool_calls",
+        ),
+        ModelResponse(text="Both say alpha.", finish_reason="stop"),
+    ])
+    orchestrator = _orchestrator(tmp_path, router)
+    response = _handle(orchestrator, _envelope("read it twice"))
+
+    assert response.message == (
+        "First I will read it.\n\nNow the other one.\n\nBoth say alpha."
+    )
+    # And the typed channel sees the whole answer, which is the half that made
+    # this visible: parts are derived from `message`.
+    assert [part["type"] for part in response.content_parts] == ["text"]
+
+
+def test_a_round_that_writes_nothing_contributes_nothing(tmp_path: Path) -> None:
+    """An ordinary turn stores exactly what it stored before FIXED-550.
+
+    Most tool rounds carry no text at all. If an empty round contributed a blank
+    line, every answer in the product would have gained leading whitespace.
+    """
+    (tmp_path / "a.txt").write_text("alpha", encoding="utf-8")
+    router = FakeRouter([
+        ModelResponse(
+            text="",
+            tool_calls=[ToolCallProposal("call_a", "read_file", {"path": "a.txt"})],
+            finish_reason="tool_calls",
+        ),
+        ModelResponse(text="It says alpha.", finish_reason="stop"),
+    ])
+    orchestrator = _orchestrator(tmp_path, router)
+
+    assert _handle(orchestrator, _envelope("read it")).message == "It says alpha."
+
+
+def test_a_turn_declaring_a_table_before_a_tool_call_still_declares_it(
+    tmp_path: Path,
+) -> None:
+    """The live failure, as a test.
+
+    The model wrote the block, called a tool, and then wrote a sentence. Before
+    FIXED-550 the stored answer was the sentence, so the table the owner was
+    looking at was not in the turn's own parts — and the one surface that could
+    render it fell back to drawing the fence as a code block.
+    """
+    (tmp_path / "a.txt").write_text("alpha", encoding="utf-8")
+    fence = (
+        '```raiker:table\n'
+        '{"caption": "City Populations", "columns": ["City", "Millions"],'
+        ' "rows": [["Tokyo", "37"]]}\n'
+        '```'
+    )
+    router = FakeRouter([
+        ModelResponse(
+            text=fence,
+            tool_calls=[ToolCallProposal("call_a", "read_file", {"path": "a.txt"})],
+            finish_reason="tool_calls",
+        ),
+        ModelResponse(text="Done. The table shows one city.", finish_reason="stop"),
+    ])
+    orchestrator = _orchestrator(tmp_path, router)
+    response = _handle(orchestrator, _envelope("show me a table"))
+
+    kinds = [part["type"] for part in response.content_parts]
+    assert "table" in kinds
+    table = next(part for part in response.content_parts if part["type"] == "table")
+    assert table["data"]["columns"] == ["City", "Millions"]

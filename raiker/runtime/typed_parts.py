@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -282,3 +283,17 @@ def content_parts(message: str) -> list[ContentPart]:
 def has_typed_part(parts: list[ContentPart]) -> bool:
     """True when at least one part is something other than prose or a refusal."""
     return any(part.type in _VALIDATORS for part in parts)
+
+
+def renders_as_parts(parts: Sequence[ContentPart]) -> bool:
+    """True when a surface should render the parts rather than the raw answer.
+
+    The difference from :func:`has_typed_part` is the refusal (BUG-300). A
+    refusal is not *content* — nothing was accepted — but it is something the
+    answer declared and a reader has to see, so any surface that renders parts
+    at all has to take the typed route when one is present. Every surface that
+    reopens an answer asks this one question, so they all get the same answer to
+    it: an export, a reopened thread and a live turn agree on when a turn had
+    parts.
+    """
+    return any(part.type in _VALIDATORS or part.type == PART_REFUSED for part in parts)

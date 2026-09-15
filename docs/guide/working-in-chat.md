@@ -287,6 +287,14 @@ Secret-shaped values — API keys, tokens, credentials — are replaced with
 `***REDACTED***` in every message before anything is rendered. Attached files are
 **listed** by name, type, and size; their contents are never embedded.
 
+**A table an answer declared is exported as a table.** When a turn answers with a
+table or a chart, the review says how many the file will carry, and each format
+renders it as the thing it is: a real table in the HTML page, a Markdown table
+you can paste anywhere, and a page-width table in the PDF. A chart is exported as
+the numbers behind it, with its kind and caption stated — the series is what you
+need when you file a transcript or send it on, and a second drawing of it could
+disagree with the one you were looking at.
+
 **Print / Save as PDF** uses your browser's own print dialog against a dedicated
 print layout: the sidebar, topbar, composer, and controls are dropped, and a turn
 never splits across a page. Every export is recorded in the event log with its

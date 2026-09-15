@@ -40,6 +40,7 @@
   import PageState from "../components/PageState.svelte";
   import Icon from "../components/Icon.svelte";
   import AnswerParts from "../components/AnswerParts.svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import RepoConnector from "../components/RepoConnector.svelte";
   import PlanChecklist from "../components/PlanChecklist.svelte";
   import ReasoningBlock from "../components/ReasoningBlock.svelte";
@@ -2031,6 +2032,10 @@
       </div>
 
       <div class="header-actions">
+        <!-- REM-GUIDE — Build shipped `working-in-build.md` and had no way to
+             open it, so the one surface with the most to explain was the one
+             that could only explain itself inline. -->
+        <GuideLink route="build" />
         <button
           type="button"
           class="btn btn-ghost btn-sm"

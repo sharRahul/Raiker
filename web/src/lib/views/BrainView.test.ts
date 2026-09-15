@@ -92,7 +92,91 @@ describe("BrainView", () => {
     ));
   });
 
-  it("shows the governed starter graph and opens force settings", async () => {
+  it("offers the same records and the same rejection as a list, with the graph stopped", async () => {
+    // REM-MAP-04 — finding where a memory came from, or rejecting a
+    // relationship Raiker inferred, are decisions about records. The canvas
+    // made them decisions about geometry: locate a dot by eye, at whatever
+    // zoom the simulation settled on, before you can act on it.
+    vi.spyOn(window, "prompt").mockReturnValue("Incorrect relationship");
+    const fetchMock = stubFetch({
+      "GET /api/brain": {
+        generated_at: "2026-08-21T00:00:00Z",
+        illustrative_motion_notice: "Stored records only.",
+        nodes: [
+          { node_id: "principal:p", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: true },
+          { node_id: "entity:rahul", node_type: "entity", label: "Rahul", status: "reviewed", detail: "person", progress_percent: null, is_real: true },
+          { node_id: "entity:raiker", node_type: "entity", label: "Raiker", status: "reviewed", detail: "project", progress_percent: null, is_real: true },
+        ],
+        edges: [{
+          source: "entity:rahul", target: "entity:raiker", relationship: "works_on",
+          is_active: false, relationship_id: "rel_1", evidence_memory_id: "mem_1",
+          owner_can_reject: true,
+        }],
+      },
+      "POST /api/memory/entity-relationships/rel_1/reject": {
+        ok: true, relationship_id: "rel_1", active: false,
+      },
+    });
+    render(BrainView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /^Rahul, entity record/i }));
+    await fireEvent.click(screen.getByRole("button", { name: "List" }));
+
+    // The records are rows, ordered by how connected they are rather than by
+    // where a force put them.
+    const table = await screen.findByRole("table", { name: /Workspace records/i });
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("Rahul");
+
+    // The same evidence and the same rejection, reached from the row. Scoped to
+    // the list: the map's own inspector is still mounted behind it, holding the
+    // owner's pan and zoom, and this is about what the list offers.
+    await fireEvent.click(within(rows[0]).getByRole("button", { name: "Relationships" }));
+    const detail = await within(table).findByText("Evidence: mem_1");
+    expect(detail).toBeInTheDocument();
+    // Rejection history is preserved rather than hidden.
+    expect(within(table).getByText("rejected")).toBeInTheDocument();
+    await fireEvent.click(within(table).getByRole("button", { name: /reject link/i }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/memory/entity-relationships/rel_1/reject",
+      expect.objectContaining({ method: "POST" }),
+    ));
+  });
+
+  it("tells a filtered-empty map apart from an empty one, and offers the way back", async () => {
+    // REM-MAP-02 — "no records match" and "nothing recorded" are different
+    // answers, and offering "Add a source" to somebody who has records and a
+    // typo in the search field is the wrong instruction.
+    stubFetch({
+      "GET /api/brain": {
+        generated_at: "2026-07-15T00:00:00Z",
+        illustrative_motion_notice: "Stored records only.",
+        nodes: [
+          { node_id: "principal:p", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: true },
+          { node_id: "entity:rahul", node_type: "entity", label: "Rahul", status: "reviewed", detail: "person", progress_percent: null, is_real: true },
+        ],
+        edges: [],
+      },
+    });
+    render(BrainView);
+
+    await screen.findByRole("button", { name: /Rahul, entity record/i });
+    expect(screen.queryByText("Nothing in the map yet")).not.toBeInTheDocument();
+    await fireEvent.input(screen.getByLabelText("Search records"), {
+      target: { value: "nothing will match this" },
+    });
+
+    expect(await screen.findByText("No records match these filters")).toBeInTheDocument();
+    expect(screen.getByText(/This workspace has 2 records/)).toBeInTheDocument();
+    expect(screen.queryByText("Nothing in the map yet")).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await waitFor(() =>
+      expect(screen.queryByText("No records match these filters")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("says the map is empty rather than drawing nodes nobody made, and opens force settings", async () => {
     stubFetch({
       "GET /api/brain": {
         generated_at: "2026-07-15T00:00:00Z",
@@ -103,9 +187,19 @@ describe("BrainView", () => {
     });
     render(BrainView);
 
-    expect(await screen.findByText("Build your knowledge graph")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Workspace, workspace record/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Add first source, source record/i })).toBeInTheDocument();
+    // REM-MAP-02 — the map used to hand a new workspace three placeholder nodes
+    // and two placeholder edges. They were flagged `is_real: false` and labelled
+    // "Starter view", so they were never covert — and they were still
+    // selectable, centreable objects in the one surface whose job is to show
+    // what the workspace actually knows.
+    expect(await screen.findByText("Nothing in the map yet")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Workspace, workspace record/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Add first source, source record/i })).not.toBeInTheDocument();
+    // The way out is in the empty state instead of inside a node.
+    expect(screen.getByRole("button", { name: /Add source/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Open Memory/i })).toHaveAttribute("href", "#/memory");
+    // And the pill counts nothing, rather than counting the placeholders.
+    expect(screen.getByText("Nothing recorded yet")).toBeInTheDocument();
     screen.getByRole("button", { name: "Graph settings" }).click();
     const settings = await screen.findByRole("complementary", { name: "Graph settings" });
     // REM-MAP-01 — the panel opens on the section that decides which records
@@ -230,6 +324,12 @@ describe("BrainView", () => {
       illustrative_motion_notice: "Stored records only.",
       nodes: [
         { node_id: "principal:p", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: true },
+        // A record the owner made, which is what "the graph survived the failed
+        // refresh" has to be proved against. It used to be proved against the
+        // principal node alone, and a map holding only "You" is a map with
+        // nothing in it — so the assertion could have passed over an empty
+        // canvas (REM-MAP-02).
+        { node_id: "entity:rahul", node_type: "entity", label: "Rahul", status: "reviewed", detail: "person", progress_percent: null, is_real: true },
       ],
       edges: [],
     };
@@ -257,7 +357,7 @@ describe("BrainView", () => {
     // Still on screen — throwing away the only graph anyone has helps nobody —
     // and it says how old it is and that renewing it failed.
     expect(screen.getByText(/last updated/i)).toHaveTextContent(/refresh failed/i);
-    expect(screen.getByRole("button", { name: /You, user record/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Rahul, entity record/i })).toBeInTheDocument();
     vi.useRealTimers();
   });
 

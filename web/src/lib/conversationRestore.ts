@@ -8,8 +8,9 @@
  * so nothing here invents a field a surface does not have.
  *
  * Restored turns carry only what is persisted: the prompt, the answer, the
- * status, the turn's tool rows and its retained working. The live per-event
- * timeline is not replayed — new turns stream as usual.
+ * status, the turn's tool rows, its retained working and the parts the answer
+ * declared. The live per-event timeline is not replayed — new turns stream as
+ * usual.
  */
 import type { ComposerAttachment } from "./composerAttachments.svelte";
 import type {
@@ -81,6 +82,11 @@ export function restoredTurnCore(
           }
         : null,
       last_event_id: null,
+      // BUG-300 — a reopened turn answers in the shapes it answered in. The
+      // split is the server's, derived from the stored text by the same
+      // splitter the live response went through, so reloading a conversation
+      // cannot produce a different reading of the same answer.
+      content_parts: turn.content_parts ?? [],
     },
     streaming: false,
     error: null,

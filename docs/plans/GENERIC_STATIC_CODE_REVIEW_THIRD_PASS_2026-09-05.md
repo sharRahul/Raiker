@@ -72,9 +72,9 @@ The third theme is **durability mismatch**: a number of operations are represent
 | GCR-21 | High | P1 | Model-operation Retry can requeue non-terminal/running/completed work and dispatch a duplicate worker — **Closed 2026-09-05 ([FIXED-422](FIXED_ITEMS.md#fixed-422--retry-checked-the-kind-and-the-payload-and-never-the-state))** |
 | GCR-22 | Medium/High | P1 | Initial Hugging Face download runs synchronously while retry uses a background worker — **Closed 2026-09-05 ([FIXED-423](FIXED_ITEMS.md#fixed-423--a-multi-gigabyte-download-ran-inside-the-request-that-asked-for-it))** |
 | GCR-23 | High | P1 | Initial Hugging Face download can overwrite a concurrent cancel with `complete` — **Closed 2026-09-05 ([FIXED-421](FIXED_ITEMS.md#fixed-421--a-cancellation-could-be-overwritten-by-the-worker-it-cancelled))** |
-| GCR-24 | Medium/High | P1 | Long model conversion is effectively non-cancellable during a subprocess that may run for hours |
+| ~~GCR-24~~ **closed (FIXED-555)** | Medium/High | P1 | Long model conversion is effectively non-cancellable during a subprocess that may run for hours |
 | GCR-25 | Medium/High | P1 | Durable model-operation rows are executed by in-process background tasks; no startup recovery wiring was identified in the reviewed lifespan — **Closed 2026-09-06 ([FIXED-437](FIXED_ITEMS.md#fixed-437--a-download-the-host-restarted-away-from-stayed-running-for-ever))** |
-| GCR-26 | Medium/High | P1 | Conversion source fingerprint hashes names and sizes, not file contents |
+| ~~GCR-26~~ **closed (FIXED-556)** | Medium/High | P1 | Conversion source fingerprint hashes names and sizes, not file contents |
 | GCR-27 | High | P1 | GGUF shard grouping can merge same-named shards from different directories — **Closed 2026-09-05 ([FIXED-424](FIXED_ITEMS.md#fixed-424--two-models-one-folder-apart-were-indexed-as-one))** |
 | GCR-28 | High | P1 | Managed llama.cpp/MLX runtime slot allocation and process maps are unsynchronized across concurrent deploys — **Closed 2026-09-06 ([FIXED-438](FIXED_ITEMS.md#fixed-438--two-deploys-at-once-could-take-the-same-slot-and-the-same-port))** |
 | GCR-29 | Medium | P2 | Managed llama.cpp custom-port launch can report the wrong endpoint — **Closed 2026-09-06 ([FIXED-439](FIXED_ITEMS.md#fixed-439--a-runtime-on-a-custom-port-reported-the-slots-declared-one))** |
@@ -253,6 +253,8 @@ The retry worker at least checks cancellation before and after the blocking down
 
 **Severity: Medium/High — Priority: P1 — Confidence: High**
 
+**Status: Closed 2026-09-16 — [FIXED-555](FIXED_ITEMS.md#fixed-555--cancel-on-a-conversion-could-go-unanswered-for-six-hours).** Each step runs under a managed `Popen` handle and is polled once a second; each container is given a name derived from the preview, so cancelling stops the container rather than only the client waiting on it, and a cleanup after a host restart can recompute the names. `ConversionCancelled` settles the operation as cancelled rather than failed. The isolation deadline gained its own reason code on the way, and the steps' unread output goes to `DEVNULL` instead of into pipes nothing drains.
+
 `_run_model_conversion()` checks cancellation immediately before and immediately after `service.convert(preview)`.
 
 `DockerConversionRunner.run()` performs two blocking `subprocess.run()` calls. `ConversionIsolation.timeout_seconds` is six hours, and there is no cancellation handle checked while either subprocess is executing.
@@ -282,6 +284,8 @@ This creates a durability mismatch: the UI can retain a durable `running`/`queue
 ## GCR-26 — Conversion source fingerprint does not fingerprint source bytes
 
 **Severity: Medium/High — Priority: P1 — Confidence: High**
+
+**Status: Closed 2026-09-16 — [FIXED-556](FIXED_ITEMS.md#fixed-556--a-source-fingerprint-that-did-not-hash-the-source).** Every included file's content is hashed, each file's own digest goes in rather than its bytes being streamed into one running hash, and every field is length-prefixed so two different trees cannot be rearranged into the same byte stream.
 
 `_source_fingerprint()` hashes:
 
@@ -723,9 +727,9 @@ The order below combines the new third-pass findings with the most important fir
 | 16 | GCR-39 per-task scheduler containment | P1 | Low-Medium | Catch/land failures per claimed task — **Closed** |
 | 17 | GCR-40 event dual-write recovery | P1 | Medium-High | Journal/reconcile or choose one authoritative store |
 | 18 | GCR-22 initial HF background execution | P1 | Medium | Use one durable worker for initial/retry — **Closed** |
-| 19 | GCR-24 cancellable conversion | P1 | Medium-High | Managed process/container handle + cancellation |
+| 19 | ~~GCR-24 cancellable conversion~~ **closed 2026-09-16 (FIXED-555)** | P1 | Medium-High | Managed process/container handle + cancellation |
 | 20 | GCR-25 durable operation runner/recovery | P1 | High | App-owned job leases/restart recovery |
-| 21 | GCR-26 content-valid provenance fingerprint | P1 | Medium | Hash source content/trusted file digests |
+| 21 | ~~GCR-26 content-valid provenance fingerprint~~ **closed 2026-09-16 (FIXED-556)** | P1 | Medium | Hash source content/trusted file digests |
 | 22 | GCR-41 reproducible dependency/tool inputs | P1/P2 | Medium | Hash-locked constraints + pinned build tools |
 | 23 | GCR-07 instance lifecycle manager | P1 | Medium-High | Parent-owned lifecycle for mounted instances |
 | 24 | GCR-09 instance registry/router serialization | P1 | Medium | Atomic registry + serialized route changes |

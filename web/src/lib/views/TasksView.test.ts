@@ -669,4 +669,35 @@ describe("TasksView blocked-on-approval pointer", () => {
     const link = await screen.findByRole("link", { name: "Nightly digest" });
     expect(link).toHaveAttribute("href", "#/tasks?task=task_1");
   });
+  // BUG-278 — the same composer grammar as asking a question.
+  //
+  // Task creation used to carry its own model picker, its own environment badge
+  // and its own capacity chip, in the layout it had before the shared shell
+  // existed — so a person who had learned the composer in Chat met a different
+  // arrangement of the same controls when they scheduled the same work.
+  // COMPOSER-10 rebuilt it on `Composer.svelte`; this is what stops it drifting
+  // back.
+  it("composes a task with the same controls Chat composes a question with", async () => {
+    stubFetch({
+      "GET /api/tasks": [],
+      "GET /api/approvals": [],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+    });
+    render(TasksView);
+
+    // One instruction, not a form.
+    await screen.findByLabelText("What should Raiker do?");
+    // The two menus every Work composer carries, under the names they carry
+    // everywhere else.
+    expect(screen.getByRole("button", { name: "Add to this turn" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tools" })).toBeInTheDocument();
+    // The one context line, rather than a separate environment badge and
+    // capacity chip of this surface's own.
+    expect(screen.getByRole("button", { name: /^Context for this turn:/ })).toBeInTheDocument();
+    // And the model control is the shared picker, not a select of its own.
+    expect(screen.getByRole("button", { name: /^Model for this turn:/ })).toBeInTheDocument();
+    // The one control planning needs that asking does not, collapsed until
+    // asked for — and still stating what was chosen while it is closed.
+    expect(screen.getByRole("button", { expanded: false, name: /Runs now/ })).toBeInTheDocument();
+  });
 });

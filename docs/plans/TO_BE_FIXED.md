@@ -1326,8 +1326,17 @@ returns for an edit or a set of variations has not been seen.
 
 ## BUG-278 — Two Work surfaces still keep their own composer
 
-**Severity: Low. Area: composer. Raised while implementing
+**Severity: Low. Area: composer. Status: Closed 2026-09-15 as
+[FIXED-540](FIXED_ITEMS.md#fixed-540--the-two-surfaces-that-kept-their-own-composer-had-stopped-keeping-it).
+Raised while implementing
 [COMPOSER-10 and COMPOSER-11](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md).**
+
+Closed by the work it was raised beside, and recorded late. COMPOSER-10 rebuilt
+task creation on `Composer.svelte`, and both surfaces this entry names — `tasks`
+and `schedule`, which the cadence chips switch between in the same form — have
+carried the shared `+` menu, Tools menu, context line and model picker since.
+What was missing was the assertion, which is now in `TasksView.test.ts`: a test
+that would fail if any of the four drifted back to a copy of its own.
 
 **Observed.** Chat, Build and Design share one composer shell, one Add menu, one
 Tools menu, one context line and one model control. Tasks and Schedule do not:

@@ -561,6 +561,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-537](#fixed-537--a-settings-page-nobody-could-reach-said-everything-stays-on-this-machine) | Low | Settings / storage | Fixed 2026-09-15 (closes REM-SET-STORAGE) |
 | [FIXED-538](#fixed-538--designs-research-findings-were-text-and-the-pages-behind-them-were-already-recorded) | Low | Design | Fixed 2026-09-15 (closes BUG-281) |
 | [FIXED-539](#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here) | Low | Runtime / environment context | Fixed 2026-09-15 (closes the clock half of BUG-280) |
+| [FIXED-540](#fixed-540--the-two-surfaces-that-kept-their-own-composer-had-stopped-keeping-it) | Low | Composer | Fixed 2026-09-15 (closes BUG-278) |
 
 ---
 
@@ -23869,4 +23870,43 @@ egress policy — re-verified on 2026-09-15 — so the tool answers
 `weather_provider_unavailable`. That is the correct typed answer to an
 unreachable provider and it is not evidence that a reachable one is read
 correctly. It needs a host with egress, not a change to Raiker.
+
+---
+
+## FIXED-540 — The two surfaces that kept their own composer had stopped keeping it
+
+**Severity: Low. Area: composer. Status: Fixed 2026-09-15. Closes
+[BUG-278](TO_BE_FIXED.md).**
+
+**Observed, when it was raised.** Chat, Build and Design shared one composer
+shell, one Add menu, one Tools menu, one context line and one model control.
+Tasks did not: task creation carried its own model picker, its own environment
+badge and its own capacity chip, in the layout it had before. The consequence is
+small and real, and it is the one the redesign exists to prevent — a person who
+has learned the composer in Chat meets a different arrangement of the same
+controls when they schedule the same work.
+
+**Why this is a late record rather than a change.** COMPOSER-10 rebuilt task
+creation on `Composer.svelte` while this entry was open, and both surfaces it
+names are the same form: `surface` is `schedule` when the cadence chips say
+*Once* or *Routine* and `tasks` otherwise, so one composer covers both. The
+proposed fix — *"Apply `Composer.svelte` with `+` and Tools to Tasks, and move
+the cadence and notification rules behind the primary action's own
+disclosure"* — is what shipped, and the timing control states what was chosen
+while it is closed, so hiding the details never hides the timing.
+
+What was missing was the **assertion**. A shared shell that nothing checks is a
+shared shell until the next surface-specific change, and this entry would have
+been re-raised rather than closed.
+
+**Fixed.** One case in `web/src/lib/views/TasksView.test.ts` asserts the grammar
+by the names every other surface uses: the **Add to this turn** menu, the
+**Tools** menu, the **Context for this turn** line, the **Model for this turn**
+picker, and the timing control collapsed but still naming the cadence. It fails
+if any of the four drifts back to a copy of its own.
+
+**Live.** The 2026-09-15 page catalogue shows it: `1080p-light-tasks.png` has
+`+ | Tools | Runs now | Chat · Local strict · 200K tokens` on the left and the
+model picker beside **Create task** on the right — the same row Chat draws, with
+the one control planning work needs that asking a question does not.
 

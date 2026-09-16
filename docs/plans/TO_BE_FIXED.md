@@ -106,18 +106,18 @@ names.
 | [BUG-283](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others) | Low | Web UI / information architecture | **Closed 2026-09-04 ([FIXED-394](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others))** — 244 words of explanation to the guide, one contract that was stated twice, and two tabs that were copies of other surfaces |
 | [BUG-284](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything) | Medium | Web UI / responsive layout | **Closed 2026-09-04 ([FIXED-395](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything))** — found by running the width sweep against a workspace that had been worked in; reproduced on unmodified `main` |
 | [BUG-285](#bug-285--an-ollama-cloud-model-tests-and-runs-in-ollama-but-chat-cannot-use-it) | Medium | Models / Ollama cloud chat | Open — raised 2026-09-08 during the provider restart round |
-| [BUG-289](#bug-289--a-hosted-provider-this-machine-cannot-reach-is-told-to-check-that-it-is-running) | Low | Models / provider errors | Open — raised 2026-09-13 while verifying [FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name) |
+| [BUG-289](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running) | Low | Models / provider errors | **Closed 2026-09-14 ([FIXED-526](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running))** — a hosted provider gets a remedy an owner can act on |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
-| [BUG-291](#bug-291--a-live-spec-asserts-a-refusal-that-a-working-key-will-never-produce) | Low | Live test harness | Open — raised 2026-09-13 running the RR-MCP-02 round with a key that works |
-| [BUG-292](#bug-292--a-live-spec-sends-a-turn-without-choosing-a-model-and-the-composer-is-right-to-refuse) | Low | Live test harness | Open — raised 2026-09-13; the product is correct and the spec skips the step |
-| [BUG-293](#bug-293--a-side-effect-capabilitys-threat-model-and-bypass-test-are-not-mechanically-required) | Medium | Governance / release assurance | Open — the remainder of RR-AUTHORITY-01 after [FIXED-505](FIXED_ITEMS.md#fixed-505--the-four-capabilities-that-reach-furthest-into-an-owners-accounts-explained-themselves-least) |
+| [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
+| [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
+| [BUG-293](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all) | Medium | Governance / release assurance | **Closed 2026-09-15 ([FIXED-542](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all))** — and it found `image_generation` with no gate at all |
 | [BUG-294](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace) | Medium | Threads / work index | **Closed 2026-09-14 ([FIXED-511](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace))** — raised and closed in the same run: the work index filters, facets over everything that matched, and pages |
-| [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — **a fifth round blocked on the same value, 2026-09-06**; confirmed in two requests again, and this host has no local runtime either. Raiker's half holds under a fifth key: the refusal reads as itself in the picker, not as *Provider unreachable*. The attempt found [FIXED-435](FIXED_ITEMS.md#fixed-435--the-models-page-said-a-gate-was-on-above-providers-it-would-refuse) |
+| [BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more) | Low | Live test harness / evidence | **Closed 2026-09-15 ([FIXED-541](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more))** — six rounds blocked on a key, then three stale selectors |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-04 to **twelve**; eight more converted and each re-run against a used workspace, three must keep their own |
 | [BUG-249](FIXED_ITEMS.md#fixed-326--a-fixed_items-link-pointed-at-a-heading-that-does-not-exist) | Low | Documentation / CI | **Closed 2026-08-30 (FIXED-326)** — one line, and `test_docs_consistency` is green |
-| [BUG-250](#bug-250--a-shared-live-workspace-carries-state-between-specs) | Low | Live test harness | Open — reduced 2026-09-04. Both halves of its proposal now exist: `requireFirstRunWorkspace` marks the four specs that need their own instance, and three re-runnability defects were found and fixed by running the round against one workspace |
+| [BUG-250](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject) | Low | Live test harness | **Closed 2026-09-15 ([FIXED-549](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject))** — `roundName()` gives each round its own subject |
 | [BUG-251](FIXED_ITEMS.md#fixed-352--every-path-an-owner-typed-was-a-path-they-had-to-know) | Medium | Web UI / file and folder selection | **Closed 2026-09-03 (FIXED-352)** — the host lists directory names and one `PathPicker` serves all four fields |
 | [BUG-252](FIXED_ITEMS.md#fixed-350--dropping-a-file-worked-in-one-place-and-was-ignored-in-four) | Low | Web UI / attachments | **Closed 2026-09-03 (FIXED-350)** — one drop target, on every surface that already accepted an upload |
 | [BUG-253](FIXED_ITEMS.md#fixed-353--reloading-the-page-signed-the-owner-out) | Medium | Authentication / web UI | **Closed 2026-09-03 (FIXED-353)** — an HttpOnly session cookie with a double-submit CSRF token and an origin check |
@@ -135,6 +135,14 @@ names.
 | [BUG-260, BUG-263, BUG-264](FIXED_ITEMS.md#fixed-358--choosing-among-four-hundred-models-was-a-dropdown-with-no-search) | High | Models / web UI | **Closed 2026-09-03 (FIXED-358)** — no dropdown; one picker with a search, on both surfaces |
 | [BUG-261, BUG-262](FIXED_ITEMS.md#fixed-359--first-run-could-detect-a-missing-runtime-and-not-offer-to-install-it) | Medium | Models / first run | **Closed 2026-09-03 (FIXED-359)** — install a runtime and choose a model without leaving first run |
 | [BUG-265](FIXED_ITEMS.md#fixed-360--a-policy-refusal-was-reported-as-a-wrong-password) | Medium | Authentication / web UI | **Closed 2026-09-03 (FIXED-360)** — "Authentication failed." for a one-owner-per-instance refusal |
+| [BUG-295](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 (FIXED-534)** |
+| [BUG-296](FIXED_ITEMS.md#fixed-527--an-outage-raiker-had-already-reported-also-reported-itself-to-the-console) | Low | Models / Hugging Face | **Closed 2026-09-14 (FIXED-527)** |
+| [BUG-297](FIXED_ITEMS.md#fixed-524--three-authority-gates-decided-their-own-capability-by-default-rather-than-by-classification) | Low | Governance / Permissions | **Closed 2026-09-14 (FIXED-524)** |
+| [BUG-298](FIXED_ITEMS.md#fixed-543--a-routed-gate-nothing-could-propose) | Low | Governance / policy | **Closed 2026-09-15 (FIXED-543)** |
+| [BUG-299](FIXED_ITEMS.md#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read) | Medium | Tasks | **Closed 2026-09-15 (FIXED-535)** |
+| [BUG-300](FIXED_ITEMS.md#fixed-551--a-declared-table-was-a-table-in-the-conversation-and-json-everywhere-else) | Low | Chat / typed output / export | **Closed 2026-09-16 (FIXED-551)** — and running it live found [FIXED-550](FIXED_ITEMS.md#fixed-550--a-turn-that-wrote-anything-before-calling-a-tool-stored-a-different-answer-than-it-showed), which is wider than this row |
+| [BUG-301](#bug-301--the-guides-own-cross-references-are-not-links) | Low | Guide / web UI | Open — raised 2026-09-16 while closing REM-GUIDE |
+| [BUG-302](#bug-302--four-audit-summaries-quote-the-whole-answer-including-a-payload) | Low | Observability / audit summaries | Open — raised 2026-09-16 while capturing FIXED-551's evidence |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (18 complete, 2 partial; B14 closed 2026-09-04 as [FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one), B10 2026-09-03 as FIXED-366, B13 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, B16 by BUG-206 slice D. B15 and B20 remain partial on [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution)) |
 | VIS | — | Visual / information hierarchy | **Complete.** 24 findings; the document was removed 2026-09-15 when its last implementation item closed |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (16 complete, 1 partial, 1 open; C15 closed by C1/C4, C11 2026-09-03 as FIXED-367, C18 as FIXED-368, C17 2026-08-29 as FIXED-311. C10 is partial — the notification half ships as [FIXED-374](FIXED_ITEMS.md#fixed-374--a-routine-ran-all-night-and-told-nobody); C12 stays an architecture decision) |
@@ -220,11 +228,18 @@ catalogue of what the visual vocabulary contains is
 [`VISUAL_DESIGN_SPEC.md`](../architecture/VISUAL_DESIGN_SPEC.md), which is a
 specification rather than a review and stays.
 
-**Still open in the third-pass document, in its own priority order:** GCR-24 and
-GCR-26 (P1), then GCR-32, GCR-34, GCR-35, GCR-36, GCR-37, GCR-41, GCR-42,
-GCR-43, GCR-44 and GCR-47 (P2). GCR-24 — a conversion that cannot be cancelled
-while its subprocess runs, for up to six hours — is the largest remaining piece
-of owner-visible work in that set.
+**Both remaining P1 entries closed 2026-09-16:** GCR-24 as
+[FIXED-555](FIXED_ITEMS.md#fixed-555--cancel-on-a-conversion-could-go-unanswered-for-six-hours)
+— a conversion that could not be cancelled while its subprocess ran, for up to
+six hours, and was the largest remaining piece of owner-visible work in that set
+— and GCR-26 as
+[FIXED-556](FIXED_ITEMS.md#fixed-556--a-source-fingerprint-that-did-not-hash-the-source),
+which hashed a file's path and length and called the result a content
+fingerprint.
+
+**Still open in the third-pass document, in its own priority order:** GCR-32,
+GCR-34, GCR-35, GCR-36, GCR-37, GCR-41, GCR-42, GCR-43, GCR-44 and GCR-47, all
+P2.
 
 ---
 
@@ -1859,36 +1874,88 @@ Home and in Build link to it.
 
 ## BUG-300 — A typed answer is typed in Chat and Build, and is characters everywhere else
 
-**Severity: Low. Area: Chat / typed output / export. Raised 2026-09-15 while
-closing [BUG-288](#bug-288--a-turn-can-only-answer-in-prose-and-the-components-to-answer-otherwise-already-exist).**
+**Closed 2026-09-16 as
+[FIXED-551](FIXED_ITEMS.md#fixed-551--a-declared-table-was-a-table-in-the-conversation-and-json-everywhere-else).**
 
-**Observed.** `AgentResponse.content_parts` reaches the two surfaces that render
-a live turn. Three places read the answer as one string and still do:
+Four media, four answers, as the entry said it needed: a real `<table>` in an
+HTML export, a GFM table in a Markdown one, a page-width Courier table in a PDF,
+and — for read aloud — *"Table: Cost by provider. 2 columns, 3 rows."* rather
+than a payload read out. A chart is exported as the numbers behind it in all
+three files. A reopened turn carries parts derived server-side by the same
+splitter, so Threads, the Sessions inspector and a reloaded conversation cannot
+produce a different reading of one answer.
 
-* **Export conversation** (`TranscriptExportMessage` carries `role`, `text`,
-  `timestamp`, `status`). An exported HTML, Markdown or PDF transcript of a turn
-  that declared a table shows the raw ` ```raiker:table ` fence with its JSON,
-  which is honest — the fence is what the model wrote — and is not the table the
-  owner was looking at when they pressed Export.
-* **Threads and Observability → Sessions**, which reopen a stored turn from the
-  event log rather than from a live response.
-* **Read aloud**, which speaks the answer text and would read a JSON payload
-  aloud rather than skipping it the way it already skips fenced-code bodies.
+**Running it live found the reason it had nothing to render.** The model
+declared its table in the round *before* it called `update_plan`, and
+`final_text` only ever kept the last round's text — so every turn that narrated
+its work stored a different answer than it showed.
+[FIXED-550](FIXED_ITEMS.md#fixed-550--a-turn-that-wrote-anything-before-calling-a-tool-stored-a-different-answer-than-it-showed)
+is that fix, and it is wider than this entry: it is why a reopened conversation
+had been losing paragraphs all along.
 
-**Root cause.** The channel was built where a turn is produced. `content_parts`
-is derived in `AgentResponse.__post_init__`, so every response carries it — but
-the three paths above do not read a response, they read a persisted message.
+---
 
-**Why it is filed rather than fixed.** The splitter is pure and deterministic
-(`content_parts(message)`), so each of the three can obtain the parts from the
-text it already holds, and none of them needs a schema change. What each needs is
-its own decision about what a *table* means in its own medium: a real `<table>`
-in an HTML export, a GFM table in a Markdown one, a page-width table in a PDF,
-and — for read aloud — a stated summary rather than a payload. Those are four
-different answers, and doing them as one change would give the same answer to
-four different questions.
+## BUG-301 — The guide's own cross-references are not links
 
-**Interface outcome that has to be true before this closes.** An exported
-conversation shows a table where the conversation showed a table, a reopened
-thread does the same, and read aloud says what a declared block was rather than
-reading it out.
+**Severity: Low. Area: Guide / web UI. Raised 2026-09-16 while closing
+REM-GUIDE.**
+
+**Observed.** `docs/guide/working-in-build.md` refers to the *Connecting a
+model* chapter as an ordinary Markdown link to `connecting-a-model.md`, and the
+Guide page renders that source literally — square brackets, parentheses and all.
+Every chapter-to-chapter reference in the guide reads as broken punctuation to an
+owner, and the guide is the one place the product now points to instead of
+explaining itself on the page
+([FIXED-554](FIXED_ITEMS.md#fixed-554--the-product-shipped-a-guide-chapter-about-build-and-could-not-open-it)),
+so its internal navigation matters more than it did.
+
+**Root cause, and it is a boundary rather than a bug.** `renderMarkdown` accepts
+`http(s):` and `mailto:` and downgrades everything else to plain text. That rule
+exists because the same renderer draws model-authored answers, where a link is
+untrusted input; relaxing it for every caller would be the wrong trade for the
+sake of a documentation link.
+
+**Proposed fix.** Resolve the reference at the guide layer, where the content is
+the product's own and the slug set is known: rewrite `](<slug>.md)` to the
+`#/guide?section=<slug>` address the page already uses, and let the renderer
+accept an in-app hash href only when the caller opts in. An in-app link must not
+carry `target="_blank"` — the guide opening itself in a second tab is a different
+defect. The opt-in is what keeps a model-authored answer exactly where it is.
+
+**Interface outcome that has to be true before this closes.** A reference from
+one guide chapter to another is a link that opens that chapter in place, and a
+model-authored answer still cannot produce a link the renderer would not have
+made before.
+
+---
+
+## BUG-302 — Four audit summaries quote the whole answer, including a payload
+
+**Severity: Low. Area: Observability / audit summaries. Raised 2026-09-16 while
+capturing the evidence for
+[FIXED-551](FIXED_ITEMS.md#fixed-551--a-declared-table-was-a-table-in-the-conversation-and-json-everywhere-else).**
+
+**Observed.** In the Sessions turn inspector, `Task completed`, `Turn closed`,
+`Checkpoint created` and `Response created` each carry the first 200 characters
+of the answer as their summary. For a turn that declared a table, all four are
+the same JSON payload, four times, under a rendered table that says the same
+thing legibly.
+
+`sessions-reopened-typed-answer.png` is the evidence: four near-identical rows of
+`raiker:table {"caption": "City Populations", "columns": …` in a list whose job
+is to say what happened, in order.
+
+**Why it is filed rather than fixed.** The summary being the raw record is
+*correct* — an audit summary is what the runtime saw, verbatim, and a fence
+rendered as a table in the evidence log would be the log editing itself. What is
+wrong is that four different events describe themselves with the same borrowed
+sentence instead of saying what each one did. That is a decision about what each
+event's summary should be, not a rendering change, and it touches the event
+vocabulary.
+
+**Interface outcome that has to be true before this closes.** An event's summary
+says what that event did. Where the answer text is genuinely the evidence, one
+event carries it rather than four.
+
+---
+

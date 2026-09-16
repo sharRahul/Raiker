@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AnswerParts from "../components/AnswerParts.svelte";
   import Badge from "../components/Badge.svelte";
   import { rowTokens, sessionCandidates } from "../rowTokens";
   import EmptyState from "../components/EmptyState.svelte";
@@ -517,7 +518,21 @@
             <p class="prompt-text">{turnDetail.turn.prompt_text}</p>
           {/if}
           {#if turnDetail.turn.summary}
-            <p class="sub">{turnDetail.turn.summary}</p>
+            <!-- BUG-300 — Sessions reopens a stored turn rather than a live
+                 response, so it used to print the raw `raiker:table` fence and
+                 its JSON where the conversation had shown a table. The parts
+                 arrive already split by the runtime, so the inspector shows the
+                 answer the conversation showed. -->
+            {#if (turnDetail.turn.content_parts ?? []).length > 0}
+              <div class="answer">
+                <AnswerParts
+                  text={turnDetail.turn.summary}
+                  parts={turnDetail.turn.content_parts}
+                />
+              </div>
+            {:else}
+              <p class="sub">{turnDetail.turn.summary}</p>
+            {/if}
           {/if}
           <h4 class="kicker">Governed events</h4>
           {#if turnDetail.events.length === 0}
@@ -780,6 +795,14 @@
     border-radius: var(--r-sm);
     padding: 0.5rem 0.7rem;
     font-size: var(--text-md);
+  }
+  /* The declared answer, given the room a table needs. Sessions is an evidence
+     inspector, so this is deliberately the same rendering the conversation
+     used — two readings of one answer is the defect, not the feature. */
+  .answer {
+    font-size: var(--text-md);
+    color: var(--text-2);
+    overflow-x: auto;
   }
   .events {
     list-style: none;

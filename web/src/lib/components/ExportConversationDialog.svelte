@@ -139,6 +139,15 @@
         <ul class="facts">
           <li><strong>{manifest.message_count}</strong> messages</li>
           <li><strong>{manifest.file_count}</strong> attached files</li>
+          {#if (manifest.typed_part_count ?? 0) > 0}
+            <!-- BUG-300 — an answer that declared a table is exported as a
+                 table. Saying so here is the difference between the owner
+                 knowing that and discovering it from the file. -->
+            <li>
+              <strong>{manifest.typed_part_count}</strong>
+              {manifest.typed_part_count === 1 ? "table or chart" : "tables and charts"}
+            </li>
+          {/if}
           <li class="title-fact">Titled <strong>{manifest.title}</strong></li>
         </ul>
         {#if manifest.files.length > 0}

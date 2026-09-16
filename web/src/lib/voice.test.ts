@@ -221,6 +221,53 @@ it("speaks answer text without markdown syntax, raw URLs, citations or code bodi
     .toBe("See the guide. Code block.");
 });
 
+// ── BUG-300 — a declared block is said, not read out ─────────────────────────
+//
+// The typed channel let a turn declare that a section of its answer *is* a
+// table. Read aloud matched the generic fence rule and said "Code block.", so a
+// listener was told a section of prose existed where a table did — and a
+// splitter-less fix would have read the JSON payload aloud, which is worse: a
+// listener cannot skim past it.
+
+it("says what a declared table was, with its caption and its shape", () => {
+  const answer =
+    'Spending so far.\n\n```raiker:table\n{"caption":"Cost by provider",' +
+    '"columns":["Provider","Spend"],"rows":[["Anthropic","4.10"],["Ollama","0.00"]]}\n```\n';
+  expect(speechText(answer)).toBe(
+    "Spending so far. Table: Cost by provider. 2 columns, 2 rows.",
+  );
+});
+
+it("names a declared table with no caption by its shape alone", () => {
+  const answer = '```raiker:table\n{"columns":["a"],"rows":[["x"]]}\n```';
+  expect(speechText(answer)).toBe("A table of 1 column, 1 row.");
+});
+
+it("names a declared chart by its kind, caption and series", () => {
+  const answer =
+    '```raiker:chart\n{"kind":"line","caption":"Spend by week",' +
+    '"labels":["W1","W2"],"series":[{"name":"Anthropic","values":[1,2]}]}\n```';
+  expect(speechText(answer)).toBe("Line chart: Spend by week. 1 series over 2 points.");
+});
+
+it("never reads a declared payload aloud", () => {
+  const answer =
+    '```raiker:table\n{"columns":["Key"],"rows":[["sk-ant-secret"]]}\n```';
+  const spoken = speechText(answer);
+  expect(spoken).not.toContain("sk-ant-secret");
+  expect(spoken).not.toContain("{");
+});
+
+it("says a declared block Raiker refused was not rendered", () => {
+  expect(speechText("```raiker:table\nnot json at all\n```")).toBe(
+    "A table Raiker did not render.",
+  );
+});
+
+it("leaves an ordinary code block as a code block", () => {
+  expect(speechText("Look:\n```ts\nconst x = 1\n```")).toBe("Look: Code block.");
+});
+
 // ── BUG-256 — dictation that runs on this machine ────────────────────────────
 
 describe("on-device transcription", () => {

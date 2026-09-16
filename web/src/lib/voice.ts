@@ -356,8 +356,60 @@ export function inputModeForDraft(state: {
   return state.typedBefore || state.editedAfter ? "mixed" : "dictated";
 }
 
+/**
+ * A declared table or chart, as a sentence rather than as its payload (BUG-300).
+ *
+ * The typed channel (BUG-288) let a turn declare that a section of its answer
+ * *is* a table. Read aloud had no idea: the fence matched the generic
+ * code-block rule and a table became the words "Code block." — which is a
+ * different answer from the one on screen, and a reader relying on speech was
+ * told a section of prose existed where a table did.
+ *
+ * It says what the block was and how big it is, and never reads the payload.
+ * Speaking a JSON object aloud would be worse than saying nothing: a listener
+ * cannot skim past it.
+ */
+const _DECLARED_FENCE = /^[ \t]*```[ \t]*raiker:(table|chart)[ \t]*\n([\s\S]*?)\n[ \t]*```[ \t]*$/gm;
+
+function _count(value: number, noun: string): string {
+  return `${value} ${noun}${value === 1 ? "" : "s"}`;
+}
+
+function declaredBlockSentence(kind: string, body: string): string {
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(body) as Record<string, unknown>;
+  } catch {
+    // The runtime refused this block and the page shows it as not rendered.
+    // Speech says the same thing rather than inventing a shape for it.
+    return ` A ${kind} Raiker did not render. `;
+  }
+  const caption = typeof payload.caption === "string" ? payload.caption.trim() : "";
+  const lead = caption ? `${caption}.` : "";
+  if (kind === "table") {
+    const columns = Array.isArray(payload.columns) ? payload.columns.length : 0;
+    const rows = Array.isArray(payload.rows) ? payload.rows.length : 0;
+    const shape = `${_count(columns, "column")}, ${_count(rows, "row")}`;
+    return caption ? ` Table: ${lead} ${shape}. ` : ` A table of ${shape}. `;
+  }
+  const kindWord =
+    payload.kind === "line" ? "Line chart" : payload.kind === "area" ? "Area chart" : "Bar chart";
+  const series = Array.isArray(payload.series) ? payload.series.length : 0;
+  const points = Array.isArray(payload.labels) ? payload.labels.length : 0;
+  // "series" is its own plural, so it does not go through `_count`.
+  const shape = `${series} series over ${_count(points, "point")}`;
+  return caption
+    ? ` ${kindWord}: ${lead} ${shape}. `
+    : ` A ${kindWord.toLowerCase()} of ${shape}. `;
+}
+
 export function speechText(markdown: string): string {
   return markdown
+    // Before the generic rule below, which would otherwise swallow a declared
+    // block as an ordinary fence and call a table "Code block."
+    .replace(_DECLARED_FENCE, (_match, kind: string, body: string) =>
+      declaredBlockSentence(kind, body),
+    )
     .replace(/```[\s\S]*?```/g, " Code block. ")
     .replace(/`([^`]+)`/g, "$1")
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")

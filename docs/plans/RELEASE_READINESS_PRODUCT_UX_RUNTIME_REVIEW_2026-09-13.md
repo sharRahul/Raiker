@@ -2590,6 +2590,22 @@ No recommendation authorizes removal of authentication, step-up, approvals, effe
 
 ## 18.3 Page-by-page removal decisions
 
+> **Implementation status, 2026-09-16.** Three more P2 rows closed, each struck
+> through in place with its `FIXED_ITEMS.md` entry: **REM-MAP-02**,
+> **REM-MAP-04** and **REM-GUIDE**. All three were driven live against a running
+> host with a real Anthropic key, and the round ended with zero uncaught console
+> errors — see [`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md).
+>
+> REM-GUIDE's trade — remove the inline chapter, keep one contextual link — only
+> works where the link exists, and two destinations had none. Build was the one
+> that mattered: the product shipped `working-in-build.md` and could not open it.
+> Two assertions now hold the invariant rather than a habit.
+>
+> Two defects were found while closing them and are filed in
+> [`TO_BE_FIXED.md`](TO_BE_FIXED.md): the guide's own chapter-to-chapter links
+> render as literal text (BUG-301), and four audit summaries quote the same
+> answer text instead of saying what each event did (BUG-302).
+
 All rows are proposed. Priorities P1/P2 indicate relative product/correctness importance; effort S/M/L is a planning estimate, not a delivery promise. Complete the more specific tests in section 18.5 as dependencies. Within a priority, do lower-effort work first unless a shared contract must land first.
 
 > **Implementation status, 2026-09-14 (second entry, evening).** A third pass
@@ -2735,9 +2751,9 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 | ~~REM-MEM-02~~ **closed** — [FIXED-518](FIXED_ITEMS.md#fixed-518--last-used-collapsed-five-events-into-one-word) | Remove ambiguous “age” or “used” claims that collapse separate timestamps/events. | Created, verified, included in context, cited and expires are distinct; retrieval is not proof the model relied on a fact. | Extend existing usage data rather than duplicating counters. Show meaningful labels and source turns; treat pinned stale facts as review candidates, not immortal truth. |
 | REM-MEM-03 / P2 / M | Move embedding/backend controls from personal review into engine settings; merge source administration with Map. | Memory owns approved facts/retention, Map explains relationships, and one source controller owns scope/indexing. | Keep recall health and repair link in Memory; share add/revoke/import flows. Verify revocation/tombstones suppress recall and graph output without deleting original external files. |
 | ~~REM-MAP-01~~ **closed** — [FIXED-530](FIXED_ITEMS.md#fixed-530--the-routing-tab-opened-on-five-force-simulation-constants) | Move Groups/Display/Forces/Motion from all-open panels into advanced display settings. | BrainView opens five settings disclosures simultaneously; force constants are visualization tuning, not knowledge management. | Default to search, filters, Fit and selected record; preserve advanced preferences. Keep reduced-motion behavior and test keyboard graph navigation. |
-| REM-MAP-02 / P2 / M | Replace synthetic starter graph nodes with a clear empty state and optional labelled illustration. | Existing nodes are flagged is_real:false and Starter view, so they are not covert fabricated records. Removing their selectable record-like behavior reduces confusion. | Offer Add source and Open Memory; exclude instructional objects from counts, search, provenance, export and selection actions. Verify truly empty versus filtered-empty states. |
+| ~~REM-MAP-02~~ **closed** — [FIXED-552](FIXED_ITEMS.md#fixed-552--a-brand-new-knowledge-map-was-given-three-records-nobody-had-made) | Replace synthetic starter graph nodes with a clear empty state and optional labelled illustration. | Existing nodes are flagged is_real:false and Starter view, so they are not covert fabricated records. Removing their selectable record-like behavior reduces confusion. | Offer Add source and Open Memory; exclude instructional objects from counts, search, provenance, export and selection actions. Verify truly empty versus filtered-empty states. |
 | ~~REM-MAP-03~~ **closed** — [FIXED-507](FIXED_ITEMS.md#fixed-507--a-stale-knowledge-graph-called-itself-live-and-a-failed-refresh-erased-it), [FIXED-508](FIXED_ITEMS.md#fixed-508--the-folder-an-owner-added-was-not-always-the-folder-they-reviewed) | Replace stale “Live workspace graph” and overlapping source-review state. | See NEW-MAP-01/02; these are correctness changes, not cosmetic simplification. | Timestamp actual successful data, discard outdated requests, snapshot reviewed source identity and show stale/error state. Test slow responses, changing source and closing the dialog. |
-| REM-MAP-04 / P2 / M | Move visualization-only animation away from the default knowledge-review experience; provide a list/relationship-table alternative. | Motion and graph geometry should not be prerequisites for finding provenance or rejecting a link. | Respect reduced motion; expose the same authorized records/actions in a virtualized list. Preserve relationship evidence and rejection history. |
+| ~~REM-MAP-04~~ **closed** — [FIXED-553](FIXED_ITEMS.md#fixed-553--reading-the-knowledge-map-required-reading-a-moving-picture) | Move visualization-only animation away from the default knowledge-review experience; provide a list/relationship-table alternative. | Motion and graph geometry should not be prerequisites for finding provenance or rejecting a link. | Respect reduced motion; expose the same authorized records/actions in a virtualized list. Preserve relationship evidence and rejection history. |
 
 ### Messaging, MCP and Extensions
 
@@ -2783,7 +2799,7 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 | ~~REM-ACTIVITY~~ **closed** — [FIXED-546](FIXED_ITEMS.md#fixed-546--four-pages-that-explained-themselves-before-they-did-anything) / P2 / S | Move raw event filters/export forms into an advanced toolbar. | Everyday audit questions should open a filtered timeline from the relevant task. | Keep complete redacted exports, chain/provenance verification and retention controls; test filters and export completeness. |
 | ~~REM-CHECKPOINT~~ **closed** — verified in source 2026-09-14, no change needed | Remove equal prominence of restore beside ordinary inspection. | Restore changes real files and must remain a deliberate action after an impact preview. | Keep browse/diff primary, restore in explicit action with fresh authority and compatibility checks. Verify managed/attached paths and partial failures. |
 | REM-LIVE / P2 / M | Move animated Workstations out of the default operational dashboard. | WorkInActionView's characters reflect records, but duplicate Tasks/Threads progress. Keep it optional rather than deleting delegation support. | Use shared run state and reduced motion; no synthetic work or invented progress. Provide direct task links and a nonanimated equivalent. |
-| REM-GUIDE / P2 / S | Remove duplicated inline manual chapters; keep one contextual help link and short essential warnings. | GuideView remains the canonical explanation of how features work. | Preserve searchable guide/deep links and update it with canonical vocabulary; decision-critical consequences remain on the action screen. |
+| ~~REM-GUIDE~~ **closed** — [FIXED-554](FIXED_ITEMS.md#fixed-554--the-product-shipped-a-guide-chapter-about-build-and-could-not-open-it) | Remove duplicated inline manual chapters; keep one contextual help link and short essential warnings. | GuideView remains the canonical explanation of how features work. | Preserve searchable guide/deep links and update it with canonical vocabulary; decision-critical consequences remain on the action screen. |
 
 ## 18.4 What should not be removed
 

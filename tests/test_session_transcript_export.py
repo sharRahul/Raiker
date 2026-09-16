@@ -18,6 +18,7 @@ from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id
 from raiker.sessions.transcript import (
     REDACTION_POLICY,
+    Transcript,
     build_transcript,
     render_html,
     render_markdown,
@@ -334,3 +335,178 @@ class TestExportApi:
         raw = (workspace / ".raiker" / "events" / f"{session_id}.jsonl").read_text("utf-8")
         assert "session_transcript_exported" in raw
         assert "Secret plan text" not in raw
+
+
+class TestDeclaredPartsAreExportedAsWhatTheyAre:
+    """BUG-300 — an export of a turn that declared a table shows a table.
+
+    The defect was not that the export was wrong; it was that it was *right
+    about the wrong thing*. ``AgentResponse.content_parts`` reaches the two
+    surfaces that render a live turn, and the export read the stored answer as
+    one string — so a turn that declared a table exported as the raw
+    ``raiker:table`` fence and its JSON, which is honest about what the model
+    wrote and is not what the owner was looking at when they pressed Export.
+
+    Each format gets its own assertion because each had its own decision to
+    make, and giving three media one answer would have been the shortcut the
+    finding warned about.
+    """
+
+    ANSWER = (
+        "Here is the spend.\n\n"
+        "```raiker:table\n"
+        '{"caption": "Cost by provider", "columns": ["Provider", "Spend"],\n'
+        ' "rows": [["Anthropic", "$4.10"], ["Ollama", "$0.00"]]}\n'
+        "```\n\n"
+        "And the trend.\n\n"
+        "```raiker:chart\n"
+        '{"kind": "bar", "caption": "Spend by week", "y_label": "Week",\n'
+        ' "labels": ["W1", "W2"], "series": [{"name": "Anthropic", "values": [1.5, 2.0]}]}\n'
+        "```\n"
+    )
+
+    def _transcript(self, answer: str = ANSWER) -> Transcript:
+        return build_transcript(
+            session_id="sess_parts",
+            title="Quarterly plan",
+            created_at=None,
+            turns=[
+                {
+                    "turn_id": "turn_1",
+                    "prompt_text": "How much did we spend?",
+                    "summary": answer,
+                    "created_at": "2026-09-15T10:00:00Z",
+                    "completed_at": "2026-09-15T10:00:05Z",
+                    "status": "completed",
+                }
+            ],
+        )
+
+    def test_html_gets_a_real_table_rather_than_the_fence(self) -> None:
+        html = render_html(self._transcript())
+        assert "raiker:table" not in html
+        assert "<caption>Cost by provider</caption>" in html
+        assert '<th scope="col">Provider</th>' in html
+        assert "<td>Anthropic</td>" in html
+
+    def test_markdown_gets_a_gfm_table(self) -> None:
+        markdown = render_markdown(self._transcript())
+        assert "raiker:table" not in markdown
+        assert "| Provider | Spend |" in markdown
+        assert "| Anthropic | $4.10 |" in markdown
+
+    def test_a_chart_is_exported_as_the_numbers_behind_it(self) -> None:
+        markdown = render_markdown(self._transcript())
+        assert "**Bar chart — Spend by week**" in markdown
+        assert "| Week | Anthropic |" in markdown
+        assert "| W1 | 1.5 |" in markdown
+        # An integer-valued point does not acquire a ".0" on the way out.
+        assert "| W2 | 2 |" in markdown
+
+    def test_the_pdf_lays_a_table_out_to_the_page_width(self) -> None:
+        pdf = render_pdf(self._transcript())
+        assert pdf.startswith(b"%PDF-1.4")
+        # Courier and Courier-Bold are base-14, so a table still embeds nothing.
+        assert b"/BaseFont /Courier" in pdf
+        assert b"/BaseFont /Courier-Bold" in pdf
+        assert b"raiker:table" not in pdf
+
+    def test_a_cell_cannot_break_out_of_its_markdown_row(self) -> None:
+        answer = (
+            "```raiker:table\n"
+            '{"columns": ["Name"], "rows": [["a | b"], ["c\\nd"]]}\n'
+            "```\n"
+        )
+        markdown = render_markdown(self._transcript(answer))
+        assert "| a \\| b |" in markdown
+        assert "| c d |" in markdown
+
+    def test_a_refused_block_is_exported_as_a_refusal_not_dropped(self) -> None:
+        answer = '```raiker:table\n{"columns": ["a"], "rows": [["x", "y"]]}\n```\n'
+        transcript = self._transcript(answer)
+        assert transcript.typed_part_count == 0
+        for rendered in (render_markdown(transcript), render_html(transcript)):
+            assert "did not accept one declared part" in rendered
+
+    def test_an_ordinary_answer_declares_nothing_and_renders_as_it_always_did(self) -> None:
+        transcript = self._transcript("Just prose, with a **bold** word.")
+        assert transcript.typed_part_count == 0
+        assert transcript.messages[1].parts == ()
+        assert "Just prose, with a **bold** word." in render_markdown(transcript)
+
+    def test_the_review_says_how_many_tables_and_charts_will_be_rendered(self) -> None:
+        manifest = self._transcript().manifest()
+        assert manifest["typed_part_count"] == 2
+        assert "Tables and charts" in manifest["redaction_policy"]
+
+    def test_a_secret_in_a_cell_is_redacted_before_the_cell_becomes_a_cell(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        """Redaction runs over the answer, and the split runs over the result.
+
+        The order is the assertion: a key pasted into a table cell must not
+        survive by virtue of being inside a JSON payload rather than in prose.
+        """
+        headers, principal = _session(client)
+        answer = (
+            "```raiker:table\n"
+            '{"columns": ["Key"], "rows": [["sk-ant-api03-'
+            + "A" * 80
+            + '"]]}\n```\n'
+        )
+        session_id = _seed_conversation(workspace, principal, "Show the key", answer)
+        body = client.get(
+            f"/api/sessions/{session_id}/export/manifest", headers=headers
+        ).json()
+        assert "sk-ant-api03-" not in str(body)
+        rendered = client.post(
+            f"/api/sessions/{session_id}/export", headers=headers, json={"format": "markdown"}
+        ).text
+        assert "sk-ant-api03-" not in rendered
+        assert "REDACTED" in rendered
+
+
+class TestAReopenedTurnCarriesItsDeclaredParts:
+    """BUG-300 — the two surfaces that read the record, over the real routes.
+
+    The unit tests above prove the split; these prove it reaches the payloads
+    the browser actually reads, because the defect was never in the splitter —
+    it was that the read paths never called it.
+    """
+
+    ANSWER = (
+        "Spending so far.\n\n"
+        "```raiker:table\n"
+        '{"caption": "Cost by provider", "columns": ["Provider", "Spend"],\n'
+        ' "rows": [["Anthropic", "$4.10"]]}\n'
+        "```\n"
+    )
+
+    def test_the_session_detail_a_reload_reads_carries_the_parts(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        headers, principal = _session(client)
+        session_id = _seed_conversation(workspace, principal, "How much?", self.ANSWER)
+        turns = client.get(f"/api/sessions/{session_id}", headers=headers).json()["turns"]
+        parts = turns[0]["content_parts"]
+        assert [part["type"] for part in parts] == ["text", "table"]
+        assert parts[1]["data"]["rows"] == [["Anthropic", "$4.10"]]
+
+    def test_the_turn_inspector_carries_the_parts(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        headers, principal = _session(client)
+        session_id = _seed_conversation(workspace, principal, "How much?", self.ANSWER)
+        turn_id = client.get(f"/api/sessions/{session_id}", headers=headers).json()["turns"][0][
+            "turn_id"
+        ]
+        detail = client.get(f"/api/turns/{turn_id}", headers=headers).json()
+        assert [part["type"] for part in detail["turn"]["content_parts"]] == ["text", "table"]
+
+    def test_an_ordinary_turn_carries_an_empty_list(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        headers, principal = _session(client)
+        session_id = _seed_conversation(workspace, principal, "Hello", "A plain answer.")
+        turns = client.get(f"/api/sessions/{session_id}", headers=headers).json()["turns"]
+        assert turns[0]["content_parts"] == []

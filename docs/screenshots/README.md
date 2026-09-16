@@ -102,3 +102,18 @@ That live-test step ran. `pages/` now holds the full sweep — every destination
 It caught a real defect on its first run, which is the argument for having it: a notification strip that had been placed above the routed page pushed Build's composer 385px below the bottom edge at 390×844, because Chat, Build and Design size themselves to `--content-h`. The strip is docked now and takes no part in any page's height.
 
 **Only one generator writes here.** `all-pages-live.spec.ts` used to write a page catalogue into `docs/plans/screenshots/pages/` — the tree this file and `docs/plans/README.md` both describe as *historical*. Two trees each claimed to be the catalogue, the historical one was the one being kept current, and this one was empty. That sweep writes its captures to the run's own `output/` directory now, where evidence about one execution belongs.
+
+## 2026-09-16 — five targeted captures
+
+Written by `web/e2e/round-2026-09-16-typed-export-and-map-live.spec.ts` against a
+running host with a real Anthropic key, on a workspace reset for the round. The
+round record is in
+[`../plans/LIVE_TEST_ROUNDS.md`](../plans/LIVE_TEST_ROUNDS.md).
+
+| Capture | What it is evidence for |
+|---|---|
+| `export-review-declared-parts.png` | The export review naming the tables and charts the file will carry, before a format is chosen ([FIXED-551](../plans/FIXED_ITEMS.md#fixed-551--a-declared-table-was-a-table-in-the-conversation-and-json-everywhere-else)) |
+| `sessions-reopened-typed-answer.png` | A turn reopened from the record rendering its declared table as a table — and the governed events beneath it still quoting the raw record, which is [BUG-302](../plans/TO_BE_FIXED.md#bug-302--four-audit-summaries-quote-the-whole-answer-including-a-payload) |
+| `knowledge-map-empty-state.png` | A map with nothing in it saying so, instead of three placeholder records ([FIXED-552](../plans/FIXED_ITEMS.md#fixed-552--a-brand-new-knowledge-map-was-given-three-records-nobody-had-made)) |
+| `knowledge-map-list-view.png` | The same records as a list, with the canvas hidden and the simulation stopped ([FIXED-553](../plans/FIXED_ITEMS.md#fixed-553--reading-the-knowledge-map-required-reading-a-moving-picture)) |
+| `guide-working-in-build.png` | Build opening the chapter the product had been shipping and could not reach — and, visible in the prose, [BUG-301](../plans/TO_BE_FIXED.md#bug-301--the-guides-own-cross-references-are-not-links) |

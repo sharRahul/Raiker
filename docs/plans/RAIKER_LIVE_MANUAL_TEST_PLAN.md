@@ -415,7 +415,9 @@ under **Generated documents**, **MUST** be previewable, and **MUST** download.
 3. Navigate away while listening. The microphone **MUST** stop, and the words
    already dictated **MUST** be kept.
 4. **Read aloud** on a completed reply **MUST** be manual, never automatic, and
-   **MUST** exclude code bodies and raw URLs.
+   **MUST** exclude code bodies and raw URLs. On a reply that declared a table or
+   a chart it **MUST** say what the block *was* — *"Table: …, 2 columns, 3
+   rows."* — and **MUST NOT** read the payload.
 5. **MUST**: only Send creates a turn.
 
 ### 5.12 Export
@@ -423,6 +425,28 @@ under **Generated documents**, **MUST** be previewable, and **MUST** download.
 Export a conversation to **HTML**, **Markdown** and **PDF**, and use **Print /
 Save as PDF**. Each **MUST** contain the transcript and **MUST NOT** contain
 retained reasoning.
+
+On a conversation holding a turn that **declared a table or a chart**:
+
+1. The review **MUST** say how many tables and charts the file will carry, before
+   a format is chosen.
+2. Each file **MUST** render it as a table — a real `<table>` in the HTML, a GFM
+   table in the Markdown, a page-width table in the PDF — and **MUST NOT**
+   contain the raw ` raiker:table ` fence.
+3. A chart **MUST** be exported as the numbers behind it, with its kind and
+   caption stated.
+
+### 5.13 The same answer, read back [S]
+
+The answer on screen and the answer stored are one string, so:
+
+1. Reload the conversation. **MUST**: every paragraph the turn wrote is still
+   there — including anything it wrote **before** calling a tool — and a declared
+   table is still a table.
+2. Open the same turn in **Observability → Sessions**. **MUST**: the same, in the
+   inspector.
+3. **MUST**: the governed events listed under it still quote the raw record. An
+   audit summary is what the runtime saw, verbatim.
 
 ---
 
@@ -647,7 +671,11 @@ would notice losing — a checkout, a notes tree — and take a copy first.
 
 ## 9. Knowledge Map
 
-1. **[S]** `#/brain` **MUST** render a force-directed graph, not an empty canvas.
+1. **[S]** `#/brain` on a **worked-in** workspace **MUST** render a
+   force-directed graph of stored records. On a workspace that has recorded
+   nothing it **MUST** say *"Nothing in the map yet"* and offer **Add source**
+   and **Open Memory** — and **MUST NOT** draw any node, least of all one that
+   stands in for a record nobody made.
 2. **Add workspace source** → the picker **MUST** open on **named places** — your
    projects' files, generated files, approved memory, the encrypted database —
    not a file browser.
@@ -658,9 +686,19 @@ would notice losing — a checkout, a notes tree — and take a copy first.
 5. **MUST**: the granted folder's files appear as nodes in the graph.
 6. Revoke the folder. **MUST**: every source indexed under it is removed with it.
 7. **Graph scope** — change it and confirm the graph changes.
-8. **Graph settings**, **Fit graph**, **Enter fullscreen**, **Record inspector**
-   — each **MUST** work and **Close** **MUST** return you to the graph.
+8. **Graph settings**, **Fit graph**, **Record inspector** — each **MUST** work
+   and **Close** **MUST** return you to the graph.
 9. **MUST**: a citation whose file is gone is drawn as a hollow node.
+10. **List** — switch to it. **MUST**: the same records as rows, each opening its
+    relationships with the evidence memory and the same **Reject link** control;
+    a rejected link is still listed and still says so. **MUST**: the choice
+    survives a reload.
+11. **Filter to nothing** — search for a string no record matches. **MUST**: the
+    page says no records *match*, names how many the workspace has, and offers
+    **Clear filters** — it **MUST NOT** say the map is empty.
+12. With the operating system set to **reduce motion**, **MUST**: the graph
+    settles rather than staying in motion, whatever the Motion setting says, and
+    the setting **MUST** keep the value the owner gave it.
 
 ---
 

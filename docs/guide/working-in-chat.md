@@ -311,6 +311,14 @@ conversations you started **and** the threads your routines are advancing on
 their own. Each row names the project it sits in and says what it is blocked on;
 a routine's row says how often it runs.
 
+**A row opens where the work was done.** A conversation started in Chat opens in
+Chat, one started in Build opens in Build, one started in Design opens in
+Design, and the row says which before you click. That matters because the
+surfaces are not interchangeable: a Build conversation's repository, its pending
+changes and the approvals over them are Build's, and none of them is on the Chat
+screen. Beneath each row, **Evidence** opens the governed record behind that
+conversation, and a routine's row also links to its own **Task detail**.
+
 Narrow it to **Chats** or **Routines**, or to one project. The project list is
 every project you have work in, with a count beside each — not only the projects
 on the page you are looking at, which is a different and much smaller list.
@@ -336,7 +344,10 @@ returns to the board with your filters as you left them.
 
 **Observability → Sessions** is the complete record: every conversation with its
 turn count, status, tags, and the governed events behind each turn. Task runs
-live there too, which is why they are not in RECENT CHATS.
+live there too, which is why they are not in RECENT CHATS. It is for reading the
+record rather than for picking work up — a session there offers one **Resume
+in …** link, naming the surface that conversation belongs to, and Threads is
+where you go to carry on.
 
 ## Attachments
 

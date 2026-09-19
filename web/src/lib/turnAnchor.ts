@@ -14,9 +14,37 @@
  * payload, a credential or a decision.
  */
 
+/** A surface that owns a conversation, as a session records it. */
+export type WorkOrigin = "chat" | "build" | "design";
+
+/** The route each surface's conversations are resumed on. */
+const WORK_MODE_ROUTES: Record<WorkOrigin, "new-chat" | "build" | "design"> = {
+  chat: "new-chat",
+  build: "build",
+  design: "design",
+};
+
+/**
+ * REM-THREAD-03 — where a conversation is resumed, from what opened it.
+ *
+ * Threads and the Sessions inspector both offered "open in chat" for every
+ * row, because every session was stored as a chat. A Build conversation opened
+ * in Chat is not the same conversation: its repository, its pending diffs and
+ * the approvals over them are Build's, and none of them is on the Chat screen.
+ *
+ * An unrecognised origin resolves to Chat rather than to nothing. A workspace
+ * written by an older build stores no origin at all, and the transcript is
+ * readable in Chat whatever surface produced it — so the fallback is the one
+ * that always works, not a dead row.
+ */
+export function workModeRoute(origin: string | null | undefined): "new-chat" | "build" | "design" {
+  const named = (origin ?? "").toLowerCase();
+  return WORK_MODE_ROUTES[named as WorkOrigin] ?? "new-chat";
+}
+
 /** The route link that opens `turnId` inside `sessionId`. */
 export function conversationLink(
-  route: "new-chat" | "build",
+  route: "new-chat" | "build" | "design",
   sessionId: string,
   turnId?: string | null,
 ): string {
@@ -24,6 +52,21 @@ export function conversationLink(
   if (turnId !== undefined && turnId !== null && turnId !== "")
     params.set("turn", turnId);
   return `#/${route}?${params.toString()}`;
+}
+
+/**
+ * REM-THREAD-03 — the technical record behind one conversation.
+ *
+ * Threads resumes work; Observability's Sessions inspector verifies how it ran.
+ * They are different jobs, and a row that offered only the first left the
+ * second reachable by navigating to a hub and finding the session again.
+ * `#/sessions?session=…` is the address the router already aliases, so a link
+ * written before this existed still resolves.
+ */
+export function evidenceLink(sessionId: string, turnId?: string | null): string {
+  const params = new URLSearchParams({ session: sessionId });
+  if (turnId !== undefined && turnId !== null && turnId !== "") params.set("turn", turnId);
+  return `#/sessions?${params.toString()}`;
 }
 
 /** Drop `turn=` from the current address, keeping everything else. */

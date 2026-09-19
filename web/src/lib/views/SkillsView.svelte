@@ -40,6 +40,34 @@
 
   // Build-a-skill: Raiker writes the document, the same reader validates it.
   let buildOpen = $state(false);
+
+  /**
+   * REM-SKILL-01 — where a skill comes from, chosen before a form appears.
+   *
+   * `null` is "the add entry is closed"; `"choose"` is "open, and the mode is
+   * not decided yet". Keeping those distinct is the point of the row: the page
+   * used to show all three forms at once, which is the same as deciding for the
+   * owner that they wanted to compare them.
+   */
+  type AddMode = "choose" | "upload" | "link" | "build";
+  const ADD_MODES: ReadonlyArray<{ id: AddMode; label: string; summary: string }> = [
+    { id: "upload", label: "From a file", summary: "A SKILL.md or a .skill bundle you already have." },
+    { id: "link", label: "From a link", summary: "A raw SKILL.md URL, fetched and verified first." },
+    { id: "build", label: "Write one here", summary: "Held to the same contract as an uploaded one." },
+  ];
+  let addMode = $state<AddMode | null>(null);
+
+  function chooseAddMode(mode: AddMode) {
+    addMode = mode;
+    // The builder is its own form below the list and already had a toggle, so
+    // choosing it opens that rather than duplicating it inside this block.
+    buildOpen = mode === "build";
+  }
+
+  function closeAdd() {
+    addMode = null;
+    buildOpen = false;
+  }
   let buildName = $state("");
   let buildDescription = $state("");
   let buildBody = $state("");
@@ -316,61 +344,98 @@
   {#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
   {#if notice}<div class="notice notice-ok" role="status"><Icon name="check" size="sm" /> {notice}</div>{/if}
 
+  <!--
+    REM-SKILL-01 — one way in, and the acquisition mode chosen before a form.
+
+    Three full add forms sat side by side above the installed list: a file
+    picker, a URL field with its own submit, and a builder toggle. All three
+    were always open, so the page asked the owner to compare three ways of
+    getting a skill before they had decided they wanted one — and the installed
+    inventory, which is what the tab is for, started below all of it.
+
+    Now: one **Add a skill**, then the three modes as a choice with one line
+    each, then only the chosen mode's form. The modes and what each verifies
+    are unchanged; what changed is that nothing is on screen until the owner
+    has said which of them they mean.
+  -->
   <div class="add">
-    <div class="add-block">
-      <h3>Upload</h3>
-      <p>A <code>SKILL.md</code> file, or a <code>.skill</code> bundle up to 2 MB.</p>
-      <input
-        bind:this={fileInput}
-        id="skill-file"
-        class="sr-only"
-        type="file"
-        accept=".skill,.md,.markdown,.zip"
-        onchange={upload}
-        disabled={busy !== null}
-      />
+    {#if addMode === null}
       <button
         type="button"
         class="btn btn-primary btn-sm"
-        onclick={() => fileInput?.click()}
+        onclick={() => (addMode = "choose")}
+        aria-expanded={false}
         disabled={busy !== null}
       >
-        {busy === "upload" ? "Installing…" : "Choose a file"}
+        <Icon name="plus" size="sm" /> Add a skill
       </button>
-    </div>
-
-    <form class="add-block" onsubmit={importFromUrl}>
-      <h3>Import from a link</h3>
-      <p>A GitHub URL pointing at a raw <code>SKILL.md</code>. It is fetched and verified first.</p>
-      <div class="row">
-        <label class="sr-only" for="skill-url">Skill URL</label>
-        <input
-          id="skill-url"
-          class="input"
-          bind:value={importUrl}
-          placeholder="https://github.com/owner/repo/blob/main/skills/name/SKILL.md"
-          autocomplete="off"
-          disabled={busy !== null}
-        />
-        <button type="submit" class="btn btn-sm" disabled={busy !== null || !importUrl.trim()}>
-          {busy === "import" ? "Verifying…" : "Verify and add"}
+    {:else}
+      <div class="add-head">
+        <h3>Add a skill</h3>
+        <button type="button" class="btn btn-ghost btn-sm" onclick={closeAdd}>
+          <Icon name="x" size="sm" /> Cancel
         </button>
       </div>
-    </form>
+      <div class="modes" role="group" aria-label="Where the skill comes from">
+        {#each ADD_MODES as mode (mode.id)}
+          <button
+            type="button"
+            class="mode"
+            class:on={addMode === mode.id}
+            aria-pressed={addMode === mode.id}
+            onclick={() => chooseAddMode(mode.id)}
+            disabled={busy !== null}
+          >
+            <strong>{mode.label}</strong>
+            <span>{mode.summary}</span>
+          </button>
+        {/each}
+      </div>
 
-    <div class="add-block">
-      <h3>Build one</h3>
-      <p>Write a skill here. It is held to the same contract as an uploaded one.</p>
-      <button
-        type="button"
-        class="btn btn-sm"
-        onclick={() => (buildOpen = !buildOpen)}
-        aria-expanded={buildOpen}
-        disabled={busy !== null}
-      >
-        {buildOpen ? "Close builder" : "Build a skill"}
-      </button>
-    </div>
+      {#if addMode === "upload"}
+        <div class="add-block">
+          <p>A <code>SKILL.md</code> file, or a <code>.skill</code> bundle up to 2 MB.</p>
+          <input
+            bind:this={fileInput}
+            id="skill-file"
+            class="sr-only"
+            type="file"
+            accept=".skill,.md,.markdown,.zip"
+            onchange={upload}
+            disabled={busy !== null}
+          />
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            onclick={() => fileInput?.click()}
+            disabled={busy !== null}
+          >
+            {busy === "upload" ? "Installing…" : "Choose a file"}
+          </button>
+        </div>
+      {:else if addMode === "link"}
+        <form class="add-block" onsubmit={importFromUrl}>
+          <p>
+            A GitHub URL pointing at a raw <code>SKILL.md</code>. It is fetched and verified
+            first.
+          </p>
+          <div class="row">
+            <label class="sr-only" for="skill-url">Skill URL</label>
+            <input
+              id="skill-url"
+              class="input"
+              bind:value={importUrl}
+              placeholder="https://github.com/owner/repo/blob/main/skills/name/SKILL.md"
+              autocomplete="off"
+              disabled={busy !== null}
+            />
+            <button type="submit" class="btn btn-sm" disabled={busy !== null || !importUrl.trim()}>
+              {busy === "import" ? "Verifying…" : "Verify and add"}
+            </button>
+          </div>
+        </form>
+      {/if}
+    {/if}
   </div>
 
   {#if buildOpen}
@@ -611,7 +676,7 @@
       {:else}
         <li class="empty">
           {skills.length === 0
-            ? "No skills installed yet. Upload one, import a link, or build one above."
+            ? "No skills installed yet. Select Add a skill above and choose where it comes from."
             : "No skill matches this filter."}
         </li>
       {/each}
@@ -707,19 +772,42 @@
   .header h2 { margin: 0 0 0.2rem; }
   .page-lead { color: var(--text-2); margin: 0 0 0.25rem; max-width: 52rem; }
   .notice { margin-bottom: var(--space-3); }
+  /* REM-SKILL-01 — one column, because there is one entry now. It was a
+     three-column grid when three forms competed for it. */
   .add {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
     gap: var(--space-3);
     margin-bottom: var(--space-4);
+    justify-items: start;
   }
+  .add .modes,
+  .add .add-block,
+  .add .add-head { justify-self: stretch; }
+  /* REM-SKILL-01 — the mode chooser: three choices at one weight, each with
+     the one line that decides between them. */
+  .add-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+  .add-head h3 { margin: 0; font-size: var(--text-base); }
+  .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: var(--space-2); margin: var(--space-3) 0; }
+  .mode {
+    display: grid;
+    gap: 0.15rem;
+    text-align: left;
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    color: var(--text-1);
+    cursor: pointer;
+  }
+  .mode.on { border-color: var(--accent-border); background: var(--accent-soft); }
+  .mode span { color: var(--text-2); font-size: var(--text-xs); }
+
   .add-block {
     border: 1px solid var(--border);
     border-radius: var(--r-md);
     background: var(--surface);
     padding: var(--space-3) var(--space-4);
   }
-  .add-block h3 { margin: 0 0 0.2rem; font-size: var(--text-md); }
   .add-block p { color: var(--text-3); font-size: var(--text-sm); margin: 0 0 var(--space-3); }
   .row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
   .row .input { flex: 1 1 12rem; min-width: 0; }

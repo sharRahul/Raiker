@@ -17,7 +17,10 @@
  *    copied from the source: the only attributes emitted are a `class` from a
  *    fixed allowlist, and `href`, which must match `http(s):` or `mailto:` or
  *    the link is downgraded to plain text. `javascript:`, `data:` and
- *    `vbscript:` URLs can never be emitted.
+ *    `vbscript:` URLs can never be emitted. A caller that owns its own text may
+ *    additionally opt in to in-app `#/…` addresses (`inAppLinks`, BUG-301);
+ *    that form carries no colon, so it cannot express a scheme, and the option
+ *    is off for every model-authored answer.
  * 3. **No remote fetches.** Images render as a labelled link, never an `<img>`,
  *    so a model cannot make the browser call out to a third-party host (a
  *    tracking pixel) merely by answering a question. Raiker's built UI makes no
@@ -66,6 +69,23 @@ export function escapeHtml(text: string): string {
 /** Schemes a link is allowed to carry. Anything else renders as plain text. */
 const SAFE_URL = /^(?:https?:\/\/|mailto:)\S+$/i;
 
+/**
+ * BUG-301 — an address inside this app, accepted only when the caller opts in.
+ *
+ * The guide's chapters point at each other, and a caller that owns its own
+ * content (`GuideView`, which resolves those references against the chapter
+ * list the product shipped) may say so. Nothing else may: `renderMarkdown`
+ * draws model-authored answers with the same code, and there a link is
+ * untrusted input, so the default stays exactly what it was.
+ *
+ * The shape is bounded to the hash routes this app actually serves — a leading
+ * `#/`, then unreserved path segments and an optional query. No colon can
+ * appear, so no scheme can be smuggled through, and a segment is never empty,
+ * so `#//host` — which reads as protocol-relative even though a fragment never
+ * navigates — is not a shape this emits.
+ */
+const IN_APP_URL = /^#\/[A-Za-z0-9\-._~]+(?:\/[A-Za-z0-9\-._~]+)*(?:\?[A-Za-z0-9\-._~=&]*)?$/;
+
 /** Language hints we are willing to echo into a `class`, once normalised. */
 const LANGUAGE_TOKEN = /^[A-Za-z0-9][A-Za-z0-9+#._-]{0,23}$/;
 
@@ -89,12 +109,30 @@ const BLOCK_MARKERS = {
  */
 let activeCitations: ReadonlySet<string> = new Set();
 
+/**
+ * BUG-301 — whether this render may emit an in-app address.
+ *
+ * Module-scoped for the same reason `activeCitations` is: one synchronous pass
+ * sets it and clears it, which is cheaper than threading an option through a
+ * dozen block emitters. It defaults to `false` and is reset in a `finally`, so
+ * a render that throws cannot leave the next one permissive.
+ */
+let activeInAppLinks = false;
+
 /** A citation marker: `[s1]`. The digits are bounded so the scan cannot run away. */
 const CITATION_RE = /\[(s\d{1,3})\]/g;
 
 export interface MarkdownOptions {
   /** Source ids that may render as clickable chips. Anything else stays text. */
   citations?: ReadonlySet<string>;
+  /**
+   * BUG-301 — allow `#/…` addresses inside this app to become anchors.
+   *
+   * Off by default and off for every model-authored answer. The one caller
+   * that sets it is the Guide, whose text ships with the build and whose
+   * targets were resolved against the chapter list before they got here.
+   */
+  inAppLinks?: boolean;
 }
 
 /** Render a Markdown document to a safe HTML fragment. */
@@ -102,10 +140,12 @@ export function renderMarkdown(source: string, options: MarkdownOptions = {}): s
   if (source.trim() === "") return "";
   const lines = source.replace(/\r\n?/g, "\n").replace(/\t/g, "    ").split("\n");
   activeCitations = options.citations ?? new Set();
+  activeInAppLinks = options.inAppLinks === true;
   try {
     return renderBlocks(lines);
   } finally {
     activeCitations = new Set();
+    activeInAppLinks = false;
   }
 }
 
@@ -478,6 +518,12 @@ function applyEmphasis(text: string): string {
 
 /** Build an anchor, or fall back to the literal source text if the URL is unsafe. */
 function link(url: string, label: string, fallback: string, className?: string): string {
+  // An in-app address is a different object from an external one and is emitted
+  // as one: it stays in this tab, because the guide opening itself in a second
+  // tab would be its own defect.
+  if (activeInAppLinks && IN_APP_URL.test(url)) {
+    return `<a href="${escapeHtml(url)}" class="md-inapp-link">${label}</a>`;
+  }
   if (!SAFE_URL.test(url)) return escapeHtml(fallback);
   return anchor(escapeHtml(url), label, className);
 }

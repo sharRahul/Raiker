@@ -7,6 +7,7 @@
   import { relativeTime } from "../format";
   import { memoryWritePosture } from "../memoryPosture";
   import GuideLink from "../components/GuideLink.svelte";
+  import MemoryRecordDrawer from "../components/MemoryRecordDrawer.svelte";
   import FileLibrary from "../components/FileLibrary.svelte";
   import TabStrip from "../components/TabStrip.svelte";
   import { HUB_TABS } from "../nav";
@@ -43,6 +44,17 @@
   let proposalEditingId = $state<string | null>(null);
   let proposalDraft = $state("");
   let historyById = $state<Record<string, MemoryHistoryEvent[]>>({});
+
+  // REM-MEM-01 — the record drawer holds an **id**, not a record. Scope,
+  // expiry and deletion are all versioned against `updated_at` server-side, so
+  // the drawer has to act on the revision the page currently holds rather than
+  // on the copy a card was drawn from. Resolving through `memories` each time
+  // also answers the "old bookmarked record" case honestly: when the id is no
+  // longer listed, the drawer says so and offers nothing.
+  let drawerId = $state<string | null>(null);
+  const drawerRecord = $derived(
+    drawerId === null ? null : ((memories ?? []).find((m) => m.memory_id === drawerId) ?? null),
+  );
 
   // MEM-04 — what the runtime captured while it worked. Loaded beside the
   // memories rather than behind a tab click, because the summary counters at
@@ -463,16 +475,25 @@
       <div class="memory-title">{#if editingId === m.memory_id}<textarea rows="3" bind:value={editDraft} aria-label="Memory text"></textarea>{:else}<h4>{m.text}</h4>{/if}{#if m.pinned}<span class="pin-label"><Icon name="check" size="sm" /> Pinned</span>{/if}</div>
       <div class="meta"><span>Approved</span><span>{m.scope} scope</span><span>{m.sensitivity} sensitivity</span></div>
       <dl><div><dt>Source</dt><dd>{provenanceLabel(m)}</dd></div><div><dt>Approved</dt><dd>{relativeTime(m.created_at)}</dd></div><div><dt>Review or expiry</dt><dd>{m.expires_at ? relativeTime(m.expires_at) : "No date set"}</dd></div></dl>
-      <div class="card-actions">{#if editingId === m.memory_id}<button class="btn btn-primary btn-sm" aria-label="Save memory" onclick={() => void saveEdit(m)}>Save</button><button class="btn btn-ghost btn-sm" onclick={() => editingId = null}>Cancel</button>{:else}<button class="btn btn-ghost btn-sm" aria-label={`View the source of “${m.text.slice(0, 40)}”`} onclick={() => void viewSource(m)}>View source</button><button class="btn btn-ghost btn-sm" aria-label="Edit memory" onclick={() => { editingId = m.memory_id; editDraft = m.text; }}>Edit</button><button class="btn btn-ghost btn-sm" onclick={() => void changeScope(m)}>Edit scope</button><button class="btn btn-ghost btn-sm" onclick={() => void reviewExpiry(m)}>Review expiry</button><button class="btn btn-ghost btn-sm" aria-label={m.pinned ? "Unpin memory" : "Pin memory"} onclick={() => void togglePin(m)}>{m.pinned ? "Unpin" : "Pin"}</button><button class="btn btn-ghost btn-sm" onclick={() => void viewHistory(m)}>View history</button><button class="btn btn-ghost btn-sm danger" aria-label="Forget memory" onclick={() => void forget(m)}>Forget</button>{/if}</div>
-      <details><summary>Advanced metadata and deletion</summary><p>Type: {m.memory_type} · Retention: {m.retention} · Confidence: {m.confidence.toFixed(2)} · Trust: {m.trust_score.toFixed(2)}</p><!-- REM-MEM-02 — this said "Last used", which collapses five different
-                 events into one word. What the store actually holds is the most
-                 recent `recall` — the moment this record was put into a model's
-                 context. Whether the model then relied on it, quoted it, or
-                 ignored it is not recorded anywhere, and "used" quietly claimed
-                 the first of those. An owner deciding whether to forget a fact
-                 reads that claim as evidence the fact is load-bearing. -->
-            <p>Last included in a model&rsquo;s context: {m.last_used_at ? relativeTime(m.last_used_at) : "Never"}. Being recalled is not evidence the answer relied on it. Source record details: {Object.keys(m.provenance).length ? Object.keys(m.provenance).join(", ") : "Source metadata unavailable"}</p><button class="btn btn-ghost btn-sm danger" onclick={() => void purge(m)}>Delete permanently</button></details>
-      {#if historyById[m.memory_id]}<ol class="history" aria-label="Memory history">{#each historyById[m.memory_id] as event}<li><strong>{event.action.replaceAll("_", " ")}</strong> <span>{relativeTime(event.created_at)}</span></li>{/each}</ol>{/if}
+      <!-- REM-MEM-01 — two everyday actions and one way in to the rest. The
+           row used to carry seven controls at one weight, so "edit the words"
+           and "delete this permanently" were the same size and the same colour,
+           and the four that only *show* something looked exactly like the three
+           that change what Raiker remembers. -->
+      <div class="card-actions">{#if editingId === m.memory_id}<button class="btn btn-primary btn-sm" aria-label="Save memory" onclick={() => void saveEdit(m)}>Save</button><button class="btn btn-ghost btn-sm" onclick={() => editingId = null}>Cancel</button>{:else}<button class="btn btn-ghost btn-sm" aria-label="Edit memory" onclick={() => { editingId = m.memory_id; editDraft = m.text; }}>Edit</button><button class="btn btn-ghost btn-sm" aria-label={m.pinned ? "Unpin memory" : "Pin memory"} onclick={() => void togglePin(m)}>{m.pinned ? "Unpin" : "Pin"}</button><button class="btn btn-ghost btn-sm" aria-expanded={drawerId === m.memory_id} aria-label={`More for “${m.text.slice(0, 40)}”`} onclick={() => drawerId = drawerId === m.memory_id ? null : m.memory_id}>More</button>{/if}</div>
+      {#if drawerId === m.memory_id}
+        <MemoryRecordDrawer
+          record={drawerRecord}
+          history={historyById[m.memory_id] ?? null}
+          onClose={() => (drawerId = null)}
+          onViewSource={(r) => void viewSource(r)}
+          onChangeScope={(r) => void changeScope(r)}
+          onReviewExpiry={(r) => void reviewExpiry(r)}
+          onViewHistory={(r) => void viewHistory(r)}
+          onForget={(r) => void forget(r)}
+          onPurge={(r) => void purge(r)}
+        />
+      {/if}
     </article>{/each}</div>{/if}
   </section>
   </div>

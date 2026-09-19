@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   extensionExceptions,
+  extensionInventory,
   extensionReach,
   reachSentence,
   tabForKind,
@@ -82,23 +83,47 @@ describe("exceptions", () => {
 });
 
 describe("reach", () => {
+  /** Only the connectors and MCP servers `/api/extensions` carries. */
+  const only = (extensions: ExtensionView[]) => ({
+    extensions,
+    skills: [],
+    hooks: null,
+    plugins: [],
+  });
+
   it("counts what is usable, what is installed, and the tools they offer", () => {
-    const reach = extensionReach([
-      extension({ extension_id: "a", usable: true, tool_count: 3 }),
-      extension({ extension_id: "b", usable: true, tool_count: 2 }),
-      extension({ extension_id: "c", usable: false, tool_count: 9 }),
-      extension({ extension_id: "d", installed: false, usable: false }),
-    ]);
+    const reach = extensionReach(
+      only([
+        extension({ extension_id: "a", usable: true, tool_count: 3 }),
+        extension({ extension_id: "b", usable: true, tool_count: 2 }),
+        extension({ extension_id: "c", usable: false, tool_count: 9 }),
+        extension({ extension_id: "d", installed: false, usable: false }),
+      ]),
+    );
     // The unusable one's tools are not reach: they cannot be called.
     expect(reach).toEqual({ usable: 2, installed: 3, tools: 5 });
   });
 
+  // REM-EXT-01 — the lead sentence counts the same five kinds the inventory
+  // does. It used to read `/api/extensions` alone, so a workspace with seven
+  // installed skills was told "Nothing is installed yet."
+  it("counts the kinds that are not in /api/extensions", () => {
+    const reach = extensionReach({
+      extensions: [],
+      skills: [{ active: true }, { active: false }],
+      hooks: { rule_count: 1, active: true },
+      plugins: [{ status: "enabled" }],
+    });
+    expect(reach).toEqual({ usable: 3, installed: 4, tools: 0 });
+    expect(reachSentence(reach)).toBe("3 of 4 installed extensions can be used.");
+  });
+
   it("says nothing is installed rather than showing three zeroes", () => {
-    expect(reachSentence(extensionReach([]))).toContain("Nothing is installed yet");
+    expect(reachSentence(extensionReach(only([])))).toContain("Nothing is installed yet");
   });
 
   it("says plainly when everything installed is blocked", () => {
-    const reach = extensionReach([extension({ usable: false })]);
+    const reach = extensionReach(only([extension({ usable: false })]));
     expect(reachSentence(reach)).toBe("1 installed, and none of them can be used yet.");
   });
 
@@ -123,5 +148,97 @@ describe("tabForKind", () => {
 
   it("sends an unknown kind somewhere real rather than nowhere", () => {
     expect(tabForKind("something-new")).toBe("connectors");
+  });
+});
+
+// REM-EXT-01 — the inventory counts what is installed, from every kind the
+// product has rather than from the one read that happened to be at hand.
+describe("extensionInventory", () => {
+  const extension = (over: Record<string, unknown>) =>
+    ({
+      extension_id: "x",
+      kind: "connector",
+      display_name: "X",
+      category: "c",
+      installed: true,
+      connected: true,
+      enabled: true,
+      usable: true,
+      blocked_reason: null,
+      detail: "",
+      capability: null,
+      gate_state: null,
+      decision_mode: null,
+      egress_host: null,
+      egress_allowed: null,
+      transport: null,
+      monitor_state: null,
+      tool_count: 0,
+      last_activity_at: null,
+      ...over,
+    }) as ExtensionView;
+
+  it("counts installed and usable separately, per kind", () => {
+    const rows = extensionInventory({
+      extensions: [
+        extension({ extension_id: "a" }),
+        extension({ extension_id: "b", usable: false }),
+        extension({ extension_id: "c", kind: "mcp_server" }),
+      ],
+      skills: [{ active: true }, { active: false }],
+      hooks: { rule_count: 3, active: true },
+      plugins: [{ status: "enabled" }, { status: "quarantined" }],
+    });
+    expect(rows.map((row) => [row.label, row.installed, row.usable])).toEqual([
+      ["Connectors", 2, 1],
+      ["Hooks", 3, 3],
+      ["MCP servers", 1, 1],
+      ["Plugins", 2, 1],
+      ["Skills", 2, 1],
+    ]);
+  });
+
+  // A rule that is loaded while hooks are switched off is installed and not
+  // usable, which is exactly what the two columns are for.
+  it("counts a loaded rule as unusable while hooks are off", () => {
+    const rows = extensionInventory({
+      extensions: [],
+      skills: [],
+      hooks: { rule_count: 2, active: false },
+      plugins: [],
+    });
+    expect(rows).toEqual([{ kind: "hook", label: "Hooks", installed: 2, usable: 0, tab: "hooks" }]);
+  });
+
+  // A failed read leaves the row out rather than reporting zero of that kind —
+  // the same rule the overview's attention list follows.
+  it("omits a kind it could not read rather than reporting none", () => {
+    const rows = extensionInventory({
+      extensions: null,
+      skills: null,
+      hooks: null,
+      plugins: null,
+    });
+    expect(rows).toEqual([]);
+  });
+
+  it("names a kind it does not recognise rather than hiding it", () => {
+    const rows = extensionInventory({
+      extensions: [extension({ kind: "widget" })],
+      skills: [],
+      hooks: null,
+      plugins: [],
+    });
+    expect(rows[0].label).toBe("widget");
+  });
+
+  it("leaves out anything that is not installed", () => {
+    const rows = extensionInventory({
+      extensions: [extension({ installed: false })],
+      skills: [],
+      hooks: null,
+      plugins: [],
+    });
+    expect(rows).toEqual([]);
   });
 });

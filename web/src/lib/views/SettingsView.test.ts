@@ -76,13 +76,45 @@ describe("supported-preferences settings", () => {
 
   it.each([
     ["general", "General"], ["notification", "Notifications"],
-    ["personalisation", "Personalisation"], ["security", "Security & sign-in"],
+    // REM-SET-SECURITY — the rail still says "Security & sign-in", and the page
+    // behind it is four sections rather than one card of eight fields. The
+    // first of them is what a deep link lands on.
+    ["personalisation", "Personalisation"], ["security", "Signing in and devices"],
     ["privacy", "Privacy"], ["account", "Account"], ["web-access", "Web access"],
     ["git-credential", "Git credential"], ["runtime", "Runtime configuration"], ["updates", "Updates"],
   ])("renders the %s deep link with its named heading", async (tab, heading) => {
     stubApi();
     render(SettingsView, { props: { principal: "alice", tab } });
     expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
+  });
+
+  // REM-SET-SECURITY — four lifecycles, four sections. Encryption, sign-in,
+  // scanning and standing grants do not change together and are not read
+  // together; they had one heading, one weight and one neighbour list.
+  it("splits Security & sign-in into its four lifecycles", async () => {
+    stubApi();
+    render(SettingsView, { props: { principal: "alice", tab: "security" } });
+    for (const heading of [
+      "Signing in and devices",
+      "Encryption and the vault",
+      "Findings and monitoring",
+      "Standing access",
+    ]) {
+      expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
+    }
+    // Nothing was removed on the way out of the single stack.
+    for (const control of [
+      "Password",
+      "Multi-factor authentication (TOTP)",
+      "Active device sessions",
+      "Database encryption",
+      "Connector Vault Key",
+      "Credential security",
+      "Monitored capabilities",
+      "Standing approval grants",
+    ]) {
+      expect(await screen.findByRole("heading", { name: control })).toBeInTheDocument();
+    }
   });
 
   it("uses fixed settings spacing rather than viewport-scaled padding", () => {

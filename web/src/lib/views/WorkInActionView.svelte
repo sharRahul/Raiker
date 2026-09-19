@@ -39,6 +39,65 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
   const finished = $derived(nodes.filter((node) => node.node_type === "task" && FINISHED.has(node.status)).slice(0, 10));
   const schedules = $derived(nodes.filter((node) => node.node_type === "schedule"));
 
+  /**
+   * REM-LIVE — the same records, without the picture.
+   *
+   * The animated workstations reflect real stored status and are worth
+   * keeping, and they are also the least readable way to answer "what is
+   * running". They duplicated what Tasks and Threads already show, they were
+   * the first thing on this tab, and a reader who cannot or does not want to
+   * read a moving picture had no other way to read it. So the list is the
+   * default and the floor is a choice — kept, not deleted, because delegation
+   * really is easier to grasp as a room than as a table the first time you see
+   * it.
+   *
+   * The choice is remembered per browser and nowhere else: it is a viewing
+   * preference, not workspace state, and it must not travel to another device
+   * or into the record. A browser that refuses storage simply starts on the
+   * list every time, which is the safe default anyway.
+   */
+  const VIEW_KEY = "raiker.work-in-action.view";
+  let view = $state<"list" | "floor">("list");
+
+  onMount(() => {
+    try {
+      if (window.localStorage.getItem(VIEW_KEY) === "floor") view = "floor";
+    } catch {
+      // Private mode, blocked site data, or an embedding context. The default
+      // stands; nothing about the page depends on remembering this.
+    }
+  });
+
+  function chooseView(next: "list" | "floor") {
+    view = next;
+    try {
+      window.localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // As above — the choice still applies for this visit.
+    }
+  }
+
+  /**
+   * The Tasks address for a node, when the node is a task.
+   *
+   * `brain` names a task node `task:<task_id>`, which is the coordinate
+   * `#/tasks?task=…` takes. Anything else — an agent, a schedule — has no such
+   * address and gets none rather than a link that lands on a board and leaves
+   * the reader to find the row.
+   */
+  function taskHref(node: BrainNode): string | null {
+    if (!node.node_id.startsWith("task:")) return null;
+    return `#/tasks?task=${encodeURIComponent(node.node_id.slice("task:".length))}`;
+  }
+
+  /** Every row the list shows, in the order it reads: doing, then done, then due. */
+  const rows = $derived([
+    ...agents.map((node) => ({ node, group: "Subagent" })),
+    ...tasks.map((node) => ({ node, group: "In action" })),
+    ...finished.map((node) => ({ node, group: "Last runs" })),
+    ...schedules.map((node) => ({ node, group: "Scheduled" })),
+  ]);
+
   // Cartoon character state derives from the agent's runtime status.
   function mood(status: string): "working" | "idle" | "queued" | "paused" {
     if (status === "running" || status === "continuing") return "working";
@@ -86,14 +145,89 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
 </script>
 
 <div class="head-row">
-  <div><p class="page-lead">Live operational view for this Raiker instance. Every task, status, schedule, and assignment comes from stored runtime records.</p><p class="truth-note"><Icon name="activity" size="sm" /> Idle character movement is visual-only; it does not mean the agent is working.</p></div>
-  <button type="button" class="btn btn-ghost btn-sm" onclick={load} disabled={refreshing}><Icon name="refresh" size="sm" /> {refreshing ? "Refreshing…" : "Refresh"}</button>
+  <div><p class="page-lead">Live operational view for this Raiker instance. Every task, status, schedule, and assignment comes from stored runtime records.</p>
+    {#if view === "floor"}
+      <!-- Only said where it is true. On the list there is no movement to
+           mistake for work. -->
+      <p class="truth-note"><Icon name="activity" size="sm" /> Idle character movement is visual-only; it does not mean the agent is working.</p>
+    {/if}
+  </div>
+  <div class="head-actions">
+    <!-- REM-LIVE — the same records, read either way. -->
+    <div class="views" role="group" aria-label="How to show live work">
+      <button type="button" class="chip" class:on={view === "list"} aria-pressed={view === "list"} onclick={() => chooseView("list")}>List</button>
+      <button type="button" class="chip" class:on={view === "floor"} aria-pressed={view === "floor"} onclick={() => chooseView("floor")}>Workstations</button>
+    </div>
+    <button type="button" class="btn btn-ghost btn-sm" onclick={load} disabled={refreshing}><Icon name="refresh" size="sm" /> {refreshing ? "Refreshing…" : "Refresh"}</button>
+  </div>
 </div>
 
 {#if loadError}
   <PageState state="error" title="Couldn't load live work" detail={loadError} />
 {:else if brain === null}
   <PageState state="loading" title="Loading live work…" />
+{:else if view === "list"}
+  <!-- REM-LIVE — the non-animated equivalent: the same nodes, the same
+       statuses, the same stored progress, and a direct link to each task's own
+       detail. Nothing here is derived from anything the floor does not already
+       draw, so the two views cannot disagree about what is running. -->
+  <section class="card">
+    <h2 class="list-h">Live work</h2>
+    {#if rows.length === 0}
+      <p class="empty">
+        Nothing is running, scheduled or recently finished, and no subagent has been recorded.
+      </p>
+    {:else}
+      <table class="table work-table" aria-label="Live work">
+        <thead>
+          <tr>
+            <th>What</th>
+            <th>Kind</th>
+            <th>Status</th>
+            <th>Progress</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each rows as row (row.group + row.node.node_id)}
+            <tr>
+              <td>
+                <span class="row-title">{row.node.label}</span>
+                {#if row.node.detail}<span class="row-detail">{row.node.detail}</span>{/if}
+              </td>
+              <td>{row.group}</td>
+              <td>{statusLabel(row.node.status)}</td>
+              <td>
+                <!-- Stored progress or nothing. A row with no recorded percent
+                     says so rather than being drawn at zero, which would read
+                     as "started and got nowhere". -->
+                {#if row.node.progress_percent !== null}
+                  <div
+                    class="progress"
+                    role="progressbar"
+                    aria-label={`${row.node.label} progress`}
+                    aria-valuenow={row.node.progress_percent}
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                  >
+                    <div style={`width:${row.node.progress_percent}%`}></div>
+                  </div>
+                  <span class="row-detail">{row.node.progress_percent}%</span>
+                {:else}
+                  <span class="row-detail">Not recorded</span>
+                {/if}
+              </td>
+              <td>
+                {#if taskHref(row.node)}
+                  <a class="row-detail" href={taskHref(row.node)}>Open task</a>
+                {/if}
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+  </section>
 {:else}
   <section class="card floor" aria-label="Agent workstations">
     <div class="floor-head"><h2>Workstations</h2><p>Each character is a recorded subagent. Their movement reflects stored status only.</p></div>
@@ -185,6 +319,16 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
   /* Layout comes from the shared `.head-row` in app.css; only the spacing
      below it is this view's own. */
   .head-row { margin-bottom:var(--space-4); }
+  .head-actions { display:flex; align-items:center; gap:var(--space-3); }
+  .views { display:flex; gap:.3rem; }
+  .chip { padding:.25rem .7rem; border:1px solid var(--border); border-radius:var(--r-pill); background:var(--surface); color:var(--text-2); font-size:var(--text-sm); cursor:pointer; }
+  .chip.on { background:var(--accent-soft); border-color:var(--accent-border); color:var(--text-1); }
+
+  /* REM-LIVE — the list. */
+  .list-h { margin:0 0 var(--space-3); font-size:var(--text-base); }
+  .work-table { width:100%; }
+  .row-title { display:block; font-weight:650; }
+  .row-detail { display:block; color:var(--text-2); font-size:var(--text-xs); }
   .page-lead { margin:0; max-width:760px; color:var(--text-2); }
   .truth-note { display:flex; align-items:center; gap:6px; margin:var(--space-2) 0 0; color:var(--text-2); font-size:var(--text-sm); }
 
@@ -276,4 +420,18 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
 
   @media (max-width:900px) { .work-layout { grid-template-columns:1fr; } .desks { grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); } }
   @media (max-width:600px) { .desks { grid-template-columns:1fr; } }
+
+  /* REM-LIVE — a room full of animation is not something every reader can
+     use, and this view never said so. Under a reduced-motion preference the
+     characters hold still and the records stay exactly as legible; the list
+     above is the fuller answer, and this is the floor keeping its own
+     promise. */
+  @media (prefers-reduced-motion: reduce) {
+    .floor *,
+    .floor *::before,
+    .floor *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
 </style>

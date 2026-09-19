@@ -9,6 +9,7 @@
     text,
     muted = false,
     citations,
+    inAppLinks = false,
     oncite,
   }: {
     text: string;
@@ -16,9 +17,18 @@
     // C6 — source ids this answer is allowed to render as chips. Omitted (the
     // usual case) means no marker is ever rewritten.
     citations?: ReadonlySet<string>;
+    // BUG-301 — let `#/…` addresses become anchors. Set by the Guide and by
+    // nothing that renders model output, which is the whole point of it being
+    // a prop rather than a renderer default.
+    inAppLinks?: boolean;
     oncite?: (sourceId: string) => void;
   } = $props();
-  const html = $derived(renderMarkdown(text, citations ? { citations } : {}));
+  const html = $derived(
+    renderMarkdown(text, {
+      ...(citations ? { citations } : {}),
+      ...(inAppLinks ? { inAppLinks: true } : {}),
+    }),
+  );
 
   // BUG-23 — the copy action for rendered code blocks.
   //
@@ -193,6 +203,12 @@
     color: var(--accent);
     text-decoration: underline;
     text-underline-offset: 2px;
+  }
+  /* BUG-301 — a reference to another chapter reads like any other link and
+     opens in place. It carries no new-tab affordance because it does not open
+     one. */
+  .markdown :global(a.md-inapp-link) {
+    text-decoration-style: dotted;
   }
   .markdown :global(code) {
     font-family: var(--font-mono);

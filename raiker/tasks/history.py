@@ -64,7 +64,19 @@ ATTEMPT_END_EVENTS: dict[str, str] = {
 #: runtime's. The payload key is read only when the runtime wrote it; a missing
 #: one falls back to the sentence rather than to an empty line, so no row in
 #: this timeline is ever blank.
-_DETAIL_KEYS: tuple[str, ...] = ("reason", "summary", "current_step", "detail")
+#:
+#: ``outcome_summary`` leads because of BUG-302: a completion's ``summary`` now
+#: says what the event did ("Task completed."), and the outcome the owner came
+#: here to read travels under its own key. Reading it first keeps this timeline
+#: exactly as informative as it was while the audit column stopped repeating an
+#: answer three other events were already repeating.
+_DETAIL_KEYS: tuple[str, ...] = (
+    "reason",
+    "outcome_summary",
+    "summary",
+    "current_step",
+    "detail",
+)
 
 _FALLBACK_DETAIL: dict[str, str] = {
     "task_created": "Filed.",

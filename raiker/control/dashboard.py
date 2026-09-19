@@ -1497,6 +1497,13 @@ class WorkThreadView:
     kind: str
     updated_at: str
     turn_count: int
+    #: REM-THREAD-03 — which surface owns this work: ``chat``, ``build`` or
+    #: ``design``. A thread is resumed *where it was done*; offering "open in
+    #: chat" for a conversation whose repository, diffs and approvals live in
+    #: Build sends the owner to a surface that cannot show any of them. Read
+    #: from the session row rather than guessed, and ``chat`` for a row written
+    #: before sessions recorded it.
+    origin: str = "chat"
     project_id: str | None = None
     project_name: str | None = None
     #: Set only on a ``routine`` thread: the task advancing it.
@@ -1756,6 +1763,15 @@ SESSION_NODE_TYPES: dict[str, str] = {
     "build": "build",
     "task": "task_run",
     "workbench": "conversation",
+}
+
+#: REM-THREAD-03 — what an untitled thread of each kind is called on the work
+#: board. Separate from ``SESSION_LABELS`` because that table describes a node
+#: on the knowledge map, and a board row and a graph node are read differently.
+WORK_THREAD_ORIGIN_NOUNS: dict[str, str] = {
+    "chat": "chat",
+    "build": "build session",
+    "design": "design session",
 }
 
 SESSION_LABELS: dict[str, str] = {
@@ -6662,20 +6678,43 @@ class DashboardService:
             for project in self.list_projects(user_id=user_id).projects
         }
         threads: list[WorkThreadView] = []
-        for session in self.store.list_sessions(
-            limit=WORK_THREAD_SCAN_LIMIT, user_id=user_id, include_archived=False, origin="chat"
-        ):
+        # REM-THREAD-03 — every conversation the owner started, on whichever
+        # surface they started it. This read used to name `chat`, which was the
+        # whole list while every session was stored as one; now that a session
+        # records the surface that opened it, naming `chat` would quietly drop
+        # Build and Design from the one board that claims to show all the work.
+        # The complement is what was always meant: not the server-owned sessions
+        # a task run executes in, which arrive below as routine threads.
+        owner_sessions = self.store.list_sessions(
+            limit=WORK_THREAD_SCAN_LIMIT,
+            user_id=user_id,
+            include_archived=False,
+            exclude_origin="task",
+        )
+        # Found 2026-09-18 while proving REM-THREAD-03: every chat row on the
+        # board said "0 turns". `list_sessions` selects the session row, which
+        # has no turn count in it, so `session.get("turn_count")` had always
+        # been `None` and every conversation was reported as empty — beside
+        # routine rows that had a real count, because those were counted. One
+        # query for the whole page, exactly as the routine half already does.
+        session_turns = self.store.count_turns_by_session(
+            [str(session.get("session_id", "")) for session in owner_sessions]
+        )
+        for session in owner_sessions:
             session_id = str(session.get("session_id", ""))
             project_id = session.get("project_id")
+            origin = str(session.get("origin") or "chat").lower()
             threads.append(
                 WorkThreadView(
                     session_id=session_id,
-                    title=str(session.get("title") or "").strip() or "Untitled chat",
+                    title=str(session.get("title") or "").strip()
+                    or f"Untitled {WORK_THREAD_ORIGIN_NOUNS.get(origin, 'chat')}",
                     kind="chat",
                     updated_at=str(session.get("updated_at", "")),
-                    turn_count=int(session.get("turn_count") or 0),
+                    turn_count=session_turns.get(session_id, 0),
                     project_id=project_id,
                     project_name=projects.get(str(project_id)) if project_id else None,
+                    origin=origin,
                 )
             )
         # A routine thread's identity comes from its task, not from its session:
@@ -6712,6 +6751,11 @@ class DashboardService:
                     task_status=task.status,
                     cadence=task.recurrence,
                     next_run_at=task.scheduled_at,
+                    # REM-THREAD-03 — a routine's thread is resumed on the
+                    # surface the routine works on. The task has recorded that
+                    # since it was filed; its session cannot say so, because
+                    # every task session's origin is `task` by construction.
+                    origin=(task.surface or "chat").lower(),
                     waiting_on=(
                         "Waiting for your approval"
                         if task.status == "waiting_for_approval"

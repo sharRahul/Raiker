@@ -10,10 +10,13 @@
   import type { ProjectView, SessionDetail, SessionSummary, TurnDetail } from "../apiTypes";
   import { responseBadge } from "../statusMaps";
   import { humanize, relativeTime, shortId } from "../format";
-  import { conversationLink } from "../turnAnchor";
+  import { conversationLink, workModeRoute } from "../turnAnchor";
 
   // When a project is active (topbar switcher) the list is scoped to it.
   let { projectId = null, sessionId = null }: { projectId?: string | null; sessionId?: string | null } = $props();
+
+  /** REM-SESSIONS — what the one way back is called, per work mode. */
+  const RESUME_LABELS = { "new-chat": "Chat", build: "Build", design: "Design" } as const;
 
   let sessions = $state<SessionSummary[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -281,7 +284,12 @@
 
 <div class="head-row">
   <p class="page-lead">
+    <!-- REM-SESSIONS — this is the evidence inspector, and saying so is what
+         stops it reading as a second chat history. Threads is where work is
+         resumed; here a conversation is read back with the governed events
+         behind each of its turns. -->
     Every conversation with the runtime, with its turns and the governed events behind each turn.
+    To pick work back up, use <a href="#/search-chat">Threads</a>.
   </p>
   <div class="head-actions">
     <label class="tag-filter">
@@ -375,13 +383,12 @@
                   {s.title ?? shortId(s.session_id)}
                 </span>
                 <span class="title-sub">
+                  <!-- REM-SESSIONS — the row opens the record, and nothing
+                       else. This used to carry an "Open" link into Chat, which
+                       made the inspector a second place to resume a
+                       conversation; resuming lives in Threads, which now sends
+                       each thread to the surface that owns it. -->
                   <span class="mono sub">{shortId(s.session_id)}</span>
-                  <a
-                    class="open-link"
-                    href={`#/new-chat?session=${encodeURIComponent(s.session_id)}`}
-                    aria-label={`Open ${s.title ?? shortId(s.session_id)} in chat`}
-                    onclick={(e) => e.stopPropagation()}
-                  >Open</a>
                 </span>
               </td>
               <td onclick={() => openSession(s.session_id)}>
@@ -440,6 +447,7 @@
                 <SessionMenu
                   sessionId={s.session_id}
                   title={s.title ?? shortId(s.session_id)}
+                  origin={s.origin ?? "chat"}
                   projects={projects.map((p) => ({ project_id: p.project_id, name: p.name }))}
                   pinned={s.pinned}
                   archived={s.archived}
@@ -464,11 +472,21 @@
           <h2 id="session-detail-h">{detail.session.title ?? shortId(detail.session.session_id)}</h2>
           <p class="sub">Created {relativeTime(detail.session.created_at)} · {detail.turns.length} turns</p>
           <p class="session-links">
-            <a href={`#/new-chat?session=${encodeURIComponent(detail.session.session_id)}`}>Open in chat</a>
-            <!-- BUG-242 — Build restores a stored conversation on the same
-                 coordinate Chat does, so the one surface where the approvals
-                 for a change live is reachable from here too. -->
-            <a href={`#/build?session=${encodeURIComponent(detail.session.session_id)}`}>Open in Build</a>
+            <!-- REM-SESSIONS / REM-THREAD-03 — one way back, to the surface
+                 this conversation was done on. It used to be two guesses side
+                 by side: "Open in chat" and "Open in Build", offered for every
+                 session because no session recorded which it was. A Build
+                 conversation opened in Chat loses its repository, its pending
+                 diffs and the approvals over them, so the guess was not a
+                 neutral one. BUG-242's point survives — Build restores a stored
+                 conversation on the same coordinate Chat does — it is simply
+                 the origin that now decides which. -->
+            <a
+              href={conversationLink(
+                workModeRoute(detail.session.origin),
+                detail.session.session_id,
+              )}>Resume in {RESUME_LABELS[workModeRoute(detail.session.origin)]}</a
+            >
             <a href={`#/tasks?session=${encodeURIComponent(detail.session.session_id)}`}>View session tasks</a>
             <a href={`#/approvals?session=${encodeURIComponent(detail.session.session_id)}`}>View session approvals</a>
             <a href={`#/activity?session=${encodeURIComponent(detail.session.session_id)}`}>View audit events</a>
@@ -647,10 +665,6 @@
     display: flex;
     align-items: baseline;
     gap: 0.5rem;
-  }
-  .open-link {
-    font-size: var(--text-xs);
-    font-weight: 600;
   }
   .tags-col {
     max-width: 22rem;

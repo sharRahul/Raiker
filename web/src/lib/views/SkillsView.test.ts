@@ -1,7 +1,7 @@
 // Extensions → Skills. The tab's promises are the ones worth testing: an
 // inactive skill is visibly withheld, a rejected upload says *why* in the
 // owner's words, and nothing claims to be installed until the server said so.
-import { render, screen, waitFor } from "@testing-library/svelte";
+import { render, screen, waitFor, within } from "@testing-library/svelte";
 import { fireEvent } from "@testing-library/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SkillsView from "./SkillsView.svelte";
@@ -29,6 +29,23 @@ function skill(partial: Partial<SkillView> = {}): SkillView {
     updated_at: "2026-08-01T00:00:00Z",
     ...partial,
   };
+}
+
+/**
+ * REM-SKILL-01 — open the one add entry and choose where the skill comes from.
+ *
+ * Three full forms used to be on screen at once, so a test could reach the URL
+ * field without ever saying it wanted a link. Now the mode is a decision, and
+ * a test that drives the product makes it the same way an owner does.
+ */
+async function chooseAddMode(mode: RegExp): Promise<void> {
+  await fireEvent.click(await screen.findByRole("button", { name: "Add a skill" }));
+  await fireEvent.click(
+    within(screen.getByRole("group", { name: "Where the skill comes from" })).getByRole(
+      "button",
+      { name: mode },
+    ),
+  );
 }
 
 describe("SkillsView", () => {
@@ -111,6 +128,7 @@ describe("SkillsView", () => {
     stubFetch({ "GET /api/skills": { skills: [] } });
     render(SkillsView);
     await screen.findByText(/No skills installed yet/i);
+    await chooseAddMode(/From a link/);
     await fireEvent.input(screen.getByLabelText("Skill URL"), {
       target: { value: "https://example.com/SKILL.md" },
     });
@@ -131,6 +149,7 @@ describe("SkillsView", () => {
     });
     render(SkillsView);
     await screen.findByText(/No skills installed yet/i);
+    await chooseAddMode(/From a link/);
     await fireEvent.input(screen.getByLabelText("Skill URL"), {
       target: { value: "https://github.com/o/r/blob/main/skills/tidy/SKILL.md" },
     });
@@ -150,7 +169,7 @@ describe("SkillsView", () => {
       },
     });
     render(SkillsView);
-    await fireEvent.click(await screen.findByRole("button", { name: "Build a skill" }));
+    await chooseAddMode(/Write one here/);
     await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "release-notes" } });
     await fireEvent.input(screen.getByLabelText(/Description/), {
       target: { value: "Draft release notes. Use when cutting a release." },

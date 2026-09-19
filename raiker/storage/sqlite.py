@@ -4096,6 +4096,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         user_id: str | None = None,
         include_archived: bool = False,
         origin: str | None = None,
+        exclude_origin: str | None = None,
     ) -> list[dict[str, Any]]:
         query = "SELECT * FROM sessions"
         params: list[Any] = []
@@ -4105,6 +4106,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             # Legacy rows written before the column existed default to 'chat'.
             conditions.append("origin = ?")
             params.append(origin)
+        if exclude_origin is not None:
+            # REM-THREAD-03 — the complement, for a caller that wants every
+            # conversation the *owner* started whatever surface they started it
+            # on. Naming one origin to leave out is honest about what it does;
+            # naming `chat` to keep in silently dropped Build and Design once
+            # sessions began recording which surface opened them.
+            conditions.append("COALESCE(origin, 'chat') <> ?")
+            params.append(exclude_origin)
         if not include_archived:
             # Default listing surfaces active sessions only; archived rows stay
             # retrievable by an explicit ``include_archived`` request.

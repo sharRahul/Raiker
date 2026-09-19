@@ -37,14 +37,26 @@ class SessionManager:
         )
 
     def get_or_create(
-        self, session_id: str | None = None, *, user_id: str | None = None
+        self,
+        session_id: str | None = None,
+        *,
+        user_id: str | None = None,
+        origin: str = "chat",
     ) -> SessionRecord:
+        """Load a session, or open one that records where it came from.
+
+        REM-THREAD-03 — ``origin`` is set only when the session is *created*.
+        A conversation started in Build is a Build conversation for good; a
+        later turn sent to it from somewhere else does not relabel it, because
+        the origin answers "which surface owns this work" rather than "which
+        composer typed most recently".
+        """
         if session_id:
             loaded = self.load_session(session_id)
             if loaded is not None:
                 return loaded
-            return self.create_session(session_id, user_id=user_id)
-        return self.create_session(user_id=user_id)
+            return self.create_session(session_id, user_id=user_id, origin=origin)
+        return self.create_session(user_id=user_id, origin=origin)
 
     def load_session(self, session_id: str) -> SessionRecord | None:
         row = self.store.load_session(session_id)

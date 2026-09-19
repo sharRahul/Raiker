@@ -38,9 +38,12 @@
   import type { SessionSummary, WorkThread, WorkThreadPage } from "../apiTypes";
   import { groupByDay, relativeTime } from "../format";
   import { cadenceLabel } from "../agentCadence";
-  import { conversationLink } from "../turnAnchor";
+  import { conversationLink, evidenceLink, workModeRoute } from "../turnAnchor";
 
   type Scope = "all" | "chat" | "routine";
+
+  /** REM-THREAD-03 — what a row calls the surface it will open on. */
+  const WORK_MODE_NAMES = { "new-chat": "Chat", build: "Build", design: "Design" } as const;
 
   let page = $state<WorkThreadPage | null>(null);
   let threads = $state<WorkThread[]>([]);
@@ -212,7 +215,13 @@
                    had nowhere to go, so verifying a recalled claim meant opening
                    the conversation at the top and scrolling. -->
               <li>
-                <a href={conversationLink("new-chat", session.session_id, session.match_turn_id)}>
+                <a
+                  href={conversationLink(
+                    workModeRoute(session.origin),
+                    session.session_id,
+                    session.match_turn_id,
+                  )}
+                >
                   <span class="title">{session.title?.trim() || "Untitled chat"}</span>
                   <span class="meta"
                     >{session.turn_count} turn{session.turn_count === 1 ? "" : "s"} · {relativeTime(
@@ -222,6 +231,12 @@
                   {#if session.match_snippet}<span class="matched">“{session.match_snippet}”</span
                     >{/if}
                 </a>
+                <span class="row-links">
+                  <a
+                    class="row-link"
+                    href={evidenceLink(session.session_id, session.match_turn_id)}>Evidence</a
+                  >
+                </span>
               </li>
             {/each}
           </ul>
@@ -255,7 +270,11 @@
     <ul class="threads">
       {#each threads as thread (thread.session_id)}
         <li class:blocked={thread.waiting_on}>
-          <a href={`#/new-chat?session=${encodeURIComponent(thread.session_id)}`}>
+          <!-- REM-THREAD-03 — a thread is resumed where it was done. Every row
+               used to point at Chat, so a Build conversation opened on a screen
+               that cannot show its repository, its pending diffs or the
+               approvals over them. -->
+          <a href={conversationLink(workModeRoute(thread.origin), thread.session_id)}>
             <span class="title">
               {#if thread.kind === "routine"}<Icon name="tasks" size="sm" />{/if}
               {thread.title}
@@ -266,10 +285,21 @@
               project={thread.project_name}
               state={thread.waiting_on ?? (thread.cadence ? cadenceLabel(thread.cadence) : null)}
               stateVariant={thread.waiting_on ? "approval-required" : "metadata-only"}
-              detail={`${thread.turn_count} turn${thread.turn_count === 1 ? "" : "s"}`}
+              detail={`${WORK_MODE_NAMES[workModeRoute(thread.origin)]} · ${thread.turn_count} turn${thread.turn_count === 1 ? "" : "s"}`}
               activityAt={thread.updated_at}
             />
           </a>
+          <!-- REM-THREAD-03 — the other job, kept out of the row's own reading
+               order. Threads resumes work; the inspector verifies how it ran,
+               and it is a link rather than the destination of the row. -->
+          <span class="row-links">
+            {#if thread.task_id}
+              <a class="row-link" href={`#/tasks?task=${encodeURIComponent(thread.task_id)}`}
+                >Task detail</a
+              >
+            {/if}
+            <a class="row-link" href={evidenceLink(thread.session_id)}>Evidence</a>
+          </span>
         </li>
       {/each}
     </ul>
@@ -401,6 +431,27 @@
   .matched {
     color: var(--text-2);
     font-size: var(--text-sm);
+  }
+  /* REM-THREAD-03 — the secondary destinations sit under the row rather than
+     inside its link, at one quiet weight: resuming the work is the row, and
+     verifying how it ran is a link beside it. */
+  .row-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    /* Tucked under the row's title rather than given a line of its own: the
+       row is the work, and a secondary destination that doubles every row's
+       height turns a board into a list of pairs. */
+    margin-top: -0.55rem;
+    padding: 0 var(--space-2) var(--space-2);
+  }
+  .row-link {
+    color: var(--text-3);
+    font-size: var(--text-xs);
+  }
+  .row-link:hover,
+  .row-link:focus-visible {
+    color: var(--accent);
   }
   .matched {
     grid-column: 1/-1;

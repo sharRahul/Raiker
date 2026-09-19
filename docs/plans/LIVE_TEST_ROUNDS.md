@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-18 | Targeted | `2026-09-18-round/` | Anthropic (`claude-haiku-4-5-20251001`), the key entered through the Connect dialog | Ten scenarios on a workspace reset for the round: the guide's own cross-references opening a chapter in place, four closing events describing four different things, a thread resuming on the surface it was done on, the evidence inspector with one routed way back, one memory record drawer, an exception-led Observability overview, an extensions inventory, one Add-skill entry, a non-animated live board and four security lifecycles. **Three defects found by the work and fixed in it** — every chat thread reported "0 turns", the Extensions lead undercounted by three of the five kinds, and two settings pages each drew their own copy of the page's guide link |
 | 2026-09-16 | Targeted | `docs/screenshots/` (five captures, no prefix) | Anthropic (`claude-haiku-4-5-20251001`), the key entered through the Connect dialog | Five scenarios on a workspace reset for the round: a declared table surviving an export, a reopened turn in the evidence inspector, a Knowledge Map that says it is empty instead of drawing three records nobody made, the same records as a list with the canvas stopped, and Build opening the guide chapter the product had been shipping and could not reach. **The first attempt found a High-severity runtime defect** — a turn that wrote anything before calling a tool stored a different answer than it showed — which is why the round had nothing to export until it was fixed |
 | 2026-09-15 (second) | Targeted | `docs/screenshots/` (seven captures, no prefix) | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | Eight scenarios on a workspace reset for the round: the two authority columns a permission could not answer before, a fresh account's capability baseline and the Build preset, a **real model answering with a declared table and chart**, four presentation rows, and `policy_mutation` proved absent. One product defect found by the work and fixed in it — the Permissions posture note still said every capability starts off — and one model behaviour that changed the system prompt rather than the test |
 | 2026-09-15 | Targeted | `2026-09-15-task-history/` | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | Three scenarios unrun since 2026-09-03 finally run; a task's attempts read at an address the task did not have — the run the scheduler claimed, how it settled, and the three surfaces that now link to it; plus two Settings rows that were saying more than they governed, and the first generation of the `docs/screenshots/pages/` catalogue — 176 files, which caught a composer 385px below the fold |
@@ -73,6 +74,70 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-09-18 — The removal round: ten rows, three defects it found in itself
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py`.
+Provider: Anthropic `claude-haiku-4-5-20251001`, the key entered through the
+Connect dialog and never written to the repository. Captures:
+[`docs/screenshots/2026-09-18-round/`](../screenshots/2026-09-18-round).**
+
+Ten items from `docs/plans/`, run as ten live scenarios — one for each of the
+two open BUG entries and one for each of the eight §18.3 rows. Each closed
+item's record is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); what belongs here is
+what the round *observed*.
+
+**What it proved.**
+
+1. A reference from *Working in Build* to *Connecting a model* is a link whose
+   `href` is `#/guide?section=connecting-a-model`, it opens that chapter in
+   place, and the source form `(connecting-a-model.md)` is nowhere on the page.
+2. A real Anthropic turn's four closing events carry four different sentences,
+   and exactly one of them carries the answer.
+3. A Chat thread on the Threads board says **Chat**, opens `#/new-chat`, and
+   carries an **Evidence** link that opens the inspector on that session's turns.
+4. The Sessions inspector offers one **Resume in Chat** and no per-row **Open**.
+5. A memory card offers three controls, and the drawer behind **More** offers
+   the six that were in the row.
+6. Observability's first heading is **Needs your attention**, and Diagnostics is
+   a closed disclosure.
+7. **Work in action** renders a list with no workstation drawn, and the floor is
+   still one press away.
+8. Extensions names what is installed before it explains anything, and the hooks
+   reference is collapsed.
+9. Skills offers one **Add a skill** and no form until a mode is chosen.
+10. Settings → Security & sign-in renders four sections, and every one of the
+    eight controls that were in the single stack is still there.
+
+**What it found, and all three are fixed in this round.**
+
+* **Every chat thread on the board reported "0 turns"**, beside routine rows
+  that reported a real count. `list_sessions` returns the session row, which has
+  no turn count in it, so the field had always been `None`. Not introduced by
+  this round's change — uncovered by looking at the board after it.
+* **Extensions said *"Nothing is installed yet"* above a list of seven installed
+  skills.** The lead counted `/api/extensions`, which carries connectors and MCP
+  servers and not skills, hooks or plugins. Building the inventory beside it is
+  what made the undercount visible.
+* **Two settings pages each drew their own copy of the page's guide link**, so
+  *How the runtime works* appeared twice on one screen.
+
+**What it could not prove.** Nothing in this round needed a provider Raiker
+cannot reach from this host, so nothing was deferred. The two scenarios that
+have historically been blocked on egress — the weather provider
+([BUG-280](TO_BE_FIXED.md#bug-280--weather-and-the-environment-clock-are-unmeasured-against-a-real-provider-and-a-real-model))
+and the image providers
+([BUG-287](TO_BE_FIXED.md#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider))
+— were not part of it and remain open for the same reason.
+
+**One item this round did not close in full, and says so.** REM-SESSIONS asks
+for the ordinary resume actions to live in Threads. They do. The rest of the
+conversation library — rename, move, pin, archive, tags and bulk delete — is
+still in the inspector, because moving it needs the work index to grow a
+`pinned` and an `archived` facet first, and a control that cannot be undone
+from the surface it moved to is worse than one that has not moved. Filed as
+[BUG-303](TO_BE_FIXED.md#bug-303--the-conversation-library-controls-are-still-in-the-evidence-inspector).
 
 ## 2026-09-16 — One answer, wherever it is read back
 

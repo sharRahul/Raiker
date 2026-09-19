@@ -131,7 +131,13 @@ describe("MemoryView", () => {
     );
     expect(screen.getByText("project:alpha scope")).toBeInTheDocument();
     expect(screen.getByText(/normal sensitivity/i)).toBeInTheDocument();
-    expect(screen.getByText(/confidence: 0.90/i)).toBeInTheDocument();
+    // REM-MEM-01 — the card carries what an owner reads at a glance. The
+    // scores are in the record drawer behind **More**, with the controls that
+    // act on them, rather than in a row of eight facts on every card.
+    await fireEvent.click(screen.getByRole("button", { name: /^More for/ }));
+    const drawer = screen.getByRole("region", { name: "Memory record" });
+    expect(within(drawer).getByText("0.90")).toBeInTheDocument();
+    expect(within(drawer).getByText("project:alpha")).toBeInTheDocument();
   });
 
   it("shows a memory written directly under the owner's standing Allow", async () => {
@@ -350,8 +356,11 @@ describe("MemoryView", () => {
       ),
     );
 
-    const forgetBtn = screen.getByRole("button", { name: /forget memory/i });
-    await fireEvent.click(forgetBtn);
+    // REM-MEM-01 — Forget is in the record drawer, with its own consequence
+    // stated, rather than at the same weight as Edit and Pin on the card.
+    await fireEvent.click(screen.getByRole("button", { name: /^More for/ }));
+    const drawer = screen.getByRole("region", { name: "Memory record" });
+    await fireEvent.click(within(drawer).getByRole("button", { name: "Forget" }));
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/memory/mem_1",

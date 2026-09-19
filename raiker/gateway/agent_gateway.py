@@ -20,6 +20,7 @@ from raiker.contracts.models import (
     normalize_prompt_surface,
 )
 from raiker.contracts.streaming import FINAL, StreamEvent
+from raiker.events.summaries import checkpoint_created_summary, turn_closed_summary
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.hooks.contracts import HookInput, HookOutcome
@@ -349,7 +350,16 @@ class AgentGateway:
             hooks_disabled(self.workspace_root, self.owner_principal_id)
         )
         existing_session = self.sessions.load_session(prompt_envelope.session_id)
-        self.sessions.get_or_create(prompt_envelope.session_id, user_id=self._owner_user_id)
+        # REM-THREAD-03 — a conversation records which surface opened it. Every
+        # session was stored as `chat`, so Threads and the Sessions inspector
+        # could only ever offer "open in chat" — including for a session whose
+        # repository, approvals and diffs live in Build. The fact was already on
+        # the envelope and simply was not written down.
+        self.sessions.get_or_create(
+            prompt_envelope.session_id,
+            user_id=self._owner_user_id,
+            origin=surface,
+        )
         self.sessions.track_turn(
             prompt_envelope.session_id,
             prompt_envelope.turn_id,
@@ -493,9 +503,13 @@ class AgentGateway:
                 turn_id=prompt_envelope.turn_id,
                 event_type="checkpoint_created",
                 actor="checkpoint_service",
+                # BUG-302 — `summary` says what this event did; the checkpoint's
+                # own state summary travels beside it under its own key, so
+                # nothing that needed the text lost it.
                 payload={
                     "checkpoint_id": checkpoint.checkpoint_id,
-                    "summary": checkpoint.summary,
+                    "summary": checkpoint_created_summary("CLOSED"),
+                    "checkpoint_summary": checkpoint.summary,
                     "last_event_id": checkpoint.last_event_id,
                 },
                 client=prompt_envelope.client,
@@ -507,7 +521,12 @@ class AgentGateway:
                 turn_id=prompt_envelope.turn_id,
                 event_type="turn_closed",
                 actor="agent_gateway",
-                payload={"status": response.status, "summary": response.message[:200]},
+                # BUG-302 — this event closed the turn; the answer it closed
+                # over is carried by `response_created`, once.
+                payload={
+                    "status": response.status,
+                    "summary": turn_closed_summary(response.status),
+                },
                 client=prompt_envelope.client,
             )
         )

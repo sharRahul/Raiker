@@ -43,9 +43,16 @@ recall and durable transcript use for that conversation.
 
 Use **Observability** when you need evidence rather than a summary:
 
-- **Overview** reports runtime and model readiness.
-- **Sessions** contains conversations and task runs. Opening a turn offers
-  **Open in the conversation**, which lands on that exchange.
+- **Overview** opens with **Needs your attention** — only the things that are
+  wrong, most urgent first, with a link to where you act on each. When there is
+  nothing it says so, and names what it checked: an all-clear covers what was
+  read, never what could not be. A read that failed says *unknown* in that same
+  list rather than counting as healthy.
+- **Sessions** is the evidence inspector: every conversation with the runtime,
+  its turns, and the governed events behind each turn. Opening a turn offers
+  **Open in the conversation**, which lands on that exchange, and a session
+  offers one **Resume in …** link naming the surface that conversation was done
+  on. To pick work back up, use **Threads** — Sessions is for reading the record.
 - **Activity / Audit log** records governed steps and can be filtered and
   exported when the audit-export capability is enabled.
 
@@ -69,20 +76,34 @@ Use **Observability** when you need evidence rather than a summary:
   Each snapshot's **Turn** links back to the exchange it was taken at, and
   *Preview rewind* opens the same preflight **Rewind to before this** opens from
   a message in Chat or Build.
-- **Work** shows live background activity.
+- **Work in action** shows live background activity. It opens as a list — every
+  recorded subagent, task, last run and schedule, with the stored status and
+  progress, and a link straight to each task's own detail. **Workstations** draws
+  the same records as a room instead, which some people find easier to read the
+  first time; it is a choice, it is remembered in this browser only, and it
+  holds still if your system asks for reduced motion.
 - **Notifications** collects events that need attention. It is the record: a
   notice is kept here whether or not either alert under **Settings →
   Notifications** showed it, so turning both off loses nothing. The bell in the
   top bar counts the unread ones from every page.
 
-**Overview** answers the whole of "is this instance in a state I can work in".
-Three tiles at the top give the runtime's readiness, how many capability gates
-are closed, and what configuration is missing — each linking to the page where
-you change it. Underneath, **Is the runtime itself healthy?** carries what only
-the runtime knows about itself: the health transitions its own monitors
-recorded, the memory integrity report and the one repair it offers, the
-background passes the host runs on its own, and any readiness check that
-actually failed, with its reason code and remediation.
+**Overview** answers the whole of "is this instance in a state I can work in",
+in the order that question is actually asked. What needs you comes first, then
+what changed, and the resting state of a working install is below both: the
+runtime's readiness, how many capability gates are closed, and what
+configuration is missing, each linking to the page where you change it.
+
+**Runtime health, in detail** is the specialist view, and it is a disclosure
+because on a healthy install it has nothing to say: the health transitions the
+runtime's own monitors recorded, the memory integrity report and the one repair
+it offers, the background passes the host runs on its own, and any readiness
+check that actually failed, with its reason code and remediation. When one of
+those does have something to say, it is already named in **Needs your
+attention** above — you do not have to open it to find out.
+
+One thing is never folded away. A containment signal that is *alerting* is a
+boundary the runtime believes is being crossed, and it leads that list whatever
+else is true.
 
 **Background passes** is the work the host does every fifteen seconds without
 anybody asking: starting due scheduled tasks, continuing runs you have

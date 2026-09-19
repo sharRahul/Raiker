@@ -20,6 +20,7 @@
   import type { GuideIndex, GuideSection } from "../apiTypes";
   import Markdown from "../components/Markdown.svelte";
   import EmptyState from "../components/EmptyState.svelte";
+  import { resolveGuideLinks } from "../guideLinks";
 
   let { section: requested = null }: { section?: string | null } = $props();
 
@@ -27,6 +28,14 @@
   let current = $state<GuideSection | null>(null);
   let loading = $state(true);
   let error = $state("");
+
+  // BUG-301 — the chapters this build actually shipped. A cross-reference is
+  // rewritten into an address only when its target is one of them, so a guide
+  // page cannot link to a chapter the reader has no way to open.
+  const slugs = $derived(new Set((index?.sections ?? []).map((section) => section.slug)));
+  const chapterMarkdown = $derived(
+    current === null ? "" : resolveGuideLinks(current.markdown, slugs),
+  );
 
   /** Load one section. Does not touch the hash — see the effect below. */
   async function load(slug: string) {
@@ -98,7 +107,10 @@
 
       <article class="guide-page" aria-live="polite">
         {#if current}
-          <Markdown text={current.markdown} />
+          <!-- BUG-301 — `inAppLinks` is set here and nowhere that renders model
+               output: the text is the product's own and its targets were
+               resolved against the chapter list above before they got here. -->
+          <Markdown text={chapterMarkdown} inAppLinks />
         {/if}
       </article>
     </div>

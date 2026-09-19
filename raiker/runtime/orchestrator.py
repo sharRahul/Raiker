@@ -29,6 +29,7 @@ from raiker.contracts.streaming import (
     TOOL,
     StreamEvent,
 )
+from raiker.events.summaries import response_created_summary
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.hooks.contracts import HookInput
@@ -3126,7 +3127,13 @@ class RuntimeOrchestrator:
         self._event(
             envelope,
             "response_created",
-            {"status": status, "summary": message[:200], "runtime_state": machine.state},
+            # BUG-302 — the one event whose subject *is* the answer, so this is
+            # the one place the answer text is still the summary.
+            {
+                "status": status,
+                "summary": response_created_summary(message),
+                "runtime_state": machine.state,
+            },
         )
         for pending in self._drain_sink():
             yield pending

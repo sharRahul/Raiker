@@ -578,6 +578,16 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-554](#fixed-554--the-product-shipped-a-guide-chapter-about-build-and-could-not-open-it) | Low | Guide / navigation | Fixed 2026-09-16 (closes REM-GUIDE) |
 | [FIXED-555](#fixed-555--cancel-on-a-conversion-could-go-unanswered-for-six-hours) | Medium | Models / conversion | Fixed 2026-09-16 (closes GCR-24) |
 | [FIXED-556](#fixed-556--a-source-fingerprint-that-did-not-hash-the-source) | Medium | Models / provenance | Fixed 2026-09-16 (closes GCR-26) |
+| [FIXED-557](#fixed-557--the-guides-own-cross-references-were-punctuation) | Low | Guide / web UI | Fixed 2026-09-18 (closes BUG-301) |
+| [FIXED-558](#fixed-558--four-events-describing-themselves-with-one-borrowed-sentence) | Low | Observability / audit summaries | Fixed 2026-09-18 (closes BUG-302) |
+| [FIXED-559](#fixed-559--every-thread-opened-in-chat-including-the-ones-that-were-not) | Medium | Threads / Sessions / routing | Fixed 2026-09-18 (closes REM-THREAD-03) |
+| [FIXED-560](#fixed-560--the-evidence-inspector-was-a-second-place-to-resume-work) | Low | Sessions / Observability | Fixed 2026-09-18 (closes REM-SESSIONS) |
+| [FIXED-561](#fixed-561--seven-equally-prominent-actions-on-every-memory-card) | Low | Memory | Fixed 2026-09-18 (closes REM-MEM-01) |
+| [FIXED-562](#fixed-562--observability-opened-with-seven-tiles-saying-nothing-is-wrong) | Low | Observability | Fixed 2026-09-18 (closes REM-OBSERVE) |
+| [FIXED-563](#fixed-563--extensions-asked-you-to-open-five-tabs-to-learn-what-you-had) | Low | Extensions | Fixed 2026-09-18 (closes REM-EXT-01) |
+| [FIXED-564](#fixed-564--three-ways-to-add-a-skill-all-open-at-once) | Low | Skills | Fixed 2026-09-18 (closes REM-SKILL-01) |
+| [FIXED-565](#fixed-565--the-live-board-could-only-be-read-as-a-moving-picture) | Low | Observability / accessibility | Fixed 2026-09-18 (closes REM-LIVE) |
+| [FIXED-566](#fixed-566--four-security-lifecycles-under-one-heading) | Low | Settings / security | Fixed 2026-09-18 (closes REM-SET-SECURITY) |
 
 ---
 
@@ -24661,3 +24671,362 @@ claim:
 The cost is one full read of the snapshot, which is a fraction of a conversion
 that has just read all of it several times, and it is what makes the recorded
 value mean what the record says it means.
+
+---
+
+## FIXED-557 — The guide's own cross-references were punctuation
+
+**Severity: Low. Area: Guide / web UI. Status: Fixed 2026-09-18. Closes
+[BUG-301](TO_BE_FIXED.md).**
+
+**Observed.** `docs/guide/working-in-build.md` refers to the *Connecting a model*
+chapter as an ordinary relative Markdown link, and the Guide page rendered that
+source literally — square brackets, parentheses and a filename. Every
+chapter-to-chapter reference in the guide read as broken punctuation, on the one
+surface the product now points to instead of explaining itself on the page
+([FIXED-554](#fixed-554--the-product-shipped-a-guide-chapter-about-build-and-could-not-open-it)).
+
+**Fixed where the entry said it had to be: at the guide layer, not in the
+renderer.** `renderMarkdown` draws model-authored answers with the same code,
+and there a link is untrusted input; relaxing its scheme rule for every caller
+would have been the wrong trade for a documentation link. So `guideLinks.ts`
+resolves the reference *before* rendering, against the chapter list the page
+already loaded from `/api/guide` — a target either is a chapter this build
+shipped or it is not, and nothing is guessed. The renderer gained one opt-in,
+`inAppLinks`, which `GuideView` sets and nothing that renders model output does.
+
+Three details are the change rather than decoration:
+
+* **The in-app form carries no colon.** `IN_APP_URL` is `#/` followed by
+  unreserved path segments and an optional query, so no scheme can be smuggled
+  through it and `#//host` is not a shape it emits.
+* **No `target="_blank"`.** An in-app link opens in place; the guide opening
+  itself in a second tab would be its own defect.
+* **A repository document becomes a sentence.** `../architecture/KNOWN_LIMITS.md`
+  is not a chapter and cannot be opened from inside the app however it is marked
+  up, so it renders as its label followed by the path once — losing the pointer
+  would be worse, and keeping the brackets would keep the defect.
+
+**Live.** `guide-cross-reference.png` and `guide-chapter-opened.png` — the
+reference on *Working in Build* is a link, its `href` is
+`#/guide?section=connecting-a-model`, clicking it opens that chapter in place,
+and the source form `(connecting-a-model.md)` is nowhere on the page. Zero
+console errors.
+
+**Held by a test that states the boundary rather than the wording**: the same
+characters a model could write stay characters, the flag does not survive into
+the next render, and a scheme is still refused with the flag on.
+
+---
+
+## FIXED-558 — Four events describing themselves with one borrowed sentence
+
+**Severity: Low. Area: Observability / audit summaries. Status: Fixed 2026-09-18.
+Closes [BUG-302](TO_BE_FIXED.md).**
+
+**Observed.** In the Sessions turn inspector, `Task completed`, `Turn closed`,
+`Checkpoint created` and `Response created` each carried the first two hundred
+characters of the answer as their summary. For a turn that declared a table they
+were four copies of the same JSON payload, in a list whose job is to say what
+happened, in order, under a rendered table that already said it legibly.
+`sessions-reopened-typed-answer.png` was the evidence.
+
+**Fixed as the entry framed it: not a rendering change.** The summary being the
+raw record is correct — an audit summary is what the runtime saw, verbatim, and a
+fence rendered as a table in the evidence log would be the log editing itself.
+What was wrong is that four events described themselves with one borrowed
+sentence. `raiker/events/summaries.py` holds the rule:
+
+* **One event carries the answer.** `response_created` is the event whose subject
+  *is* the answer, so it keeps it, verbatim and bounded exactly as before.
+* **Every other event says what it did.** *"Recorded a restore point for this
+  turn at CLOSED."* *"Turn closed as completed."* *"Completed the task 'Chat
+  turn'."*
+
+The last of those follows the convention `raiker/events/otlp.py` already states —
+*a summary names the object an action acted on* — because the event type already
+says "Task completed" and what a reader scanning a list needs is **which** task.
+
+**Nothing that needed the text lost it.** The checkpoint's own state summary
+moved to `checkpoint_summary`, and a task's outcome to `outcome_summary`, which
+is where the per-task attempt timeline
+([FIXED-535](#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read))
+reads it — so that timeline is exactly as informative as it was while the audit
+column stopped repeating an answer three other events were already repeating.
+
+**Live.** `sessions-event-summaries.png` — a real Anthropic turn, four closing
+events, four different sentences, one answer. The spec asserts the rule rather
+than the wording: no two summaries in one turn are the same.
+
+---
+
+## FIXED-559 — Every thread opened in Chat, including the ones that were not
+
+**Severity: Medium. Area: Threads / Sessions / routing. Status: Fixed 2026-09-18.
+Closes **REM-THREAD-03** of the release-readiness review's §18.3.**
+
+**Observed.** Every row on Threads linked to `#/new-chat?session=…`, and the
+Sessions inspector offered *Open in chat* and *Open in Build* side by side for
+every session. Both were guesses, and the reason they had to be is that **no
+session recorded which surface opened it**: `_all_work_threads` read
+`origin="chat"` because that was the whole list, and `set_session_origin` was
+only ever called to mark a task's own session. A Build conversation opened in
+Chat is not the same conversation — its repository, its pending diffs and the
+approvals over them are Build's, and none of them is on the Chat screen.
+
+**Fixed at the root rather than at the link.** The turn envelope has carried the
+composer's `surface` since the operating protocols shipped; it simply was not
+written down. The gateway now passes it as the origin when a session is
+*created*, and only then — a conversation started in Build is a Build
+conversation for good, and a later turn sent to it from elsewhere does not
+relabel it.
+
+With that recorded, three things follow rather than being invented:
+
+* `list_sessions` gained `exclude_origin`, so the work index reads *every
+  conversation the owner started* rather than the ones stored as `chat`. Naming
+  the complement is honest about what it does; naming `chat` would have silently
+  dropped Build and Design from the one board that claims to show all the work.
+* A routine thread routes by its **task's** surface, which the task has recorded
+  since it was filed — its session cannot say, because every task session's
+  origin is `task` by construction.
+* `workModeRoute` resolves an unrecognised or absent origin to Chat. A workspace
+  written by an older build stores none, and the transcript is readable in Chat
+  whatever produced it, so the fallback is the one that always works rather than
+  a dead row.
+
+**And the technical record became a link beside the row rather than its
+destination.** `evidenceLink` addresses `#/sessions?session=…` — the alias the
+router already carries, so a link written before this existed still resolves —
+and a routine row also links to its own task detail.
+
+**Live.** `threads-work-mode-and-evidence.png` — a Chat thread names Chat, opens
+Chat, and carries **Evidence** that opens the inspector on that session's turns.
+
+**Found while proving it, and fixed with it: every chat row said "0 turns".**
+`list_sessions` returns the session row, and a session row has no turn count in
+it, so `session.get("turn_count")` had always been `None` — beside routine rows
+that showed a real count, because those were counted with
+`count_turns_by_session`. The chat half does the same now, in one query for the
+page. The spec asserts it rather than trusting it: a thread that has just
+answered does not say zero.
+
+---
+
+## FIXED-560 — The evidence inspector was a second place to resume work
+
+**Severity: Low. Area: Sessions / Observability. Status: Fixed 2026-09-18.
+Closes **REM-SESSIONS** of §18.3.**
+
+**Observed.** Sessions exposes turn ids and the governed events behind each turn,
+which is audit. It also carried an **Open** link into Chat on every row and a
+pair of *Open in chat* / *Open in Build* links on every session — an everyday
+chat history growing inside the inspector, with the routing defect of
+[FIXED-559](#fixed-559--every-thread-opened-in-chat-including-the-ones-that-were-not)
+in both.
+
+**Fixed.** The row opens the record and nothing else. The detail panel carries
+**one** way back, named for the surface that owns the conversation — *Resume in
+Chat*, *Resume in Build*, *Resume in Design* — and the page's own lead says where
+resuming lives. BUG-242's point survives unchanged: Build restores a stored
+conversation on the same coordinate Chat does; it is the origin that now decides
+which of them is offered.
+
+`SessionMenu`'s **Copy local link** was the same defect in a third place and is
+fixed with them.
+
+**Live.** `sessions-evidence-inspector.png` — no per-row Open, one *Resume in
+Chat*, and a link to Threads in the lead.
+
+**What is left, and why it was not done here.** The conversation-library controls
+— rename, move to project, pin, archive, the tag editor and bulk delete — are
+still on this page. Moving them to Threads needs the work index to grow a
+`pinned` and an `archived` facet and an ordering that honours them, and a control
+whose effect cannot be undone from the same surface is worse than one that has
+not moved yet. Filed as
+[BUG-303](TO_BE_FIXED.md#bug-303--the-conversation-library-controls-are-still-in-the-evidence-inspector).
+
+---
+
+## FIXED-561 — Seven equally prominent actions on every memory card
+
+**Severity: Low. Area: Memory. Status: Fixed 2026-09-18. Closes **REM-MEM-01** of
+§18.3.**
+
+**Observed.** A memory card carried **View source**, **Edit**, **Edit scope**,
+**Review expiry**, **Pin**, **View history** and **Forget** in one row, at one
+weight, with **Delete permanently** in a disclosure below. Seven controls of
+equal prominence is not a choice an owner makes quickly, and the three that
+change what Raiker remembers looked exactly like the four that only show it
+something.
+
+**Fixed.** The card keeps **Edit**, **Pin** and **More**, plus the provenance and
+expiry summary it already had. `MemoryRecordDrawer` holds the rest, grouped by
+what they do — *look at the record*, *change how long it lives*, *remove it* —
+with each irreversible action stating its own consequence rather than sharing one
+sentence with the others.
+
+**The drawer holds an id, not a record.** Scope, expiry and deletion are all
+versioned against `updated_at` server-side, so it resolves through the list its
+parent keeps refreshed and acts on the revision the page currently holds. When
+the id is no longer listed — forgotten in another tab, expired by the sweep, or
+reached from an old bookmark — it says so and offers nothing, rather than acting
+on a copy that has stopped being true. That is the "conflict recovery and old
+bookmarked records" the row asks to be tested.
+
+**Live.** `memory-record-drawer.png` — three controls on the card, and the
+drawer's six behind **More**.
+
+---
+
+## FIXED-562 — Observability opened with seven tiles saying nothing is wrong
+
+**Severity: Low. Area: Observability. Status: Fixed 2026-09-18. Closes
+**REM-OBSERVE** of §18.3.**
+
+**Observed.** The Overview asked five good operational questions and answered
+every one whether or not there was anything to say. On a working install that is
+seven tiles reading *Ready*, *0*, *0*, *0*, *Nothing required is unset* — and then
+the whole of Diagnostics rendered inline below them — before the owner reached
+anything that told them something. The page was not wrong; it was uniform, and a
+uniform page makes one red tile no easier to find than the six green ones beside
+it.
+
+**Fixed by changing the order, not the content.** `observeAttention.ts` decides
+what is an exception, and the page opens with those. Three rules are in it
+because they had each already broken something:
+
+* **Healthy work is not an exception.** REM-HOME-02 settled this for Home when
+  the attention rail counted every active task and a healthy nightly routine made
+  the board permanently claim something needed the owner.
+* **Unknown is not healthy.** A failed read is an explicit `unknown` row naming
+  what could not be read, and the all-clear sentence names the scope it covers —
+  which is NEW-HOME-01 from the other side, where a caught diagnostics failure
+  became `0 issues` and `0 issues` became "nothing needs you".
+* **Containment leads and is never folded away.** A security signal in `alerting`
+  is the one row that must not sit below a telemetry delivery error, so the
+  overview reads `/api/security/health` itself rather than waiting for the
+  specialist view to be opened. It is read in its own request and allowed to fail
+  on its own, so a build without the route degrades to *unknown* rather than
+  taking the page down.
+
+Diagnostics is a disclosure now — *"preserve diagnostics as specialist views"* —
+carrying the failed readiness checks, the health transitions and the memory
+integrity report it always had.
+
+**Live.** `observe-attention-first.png` — **Needs your attention** is the first
+heading on the page, and the disclosure is closed.
+
+---
+
+## FIXED-563 — Extensions asked you to open five tabs to learn what you had
+
+**Severity: Low. Area: Extensions. Status: Fixed 2026-09-18. Closes **REM-EXT-01**
+of §18.3.**
+
+**Observed.** The hub's overview led with what needed attention and where to add
+something, which is two of the three things the row asks for. What was missing is
+the inventory: *what have I got* could only be answered by opening Connectors,
+MCP servers, Skills, Hooks and Plugins in turn. Meanwhile the Hooks tab carried
+**Handler types** and **Built-in handlers** as full cards of operator reference,
+and the Plugins tab put the contribution catalogue at the same weight as the
+installed inventory.
+
+**Fixed.** `extensionInventory` groups what is installed by kind, and the overview
+shows one row per kind — *4 of 5 usable* — each opening the tab that lists it. A
+count per kind rather than a card per extension, because the exceptions above it
+already name everything that needs a person, and a card per working extension is
+the most expensive possible way to report that nothing is wrong. An unknown kind
+is named as itself rather than hidden, so a build that grows a sixth shows it
+before anyone remembers to add a row for it.
+
+The reference moved without being removed: handler types and built-ins are one
+disclosure whose summary carries the counts, and so is the plugin contribution
+catalogue. Every signed-manifest fact, every audit link and every unavailable
+reason is exactly where it was.
+
+**Found while proving it, and fixed with it: the page's lead sentence
+undercounted by three kinds.** `/api/extensions` carries connectors and MCP
+servers; skills, hooks and plugins have their own routes. So a workspace with
+seven installed skills was told *"Nothing is installed yet. Connect an account,
+add an MCP server, or install a skill."* — advice to do the thing it had
+already done. Building the inventory beside it is what made that visible, and
+`extensionReach` now counts the same five kinds, so the two cannot disagree on
+one screen. A kind that could not be read is left out rather than counted as
+zero, which is the same rule the attention list above it follows.
+
+**One more, smaller:** Security & sign-in and Runtime configuration each drew
+their own *How the runtime works* link under the one the Settings page already
+draws. Two links, one destination, one screen.
+
+---
+
+## FIXED-564 — Three ways to add a skill, all open at once
+
+**Severity: Low. Area: Skills. Status: Fixed 2026-09-18. Closes **REM-SKILL-01**
+of §18.3.**
+
+**Observed.** A file picker, a URL field with its own submit, and a builder toggle
+sat side by side above the installed list, all three always open. The page asked
+the owner to compare three ways of getting a skill before they had said they
+wanted one — and the installed inventory, which is what the tab is for, started
+below all of it.
+
+**Fixed.** One **Add a skill**, then the three modes as a choice with the one line
+each that decides between them, then only the chosen mode's form. The modes and
+what each verifies are unchanged — a `.skill` bundle is still bounded at 2 MB, a
+link is still fetched and verified before anything is installed, and a built skill
+is still held to the same contract. What changed is that nothing is on screen
+until the owner has said which of them they mean.
+
+---
+
+## FIXED-565 — The live board could only be read as a moving picture
+
+**Severity: Low. Area: Observability / accessibility. Status: Fixed 2026-09-18.
+Closes **REM-LIVE** of §18.3.**
+
+**Observed.** Work in action opened on animated workstations. The characters do
+reflect real stored status — the tab was careful about that, and says so — but
+they were the first and only way to read it, they duplicated what Tasks and
+Threads already show, and the view honoured no reduced-motion preference at all.
+
+**Fixed, and the floor kept.** The list is the default: the same nodes, the same
+statuses, the same stored progress, and a direct link to each task's own detail
+through the `task:<id>` coordinate `brain` already returns. Nothing in it is
+derived from anything the floor does not draw, so the two cannot disagree about
+what is running. A row with no recorded percentage says *Not recorded* rather than
+being drawn at zero, which would read as "started and got nowhere".
+
+The floor is one press away, because delegation really is easier to grasp as a
+room than as a table the first time you see it — and under
+`prefers-reduced-motion` it now holds still. The choice is remembered in
+`localStorage` and nowhere else: it is a viewing preference, not workspace state,
+and a browser that refuses storage simply starts on the list, which is the safe
+default anyway.
+
+**Live.** `work-in-action-list.png` — the list renders, no workstation is drawn,
+and the floor is still reachable.
+
+---
+
+## FIXED-566 — Four security lifecycles under one heading
+
+**Severity: Low. Area: Settings / security. Status: Fixed 2026-09-18. Closes
+**REM-SET-SECURITY** of §18.3.**
+
+**Observed.** Settings → Security & sign-in was one card holding eight fields in a
+flat stack: database encryption, the connector vault key, TOTP, credential
+scanning, monitored capabilities, password, active device sessions and standing
+approval grants. They do not change together, they are not read together, and
+they are not answered by the same question — *"how do I sign in"* and *"what may
+run without asking me"* had the same heading, the same weight and the same
+neighbours.
+
+**Fixed.** Four sections, each named for its lifecycle: **Signing in and
+devices**, **Encryption and the vault**, **Findings and monitoring**, and
+**Standing access**. Nothing is removed and nothing is weakened — the same
+controls, in the same order within each group, with the same confirmations. The
+emergency pause is not here and never was: it is the STOP switch in the context
+bar, on every screen rather than behind a settings tab.
+

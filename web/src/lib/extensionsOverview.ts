@@ -87,16 +87,31 @@ export function extensionExceptions(
     }));
 }
 
-/** What is working, as counts. */
-export function extensionReach(
-  extensions: readonly ExtensionView[] | null | undefined,
-): ExtensionReach {
-  const known: readonly ExtensionView[] = Array.isArray(extensions) ? extensions : [];
-  const usable = known.filter((extension) => extension.usable);
+/**
+ * What is working, as counts.
+ *
+ * **Counted over the same five kinds the inventory is.** It used to read
+ * `/api/extensions` alone, which covers connectors and MCP servers and not
+ * skills, hooks or plugins — so a workspace with seven installed skills was
+ * told *"Nothing is installed yet."* Building the inventory beside it is what
+ * made that visible, and leaving the two to disagree on one screen would have
+ * been worse than either of them being wrong on its own.
+ *
+ * `tools` stays over the extension views, because a tool count is something
+ * only a connector or an MCP server has. A skill offers no tool; it is
+ * instructions.
+ */
+export function extensionReach(inputs: ExtensionInventoryInputs): ExtensionReach {
+  const rows = extensionInventory(inputs);
+  const known: readonly ExtensionView[] = Array.isArray(inputs.extensions)
+    ? inputs.extensions
+    : [];
   return {
-    usable: usable.length,
-    installed: known.filter((extension) => extension.installed).length,
-    tools: usable.reduce((total, extension) => total + (extension.tool_count || 0), 0),
+    usable: rows.reduce((total, row) => total + row.usable, 0),
+    installed: rows.reduce((total, row) => total + row.installed, 0),
+    tools: known
+      .filter((extension) => extension.usable)
+      .reduce((total, extension) => total + (extension.tool_count || 0), 0),
   };
 }
 
@@ -115,4 +130,91 @@ export function reachSentence(reach: ExtensionReach): string {
         ? ", offering 1 tool"
         : `, offering ${reach.tools} tools`;
   return `${reach.usable} of ${reach.installed} installed extensions can be used${tools}.`;
+}
+
+/**
+ * REM-EXT-01 — what is installed, grouped by kind.
+ *
+ * The overview said how many extensions were usable and named the ones that
+ * were not, which answers "is anything wrong" and leaves "what have I got"
+ * to be worked out by opening five tabs in turn. The inventory is the third
+ * thing the review asks this page to lead with, beside the exceptions and
+ * **Add**, and it is a count per kind rather than a card per extension: a card
+ * per working extension is the most expensive possible way to report that
+ * nothing is wrong.
+ */
+export interface ExtensionInventoryRow {
+  kind: string;
+  label: string;
+  installed: number;
+  usable: number;
+  /** The hub tab that lists this kind. */
+  tab: string;
+}
+
+/** Which tab lists each kind, and what that kind is called on the row. */
+const KIND_TABS: Record<string, { label: string; tab: string }> = {
+  connector: { label: "Connectors", tab: "connectors" },
+  mcp_server: { label: "MCP servers", tab: "mcp" },
+};
+
+/**
+ * What the inventory is counted from.
+ *
+ * Five kinds, from four reads, because that is what the product actually has:
+ * `/api/extensions` covers connectors and MCP servers and **not** skills, hooks
+ * or plugins, which have their own routes. An inventory built from the first
+ * alone would have claimed to say what is installed while silently omitting
+ * three of the five kinds, which is a worse answer than the five tabs it
+ * replaces.
+ */
+export interface ExtensionInventoryInputs {
+  extensions: readonly ExtensionView[] | null | undefined;
+  /** Installed skills, and whether each is switched on. */
+  skills: ReadonlyArray<{ active: boolean }> | null | undefined;
+  /** Loaded hook rules, and whether hooks are running at all. */
+  hooks: { rule_count: number; active: boolean } | null | undefined;
+  plugins: ReadonlyArray<{ status: string }> | null | undefined;
+}
+
+export function extensionInventory(
+  inputs: ExtensionInventoryInputs,
+): ExtensionInventoryRow[] {
+  const rows = new Map<string, ExtensionInventoryRow>();
+  const add = (kind: string, label: string, tab: string, usable: boolean) => {
+    const row = rows.get(kind) ?? { kind, label, installed: 0, usable: 0, tab };
+    row.installed += 1;
+    if (usable) row.usable += 1;
+    rows.set(kind, row);
+  };
+
+  const known: readonly ExtensionView[] = Array.isArray(inputs.extensions)
+    ? inputs.extensions
+    : [];
+  for (const extension of known) {
+    if (!extension.installed) continue;
+    // An unknown kind is named as itself rather than hidden: a build that grows
+    // a sixth should show it here before anyone remembers to add a row for it.
+    const named = KIND_TABS[extension.kind];
+    add(
+      extension.kind,
+      named?.label ?? extension.kind,
+      named?.tab ?? "connectors",
+      extension.usable,
+    );
+  }
+  for (const skill of inputs.skills ?? []) {
+    add("skill", "Skills", "skills", skill.active);
+  }
+  if (inputs.hooks != null) {
+    for (let index = 0; index < inputs.hooks.rule_count; index += 1) {
+      // A rule that is loaded while hooks are switched off is installed and not
+      // usable, which is exactly the distinction this column is for.
+      add("hook", "Hooks", "hooks", inputs.hooks.active);
+    }
+  }
+  for (const plugin of inputs.plugins ?? []) {
+    add("plugin", "Plugins", "plugins", plugin.status === "enabled");
+  }
+  return [...rows.values()].sort((a, b) => a.label.localeCompare(b.label));
 }

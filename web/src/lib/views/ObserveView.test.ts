@@ -106,21 +106,29 @@ describe("ObserveView", () => {
     expect(screen.queryByText("Ready")).not.toBeInTheDocument();
   });
 
-  it("answers the four overview questions with evidence links", async () => {
+  it("answers the overview's questions with evidence links", async () => {
     stubFetch(routes());
     render(ObserveView, { props: { tab: "overview" } });
 
-    await waitFor(() => expect(screen.getByText("Is Raiker ready?")).toBeInTheDocument());
+    // REM-OBSERVE — exceptions first, then what changed, then the resting
+    // state. The page used to open with seven tiles reading Ready and 0 on any
+    // working install, which made the one that mattered exactly as easy to
+    // miss as the six that did not.
+    await waitFor(() => expect(screen.getByText("Needs your attention")).toBeInTheDocument());
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(headings[0]).toBe("Needs your attention");
+
+    expect(screen.getByText("Is Raiker ready?")).toBeInTheDocument();
     expect(screen.getByText("Is anything waiting for me?")).toBeInTheDocument();
     expect(screen.getByText("What changed?")).toBeInTheDocument();
     expect(screen.getByText("Can I safely share this?")).toBeInTheDocument();
     // Diagnostics was a seventh tab reading this same object and restating four
-    // of its six cards from it. Its unique half is a section of this page now,
-    // so the Runtime tile no longer links away to a copy of itself.
-    expect(screen.getByText("Is the runtime itself healthy?")).toBeInTheDocument();
+    // of its six cards from it. Its unique half is on this page — as a
+    // disclosure now, because on a healthy install it has nothing to say and
+    // what it does have is already named in the attention list above.
+    expect(screen.getByText("Runtime health, in detail")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /open diagnostics/i })).toBeNull();
-    expect(screen.getByRole("link", { name: /open the decision queue/i })).toHaveAttribute(
-      "href",
+    expect(screen.getByRole("link", { name: /open the decision queue/i }).getAttribute("href")).toBe(
       "#/approvals",
     );
   });
@@ -137,9 +145,14 @@ describe("ObserveView", () => {
     render(ObserveView, { props: { tab: "overview" } });
 
     await waitFor(() => expect(screen.getByText("Pending approvals")).toBeInTheDocument());
-    expect(
-      screen.getByText(/these can no longer be approved/i),
-    ).toBeInTheDocument();
+    // REM-OBSERVE — an expired approval is a different job from a live one, so
+    // it is its own row in the attention list as well as its own tile. Both
+    // carry the same sentence, which is why this asserts on the list rather
+    // than on the page.
+    const attention = screen.getByRole("list", { name: undefined }).closest("section");
+    expect(attention?.textContent).toContain("1 approval expired");
+    expect(attention?.textContent).toContain("1 decision waiting on you");
+    expect(screen.getAllByText(/these can no longer be approved/i).length).toBeGreaterThan(0);
   });
 
   it("builds the support bundle only from what the server returns", async () => {

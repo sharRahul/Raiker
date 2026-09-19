@@ -1897,65 +1897,58 @@ had been losing paragraphs all along.
 
 ## BUG-301 — The guide's own cross-references are not links
 
-**Severity: Low. Area: Guide / web UI. Raised 2026-09-16 while closing
-REM-GUIDE.**
-
-**Observed.** `docs/guide/working-in-build.md` refers to the *Connecting a
-model* chapter as an ordinary Markdown link to `connecting-a-model.md`, and the
-Guide page renders that source literally — square brackets, parentheses and all.
-Every chapter-to-chapter reference in the guide reads as broken punctuation to an
-owner, and the guide is the one place the product now points to instead of
-explaining itself on the page
-([FIXED-554](FIXED_ITEMS.md#fixed-554--the-product-shipped-a-guide-chapter-about-build-and-could-not-open-it)),
-so its internal navigation matters more than it did.
-
-**Root cause, and it is a boundary rather than a bug.** `renderMarkdown` accepts
-`http(s):` and `mailto:` and downgrades everything else to plain text. That rule
-exists because the same renderer draws model-authored answers, where a link is
-untrusted input; relaxing it for every caller would be the wrong trade for the
-sake of a documentation link.
-
-**Proposed fix.** Resolve the reference at the guide layer, where the content is
-the product's own and the slug set is known: rewrite `](<slug>.md)` to the
-`#/guide?section=<slug>` address the page already uses, and let the renderer
-accept an in-app hash href only when the caller opts in. An in-app link must not
-carry `target="_blank"` — the guide opening itself in a second tab is a different
-defect. The opt-in is what keeps a model-authored answer exactly where it is.
-
-**Interface outcome that has to be true before this closes.** A reference from
-one guide chapter to another is a link that opens that chapter in place, and a
-model-authored answer still cannot produce a link the renderer would not have
-made before.
+**Closed 2026-09-18 as
+[FIXED-557](FIXED_ITEMS.md#fixed-557--the-guides-own-cross-references-were-punctuation).**
+Resolved at the guide layer, exactly as the entry set out: `guideLinks.ts`
+rewrites a chapter reference against the chapter list the page already loaded,
+and the renderer accepts an in-app `#/…` address only for the one caller that
+opts in — so a model-authored answer still cannot produce a link the renderer
+would not have made before. A `.md` target that is *not* a chapter is a
+repository document a reader inside the app cannot open however it is marked up,
+and it renders as its label with the path named once rather than as punctuation.
 
 ---
 
 ## BUG-302 — Four audit summaries quote the whole answer, including a payload
 
-**Severity: Low. Area: Observability / audit summaries. Raised 2026-09-16 while
-capturing the evidence for
-[FIXED-551](FIXED_ITEMS.md#fixed-551--a-declared-table-was-a-table-in-the-conversation-and-json-everywhere-else).**
+**Closed 2026-09-18 as
+[FIXED-558](FIXED_ITEMS.md#fixed-558--four-events-describing-themselves-with-one-borrowed-sentence).**
+The decision the entry asked for, written down in `raiker/events/summaries.py`:
+`response_created` is the one event whose subject *is* the answer and keeps it
+verbatim; the other three say what they did. The facts that used to ride in the
+`summary` column travel under their own keys, so the per-task attempt timeline
+still reads a completion's outcome.
 
-**Observed.** In the Sessions turn inspector, `Task completed`, `Turn closed`,
-`Checkpoint created` and `Response created` each carry the first 200 characters
-of the answer as their summary. For a turn that declared a table, all four are
-the same JSON payload, four times, under a rendered table that says the same
-thing legibly.
+---
 
-`sessions-reopened-typed-answer.png` is the evidence: four near-identical rows of
-`raiker:table {"caption": "City Populations", "columns": …` in a list whose job
-is to say what happened, in order.
+## BUG-303 — The conversation-library controls are still in the evidence inspector
 
-**Why it is filed rather than fixed.** The summary being the raw record is
-*correct* — an audit summary is what the runtime saw, verbatim, and a fence
-rendered as a table in the evidence log would be the log editing itself. What is
-wrong is that four different events describe themselves with the same borrowed
-sentence instead of saying what each one did. That is a decision about what each
-event's summary should be, not a rendering change, and it touches the event
-vocabulary.
+**Severity: Low. Area: Sessions / Threads. Raised 2026-09-18 while closing
+[REM-SESSIONS](FIXED_ITEMS.md#fixed-560--the-evidence-inspector-was-a-second-place-to-resume-work).**
 
-**Interface outcome that has to be true before this closes.** An event's summary
-says what that event did. Where the answer text is genuinely the evidence, one
-event carries it rather than four.
+**Observed.** Sessions no longer offers a second way to *resume* a conversation:
+the row opens the record, and one routed link is the way back. What is still
+there is the rest of an everyday chat library — rename, move to project, pin,
+archive, the inline tag editor and bulk delete — on the page whose job is audit.
+
+**Why it was not moved with the resume actions.** Threads is the right home for
+all six, and its index cannot hold them yet. `GET /api/work-threads/page`
+filters by project, kind and query and pages behind a scope-bound cursor; it has
+no `pinned` or `archived` facet, no ordering that honours a pin, and no way to
+list an archived thread at all — `_all_work_threads` reads
+`include_archived=False`. Moving **Archive** there would give an owner a control
+whose effect they could not undo from the same surface, which is worse than one
+that has not moved.
+
+**Proposed fix.** Grow the work index first: `pinned` and `archived` on
+`WorkThreadView`, an `archived` scope on the page request with its own facet, and
+a sort that puts pinned threads first — then move the lifecycle menu and the tag
+editor to Threads and leave Sessions reading only. **Delete** is the one that
+should stay: it removes the audit record, and it belongs beside the evidence it
+removes rather than in the library.
+
+**Interface outcome that has to be true before this closes.** One place organises
+conversations, and it is the place work is resumed from. The inspector reads.
 
 ---
 

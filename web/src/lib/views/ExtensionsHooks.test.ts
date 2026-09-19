@@ -273,8 +273,16 @@ describe("Extensions → Hooks", () => {
     expect(within(section).getByText("Decides")).toBeInTheDocument();
     expect(within(section).getByText("Never fires")).toBeInTheDocument();
 
-    const builtins = screen.getByRole("heading", { name: "Built-in handlers" }).closest("section") as HTMLElement;
-    expect(within(builtins).getByText("block_destructive_shell")).toBeInTheDocument();
+    // REM-EXT-01 — handler types and the built-ins this build ships are one
+    // disclosure now: the same four clauses on every visit, on a tab an owner
+    // opens to check whether their rule ran. Collapsed, not removed — and the
+    // summary carries the count, so "how many builtins" is readable without
+    // opening it.
+    const reference = screen
+      .getByRole("heading", { name: "What a handler may be" })
+      .closest("details") as HTMLElement;
+    expect(within(reference).getByText("block_destructive_shell")).toBeInTheDocument();
+    expect(reference.hasAttribute("open")).toBe(false);
   });
 
   it("presents prompt handlers as tool-free advisories, never decision authorities", async () => {

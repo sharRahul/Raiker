@@ -1669,6 +1669,12 @@ export interface WorkThread {
   kind: "chat" | "routine";
   updated_at: string;
   turn_count: number;
+  /**
+   * REM-THREAD-03 — which surface owns this work: "chat", "build" or "design".
+   * It decides where the row resumes, because a Build conversation opened in
+   * Chat loses its repository, its diffs and the approvals over them.
+   */
+  origin?: string;
   project_id: string | null;
   project_name: string | null;
   task_id?: string | null;

@@ -1,12 +1,18 @@
 <script lang="ts">
   import { isLoopbackHost } from "../loopback";
+  import { conversationLink, workModeRoute } from "../turnAnchor";
 
   type Project = { project_id: string; name: string };
   let {
-    sessionId, title, projects = [], pinned = false, archived = false,
+    sessionId, title, origin = "chat", projects = [], pinned = false, archived = false,
     onRename, onMove, onPin, onArchive, onDelete,
   }: {
-    sessionId: string; title: string; projects?: Project[]; pinned?: boolean; archived?: boolean;
+    sessionId: string; title: string;
+    /** REM-THREAD-03 — which surface owns this conversation, so the copied
+     *  link opens where the work was done. It used to be Chat for every
+     *  session, including a Build one. */
+    origin?: string;
+    projects?: Project[]; pinned?: boolean; archived?: boolean;
     onRename: (title: string) => void;
     onMove: (projectId: string) => void; onPin: () => void; onArchive: () => void; onDelete: () => void;
   } = $props();
@@ -24,7 +30,9 @@
 
   async function copyLocalLink() {
     if (!navigator.clipboard || !isLoopbackHost(window.location.hostname)) return;
-    await navigator.clipboard.writeText(`${window.location.origin}/#/new-chat?session=${encodeURIComponent(sessionId)}`);
+    await navigator.clipboard.writeText(
+      `${window.location.origin}/${conversationLink(workModeRoute(origin), sessionId)}`,
+    );
   }
 </script>
 

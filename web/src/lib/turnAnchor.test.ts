@@ -9,7 +9,13 @@
 // These assert the two halves that make one clickable: the link a surface
 // builds, and the landing that spends it.
 import { describe, expect, it, vi } from "vitest";
-import { conversationLink, forgetTurnInRoute, revealTurn } from "./turnAnchor";
+import {
+  conversationLink,
+  evidenceLink,
+  forgetTurnInRoute,
+  revealTurn,
+  workModeRoute,
+} from "./turnAnchor";
 
 describe("conversationLink", () => {
   it("carries the exchange when the caller knows which one matched", () => {
@@ -75,5 +81,44 @@ describe("forgetTurnInRoute", () => {
     window.history.replaceState(null, "", "#/new-chat?session=sess_1");
     forgetTurnInRoute();
     expect(window.location.hash).toBe("#/new-chat?session=sess_1");
+  });
+});
+
+// REM-THREAD-03 / REM-SESSIONS — a thread is resumed where it was done, and the
+// technical record behind it is a separate destination.
+describe("workModeRoute", () => {
+  it("sends each surface's conversations back to that surface", () => {
+    expect(workModeRoute("chat")).toBe("new-chat");
+    expect(workModeRoute("build")).toBe("build");
+    expect(workModeRoute("design")).toBe("design");
+  });
+
+  it("is case-insensitive, because an origin is read back from a store", () => {
+    expect(workModeRoute("Build")).toBe("build");
+  });
+
+  // A workspace written before sessions recorded an origin has none, and the
+  // transcript is readable in Chat whatever produced it. The fallback is the
+  // one that always works rather than a row that goes nowhere.
+  it("falls back to Chat for an origin it does not recognise", () => {
+    expect(workModeRoute(null)).toBe("new-chat");
+    expect(workModeRoute(undefined)).toBe("new-chat");
+    expect(workModeRoute("")).toBe("new-chat");
+    expect(workModeRoute("task")).toBe("new-chat");
+  });
+});
+
+describe("evidenceLink", () => {
+  it("addresses the inspector through the alias the router already carries", () => {
+    expect(evidenceLink("sess_1")).toBe("#/sessions?session=sess_1");
+  });
+
+  it("carries the turn when the caller knows which one matched", () => {
+    expect(evidenceLink("sess_1", "turn_9")).toBe("#/sessions?session=sess_1&turn=turn_9");
+  });
+
+  it("omits an absent turn rather than sending an empty coordinate", () => {
+    expect(evidenceLink("sess_1", "")).toBe("#/sessions?session=sess_1");
+    expect(evidenceLink("sess_1", null)).toBe("#/sessions?session=sess_1");
   });
 });

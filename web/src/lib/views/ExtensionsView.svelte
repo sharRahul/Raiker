@@ -28,12 +28,14 @@
     HooksView,
     PluginContributions,
     PluginsView,
+    SkillView,
   } from "../apiTypes";
   import { relativeTime } from "../format";
   import { HUB_TABS } from "../nav";
   import {
     extensionExceptions,
     extensionReach,
+    extensionInventory,
     reachSentence,
   } from "../extensionsOverview";
 
@@ -87,6 +89,19 @@
         error instanceof ApiError ? error.message : "That setting could not be saved.";
     } finally {
       hooksBusy = false;
+    }
+  }
+
+  // REM-EXT-01 — skills are read here as well as inside `SkillsView`, because
+  // the overview's inventory cannot say what is installed without them and the
+  // tab that lists them may never be opened.
+  let skills = $state<SkillView[] | null>(null);
+  async function loadSkills() {
+    try {
+      skills = await api.skills();
+    } catch {
+      // A failed read leaves the row out rather than reporting zero skills.
+      skills = null;
     }
   }
 
@@ -182,8 +197,19 @@
   // What Raiker can reach, and what is installed and broken. Derived
   // from the same readiness the tabs render, so the overview cannot disagree
   // with the row underneath it.
-  const reach = $derived(extensionReach(overview?.extensions));
+  // REM-EXT-01 — what is installed, beside what is wrong with it. Counted from
+  // four reads because `/api/extensions` covers two of the five kinds; see
+  // `extensionInventory`. The lead sentence counts the same set, so the page
+  // cannot say "nothing is installed" above a list of what is.
+  const inventoryInputs = $derived({
+    extensions: overview?.extensions,
+    skills,
+    hooks: hooks === null ? null : { rule_count: hooks.rule_count, active: hooks.active },
+    plugins: plugins?.plugins,
+  });
+  const reach = $derived(extensionReach(inventoryInputs));
   const exceptions = $derived(extensionExceptions(overview?.extensions));
+  const inventory = $derived(extensionInventory(inventoryInputs));
 
   const visible = $derived(
     (overview?.extensions ?? []).filter((extension) =>
@@ -279,6 +305,7 @@
     void load();
     void loadPlugins();
     void loadHooks();
+    void loadSkills();
   });
 </script>
 
@@ -335,6 +362,33 @@
         </ul>
       {/if}
     </section>
+
+    {#if inventory.length > 0}
+      <!-- REM-EXT-01 — the inventory, which this hub asked the owner to
+           assemble by opening five tabs in turn. A count per kind, not a card
+           per extension: the exceptions above already name everything that
+           needs a person. -->
+      <section class="hub-overview" aria-labelledby="extensions-installed">
+        <div class="overview-head">
+          <div>
+            <h2 id="extensions-installed">What is installed</h2>
+            <p class="lead">Each row opens the tab that lists it.</p>
+          </div>
+        </div>
+        <ul class="inventory">
+          {#each inventory as row (row.kind)}
+            <li>
+              <button type="button" class="btn btn-ghost" onclick={() => selectTab(row.tab)}>
+                <strong>{row.label}</strong>
+                <span class="note">
+                  {row.usable} of {row.installed} usable
+                </span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
 
     <section class="hub-overview" aria-labelledby="extensions-add">
       <div class="overview-head">
@@ -688,33 +742,37 @@
         </details>
       </section>
 
+      <!-- REM-EXT-01 — operator reference, kept and moved out of the reading
+           order. What a handler *may be* is the same four clauses on every
+           visit; what an owner opens this tab for is whether their rule ran.
+           Collapsed with the counts in the summary, so the page still answers
+           "how many builtins does this build ship" without the list. -->
       <section class="card">
-        <h2>Handler types</h2>
-        <!-- One clause each. The paragraph this replaced said the same four
-             things in eight lines, and the detail behind each is in the guide. -->
-        <ul class="event-list">
-          <li><strong>command</strong> <span class="note">a bounded program in your workspace</span></li>
-          <li>
-            <strong>http</strong>
-            <span class="note">
-              posts the redacted event to a host in <code>RAIKER_HOOK_EGRESS_ALLOWLIST</code>,
-              empty until you set it
-            </span>
-          </li>
-          <li><strong>prompt</strong> <span class="note">one tool-free model call; advisory only</span></li>
-          <li><strong>builtin</strong> <span class="note">Raiker's own reviewed logic</span></li>
-        </ul>
-        <p class="note">MCP tool and agent handlers stay refused. <GuideLink section="extensions-and-mcp" label="Why" /></p>
-      </section>
-
-      <section class="card">
-        <h2>Built-in handlers</h2>
-        <p class="note">Raiker's own code.</p>
-        <ul class="event-list">
-          {#each hooks.builtins as builtin (builtin)}
-            <li><strong>{builtin}</strong></li>
-          {/each}
-        </ul>
+        <details class="events">
+          <summary>
+            <h2 class="events-h">What a handler may be</h2>
+            <span class="note">4 types · {hooks.builtins.length} built in</span>
+          </summary>
+          <ul class="event-list">
+            <li><strong>command</strong> <span class="note">a bounded program in your workspace</span></li>
+            <li>
+              <strong>http</strong>
+              <span class="note">
+                posts the redacted event to a host in <code>RAIKER_HOOK_EGRESS_ALLOWLIST</code>,
+                empty until you set it
+              </span>
+            </li>
+            <li><strong>prompt</strong> <span class="note">one tool-free model call; advisory only</span></li>
+            <li><strong>builtin</strong> <span class="note">Raiker's own reviewed logic</span></li>
+          </ul>
+          <p class="note">MCP tool and agent handlers stay refused. <GuideLink section="extensions-and-mcp" label="Why" /></p>
+          <h3 class="events-h">Built-in handlers this build ships</h3>
+          <ul class="event-list">
+            {#each hooks.builtins as builtin (builtin)}
+              <li><strong>{builtin}</strong></li>
+            {/each}
+          </ul>
+        </details>
       </section>
 
       <section class="card">
@@ -826,23 +884,35 @@
       {/if}
     </section>
     {#if plugins !== null}
+      <!-- REM-EXT-01 — the contribution catalogue is reference, not state. It
+           says the same four things about every plugin and about none, and it
+           sat below the inventory as a full card of equal weight. Collapsed,
+           with the count that is the actual question in the summary. -->
       <section class="card">
-        <h2>What a plugin may contribute</h2>
-        <p class="note">
-          A plugin runs no code of its own.
-          <GuideLink section="extensions-and-mcp" label="Why a kind can be unavailable" />
-        </p>
-        <ul class="event-list">
-          {#each plugins.contribution_kinds ?? [] as kind (kind.kind)}
-            <li class:event-dead={!kind.available}>
-              <strong>{kindLabel(kind.kind)}</strong>
-              <span class="hook-tag" class:hook-tag-dead={!kind.available}>
-                {kind.available ? "Available" : "Not yet"}
-              </span>
-              <span class="note">{kind.summary}</span>
-            </li>
-          {/each}
-        </ul>
+        <details class="events">
+          <summary>
+            <h2 class="events-h">What a plugin may contribute</h2>
+            <span class="note">
+              {(plugins.contribution_kinds ?? []).filter((kind) => kind.available).length} of
+              {(plugins.contribution_kinds ?? []).length} kinds available
+            </span>
+          </summary>
+          <p class="note">
+            A plugin runs no code of its own.
+            <GuideLink section="extensions-and-mcp" label="Why a kind can be unavailable" />
+          </p>
+          <ul class="event-list">
+            {#each plugins.contribution_kinds ?? [] as kind (kind.kind)}
+              <li class:event-dead={!kind.available}>
+                <strong>{kindLabel(kind.kind)}</strong>
+                <span class="hook-tag" class:hook-tag-dead={!kind.available}>
+                  {kind.available ? "Available" : "Not yet"}
+                </span>
+                <span class="note">{kind.summary}</span>
+              </li>
+            {/each}
+          </ul>
+        </details>
       </section>
     {/if}
   </div>
@@ -871,6 +941,17 @@
     font-size: var(--text-sm);
   }
   .hub-overview .lead { margin: .3rem 0 0; color: var(--text-2); max-width: 46rem; }
+  /* REM-EXT-01 — the inventory reads as a row of destinations, at the same
+     weight as the Add routes below it, because both are navigation. */
+  .inventory {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: var(--space-4) 0 0;
+    padding: 0;
+  }
+  .inventory button { display: grid; gap: .1rem; text-align: left; }
   .all-well {
     display: flex;
     align-items: center;

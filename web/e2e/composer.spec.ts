@@ -527,8 +527,15 @@ test("the Hooks tab tells an enforcing rule from a dead one and a broken file", 
     page.getByText(/never emits SessionEnd, so this rule is configured but never fires/i),
   ).toBeVisible();
 
-  // The builtin names an owner may write in the file, since there is no form.
-  await expect(page.getByRole("heading", { name: "Built-in handlers" })).toBeVisible();
+  // REM-EXT-01 — the builtin names an owner may write in the file, since there
+  // is no form. They are reference rather than state, so they moved into the
+  // handler disclosure — collapsed, with the count in its summary, on a tab an
+  // owner opens to check whether their rule ran.
+  const reference = page.locator("details").filter({ hasText: "What a handler may be" });
+  await expect(reference).toBeVisible();
+  await expect(reference).toContainText("built in");
+  await reference.locator("summary").click();
+  await expect(page.getByRole("heading", { name: "Built-in handlers this build ships" })).toBeVisible();
 
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await capture(page, join(shots, "hooks-tab.png"));

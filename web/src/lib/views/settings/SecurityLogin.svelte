@@ -1,5 +1,4 @@
 <script lang="ts">
-  import GuideLink from "../../components/GuideLink.svelte";
   import { api, auth, getToken, health as runtimeHealth, setToken, ApiError } from "../../api";
   import type { HealthView } from "../../api";
   import type {
@@ -295,9 +294,24 @@
   load();
 </script>
 
-<section class="card" aria-labelledby="security-h">
-  <GuideLink route="settings" />
-  <h2 id="security-h">Security &amp; sign-in</h2>
+<!--
+  REM-SET-SECURITY — four sections, because these are four lifecycles.
+
+  Everything below used to be one card: eight fields in a flat stack, from
+  database encryption through a breach check to standing approval grants. They
+  do not change together, they are not read together, and they are not even
+  answered by the same question — "how do I sign in" and "what may run without
+  asking me" had the same heading, the same weight and the same neighbours.
+
+  Nothing is removed and nothing is weakened: the same controls, in the same
+  order within each group, under the heading that says which lifecycle they
+  belong to. The emergency pause is not here and never was — it is the STOP
+  switch in the context bar, which is on every screen rather than behind a
+  settings tab.
+-->
+<section class="card" aria-labelledby="security-signin-h">
+  <h2 id="security-signin-h">Signing in and devices</h2>
+  <p class="sub">How you unlock this instance, and which devices currently hold a session.</p>
 
   {#if notice}
     <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">
@@ -305,6 +319,79 @@
     </p>
   {/if}
 
+  <!-- Password reset -->
+  <div class="field">
+    <div class="field-head"><h3>Password</h3></div>
+    <label>
+      Current password
+      <input type="password" bind:value={oldPassword} autocomplete="current-password" />
+    </label>
+    <label>
+      New password
+      <input type="password" bind:value={newPassword} autocomplete="new-password" />
+    </label>
+    <div class="actions">
+      <button type="button" class="btn btn-primary" disabled={!oldPassword || !newPassword} onclick={changePassword}>
+        Change password
+      </button>
+    </div>
+    <p class="sub">Changing your password signs out all your other devices.</p>
+  </div>
+  <!-- MFA -->
+  <div class="field">
+    <div class="field-head">
+      <h3>Multi-factor authentication (TOTP)</h3>
+      <span class="pill" class:pill-ok={mfaEnrolled}>{mfaEnrolled ? "Enrolled" : "Not enrolled"}</span>
+    </div>
+    {#if !mfaEnrolled}
+      {#if enrollUri === null}
+        <button type="button" class="btn btn-soft" onclick={startEnroll}>Enroll in MFA</button>
+      {:else}
+        <p class="sub">Add this to your authenticator app, then enter the current code:</p>
+        <code class="uri">{enrollUri}</code>
+        <label>
+          Verification code
+          <input bind:value={activateCode} inputmode="numeric" autocomplete="one-time-code" />
+        </label>
+        <button type="button" class="btn btn-primary" disabled={!activateCode} onclick={activate}>
+          Activate
+        </button>
+      {/if}
+    {/if}
+    <label class="toggle">
+      <input type="checkbox" checked={requireMfaForVault} onchange={toggleRequireMfa} disabled={!mfaEnrolled} />
+      Require MFA for Vault operations
+      {#if !mfaEnrolled}<span class="sub">(enroll in MFA to enable)</span>{/if}
+    </label>
+  </div>
+  <!-- Active device sessions -->
+  <div class="field">
+    <div class="field-head"><h3>Active device sessions</h3></div>
+    {#if sessions.length === 0}
+      <p class="sub">No active sessions.</p>
+    {:else}
+      <ul class="sessions">
+        {#each sessions as s (s.session_id)}
+          <li>
+            <span>
+              {s.session_id.slice(0, 16)}…
+              {#if s.current}<span class="pill pill-ok">This device</span>{/if}
+            </span>
+            {#if !s.current}
+              <button type="button" class="btn btn-danger" onclick={() => revokeSession(s.session_id)}>
+                Revoke
+              </button>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
+</section>
+
+<section class="card" aria-labelledby="security-vault-h">
+  <h2 id="security-vault-h">Encryption and the vault</h2>
+  <p class="sub">Where stored secrets live, and what has to be true before one can be read.</p>
   <div class="field storage-posture" data-testid="storage-posture">
     <div class="field-head"><h3>Database encryption</h3></div>
     {#if storageHealth === null}
@@ -334,7 +421,6 @@
       </p>
     {/if}
   </div>
-
   <!-- Vault Key -->
   <div class="field">
     <div class="field-head">
@@ -388,35 +474,11 @@
       </button>
     </div>
   </div>
+</section>
 
-  <!-- MFA -->
-  <div class="field">
-    <div class="field-head">
-      <h3>Multi-factor authentication (TOTP)</h3>
-      <span class="pill" class:pill-ok={mfaEnrolled}>{mfaEnrolled ? "Enrolled" : "Not enrolled"}</span>
-    </div>
-    {#if !mfaEnrolled}
-      {#if enrollUri === null}
-        <button type="button" class="btn btn-soft" onclick={startEnroll}>Enroll in MFA</button>
-      {:else}
-        <p class="sub">Add this to your authenticator app, then enter the current code:</p>
-        <code class="uri">{enrollUri}</code>
-        <label>
-          Verification code
-          <input bind:value={activateCode} inputmode="numeric" autocomplete="one-time-code" />
-        </label>
-        <button type="button" class="btn btn-primary" disabled={!activateCode} onclick={activate}>
-          Activate
-        </button>
-      {/if}
-    {/if}
-    <label class="toggle">
-      <input type="checkbox" checked={requireMfaForVault} onchange={toggleRequireMfa} disabled={!mfaEnrolled} />
-      Require MFA for Vault operations
-      {#if !mfaEnrolled}<span class="sub">(enroll in MFA to enable)</span>{/if}
-    </label>
-  </div>
-
+<section class="card" aria-labelledby="security-findings-h">
+  <h2 id="security-findings-h">Findings and monitoring</h2>
+  <p class="sub">What a scan found, and what the runtime is watching because it has failed before.</p>
   <div class="field">
     <div class="field-head"><h3>Credential security</h3></div>
     {#if credentials.length}
@@ -437,7 +499,6 @@
       Check breach corpus
     </button>
   </div>
-
   <div class="field" data-testid="capability-containment">
     <div class="field-head"><h3>Monitored capabilities</h3></div>
     {#if containment === null}
@@ -489,50 +550,11 @@
     {/if}
     <div class="actions"><button class="btn btn-soft" onclick={loadContainment}>Refresh</button></div>
   </div>
+</section>
 
-  <!-- Password reset -->
-  <div class="field">
-    <div class="field-head"><h3>Password</h3></div>
-    <label>
-      Current password
-      <input type="password" bind:value={oldPassword} autocomplete="current-password" />
-    </label>
-    <label>
-      New password
-      <input type="password" bind:value={newPassword} autocomplete="new-password" />
-    </label>
-    <div class="actions">
-      <button type="button" class="btn btn-primary" disabled={!oldPassword || !newPassword} onclick={changePassword}>
-        Change password
-      </button>
-    </div>
-    <p class="sub">Changing your password signs out all your other devices.</p>
-  </div>
-
-  <!-- Active device sessions -->
-  <div class="field">
-    <div class="field-head"><h3>Active device sessions</h3></div>
-    {#if sessions.length === 0}
-      <p class="sub">No active sessions.</p>
-    {:else}
-      <ul class="sessions">
-        {#each sessions as s (s.session_id)}
-          <li>
-            <span>
-              {s.session_id.slice(0, 16)}…
-              {#if s.current}<span class="pill pill-ok">This device</span>{/if}
-            </span>
-            {#if !s.current}
-              <button type="button" class="btn btn-danger" onclick={() => revokeSession(s.session_id)}>
-                Revoke
-              </button>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  </div>
-
+<section class="card" aria-labelledby="security-standing-h">
+  <h2 id="security-standing-h">Standing access</h2>
+  <p class="sub">What may run without asking you each time, and how to take it back.</p>
   <!-- Scoped standing approval grants (ZT-5) -->
   <div class="field">
     <div class="field-head"><h3>Standing approval grants</h3></div>
@@ -581,6 +603,10 @@
 </section>
 
 <style>
+  /* REM-SET-SECURITY — four cards where there was one, so they need the gap
+     between them that a single card never did. */
+  section.card + section.card { margin-top: var(--space-4); }
+
   .field {
     padding: var(--space-3) 0;
     border-top: 1px solid var(--border);

@@ -20,7 +20,6 @@
   import Icon from "../../components/Icon.svelte";
   import StepUpDialog from "../../components/StepUpDialog.svelte";
   import type { StepUpValues } from "../../components/StepUpDialog.svelte";
-  import GuideLink from "../../components/GuideLink.svelte";
   import { api, ApiError } from "../../api";
   import type { ExecutionEnvironmentsView, RuntimeMode } from "../../apiTypes";
   import { explainReasonCode } from "../../reasonCodes";
@@ -238,7 +237,6 @@
 {#if notice}<p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>{/if}
 
 <section class="settings-card">
-  <GuideLink route="settings" />
   <div class="card-heading">
     <span class="eyebrow">Agent runtime</span>
     <h3>

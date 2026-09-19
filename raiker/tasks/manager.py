@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import TaskRecord
+from raiker.events.summaries import task_completed_summary
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.hooks.contracts import HookInput
@@ -234,7 +235,15 @@ class TaskManager:
                 turn_id=task.parent_turn_id,
                 event_type="task_completed",
                 actor="task_manager",
-                payload={"task_id": task_id, "summary": summary or ""},
+                # BUG-302 — `summary` says what this event did. The task's own
+                # outcome text rides beside it under `outcome_summary`, where
+                # the per-task attempt timeline reads it, rather than in a
+                # column whose job is to describe the event.
+                payload={
+                    "task_id": task_id,
+                    "summary": task_completed_summary(task.title),
+                    "outcome_summary": summary or "",
+                },
             )
             self.writer.append(event)
             self._dispatch_task_hook(

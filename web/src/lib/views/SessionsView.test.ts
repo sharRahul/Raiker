@@ -375,13 +375,19 @@ describe("SessionsView organisation", () => {
     });
   });
 
-  it("links each conversation back into the chat surface", async () => {
+  // REM-SESSIONS — the row used to carry an "Open" link straight into Chat,
+  // which made the evidence inspector a second place to resume a conversation.
+  // Resuming lives in Threads; the row here opens the record.
+  it("offers no per-row way to resume a conversation", async () => {
     stubFetch(SESSIONS_ROUTE);
     render(SessionsView);
 
     await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
-    const link = screen.getByRole("link", { name: "Open Second chat in chat" });
-    expect(link).toHaveAttribute("href", "#/new-chat?session=sess_b");
+    expect(screen.queryByRole("link", { name: "Open Second chat in chat" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Threads" })).toHaveAttribute(
+      "href",
+      "#/search-chat",
+    );
   });
 
   it("links a session detail to its audit events and checkpoints", async () => {
@@ -419,10 +425,15 @@ describe("SessionsView organisation", () => {
 
     await fireEvent.click(await screen.findByText("Second chat"));
 
-    expect(screen.getByRole("link", { name: "Open in chat" })).toHaveAttribute(
+    // REM-SESSIONS / REM-THREAD-03 — one way back, named for the surface this
+    // conversation was done on, rather than the two side-by-side guesses
+    // ("Open in chat" / "Open in Build") every session used to be offered.
+    expect(screen.getByRole("link", { name: "Resume in Chat" })).toHaveAttribute(
       "href",
       "#/new-chat?session=sess_b",
     );
+    expect(screen.queryByRole("link", { name: "Open in chat" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open in Build" })).toBeNull();
     expect(screen.getByRole("link", { name: "View session tasks" })).toHaveAttribute(
       "href",
       "#/tasks?session=sess_b",

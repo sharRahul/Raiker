@@ -22,6 +22,7 @@
   import TelemetryExport from "../components/TelemetryExport.svelte";
   import { api, ApiError } from "../api";
   import { digestEvents } from "../auditDigest";
+  import { allClearSentence, attentionItems } from "../observeAttention";
   import { isDeferred, isInherent } from "../capabilityModel";
   import type {
     ApprovalView,
@@ -30,6 +31,7 @@
     EventEntry,
     Notification as RaikerNotification,
     RuntimeReadiness,
+    SecurityHealth,
     TaskView,
   } from "../apiTypes";
   import { humanize, isAddressableSession, isRedacted, relativeTime, shortId } from "../format";
@@ -48,6 +50,10 @@
   let tasks = $state<TaskView[] | null>(null);
   let events = $state<EventEntry[] | null>(null);
   let notifications = $state<RaikerNotification[] | null>(null);
+  // REM-OBSERVE — containment is the one signal on this page that must never
+  // sit below a telemetry delivery error, so the overview reads it itself
+  // rather than waiting for the specialist view below to be opened.
+  let security = $state<SecurityHealth[] | null>(null);
   let loadError = $state<string | null>(null);
   let offline = $state(false);
 
@@ -105,6 +111,18 @@
   /** "What changed?" answers with changes — see `auditDigest.ts`. */
   const changes = $derived(digestEvents(events ?? []));
 
+  // REM-OBSERVE — the exceptions, and what an empty list of them may claim.
+  // `null` for `unreadNotifications` while the read is in flight or failed, so
+  // an unread count that could not be read is not counted as zero.
+  const attentionInputs = $derived({
+    diagnostics,
+    approvals,
+    security,
+    unreadNotifications:
+      notifications === null ? null : notifications.filter((n) => !n.read).length,
+  });
+  const attention = $derived(attentionItems(attentionInputs));
+
   function selectTab(next: string) {
     window.location.hash = `#/observe?tab=${encodeURIComponent(next)}`;
   }
@@ -123,6 +141,15 @@
         api.notifications(),
       ]);
       offline = false;
+      // Read separately and allowed to fail on its own: a build without the
+      // security-health route must not take the whole overview down, and a
+      // failure here becomes an explicit *unknown* in the attention list
+      // rather than a silent all-clear.
+      try {
+        security = await api.securityHealth();
+      } catch {
+        security = null;
+      }
     } catch (error) {
       // A failed read never invents a green status: the overview says it could
       // not reach the runtime and offers a retry, rather than showing stale
@@ -187,7 +214,34 @@
     {:else if diagnostics === null}
       <PageState state="loading" title="Reading runtime status…" />
     {:else}
-      <section aria-labelledby="ready-h">
+      <!-- REM-OBSERVE — exceptions first. This page used to open with seven
+           tiles that read Ready, 0, 0, 0 and "Nothing required is unset" on any
+           working install, which made the one tile that mattered exactly as
+           easy to miss as the six that did not. The resting state moved below;
+           what is wrong, and what changed, came up. -->
+      <section aria-labelledby="attention-h" class="attention">
+        <h2 id="attention-h" class="section-h">Needs your attention</h2>
+        {#if attention.length === 0}
+          <!-- NEW-HOME-01's rule, stated in the sentence itself: an all-clear
+               names what it covers, so a read that failed cannot hide inside
+               the word "nothing". -->
+          <p class="quiet" role="status">{allClearSentence(attentionInputs)}</p>
+        {:else}
+          <ul class="attention-list">
+            {#each attention as item (item.id)}
+              <li data-tone={item.tone}>
+                <div>
+                  <p class="attention-title">{item.title}</p>
+                  <p class="attention-detail">{item.detail}</p>
+                </div>
+                <a class="btn btn-ghost btn-sm" href={item.href}>{item.linkLabel}</a>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
+
+      <section aria-labelledby="ready-h" class="folded">
         <h2 id="ready-h" class="section-h">Is Raiker ready?</h2>
         <div class="tiles">
           <!-- The healthy half of this pair is the resting state of a
@@ -229,7 +283,7 @@
         </div>
       </section>
 
-      <section aria-labelledby="waiting-h">
+      <section aria-labelledby="waiting-h" class="folded">
         <h2 id="waiting-h" class="section-h">Is anything waiting for me?</h2>
         <div class="tiles">
           <StatTile
@@ -312,7 +366,7 @@
         {/if}
       </section>
 
-      <section aria-labelledby="support-h" class="support">
+      <section aria-labelledby="support-h" class="support folded">
         <h2 id="support-h" class="section-h">Can I safely share this?</h2>
         <p>
           The support bundle is built by the server and redacted with the same rules every API
@@ -349,10 +403,26 @@
         own health transitions, the memory integrity report and its repair, and
         any readiness check that actually failed.
       -->
-      <section aria-labelledby="health-h">
-        <h2 id="health-h" class="section-h">Is the runtime itself healthy?</h2>
-        <DiagnosticsView />
-      </section>
+      <!-- REM-OBSERVE — "preserve diagnostics as specialist views". The whole
+           of Diagnostics rendered inline on every visit, below two rows of
+           tiles, on a page whose first job is to say what is wrong. It is one
+           disclosure now: the failed readiness checks, the runtime's health
+           transitions and the memory integrity report are all still here, and
+           a healthy install does not have to scroll past them. What its
+           failures mean for the owner is already in the attention list above,
+           read from the same records. -->
+      <details class="specialist">
+        <summary>
+          <span>
+            <strong>Runtime health, in detail</strong>
+            <small>Failed readiness checks, health transitions and memory integrity.</small>
+          </span>
+          <Icon name="chevron-down" size="md" />
+        </summary>
+        <div class="specialist-body">
+          <DiagnosticsView />
+        </div>
+      </details>
 
       <!-- Backlog #18 — the record Raiker keeps is more than any compared
            product exports, and until now it could not leave the machine on a
@@ -469,6 +539,40 @@
   .more { font-size: var(--text-sm); font-weight: 600; }
   .more-row { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: var(--space-2) 0 0; }
   .quiet { color: var(--text-3); }
+
+  /* REM-OBSERVE — the exception list leads the page, and the resting state
+     that follows it is quieter than it was so the order is legible without
+     reading the headings. */
+  .attention-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+  .attention-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border-strong);
+    border-radius: var(--r-md);
+    background: var(--surface);
+  }
+  /* Containment is the one row that carries the danger colour, because it is
+     the one row that must not be read as an ordinary queue item. */
+  .attention-list li[data-tone="containment"] { border-left-color: var(--danger); }
+  .attention-list li[data-tone="blocking"] { border-left-color: var(--warn); }
+  .attention-list li[data-tone="waiting"] { border-left-color: var(--accent); }
+  .attention-list li[data-tone="unknown"] { border-left-color: var(--text-3); }
+  .attention-title { margin: 0; font-weight: 650; }
+  .attention-detail { margin: 0.15rem 0 0; color: var(--text-2); font-size: var(--text-sm); }
+  .folded .section-h { color: var(--text-2); }
+  .specialist summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    cursor: pointer;
+  }
+  .specialist summary small { display: block; color: var(--text-2); font-size: var(--text-sm); }
+  .specialist-body { margin-top: var(--space-4); }
   .support p { color: var(--text-2); max-width: 68ch; }
   .support-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .copy-note { color: var(--ok); font-size: var(--text-sm); font-weight: 600; }

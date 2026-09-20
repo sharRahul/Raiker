@@ -256,7 +256,7 @@
   .step-number {
     flex: 0 0 auto; width: 1.5rem; height: 1.5rem; border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
-    background: var(--surface-3); color: var(--text-2);
+    background: var(--sunken); color: var(--text-2);
     font-size: var(--text-xs); font-weight: 600;
   }
   .lead { color: var(--text-2); font-size: var(--text-sm); margin: 0 0 var(--space-3); }

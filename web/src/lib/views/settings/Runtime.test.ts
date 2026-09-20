@@ -250,3 +250,54 @@ describe("Runtime filtered egress honesty", () => {
     expect(screen.queryByText("Publisher verified")).not.toBeInTheDocument();
   });
 });
+
+/**
+ * REM-SET-RUNTIME — the page guides an execution target, and keeps the tuning
+ * that is an interval or a port number below the thing it tunes.
+ */
+describe("Runtime configuration reading order", () => {
+  it("puts the execution target above the tuning, not below it", async () => {
+    stubRuntime();
+    render(Runtime, { principal: "owner", settings: {}, save: vi.fn() });
+
+    const targets = await screen.findByText("Local, remote, and cloud environments");
+    const advanced = screen.getByText("Advanced");
+    expect(targets.compareDocumentPosition(advanced) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("folds the readiness window away and says where readiness is actually read", async () => {
+    stubRuntime();
+    render(Runtime, { principal: "owner", settings: {}, save: vi.fn() });
+
+    const summary = await screen.findByText("Advanced");
+    expect(summary.closest("details")?.open).toBe(false);
+    expect(screen.getByLabelText(/Re-confirm a model check after/)).toHaveValue(5);
+    expect(screen.getByRole("link", { name: "Models" })).toHaveAttribute("href", "#/models");
+    expect(screen.getByRole("link", { name: "Observability" })).toHaveAttribute("href", "#/observe");
+  });
+
+  it("still reports the owner's readiness window to the runtime", async () => {
+    const save = vi.fn();
+    stubRuntime();
+    render(Runtime, { principal: "owner", settings: {}, save });
+
+    const field = await screen.findByLabelText(/Re-confirm a model check after/);
+    await fireEvent.change(field, { target: { value: "30" } });
+
+    expect(save).toHaveBeenCalledWith({ "models.readiness_ttl_minutes": 30 });
+  });
+
+  it("keeps the container scope preview in the open and the port list below it", async () => {
+    stubRuntime();
+    render(Runtime, { principal: "owner", settings: {}, save: vi.fn() });
+
+    await fireEvent.click(await screen.findByText("Add execution profile"));
+    await fireEvent.change(screen.getByLabelText("Environment type"), {
+      target: { value: "container" },
+    });
+
+    expect(screen.getByText("Read only")).toBeInTheDocument();
+    const ports = screen.getByLabelText(/Allowed destination ports/);
+    expect(ports.closest("details")?.open).toBe(false);
+  });
+});

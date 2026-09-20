@@ -728,8 +728,14 @@ describe("MemoryView observations (MEM-04)", () => {
   // on a default install the only honest answer it has is the fallback. These
   // two pin the way out of that: the page says what could build a real space,
   // and says how many memories the run would send.
-  it("offers to build a meaning-based index when recall is on the fallback", async () => {
-    const fetchMock = stubFetch({
+  /*
+   * REM-MEM-03 — the engine's controls moved to Settings → Memory engine, so
+   * what this page owes an owner reading their own memories is the health of
+   * recall and one link to repair it. The builder's own behaviour is covered
+   * where it now lives, in `settings/MemoryEngine.test.ts`.
+   */
+  it("says how recall is matching, and links to where it is changed", async () => {
+    stubFetch({
       "GET /api/memory": [],
       "GET /api/memory/settings": {
         incognito: false,
@@ -743,60 +749,21 @@ describe("MemoryView observations (MEM-04)", () => {
           reason_code: "embedding_backend_semantic_not_configured",
         },
         spaces: [],
-        embedding_providers: [
-          {
-            profile_id: "raiker-local-llama-cpp",
-            provider: "llama.cpp",
-            model: "local-gguf",
-            space: "llama.cpp:local-gguf",
-            local_only: true,
-            requires_network: false,
-            unindexed_memories: 4,
-            unindexed_file_chunks: 2,
-            pending_count: 6,
-          },
-          {
-            profile_id: "openai-hosted",
-            provider: "openai",
-            model: "text-embedding-3-small",
-            space: "openai:text-embedding-3-small",
-            local_only: false,
-            requires_network: true,
-            unindexed_memories: 4,
-            unindexed_file_chunks: 2,
-            pending_count: 6,
-          },
-        ],
+        embedding_providers: [],
         unindexed_memories: 4,
-        unindexed_file_chunks: 2,
-      },
-      "POST /api/memory/embedding-index": {
-        ok: true,
-        embedding_model: "openai:text-embedding-3-small",
-        indexed_count: 4,
-        indexed_file_chunk_count: 2,
-        skipped_count: 0,
       },
     });
-    vi.stubGlobal("confirm", () => true);
     render(MemoryView, { props: { tab: "recall" } });
 
-    const select = await screen.findByLabelText(/embedding model/i);
-    expect(
-      screen.getByRole("link", { name: /review and download it in models/i }),
-    ).toHaveAttribute("href", "#/models?tab=add");
-    await fireEvent.change(select, { target: { value: "openai:text-embedding-3-small" } });
-    await fireEvent.click(screen.getByRole("button", { name: /embed 6/i }));
-
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/memory/embedding-index",
-        expect.objectContaining({
-          method: "POST",
-          body: JSON.stringify({ provider: "openai", model: "text-embedding-3-small" }),
-        }),
-      ),
+      expect(screen.getByText(/matches words, not meaning/i)).toBeInTheDocument(),
     );
+    expect(
+      screen.getByRole("link", { name: /change the recall backend/i }),
+    ).toHaveAttribute("href", "#/settings?tab=memory-engine");
+    // The controls themselves are not here any more.
+    expect(screen.queryByLabelText(/embedding model/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/recall backend/i)).not.toBeInTheDocument();
   });
 
   // A semantic *space* and semantic *recall* are two claims. The card said
@@ -830,44 +797,6 @@ describe("MemoryView observations (MEM-04)", () => {
     expect(screen.queryByText(/matches meaning/i)).not.toBeInTheDocument();
   });
 
-  it("offers to refresh an index when semantic recall has new content", async () => {
-    stubFetch({
-      "GET /api/memory": [],
-      "GET /api/memory/settings": {
-        incognito: false,
-        embedding_backend: "auto",
-        retrieval: {
-          backend_id: "provider",
-          kind: "provider",
-          model: "openai:text-embedding-3-small",
-          dimensions: 1536,
-          semantic: true,
-          reason_code: "",
-          query_embeddable: true,
-        },
-        spaces: [],
-        embedding_providers: [
-          {
-            profile_id: "openai-hosted",
-            provider: "openai",
-            model: "text-embedding-3-small",
-            space: "openai:text-embedding-3-small",
-            local_only: false,
-            requires_network: true,
-            unindexed_memories: 1,
-            unindexed_file_chunks: 1,
-            pending_count: 2,
-          },
-        ],
-        unindexed_memories: 1,
-        unindexed_file_chunks: 1,
-      },
-    });
-    render(MemoryView, { props: { tab: "recall" } });
-
-    await waitFor(() => expect(screen.getByText(/matches meaning/i)).toBeInTheDocument());
-    expect(screen.getByLabelText(/embedding model/i)).toBeInTheDocument();
-  });
   // MEM-07 — six retention classes were stored and stated on every row, and
   // nothing ever swept them. There is still no daemon; this is the confirmed
   // sweep that was meant to stand in for one and never got a surface.

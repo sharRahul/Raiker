@@ -35,14 +35,16 @@ describe("TasksView", () => {
     requestSchedule();
     render(TasksView);
 
-    // The command arranges the control it names, and stops there.
+    // The command arranges the control it names, and stops there. REM-TASK-01
+    // split the one chip row into the two questions it was answering, so the
+    // control /schedule names is the timing one.
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Once" })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: "At a time" })).toHaveAttribute(
         "aria-pressed",
         "true",
       ),
     );
-    expect(screen.getByRole("button", { name: "Task" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Now" })).toHaveAttribute("aria-pressed", "false");
     expect(
       fetchMock.mock.calls.filter(([url, init]) =>
         String(url).includes("/api/tasks") && (init as RequestInit | undefined)?.method === "POST",
@@ -50,7 +52,7 @@ describe("TasksView", () => {
     ).toHaveLength(0);
   });
 
-  it("opens on an immediate task when nothing asked otherwise", async () => {
+  it("opens on work that runs now, in one pass, when nothing asked otherwise", async () => {
     stubFetch({
       "GET /api/tasks": [],
       "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
@@ -58,7 +60,11 @@ describe("TasksView", () => {
     render(TasksView);
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Task" })).toHaveAttribute("aria-pressed", "true"),
+      expect(screen.getByRole("button", { name: "Now" })).toHaveAttribute("aria-pressed", "true"),
+    );
+    expect(screen.getByRole("button", { name: "One pass" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
   });
 
@@ -208,7 +214,7 @@ describe("TasksView", () => {
     ] } });
     render(TasksView);
     await screen.findByText("No work queued");
-    await fireEvent.click(screen.getByRole("button", { name: "Once" }));
+    await fireEvent.click(screen.getByRole("button", { name: "At a time" }));
     // COMPOSER-10 — the model sits in the composer bar as it does on every
     // other Work surface, rather than under a label of its own. What a schedule
     // captures it *onto* is said by the primary action and the timing line.
@@ -273,7 +279,7 @@ describe("TasksView", () => {
     render(TasksView);
 
     await waitFor(() => expect(screen.getByText("No work queued")).toBeInTheDocument());
-    await fireEvent.click(screen.getByRole("button", { name: "Routine" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Repeating" }));
     await instruct("Prepare the release notes.");
     await openDetails();
     await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Plan release" } });
@@ -331,7 +337,7 @@ describe("TasksView", () => {
     render(TasksView);
 
     await waitFor(() => expect(screen.getByText("No work queued")).toBeInTheDocument());
-    await fireEvent.click(screen.getByRole("button", { name: "Routine" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Repeating" }));
     await instruct("Report any failing job.");
     await openDetails();
     await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Watch the build" } });

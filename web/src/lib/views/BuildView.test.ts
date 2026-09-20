@@ -43,6 +43,11 @@ afterEach(() => {
   // Build remembers its project across visits, which is the product behaviour —
   // so a test that selected one must not hand it to the next test.
   window.localStorage.removeItem("raiker.build.project");
+  // REM-BUILD-01 — and the workbench remembers which view it was left on, for
+  // the same reason. Same rule: what one test left open is not the next test's
+  // starting state.
+  window.localStorage.removeItem("raiker.build.workbenchOpen");
+  window.localStorage.removeItem("raiker.build.workbenchTab");
 });
 
 const DEFAULT_READY_PROFILE = {

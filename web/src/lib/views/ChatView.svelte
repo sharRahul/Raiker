@@ -48,6 +48,7 @@
   import PlanChecklist from "../components/PlanChecklist.svelte";
   import ReasoningBlock from "../components/ReasoningBlock.svelte";
   import ToolActivity from "../components/ToolActivity.svelte";
+  import TurnEvidence from "../components/TurnEvidence.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
   import SourceChips from "../components/SourceChips.svelte";
   import RecallStrip from "../components/RecallStrip.svelte";
@@ -2176,6 +2177,18 @@
                its reasons and its remediation link on the row rather than in a
                block after the answer. This removes a surface instead of adding
                one; nothing it said has been lost. -->
+
+          <!-- REM-CHAT-01 — the turn's own evidence, under the turn rather than
+               on another route. Collapsed, so the answer and the decisions it
+               asked for keep the primary reading order; it reads nothing until
+               it is opened. -->
+          {#if !turn.streaming && turn.response?.turn_id}
+            <TurnEvidence
+              sessionId={sessionId}
+              turnId={turn.response.turn_id}
+              rows={toolRows}
+            />
+          {/if}
 
           {#if turn.response?.status === "needs_approval" && turn.response.approval}
             <!-- BUG-24 — this card is the parked turn's live state. Once a

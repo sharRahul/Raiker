@@ -346,7 +346,7 @@ Four destinations are tabbed:
 | Models | Overview, My models, Add model, Runtime & routing, Usage |
 | Extensions | Connectors, MCP servers, Skills, Hooks, Plugins |
 | Observability | Overview, Sessions, Activity, Checkpoints, Live work, Notifications |
-| Settings | General, Notifications, Personalisation, Security & sign-in, Privacy, Account, Web access, Git credential, Runtime configuration, Updates |
+| Settings | General, Notifications, Personalisation, Security & sign-in, Privacy, Account, Web access, Git credential, Runtime configuration, Memory engine, Updates |
 
 Old links to the pages these absorbed still resolve and open the right tab, and
 so does the path form — `#/extensions/mcp` opens Extensions on MCP servers,

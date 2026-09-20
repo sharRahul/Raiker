@@ -65,3 +65,57 @@ export function changesSummary(
     text: count === 1 ? "1 file changed and not committed." : `${count} files changed and not committed.`,
   };
 }
+
+/**
+ * REM-BUILD-01 — the workbench remembers which view it was left on.
+ *
+ * Build's file explorer has remembered its width and its open state since B13,
+ * for the reason stated in `buildExplorer.ts`: a panel that closes itself every
+ * time is one an owner stops opening. The workbench did not, so every reload
+ * put an owner reading a failing command's output back on a closed pane, and
+ * the only inspector Build guarantees is open is the one the *next action*
+ * brings forward. Both rules are wanted: the next action still decides, and
+ * where the owner left it is where they come back to.
+ *
+ * Presentation only — nothing here grants, reaches or changes anything. The tab
+ * is validated on read for the same reason the width is clamped: a stored value
+ * is the one input here a person can edit by hand, and an unknown tab would
+ * select nothing at all.
+ */
+const WORKBENCH_OPEN_KEY = "raiker.build.workbenchOpen";
+const WORKBENCH_TAB_KEY = "raiker.build.workbenchTab";
+
+export function readWorkbenchOpen(): boolean {
+  try {
+    return window.localStorage.getItem(WORKBENCH_OPEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function rememberWorkbenchOpen(open: boolean): void {
+  try {
+    if (open) window.localStorage.setItem(WORKBENCH_OPEN_KEY, "1");
+    else window.localStorage.removeItem(WORKBENCH_OPEN_KEY);
+  } catch {
+    // A blocked storage is a lost preference, never a blocked panel.
+  }
+}
+
+export function readWorkbenchTab(): ArtifactTab {
+  try {
+    const stored = window.localStorage.getItem(WORKBENCH_TAB_KEY) ?? "";
+    const known = ARTIFACT_TABS.some((tab) => tab.id === stored);
+    return known ? (stored as ArtifactTab) : "changes";
+  } catch {
+    return "changes";
+  }
+}
+
+export function rememberWorkbenchTab(tab: ArtifactTab): void {
+  try {
+    window.localStorage.setItem(WORKBENCH_TAB_KEY, tab);
+  } catch {
+    // As above.
+  }
+}

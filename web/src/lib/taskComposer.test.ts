@@ -2,12 +2,18 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_DERIVED_TITLE,
+  RECURRENCE_INTERVAL_MS,
   TASK_CADENCES,
+  cadenceFor,
   deriveTitle,
+  nextRuns,
   primaryAction,
+  runModeFor,
   scheduleSummary,
+  timingFor,
   wantsStartTime,
 } from "./taskComposer";
+import { AGENT_CADENCES } from "./agentCadence";
 
 describe("deriveTitle", () => {
   it("takes the instruction's first sentence", () => {
@@ -99,5 +105,75 @@ describe("scheduleSummary", () => {
     expect(scheduleSummary({ ...base, cadence: "once", startAt: "not-a-date" })).toContain(
       "not-a-date",
     );
+  });
+});
+
+/**
+ * REM-TASK-01 — when work runs, and how it runs, asked as two questions.
+ *
+ * The chip row was one control answering two questions. These pin the
+ * translation both ways, so the four shapes the runtime accepts are exactly the
+ * four the composer can reach — no more, and no fewer.
+ */
+describe("timing and run mode", () => {
+  it("round-trips every shape the runtime accepts", () => {
+    for (const cadence of ["now", "once", "routine", "background"] as const) {
+      expect(cadenceFor(timingFor(cadence), runModeFor(cadence))).toBe(cadence);
+    }
+  });
+
+  it("asks for a background agent from the timing it actually has", () => {
+    expect(cadenceFor("now", "background")).toBe("background");
+    // A background agent starts now; there is no scheduled variant to compose.
+    expect(cadenceFor("at", "background")).toBe("once");
+    expect(cadenceFor("repeating", "background")).toBe("routine");
+  });
+});
+
+/**
+ * REM-TASK-01 — the preview is the scheduler's own arithmetic, or it is a lie.
+ */
+describe("the next runs a schedule would produce", () => {
+  const now = new Date("2026-09-20T12:00:00Z");
+
+  it("has nothing to preview for work that runs now", () => {
+    expect(nextRuns({ cadence: "now", every: "daily", startAt: "", now })).toEqual([]);
+    expect(nextRuns({ cadence: "background", every: "daily", startAt: "", now })).toEqual([]);
+  });
+
+  it("previews a one-off as the single run it is", () => {
+    const runs = nextRuns({ cadence: "once", every: "daily", startAt: "2026-09-21T09:00:00Z", now });
+    expect(runs).toHaveLength(1);
+    expect(runs[0].toISOString()).toBe("2026-09-21T09:00:00.000Z");
+  });
+
+  it("anchors a routine to the slot the owner picked", () => {
+    const runs = nextRuns({
+      cadence: "routine", every: "daily", startAt: "2026-09-21T09:00:00Z", now,
+    });
+    expect(runs.map((run) => run.toISOString())).toEqual([
+      "2026-09-21T09:00:00.000Z",
+      "2026-09-22T09:00:00.000Z",
+      "2026-09-23T09:00:00.000Z",
+    ]);
+  });
+
+  it("skips slots that have already passed rather than owing them", () => {
+    // Four days of daily slots are behind `now`. The scheduler skips them, so
+    // the preview must not imply four runs are queued up.
+    const runs = nextRuns({
+      cadence: "routine", every: "daily", startAt: "2026-09-16T09:00:00Z", now, count: 1,
+    });
+    expect(runs.map((run) => run.toISOString())).toEqual(["2026-09-21T09:00:00.000Z"]);
+  });
+
+  it("says nothing at all until a first run has been chosen", () => {
+    expect(nextRuns({ cadence: "routine", every: "daily", startAt: "", now })).toEqual([]);
+    expect(nextRuns({ cadence: "routine", every: "daily", startAt: "not a time", now })).toEqual([]);
+  });
+
+  it("covers every repeating cadence the composer offers", () => {
+    const offered = AGENT_CADENCES.filter((entry) => entry.id !== "background").map((e) => e.id);
+    expect(offered.every((id) => id in RECURRENCE_INTERVAL_MS)).toBe(true);
   });
 });

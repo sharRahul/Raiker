@@ -21,7 +21,7 @@ captured stdout even if the command echoes it back.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -44,10 +44,65 @@ RUNTIME_TOKEN_VAR = "RAIKER_GIT_RUNTIME_TOKEN"
 GRANT_SECONDS: dict[str, int] = {"once": 300, "session": 3600}
 GRANT_SCOPES = frozenset(GRANT_SECONDS)
 
+#: The hosts this credential belongs to. A GitHub token answered to another
+#: forge is a credential leak wearing a feature's clothes, so the helper built
+#: below answers for these names and stays silent for every other one.
+CREDENTIAL_HOSTS: tuple[str, ...] = ("github.com", "www.github.com")
+
+#: Everything a lent credential is ever used for. Reads of a public repository
+#: need no credential, and nothing here writes to an account: the loan exists so
+#: a branch the owner approved can leave this machine.
+CREDENTIAL_OPERATIONS: tuple[str, ...] = ("Push a branch you approved",)
+
+
+def credential_helper(token_var: str, hosts: Sequence[str] = CREDENTIAL_HOSTS) -> str:
+    """An inline git credential helper that answers only *hosts*, and only ``get``.
+
+    The helper git ran before this was three words long: it echoed the username
+    and the token for whatever git asked about. Git asks about the URL it is
+    *currently* contacting, which is not always the URL the remote names — a
+    redirect, an ``insteadOf`` rewrite or a submodule points it somewhere else,
+    and the helper would have answered each of them with the owner's GitHub
+    token. So the request is read and the host in it is checked here, inside the
+    child, where it is true regardless of which caller installed the helper and
+    how carefully they scoped it.
+
+    ``$1`` is the operation git wants (``get``, ``store`` or ``erase``): only a
+    read is answered, so nothing git decides to cache can write back through it.
+    The port, when git sends one, is not part of the identity being checked.
+    """
+    pattern = "|".join(hosts)
+    return (
+        "!f() { "
+        # Only a read. `store` and `erase` exit quietly rather than erroring,
+        # because a helper that fails an operation git considers optional turns
+        # a successful fetch into a failed command.
+        '[ "$1" = get ] || exit 0; '
+        "h=; "
+        'while IFS= read -r line; do case "$line" in host=*) h=${line#host=} ;; esac; done; '
+        f'case "${{h%%:*}}" in {pattern}) ;; *) exit 0 ;; esac; '
+        "echo username=x-access-token; "
+        f'echo "password=${token_var}"; '
+        "}; f"
+    )
+
+
+def credential_config(token_var: str, hosts: Sequence[str] = CREDENTIAL_HOSTS) -> list[str]:
+    """``git -c`` values that install the helper for *hosts* and nothing else.
+
+    The empty ``credential.helper`` comes first and is what clears the list:
+    whatever this machine has configured — a keychain, a manager, another
+    account's token — is dropped, so the credential a governed push uses is the
+    one the owner governed. Each host then gets the helper under its own URL, so
+    git does not even consult it for an address the credential does not belong
+    to; :func:`credential_helper` checks again inside the child.
+    """
+    helper = credential_helper(token_var, hosts)
+    return ["credential.helper=", *(f"credential.https://{host}.helper={helper}" for host in hosts)]
+
+
 #: Read by the helper below; never interpolated into a command string.
-CREDENTIAL_HELPER = (
-    f'!f() {{ echo username=x-access-token; echo "password=${RUNTIME_TOKEN_VAR}"; }}; f'
-)
+CREDENTIAL_HELPER = credential_helper(RUNTIME_TOKEN_VAR)
 
 
 class GitCredentialError(Exception):
@@ -205,6 +260,12 @@ class GitCredentialBroker:
             "grant": grant.as_dict() if grant else None,
             "scopes": sorted(GRANT_SCOPES),
             "grant_seconds": dict(GRANT_SECONDS),
+            # The boundary the credential is issued inside, said by the runtime
+            # that enforces it rather than repeated as prose on a page. A
+            # surface that asks for a secret should be able to state what the
+            # secret will be used for first, and be right about it.
+            "hosts": list(CREDENTIAL_HOSTS),
+            "operations": list(CREDENTIAL_OPERATIONS),
             "checked_at": utc_now(),
         }
 
@@ -236,14 +297,17 @@ class GitCredentialBroker:
 
         remember_secret(token)
         try:
-            yield {
-                RUNTIME_TOKEN_VAR: token,
-                # git reads the helper from config we pass per-invocation; the
-                # token itself is only ever in the variable above.
-                "GIT_CONFIG_COUNT": "1",
-                "GIT_CONFIG_KEY_0": "credential.helper",
-                "GIT_CONFIG_VALUE_0": CREDENTIAL_HELPER,
-            }
+            # git reads the helper from config we pass per-invocation; the
+            # token itself is only ever in the variable above. The entries are
+            # host-scoped, so a command that wanders to another address is not
+            # offered this credential at all.
+            config = credential_config(RUNTIME_TOKEN_VAR)
+            environment = {RUNTIME_TOKEN_VAR: token, "GIT_CONFIG_COUNT": str(len(config))}
+            for index, entry in enumerate(config):
+                key, _, value = entry.partition("=")
+                environment[f"GIT_CONFIG_KEY_{index}"] = key
+                environment[f"GIT_CONFIG_VALUE_{index}"] = value
+            yield environment
         finally:
             self._store.consume_git_credential_grant(grant.grant_id)
             forget_secret(token)

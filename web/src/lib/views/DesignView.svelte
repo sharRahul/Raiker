@@ -480,8 +480,12 @@
     const sentText = sentDraft.text;
     busy = true;
     failure = null;
+    // REM-DESIGN-02 — what this request made, so it can be put on the canvas
+    // rather than at the top of a list. Declared out here because the reload
+    // that finds it happens in `finally`, after a refusal as well as a success.
+    let made: string | null = null;
     try {
-      await api.generateImage({
+      const created = await api.generateImage({
         profile_id: choice.profileId,
         prompt: draft.text.trim(),
         size,
@@ -493,6 +497,7 @@
         ...(variations > 1 ? { variations } : {}),
         ...(project ? { project_id: project.project_id } : {}),
       });
+      made = created.generation_id;
       if (sentDraft.text === sentText) sentDraft.text = "";
     } catch (error) {
       failure =
@@ -502,6 +507,26 @@
       // Reloaded either way: a refusal is recorded, so the thread is where the
       // owner reads what happened even when this attempt failed.
       await load();
+      /*
+       * REM-DESIGN-02 — the picture just made is the current work.
+       *
+       * Every generation went to the top of the history and nothing was
+       * selected, so the canvas an owner had been composing on emptied itself
+       * at the moment their request succeeded, and the result they asked for
+       * arrived as the first row of a list that grows all day. Putting it on
+       * the canvas is what keeps "the selected artifact and prompt central"
+       * true after the twentieth image as well as the first.
+       *
+       * Only a picture. A refusal is recorded as a generation too, and a
+       * refusal has nothing to put on a canvas — it is read in the history,
+       * where its reason is.
+       */
+      if (made !== null) {
+        const generation = (view?.generations ?? []).find(
+          (item) => item.generation_id === made,
+        );
+        if (generation?.has_image) selectedId = generation.generation_id;
+      }
     }
   }
 

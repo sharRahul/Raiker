@@ -7,6 +7,8 @@ and the value never reaches anything that gets written down.
 """
 from __future__ import annotations
 
+import os
+import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -14,13 +16,17 @@ import pytest
 
 from raiker.context.redaction import redact_text, registered_secret_count
 from raiker.runtime.git_credential import (
+    CREDENTIAL_HOSTS,
     GRANT_SECONDS,
     RUNTIME_TOKEN_VAR,
     GitCredentialBroker,
     GitCredentialError,
+    credential_config,
+    credential_helper,
     grant_expiry,
 )
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tools.git import GIT_PUSH_CREDENTIAL_HOSTS
 
 TOKEN = "ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
 
@@ -195,3 +201,115 @@ def test_the_loan_ends_even_when_the_command_fails(broker: GitCredentialBroker) 
         raise RuntimeError("git exploded")
     assert registered_secret_count() == 0
     assert broker.active_grant() is None
+
+
+# ── Which host the credential answers ────────────────────────────────────────
+#
+# The helper git used to run was three words long: it echoed the username and
+# the token for whatever git asked about. Git asks about the URL it is
+# *currently* contacting, which is not always the URL the remote names — a
+# redirect, an `insteadOf` rewrite or a submodule sends it elsewhere. These run
+# the real `git credential fill` against the real helper, because a shell
+# function is only correct in the shell that runs it.
+
+
+def _fill(args: list[str], host: str) -> tuple[int, str]:
+    """Ask git for the credential it would use for *host*."""
+    environment = dict(
+        os.environ,
+        RAIKER_GIT_PUSH_TOKEN=TOKEN,
+        GIT_TERMINAL_PROMPT="0",
+        GIT_ASKPASS="",
+        SSH_ASKPASS="",
+    )
+    proc = subprocess.run(
+        ["git", *args, "credential", "fill"],
+        input=f"protocol=https\nhost={host}\n\n",
+        text=True, capture_output=True, env=environment, timeout=30, check=False,
+    )
+    return proc.returncode, proc.stdout
+
+
+def test_the_helper_answers_the_host_the_credential_belongs_to() -> None:
+    args = [item for value in credential_config("RAIKER_GIT_PUSH_TOKEN") for item in ("-c", value)]
+    code, output = _fill(args, "github.com")
+    assert code == 0
+    assert f"password={TOKEN}" in output
+
+
+@pytest.mark.parametrize("host", ["evil.example.com", "github.com.evil.example.com"])
+def test_the_helper_says_nothing_to_any_other_host(host: str) -> None:
+    args = [item for value in credential_config("RAIKER_GIT_PUSH_TOKEN") for item in ("-c", value)]
+    code, output = _fill(args, host)
+    assert TOKEN not in output
+    assert code != 0
+
+
+def test_the_host_check_holds_even_when_the_helper_is_installed_unscoped() -> None:
+    """The URL scoping and the in-helper check are two answers, not one.
+
+    A caller that installs the helper as a plain `credential.helper` loses the
+    first; the second is inside the child and cannot be lost by a caller at all.
+    """
+    helper = credential_helper("RAIKER_GIT_PUSH_TOKEN")
+    args = ["-c", "credential.helper=", "-c", f"credential.helper={helper}"]
+    assert _fill(args, "github.com")[0] == 0
+    code, output = _fill(args, "evil.example.com")
+    assert TOKEN not in output
+    assert code != 0
+
+
+def test_the_helper_refuses_to_write_anything_back() -> None:
+    """Only `get` is answered, so nothing git caches can write through it."""
+    helper = credential_helper("RAIKER_GIT_PUSH_TOKEN")
+    assert '[ "$1" = get ] || exit 0' in helper
+
+
+def test_the_loan_installs_the_helper_against_the_credentials_hosts_only(
+    broker: GitCredentialBroker,
+) -> None:
+    broker.store_token(TOKEN)
+    broker.grant("session")
+    with broker.lend() as environment:
+        count = int(environment["GIT_CONFIG_COUNT"])
+        keys = [environment[f"GIT_CONFIG_KEY_{index}"] for index in range(count)]
+    # The first entry is what drops this machine's own helpers; every other one
+    # names a host rather than applying to all of them.
+    assert keys[0] == "credential.helper"
+    assert keys[1:] == [f"credential.https://{host}.helper" for host in CREDENTIAL_HOSTS]
+
+
+def test_the_push_path_and_the_helper_agree_on_the_hosts() -> None:
+    assert frozenset(CREDENTIAL_HOSTS) == GIT_PUSH_CREDENTIAL_HOSTS
+
+
+def test_the_loans_own_environment_answers_github_and_nothing_else(
+    broker: GitCredentialBroker,
+) -> None:
+    """The mapping a caller passes to a child, driven through real git.
+
+    The two tests above prove the helper and the config separately. This proves
+    the thing a caller actually holds: `lend()` yields an environment, and a
+    child given exactly that environment gets the credential for GitHub and
+    nothing at all for anywhere else.
+    """
+    broker.store_token(TOKEN)
+    broker.grant("session")
+    with broker.lend() as loan:
+        environment = dict(
+            os.environ,
+            **loan,
+            GIT_TERMINAL_PROMPT="0",
+            GIT_ASKPASS="",
+            SSH_ASKPASS="",
+        )
+        answers = {}
+        for host in ("github.com", "evil.example.com"):
+            proc = subprocess.run(
+                ["git", "credential", "fill"],
+                input=f"protocol=https\nhost={host}\n\n",
+                text=True, capture_output=True, env=environment, timeout=30, check=False,
+            )
+            answers[host] = proc.stdout
+    assert f"password={TOKEN}" in answers["github.com"]
+    assert TOKEN not in answers["evil.example.com"]

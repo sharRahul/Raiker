@@ -44,7 +44,11 @@ const GENERATIONS = [
 function routes(overrides: Record<string, unknown> = {}) {
   return {
     "GET /api/images": { sizes: ["1024x1024"], generations: GENERATIONS },
-    "GET /api/capabilities/gates": [
+    // The route `api.capabilityGates()` actually reads. Spelled
+    // `/api/capabilities/gates` here until REM-DESIGN-02, which meant every
+    // test in this file ran against an empty gate list and a composer that
+    // could not send — invisible while nothing tried to send.
+    "GET /api/capability-gates": [
       makeGate({ capability: "image_generation", state: "runtime", runtime_enabled: true }),
     ],
     "GET /api/models": { profiles: [], selected_profile_id: null },
@@ -315,5 +319,87 @@ describe("Design research sources", () => {
     const panel = await screen.findByTestId("design-research");
     await waitFor(() => expect(panel).toHaveTextContent("Maple leaves are palmate"));
     expect(screen.queryByRole("button", { name: /reference plate/ })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * REM-DESIGN-02 — the picture just made is the current work.
+ *
+ * Every generation went to the top of the history and nothing was selected, so
+ * the canvas emptied itself at the moment the request succeeded and the result
+ * arrived as the first row of a list that grows all day.
+ */
+describe("what happens to a picture once it is made", () => {
+  const MODELS = {
+    profiles: [
+      {
+        profile_id: "prof_1",
+        provider: "openai",
+        model: "gpt-4",
+        selected: true,
+        configured: true,
+        ready: true,
+        readiness_state: "ready",
+        image_models: ["gpt-image-1"],
+      },
+    ],
+    selected_profile_id: "prof_1",
+  };
+
+  async function generate(created: Record<string, unknown>, after: unknown[]) {
+    let posted = false;
+    stubFetch({
+      ...routes({
+        "GET /api/models": MODELS,
+        // No working project, so the draft this test types into is not swapped
+        // for another one when the project list lands.
+        "GET /api/projects": { projects: [], active_project_id: null },
+        "GET /api/read-capabilities": { web_read: { enabled: false } },
+        "GET /api/surface-models": { surfaces: {} },
+      }),
+      // The read after the request answers with the new picture, as a real
+      // reload does. Keyed off the request itself rather than off a call count,
+      // so an extra read on mount cannot consume the change.
+      get "GET /api/images"() {
+        return { sizes: ["1024x1024"], generations: posted ? after : GENERATIONS };
+      },
+      get "POST /api/images"() {
+        posted = true;
+        return { ok: true, ...created };
+      },
+    });
+    render(DesignView);
+
+    const prompt = await screen.findByLabelText("Describe the image");
+    await fireEvent.input(prompt, { target: { value: "a birch leaf" } });
+    const button = screen.getByRole("button", { name: "Generate" });
+    await waitFor(() => expect(button).not.toBeDisabled());
+    await fireEvent.click(button);
+    return fetch as unknown as ReturnType<typeof vi.fn>;
+  }
+
+  it("puts it on the canvas rather than at the top of a list", async () => {
+    const made = generation({ generation_id: "img_new", prompt: "a birch leaf" });
+    await generate({ generation_id: "img_new" }, [made, ...GENERATIONS]);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Back to everything" })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("region", { name: "Canvas" })).toBeInTheDocument();
+  });
+
+  it("leaves a refusal in the history, where its reason is", async () => {
+    const refused = generation({
+      generation_id: "img_refused",
+      prompt: "a birch leaf",
+      status: "refused",
+      has_image: false,
+      reason_code: "disabled_by_capability_gate",
+    });
+    await generate({ generation_id: "img_refused" }, [refused, ...GENERATIONS]);
+
+    await waitFor(() => expect(screen.getAllByRole("img").length).toBeGreaterThan(0));
+    // A refusal has nothing to put on a canvas, so no canvas is opened.
+    expect(screen.queryByRole("button", { name: "Back to everything" })).not.toBeInTheDocument();
   });
 });

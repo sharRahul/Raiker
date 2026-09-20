@@ -52,10 +52,11 @@ Putting Chat on a small local model does not move your image prompts onto it.
 
 ## The canvas
 
-Press a picture and Design composes itself around it:
+Press a picture — or generate one, which does the same thing — and Design
+composes itself around it:
 
-- **Assets**, down the left — everything this workspace has made, newest first.
-  Selecting one moves the canvas to it.
+- **Assets**, down the left — everything this workspace has made, newest first,
+  with how many that is. Selecting one moves the canvas to it.
 - **Canvas**, in the middle and the largest of the three, because it is the
   thing you are working on.
 - **Inspector**, on the right — the prompt, the model, the size, when it was
@@ -73,6 +74,11 @@ something you asked of *this* picture, so it is recorded against it and shown
 there, with the reason, rather than disappearing.
 
 **Back to everything**, above the picture, returns you to the history.
+
+A picture you have just generated goes straight onto the canvas, so the thing
+you asked for stays in front of you rather than becoming the first row of a
+history that grows all day. A refused request does not: there is nothing to put
+on a canvas, and it is read in the history with its reason.
 
 ## What it needs before it can generate anything
 

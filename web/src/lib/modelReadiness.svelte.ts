@@ -123,6 +123,39 @@ export function isChoosableModel(profile: {
 }
 
 /**
+ * REM-MODEL-01 — one answer to "could Raiker reach this profile right now".
+ *
+ * `isChoosableModel` above answers a picker's question: may this be *offered*?
+ * A local profile nobody has checked is a legitimate choice there, because the
+ * server takes the first check before it admits a turn. Onboarding and the
+ * first-run recommendation ask a different question — will this actually serve
+ * — and each had invented its own answer to it out of `configured` and
+ * `provider_detected`, neither of which has ever meant "reachable".
+ *
+ * The cost of that was concrete and is the one BUG-198 first found: a provider
+ * whose key the last check *rejected* still read as usable, so the last screen
+ * of first-run called a mode ready and the composer behind it could not send.
+ * Both callers now come here, and both inherit the one rule the rest of the
+ * app already keeps: a check that answered badly disqualifies the profile, and
+ * nothing else claims reachability on its behalf.
+ */
+export function isReachableProfile(profile: {
+  readiness_state?: string | null;
+  connection_configured?: boolean;
+  configured?: boolean;
+  provider_detected?: boolean | null;
+  off_machine?: boolean;
+}): boolean {
+  if (profile.readiness_state && MEASURED_UNAVAILABLE.has(profile.readiness_state)) return false;
+  // A connected account is reachable whether or not anything local was found.
+  if (profile.connection_configured === true) return true;
+  // A hosted provider with no credential is not reachable, however the profile
+  // is otherwise configured — there is nothing to authenticate with.
+  if (profile.off_machine === true) return false;
+  return profile.configured === true || profile.provider_detected === true;
+}
+
+/**
  * True when the owner has something to fix before a turn can run.
  *
  * A model nobody has checked yet is not one of those things. The server takes

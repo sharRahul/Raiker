@@ -7,23 +7,30 @@ identity. A parked task keeps its proposal attribution; continuing after an
 approval rotates the token before work resumes. Activity therefore shows which
 machine turn acted while account resources remain scoped to the human owner.
 
-**Tasks → Plan work.** Pick one of four work types from the chip row; the form
-adapts to your choice.
+**Tasks → Plan work.** The composer asks two questions, in this order: **when
+to run**, and — only where there is a choice — **how it runs**.
 
-| Type | Extra fields | Button | Behaviour |
-|---|---|---|---|
-| **Task** | — | Create task | Runs now |
-| **Once** | Start time | Schedule task | Runs once at that time |
-| **Routine** | Repeat, First run | Create routine | Repeats on the chosen interval, anchored to the first run |
-| **Background** | — | Start background agent | Runs asynchronously until its work is complete or you stop it |
+| When to run | How it runs | Extra fields | Button | Behaviour |
+|---|---|---|---|---|
+| **Now** | One pass | — | Create task | Runs now, once |
+| **Now** | Until it is done | — | Start background agent | Runs asynchronously until its work is complete or you stop it |
+| **At a time** | — | Start time | Schedule task | Runs once at that time |
+| **Repeating** | — | Repeat, First run | Create routine | Repeats on the chosen interval, anchored to the first run |
+
+A background agent starts now, so **How it runs** is asked under **Now** and
+nowhere else — there is no scheduled variant of it to compose.
 
 **Repeat** offers every cadence the scheduler honours: **Keep going** (a cycle
 roughly every 20 minutes), **Hourly**, **Daily** and **Weekly**. A routine is
 anchored to its **First run**, and every later cycle is counted forward from
 that slot rather than from whenever the previous one happened to finish — so a
-daily routine created at 4pm for a 9am first run runs at 9am, not at 4pm. Build's
-side panel offers the same choice for a standing agent; leaving its **First run**
-empty starts the first cycle on the next scheduler tick.
+daily routine created at 4pm for a 9am first run runs at 9am, not at 4pm. The
+form previews the next three runs as you choose them, and names the zone the
+start time is read in. The preview skips slots that have already passed, because
+that is what the scheduler does: a machine that was asleep does not wake up
+running the same cycle twice. Build's side panel offers the same choice for a
+standing agent; leaving its **First run** empty starts the first cycle on the
+next scheduler tick.
 
 A cycle is one governed turn. Policy, permissions and approvals apply to cycle
 forty exactly as they did to cycle one, and a schedule only fires while Raiker is
@@ -128,10 +135,21 @@ lives.
 To move an existing conversation in, drag a recent chat onto the project, or use
 **Move to project** from the session's `⋯` menu.
 
-Opening a project shows what belongs to it in one place: its files, its
-sessions, the tasks scoped to it, its checkpoints, and the **images** generated
-in [Design](design.md) while it was the working project. Pictures made with no
-project chosen stand alone and are not shown under any project.
+Opening a project shows what belongs to it, in five sections rather than one
+long column:
+
+| Section | What is in it |
+|---|---|
+| **Overview** | The project's instructions and memory setting, and how many of each kind of thing is under it |
+| **Files** | The project's folder, and any file's provenance |
+| **Work** | The sessions started in it, and the tasks scoped to it |
+| **Assets** | The **images** generated in [Design](design.md) while it was the working project |
+| **Evidence** | The checkpoints taken in its sessions |
+
+It opens on **Overview**, and the counts there say whether a section holds
+anything before you open it. An edit to the instructions is kept while you move
+between sections, and the other sections say so until you save it. Pictures made
+with no project chosen stand alone and are not shown under any project.
 
 Click any of those images to open **that** picture in Design, with the canvas
 scoped to this project and a **Show all images** way back out. **View all in

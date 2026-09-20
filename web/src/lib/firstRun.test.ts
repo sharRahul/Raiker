@@ -71,6 +71,38 @@ describe("what the model stage recommends", () => {
     expect(recommended?.label).toContain("already running here");
   });
 
+  /**
+   * REM-MODEL-01 — the recommendation passes through the one reachability
+   * answer, so "the cheapest path to a working model" cannot name a backend
+   * whose last check said it does not work.
+   */
+  it("does not recommend a connected provider whose key was rejected", () => {
+    const recommended = recommendedPath([
+      profile({
+        profile_id: "anthropic-hosted",
+        provider: "anthropic",
+        local_only: false,
+        off_machine: true,
+        connection_configured: true,
+        readiness_state: "authentication_failed",
+      }),
+    ]);
+
+    expect(recommended).toBeNull();
+  });
+
+  it("does not recommend a running runtime that has no model to serve", () => {
+    const recommended = recommendedPath([
+      profile({
+        profile_id: "ollama-local",
+        provider_detected: true,
+        readiness_state: "model_missing",
+      }),
+    ]);
+
+    expect(recommended).toBeNull();
+  });
+
   it("falls back to a provider the owner has already connected", () => {
     const recommended = recommendedPath([
       profile({

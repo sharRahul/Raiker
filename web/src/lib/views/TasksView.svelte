@@ -16,10 +16,18 @@
   import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
   import { setWorkProject, workProject } from "../workProject.svelte";
   import {
-    TASK_CADENCES,
     deriveTitle,
     primaryAction,
+    cadenceFor,
+    nextRuns,
+    runModeFor,
     scheduleSummary,
+    scheduleZone,
+    TASK_RUN_MODES,
+    TASK_TIMINGS,
+    timingFor,
+    type TaskRunMode,
+    type TaskTiming,
     type TaskCadence,
   } from "../taskComposer";
   import GuideLink from "../components/GuideLink.svelte";
@@ -92,7 +100,12 @@
   const title = $derived(titleOverride.trim() || deriveTitle(objective));
   let priority = $state("normal");
   let parentTaskId = $state("");
-  let cadence = $state<TaskCadence>("now");
+  // REM-TASK-01 — two questions, not one row of four chips. `cadence` is what
+  // the runtime is asked for and is derived from both, so the four shapes it
+  // accepts are unchanged and no combination it does not have can be composed.
+  let timing = $state<TaskTiming>("now");
+  let runMode = $state<TaskRunMode>("single");
+  const cadence = $derived(cadenceFor(timing, runMode));
   /** COMPOSER-10 — the timing details, opened only when asked for. */
   let detailsOpen = $state(false);
   let composerGates = $state<CapabilityGate[]>([]);
@@ -135,6 +148,18 @@
       model = remembered.model;
     });
   });
+  /**
+   * REM-TASK-01 — the runs this schedule would actually produce.
+   *
+   * A cadence and a first run are two abstractions; three timestamps are the
+   * thing the owner is choosing. It is computed the way the scheduler computes
+   * it, elapsed slots and all, so the preview cannot promise a run the runtime
+   * would not take.
+   */
+  const upcoming = $derived(
+    nextRuns({ cadence, every: routineEvery, startAt: scheduledAt, count: cadence === "routine" ? 3 : 1 }),
+  );
+
   /** The timing, in one line, whether or not the details are open. */
   const schedule = $derived(
     scheduleSummary({
@@ -427,7 +452,7 @@
         ...(modelProfile && model ? { model_profile: modelProfile, model } : {}),
         ...(attachments ? { attachments } : {}),
       });
-      titleOverride = ""; objective = ""; parentTaskId = ""; priority = "normal"; cadence = "now"; routineEvery = "daily"; scheduledAt = ""; modelProfile = ""; model = ""; workMethod = "chat";
+      titleOverride = ""; objective = ""; parentTaskId = ""; priority = "normal"; timing = "now"; runMode = "single"; routineEvery = "daily"; scheduledAt = ""; modelProfile = ""; model = ""; workMethod = "chat";
       notice = "Saved to your work queue.";
       attachStore.clear();
       await load();
@@ -501,7 +526,11 @@
     // Chat's `/schedule` asks this surface to open on **Schedule once**. It
     // arranges the form and stops: nothing is created and nothing is scheduled.
     if (takeScheduleRequest()) {
-      cadence = "once";
+      // Asked for by the shape the runtime knows, and translated by the one
+      // function that owns that translation.
+      const asked: TaskCadence = "once";
+      timing = timingFor(asked);
+      runMode = runModeFor(asked);
       queueMicrotask(() => instructionEl?.focus());
     }
     void refreshModels();
@@ -583,16 +612,31 @@
     onsubmit={() => void createTask()}
   >
     {#snippet above()}
+      <!-- REM-TASK-01 — when it runs, then how it runs. The second question is
+           only asked where the runtime has an answer for it: a background agent
+           starts now, so it is not offered beside a start time. -->
       <div class="cadence chip-row" role="group" aria-label="When to run">
-        {#each TASK_CADENCES as entry (entry.id)}
+        {#each TASK_TIMINGS as entry (entry.id)}
           <button
             type="button"
             class="chip"
-            aria-pressed={cadence === entry.id}
-            onclick={() => (cadence = entry.id)}>{entry.label}</button
+            aria-pressed={timing === entry.id}
+            onclick={() => (timing = entry.id)}>{entry.label}</button
           >
         {/each}
       </div>
+      {#if timing === "now"}
+        <div class="cadence chip-row" role="group" aria-label="How it runs">
+          {#each TASK_RUN_MODES as entry (entry.id)}
+            <button
+              type="button"
+              class="chip"
+              aria-pressed={runMode === entry.id}
+              onclick={() => (runMode = entry.id)}>{entry.label}</button
+            >
+          {/each}
+        </div>
+      {/if}
       <ComposerChips store={attachStore} disabled={creating} />
       {#if attachOpen}
         <ComposerAttachPanel store={attachStore} disabled={creating} idPrefix="task" />
@@ -659,7 +703,28 @@
                 bind:value={scheduledAt}
                 required
               />
+              <!-- REM-TASK-01 — the field reads and writes this machine's zone,
+                   and the runtime stores UTC. An owner scheduling work for "09:00"
+                   is entitled to know which 09:00 that is without having to test
+                   it with a real run. -->
+              <small class="zone">Times are {scheduleZone()}.</small>
             </label>
+            {#if upcoming.length > 0}
+              <div class="preview" role="status" aria-label="Next runs">
+                <span class="preview-heading">Next {upcoming.length === 1 ? "run" : "runs"}</span>
+                <ol>
+                  {#each upcoming as run, index (index)}
+                    <li>{run.toLocaleString()}</li>
+                  {/each}
+                </ol>
+                {#if cadence === "routine"}
+                  <small>
+                    A slot that has already passed is skipped rather than owed, so a machine
+                    that was asleep does not wake up running the same cycle twice.
+                  </small>
+                {/if}
+              </div>
+            {/if}
           {/if}
           <label>
             Parent work
@@ -917,6 +982,13 @@
      four short fields do not become four full-width rows. */
   .task-details{display:grid;gap:var(--space-3);grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));margin:var(--space-2) 0}
   .task-details label{color:var(--text-2);display:grid;font-size:var(--text-sm);gap:.35rem}
+  .zone{color:var(--text-3);font-size:var(--text-xs)}
+  /* The preview spans the details grid: three timestamps read as a list, not as
+     a fourth field squeezed beside Parent work. */
+  .preview{grid-column:1/-1;display:grid;gap:.25rem;padding:var(--space-3);border-left:3px solid var(--accent);background:var(--sunken);border-radius:var(--r-sm)}
+  .preview-heading{color:var(--text-3);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.04em}
+  .preview ol{margin:0;padding-left:1.1rem;display:grid;gap:.1rem;color:var(--text-1);font-size:var(--text-sm)}
+  .preview small{color:var(--text-2);font-size:var(--text-xs)}
   /* The one control planning work needs that asking a question does not. It
      reads as a composer control rather than as a form field, because that is
      what it is. */

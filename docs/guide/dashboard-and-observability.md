@@ -236,9 +236,15 @@ of these still asks it at the moment of use.
 Web reads use HTTPS and reject credentials embedded in URLs. Resolved addresses
 must be public and are checked again on redirects. The fetched page is converted
 to sanitized text, with removed content reported. You control a blocklist; the
-address-safety guard cannot be disabled. Extraction opens no connection of its
-own — it reads what that same bounded fetch returned — so nothing it does can
-widen what leaves this machine.
+address-safety guard cannot be disabled — no setting on the page and no approval
+lifts it. Extraction opens no connection of its own — it reads what that same
+bounded fetch returned — so nothing it does can widen what leaves this machine.
+
+**Settings → Web access** leads with the number of rules actually in force and
+the three sources that add up to it: your own, this host's environment, and the
+ones built into the build. The last two are read-only there, folded away and
+each naming who *can* change it — the environment list is set before Raiker is
+started, and the built-in list ships with the build.
 
 A page that builds itself in the browser is reported as such rather than
 guessed at. Interactive browsing — running a page's scripts, filling a form,
@@ -249,6 +255,15 @@ The Git credential used for pushes is encrypted at rest and loaned to one
 command at a time under a grant you make once or for a session. It is redacted
 from commands, logs, errors, and output. Publishing is a separate permission
 from changing a local repository.
+
+**Settings → Git credential** says what the credential is for before it asks for
+one: the hosts Raiker will offer it to, the operations it is used for, and that
+every use asks first. It is only ever offered to those hosts — a remote on
+another forge, or a redirect that sends git somewhere unexpected, is answered
+without it. Raiker deliberately does not use this machine's own credential
+manager: a keychain answers for whichever account signed in last, which Raiker
+cannot name for you, cannot scope, and cannot withdraw. A fine-grained token
+scoped to the repositories you want is the supported method.
 
 ## Voice
 

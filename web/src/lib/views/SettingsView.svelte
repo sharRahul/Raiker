@@ -12,6 +12,7 @@
   import Runtime from "./settings/Runtime.svelte";
   import WebAccess from "./settings/WebAccess.svelte";
   import GitCredential from "./settings/GitCredential.svelte";
+  import MemoryEngine from "./settings/MemoryEngine.svelte";
   import Updates from "./settings/Updates.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
@@ -238,6 +239,8 @@
       <WebAccess />
     {:else if active === "git-credential"}
       <GitCredential />
+    {:else if active === "memory-engine"}
+      <MemoryEngine />
     {:else if active === "updates"}
       <Updates />
     {:else}

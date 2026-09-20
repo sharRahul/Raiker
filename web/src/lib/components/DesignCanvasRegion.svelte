@@ -136,6 +136,11 @@
     <!-- Assets. Every picture this owner has, newest first, so the one being
          worked on can be swapped without leaving the canvas. -->
     <aside class="rail" aria-label="Assets">
+      <!-- REM-DESIGN-02 — the strip says how many it is showing. Unnamed, a
+           column of thumbnails reads as "some recent ones"; named and counted,
+           it reads as the library it is, and an owner can tell at a glance
+           whether the picture they are looking for is in it. -->
+      <p class="rail-head">Assets <span>{assets.length}</span></p>
       <ol>
         {#each assets as asset (asset.generation.generation_id)}
           <li>
@@ -359,6 +364,20 @@
     align-items: start;
     min-height: 0;
   }
+  /* REM-DESIGN-02 — the strip says what it is and how much of it there is. */
+  .rail-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-2);
+    color: var(--text-3);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 650;
+  }
+  .rail-head span { color: var(--text-2); }
   .rail ol {
     list-style: none;
     margin: 0;

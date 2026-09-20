@@ -354,6 +354,73 @@ describe("ProjectsView context home", () => {
     await fireEvent.click(screen.getByRole("button", { name: /open project alpha/i }));
   }
 
+  /**
+   * REM-PROJ-02 — the detail is five sections, and it opens on Overview.
+   *
+   * A test that wants the file tree or the image strip now asks for its
+   * section, exactly as an owner does. Nothing is fetched by the switch: the
+   * project's files, tasks and images are read once on selection.
+   */
+  async function openSection(label: string) {
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: label })).toBeInTheDocument(),
+    );
+    await fireEvent.click(screen.getByRole("tab", { name: label }));
+  }
+
+  /*
+   * REM-PROJ-02 — five sections, and the one that answers "what is this
+   * project" leads. The detail stacked context, files, sessions, images, tasks
+   * and checkpoints in one open column, so whichever of the six an owner came
+   * for, they scrolled past the others to reach it.
+   */
+  it("opens on the overview, with the project's own counts", async () => {
+    await openDetail(routes());
+
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    );
+    expect(screen.getByLabelText("Project instructions")).toBeInTheDocument();
+    // The overview names what is under the project; the sections themselves
+    // are not rendered until one is asked for.
+    expect(
+      screen.queryByText("No checkpoints for this project's sessions yet."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows one section's content at a time", async () => {
+    await openDetail(routes());
+    await openSection("Evidence");
+
+    expect(
+      screen.getByText("No checkpoints for this project's sessions yet."),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Project instructions")).not.toBeInTheDocument();
+  });
+
+  it("keeps an unsaved context edit, and says where it is", async () => {
+    await openDetail(routes());
+
+    const instructions = await screen.findByLabelText("Project instructions");
+    await fireEvent.input(instructions, { target: { value: "Prefer short answers." } });
+    await openSection("Work");
+
+    expect(screen.getByText(/Project context has unsaved changes/)).toBeInTheDocument();
+
+    await openSection("Overview");
+    expect(screen.getByLabelText("Project instructions")).toHaveValue("Prefer short answers.");
+  });
+
+  it("says nothing about unsaved changes when nothing was changed", async () => {
+    await openDetail(routes());
+    await openSection("Work");
+
+    expect(screen.queryByText(/unsaved changes/)).not.toBeInTheDocument();
+  });
+
   /*
    * BUG-282 — a picture generated in a project is that project's material.
    *
@@ -392,6 +459,7 @@ describe("ProjectsView context home", () => {
         },
       }),
     );
+    await openSection("Assets");
 
     // NEW-PROJ-02 — the alt text names the action, because the picture is now
     // a link to itself rather than an illustration.
@@ -411,6 +479,7 @@ describe("ProjectsView context home", () => {
         },
       }),
     );
+    await openSection("Assets");
 
     const link = (await screen.findByRole("img", { name: /a maple leaf/ })).closest("a");
     expect(link).toHaveAttribute("href", "#/design?project=proj_1&asset=img_1");
@@ -433,6 +502,7 @@ describe("ProjectsView context home", () => {
         },
       }),
     );
+    await openSection("Assets");
 
     // Eight tiles that look like the whole set are a count nobody stated.
     expect(await screen.findByText("Showing 8 of 11.")).toBeInTheDocument();
@@ -456,6 +526,7 @@ describe("ProjectsView context home", () => {
         },
       }),
     );
+    await openSection("Assets");
 
     expect(
       await screen.findByText(/pictures generated in design while this project is active/i),
@@ -467,12 +538,14 @@ describe("ProjectsView context home", () => {
 
   it("renders exactly one file list", async () => {
     await openDetail(routes());
+    await openSection("Files");
     await screen.findByRole("tree", { name: /project files/i });
     expect(screen.getAllByRole("tree").length).toBe(1);
   });
 
   it("lists project files through the explorer", async () => {
     await openDetail(routes());
+    await openSection("Files");
     expect(await screen.findByRole("button", { name: "Inspect brief.md" })).toBeInTheDocument();
     expect(screen.getByText("2.0 KB")).toBeInTheDocument();
     expect(screen.getByText("Ready")).toBeInTheDocument();
@@ -480,6 +553,7 @@ describe("ProjectsView context home", () => {
 
   it("links a selected file's provenance back to the session and audit log", async () => {
     await openDetail(routes());
+    await openSection("Files");
     await fireEvent.click(await screen.findByRole("button", { name: "Inspect brief.md" }));
 
     expect(await screen.findByText("Provenance")).toBeInTheDocument();
@@ -495,6 +569,7 @@ describe("ProjectsView context home", () => {
 
   it("says a file has no recorded governed write rather than implying one", async () => {
     await openDetail(routes({ "GET /api/projects/proj_1/files": { ...FILES, provenance: {} } }));
+    await openSection("Files");
     await fireEvent.click(await screen.findByRole("button", { name: "Inspect brief.md" }));
     expect(
       await screen.findByText(/no governed write is recorded against this path/i),
@@ -508,6 +583,7 @@ describe("ProjectsView context home", () => {
       Object.entries(routes()).filter(([key]) => key !== "GET /api/projects/proj_1/files"),
     );
     await openDetail(withoutFiles);
+    await openSection("Files");
     expect(await screen.findByRole("button", { name: "Inspect brief.md" })).toBeInTheDocument();
     expect(await screen.findByText(/files unavailable \(404\)/i)).toBeInTheDocument();
   });
@@ -528,6 +604,7 @@ describe("ProjectsView context home", () => {
         "GET /api/projects/proj_1/root/status": { ...STATUS, root_kind: "attached" },
       }),
     );
+    await openSection("Files");
     await screen.findByRole("tree", { name: /project files/i });
     expect(screen.queryByRole("button", { name: "Attach a folder" })).not.toBeInTheDocument();
   });

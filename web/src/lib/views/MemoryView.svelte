@@ -122,43 +122,6 @@
     catch (e) { actionError = e instanceof ApiError ? `Could not update memory use (${e.status}).` : "Could not update memory use."; }
     finally { busy = false; }
   }
-  // MEM-03 — recall searches exactly one embedding space. Reloading rather than
-  // patching the local object is deliberate: the server decides what "auto"
-  // resolved to, and showing a guess would put the page back in the business of
-  // claiming a backend it did not confirm.
-  async function chooseEmbeddingBackend(backend: string) {
-    if (!settings || busy) return;
-    busy = true; actionError = null;
-    try { await api.setMemoryEmbeddingBackend(backend); await load(); }
-    catch (e) { actionError = e instanceof ApiError ? `Could not change the recall backend (${e.status}).` : "Could not change the recall backend."; }
-    finally { busy = false; }
-  }
-  // MEM-10 — the select above can only offer spaces this workspace already
-  // holds vectors in, which on a default install is the lexical fallback and
-  // nothing else. This is how the first semantic space comes to exist: one
-  // governed run that sends each approved memory to the named embedding model.
-  // The count and the destination are both stated before the owner confirms,
-  // because the text really does leave the machine.
-  let indexProvider = $state("");
-  let indexResult = $state<string | null>(null);
-  const indexTarget = $derived(
-    (settings?.embedding_providers ?? []).find((p) => p.space === indexProvider) ?? null,
-  );
-  async function buildEmbeddingIndex() {
-    if (!indexTarget || busy) return;
-    const waiting = indexTarget.unindexed_memories ?? 0;
-    const waitingFiles = indexTarget.unindexed_file_chunks ?? 0;
-    const where = indexTarget.local_only ? "on this machine" : `to ${indexTarget.provider}`;
-    if (!window.confirm(`${indexTarget.local_only ? "Process" : "Send"} ${waiting} approved ${waiting === 1 ? "memory" : "memories"} and ${waitingFiles} managed document ${waitingFiles === 1 ? "passage" : "passages"} ${where} to be embedded as ${indexTarget.model}? Secret-like or credential-like content is never embedded.`)) return;
-    busy = true; actionError = null; indexResult = null;
-    try {
-      const result = await api.buildMemoryEmbeddingIndex(indexTarget.provider, indexTarget.model);
-      indexResult = `Embedded ${result.indexed_count} memories and ${result.indexed_file_chunk_count ?? 0} document passages into ${result.embedding_model}.`;
-      await load();
-    } catch (e) {
-      actionError = e instanceof ApiError ? `Could not build the index (${e.status}).` : "Could not build the index.";
-    } finally { busy = false; }
-  }
   async function togglePin(m: MemoryControlView) {
     try { await api.setMemoryPinned(m.memory_id, !m.pinned); await load(); }
     catch { actionError = "Could not update this memory."; }
@@ -619,6 +582,16 @@
       description="Files kept under Raiker's managed memory storage. Uploaded content is data, never instructions."
       onLibraryChange={() => void load()}
     />
+    <!-- REM-MEM-03 — the other half of "what Raiker can read". This library
+         holds files kept under managed memory storage; the folders Raiker
+         indexes in place are administered on the Knowledge Map. They are
+         different objects with different lifecycles, so they are not merged
+         here — but an owner asking "what can Raiker read" should not have to
+         know that to find the second one. -->
+    <p class="control-note">
+      Folders Raiker indexes where they already live are added and revoked on the
+      <a href="#/brain">Knowledge Map</a>.
+    </p>
   </section>
   </div>
 {:else}
@@ -666,55 +639,16 @@
           Ranks {settings.vector_search_exact_limit ?? 512} vectors exactly, then approximates.
         </p>
       {/if}
-      <!-- MEM-10 — the select opposite can only offer spaces that already hold
-           vectors, so on a default install it offers the fallback and nothing
-           else. This row is the way out of that: it builds one. -->
-      {#if (settings.embedding_providers ?? []).some((provider) => (provider.pending_count ?? 0) > 0)}
-        <div class="index-row">
-          <label class="index-field">
-            <span class="sr-only">Embedding model to build with</span>
-            <select class="select" aria-label="Embedding model" bind:value={indexProvider} disabled={busy}>
-              <option value="">Build a meaning-based index…</option>
-              {#each settings.embedding_providers as provider (provider.space)}
-                <option value={provider.space}>{provider.model} · {provider.local_only ? "on this machine" : provider.provider}</option>
-              {/each}
-            </select>
-          </label>
-          <button
-            class="btn btn-sm"
-            type="button"
-            disabled={busy || !indexTarget || !(indexTarget.pending_count ?? 0)}
-            onclick={() => void buildEmbeddingIndex()}
-          >Embed {indexTarget?.pending_count ?? 0}</button>
-        </div>
-        {#if settings.embedding_providers.some((provider) => provider.provider === "llama.cpp")}
-          <p class="posture-line">
-            <Icon name="download" size="sm" />
-            <span>
-              Need a local embedding model? The curated Apache-2.0 Nomic Embed
-              Q4_K_M option is about 81 MiB. <a href="#/models?tab=add">Review and download it in Models</a>;
-              Raiker pins the revision and shows the exact bytes before download.
-            </span>
-          </p>
-        {/if}
-        {#if indexResult}<p class="posture-line" data-semantic="true"><Icon name="check" size="sm" /><span>{indexResult}</span></p>{/if}
-      {/if}
+      <!-- REM-MEM-03 — the health, and the way to repair it. Which space recall
+           searches, and building one, are engine configuration and moved to
+           Settings → Memory engine; what an owner reading their own memories
+           needs here is whether recall is matching meaning or only words, and
+           one link when it is not what they wanted. -->
+      <p class="control-note">
+        <a href="#/settings?tab=memory-engine">Change the recall backend, or build a
+        meaning-based index</a>
+      </p>
     </div>
-    <label class="backend-field">
-      <span class="sr-only">Recall backend</span>
-      <select
-        class="select"
-        aria-label="Recall backend"
-        value={settings.embedding_backend ?? "auto"}
-        disabled={busy}
-        onchange={(event) => void chooseEmbeddingBackend(event.currentTarget.value)}
-      >
-        <option value="auto">Automatic</option>
-        {#each settings.spaces ?? [] as space (space.model)}
-          <option value={space.model}>{space.model} · {space.dimensions}d</option>
-        {/each}
-      </select>
-    </label>
   </section>
 {/if}
 
@@ -785,7 +719,6 @@
      visible on an empty workspace, which is why the width sweep went green on a
      fresh instance and red on a used one. */
   .index-field { flex:1 1 14rem; min-width:0; }
-  .index-field select { width:100%; min-width:0; }
   /* BUG-71 — the posture strip states what this page can actually promise. It
      sits above everything else because it changes the meaning of the counts
      below it: "0 Pending review" reads very differently when nothing is able

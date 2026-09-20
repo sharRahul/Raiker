@@ -45,6 +45,7 @@
   import PlanChecklist from "../components/PlanChecklist.svelte";
   import ReasoningBlock from "../components/ReasoningBlock.svelte";
   import ToolActivity from "../components/ToolActivity.svelte";
+  import TurnEvidence from "../components/TurnEvidence.svelte";
   import RewindPanel from "../components/RewindPanel.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
   import DiffView from "../components/DiffView.svelte";
@@ -109,7 +110,14 @@
   import BuildModePicker from "../components/BuildModePicker.svelte";
   import TurnControl from "../components/TurnControl.svelte";
   import CommandOutputPane from "../components/CommandOutputPane.svelte";
-  import { focusFor, type ArtifactTab } from "../buildArtifacts";
+  import {
+    focusFor,
+    readWorkbenchOpen,
+    readWorkbenchTab,
+    rememberWorkbenchOpen,
+    rememberWorkbenchTab,
+    type ArtifactTab,
+  } from "../buildArtifacts";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { createFileDrop } from "../fileDrop.svelte";
   import ComposerMenu, { type MenuItem } from "../components/ComposerMenu.svelte";
@@ -936,6 +944,11 @@
     // but never as a drawer over a narrow window nobody asked to open.
     filesWidth = readExplorerWidth();
     filesOpen = readExplorerOpen() && !compactRail;
+    // REM-BUILD-01 — and the workbench does the same: the view the owner was
+    // reading is the view they come back to. Never as a drawer over a narrow
+    // window nobody asked to open, for the same reason the explorer is not.
+    artifactTab = readWorkbenchTab();
+    railOpen = readWorkbenchOpen() && !compactRail;
     void loadRepos();
     void refreshModels();
     void loadRuntimeEnvironment();
@@ -1045,6 +1058,13 @@
    * owner away would interrupt them.
    */
   let artifactTab = $state<ArtifactTab>("changes");
+  // Written whenever either changes, from wherever it changed — an auto-focus,
+  // a tab press, a close. One effect rather than a call beside every mutation,
+  // because the mutations are in eight places and the next one would forget.
+  $effect(() => rememberWorkbenchTab(artifactTab));
+  $effect(() => {
+    if (!compactRail) rememberWorkbenchOpen(railOpen);
+  });
   let previewPath = $state<string | null>(null);
   /** Bumped when a turn ends, so the Changes tab re-reads without a button. */
   let workingTreeRevision = $state(0);
@@ -2331,20 +2351,24 @@
             {#if copyNotice !== null}<p class="error" role="alert">{copyNotice}</p>{/if}
             {#if turn.error !== null}<p class="error" role="alert">{turn.error}</p>{/if}
 
-            {#if turn.events.some((event) => event.kind === "lifecycle" || event.kind === "tool")}
-              <details class="governance" open={turn.streaming}>
-                <summary><Icon name="shield" size="sm" /> How this turn was governed</summary>
-                <ol>
-                  {#each groupPhases(turn.events) as row (row.phase)}
-                    <li>
-                      <span class="phase">{row.label}</span>
-                      <ul>
-                        {#each row.events as event, index (index)}<li>{summarizeEvent(event)}</li>{/each}
-                      </ul>
-                    </li>
-                  {/each}
-                </ol>
-              </details>
+            <!-- REM-CHAT-01 — Build's own governance disclosure is now the
+                 shared turn inspector, so a turn answers "how did this happen"
+                 the same way in Build and in Chat. It keeps Build's property of
+                 opening while the turn runs, and gains Build's missing half:
+                 the turn's coordinate, each call's action id and the governed
+                 events the runtime actually wrote down. -->
+            {#if turn.response?.turn_id || turn.events.some((event) => event.kind === "lifecycle" || event.kind === "tool")}
+              <TurnEvidence
+                sessionId={sessionId}
+                turnId={turn.response?.turn_id ?? null}
+                rows={toolRows}
+                phases={groupPhases(turn.events).map((row) => ({
+                  phase: row.phase,
+                  label: row.label,
+                  lines: row.events.map(summarizeEvent),
+                }))}
+                initiallyOpen={turn.streaming}
+              />
             {/if}
           </div>
         </article>
@@ -3126,42 +3150,6 @@
       opacity: 1;
     }
   }
-  .governance {
-    border-top: 1px dashed var(--border);
-    padding-top: 0.45rem;
-  }
-  .governance summary {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    cursor: pointer;
-    font-size: var(--text-xs);
-    font-weight: 650;
-    color: var(--text-3);
-    list-style: none;
-  }
-  .governance summary::-webkit-details-marker {
-    display: none;
-  }
-  .governance ol {
-    margin: 0.45rem 0 0;
-    padding-left: 0;
-    list-style: none;
-    display: grid;
-    gap: 0.35rem;
-  }
-  .phase {
-    font-size: var(--text-xs);
-    font-weight: 650;
-    color: var(--accent);
-  }
-  .governance ol ul {
-    margin: 0.1rem 0 0;
-    padding-left: 1rem;
-    font-size: var(--text-sm);
-    color: var(--text-2);
-  }
-
   .decisions {
     border: 1px solid var(--warn-border);
     background: var(--warn-soft);

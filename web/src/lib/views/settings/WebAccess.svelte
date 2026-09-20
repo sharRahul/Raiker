@@ -127,14 +127,35 @@
   {:else}
     <!-- Stated before the editable list, because it is the part that is *not*
          editable and the part that actually stops a fetch reaching your own
-         network. An owner who empties the list below should know what remains. -->
+         network. An owner who empties the list below should know what remains.
+
+         REM-SET-WEB — and it now answers the question the old wording left
+         open: whether there is a grant, an approval or a setting that lifts it.
+         There is not, and saying so is cheaper than letting an owner go looking
+         for one. -->
     <div class="guard card" role="note">
       <strong>Private networks are always refused</strong>
       <p>{data.address_guard.description}</p>
+      <p class="guard-grant">
+        {data.address_guard.editable
+          ? "This can be changed below."
+          : "No setting on this page and no approval lifts it — a private service is reached by you, not by Raiker."}
+      </p>
     </div>
 
     <div class="card">
       <h3>Blocked destinations</h3>
+      <!-- REM-SET-WEB — the effective total, which is what a fetch is actually
+           evaluated against. The three sources below add up to it, so an owner
+           who deletes one of their own rules can see that the number the
+           runtime uses moved with it. -->
+      <p class="effective" role="status">
+        <strong>{data.effective_count}</strong>
+        {data.effective_count === 1 ? "rule" : "rules"} in force —
+        {data.stored.length} yours,
+        {data.environment.length} from this host's environment,
+        {data.builtin.length} built in.
+      </p>
       <p class="lead">
         A domain also covers its subdomains. You can also use a wildcard
         (<code>*.ads.example.com</code>), an IP address, an IP range
@@ -208,24 +229,40 @@
       {/if}
     </div>
 
+    <!-- REM-SET-WEB — this was a card of the same weight as the editable list
+         above it, which made deployment configuration read as policy an owner
+         could change here and then find they could not. It is read-only detail
+         now: folded away, marked as read-only, and each source says who can
+         actually change it rather than only that this page cannot. -->
     {#if data.environment.length || data.builtin.length}
-      <div class="card">
-        <h3>Set outside this app</h3>
+      <details class="card fixed-card">
+        <summary>
+          <span>Set outside this app</span>
+          <span class="read-only">Read-only · {data.environment.length + data.builtin.length}</span>
+        </summary>
         <p class="lead">
-          These apply as well and cannot be removed here — they are part of how this
-          Raiker was started.
+          These apply as well as the rules above. They are part of how this Raiker was
+          started, so they cannot be added or removed from this page.
         </p>
         {#if data.environment.length}
           <p class="source"><code>{data.environment_variable}</code></p>
+          <p class="remedy">
+            Changed by whoever starts Raiker on this machine, by setting this variable
+            before launch. It is read once, at startup.
+          </p>
           <ul class="fixed">
             {#each data.environment as rule (rule)}<li><code>{rule}</code></li>{/each}
           </ul>
         {/if}
         <p class="source">Built in</p>
+        <p class="remedy">
+          Part of this build. Changed only by installing a Raiker that ships a
+          different list.
+        </p>
         <ul class="fixed">
           {#each data.builtin as rule (rule)}<li><code>{rule}</code></li>{/each}
         </ul>
-      </div>
+      </details>
     {/if}
   {/if}
 </section>
@@ -239,6 +276,17 @@
   .guard { border-left: 3px solid var(--accent); }
   .guard strong { display: block; margin-bottom: 0.25rem; }
   .guard p { color: var(--text-2); font-size: var(--text-sm); margin: 0; }
+  .guard-grant { margin-top: 0.35rem !important; color: var(--text-3) !important; }
+  .effective { font-size: var(--text-sm); color: var(--text-2); margin: 0 0 var(--space-2); }
+  .effective strong { color: var(--text-1); }
+  .fixed-card summary {
+    display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);
+    cursor: pointer; font-size: var(--text-lg); font-weight: 600;
+  }
+  .fixed-card[open] summary { margin-bottom: var(--space-3); }
+  .read-only { color: var(--text-3); font-size: var(--text-xs); font-weight: 400;
+    text-transform: uppercase; letter-spacing: 0.04em; }
+  .remedy { color: var(--text-2); font-size: var(--text-sm); margin: 0.2rem 0 0; }
   /* Found by the width sweep once it started covering Settings (FIXED-416).
      This was `grid-template-columns: 1fr 1fr auto`, and a `1fr` track will not
      shrink below its content's own minimum: an `<input>` defaults to about

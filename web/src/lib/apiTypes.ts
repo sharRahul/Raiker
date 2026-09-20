@@ -3043,6 +3043,12 @@ export interface GitCredentialStatus {
   grant: GitCredentialGrant | null;
   scopes: string[];
   grant_seconds: Record<string, number>;
+  // The boundary the runtime issues the credential inside — the hosts its
+  // credential helper will answer, and everything a loan is used for. The page
+  // states the scope before it asks for the secret, and states the runtime's
+  // answer rather than its own.
+  hosts: string[];
+  operations: string[];
   checked_at: string;
 }
 

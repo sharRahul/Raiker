@@ -588,6 +588,17 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-564](#fixed-564--three-ways-to-add-a-skill-all-open-at-once) | Low | Skills | Fixed 2026-09-18 (closes REM-SKILL-01) |
 | [FIXED-565](#fixed-565--the-live-board-could-only-be-read-as-a-moving-picture) | Low | Observability / accessibility | Fixed 2026-09-18 (closes REM-LIVE) |
 | [FIXED-566](#fixed-566--four-security-lifecycles-under-one-heading) | Low | Settings / security | Fixed 2026-09-18 (closes REM-SET-SECURITY) |
+| [FIXED-567](#fixed-567--a-follow-up-to-a-long-answer-arrived-with-no-conversation-at-all) | Medium | Runtime / conversation history | Fixed 2026-09-20 |
+| [FIXED-568](#fixed-568--a-transcript-that-could-not-be-read-looked-exactly-like-one-that-was-empty) | Medium | Runtime / conversation history, Observability | Fixed 2026-09-20 |
+| [FIXED-569](#fixed-569--a-large-json-answer-from-a-connector-became-a-short-string) | Medium | Connectors / tool results | Fixed 2026-09-20 |
+| [FIXED-570](#fixed-570--one-endpoints-refusal-rewrote-every-other-endpoints-request) | Medium | Models / Anthropic provider | Fixed 2026-09-20 |
+| [FIXED-571](#fixed-571--a-new-worker-could-adopt-an-exited-workers-database-connection) | Medium | Storage / SQLCipher connection cache | Fixed 2026-09-20 |
+| [FIXED-572](#fixed-572--every-pdf-and-every-attachment-was-copied-through-a-json-redactor) | Low | API / redaction middleware | Fixed 2026-09-20 |
+| [FIXED-573](#fixed-573--a-watcher-failing-every-fifteen-seconds-said-every-folder-was-fresh) | Medium | Knowledge / attached-root watcher, Observability | Fixed 2026-09-20 |
+| [FIXED-574](#fixed-574--two-builds-of-one-commit-could-contain-different-build-tool-bytes) | Medium | Release / reproducibility | Fixed 2026-09-20 |
+| [FIXED-575](#fixed-575--the-guard-against-contract-drift-was-a-second-hand-written-copy-of-the-contract) | Medium | API contract / CI | Fixed 2026-09-20 |
+| [FIXED-576](#fixed-576--the-conversation-library-lived-in-the-evidence-inspector) | Low | Sessions / Threads / web UI | Fixed 2026-09-20 |
+| [FIXED-577](#fixed-577--delete-was-off-the-bottom-of-the-menu-it-lived-in) | Medium | Sessions / web UI | Fixed 2026-09-20 |
 
 ---
 

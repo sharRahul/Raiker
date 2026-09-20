@@ -3,12 +3,14 @@ from __future__ import annotations
 import atexit
 import contextlib
 import hashlib
+import itertools
 import json
 import logging
 import os
 import re
 import secrets
 import threading
+import weakref
 from collections import OrderedDict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -464,6 +466,24 @@ _CONNECTION_CACHE_CEILING_ENV = "RAIKER_SQLITE_CONNECTION_CACHE_CEILING"
 _DEFAULT_CONNECTION_CACHE_CEILING = 16
 _CONNECTIONS: OrderedDict[tuple[Path, int], sqlite3.Connection] = OrderedDict()
 _CONNECTIONS_LOCK = threading.RLock()
+
+# ── Who owns a cached connection (GCR-37) ────────────────────────────────────
+#
+# The cache used to be keyed by ``(workspace_root, threading.get_ident())``. A
+# thread identifier is a numeric identity the platform is free to hand out
+# again once the thread it belonged to has exited, and these connections are
+# opened with ``check_same_thread=False``. So a new worker that happened to
+# receive a retired worker's identifier could look up the cache, find that
+# worker's connection, and adopt its handle and its session state — the one
+# thing the per-thread key exists to prevent.
+#
+# Ownership is therefore a token this module mints, never a number the platform
+# recycles. It lives in thread-local storage, so a thread cannot inherit
+# another's, and a weak reference to the owning ``Thread`` is what answers "is
+# that owner still alive?" for eviction and for memory-pressure release.
+_OWNER_TOKENS = threading.local()
+_OWNER_SEQUENCE = itertools.count(1)
+_OWNER_THREADS: dict[int, weakref.ReferenceType[threading.Thread]] = {}
 # Schema/FTS bootstrap uses multiple statements and must not race another store
 # instance in this process. SQLite's busy timeout cannot resolve two deferred
 # transactions that both try to upgrade to writers.
@@ -762,13 +782,50 @@ def store_health(workspace_root: str | Path) -> dict[str, Any]:
     return {"store": "ok", "reason": "", "detail": "", **posture}
 
 
+def _owner_token() -> int:
+    """This thread's ownership token, minted once and never reused.
+
+    Unlike a thread identifier, the token is not returned to a pool when the
+    thread exits, so a later thread can never be mistaken for this one.
+    """
+    token: int | None = getattr(_OWNER_TOKENS, "value", None)
+    if token is None:
+        token = next(_OWNER_SEQUENCE)
+        _OWNER_TOKENS.value = token
+        with _CONNECTIONS_LOCK:
+            _OWNER_THREADS[token] = weakref.ref(threading.current_thread())
+    return token
+
+
+def _live_owners_locked() -> set[int]:
+    """The tokens whose owning thread is still running.
+
+    A token whose thread has exited and whose connections are already gone is
+    forgotten here, so the registry does not outgrow the cache it describes.
+    Called with ``_CONNECTIONS_LOCK`` held.
+    """
+    live: set[int] = set()
+    retired: list[int] = []
+    for token, reference in _OWNER_THREADS.items():
+        thread = reference()
+        if thread is not None and thread.is_alive():
+            live.add(token)
+        else:
+            retired.append(token)
+    held = {key[1] for key in _CONNECTIONS}
+    for token in retired:
+        if token not in held:
+            _OWNER_THREADS.pop(token, None)
+    return live
+
+
 def _evictable_locked(owner: int) -> list[sqlite3.Connection]:
     """Handles this thread may close: its own stalest, plus any dead thread's.
 
     Called with ``_CONNECTIONS_LOCK`` held; the caller closes what it returns
     outside the lock, exactly as invalidation does.
     """
-    live = {thread.ident for thread in threading.enumerate() if thread.ident is not None}
+    live = _live_owners_locked()
     evicted: list[sqlite3.Connection] = []
     orphans = [key for key in _CONNECTIONS if key[1] != owner and key[1] not in live]
     for key in orphans:
@@ -791,7 +848,7 @@ def _releasable_locked(owner: int) -> list[sqlite3.Connection]:
     still never touched: closing one would be a use-after-close in that worker.
     Called with ``_CONNECTIONS_LOCK`` held.
     """
-    live = {thread.ident for thread in threading.enumerate() if thread.ident is not None}
+    live = _live_owners_locked()
     doomed = [key for key in _CONNECTIONS if key[1] == owner or key[1] not in live]
     return [_CONNECTIONS.pop(key) for key in doomed]
 
@@ -812,6 +869,7 @@ def close_cached_connections() -> None:
     with _CONNECTIONS_LOCK:
         connections = list(_CONNECTIONS.values())
         _CONNECTIONS.clear()
+        _OWNER_THREADS.clear()
     for connection in connections:
         with contextlib.suppress(Exception):
             connection.close()
@@ -901,7 +959,7 @@ class SQLiteStore:
         return connection
 
     def connect(self) -> sqlite3.Connection:
-        owner = threading.get_ident()
+        owner = _owner_token()
         cache_key = (self.paths.workspace_root, owner)
         with _CONNECTIONS_LOCK:
             connection = _CONNECTIONS.get(cache_key)
@@ -943,7 +1001,7 @@ class SQLiteStore:
         named rather than left as a bare ``MemoryError`` escaping a request
         handler. Called with ``_CONNECTIONS_LOCK`` held.
         """
-        for stale in _releasable_locked(threading.get_ident()):
+        for stale in _releasable_locked(_owner_token()):
             with contextlib.suppress(Exception):
                 stale.close()
         with contextlib.suppress(MemoryError, sqlite3.Error):
@@ -5410,6 +5468,30 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (session_id,),
             ).fetchall()
         return [str(row["tag"]) for row in rows]
+
+    def list_session_tags_by_session(self, session_ids: list[str]) -> dict[str, list[str]]:
+        """Tags for a whole page of sessions, in one query (BUG-303).
+
+        The work index draws the tag editor on every row, and calling
+        :meth:`list_session_tags` per row would make one page of Threads fifty
+        round trips against an encrypted store. Sessions with no tags are simply
+        absent, exactly as the per-session read returns an empty list.
+        """
+        wanted = [item for item in dict.fromkeys(session_ids) if item]
+        if not wanted:
+            return {}
+        placeholders = ",".join("?" for _ in wanted)
+        with self.connect() as connection:
+            rows = connection.execute(
+                f"""SELECT session_id, tag FROM session_tags
+                    WHERE session_id IN ({placeholders})
+                    ORDER BY session_id, tag""",  # noqa: S608 - placeholders only
+                tuple(wanted),
+            ).fetchall()
+        grouped: dict[str, list[str]] = {}
+        for row in rows:
+            grouped.setdefault(str(row["session_id"]), []).append(str(row["tag"]))
+        return grouped
 
     def set_session_tags(
         self, session_id: str, tags: list[str], user_id: str | None = None

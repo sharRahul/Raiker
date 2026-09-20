@@ -17,7 +17,13 @@ import pytest
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.control.dashboard import DashboardService
 from raiker.knowledge.reconcile import reconcile_attached_root
-from raiker.knowledge.watcher import AttachedRootWatcher
+from raiker.knowledge.watcher import (
+    MAX_BACKOFF_SECONDS,
+    REFRESH_SECONDS,
+    WATCH_PASS_NAME,
+    AttachedRootWatcher,
+)
+from raiker.storage.sqlite import SQLiteStore
 
 OWNER = "principal_owner"
 
@@ -152,3 +158,106 @@ class TestWorker:
                 await asyncio.wait_for(task, timeout=10)
 
         assert service.store.search_managed_file_chunks("rollout", owner_principal_id=OWNER)
+
+
+class TestWatcherHealth:
+    """GCR-47 — the loop's own failures, which used to leave no trace at all.
+
+    `_cycle` was wrapped in `suppress(Exception)`. A failure inside it that
+    happened *before* any project was reached — enumerating the indexed roots,
+    setting the cycle up — recorded nothing, and every project kept the
+    `WatchState` its last good pass had earned. The interface went on saying
+    "Watching this folder for changes", with a timestamp, while nothing was.
+    """
+
+    @pytest.mark.anyio
+    async def test_a_cycle_that_throws_is_recorded_as_a_background_pass(
+        self, workspace: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        watcher = AttachedRootWatcher(workspace)
+
+        async def broken(_stop: asyncio.Event) -> None:
+            raise OSError("no watch descriptors left")
+
+        monkeypatch.setattr(watcher, "_cycle", broken)
+        stop = asyncio.Event()
+        task = asyncio.create_task(watcher.run(stop))
+        await asyncio.sleep(0.2)
+        stop.set()
+        await asyncio.wait_for(task, timeout=10)
+
+        health = watcher.health()
+        assert health.healthy is False
+        assert health.consecutive_failures >= 1
+        assert health.last_error_class == "OSError"
+
+        recorded = {
+            row["pass_name"]: row
+            for row in SQLiteStore(workspace).list_background_worker_health()
+        }
+        assert WATCH_PASS_NAME in recorded, "Diagnostics has to be able to see this"
+        assert recorded[WATCH_PASS_NAME]["healthy"] is False
+        assert recorded[WATCH_PASS_NAME]["last_error_class"] == "OSError"
+
+    @pytest.mark.anyio
+    async def test_no_project_is_told_it_is_watched_while_the_loop_is_failing(
+        self, workspace: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        watcher = AttachedRootWatcher(workspace)
+        watcher.record_scan("proj_a", "2026-09-18T10:00:00Z")
+        assert watcher.state("proj_a").watching is True
+
+        async def broken(_stop: asyncio.Event) -> None:
+            raise RuntimeError("the cycle could not start")
+
+        monkeypatch.setattr(watcher, "_cycle", broken)
+        stop = asyncio.Event()
+        task = asyncio.create_task(watcher.run(stop))
+        await asyncio.sleep(0.2)
+        stop.set()
+        await asyncio.wait_for(task, timeout=10)
+
+        state = watcher.state("proj_a")
+        assert state.watching is False
+        assert state.reason == "watcher_failed:RuntimeError"
+        # The freshness it earned survives: the index is exactly as current as
+        # that last good pass left it.
+        assert state.last_scanned_at == "2026-09-18T10:00:00Z"
+
+    def test_the_retry_interval_backs_off_and_is_capped(self, workspace: Path) -> None:
+        watcher = AttachedRootWatcher(workspace)
+        assert watcher.health().retry_seconds == REFRESH_SECONDS
+
+        intervals = []
+        for count in range(1, 12):
+            watcher._consecutive_failures = count
+            intervals.append(watcher.health().retry_seconds)
+
+        assert intervals[0] > REFRESH_SECONDS
+        assert intervals == sorted(intervals)
+        assert max(intervals) == MAX_BACKOFF_SECONDS
+
+    @pytest.mark.anyio
+    async def test_a_cycle_that_gets_through_clears_the_streak(
+        self, workspace: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        watcher = AttachedRootWatcher(workspace)
+        watcher._consecutive_failures = 3
+        watcher._last_error_class = "OSError"
+
+        async def fine(_stop: asyncio.Event) -> None:
+            return None
+
+        monkeypatch.setattr(watcher, "_cycle", fine)
+        stop = asyncio.Event()
+        task = asyncio.create_task(watcher.run(stop))
+        await asyncio.sleep(0.2)
+        stop.set()
+        await asyncio.wait_for(task, timeout=10)
+
+        assert watcher.health().healthy is True
+        recorded = {
+            row["pass_name"]: row
+            for row in SQLiteStore(workspace).list_background_worker_health()
+        }
+        assert recorded[WATCH_PASS_NAME]["healthy"] is True

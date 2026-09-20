@@ -258,9 +258,9 @@
     <section class="card" aria-labelledby="diag-workers-h">
       <h2 id="diag-workers-h">Background passes</h2>
       <p class="sub">
-        The scheduled work the host runs every fifteen seconds. A pass is isolated from the
-        others, so one failing pass never stops the rest — and is recorded here rather than
-        swallowed.
+        The background work the host runs on its own, from the fifteen-second host tick to the
+        watcher that keeps attached folders indexed. A pass is isolated from the others, so one
+        failing pass never stops the rest — and is recorded here rather than swallowed.
       </p>
       {#if diag.background_workers.length === 0}
         <p class="sub">No pass has run yet on this host.</p>

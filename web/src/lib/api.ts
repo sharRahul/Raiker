@@ -1701,6 +1701,9 @@ export const api = {
     query?: string;
     cursor?: string | null;
     limit?: number;
+    // BUG-303 — a scope, not a filter: the two sets do not overlap and every
+    // other filter applies within whichever one is read.
+    archived?: boolean;
   } = {}) =>
     request<WorkThreadPage>(
       withQuery("/api/work-threads/page", {
@@ -1709,6 +1712,7 @@ export const api = {
         query: options.query || undefined,
         cursor: options.cursor ?? undefined,
         limit: options.limit ?? undefined,
+        archived: options.archived ? "true" : undefined,
       }),
     ),
   searchChats: (q: string) =>

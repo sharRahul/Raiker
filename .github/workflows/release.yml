@@ -199,16 +199,24 @@ jobs:
       - name: Install the WiX toolset
         if: matrix.os == 'windows'
         run: dotnet tool install --global wix
+      # GCR-41 — this used to fetch the AppImage project's `continuous` release,
+      # a tag that project moves on every publish. Two builds of one Raiker
+      # commit a week apart therefore shipped different build-tool bytes, while
+      # every other step here was careful to be deterministic. The version and
+      # the exact digest now come from `raiker/config/build-tools.json`, the
+      # download is checked against that digest, and a mismatch fails the target
+      # rather than producing an artifact nobody can reproduce.
       - name: Install appimagetool
         if: matrix.os == 'linux'
+        shell: bash
+        env:
+          APPIMAGE_ARCH: ${{ matrix.arch }}
         run: |
-          case "${{ matrix.arch }}" in
-            x86_64) appimage_arch=x86_64 ;;
-            arm64) appimage_arch=aarch64 ;;
-            *) echo "refused: unsupported AppImage architecture ${{ matrix.arch }}" >&2; exit 1 ;;
-          esac
-          curl -fsSL -o "$RUNNER_TEMP/appimagetool" \
-            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${appimage_arch}.AppImage"
+          pin=$(python -c 'import os; from raiker.app.build_tools import pinned_tool; t = pinned_tool("appimagetool", os.environ["APPIMAGE_ARCH"]); print(t.url, t.sha256)')
+          read -r url sha256 <<<"$pin"
+          echo "appimagetool: $url"
+          curl -fsSL -o "$RUNNER_TEMP/appimagetool" "$url"
+          echo "$sha256  $RUNNER_TEMP/appimagetool" | sha256sum --check --strict
           chmod +x "$RUNNER_TEMP/appimagetool"
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 

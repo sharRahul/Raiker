@@ -25,6 +25,7 @@ from raiker.app.release import (
     build_bundle,
     build_channel_index,
     collect_payload,
+    dependency_manifest,
     main,
     public_key_of,
     target_for,
@@ -322,3 +323,84 @@ def test_an_index_for_another_target_is_refused_not_ignored(
             target="windows-x86_64",
             current_version="1.0.0",
         )
+
+
+def test_the_artifact_records_the_wheels_it_shipped(
+    source_root: Path, tmp_path: Path
+) -> None:
+    """GCR-41 — what a build resolved must be readable from the build.
+
+    The release resolves its dependencies on the target's own runner, which is
+    what makes the artifact installable offline. Nothing wrote down *what* it
+    resolved, so "were these two builds made from the same inputs?" could only
+    be answered by re-running the resolver against a registry that had moved on.
+    """
+    wheels = tmp_path / "wheels"
+    wheels.mkdir()
+    (wheels / "sqlcipher3_wheels-0.5.7-cp311-cp311-linux_x86_64.whl").write_bytes(b"one")
+    (wheels / "fastapi-0.141.1-py3-none-any.whl").write_bytes(b"two")
+
+    target = target_for("linux-x86_64")
+    artifact = build_bundle(
+        out_dir=tmp_path / "dist",
+        version="1.2.3",
+        target=target,
+        entries=collect_payload(source_root=source_root, wheel_dir=wheels),
+        dependencies=dependency_manifest(wheels),
+    )
+    with zipfile.ZipFile(artifact.path) as bundle:
+        record = json.loads(bundle.read("installation.json"))
+
+    shipped = {item["filename"]: item["sha256"] for item in record["dependencies"]}
+    assert shipped == {
+        "fastapi-0.141.1-py3-none-any.whl": hashlib.sha256(b"two").hexdigest(),
+        "sqlcipher3_wheels-0.5.7-cp311-cp311-linux_x86_64.whl": hashlib.sha256(
+            b"one"
+        ).hexdigest(),
+    }
+
+
+def test_the_artifact_records_the_build_tools_it_was_allowed_to_fetch(
+    source_root: Path, tmp_path: Path
+) -> None:
+    linux = build_bundle(
+        out_dir=tmp_path / "linux",
+        version="1.2.3",
+        target=target_for("linux-x86_64"),
+        entries=collect_payload(source_root=source_root),
+    )
+    with zipfile.ZipFile(linux.path) as bundle:
+        record = json.loads(bundle.read("installation.json"))
+    tools = {item["name"]: item for item in record["build_tools"]}
+    assert tools["appimagetool"]["version"] == "1.9.0"
+    assert len(tools["appimagetool"]["sha256"]) == 64
+
+    # A target that downloads no external tool says so, rather than borrowing
+    # another platform's list.
+    macos = build_bundle(
+        out_dir=tmp_path / "macos",
+        version="1.2.3",
+        target=target_for("macos-arm64"),
+        entries=collect_payload(source_root=source_root),
+    )
+    with zipfile.ZipFile(macos.path) as bundle:
+        assert json.loads(bundle.read("installation.json"))["build_tools"] == []
+
+
+def test_recording_the_inputs_does_not_break_reproducibility(
+    source_root: Path, tmp_path: Path
+) -> None:
+    wheels = tmp_path / "wheels"
+    wheels.mkdir()
+    (wheels / "fastapi-0.141.1-py3-none-any.whl").write_bytes(b"two")
+    built = [
+        build_bundle(
+            out_dir=tmp_path / f"dist{index}",
+            version="1.2.3",
+            target=target_for("linux-x86_64"),
+            entries=collect_payload(source_root=source_root, wheel_dir=wheels),
+            dependencies=dependency_manifest(wheels),
+        ).sha256
+        for index in (1, 2)
+    ]
+    assert built[0] == built[1]

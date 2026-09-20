@@ -94,6 +94,12 @@ EVENT_TYPES = {
     # Prior turns of this conversation replayed to the model. Counts only —
     # message count and character total — never the transcript itself.
     "conversation_history_replayed",
+    # GCR-36 — the transcript could not be read at all, which is a different
+    # fact from a conversation with nothing in it. Recorded because the model
+    # is told the history is missing rather than left to answer as though this
+    # were a first turn, and that substitution has to be checkable afterwards.
+    # A reason code only; no transcript and no exception detail.
+    "conversation_history_unavailable",
     # Automatic 90% model-context compaction. Metadata only: source-turn count
     # and token estimates, or a governed reason code on safe fallback. The
     # summary itself remains in the encrypted workspace store.

@@ -325,6 +325,80 @@ def test_the_negotiated_spelling_is_remembered_so_it_is_paid_for_once() -> None:
     assert attempts == ["adaptive", "enabled", "enabled"]
 
 
+def test_a_refusal_from_one_endpoint_does_not_change_requests_to_another() -> None:
+    """GCR-32 — the observed spelling is a fact about an endpoint, not a name.
+
+    `claude-...` can be asked of the Anthropic API, of a gateway, of a relay and
+    of a self-hosted proxy, and they do not have to accept the same `thinking`
+    block. Keyed by model id alone, one endpoint's refusal used to rewrite every
+    other endpoint's next request — including endpoints that had never refused
+    anything and would have taken the adaptive spelling.
+    """
+    refusing: list[str] = []
+    accepting: list[str] = []
+
+    def refuse_adaptive(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        refusing.append(payload["thinking"]["type"])
+        if payload["thinking"]["type"] == "adaptive":
+            return httpx.Response(
+                400,
+                json={"error": {"message": "adaptive thinking is not supported on this model"}},
+            )
+        return httpx.Response(200, json=_answer(thinking="t"))
+
+    def accept_anything(request: httpx.Request) -> httpx.Response:
+        accepting.append(json.loads(request.content)["thinking"]["type"])
+        return httpx.Response(200, json=_answer(thinking="t"))
+
+    gateway = _provider(refuse_adaptive)
+    gateway.endpoint = "https://gateway.anthropic.test"
+    run(gateway.chat(_reasoning_request()))
+    assert refusing == ["adaptive", "enabled"]
+
+    direct = _provider(accept_anything)
+    run(direct.chat(_reasoning_request()))
+    assert accepting == ["adaptive"], "the other endpoint was never asked"
+
+
+def test_the_same_endpoint_spelled_differently_is_still_the_same_endpoint() -> None:
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        seen.append(payload["thinking"]["type"])
+        if payload["thinking"]["type"] == "adaptive":
+            return httpx.Response(
+                400,
+                json={"error": {"message": "adaptive thinking is not supported on this model"}},
+            )
+        return httpx.Response(200, json=_answer(thinking="t"))
+
+    first = _provider(handler)
+    run(first.chat(_reasoning_request()))
+    second = _provider(handler)
+    second.endpoint = "https://API.Anthropic.test/"
+    run(second.chat(_reasoning_request()))
+    # Case and a trailing slash do not make a second endpoint, so the refusal is
+    # paid for once rather than once per spelling.
+    assert seen == ["adaptive", "enabled", "enabled"]
+
+
+def test_the_negotiation_cache_cannot_grow_without_bound() -> None:
+    from raiker.models.providers.anthropic_messages import (
+        _NEGOTIATED_THINKING,
+        _NEGOTIATED_THINKING_LIMIT,
+        record_negotiated_thinking_shape,
+    )
+
+    for index in range(_NEGOTIATED_THINKING_LIMIT + 50):
+        record_negotiated_thinking_shape(
+            ("profile", "anthropic", f"https://host-{index}.test/v1/messages", "v1", "m"),
+            "enabled",
+        )
+    assert len(_NEGOTIATED_THINKING) == _NEGOTIATED_THINKING_LIMIT
+
+
 def test_a_400_that_names_no_other_spelling_stays_a_real_error() -> None:
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(

@@ -69,7 +69,11 @@ from raiker.runtime.conversation_compaction import (
     ConversationCompactor,
     compacted_conversation_messages,
 )
-from raiker.runtime.conversation_history import conversation_messages, history_char_budget
+from raiker.runtime.conversation_history import (
+    ConversationHistoryUnavailable,
+    conversation_messages,
+    history_char_budget,
+)
 from raiker.runtime.environment import EnvironmentContext, environment_context
 from raiker.runtime.identity.lifecycle import TrustedTurnIdentity
 from raiker.runtime.identity.presentation import (
@@ -906,7 +910,37 @@ class RuntimeOrchestrator:
     async def _conversation_history(
         self, envelope: PromptEnvelope, fixed_messages: list[ModelMessage]
     ) -> list[ModelMessage]:
-        """Prior exchanges, automatically compacted at 90% of known capacity."""
+        """Prior exchanges, automatically compacted at 90% of known capacity.
+
+        GCR-36 — when the transcript cannot be *read*, this does not quietly
+        answer as though the conversation had not happened. The turn still runs,
+        because a storage fault is not a reason to refuse an owner an answer,
+        but the model is told the history is missing and the audit log records
+        why.
+        """
+        try:
+            return await self._conversation_history_or_raise(envelope, fixed_messages)
+        except ConversationHistoryUnavailable as exc:
+            self._event(
+                envelope,
+                "conversation_history_unavailable",
+                {"reason_code": exc.reason},
+            )
+            return [
+                ModelMessage(
+                    role="system",
+                    content=(
+                        "This conversation's earlier exchanges could not be read "
+                        f"from storage ({exc.reason}). Do not state or imply that "
+                        "this is the first message: say that the earlier part of "
+                        "the conversation is unavailable if it matters to the answer."
+                    ),
+                )
+            ]
+
+    async def _conversation_history_or_raise(
+        self, envelope: PromptEnvelope, fixed_messages: list[ModelMessage]
+    ) -> list[ModelMessage]:
         store = getattr(self.tool_broker, "store", None)
         if store is None:
             return []

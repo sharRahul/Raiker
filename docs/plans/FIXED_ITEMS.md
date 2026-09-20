@@ -25030,3 +25030,393 @@ controls, in the same order within each group, with the same confirmations. The
 emergency pause is not here and never was: it is the STOP switch in the context
 bar, on every screen rather than behind a settings tab.
 
+---
+
+## FIXED-567 — A follow-up to a long answer arrived with no conversation at all
+
+**Severity: Medium. Area: Runtime / conversation history. Status: Fixed
+2026-09-20. Closes **GCR-35** of the third-pass static review.**
+
+**Observed.** `conversation_messages()` walks a session's completed exchanges
+newest-to-oldest and stops when the next one would not fit the character
+budget. That is the right rule for dropping the *oldest* context and the wrong
+one for the first iteration: when the newest exchange alone exceeded the whole
+budget, the loop broke before anything had been kept, and the model received a
+conversation it could see on screen and could not read. From inside the model
+that is indistinguishable from an opening message — the exact failure the
+module was written to end.
+
+A long answer is not unusual, so neither is the condition. A model with an
+unknown context window gets the 24 000-character default; one pasted document
+and its reply clears it.
+
+**Root cause.** `if used + cost > char_budget: break`, with no case for
+`kept == []`. The same three lines, with the same consequence, in
+`compacted_conversation_messages` — where the result was a summary replayed with
+no live exchanges after it, which reads worse still: *this conversation was
+summarised*, followed by nothing.
+
+**Fixed.** An exchange that will not fit on its own is elided to fit rather than
+dropped. `fit_exchange` gives each half of it the budget the other does not
+need — so a short question with an enormous answer keeps the question whole —
+and `elide_to_fit` keeps the head and the tail of what it cuts, because an
+oversized prompt is usually a pasted document with the instruction at the end
+and an oversized reply usually answers at the start. The cut says how many
+characters it removed, so the model is told the text is incomplete rather than
+reading a sentence that stops mid-word as though that were what was said.
+
+Once anything has been kept, the walk stops exactly as before: oldest-dropped-
+first, no gap in the middle.
+
+**Evidence.** `tests/test_owner_consent_and_history.py::TestOversizedNewestExchange`
+(four cases: elided rather than dropped, the elision states its size, a short
+question survives whole, and the oldest-first rule is unchanged where it
+applies) and
+`tests/test_conversation_compaction.py::test_an_oversized_exchange_after_the_boundary_is_elided_not_dropped`.
+
+---
+
+## FIXED-568 — A transcript that could not be read looked exactly like one that was empty
+
+**Severity: Medium. Area: Runtime / conversation history, Observability. Status:
+Fixed 2026-09-20. Closes **GCR-36** of the third-pass static review.**
+
+**Observed.** `conversation_messages()` caught every exception from
+`store.list_turns()` and returned `[]`. So did `_completed_turns()` in the
+compaction path. A storage fault — a locked database, an I/O error, a workspace
+the process could no longer read — became *"there was no prior conversation"*,
+and the model answered a follow-up as a first turn while neither the owner nor
+the operator was told anything had failed. The turn succeeded, the answer was
+wrong, and nothing anywhere recorded why.
+
+The two facts are not close. "Nothing has been said yet" is a state; "the record
+of what was said cannot be read" is a fault, and only one of them should ever
+reach a model silently.
+
+**Fixed.** Both readers raise `ConversationHistoryUnavailable` with a stable
+reason code instead of returning an empty list. The turn still runs — a storage
+fault is not a reason to refuse an owner an answer — but the orchestrator
+catches it, writes `conversation_history_unavailable` to the audit log with the
+reason, and puts a system message in the request telling the model the earlier
+exchanges could not be read and not to claim this is the first one. The
+owner-initiated compaction route answers `503` with the same code rather than
+reporting that it shortened a conversation it never read.
+
+**Evidence.** `tests/test_owner_consent_and_history.py::TestHistoryUnavailable`,
+`tests/test_conversation_compaction.py::test_an_unreadable_transcript_is_named_rather_than_replayed_as_empty`
+and `::test_an_unreadable_transcript_tells_the_model_rather_than_answering_as_a_first_turn`,
+which asserts the substituted system message and the event that records it.
+
+---
+
+## FIXED-569 — A large JSON answer from a connector became a short string
+
+**Severity: Medium. Area: Connectors / tool results. Status: Fixed 2026-09-20.
+Closes **GCR-34** of the third-pass static review.**
+
+**Observed.** Both connector invocation paths applied their size cap as a slice
+of the bytes *before* parsing:
+
+```python
+raw = response.content[:200_000]
+try:
+    result = json.loads(raw)
+except ...:
+    result = raw.decode("utf-8", errors="replace")[:20_000]
+```
+
+A perfectly valid JSON answer one byte over the cap was cut in the middle of a
+token, failed to parse, and came back as a 20 000-character string. Nothing said
+the body had been truncated and nothing said a structured result had become an
+unstructured one, so a model reading that string could not tell it apart from a
+connector that answers in plain text — and neither could the caller.
+
+**Fixed.** The bound is a stated contract rather than a silent slice. A body over
+`CONNECTOR_RESPONSE_MAX_BYTES` is its own typed outcome — `truncated`,
+`reason_code: response_too_large`, the size that caused it, the content type and
+a bounded preview — rather than a value. Both paths stream the response and stop
+accumulating at the cap instead of buffering the whole of a body they are about
+to report as too large. A body within the cap is parsed exactly as before, so a
+connector that answers in text still answers in text.
+
+**Evidence.** `tests/test_connector_ecosystem.py::TestConnectorResponseSizeContract`
+— JSON within the cap still parses, text within it is still text, oversized JSON
+is named rather than stringified, the reader stops accumulating past the cap, and
+a body exactly at the cap is still a value.
+
+---
+
+## FIXED-570 — One endpoint's refusal rewrote every other endpoint's request
+
+**Severity: Medium. Area: Models / Anthropic provider. Status: Fixed 2026-09-20.
+Closes **GCR-32** of the third-pass static review.**
+
+**Observed.** The Anthropic provider learns which `thinking` spelling a model
+accepts by sending the adaptive one and reading the refusal that names the
+other. The result was cached in a process-global dict keyed by model id alone —
+a claim about a *name* rather than about an endpoint.
+
+Anthropic-compatible endpoints are not all Anthropic. A gateway, a relay, a
+self-hosted proxy and the API itself can all be asked for `claude-…`, and they
+do not have to accept the same block. One of them refusing adaptive thinking
+silently changed the requests Raiker sent to all the others, including endpoints
+that had never refused anything and would have taken it.
+
+**Fixed.** The cache is keyed by what actually decides the answer: the profile
+that configured the connection, the provider, the normalised endpoint the
+request goes to, the API revision it is sent under, and the model. Case and a
+trailing slash do not make a second endpoint, so a refusal is still paid for
+once rather than once per spelling. The cache is bounded and
+least-recently-used, so a long-lived host that talks to many endpoints cannot
+grow it without limit.
+
+**Evidence.** `tests/test_bug_206_207_tool_rows_and_reasoning.py` —
+`test_a_refusal_from_one_endpoint_does_not_change_requests_to_another`,
+`test_the_same_endpoint_spelled_differently_is_still_the_same_endpoint`, and
+`test_the_negotiation_cache_cannot_grow_without_bound`.
+
+---
+
+## FIXED-571 — A new worker could adopt an exited worker's database connection
+
+**Severity: Medium. Area: Storage / SQLCipher connection cache. Status: Fixed
+2026-09-20. Closes **GCR-37** of the third-pass static review.**
+
+**Observed.** The keyed-connection cache was keyed by
+`(workspace_root, threading.get_ident())`, and the connections are opened with
+`check_same_thread=False`. A thread identifier is a number the platform is free
+to hand out again once the thread holding it has exited — on CPython it
+reliably *does*: six short-lived sequential threads on this host all receive the
+same identifier. So a new worker looked the cache up, found a retired worker's
+handle under its own key, and used it: shared session state, and a
+use-after-close as soon as the reaper had reached that handle.
+
+Reproduced on unmodified `main`, where six sequential workers opened **one**
+connection between them.
+
+**Fixed.** Ownership is a token this module mints, from a counter, held in
+thread-local storage — never a number the platform recycles. A weak reference to
+the owning `Thread` is what answers "is that owner still alive?" for eviction
+and for memory-pressure release, and a token whose thread has exited and whose
+connections are gone is forgotten, so the registry cannot outgrow the cache it
+describes.
+
+**Evidence.** `tests/test_sqlite_connection_cache.py::test_a_recycled_thread_id_cannot_adopt_an_exited_workers_connection`
+(asserts the identifier really was reused, then that each worker still opened
+its own connection) and `::test_an_exited_workers_ownership_token_is_forgotten`.
+
+---
+
+## FIXED-572 — Every PDF and every attachment was copied through a JSON redactor
+
+**Severity: Low. Area: API / redaction middleware. Status: Fixed 2026-09-20.
+Closes **GCR-44** of the third-pass static review.**
+
+**Observed.** `RedactionMiddleware` decided what to buffer from the request
+*path*, so every non-exempt `/api` response was appended into a `bytearray`,
+joined into `bytes`, offered to `json.loads`, and — when that failed, as it
+always does for binary — sent out again unchanged. That includes the attachment
+preview and download routes, which already hold the complete bytes to construct
+their `Response`. The largest bodies the product serves were copied twice for a
+redaction that cannot apply to them, and streaming semantics were lost on the
+routes that had them.
+
+**Fixed.** The decision is made from what the response *is*. A `content-type`
+Raiker can see is not JSON streams straight through, chunk by chunk, with its
+headers untouched. A JSON body is buffered and redacted exactly as before, and a
+response that declares no content type at all is still buffered — unknown is not
+a licence to skip the redactor, and it costs nothing, because the bodies this is
+about all say what they are.
+
+**Evidence.** `tests/test_redaction_middleware_content_types.py` — a PDF preview
+is not coalesced into one body, binary bytes arrive unchanged, a declared
+content length is left alone, and JSON (including a `+json` suffix type, and a
+response with no content type) still has its secrets removed.
+
+---
+
+## FIXED-573 — A watcher failing every fifteen seconds said every folder was fresh
+
+**Severity: Medium. Area: Knowledge / attached-root watcher, Observability.
+Status: Fixed 2026-09-20. Closes **GCR-47** of the third-pass static review.**
+
+**Observed.** `AttachedRootWatcher.run()` wrapped each cycle in
+`suppress(Exception)`. Failures the loop reached a *project* with were recorded
+in that project's `WatchState`, which was the point of the class. A failure
+raised **before** it got that far — enumerating the indexed roots, setting the
+cycle up — was swallowed at the outer level with nothing recorded anywhere, and
+every project kept the state its last good pass had earned. The interface went
+on saying "Watching this folder for changes", with a timestamp, for as long as
+the host ran.
+
+**Fixed.** Every cycle outcome is recorded as a background worker pass under
+`attached_root_watch`, so it appears in **Observe → Diagnostics → Background
+passes** beside the host tick's own passes, with the same consecutive-failure
+count and the same exception class — this watcher is not a special case and does
+not get a surface of its own. A failing loop backs off, capped, instead of
+logging the same thing every fifteen seconds. And while it is failing no project
+is told it is being watched: the reason becomes `watcher_failed:<class>` and the
+freshness the last good pass earned survives, because dropping the timestamp
+would make a degraded watcher look like one that never ran.
+
+**Evidence.** `tests/test_attached_root_watcher.py::TestWatcherHealth` — the
+failure reaches the Diagnostics row, no project claims to be watched while the
+loop is failing, the retry interval backs off and is capped, and a cycle that
+gets through clears the streak.
+
+---
+
+## FIXED-574 — Two builds of one commit could contain different build-tool bytes
+
+**Severity: Medium. Area: Release / reproducibility. Status: Fixed 2026-09-20.
+Closes the build-tool and provenance halves of **GCR-41**; the hash-locked
+dependency set remains open in that entry.**
+
+**Observed.** The release pipeline is careful about determinism — sorted zip
+members, one fixed timestamp, normalised modes, `SOURCE_DATE_EPOCH` — and then
+fetched `appimagetool` from the AppImage project's `continuous` release, a tag
+that project moves on every publish. Two builds of the same Raiker commit a week
+apart therefore shipped different build-tool bytes. Nothing recorded which
+wheels a target had resolved either, so "were these two builds made from the
+same inputs?" could only be answered by re-running the resolver against a
+registry that had moved on.
+
+**Fixed.** `raiker/config/build-tools.json` names the tool by an immutable
+version tag and by the SHA-256 of the exact file, per architecture. The release
+job reads the pin, downloads it, and checks it with `sha256sum --check
+--strict`; an architecture with no pin is refused rather than falling back to
+whatever the project publishes today. What a build used travels inside the
+artifact: `installation.json` now carries `dependencies` — every wheel it
+shipped, by filename and digest — and `build_tools`, the pins that applied to
+that target. Recording the inputs does not change the artifact's own bytes, so
+two builds of one commit still produce one digest.
+
+**Evidence.** `tests/test_release_workflow.py` — the moving tag is gone, the
+download is checked, the pin is data rather than a literal in a shell, every
+Linux target has one, and an unpinned architecture is refused.
+`tests/test_release_pipeline.py` — the artifact records the wheels it shipped and
+the tools it was allowed to fetch, a target that fetches none says so, and
+reproducibility is unaffected.
+
+---
+
+## FIXED-575 — The guard against contract drift was a second hand-written copy of the contract
+
+**Severity: Medium. Area: API contract / CI. Status: Fixed 2026-09-20. Closes
+**GCR-42** of the third-pass static review.**
+
+**Observed.** `web/src/lib/apiTypes.ts` is a hand-maintained mirror of the
+backend DTOs and says so in its own header. The guard standing behind it —
+`tests/test_api_contract_schemas.py` — was a *second* hand-maintained copy: sets
+of field names transcribed out of the TypeScript into Python literals. Three
+hands had to agree about every shape, and a backend change that dropped a field
+the UI reads would only fail the build if somebody had remembered to transcribe
+that field in the first place.
+
+**Fixed.** `scripts/check_api_contract.py` derives the comparison from the two
+artefacts themselves: each interface in `apiTypes.ts` is paired with the backend
+`<Name>View` dataclass, and every field the interface declares as **required**
+must be one that DTO sends. "Sends" means the serialised shape, not the field
+list — a view whose `to_dict` adds a computed key is sending that key, and
+comparing against `dataclasses.fields` alone reported `BrainView`'s constant
+motion notice as missing. Types are deliberately not compared: the two sides use
+different type vocabularies, and asserting a correspondence between them would
+be asserting a translation table nobody maintains.
+
+It does not replace the older guard, which asserts against *live* responses and
+so covers the routes as well as the shapes. It covers what that one cannot:
+every shape nobody thought to transcribe. Both run in the Python CI job, so a
+backend-only change is checked even though the web job does not run for one.
+
+**Evidence.** `tests/test_api_contract_generated.py`. Verified to bite by
+removing a field the browser reads and watching the checker name it.
+
+---
+
+## FIXED-576 — The conversation library lived in the evidence inspector
+
+**Severity: Low. Area: Sessions / Threads / web UI. Status: Fixed 2026-09-20.
+Closes **[BUG-303](TO_BE_FIXED.md)**, raised 2026-09-18 while closing
+[FIXED-560](#fixed-560--the-evidence-inspector-was-a-second-place-to-resume-work).**
+
+**Observed.** FIXED-560 stopped Sessions being a second place to *resume* a
+conversation. What stayed was the rest of an everyday chat library — rename,
+move to project, pin, archive and the inline tag editor — on the page whose job
+is audit, while **Threads**, the page work is actually resumed from, could not
+express any of it.
+
+**Why it had not moved.** The work index could not hold the state. `GET
+/api/work-threads/page` filtered by project, kind and query behind a
+scope-bound cursor; it had no `pinned` or `archived` facet, no ordering that
+honoured a pin, no tags, and no way to list an archived thread at all —
+`_all_work_threads` read `include_archived=False`. Moving **Archive** there
+would have given an owner a control whose effect they could not undo from the
+same surface, which is worse than one that has not moved.
+
+**Fixed, in the order the entry set out.** The index grew first.
+`WorkThreadView` carries `pinned`, `archived` and `tags`; the sort puts pinned
+threads first, so a pin changes where a thread appears rather than being a label
+nobody can act on; `archived` is a **scope** on the page request rather than a
+facet, because the two sets do not overlap and every other filter applies within
+whichever one is read; and both counts come back in either scope, which is what
+makes archiving from Threads undoable from Threads. A page's tags are read in
+one query, because a tag editor on every row must not cost a round trip per row.
+
+Then the controls moved. Threads has an **Organise** control per row —
+pin/unpin, rename, archive/restore, move to a project — and the tag editor, with
+a chip that switches to the archived scope and back and names the count in each.
+A routine thread is offered none of it: it belongs to its task, not to the
+owner's library. Sessions keeps **Delete**, exactly as the entry said it should,
+because deleting removes the audit record and belongs beside the evidence it
+removes; its session menu says in one line where the rest went. Tags still
+*render* there and are still filterable, because finding a record is what that
+page is for; they are no longer editable there. The archived read scope stays
+too — an archived conversation still has evidence to read.
+
+**Evidence.** `tests/test_work_thread_index.py::TestTheLibraryTheIndexHadToGrowToHold`
+(pin ordering, the archived scope and its counts, a cursor refused across
+scopes, tags travelling with a thread, a routine carrying none of it, and the
+single-query tag read) and, in the browser,
+`web/src/lib/views/SearchChatView.test.ts` →
+"SearchChatView organises the threads it lists" (six cases, including the
+restore path and the failure message), plus
+`web/src/lib/views/SessionsView.test.ts` and
+`web/src/lib/components/SessionMenu.test.ts`, which assert the inspector now
+offers none of them and says where they went.
+
+---
+
+## FIXED-577 — Delete was off the bottom of the menu it lived in
+
+**Severity: Medium. Area: Sessions / web UI. Status: Fixed 2026-09-20. Found
+live while capturing [FIXED-576](#fixed-576--the-conversation-library-lived-in-the-evidence-inspector)'s
+evidence.**
+
+**Observed.** The session row's `•••` menu is absolutely positioned inside the
+table, and the table's card scrolls horizontally on a narrow window —
+`overflow-x: auto`, which the browser resolves to `overflow-y: auto` too,
+because only one axis may be `visible`. On a workspace holding one conversation
+the card is barely taller than its single row, and the menu opened **131 pixels
+below the bottom of it** and was cut off. **Delete** — the only destructive
+control on the page, and after FIXED-576 the only control in that menu that does
+anything to the record — could not be clicked at all.
+
+Measured rather than eyeballed, because this is the shape of defect an assertion
+walks straight past: the element is in the DOM, it has a bounding box, and a
+locator calls it visible. `document.elementFromPoint` at Delete's own centre
+returned `MAIN`.
+
+**Root cause.** A scroll container clips an absolutely positioned descendant on
+both axes. Nothing about the menu was wrong; it was in the wrong coordinate
+space.
+
+**Fixed.** The menu is `position: fixed`, with its `top` and `right` measured
+from the trigger when it opens, so no ancestor's overflow can reach it. A fixed
+element does not travel with the row it belongs to, so the menu closes on scroll
+or resize rather than being left pointing at a row that has moved.
+
+**Evidence.** `web/src/lib/components/SessionMenu.test.ts` — the menu carries
+viewport coordinates, and closes when the page moves under it — and, live,
+`web/e2e/gcr-p2-and-bug-303-live.spec.ts`, which asserts that the element at
+Delete's own centre point *is* Delete. Reproduced by putting `position:
+absolute` back and watching the live assertion report "covered by MAIN".

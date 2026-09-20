@@ -204,6 +204,7 @@ async def work_thread_page(
     query: str = "",
     cursor: str | None = None,
     limit: int = 50,
+    archived: bool = False,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """The work index: one filtered, faceted, bounded page of it (NEW-THREAD-01).
@@ -218,6 +219,11 @@ async def work_thread_page(
     Filters are applied first, facets are computed over everything that matched
     with their own filter lifted, and only then is the answer paged. Owner-scoped
     exactly like the listing beside it, and read-only.
+
+    ``archived`` is a scope rather than a filter (BUG-303): the two sets do not
+    overlap and every other filter applies within whichever one is read. Both
+    counts come back either way, so a thread archived from this page can be
+    found and restored from this page.
     """
     user_id = auth_data[1].delegated_by_user_id
     return serialize_dto(
@@ -228,6 +234,7 @@ async def work_thread_page(
             query=query,
             cursor=cursor,
             limit=limit,
+            archived=archived,
         )
     )
 

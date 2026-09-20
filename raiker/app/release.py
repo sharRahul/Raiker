@@ -32,7 +32,7 @@ import platform
 import stat
 import sys
 import zipfile
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -40,6 +40,8 @@ from typing import Any
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from raiker.app.build_tools import tools_for
 
 RELEASE_SCHEMA = 1
 #: A fixed timestamp for every archive member. Reproducibility is the point: two
@@ -290,6 +292,30 @@ def collect_payload(
     return entries
 
 
+def dependency_manifest(wheel_dir: Path | str | None) -> list[dict[str, str]]:
+    """Every wheel this artifact ships, by filename and content digest.
+
+    GCR-41 — the release resolves its dependencies on the target's own runner,
+    which is what makes the artifact installable without a network. What it
+    resolved was not written down anywhere, so "was this build made from the
+    same inputs as that one?" had no answer beyond re-running the resolver and
+    hoping the registry had not moved. It has one now, and it travels inside
+    the artifact rather than in a log that expires.
+    """
+    if wheel_dir is None:
+        return []
+    directory = Path(wheel_dir)
+    if not directory.is_dir():
+        return []
+    return [
+        {
+            "filename": path.name,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+        for path in sorted(directory.glob("*.whl"))
+    ]
+
+
 def installation_record(
     *,
     version: str,
@@ -298,11 +324,17 @@ def installation_record(
     signed: bool,
     commit: str | None = None,
     built_at: str | None = None,
+    dependencies: Sequence[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """The provenance an installed Raiker reports back to its owner.
 
     It travels inside the artifact, so what the product says about itself comes
     from the build that produced it and not from a value someone typed later.
+
+    ``dependencies`` and ``build_tools`` are the inputs, added for GCR-41: the
+    wheels this target resolved and the external tools it was allowed to fetch,
+    each by digest. The tool list comes from the pins rather than from the
+    runner, because a pin the build did not honour is a build that failed.
     """
     return {
         "schema": RELEASE_SCHEMA,
@@ -319,6 +351,10 @@ def installation_record(
             "required_secrets": list(target.signing.secrets),
             "applied": signed,
         },
+        "dependencies": list(dependencies or []),
+        "build_tools": [
+            tool.to_dict() for tool in tools_for(target.os_name, target.arch)
+        ],
     }
 
 
@@ -362,6 +398,7 @@ def build_bundle(
     signed: bool = False,
     commit: str | None = None,
     private_key: bytes | None = None,
+    dependencies: Sequence[dict[str, str]] | None = None,
 ) -> ReleaseArtifact:
     """Build one target's artifact, its schema-1 manifest, and its signature.
 
@@ -377,7 +414,12 @@ def build_bundle(
     bundle = destination / artifact_name(version, target.target_id, signed=signed)
 
     record = installation_record(
-        version=version, target=target, channel=channel, signed=signed, commit=commit
+        version=version,
+        target=target,
+        channel=channel,
+        signed=signed,
+        commit=commit,
+        dependencies=dependencies,
     )
     members: list[tuple[str, bytes, bool]] = [
         ("version.txt", f"{version}\n".encode(), False),
@@ -630,6 +672,7 @@ def _run(args: argparse.Namespace) -> int:
             signed=bool(args.signed),
             commit=args.commit,
             private_key=_key_from_env("RAIKER_RELEASE_SIGNING_KEY"),
+            dependencies=dependency_manifest(args.wheel_dir),
         )
         print(json.dumps(artifact.to_dict(), indent=2))
         return 0

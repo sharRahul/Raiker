@@ -274,6 +274,8 @@ Some differences are transport-appropriate, but preparation/business orchestrati
 
 **Severity: Medium — Priority: P2 — Confidence: High**
 
+**Status: Reduced 2026-09-20 — [FIXED-572](FIXED_ITEMS.md#fixed-572--every-pdf-and-every-attachment-was-copied-through-a-json-redactor)**, which closed the deeper pass's GCR-44. Two of the three things this entry asks for now hold: the middleware is content-type aware, and a non-JSON body — the binary attachment, preview and media responses that were the expensive half — streams through without being buffered. **What remains** is the first recommendation: redacting structured DTOs before serialization, so a JSON body is not buffered either. A response that declares no content type is still buffered deliberately, because unknown is not a licence to skip the redactor.
+
 `RedactionMiddleware` captures the response start and accumulates every body chunk for almost every `/api` path, only emitting after the final body chunk. A manually maintained exemption list exists for SSE and some exports.
 
 **Impact:** streaming semantics are opt-out rather than natural; new streaming/binary endpoints can accidentally be buffered, memory use scales with response size, and every new special route requires remembering another exemption.
@@ -297,6 +299,8 @@ This is lifecycle-correct for the normal async methods but loses HTTP keep-alive
 ## GCR-15 — Backend API changes can bypass frontend CI
 
 **Severity: Medium — Priority: P2 — Confidence: High**
+
+**Status: Reduced 2026-09-20 — [FIXED-575](FIXED_ITEMS.md#fixed-575--the-guard-against-contract-drift-was-a-second-hand-written-copy-of-the-contract)**, which closed the deeper pass's GCR-42 by taking this entry's *second* recommendation: a contract check that is derived rather than transcribed and runs in the **Python** job, so a backend-only change is checked for contract drift even though the web job does not run for one. **What remains** is the rest of what the web job does — compilation and the mocked end-to-end suite still do not run for a backend-only change, and a contract that matches field-for-field can still break a page.
 
 `.github/workflows/web.yml` is triggered only when `apps/web/**` or the workflow itself changes. It runs lint, Svelte/TypeScript checks, tests, build and mocked Playwright.
 

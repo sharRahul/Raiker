@@ -11,11 +11,27 @@ more than its success: a watcher that quietly stopped would leave recall
 answering from a stale index with nothing anywhere to notice. So every outcome
 lands in :class:`WatchState`, failures included, and the interface states what
 it finds there rather than implying freshness.
+
+**GCR-47.** That held for failures the loop reached a *project* with. An
+exception raised before it got that far — enumerating the indexed roots, or
+setting the cycle up — was suppressed at the outer level, and the last
+:class:`WatchState` each project had earned stayed exactly as it was. A watcher
+failing every fifteen seconds therefore left every project still saying
+"Watching this folder for changes", with a timestamp, for as long as the host
+ran.
+
+Two things answer that here. A cycle-level failure is recorded as a background
+worker pass under :data:`WATCH_PASS_NAME`, so it appears in Diagnostics beside
+the host tick's own passes with the same consecutive-failure count and the same
+exception class — this watcher is not a special case and does not get a special
+surface. And while the watcher itself is failing, no project is told it is being
+watched: the freshness it earned survives, the claim does not.
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +45,20 @@ from raiker.storage.sqlite import SQLiteStore
 #: while the host is running joins on the next cycle rather than on a restart.
 REFRESH_SECONDS = 15
 
+#: The longest a failing watcher waits before trying again. A cycle that throws
+#: is usually throwing for a reason that fifteen seconds will not change — a
+#: revoked grant, an exhausted watch-descriptor allowance — so retrying at the
+#: healthy cadence is a log entry every fifteen seconds and no more information
+#: than the first one carried.
+MAX_BACKOFF_SECONDS = 120
+
+#: What this watcher records its cycles under, so a Diagnostics reader finds it
+#: in the same list as every other background pass rather than in a surface of
+#: its own.
+WATCH_PASS_NAME = "attached_root_watch"
+
+_LOG = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class WatchState:
@@ -39,15 +69,56 @@ class WatchState:
     last_scanned_at: str
 
 
+@dataclass(frozen=True)
+class WatcherHealth:
+    """Whether the loop itself is running, independent of any project (GCR-47).
+
+    A project's :class:`WatchState` says what the last scan of *that* project
+    found. This says whether there were scans at all.
+    """
+
+    healthy: bool
+    consecutive_failures: int
+    last_error_class: str
+    retry_seconds: int
+
+
 class AttachedRootWatcher:
     """Keeps indexed attached roots current, and says when it cannot."""
 
     def __init__(self, workspace_root: str | Path) -> None:
         self.workspace_root = Path(workspace_root).resolve()
         self._state: dict[str, WatchState] = {}
+        self._consecutive_failures = 0
+        self._last_error_class = ""
 
     def state(self, project_id: str) -> WatchState:
-        return self._state.get(project_id, WatchState(False, "not_started", ""))
+        known = self._state.get(project_id, WatchState(False, "not_started", ""))
+        if self._consecutive_failures:
+            # GCR-47 — the loop is not reaching projects, so no project may be
+            # told it is being watched. The timestamp it earned survives: the
+            # index is as fresh as that pass left it, and dropping the
+            # timestamp would make a degraded watcher look like one that never
+            # ran, which is the distinction `record_failure` exists to keep.
+            return WatchState(
+                False, f"watcher_failed:{self._last_error_class}", known.last_scanned_at
+            )
+        return known
+
+    def health(self) -> WatcherHealth:
+        """Whether the loop itself is getting through a cycle."""
+        return WatcherHealth(
+            healthy=self._consecutive_failures == 0,
+            consecutive_failures=self._consecutive_failures,
+            last_error_class=self._last_error_class,
+            retry_seconds=self._retry_seconds(),
+        )
+
+    def _retry_seconds(self) -> int:
+        """How long to wait before the next cycle, backing off while failing."""
+        if not self._consecutive_failures:
+            return REFRESH_SECONDS
+        return min(REFRESH_SECONDS * 2**self._consecutive_failures, MAX_BACKOFF_SECONDS)
 
     def record_failure(self, project_id: str, reason: str) -> None:
         """Stop claiming to watch *project_id*, keeping the freshness it earned.
@@ -75,18 +146,53 @@ class AttachedRootWatcher:
     async def run(self, stop: asyncio.Event) -> None:
         """Watch until asked to stop, rebuilding the watched set as it changes.
 
-        Each cycle is suppressed on its own. A folder that becomes unwatchable
+        Each cycle is isolated on its own. A folder that becomes unwatchable
         must not stop the loop, because the next cycle is what picks up the
         *other* projects — and the failure it records is what the interface
         needs in order to stop claiming freshness for the one that broke.
+
+        Isolation is not suppression, though, and that is what GCR-47 was: a
+        cycle that threw before reaching any project left no trace at all. Every
+        outcome is now recorded, the failing case backs off, and until a cycle
+        gets through again no project is told it is being watched.
         """
         while not stop.is_set():
-            with suppress(Exception):
+            try:
                 await self._cycle(stop)
+            except Exception as exc:  # noqa: BLE001 - recorded, not swallowed
+                self._consecutive_failures += 1
+                self._last_error_class = type(exc).__name__
+                _LOG.warning(
+                    "attached-root watch cycle failed (%s), %d in a row; "
+                    "retrying in %ds",
+                    self._last_error_class,
+                    self._consecutive_failures,
+                    self._retry_seconds(),
+                )
+                await self._record_pass(self._last_error_class)
+            else:
+                self._consecutive_failures = 0
+                self._last_error_class = ""
+                await self._record_pass(None)
             if stop.is_set():
                 return
             with suppress(TimeoutError):
-                await asyncio.wait_for(stop.wait(), timeout=REFRESH_SECONDS)
+                await asyncio.wait_for(stop.wait(), timeout=self._retry_seconds())
+
+    async def _record_pass(self, error_class: str | None) -> None:
+        """File this cycle with the background-worker health the host tick uses.
+
+        Best effort by design: a watcher that cannot write its own health row
+        must still watch, and the in-memory counters above are what the
+        interface reads. The row is what a Diagnostics reader sees.
+        """
+        with suppress(Exception):
+            await asyncio.to_thread(self._write_pass, error_class)
+
+    def _write_pass(self, error_class: str | None) -> None:
+        SQLiteStore(self.workspace_root).record_background_pass(
+            WATCH_PASS_NAME, error_class=error_class
+        )
 
     async def _cycle(self, stop: asyncio.Event) -> None:
         roots = await asyncio.to_thread(self.indexed_attached_roots)

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections import OrderedDict
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
@@ -90,9 +92,23 @@ THINKING_BUDGET_TOKENS = 2048
 # whole allowance is 1024 cannot carry a 1024-token minimum *and* an answer.
 MINIMUM_THINKING_BUDGET_TOKENS = 1024
 RESERVED_ANSWER_TOKENS = 512
-# What each model turned out to accept, keyed by model id and kept for the life
-# of the process. Cleared by `reset_thinking_negotiation()` in tests.
-_NEGOTIATED_THINKING: dict[str, str] = {}
+# What each model turned out to accept.
+#
+# GCR-32 — this used to be keyed by model id alone, which made it a claim about
+# a *name* rather than about an endpoint. Anthropic-compatible endpoints are not
+# all Anthropic: a proxy, a gateway, a self-hosted relay and the API itself can
+# all be asked for `claude-...`, and they do not have to accept the same
+# `thinking` spelling. A refusal learned from one of them silently changed the
+# requests Raiker sent to the others, including ones that had never refused
+# anything.
+#
+# The key is therefore what actually decides the answer: the profile that
+# configured the connection, the provider, the exact endpoint the request goes
+# to, the API revision it is sent under, and the model. It is bounded and
+# least-recently-used, so a long-lived host that talks to many endpoints cannot
+# grow it without limit.
+_NEGOTIATED_THINKING_LIMIT = 256
+_NEGOTIATED_THINKING: OrderedDict[tuple[str, ...], str] = OrderedDict()
 
 
 class _ThinkingShapeRejected(Exception):
@@ -119,8 +135,44 @@ def _rejected_thinking_shape(body: str) -> str | None:
 
 
 def reset_thinking_negotiation() -> None:
-    """Forget what every model was observed to accept (tests only)."""
+    """Forget what every endpoint was observed to accept (tests only)."""
     _NEGOTIATED_THINKING.clear()
+
+
+def _normalised_endpoint(endpoint: str, path: str) -> str:
+    """The address a request really goes to, compared the way a peer would.
+
+    Scheme and host are case-insensitive and a trailing slash means nothing, so
+    two spellings of one endpoint must not become two cache entries — and, more
+    importantly, two *different* endpoints must never collapse into one.
+    """
+    parts = urlsplit(endpoint.rstrip("/") + "/" + path.lstrip("/"))
+    return urlunsplit(
+        (
+            parts.scheme.lower(),
+            parts.netloc.lower(),
+            parts.path.rstrip("/") or "/",
+            "",
+            "",
+        )
+    )
+
+
+def negotiated_thinking_shape(key: tuple[str, ...]) -> str:
+    """The spelling this exact endpoint was observed to accept, or the default."""
+    shape = _NEGOTIATED_THINKING.get(key)
+    if shape is None:
+        return THINKING_ADAPTIVE
+    _NEGOTIATED_THINKING.move_to_end(key)
+    return shape
+
+
+def record_negotiated_thinking_shape(key: tuple[str, ...], shape: str) -> None:
+    """Remember a refusal, for this endpoint only, within a bounded cache."""
+    _NEGOTIATED_THINKING[key] = shape
+    _NEGOTIATED_THINKING.move_to_end(key)
+    while len(_NEGOTIATED_THINKING) > _NEGOTIATED_THINKING_LIMIT:
+        _NEGOTIATED_THINKING.popitem(last=False)
 
 
 def _cache_control(cache_ttl: str | None) -> dict[str, Any] | None:
@@ -392,7 +444,7 @@ class AsyncAnthropicMessagesProvider:
         if not (reasoning and reasoning.enabled and self.capabilities.supports_reasoning):
             return None
         model = request.model or self.model
-        shape = _NEGOTIATED_THINKING.get(model, THINKING_ADAPTIVE)
+        shape = negotiated_thinking_shape(self._thinking_key(model))
         if shape == THINKING_BUDGETED:
             budget = reasoning.budget_tokens or THINKING_BUDGET_TOKENS
             # The budget has to leave room for the answer, and `max_tokens`
@@ -420,9 +472,18 @@ class AsyncAnthropicMessagesProvider:
             thinking["display"] = "summarized"
         return thinking
 
-    @staticmethod
-    def _record_thinking_shape(model: str, shape: str) -> None:
-        _NEGOTIATED_THINKING[model] = shape
+    def _thinking_key(self, model: str) -> tuple[str, ...]:
+        """What the observed spelling is actually a fact about (GCR-32)."""
+        return (
+            self.profile_id,
+            self.provider,
+            _normalised_endpoint(self.endpoint, self.chat_path),
+            ANTHROPIC_VERSION,
+            model,
+        )
+
+    def _record_thinking_shape(self, model: str, shape: str) -> None:
+        record_negotiated_thinking_shape(self._thinking_key(model), shape)
 
     @staticmethod
     def _cache_headers(request: ModelRequest) -> dict[str, str]:

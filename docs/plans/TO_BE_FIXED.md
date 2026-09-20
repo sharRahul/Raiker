@@ -141,8 +141,10 @@ names.
 | [BUG-298](FIXED_ITEMS.md#fixed-543--a-routed-gate-nothing-could-propose) | Low | Governance / policy | **Closed 2026-09-15 (FIXED-543)** |
 | [BUG-299](FIXED_ITEMS.md#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read) | Medium | Tasks | **Closed 2026-09-15 (FIXED-535)** |
 | [BUG-300](FIXED_ITEMS.md#fixed-551--a-declared-table-was-a-table-in-the-conversation-and-json-everywhere-else) | Low | Chat / typed output / export | **Closed 2026-09-16 (FIXED-551)** — and running it live found [FIXED-550](FIXED_ITEMS.md#fixed-550--a-turn-that-wrote-anything-before-calling-a-tool-stored-a-different-answer-than-it-showed), which is wider than this row |
-| [BUG-301](#bug-301--the-guides-own-cross-references-are-not-links) | Low | Guide / web UI | Open — raised 2026-09-16 while closing REM-GUIDE |
-| [BUG-302](#bug-302--four-audit-summaries-quote-the-whole-answer-including-a-payload) | Low | Observability / audit summaries | Open — raised 2026-09-16 while capturing FIXED-551's evidence |
+| [BUG-301](FIXED_ITEMS.md#fixed-557--the-guides-own-cross-references-were-punctuation) | Low | Guide / web UI | **Closed 2026-09-18 (FIXED-557)** |
+| [BUG-302](FIXED_ITEMS.md#fixed-558--four-events-describing-themselves-with-one-borrowed-sentence) | Low | Observability / audit summaries | **Closed 2026-09-18 (FIXED-558)** |
+| [BUG-303](FIXED_ITEMS.md#fixed-576--the-conversation-library-lived-in-the-evidence-inspector) | Low | Sessions / Threads | **Closed 2026-09-20 ([FIXED-576](FIXED_ITEMS.md#fixed-576--the-conversation-library-lived-in-the-evidence-inspector))** — the work index grew `pinned`, `archived` and tags first, so Archive could move without becoming a control nothing could undo |
+| [BUG-304](FIXED_ITEMS.md#fixed-577--delete-was-off-the-bottom-of-the-menu-it-lived-in) | Medium | Sessions / web UI | **Closed 2026-09-20 ([FIXED-577](FIXED_ITEMS.md#fixed-577--delete-was-off-the-bottom-of-the-menu-it-lived-in))** — raised and closed in the same run, found while capturing BUG-303's evidence: the row menu was clipped by the card it opened inside, so Delete could not be clicked |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (18 complete, 2 partial; B14 closed 2026-09-04 as [FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one), B10 2026-09-03 as FIXED-366, B13 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, B16 by BUG-206 slice D. B15 and B20 remain partial on [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution)) |
 | VIS | — | Visual / information hierarchy | **Complete.** 24 findings; the document was removed 2026-09-15 when its last implementation item closed |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (16 complete, 1 partial, 1 open; C15 closed by C1/C4, C11 2026-09-03 as FIXED-367, C18 as FIXED-368, C17 2026-08-29 as FIXED-311. C10 is partial — the notification half ships as [FIXED-374](FIXED_ITEMS.md#fixed-374--a-routine-ran-all-night-and-told-nobody); C12 stays an architecture decision) |
@@ -237,9 +239,30 @@ six hours, and was the largest remaining piece of owner-visible work in that set
 which hashed a file's path and length and called the result a content
 fingerprint.
 
-**Still open in the third-pass document, in its own priority order:** GCR-32,
-GCR-34, GCR-35, GCR-36, GCR-37, GCR-41, GCR-42, GCR-43, GCR-44 and GCR-47, all
-P2.
+**Nine more closed 2026-09-20**, which is every P2 in that set but two. Taken
+by consequence rather than by list order — the two that could change a model's
+answer first, then the two that could change a stored or served one, then the
+observability and build-integrity work:
+GCR-35 as [FIXED-567](FIXED_ITEMS.md#fixed-567--a-follow-up-to-a-long-answer-arrived-with-no-conversation-at-all),
+GCR-36 as [FIXED-568](FIXED_ITEMS.md#fixed-568--a-transcript-that-could-not-be-read-looked-exactly-like-one-that-was-empty),
+GCR-34 as [FIXED-569](FIXED_ITEMS.md#fixed-569--a-large-json-answer-from-a-connector-became-a-short-string),
+GCR-32 as [FIXED-570](FIXED_ITEMS.md#fixed-570--one-endpoints-refusal-rewrote-every-other-endpoints-request),
+GCR-37 as [FIXED-571](FIXED_ITEMS.md#fixed-571--a-new-worker-could-adopt-an-exited-workers-database-connection),
+GCR-44 as [FIXED-572](FIXED_ITEMS.md#fixed-572--every-pdf-and-every-attachment-was-copied-through-a-json-redactor),
+GCR-47 as [FIXED-573](FIXED_ITEMS.md#fixed-573--a-watcher-failing-every-fifteen-seconds-said-every-folder-was-fresh),
+GCR-41's build-tool and provenance halves as
+[FIXED-574](FIXED_ITEMS.md#fixed-574--two-builds-of-one-commit-could-contain-different-build-tool-bytes),
+and GCR-42 as
+[FIXED-575](FIXED_ITEMS.md#fixed-575--the-guard-against-contract-drift-was-a-second-hand-written-copy-of-the-contract).
+Two of them were reproduced on unmodified `main` before being fixed: GCR-37,
+where six sequential worker threads shared one database connection because
+CPython gave all six the same identifier, and GCR-42's own gate, checked by
+removing a field the browser reads and watching it name the drift.
+
+**Still open in the third-pass document:** GCR-43 (the ~400 KB dashboard
+module) and the remainder of GCR-41 — a hash-locked constraints set for the
+Python dependencies, which is a per-target lockfile pipeline rather than a
+change to the release job. Both are P2.
 
 ---
 
@@ -1923,32 +1946,16 @@ still reads a completion's outcome.
 
 ## BUG-303 — The conversation-library controls are still in the evidence inspector
 
-**Severity: Low. Area: Sessions / Threads. Raised 2026-09-18 while closing
-[REM-SESSIONS](FIXED_ITEMS.md#fixed-560--the-evidence-inspector-was-a-second-place-to-resume-work).**
-
-**Observed.** Sessions no longer offers a second way to *resume* a conversation:
-the row opens the record, and one routed link is the way back. What is still
-there is the rest of an everyday chat library — rename, move to project, pin,
-archive, the inline tag editor and bulk delete — on the page whose job is audit.
-
-**Why it was not moved with the resume actions.** Threads is the right home for
-all six, and its index cannot hold them yet. `GET /api/work-threads/page`
-filters by project, kind and query and pages behind a scope-bound cursor; it has
-no `pinned` or `archived` facet, no ordering that honours a pin, and no way to
-list an archived thread at all — `_all_work_threads` reads
-`include_archived=False`. Moving **Archive** there would give an owner a control
-whose effect they could not undo from the same surface, which is worse than one
-that has not moved.
-
-**Proposed fix.** Grow the work index first: `pinned` and `archived` on
-`WorkThreadView`, an `archived` scope on the page request with its own facet, and
-a sort that puts pinned threads first — then move the lifecycle menu and the tag
-editor to Threads and leave Sessions reading only. **Delete** is the one that
-should stay: it removes the audit record, and it belongs beside the evidence it
-removes rather than in the library.
-
-**Interface outcome that has to be true before this closes.** One place organises
-conversations, and it is the place work is resumed from. The inspector reads.
+**Closed 2026-09-20 as
+[FIXED-576](FIXED_ITEMS.md#fixed-576--the-conversation-library-lived-in-the-evidence-inspector).**
+Taken in the order the entry set out. The work index grew first — `pinned`,
+`archived` and `tags` on `WorkThreadView`, a pin-first sort, an `archived`
+*scope* on the page request with both counts returned in either one — so
+Archive could move without becoming a control whose effect an owner could not
+undo from the surface they used it on. Then the lifecycle menu and the tag
+editor moved to Threads, and Sessions kept **Delete**, exactly as the entry
+said it should: it removes the audit record, and it belongs beside the evidence
+it removes.
 
 ---
 

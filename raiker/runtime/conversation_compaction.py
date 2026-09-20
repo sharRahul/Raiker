@@ -27,6 +27,10 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.hooks.contracts import HookInput
 from raiker.models.contracts import ModelMessage, ReasoningOptions, summarize_model_usage
 from raiker.models.exceptions import ModelProviderError, provider_error_code
+from raiker.runtime.conversation_history import (
+    ConversationHistoryUnavailable,
+    fit_exchange,
+)
 
 COMPACTION_THRESHOLD = 0.9
 RETAIN_NEWEST_EXCHANGES = 2
@@ -551,10 +555,20 @@ def compacted_conversation_messages(
         kept: list[dict[str, Any]] = []
         used = 0
         for row in reversed(rows):
-            cost = len(str(row.get("prompt_text") or "")) + len(
-                str(row.get("summary") or "")
-            )
+            prompt = str(row.get("prompt_text") or "")
+            reply = str(row.get("summary") or "")
+            cost = len(prompt) + len(reply)
             if used + cost > char_budget:
+                if kept:
+                    break
+                # GCR-35, the same defect as in `conversation_messages`: the
+                # newest exchange after the boundary is over the budget on its
+                # own, and breaking here would replay the summary with no live
+                # exchanges at all. It is elided to fit instead.
+                fitted_prompt, fitted_reply = fit_exchange(prompt, reply, char_budget)
+                if not fitted_prompt and not fitted_reply:
+                    break
+                kept.append({**row, "prompt_text": fitted_prompt, "summary": fitted_reply})
                 break
             kept.append(row)
             used += cost
@@ -620,8 +634,14 @@ def _completed_turns(
 ) -> list[dict[str, Any]]:
     try:
         rows = store.list_turns(session_id, limit=500)
-    except Exception:  # noqa: BLE001
-        return []
+    except Exception as exc:  # noqa: BLE001 — every read failure is one condition
+        # GCR-36 — an unreadable transcript is not an empty one. Returning `[]`
+        # here told the planner the conversation was short enough to replay
+        # whole and told replay there was nothing to replay, which is how a
+        # storage failure used to reach the model as a first turn.
+        raise ConversationHistoryUnavailable(
+            f"conversation_history_unreadable:{type(exc).__name__}"
+        ) from exc
     return [
         row
         for row in rows

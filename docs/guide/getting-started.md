@@ -335,8 +335,9 @@ than counting an unread check as zero problems. A readiness claim nobody checked
 is worse than no claim, because you would act on it.
 
 **Sessions is inside Observability**, not a destination of its own: it is the
-complete record of every conversation *and* every task run, which is why the
-sidebar's RECENT CHATS list stays conversations only.
+complete record of every conversation *and* every task run, which is why
+**Threads** — the board you pick work up from — lists conversations and the
+threads your routines are advancing, and nothing else.
 
 Four destinations are tabbed:
 

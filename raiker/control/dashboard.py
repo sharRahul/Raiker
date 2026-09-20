@@ -1515,9 +1515,25 @@ class WorkThreadView:
     #: is not waiting on anything. Only ever states a blocker the runtime
     #: actually holds — never a guess about staleness.
     waiting_on: str | None = None
+    # ── BUG-303: what the library needs to organise a thread ─────────────────
+    #
+    # These three were already stored on the session row and read only by
+    # Sessions, which is the page whose job is *audit*. So the everyday library
+    # controls — pin, archive, tags — lived in the evidence inspector, while the
+    # page work is actually resumed from could not express any of them. Moving
+    # the controls needed the index to be able to carry their state first, and
+    # this is that state. Nothing new is invented: a pin, an archive flag and a
+    # tag set are organizing labels that grant nothing.
+    #
+    # A routine thread is a task's own conversation. It is not in the owner's
+    # library and cannot be pinned, archived or tagged, so it reports the
+    # defaults and the interface offers it no such control.
+    pinned: bool = False
+    archived: bool = False
+    tags: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return {**asdict(self), "tags": list(self.tags)}
 
 
 # ── The work index (NEW-THREAD-01) ───────────────────────────────────────────
@@ -1576,6 +1592,15 @@ class WorkThreadPage:
     projects: list[WorkThreadFacet]
     #: Same, with the *kind* filter lifted.
     kinds: list[WorkThreadFacet]
+    #: BUG-303 — how many threads the *other* archive scope holds, so archiving
+    #: from this page is undoable from this page. A control whose effect the
+    #: owner cannot reverse on the surface they used is worse than one that has
+    #: not moved, which is exactly why Archive stayed in Sessions until now.
+    #:
+    #: Bounded by the same scan as ``total``, and qualified by the same
+    #: ``scan_truncated``: both are counts of what the index looked at.
+    archived_count: int
+    active_count: int
     #: True when the scan bound was reached, so the counts above describe the
     #: most recent `WORK_THREAD_SCAN_LIMIT` threads rather than all of them.
     scan_truncated: bool
@@ -1587,12 +1612,18 @@ class WorkThreadPage:
             "total": self.total,
             "projects": [facet.to_dict() for facet in self.projects],
             "kinds": [facet.to_dict() for facet in self.kinds],
+            "archived_count": self.archived_count,
+            "active_count": self.active_count,
             "scan_truncated": self.scan_truncated,
         }
 
 
 def _work_thread_scope(
-    user_id: str | None, project_id: str | None, kind: str | None, query: str
+    user_id: str | None,
+    project_id: str | None,
+    kind: str | None,
+    query: str,
+    archived: bool = False,
 ) -> str:
     """A short digest of the question a cursor was issued for.
 
@@ -1600,7 +1631,9 @@ def _work_thread_scope(
     owner or a different filter set — paging is a position in one ordered
     answer, and the position means nothing in another.
     """
-    material = "\x1f".join([user_id or "", project_id or "", kind or "", query])
+    material = "\x1f".join(
+        [user_id or "", project_id or "", kind or "", query, "archived" if archived else ""]
+    )
     return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
 
 
@@ -6655,7 +6688,9 @@ class DashboardService:
         """
         return self.work_thread_page(user_id=user_id, limit=limit).threads
 
-    def _all_work_threads(self, *, user_id: str | None) -> tuple[list[WorkThreadView], bool]:
+    def _all_work_threads(
+        self, *, user_id: str | None, include_archived: bool = False
+    ) -> tuple[list[WorkThreadView], bool]:
         """Every thread of this owner's work, newest first (GAP-CHAT C18).
 
         Two kinds, in one list, because the owner has one head:
@@ -6685,10 +6720,15 @@ class DashboardService:
         # Build and Design from the one board that claims to show all the work.
         # The complement is what was always meant: not the server-owned sessions
         # a task run executes in, which arrive below as routine threads.
+        # BUG-303 — an archived thread used to be unreachable from here at all,
+        # which is why Archive could not move off Sessions: a control whose
+        # effect the owner cannot see or undo from the same surface is worse
+        # than one that has not moved. The index can list them now; which of the
+        # two scopes is shown is `work_thread_page`'s decision.
         owner_sessions = self.store.list_sessions(
             limit=WORK_THREAD_SCAN_LIMIT,
             user_id=user_id,
-            include_archived=False,
+            include_archived=include_archived,
             exclude_origin="task",
         )
         # Found 2026-09-18 while proving REM-THREAD-03: every chat row on the
@@ -6697,9 +6737,11 @@ class DashboardService:
         # been `None` and every conversation was reported as empty — beside
         # routine rows that had a real count, because those were counted. One
         # query for the whole page, exactly as the routine half already does.
-        session_turns = self.store.count_turns_by_session(
-            [str(session.get("session_id", "")) for session in owner_sessions]
-        )
+        session_ids = [str(session.get("session_id", "")) for session in owner_sessions]
+        session_turns = self.store.count_turns_by_session(session_ids)
+        # One query for the page's tags, not one per row: the library controls
+        # draw a tag editor on every thread (BUG-303).
+        session_tags = self.store.list_session_tags_by_session(session_ids)
         for session in owner_sessions:
             session_id = str(session.get("session_id", ""))
             project_id = session.get("project_id")
@@ -6715,6 +6757,9 @@ class DashboardService:
                     project_id=project_id,
                     project_name=projects.get(str(project_id)) if project_id else None,
                     origin=origin,
+                    pinned=bool(session.get("pinned")),
+                    archived=bool(session.get("archived")),
+                    tags=tuple(session_tags.get(session_id, ())),
                 )
             )
         # A routine thread's identity comes from its task, not from its session:
@@ -6763,10 +6808,17 @@ class DashboardService:
                     ),
                 )
             )
+        # Pinned first, then newest. BUG-303 — a pin that does not change where
+        # a thread appears is a label, not a pin, and the library control being
+        # moved here is the one Sessions had: "keep this where I can find it".
+        #
         # Stable, with a tie-breaker: two threads touched in the same second
         # must not swap places between pages, or a cursor would skip one and
         # repeat the other.
-        threads.sort(key=lambda thread: (thread.updated_at, thread.session_id), reverse=True)
+        threads.sort(
+            key=lambda thread: (thread.pinned, thread.updated_at, thread.session_id),
+            reverse=True,
+        )
         return threads, len(threads) >= WORK_THREAD_SCAN_LIMIT
 
     def work_thread_page(
@@ -6778,6 +6830,7 @@ class DashboardService:
         query: str = "",
         cursor: str | None = None,
         limit: int = WORK_THREAD_PAGE_LIMIT,
+        archived: bool = False,
     ) -> WorkThreadPage:
         """One page of the owner's work, with the filters that produced it.
 
@@ -6790,10 +6843,28 @@ class DashboardService:
         A blank ``query`` is not a filter. A query *with* a project selected
         keeps the project — narrowing something down must not widen it, which is
         what an unscoped search on the first keystroke did.
+
+        BUG-303 — ``archived`` is a *scope*, not a filter, which is why it sits
+        outside the facets: the two sets do not overlap, and every other filter
+        applies within whichever one is being read. Both counts come back either
+        way, so archiving a thread from this page leaves somewhere visible to
+        go and get it back from.
+
+        One scan covers both scopes rather than two, because the counts have to
+        agree with each other and with what is on screen. The cost is that
+        ``WORK_THREAD_SCAN_LIMIT`` is now shared: a workspace with thousands of
+        archived threads sees fewer active ones considered. Sessions are scanned
+        newest-first and an archived thread is by definition one the owner has
+        finished with, so they sit at the tail of that order — and when the
+        bound does bind, ``scan_truncated`` says so rather than letting the
+        counts read as an inventory.
         """
         size = max(1, min(int(limit or WORK_THREAD_PAGE_LIMIT), WORK_THREAD_MAX_PAGE_LIMIT))
         needle = (query or "").strip().casefold()
-        every, truncated = self._all_work_threads(user_id=user_id)
+        every, truncated = self._all_work_threads(user_id=user_id, include_archived=True)
+        archived_count = sum(1 for thread in every if thread.archived)
+        active_count = len(every) - archived_count
+        every = [thread for thread in every if thread.archived == archived]
 
         def matches(
             thread: WorkThreadView, *, ignore_project: bool = False, ignore_kind: bool = False
@@ -6819,7 +6890,7 @@ class DashboardService:
                 kind_counts[thread.kind] = kind_counts.get(thread.kind, 0) + 1
 
         matched = [thread for thread in every if matches(thread)]
-        scope = _work_thread_scope(user_id, project_id, kind, needle)
+        scope = _work_thread_scope(user_id, project_id, kind, needle, archived)
         start = 0
         if cursor:
             after = decode_work_thread_cursor(cursor, scope)
@@ -6844,6 +6915,8 @@ class DashboardService:
                 WorkThreadFacet(value=key, label=key, count=count)
                 for key, count in sorted(kind_counts.items())
             ],
+            archived_count=archived_count,
+            active_count=active_count,
             scan_truncated=truncated,
         )
 

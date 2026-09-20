@@ -302,14 +302,14 @@ format and counts — never its text.
 
 ## Your conversations
 
-Every chat appears under **RECENT CHATS** in the sidebar with its title and a
-relative timestamp. The `⋯` menu offers Copy local link, Rename, Move to
-project, Pin, Archive, and Delete.
+**Threads is where your conversations are.** The sidebar is navigation and
+nothing else — it carries no list of recent chats and reads none, so nothing you
+have said is fetched to draw it.
 
-**Threads** is the board: everything you have going, newest first — the
-conversations you started **and** the threads your routines are advancing on
-their own. Each row names the project it sits in and says what it is blocked on;
-a routine's row says how often it runs.
+**Threads** is the board: everything you have going, pinned first and then
+newest — the conversations you started **and** the threads your routines are
+advancing on their own. Each row names the project it sits in and says what it
+is blocked on; a routine's row says how often it runs.
 
 **A row opens where the work was done.** A conversation started in Chat opens in
 Chat, one started in Build opens in Build, one started in Design opens in
@@ -325,6 +325,16 @@ on the page you are looking at, which is a different and much smaller list.
 Typing in the box narrows the board further by title, and **the filters stay
 on and stay visible while you type**: choosing a project and then typing does
 not quietly drop the project.
+
+**Organising a thread happens here**, on the row, because this is where you work
+from. **Organise** on a chat row offers Pin or Unpin, Rename, Archive or
+Restore, and Move to a project, and it carries a box for adding a tag; existing
+tags show on the row with an × to take one off. A pinned thread says so and
+comes first. Archiving takes a thread out of the default board without deleting
+anything: **Archived (n)** switches to what you have filed away, where the same
+control offers **Restore**, and **Back to active (n)** brings you back. A
+routine's row is offered none of this — that thread belongs to its task, and
+Tasks is where it is managed.
 
 The board shows a page at a time and says so — *Showing 12 of 140 threads* —
 with **Load more** for the next page. A count you can see is better than a
@@ -344,10 +354,15 @@ returns to the board with your filters as you left them.
 
 **Observability → Sessions** is the complete record: every conversation with its
 turn count, status, tags, and the governed events behind each turn. Task runs
-live there too, which is why they are not in RECENT CHATS. It is for reading the
-record rather than for picking work up — a session there offers one **Resume
-in …** link, naming the surface that conversation belongs to, and Threads is
-where you go to carry on.
+live there too, which is why they are not among your own conversations. It is
+for reading the record rather than for picking work up or filing it away — a
+session there offers one **Resume in …** link, naming the surface that
+conversation belongs to, and its `⋯` menu offers Copy local link, a link to
+Threads, and Delete.
+Tags show there and can be filtered on, because finding a record is what that
+page is for; changing them is done on Threads. **Delete** stays in Sessions
+deliberately: it removes the governed record itself, so it sits beside the
+evidence it removes rather than among the controls that only tidy.
 
 ## Attachments
 

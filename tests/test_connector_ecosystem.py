@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
@@ -19,9 +20,13 @@ from raiker.contracts.ids import utc_now
 from raiker.models.contracts import ToolCallProposal
 from raiker.models.tool_call_validation import default_tool_specs, validate_tool_call
 from raiker.runtime.connector_ecosystem import (
+    CONNECTOR_RESPONSE_MAX_BYTES,
+    CONNECTOR_TEXT_MAX_CHARS,
     ConnectorCatalog,
     ConnectorInvoker,
     ConnectorVault,
+    _connector_result,
+    _read_bounded,
     compile_manifest,
 )
 from raiker.storage.sqlite import SQLiteStore
@@ -396,3 +401,62 @@ class TestOAuthRefreshIsSingleFlight:
         assert first["refresh_token"] == "R1"
         assert second["refresh_token"] == "R1"
         assert ConnectorVault(store).get("principal_owner", "github") == first
+
+
+class TestConnectorResponseSizeContract:
+    """GCR-34 — a body over the cap is a size condition, not a value.
+
+    The cap used to be a slice taken before parsing, so a valid JSON answer one
+    byte over it was cut mid-token, failed to parse, and came back as a short
+    string. Neither the caller nor the model could tell that apart from a
+    connector that answers in plain text.
+    """
+
+    @staticmethod
+    def _response(body: bytes, content_type: str = "application/json") -> httpx.Response:
+        return httpx.Response(200, content=body, headers={"content-type": content_type})
+
+    def test_json_within_the_cap_is_still_parsed(self) -> None:
+        body = json.dumps({"items": [1, 2, 3]}).encode()
+        assert _connector_result(self._response(body), body, len(body)) == {
+            "items": [1, 2, 3]
+        }
+
+    def test_text_within_the_cap_is_still_carried_as_text(self) -> None:
+        body = b"plain text answer"
+        result = _connector_result(self._response(body, "text/plain"), body, len(body))
+        assert result == "plain text answer"
+
+    def test_oversized_json_is_named_rather_than_turned_into_a_string(self) -> None:
+        body = b'{"items": [' + b"1," * 200_000 + b"1]}"
+        head = body[:CONNECTOR_TEXT_MAX_CHARS]
+        result = _connector_result(self._response(body), head, len(body))
+        assert isinstance(result, dict)
+        assert result["truncated"] is True
+        assert result["reason_code"] == "response_too_large"
+        assert result["byte_count"] == len(body)
+        assert result["max_bytes"] == CONNECTOR_RESPONSE_MAX_BYTES
+        assert result["content_type"] == "application/json"
+        assert len(result["preview"]) <= CONNECTOR_TEXT_MAX_CHARS
+
+    def test_the_reader_stops_accumulating_once_the_cap_is_passed(self) -> None:
+        # The body is a megabyte; what is kept is a preview, and the reported
+        # size is what the peer really sent.
+        body = b"x" * 1_000_000
+        response = httpx.Response(
+            200,
+            content=body,
+            headers={"content-type": "application/octet-stream"},
+        )
+        kept, total = _read_bounded(response)
+        assert total == 1_000_000
+        assert len(kept) <= CONNECTOR_TEXT_MAX_CHARS
+
+    def test_a_body_exactly_at_the_cap_is_still_a_value(self) -> None:
+        payload = {"pad": "y" * (CONNECTOR_RESPONSE_MAX_BYTES - 11)}
+        body = json.dumps(payload).encode()
+        assert len(body) == CONNECTOR_RESPONSE_MAX_BYTES
+        response = httpx.Response(200, content=body)
+        kept, total = _read_bounded(response)
+        assert total == CONNECTOR_RESPONSE_MAX_BYTES
+        assert _connector_result(response, kept, total) == payload

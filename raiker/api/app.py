@@ -133,6 +133,29 @@ def _is_session_export_request(scope: Scope, path: str) -> bool:
     )
 
 
+def _carries_json(start_message: Message) -> bool:
+    """Whether this response is something the JSON redactor can act on.
+
+    GCR-44 — the middleware used to decide what to buffer from the *path*
+    alone, so a PDF preview and an image or attachment download were each
+    copied into a `bytearray`, joined into `bytes`, offered to `json.loads`,
+    and then sent out again unchanged. Binary bytes cannot be JSON-redacted, so
+    every one of those copies was work that could not change the answer, on the
+    largest bodies the product serves.
+
+    A content type Raiker can see is not JSON is therefore streamed straight
+    through. A response that declares no content type at all is still buffered:
+    the old behaviour is the safe one where the answer is unknown, and it costs
+    nothing, because the bodies this is about all declare what they are.
+    """
+    for key, value in start_message.get("headers", []):
+        if key.lower() != b"content-type":
+            continue
+        media_type = value.split(b";", 1)[0].strip().lower()
+        return media_type.endswith((b"/json", b"+json"))
+    return True
+
+
 class RedactionMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -157,13 +180,21 @@ class RedactionMiddleware:
 
         start_message: Message | None = None
         body = bytearray()
+        passing_through = False
 
         async def capture(message: Message) -> None:
-            nonlocal start_message
+            nonlocal start_message, passing_through
             if message["type"] == "http.response.start":
-                start_message = message
+                if _carries_json(message):
+                    start_message = message
+                    return
+                # GCR-44 — nothing here for the redactor to do, so the bytes go
+                # out as they arrive: no buffer, no copy, and streaming
+                # semantics preserved for the routes that have them.
+                passing_through = True
+                await send(message)
                 return
-            if message["type"] != "http.response.body":
+            if message["type"] != "http.response.body" or passing_through:
                 await send(message)
                 return
             body.extend(message.get("body", b""))

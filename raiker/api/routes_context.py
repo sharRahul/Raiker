@@ -39,6 +39,7 @@ from raiker.runtime.conversation_compaction import (
     ContextCompactionStore,
     ConversationCompactor,
 )
+from raiker.runtime.conversation_history import ConversationHistoryUnavailable
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -116,18 +117,26 @@ async def compact_conversation(
     capacity = _context_capacity(store, principal_id, provider, model)
     compactions = ContextCompactionStore(store)
     active = compactions.active(principal_id, session_id)
-    plan = ContextBudgetPlanner().plan_through(
-        store=store,
-        session_id=session_id,
-        capacity_tokens=capacity,
-        # No turn is running, so there are no system messages and no prompt to
-        # add. The estimate is therefore of the stored conversation alone, which
-        # is what the owner is choosing to shorten.
-        fixed_messages=(),
-        current_prompt="",
-        latest_compaction=active,
-        through_turn_id=body.through_turn_id,
-    )
+    try:
+        plan = ContextBudgetPlanner().plan_through(
+            store=store,
+            session_id=session_id,
+            capacity_tokens=capacity,
+            # No turn is running, so there are no system messages and no prompt to
+            # add. The estimate is therefore of the stored conversation alone, which
+            # is what the owner is choosing to shorten.
+            fixed_messages=(),
+            current_prompt="",
+            latest_compaction=active,
+            through_turn_id=body.through_turn_id,
+        )
+    except ConversationHistoryUnavailable as exc:
+        # GCR-36 — the transcript could not be read. Summarising nothing and
+        # reporting success would tell the owner their conversation had been
+        # shortened when it had not been looked at.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=exc.reason
+        ) from exc
     if not plan.should_compact:
         return {
             "session_id": session_id,

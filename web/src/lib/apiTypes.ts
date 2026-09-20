@@ -2,7 +2,15 @@ import type { ApprovalMode } from "./approvalMode";
 
 // Response shapes from the governed read API (see raiker/control/dashboard.py and
 // raiker/control/dtos.py). These mirror the backend DTOs; the backend remains the source of truth.
-// tests/test_api_contract_schemas.py guards the backend against dropping keys the UI reads.
+//
+// Two guards stand behind that, both in the Python CI job, so a backend-only change is checked
+// even though the web job does not run for one:
+//   - tests/test_api_contract_schemas.py asserts against live responses, so it covers the routes
+//     as well as the shapes — but its key sets are transcribed here by hand.
+//   - tests/test_api_contract_generated.py (GCR-42) derives the comparison instead: every
+//     interface below is paired with the backend `<Name>View` dataclass and every field declared
+//     required here must be one that DTO sends. It covers the shapes nobody transcribed.
+// A required field added here without its backend field fails the second one.
 
 /**
  * Whether a read capability can answer *now*, said separately from
@@ -1658,6 +1666,14 @@ export interface WorkThreadPage {
   total: number;
   projects: WorkThreadFacet[];
   kinds: WorkThreadFacet[];
+  /**
+   * BUG-303 — how many threads each archive scope holds. Both come back in
+   * either scope, so archiving a thread from Threads leaves somewhere visible
+   * to get it back from; a control whose effect cannot be undone on the surface
+   * that applied it is worse than one that has not moved.
+   */
+  archived_count: number;
+  active_count: number;
   /** True when the index considered its most recent rows rather than all of them. */
   scan_truncated: boolean;
 }
@@ -1683,6 +1699,16 @@ export interface WorkThread {
   next_run_at?: string | null;
   /** A blocker the runtime is actually holding, or null. Never a guess. */
   waiting_on?: string | null;
+  /**
+   * BUG-303 — the library state Sessions used to be the only reader of. A pin
+   * puts the thread first; archiving takes it out of the default scope without
+   * deleting anything; tags are organizing labels that grant nothing. All three
+   * are false/empty on a routine thread, which belongs to its task rather than
+   * to the owner's library.
+   */
+  pinned: boolean;
+  archived: boolean;
+  tags: string[];
 }
 
 export interface SessionSummary {

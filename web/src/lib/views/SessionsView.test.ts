@@ -73,32 +73,26 @@ describe("SessionsView organisation", () => {
     expect(rows[1].textContent).toContain("Second chat");
   });
 
-  it("pins a session by toggling the star and refreshes", async () => {
-    const fetchMock = stubFetch({
-      ...SESSIONS_ROUTE,
-      "PUT /api/sessions/sess_b/pin": { ok: true, session_id: "sess_b", pinned: true },
-    });
+  // BUG-303 — pin, rename, archive, move and the tag editor were here. They
+  // are how somebody organises the conversations they work in; this is the page
+  // whose job is audit. The tests that asserted them now live beside the
+  // controls, in SearchChatView.test.ts.
+  it("offers none of the conversation-library controls", async () => {
+    stubFetch(SESSIONS_ROUTE);
     render(SessionsView);
 
-    await waitFor(() => expect(screen.getByText("Pinned chat")).toBeInTheDocument());
-    // Pin lives in the row's session menu; the unpinned row offers "Pin".
+    await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
     const row = screen.getByText("Second chat").closest("tr")!;
-    await fireEvent.click(within(row as HTMLElement).getByRole("button", { name: /session actions/i }));
-    await fireEvent.click(within(row as HTMLElement).getByRole("menuitem", { name: /^pin$/i }));
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/sessions/sess_b/pin",
-        expect.objectContaining({ method: "PUT" }),
-      );
-    });
-    // The list is reloaded after the toggle.
-    await waitFor(() => {
-      const listCalls = fetchMock.mock.calls.filter(
-        (c) => String(c[0]) === "/api/sessions" && (c[1]?.method ?? "GET") === "GET",
-      );
-      expect(listCalls.length).toBeGreaterThan(1);
-    });
+    await fireEvent.click(
+      within(row as HTMLElement).getByRole("button", { name: /session actions/i }),
+    );
+    for (const gone of [/^pin$/i, /^rename$/i, /^archive$/i, /move to project/i]) {
+      expect(within(row as HTMLElement).queryByRole("menuitem", { name: gone })).toBeNull();
+    }
+    // Delete stays: it removes the audit record, which is this page's subject.
+    expect(within(row as HTMLElement).getByRole("menuitem", { name: /delete/i })).toBeVisible();
+    // And there is no tag editor anywhere on the page.
+    expect(document.querySelector('input[aria-label^="Add a tag to"]')).toBeNull();
   });
 
   it("deletes a single session after confirmation and refreshes", async () => {
@@ -175,61 +169,15 @@ describe("SessionsView organisation", () => {
     expect(screen.getAllByText("alpha").length).toBe(1);
   });
 
-  it("adds a tag by typing and clicking the add button, then refreshes", async () => {
-    const fetchMock = stubFetch({
-      ...SESSIONS_ROUTE,
-      "PUT /api/sessions/sess_a/tags": { ok: true, session_id: "sess_a", tags: ["beta"] },
-    });
-    render(SessionsView);
-
-    await waitFor(() => expect(screen.getByText("Pinned chat")).toBeInTheDocument());
-    // Target the add-tag input inside the "Pinned chat" row (sess_a), since
-    // that row has no chips yet.
-    const row = screen.getByText("Pinned chat").closest("tr")!;
-    const input = row.querySelector('input[aria-label^="Add a tag to"]') as HTMLInputElement;
-    await fireEvent.input(input, { target: { value: "beta" } });
-
-    const addBtn = row.querySelector('button[aria-label^="Add tag to"]') as HTMLButtonElement;
-    await fireEvent.click(addBtn);
-
-    await waitFor(() => {
-      const putCall = fetchMock.mock.calls.find(
-        (c) => String(c[0]) === "/api/sessions/sess_a/tags" && c[1]?.method === "PUT",
-      );
-      expect(putCall).toBeDefined();
-      const body = JSON.parse(String(putCall![1]!.body));
-      expect(body.tags).toEqual(["beta"]);
-    });
-    // The list is reloaded after the toggle.
-    await waitFor(() => {
-      const listCalls = fetchMock.mock.calls.filter(
-        (c) => String(c[0]) === "/api/sessions" && (c[1]?.method ?? "GET") === "GET",
-      );
-      expect(listCalls.length).toBeGreaterThan(1);
-    });
-  });
-
-  it("removes a tag by clicking the chip × button", async () => {
-    const fetchMock = stubFetch({
-      ...SESSIONS_ROUTE,
-      "PUT /api/sessions/sess_b/tags": { ok: true, session_id: "sess_b", tags: [] },
-    });
+  it("renders a tag as a label rather than as something to edit", async () => {
+    // BUG-303 — reading a tag is finding a record, which is this page's job.
+    // Applying one is filing a conversation, which is not.
+    stubFetch(SESSIONS_ROUTE);
     render(SessionsView);
 
     await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
-    // sess_b carries ["alpha"]; the remove button is labelled "Remove tag alpha from Second chat".
-    const removeBtn = screen.getByRole("button", { name: /remove tag alpha from second chat/i });
-    await fireEvent.click(removeBtn);
-
-    await waitFor(() => {
-      const putCall = fetchMock.mock.calls.find(
-        (c) => String(c[0]) === "/api/sessions/sess_b/tags" && c[1]?.method === "PUT",
-      );
-      expect(putCall).toBeDefined();
-      const body = JSON.parse(String(putCall![1]!.body));
-      // The remove path sends the remaining tags (alpha filtered out → []).
-      expect(body.tags).toEqual([]);
-    });
+    expect(screen.getByText("alpha")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /remove tag alpha/i })).toBeNull();
   });
 
   it("filters the list down to sessions whose tags contain the query", async () => {
@@ -274,52 +222,7 @@ describe("SessionsView organisation", () => {
     await waitFor(() => expect(screen.getByText(/1 selected/i)).toBeInTheDocument());
   });
 
-  it("renames a session from the session menu", async () => {
-    const fetchMock = stubFetch({
-      ...SESSIONS_ROUTE,
-      "PUT /api/sessions/sess_b/rename": { ok: true, session_id: "sess_b", title: "Renamed chat" },
-    });
-    render(SessionsView);
-
-    await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
-    const row = screen.getByText("Second chat").closest("tr")!;
-    await fireEvent.click(within(row as HTMLElement).getByRole("button", { name: /session actions/i }));
-    await fireEvent.click(within(row as HTMLElement).getByRole("menuitem", { name: /rename/i }));
-    await fireEvent.input(within(row as HTMLElement).getByLabelText("Session title"), {
-      target: { value: "Renamed chat" },
-    });
-    await fireEvent.click(within(row as HTMLElement).getByRole("menuitem", { name: "Save name" }));
-
-    await waitFor(() => {
-      const call = fetchMock.mock.calls.find(
-        (c) => String(c[0]) === "/api/sessions/sess_b/rename" && c[1]?.method === "PUT",
-      );
-      expect(call).toBeDefined();
-      expect(JSON.parse(String(call![1]!.body))).toEqual({ title: "Renamed chat" });
-    });
-  });
-
-  it("archives a session from the session menu and refreshes", async () => {
-    const fetchMock = stubFetch({
-      ...SESSIONS_ROUTE,
-      "PUT /api/sessions/sess_b/archive": { ok: true, session_id: "sess_b", archived: true },
-    });
-    render(SessionsView);
-
-    await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
-    const row = screen.getByText("Second chat").closest("tr")!;
-    await fireEvent.click(within(row as HTMLElement).getByRole("button", { name: /session actions/i }));
-    await fireEvent.click(within(row as HTMLElement).getByRole("menuitem", { name: /^archive$/i }));
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/sessions/sess_b/archive",
-        expect.objectContaining({ method: "PUT" }),
-      );
-    });
-  });
-
-  it("shows archived sessions on demand and unarchives from the menu", async () => {
+  it("can still read an archived session's record, and cannot file it", async () => {
     const archivedRow = {
       session_id: "sess_c",
       title: "Archived chat",
@@ -333,10 +236,7 @@ describe("SessionsView organisation", () => {
       archived: true,
       archived_at: "2026-07-09T00:00:00Z",
     };
-    const fetchMock = stubFetch({
-      ...SESSIONS_ROUTE,
-      "PUT /api/sessions/sess_c/unarchive": { ok: true, session_id: "sess_c", archived: false },
-    });
+    const fetchMock = stubFetch(SESSIONS_ROUTE);
     // The include_archived read returns the archived session too.
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -350,9 +250,6 @@ describe("SessionsView organisation", () => {
       if (method === "GET" && url.startsWith("/api/projects")) {
         return { ok: true, status: 200, json: async () => SESSIONS_ROUTE["GET /api/projects"] } as Response;
       }
-      if (method === "PUT" && url === "/api/sessions/sess_c/unarchive") {
-        return { ok: true, status: 200, json: async () => ({ ok: true, session_id: "sess_c", archived: false }) } as Response;
-      }
       return { ok: false, status: 404, json: async () => ({ detail: {} }) } as Response;
     });
     render(SessionsView);
@@ -363,16 +260,17 @@ describe("SessionsView organisation", () => {
     await fireEvent.click(screen.getByLabelText("Show archived sessions"));
     await waitFor(() => expect(screen.getByText("Archived chat")).toBeInTheDocument());
 
+    // BUG-303 — an archived conversation still has evidence to read, so the
+    // inspector still reaches it. Restoring it is done on Threads, where
+    // archiving it was.
     const row = screen.getByText("Archived chat").closest("tr")!;
-    await fireEvent.click(within(row as HTMLElement).getByRole("button", { name: /session actions/i }));
-    await fireEvent.click(within(row as HTMLElement).getByRole("menuitem", { name: /unarchive/i }));
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/sessions/sess_c/unarchive",
-        expect.objectContaining({ method: "PUT" }),
-      );
-    });
+    await fireEvent.click(
+      within(row as HTMLElement).getByRole("button", { name: /session actions/i }),
+    );
+    expect(within(row as HTMLElement).queryByRole("menuitem", { name: /unarchive/i })).toBeNull();
+    expect(
+      within(row as HTMLElement).getByRole("menuitem", { name: /organise in threads/i }),
+    ).toHaveAttribute("href", "#/search-chat");
   });
 
   // REM-SESSIONS — the row used to carry an "Open" link straight into Chat,

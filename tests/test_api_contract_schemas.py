@@ -2,6 +2,12 @@
 exist in the corresponding backend response. The check is directional — the backend may include
 extra fields (e.g. schema_version) — but it must never drop a key the UI depends on. If this fails,
 the frontend interface and the backend DTO have drifted and must be reconciled.
+
+This asserts against **live responses**, which is what it is for: it covers the routes as well as
+the shapes. Its key sets are transcribed from the TypeScript by hand, so it only guards the fields
+somebody remembered to transcribe. ``test_api_contract_generated.py`` (GCR-42) is the other half —
+it derives the same comparison from ``apiTypes.ts`` and the DTOs themselves, and so covers the
+shapes this file never listed.
 """
 
 from __future__ import annotations

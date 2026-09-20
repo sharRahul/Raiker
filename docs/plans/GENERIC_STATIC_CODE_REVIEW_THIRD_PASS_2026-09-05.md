@@ -80,22 +80,22 @@ The third theme is **durability mismatch**: a number of operations are represent
 | GCR-29 | Medium | P2 | Managed llama.cpp custom-port launch can report the wrong endpoint — **Closed 2026-09-06 ([FIXED-439](FIXED_ITEMS.md#fixed-439--a-runtime-on-a-custom-port-reported-the-slots-declared-one))** |
 | GCR-30 | Medium | P1/P2 | Provider `health()` can raise quota/workspace exceptions instead of returning `ProviderHealth` — **Closed 2026-09-05 ([FIXED-425](FIXED_ITEMS.md#fixed-425--a-method-whose-contract-was-to-return-health-raised-instead))** |
 | GCR-31 | Medium/High | P1 | Anthropic budgeted-thinking clamp can produce an invalid budget equal to or larger than available output capacity — **Closed 2026-09-05 ([FIXED-426](FIXED_ITEMS.md#fixed-426--a-thinking-budget-that-left-the-answer-nothing))** |
-| GCR-32 | Medium | P2 | Anthropic thinking-shape negotiation cache is process-global and keyed only by model name |
+| GCR-32 | Medium | P2 | Anthropic thinking-shape negotiation cache is process-global and keyed only by model name — **Closed 2026-09-20 ([FIXED-570](FIXED_ITEMS.md#fixed-570--one-endpoints-refusal-rewrote-every-other-endpoints-request))** |
 | GCR-33 | Medium/High | P1 | Concurrent OAuth refresh can race when providers rotate refresh tokens — **Closed 2026-09-06 ([FIXED-440](FIXED_ITEMS.md#fixed-440--two-expired-calls-presented-the-same-refresh-token-and-one-was-already-retired))** |
-| GCR-34 | Medium | P2 | Connector response truncation occurs before JSON parsing and silently changes a large JSON result into a string |
-| GCR-35 | Medium | P2 | Conversation-history budget can discard all history when the newest exchange alone exceeds the budget |
-| GCR-36 | Medium | P2 | Conversation-history read failures silently become an empty conversation context |
-| GCR-37 | Medium | P2 | SQLite connection cache uses recyclable numeric thread IDs as connection ownership identity |
+| GCR-34 | Medium | P2 | Connector response truncation occurs before JSON parsing and silently changes a large JSON result into a string — **Closed 2026-09-20 ([FIXED-569](FIXED_ITEMS.md#fixed-569--a-large-json-answer-from-a-connector-became-a-short-string))** |
+| GCR-35 | Medium | P2 | Conversation-history budget can discard all history when the newest exchange alone exceeds the budget — **Closed 2026-09-20 ([FIXED-567](FIXED_ITEMS.md#fixed-567--a-follow-up-to-a-long-answer-arrived-with-no-conversation-at-all))** |
+| GCR-36 | Medium | P2 | Conversation-history read failures silently become an empty conversation context — **Closed 2026-09-20 ([FIXED-568](FIXED_ITEMS.md#fixed-568--a-transcript-that-could-not-be-read-looked-exactly-like-one-that-was-empty))** |
+| GCR-37 | Medium | P2 | SQLite connection cache uses recyclable numeric thread IDs as connection ownership identity — **Closed 2026-09-20 ([FIXED-571](FIXED_ITEMS.md#fixed-571--a-new-worker-could-adopt-an-exited-workers-database-connection))** |
 | GCR-38 | Medium/High | P1 | Scheduler top-level work passes suppress unexpected exceptions without recording worker health — **Closed 2026-09-05 ([FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence))** |
 | GCR-39 | Medium/High | P1 | One unexpected scheduled-task exception aborts the remainder of the claimed scheduler batch — **Closed 2026-09-05 ([FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence))** |
 | GCR-40 | High | P1 | Event JSONL append and database index update are not atomic; integrity verification is blind to unindexed orphan lines — **Closed 2026-09-06 ([FIXED-441](FIXED_ITEMS.md#fixed-441--an-event-the-index-never-heard-of-was-invisible-to-the-check-for-exactly-that))** |
-| GCR-41 | Medium/High | P1/P2 | Release artifact reproducibility is undermined by unpinned dependency resolution and mutable external build-tool downloads |
-| GCR-42 | Medium | P2 | Frontend API types are manually duplicated from backend DTOs instead of generated from the source contract |
+| GCR-41 | Medium/High | P1/P2 | Release artifact reproducibility is undermined by unpinned dependency resolution and mutable external build-tool downloads — **Reduced 2026-09-20 ([FIXED-574](FIXED_ITEMS.md#fixed-574--two-builds-of-one-commit-could-contain-different-build-tool-bytes))**: the build tool is pinned by version + SHA-256 and the resolved inputs travel in the artifact's provenance; the hash-locked dependency set remains |
+| GCR-42 | Medium | P2 | Frontend API types are manually duplicated from backend DTOs instead of generated from the source contract — **Closed 2026-09-20 ([FIXED-575](FIXED_ITEMS.md#fixed-575--the-guard-against-contract-drift-was-a-second-hand-written-copy-of-the-contract))** |
 | GCR-43 | Medium | P2 | `raiker/control/dashboard.py` is a ~400 KB multi-domain integration/god module |
-| GCR-44 | Medium | P2 | API redaction buffering also copies large binary attachment preview/download responses |
+| GCR-44 | Medium | P2 | API redaction buffering also copies large binary attachment preview/download responses — **Closed 2026-09-20 ([FIXED-572](FIXED_ITEMS.md#fixed-572--every-pdf-and-every-attachment-was-copied-through-a-json-redactor))** |
 | GCR-45 | Medium | P2 | Model-profile configuration resolution depends on process current working directory before packaged resources — **Closed 2026-09-06 ([FIXED-436](FIXED_ITEMS.md#fixed-436--the-registry-raiker-loaded-depended-on-the-folder-it-was-started-from))** |
 | GCR-46 | Medium | P2 | Configured-model storage failures are silently treated as “no configured model,” changing fallback/readiness behavior — **Closed 2026-09-06 ([FIXED-433](FIXED_ITEMS.md#fixed-433--a-database-raiker-could-not-read-was-reported-as-a-model-the-owner-never-chose))** |
-| GCR-47 | Medium | P2 | Attached-root watcher can suppress cycle-level failures without updating any project health state |
+| GCR-47 | Medium | P2 | Attached-root watcher can suppress cycle-level failures without updating any project health state — **Closed 2026-09-20 ([FIXED-573](FIXED_ITEMS.md#fixed-573--a-watcher-failing-every-fifteen-seconds-said-every-folder-was-fresh))** |
 
 ---
 
@@ -405,6 +405,8 @@ The comment says the thinking budget must leave room for the answer. But if `lim
 
 **Severity: Medium — Priority: P2 — Confidence: High**
 
+**Status: Closed 2026-09-20 — [FIXED-570](FIXED_ITEMS.md#fixed-570--one-endpoints-refusal-rewrote-every-other-endpoints-request).** The fix is the one proposed: the key is profile + provider + normalised endpoint + API revision + model, and the cache is bounded and least-recently-used.
+
 The negotiation result is stored in module-global:
 
 ```python
@@ -437,6 +439,8 @@ For providers that rotate refresh tokens, two simultaneous requests can both use
 
 **Severity: Medium — Priority: P2 — Confidence: High**
 
+**Status: Closed 2026-09-20 — [FIXED-569](FIXED_ITEMS.md#fixed-569--a-large-json-answer-from-a-connector-became-a-short-string).** The fix is the one proposed: an explicit response-size contract, a typed `response_too_large` result carrying the size and a bounded preview, and a streamed read that stops at the cap rather than buffering a body it is about to refuse.
+
 Both async and sync connector invocation paths do:
 
 ```python
@@ -457,6 +461,8 @@ A perfectly valid JSON response larger than 200 KB is cut in the middle, fails J
 
 **Severity: Medium — Priority: P2 — Confidence: High**
 
+**Status: Closed 2026-09-20 — [FIXED-567](FIXED_ITEMS.md#fixed-567--a-follow-up-to-a-long-answer-arrived-with-no-conversation-at-all).** Of the two semantics this entry offered, the first: an oversized newest exchange is truncated to fit, head and tail, saying how much it removed — because skipping it and continuing would leave a gap in the middle of a transcript whose budget rule is oldest-first. The same defect in `compacted_conversation_messages` closed with it.
+
 `conversation_messages()` walks exchanges newest-to-oldest and does:
 
 ```python
@@ -474,6 +480,8 @@ If the single newest completed exchange exceeds the entire history budget, `kept
 
 **Severity: Medium — Priority: P2 — Confidence: High**
 
+**Status: Closed 2026-09-20 — [FIXED-568](FIXED_ITEMS.md#fixed-568--a-transcript-that-could-not-be-read-looked-exactly-like-one-that-was-empty).** Both readers raise a named condition instead of returning `[]`; the turn still runs, the audit log records `conversation_history_unavailable`, and the model is told the earlier exchanges are missing rather than left to answer as though this were a first turn.
+
 `conversation_messages()` catches every exception from `store.list_turns(...)` and returns `[]` with no diagnostic/event.
 
 That keeps a provider call alive, but it changes semantic behavior: a database/read problem becomes “there was no prior conversation.” The model can then answer a follow-up without the conversation context while neither operator nor user is told why.
@@ -485,6 +493,8 @@ That keeps a provider call alive, but it changes semantic behavior: a database/r
 ## GCR-37 — SQLite cached connection ownership relies on recyclable thread IDs
 
 **Severity: Medium — Priority: P2 — Confidence: Medium/High**
+
+**Status: Closed 2026-09-20 — [FIXED-571](FIXED_ITEMS.md#fixed-571--a-new-worker-could-adopt-an-exited-workers-database-connection).** Confidence was Medium/High; it reproduces on the first try. Six short-lived sequential threads on CPython all receive one identifier, and on unmodified `main` they shared one connection. Ownership is now a minted, thread-local, non-recyclable token, with a weak `Thread` reference answering liveness for eviction.
 
 The SQLCipher connection cache key is:
 
@@ -567,6 +577,8 @@ Fault-injection tests should fail immediately after file flush and immediately b
 
 **Severity: Medium/High — Priority: P1/P2 — Confidence: High**
 
+**Status: Reduced 2026-09-20 — [FIXED-574](FIXED_ITEMS.md#fixed-574--two-builds-of-one-commit-could-contain-different-build-tool-bytes).** Two of the three bullets below are done: `appimagetool` is pinned by immutable version tag and SHA-256 in `raiker/config/build-tools.json` and checked on download, and the resolved dependency and tool manifests travel in the artifact's own provenance. **What remains** is the first bullet — a hash-locked constraints set per target, used by `pip wheel` at release time — which is a lockfile pipeline rather than a change to the release job.
+
 The release code carefully normalizes archive timestamps and uses `SOURCE_DATE_EPOCH`, but the build inputs are not fully reproducible:
 
 - Python runtime/dev dependencies are broad version ranges rather than a hash-locked release constraints set.
@@ -582,6 +594,8 @@ Two builds of the same source commit at different dates can therefore contain di
 ## GCR-42 — Frontend contracts are manually mirrored instead of generated
 
 **Severity: Medium — Priority: P2 — Confidence: High**
+
+**Status: Closed 2026-09-20 — [FIXED-575](FIXED_ITEMS.md#fixed-575--the-guard-against-contract-drift-was-a-second-hand-written-copy-of-the-contract).** Not by generating the TypeScript — that would replace one hand-maintained artefact with a generated one whose prose and hand-shaped client types are load-bearing — but by making the *diff* a derived backend CI gate, which is the half this entry says is missing. `scripts/check_api_contract.py` pairs each interface with its `<Name>View` DTO and fails on a required field the backend does not send, which also answers GCR-15: it runs in the Python job, so a backend-only change is checked.
 
 `apps/web/src/lib/apiTypes.ts` is roughly 94 KB and explicitly states that the interfaces “mirror the backend DTOs; the backend remains the source of truth.” `apps/web/src/lib/api.ts` is also roughly 95 KB.
 
@@ -608,6 +622,8 @@ This complements GCR-11 (`sqlite.py`, approximately 568 KB): storage and dashboa
 ## GCR-44 — Redaction middleware duplicates large binary response bodies
 
 **Severity: Medium — Priority: P2 — Confidence: High**
+
+**Status: Closed 2026-09-20 — [FIXED-572](FIXED_ITEMS.md#fixed-572--every-pdf-and-every-attachment-was-copied-through-a-json-redactor).** The fix is the one proposed: redaction is content-type aware, a non-JSON response streams through untouched, and JSON is buffered and redacted exactly as before. A response that declares no content type is still buffered, because unknown is not a licence to skip the redactor.
 
 GCR-13 identified that `RedactionMiddleware` buffers almost every `/api` response. The deeper pass found that this includes binary attachment preview/download routes because only a small fixed set of API paths are exempted.
 
@@ -652,6 +668,8 @@ For placeholder profiles, `None` means the profile can disappear from fallback r
 ## GCR-47 — Attached-root watcher can lose cycle-level failure observability
 
 **Severity: Medium — Priority: P2 — Confidence: High**
+
+**Status: Closed 2026-09-20 — [FIXED-573](FIXED_ITEMS.md#fixed-573--a-watcher-failing-every-fifteen-seconds-said-every-folder-was-fresh).** Watcher health is recorded as a background worker pass under `attached_root_watch`, so it appears in Diagnostics beside the host tick's passes rather than on a surface of its own; failures back off, capped; and no project claims to be watched while the loop is failing.
 
 `AttachedRootWatcher.run()` wraps each `_cycle(stop)` in `with suppress(Exception)`. Project-specific `_reconcile()` failures are recorded in `WatchState`, which is good. But exceptions that occur before a project-specific reconcile can record failure — for example while enumerating indexed roots or setting up the cycle — are swallowed at the outer level with no watcher-wide degraded state.
 

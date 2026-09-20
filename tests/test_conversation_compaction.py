@@ -26,6 +26,7 @@ from raiker.runtime.conversation_compaction import (
     estimate_message_tokens,
     protected_context,
 )
+from raiker.runtime.conversation_history import ConversationHistoryUnavailable
 from raiker.runtime.model_facts_store import ModelFactsStore
 from raiker.runtime.orchestrator import RuntimeOrchestrator
 from raiker.storage.sqlite import SQLiteStore
@@ -144,6 +145,55 @@ def test_compacted_replay_still_bounds_new_history(store: SQLiteStore) -> None:
     assert [message.content[:2] for message in messages[1:]] == ["u3", "a3"]
 
 
+def test_an_oversized_exchange_after_the_boundary_is_elided_not_dropped(
+    store: SQLiteStore,
+) -> None:
+    """GCR-35 in the compacted branch: the same break, the same consequence.
+
+    Replaying the summary with no live exchanges after it is worse than
+    replaying a shortened one — the model is told the conversation was
+    summarised and then shown nothing of what followed.
+    """
+    _turn(store, 0, chars=40)
+    _turn(store, 1, chars=4000)
+    record = ContextCompactionRecord(
+        "compact_ok", "p1", "s1", "turn_0", "Earlier summary", "", 1, 100, 5,
+        "ollama", "local", "completed", None, "2026-08-11T12:00:00Z",
+    )
+    messages = compacted_conversation_messages(store, "s1", record, char_budget=500)
+    assert [message.role for message in messages] == ["system", "user", "assistant"]
+    assert messages[1].content.startswith("u1")
+    assert sum(len(m.content) for m in messages[1:]) <= 500
+    assert "elided" in messages[1].content
+
+
+def test_an_unreadable_transcript_is_named_rather_than_replayed_as_empty(
+    store: SQLiteStore,
+) -> None:
+    """GCR-36 — a store that raises must not look like a fresh conversation."""
+
+    class _BrokenStore:
+        def list_turns(self, session_id: str, limit: int = 500) -> list[dict[str, object]]:
+            raise OSError("disk I/O error")
+
+    record = ContextCompactionRecord(
+        "compact_ok", "p1", "s1", "turn_0", "Earlier summary", "", 1, 100, 5,
+        "ollama", "local", "completed", None, "2026-08-11T12:00:00Z",
+    )
+    with pytest.raises(ConversationHistoryUnavailable):
+        compacted_conversation_messages(_BrokenStore(), "s1", record)
+    with pytest.raises(ConversationHistoryUnavailable):
+        ContextBudgetPlanner().plan(
+            store=_BrokenStore(),
+            owner_principal_id="p1",
+            session_id="s1",
+            capacity_tokens=1000,
+            fixed_messages=(),
+            current_prompt="hello",
+            latest_compaction=None,
+        )
+
+
 def test_protected_context_serializes_ids_not_source_content(store: SQLiteStore) -> None:
     store.save_agent_plan(
         session_id="s1",
@@ -245,3 +295,59 @@ def test_runtime_compacts_as_a_separate_tool_free_accounted_request(
     assert latest_view.latest_compaction is not None
     assert latest_view.latest_compaction["status"] == "completed"
     assert latest_view.latest_compaction["source_turn_count"] == 2
+
+
+def test_an_unreadable_transcript_tells_the_model_rather_than_answering_as_a_first_turn(
+    store: SQLiteStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """GCR-36's owner-visible half.
+
+    The turn still runs — a storage fault is not a reason to refuse an owner an
+    answer — but the model is told the earlier exchanges are missing, and the
+    audit log records that the substitution happened.
+    """
+    _turn(store, 0, chars=40)
+
+    def _broken(self: SQLiteStore, session_id: str, limit: int = 50) -> list[dict[str, object]]:
+        raise OSError("disk I/O error")
+
+    monkeypatch.setattr(SQLiteStore, "list_turns", _broken)
+    writer = EventLogWriter(store)
+    router = _RecordingCompactionRouter()
+    broker = ToolBroker(
+        workspace_root=tmp_path,
+        policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)),
+        store=store,
+        writer=writer,
+        principal_id="p1",
+    )
+    runtime = RuntimeOrchestrator(
+        workspace_root=tmp_path,
+        writer=writer,
+        tool_broker=broker,
+        model_router=router,  # type: ignore[arg-type]
+        default_provider=("test-provider", "test-model"),
+    )
+    envelope = PromptEnvelope(
+        request_id="req_unreadable",
+        session_id="s1",
+        turn_id="turn_current",
+        client=ClientMetadata("test_harness", "tests", "1"),
+        user=UserMetadata("p1"),
+        prompt=PromptPayload("What did we decide?"),
+        options=PromptOptions(),
+    )
+
+    asyncio.run(runtime.ahandle(envelope))
+
+    sent = router.calls[-1][0]
+    assert any("could not be read from storage" in message.content for message in sent)
+    assert any("first message" in message.content for message in sent)
+    events = [
+        line
+        for path in store.paths.events_dir.rglob("*.jsonl")
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if "conversation_history_unavailable" in line
+    ]
+    assert events, "the substitution has to be readable in the audit log"
+    assert "conversation_history_unreadable:OSError" in events[0]

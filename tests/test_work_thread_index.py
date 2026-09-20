@@ -251,3 +251,116 @@ class TestTheUnfilteredListingIsUnchanged:
     def test_another_account_sees_none_of_it(self, service: DashboardService) -> None:
         _chat(service, "private", when="2026-09-13T10:00:00Z")
         assert service.work_thread_page(user_id="user_someone_else").total == 0
+
+
+class TestTheLibraryTheIndexHadToGrowToHold:
+    """BUG-303 — pin, archive and tags had to reach the index before the
+    controls could leave Sessions.
+
+    Sessions is the evidence inspector, and it was the only page that could
+    organise a conversation: rename, move, pin, archive, tags. Threads — the
+    page work is actually resumed from — could not express any of it, because
+    `GET /api/work-threads/page` had no pin, no archive scope and no tags. This
+    is that state arriving.
+    """
+
+    def test_a_pinned_thread_comes_first_whatever_its_timestamp(
+        self, service: DashboardService
+    ) -> None:
+        _chat(service, "newest", when="2026-09-18T12:00:00Z")
+        old = _chat(service, "the one I keep", when="2026-01-01T00:00:00Z")
+        service.store.set_session_pinned(old, True)
+
+        page = service.work_thread_page(user_id=OWNER)
+
+        assert [thread.title for thread in page.threads] == ["the one I keep", "newest"]
+        assert page.threads[0].pinned is True
+        assert page.threads[1].pinned is False
+
+    def test_the_archived_scope_is_a_scope_and_not_a_filter(
+        self, service: DashboardService
+    ) -> None:
+        _chat(service, "still going", when="2026-09-18T12:00:00Z")
+        filed = _chat(service, "filed away", when="2026-09-17T12:00:00Z")
+        service.store.set_session_archived(filed, True)
+
+        active = service.work_thread_page(user_id=OWNER)
+        archived = service.work_thread_page(user_id=OWNER, archived=True)
+
+        assert [thread.title for thread in active.threads] == ["still going"]
+        assert [thread.title for thread in archived.threads] == ["filed away"]
+        assert archived.threads[0].archived is True
+        # Both counts come back in either scope, which is what makes archiving
+        # from Threads undoable from Threads.
+        for page in (active, archived):
+            assert page.active_count == 1
+            assert page.archived_count == 1
+
+    def test_a_cursor_from_one_archive_scope_is_refused_in_the_other(
+        self, service: DashboardService
+    ) -> None:
+        for index in range(4):
+            _chat(service, f"active {index}", when=f"2026-09-18T10:{index:02d}:00Z")
+        for index in range(4):
+            filed = _chat(service, f"filed {index}", when=f"2026-09-17T10:{index:02d}:00Z")
+            service.store.set_session_archived(filed, True)
+
+        first = service.work_thread_page(user_id=OWNER, limit=2)
+        assert first.next_cursor is not None
+
+        # A cursor is a position in one ordered answer; the archived scope is a
+        # different question, so the listing restarts rather than paging into it.
+        crossed = service.work_thread_page(user_id=OWNER, limit=2, archived=True, cursor=first.next_cursor)
+        assert [thread.title for thread in crossed.threads] == ["filed 3", "filed 2"]
+
+    def test_a_threads_tags_travel_with_it(self, service: DashboardService) -> None:
+        tagged = _chat(service, "with labels", when="2026-09-18T12:00:00Z")
+        _chat(service, "without", when="2026-09-18T11:00:00Z")
+        service.store.set_session_tags(tagged, ["alpha", "beta"])
+
+        page = service.work_thread_page(user_id=OWNER)
+        by_title = {thread.title: thread for thread in page.threads}
+
+        assert by_title["with labels"].tags == ("alpha", "beta")
+        assert by_title["without"].tags == ()
+        # And they serialise as a list, because the browser reads JSON.
+        assert by_title["with labels"].to_dict()["tags"] == ["alpha", "beta"]
+
+    def test_a_routine_thread_carries_no_library_state(
+        self, service: DashboardService
+    ) -> None:
+        """It belongs to its task, not to the owner's library."""
+        task = service.create_task(
+            title="Overnight research",
+            objective="Read the news",
+            user_id=OWNER,
+            principal_id="principal_owner",
+            recurrence="daily",
+            start_immediately=False,
+        )
+        assert task.thread_session_id
+        service.store.insert_turn(task.thread_session_id, "turn_r", "cycle one")
+        service.store.complete_turn("turn_r", "completed", "found nothing")
+
+        page = service.work_thread_page(user_id=OWNER)
+        routine = next(thread for thread in page.threads if thread.kind == "routine")
+
+        assert routine.pinned is False
+        assert routine.archived is False
+        assert routine.tags == ()
+
+    def test_tags_for_a_whole_page_are_read_in_one_query(
+        self, service: DashboardService
+    ) -> None:
+        """A tag editor on every row must not cost a round trip per row."""
+        ids = [
+            _chat(service, f"thread {index}", when=f"2026-09-18T10:{index:02d}:00Z")
+            for index in range(5)
+        ]
+        for session_id in ids:
+            service.store.set_session_tags(session_id, ["shared"])
+
+        grouped = service.store.list_session_tags_by_session(ids)
+
+        assert grouped == {session_id: ["shared"] for session_id in ids}
+        assert service.store.list_session_tags_by_session([]) == {}

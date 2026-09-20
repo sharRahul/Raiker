@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-20 | Targeted | `2026-09-20-round/` | Anthropic (`claude-haiku-4-5-20251001`), the key entered through the Connect dialog | Four scenarios on a workspace reset for the round, covering the nine items this run closed: a follow-up after a very long exchange answered *from* it, the conversation library organising a thread on the board it is resumed from (pin, rename, tag, archive and restore), the evidence inspector left with Delete and a line saying where the rest went, and the attached-root watcher named among Diagnostics' background passes. **One Medium defect found by the work and fixed in it** — the session row's menu was clipped by the card it opened inside, so **Delete** could not be clicked |
 | 2026-09-18 | Targeted | `2026-09-18-round/` | Anthropic (`claude-haiku-4-5-20251001`), the key entered through the Connect dialog | Ten scenarios on a workspace reset for the round: the guide's own cross-references opening a chapter in place, four closing events describing four different things, a thread resuming on the surface it was done on, the evidence inspector with one routed way back, one memory record drawer, an exception-led Observability overview, an extensions inventory, one Add-skill entry, a non-animated live board and four security lifecycles. **Three defects found by the work and fixed in it** — every chat thread reported "0 turns", the Extensions lead undercounted by three of the five kinds, and two settings pages each drew their own copy of the page's guide link |
 | 2026-09-16 | Targeted | `docs/screenshots/` (five captures, no prefix) | Anthropic (`claude-haiku-4-5-20251001`), the key entered through the Connect dialog | Five scenarios on a workspace reset for the round: a declared table surviving an export, a reopened turn in the evidence inspector, a Knowledge Map that says it is empty instead of drawing three records nobody made, the same records as a list with the canvas stopped, and Build opening the guide chapter the product had been shipping and could not reach. **The first attempt found a High-severity runtime defect** — a turn that wrote anything before calling a tool stored a different answer than it showed — which is why the round had nothing to export until it was fixed |
 | 2026-09-15 (second) | Targeted | `docs/screenshots/` (seven captures, no prefix) | Anthropic (`claude-haiku-4-5-20251001`), the same key entered through the Connect dialog | Eight scenarios on a workspace reset for the round: the two authority columns a permission could not answer before, a fresh account's capability baseline and the Build preset, a **real model answering with a declared table and chart**, four presentation rows, and `policy_mutation` proved absent. One product defect found by the work and fixed in it — the Permissions posture note still said every capability starts off — and one model behaviour that changed the system prompt rather than the test |
@@ -72,6 +73,66 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-09-20 — Nine static-review items, and the menu that could not be clicked
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py`.
+Provider: Anthropic `claude-haiku-4-5-20251001`, the key entered through the
+Connect dialog and never written to the repository. Captures:
+[`docs/screenshots/2026-09-20-round/`](../screenshots/2026-09-20-round).**
+
+Ten items from `docs/plans/`: nine P2 entries of the third-pass static review
+and [BUG-303](TO_BE_FIXED.md). Most of them are proved by unit tests, because
+most of them are conditions a test can *create* and a live round cannot — an
+unreadable transcript, a recycled thread identifier, a connector answering with
+300 KB of JSON. Four are not, and those are the four run here.
+
+**What it proved.**
+
+1. A conversation whose previous exchange is long — a long prompt and eight
+   paragraphs of answer — answers *"what reference number did I give you at the
+   start?"* with the reference number. The history reached the model.
+2. **Threads** organises a thread from the row it is resumed from: **Organise**
+   offers pin, rename and archive, the pin shows on the row and puts it first, a
+   tag typed on the row appears on it, archiving takes the thread off the board,
+   **Archived (n)** is where it is found, **Restore** brings it back and **Back
+   to active (n)** returns.
+3. The evidence inspector's row menu offers **Copy local link**, **Organise in
+   Threads** and **Delete**, and none of Rename, Move to project, Pin or
+   Unarchive. The tag applied on Threads reads there, and there is no field to
+   change it with.
+4. **Observe → Overview → Runtime health, in detail** lists
+   `Attached root watch` among its background passes, with the same badge and
+   the same "succeeded …" line as every other pass the host runs.
+
+**What it found, and it is fixed in this round.**
+
+* **Delete was off the bottom of the menu it lived in.** The session row's `•••`
+  menu is absolutely positioned inside the table, and the card holding that
+  table scrolls horizontally — `overflow-x: auto`, which the browser resolves to
+  `overflow-y: auto` as well. On a workspace with one conversation the menu
+  opened **131 pixels** below the bottom of the card and was cut off, so the
+  page's only destructive control could not be clicked. Not introduced by this
+  round's change; uncovered by photographing the menu after it, and worse before
+  it, when the menu held seven items rather than three. Closed as
+  [FIXED-577](FIXED_ITEMS.md#fixed-577--delete-was-off-the-bottom-of-the-menu-it-lived-in),
+  and reproduced by putting `position: absolute` back and watching the live
+  assertion report the element at Delete's centre as `MAIN`.
+
+**Two notes on the harness, neither of them a product defect.**
+
+* The first attempt at scenario 1 wrote its padding as *"remember this code
+  word, ignore the rest of this message"*, and the model declined — correctly —
+  as a prompt-injection pattern, explaining that it takes instructions from the
+  platform rather than from text embedded in a message, and offering the memory
+  tool instead. The scenario was rewritten to state its reference number plainly;
+  the refusal is the product behaving as designed.
+* `PLAYWRIGHT_CHROMIUM_EXECUTABLE` was needed on this host: the image ships
+  Chromium build 1194 and this `@playwright/test` wants 1234. The config has
+  supported the variable since it was written, and no spec was changed for it.
 
 ---
 

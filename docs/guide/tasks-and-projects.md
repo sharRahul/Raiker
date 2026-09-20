@@ -265,6 +265,6 @@ As of 2026-08-08, one edge remains here:
 
 Three limits this section used to list have shipped and are gone from it: a
 background-agent run now ends with a user-visible reason (**FIXED-13**), a
-task run no longer appears in the sidebar's **RECENT CHATS** — that list is
-conversations, and task sessions are in Observability → Sessions (**FIXED-15**) —
+task run no longer appears among the owner's own conversations — those are on
+**Threads**, and task sessions are in Observability → Sessions (**FIXED-15**) —
 and approving a task the agent proposed now creates it (**FIXED-106**).

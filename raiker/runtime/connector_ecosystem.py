@@ -20,6 +20,111 @@ from raiker.storage.sqlite import SQLiteStore
 
 _METHODS = frozenset({"get", "post", "put", "patch", "delete"})
 
+# ── The connector response-size contract (GCR-34) ────────────────────────────
+#
+# A connector answer is read into memory and handed to a model, so it needs a
+# bound. The bound used to be applied as a slice of the bytes *before* parsing:
+#
+#     raw = response.content[:200_000]
+#     try: result = json.loads(raw)
+#     except ...: result = raw.decode(...)[:20_000]
+#
+# which meant a perfectly valid JSON answer one byte over the cap was cut in the
+# middle of a token, failed to parse, and came back as a 20 000-character
+# string. Nothing told the caller the body had been truncated, and nothing told
+# it that a structured result had become an unstructured one — a model reading
+# that string cannot tell it apart from a connector that answers in plain text.
+#
+# The bound is now a stated contract rather than a silent slice. A body over the
+# cap is its own outcome, named, with the size that caused it; the stream is
+# stopped at the cap rather than buffered whole and then discarded.
+
+#: The most of one connector answer Raiker will hold and hand on.
+CONNECTOR_RESPONSE_MAX_BYTES = 200_000
+#: How much of a body that is text rather than JSON is carried as text, and how
+#: much of an over-cap body is kept as a preview so the owner can see what
+#: arrived.
+CONNECTOR_TEXT_MAX_CHARS = 20_000
+#: The stable code an over-cap answer carries in place of its value.
+CONNECTOR_RESPONSE_TOO_LARGE = "response_too_large"
+
+
+def _too_large_result(byte_count: int, content_type: str, head: bytes) -> dict[str, Any]:
+    """The typed stand-in for an answer that does not fit the contract.
+
+    A dict rather than a truncated string on purpose: the caller and the model
+    both need to be able to tell "this connector answered with more than Raiker
+    will carry" from "this connector answered with text".
+    """
+    return {
+        "truncated": True,
+        "reason_code": CONNECTOR_RESPONSE_TOO_LARGE,
+        "byte_count": byte_count,
+        "max_bytes": CONNECTOR_RESPONSE_MAX_BYTES,
+        "content_type": content_type,
+        "preview": head.decode("utf-8", errors="replace")[:CONNECTOR_TEXT_MAX_CHARS],
+    }
+
+
+def _decode_connector_body(body: bytes) -> Any:
+    """A complete body within the cap: parsed as JSON, or carried as text.
+
+    Reached only for a body that was *not* truncated, so a parse failure here
+    means the connector really did answer with something that is not JSON.
+    """
+    try:
+        return json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return body.decode("utf-8", errors="replace")[:CONNECTOR_TEXT_MAX_CHARS]
+
+
+def _keep(chunks: list[bytes], kept: int, chunk: bytes, total: int) -> int:
+    """Accumulate *chunk* while the contract still allows it. Returns bytes kept.
+
+    Under the cap the whole chunk is kept, because it is the answer. Over it
+    only enough for a preview is kept: the body is already known not to fit, and
+    buffering the rest of a body that will be reported as too large is the copy
+    this contract exists to avoid.
+    """
+    if total <= CONNECTOR_RESPONSE_MAX_BYTES:
+        chunks.append(chunk)
+        return kept + len(chunk)
+    if kept < CONNECTOR_TEXT_MAX_CHARS:
+        head = chunk[: CONNECTOR_TEXT_MAX_CHARS - kept]
+        chunks.append(head)
+        return kept + len(head)
+    return kept
+
+
+async def _aread_bounded(response: httpx.Response) -> tuple[bytes, int]:
+    """The body as far as the contract allows, and the size the peer really sent."""
+    chunks: list[bytes] = []
+    kept = 0
+    total = 0
+    async for chunk in response.aiter_bytes():
+        total += len(chunk)
+        kept = _keep(chunks, kept, chunk, total)
+    return b"".join(chunks), total
+
+
+def _read_bounded(response: httpx.Response) -> tuple[bytes, int]:
+    chunks: list[bytes] = []
+    kept = 0
+    total = 0
+    for chunk in response.iter_bytes():
+        total += len(chunk)
+        kept = _keep(chunks, kept, chunk, total)
+    return b"".join(chunks), total
+
+
+def _connector_result(response: httpx.Response, body: bytes, total: int) -> Any:
+    """One connector answer, honouring the response-size contract above."""
+    if total > CONNECTOR_RESPONSE_MAX_BYTES:
+        return _too_large_result(
+            total, str(response.headers.get("content-type") or ""), body
+        )
+    return _decode_connector_body(body)
+
 
 @dataclass(frozen=True)
 class ConnectorDefinition:
@@ -354,33 +459,39 @@ class ConnectorInvoker:
                     utc_now(),
                 ),
             )
+        data: Any = None
+        status_code = 0
         try:
-            async with httpx.AsyncClient(timeout=20.0, follow_redirects=False) as client:
-                response = await client.request(
+            # Streamed rather than buffered so the response-size contract is
+            # enforced while the body arrives, instead of after the whole of it
+            # is already in memory.
+            async with (
+                httpx.AsyncClient(timeout=20.0, follow_redirects=False) as client,
+                client.stream(
                     operation["method"],
                     url,
                     headers=headers,
                     json=body if body is not None else None,
-                )
+                ) as response,
+            ):
+                status_code = response.status_code
+                if status_code < 400:
+                    raw, byte_count = await _aread_bounded(response)
+                    data = _connector_result(response, raw, byte_count)
         except Exception:
             self._finish_invocation(invocation_id, "failed")
             raise
-        if response.status_code >= 400:
+        if status_code >= 400:
             self._finish_invocation(invocation_id, "failed")
-            raise ValueError(f"connector_upstream_error:{response.status_code}")
-        raw = response.content[:200_000]
-        try:
-            result: Any = json.loads(raw)
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            result = raw.decode("utf-8", errors="replace")[:20_000]
+            raise ValueError(f"connector_upstream_error:{status_code}")
         self._finish_invocation(invocation_id, "completed")
-        result = {
+        result: dict[str, Any] = {
             "invocation_id": invocation_id,
             "connector_id": connector_id,
             "operation_id": operation_id,
             "method": operation["method"],
-            "status_code": response.status_code,
-            "data": result,
+            "status_code": status_code,
+            "data": data,
         }
         compensation = operation.get("compensation")
         if isinstance(compensation, dict):
@@ -450,27 +561,32 @@ class ConnectorInvoker:
                    VALUES (?, ?, ?, ?, 'GET', 'processing', ?)""",
                 (invocation_id, principal_id, connector_id, operation_id, utc_now()),
             )
+        data: Any = None
+        status_code = 0
         try:
-            with httpx.Client(timeout=20.0, follow_redirects=False) as client:
-                response = client.get(url, headers=headers)
+            # The same response-size contract as the async path, enforced the
+            # same way: while the body arrives, not once it is all in memory.
+            with (
+                httpx.Client(timeout=20.0, follow_redirects=False) as client,
+                client.stream("GET", url, headers=headers) as response,
+            ):
+                status_code = response.status_code
+                if status_code < 400:
+                    raw, byte_count = _read_bounded(response)
+                    data = _connector_result(response, raw, byte_count)
         except Exception:
             self._finish_invocation(invocation_id, "failed")
             raise
-        if response.status_code >= 400:
+        if status_code >= 400:
             self._finish_invocation(invocation_id, "failed")
-            raise ValueError(f"connector_upstream_error:{response.status_code}")
-        raw = response.content[:200_000]
-        try:
-            data: Any = json.loads(raw)
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            data = raw.decode("utf-8", errors="replace")[:20_000]
+            raise ValueError(f"connector_upstream_error:{status_code}")
         self._finish_invocation(invocation_id, "completed")
         return {
             "invocation_id": invocation_id,
             "connector_id": connector_id,
             "operation_id": operation_id,
             "method": "GET",
-            "status_code": response.status_code,
+            "status_code": status_code,
             "data": data,
         }
 

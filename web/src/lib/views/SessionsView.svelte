@@ -7,7 +7,7 @@
   import PageState from "../components/PageState.svelte";
   import SessionMenu from "../components/SessionMenu.svelte";
   import { api, ApiError } from "../api";
-  import type { ProjectView, SessionDetail, SessionSummary, TurnDetail } from "../apiTypes";
+  import type { SessionDetail, SessionSummary, TurnDetail } from "../apiTypes";
   import { responseBadge } from "../statusMaps";
   import { humanize, relativeTime, shortId } from "../format";
   import { conversationLink, workModeRoute } from "../turnAnchor";
@@ -28,29 +28,19 @@
   let turnError = $state<string | null>(null);
   let openedRouteSessionId = $state<string | null | undefined>(undefined);
 
-  // Conversation organisation: multi-select for bulk delete, plus a per-row
-  // pin toggle. Pinned sessions surface first. These are organizing actions
-  // only — they grant nothing and change no authority.
+  // Multi-select, for the one destructive action this page still owns.
   let selected = $state<Set<string>>(new Set());
   let actionError = $state<string | null>(null);
   let deleting = $state(false);
 
-  // Conversation organisation remainder: per-session tags. Tags are organizing
-  // labels only — they grant nothing. The view renders chips, lets the user
-  // add/remove a tag inline, and filter the list by a tag substring.
-  let tagDraft = $state<Record<string, string>>({});
+  // BUG-303 — tags are *read* here and edited on Threads. Filtering by one is
+  // finding a record, which is this page's job; applying one is filing a
+  // conversation, which is not.
   let tagFilter = $state("");
 
-  // Archived sessions stay out of the default list; the toggle re-reads the
-  // owner-scoped list with include_archived. Archive is reversible and never
-  // deletes transcripts, events, checkpoints, or permissions.
+  // Likewise the archived scope: an archived conversation still has evidence to
+  // read, so the inspector can still reach it. Archiving is done on Threads.
   let showArchived = $state(false);
-
-  // Project context (backlog item 1): a chat can be moved into a project or out
-  // of every project. The project is an organizing scope — the move grants
-  // nothing; it only changes the bounded context (instructions, shared
-  // attachments, opt-in project memory) the chat receives on its next turn.
-  let projects = $state<ProjectView[]>([]);
 
   // Pinned sessions first, then most-recently-updated. The sort is display-only
   // — the backend list order is unchanged. A non-empty tag filter further
@@ -106,86 +96,10 @@
     if (kept.length !== selected.size) selected = new Set(kept);
   });
 
-  async function togglePin(s: SessionSummary) {
-    actionError = null;
-    try {
-      await api.setSessionPinned(s.session_id, !s.pinned);
-      await load();
-    } catch (e) {
-      actionError =
-        e instanceof ApiError ? `Could not update pin (${e.status}).` : "Could not update pin.";
-    }
-  }
-
-  async function renameSession(s: SessionSummary, title: string) {
-    const next = title.trim();
-    if (next === "" || next === s.title) return;
-    actionError = null;
-    try {
-      await api.renameSession(s.session_id, next);
-      await load();
-    } catch (e) {
-      actionError =
-        e instanceof ApiError ? `Could not rename (${e.status}).` : "Could not rename.";
-    }
-  }
-
-  async function toggleArchived(s: SessionSummary) {
-    actionError = null;
-    try {
-      if (s.archived) await api.unarchiveSession(s.session_id);
-      else await api.archiveSession(s.session_id);
-      await load();
-    } catch (e) {
-      actionError =
-        e instanceof ApiError ? `Could not update archive state (${e.status}).` : "Could not update archive state.";
-    }
-  }
-
-  // Add or remove a single tag by replacing the session's full tag set. The
-  // server normalizes and dedupes, so we send the desired next set and let
-  // the backend be the source of truth.
-  async function addTag(s: SessionSummary) {
-    const draft = (tagDraft[s.session_id] ?? "").trim();
-    if (draft === "") return;
-    actionError = null;
-    const next = [...s.tags, draft];
-    try {
-      await api.setSessionTags(s.session_id, next);
-      tagDraft[s.session_id] = "";
-      await load();
-    } catch (e) {
-      actionError =
-        e instanceof ApiError ? `Could not add tag (${e.status}).` : "Could not add tag.";
-    }
-  }
-
-  async function removeTag(s: SessionSummary, tag: string) {
-    actionError = null;
-    const next = s.tags.filter((t) => t !== tag);
-    try {
-      await api.setSessionTags(s.session_id, next);
-      await load();
-    } catch (e) {
-      actionError =
-        e instanceof ApiError ? `Could not remove tag (${e.status}).` : "Could not remove tag.";
-    }
-  }
-
-  // Move a chat into a project, or out of every project (empty selection).
-  // Moving out removes the project's bounded context from the next turn.
-  async function moveToProject(s: SessionSummary, value: string) {
-    const next = value === "" ? null : value;
-    if (next === s.project_id) return;
-    actionError = null;
-    try {
-      await api.setSessionProject(s.session_id, next);
-      await load();
-    } catch (e) {
-      actionError =
-        e instanceof ApiError ? `Could not move chat (${e.status}).` : "Could not move chat.";
-    }
-  }
+  // BUG-303 — pin, rename, archive, move and the tag editor used to live here.
+  // They are how somebody organises the conversations they work in, and this is
+  // the page whose job is audit. They are on Threads now, beside the threads
+  // they organise. What stays is Delete, which removes the audit record itself.
 
   async function deleteOne(id: string) {
     if (!window.confirm("Delete this conversation permanently? Its turns and governed events will be removed.")) return;
@@ -229,13 +143,6 @@
   async function load() {
     loadError = null;
     try {
-      // The project list feeds the per-row move control. A failure here must
-      // not break the session list, so it degrades to "no projects to move to".
-      try {
-        projects = (await api.projects()).projects.filter((p) => !p.is_archived);
-      } catch {
-        projects = [];
-      }
       sessions = await api.sessions(projectId ?? undefined, showArchived);
       // Drop any selection that no longer exists after a refresh.
       const ids = new Set((sessions ?? []).map((s) => s.session_id));
@@ -403,43 +310,12 @@
                 {/each}
               </td>
               <td onclick={() => openSession(s.session_id)}>{s.turn_count}</td>
-              <td class="tags-col" onclick={(e) => e.stopPropagation()}>
+              <!-- BUG-303 — read-only here. The editor is on Threads. -->
+              <td class="tags-col" onclick={() => openSession(s.session_id)}>
                 <span class="tag-chips">
                   {#each s.tags as t (t)}
-                    <span class="tag-chip">
-                      {t}
-                      <button
-                        type="button"
-                        class="tag-x"
-                        aria-label={`Remove tag ${t} from ${s.title ?? shortId(s.session_id)}`}
-                        title="Remove tag"
-                        onclick={() => void removeTag(s, t)}
-                      >×</button>
-                    </span>
+                    <span class="tag-chip">{t}</span>
                   {/each}
-                </span>
-                <span class="tag-add">
-                  <input
-                    type="text"
-                    class="tag-input"
-                    placeholder="Add tag…"
-                    value={tagDraft[s.session_id] ?? ""}
-                    oninput={(e) => (tagDraft = { ...tagDraft, [s.session_id]: e.currentTarget.value })}
-                    onkeydown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void addTag(s);
-                      }
-                    }}
-                    aria-label={`Add a tag to ${s.title ?? shortId(s.session_id)}`}
-                  />
-                  <button
-                    type="button"
-                    class="tag-add-btn"
-                    aria-label={`Add tag to ${s.title ?? shortId(s.session_id)}`}
-                    title="Add tag"
-                    onclick={() => void addTag(s)}
-                  >+</button>
                 </span>
               </td>
               <td onclick={() => openSession(s.session_id)} title={s.updated_at}>{relativeTime(s.updated_at)}</td>
@@ -448,13 +324,6 @@
                   sessionId={s.session_id}
                   title={s.title ?? shortId(s.session_id)}
                   origin={s.origin ?? "chat"}
-                  projects={projects.map((p) => ({ project_id: p.project_id, name: p.name }))}
-                  pinned={s.pinned}
-                  archived={s.archived}
-                  onRename={(title) => void renameSession(s, title)}
-                  onMove={(projectId) => void moveToProject(s, projectId)}
-                  onPin={() => void togglePin(s)}
-                  onArchive={() => void toggleArchived(s)}
                   onDelete={() => void deleteOne(s.session_id)}
                 />
               </td>
@@ -686,54 +555,6 @@
     padding: 0.05rem 0.45rem;
     font-size: var(--text-xs);
     line-height: 1.4;
-  }
-  .tag-x {
-    border: none;
-    background: none;
-    color: var(--text-3);
-    cursor: pointer;
-    font-size: var(--text-md);
-    line-height: 1;
-    padding: 0 0.1rem;
-    border-radius: 999px;
-  }
-  .tag-x:hover {
-    color: var(--danger);
-  }
-  .tag-add {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.2rem;
-  }
-  .tag-input {
-    font: inherit;
-    font-size: var(--text-sm);
-    padding: 0.15rem 0.4rem;
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    background: var(--bg);
-    color: var(--text-1);
-    width: 8rem;
-  }
-  /* A square control, so it is sized like one: 23x20 was under the 24px
-     minimum target at every window width, not only on touch. */
-  .tag-add-btn {
-    display: inline-grid;
-    place-items: center;
-    min-width: 1.5rem;
-    min-height: 1.5rem;
-    border: 1px solid var(--border);
-    background: var(--neutral-soft);
-    color: var(--text-2);
-    cursor: pointer;
-    font-size: var(--text-md);
-    line-height: 1;
-    padding: 0.1rem 0.4rem;
-    border-radius: var(--r-sm);
-  }
-  .tag-add-btn:hover {
-    color: var(--text-1);
-    border-color: var(--accent-border);
   }
   .session-title {
     display: block;

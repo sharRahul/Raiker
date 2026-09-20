@@ -280,3 +280,81 @@ def test_one_thread_never_closes_another_live_thread_handle(
     worker.join(timeout=10)
     assert still_usable == [True]
     close_cached_connections()
+
+
+def test_a_recycled_thread_id_cannot_adopt_an_exited_workers_connection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """GCR-37 — ownership is a token this module mints, not a platform number.
+
+    Thread identifiers are reused as soon as the thread holding one exits, and
+    these connections are opened with ``check_same_thread=False``. Keyed by
+    identifier, each worker below found its predecessor's entry in the cache and
+    used that connection instead of opening one — the exact sharing the
+    per-thread key exists to prevent, and a use-after-close the moment the
+    reaper had already reached the earlier handle.
+
+    Short-lived sequential threads are the natural reproduction: CPython hands
+    every one of them the same identifier, so the test asserts that it did and
+    then asserts each worker still opened a connection of its own.
+    """
+    close_cached_connections()
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    assert SQLiteStore(workspace).table_names()
+
+    real_connect = sqlite_module.sqlite3.connect
+    opened = 0
+
+    def counting_connect(*args: Any, **kwargs: Any) -> Any:
+        nonlocal opened
+        opened += 1
+        return real_connect(*args, **kwargs)
+
+    monkeypatch.setattr(sqlite_module.sqlite3, "connect", counting_connect)
+
+    idents: list[int] = []
+    failures: list[str] = []
+
+    def open_one() -> None:
+        idents.append(threading.get_ident())
+        try:
+            SQLiteStore(workspace).connect().execute("SELECT 1")
+        except Exception as exc:  # noqa: BLE001 - reported, not swallowed
+            failures.append(f"{type(exc).__name__}: {exc}")
+
+    for _ in range(6):
+        worker = threading.Thread(target=open_one)
+        worker.start()
+        worker.join(timeout=10)
+
+    assert not failures, failures
+    if len(set(idents)) == len(idents):
+        pytest.skip("this platform did not reuse a thread identifier")
+    assert opened == 6, (
+        "each worker must open its own connection rather than adopt the "
+        f"connection of the exited worker whose identifier it was given ({opened})"
+    )
+    close_cached_connections()
+
+
+def test_an_exited_workers_ownership_token_is_forgotten(tmp_path: Path) -> None:
+    """The registry that answers "is that owner alive?" must not grow for ever."""
+    close_cached_connections()
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    assert SQLiteStore(workspace).table_names()
+
+    def open_one() -> None:
+        SQLiteStore(workspace).connect()
+
+    for _ in range(8):
+        worker = threading.Thread(target=open_one)
+        worker.start()
+        worker.join(timeout=10)
+
+    # One more open from this thread runs the reaper, which closes every exited
+    # worker's handle and drops the tokens that no longer own anything.
+    assert SQLiteStore(workspace).table_names()
+    assert len(sqlite_module._OWNER_THREADS) <= 2
+    close_cached_connections()

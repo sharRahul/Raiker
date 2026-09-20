@@ -29,13 +29,31 @@
    * question — it reads message text, across every conversation the account
    * has — so it is an explicit action rather than something that happens to the
    * owner mid-keystroke.
+   *
+   * **BUG-303 — the library lives here now.** Rename, move to a project, pin,
+   * archive and tag were on Sessions, which is the page whose job is *audit*.
+   * Organising the conversations you work in is not an audit activity, and the
+   * page work is actually resumed from could not express any of it. The four
+   * controls and the tag editor moved here, where the threads are; Sessions
+   * keeps only **Delete**, because deleting removes the evidence record and
+   * belongs beside the evidence.
+   *
+   * Archive could not move until the index could show an archived thread —
+   * a control whose effect the owner cannot undo from the surface they used it
+   * on is worse than one that has not moved. It can: `archived` is a scope on
+   * the index, both counts come back in either scope, and the chip that
+   * switches between them is the way back.
+   *
+   * A routine thread is a task's own conversation, not something in the
+   * owner's library, so it is offered none of these.
    */
+  import { onMount } from "svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
-  import type { SessionSummary, WorkThread, WorkThreadPage } from "../apiTypes";
+  import type { ProjectView, SessionSummary, WorkThread, WorkThreadPage } from "../apiTypes";
   import { groupByDay, relativeTime } from "../format";
   import { cadenceLabel } from "../agentCadence";
   import { conversationLink, evidenceLink, workModeRoute } from "../turnAnchor";
@@ -56,6 +74,21 @@
   let scope = $state<Scope>("all");
   let projectFilter = $state<string>("");
   let requestId = 0;
+
+  // ── BUG-303: the conversation library ──────────────────────────────────
+  /** Which archive scope is on screen. A scope, not a filter: the sets are disjoint. */
+  let archivedScope = $state(false);
+  /** The thread whose library controls are open, or null. One at a time. */
+  let openMenu = $state<string | null>(null);
+  /** The thread being renamed inline, and the draft title. */
+  let renaming = $state<string | null>(null);
+  let titleDraft = $state("");
+  /** Per-thread tag drafts, so typing in one row does not appear in another. */
+  let tagDraft = $state<Record<string, string>>({});
+  /** Projects a thread can be moved into. Degrades to none rather than failing. */
+  let projects_ = $state<ProjectView[]>([]);
+  let actionError = $state<string | null>(null);
+  let busy = $state<string | null>(null);
 
   const groupedSessions = $derived(groupByDay(sessions ?? []));
 
@@ -82,6 +115,7 @@
         kind: scope === "all" ? null : scope,
         query: query.trim(),
         cursor,
+        archived: archivedScope,
       });
       if (id !== requestId) return;
       page = result;
@@ -108,9 +142,86 @@
     const typed = query.trim();
     void projectFilter;
     void scope;
+    void archivedScope;
     const timer = window.setTimeout(() => void read(null), typed ? 180 : 0);
     return () => window.clearTimeout(timer);
   });
+
+  // The move-to-project control needs somewhere to move things to. A failure
+  // here must not take the board down with it, so it degrades to "no projects".
+  onMount(() => {
+    void (async () => {
+      try {
+        projects_ = (await api.projects()).projects.filter((project) => !project.is_archived);
+      } catch {
+        projects_ = [];
+      }
+    })();
+  });
+
+  /**
+   * Run one library mutation and re-read the page it changed.
+   *
+   * Re-reading rather than patching the row in place: a pin changes the order,
+   * an archive moves the thread to the other scope, and a move changes the
+   * project facet counts. Every one of those is the index's answer, not
+   * something the browser can derive — which is the whole reason the index
+   * moved to the server.
+   */
+  async function organise(
+    sessionId: string,
+    what: string,
+    run: () => Promise<unknown>,
+  ): Promise<void> {
+    actionError = null;
+    busy = sessionId;
+    try {
+      await run();
+      // The menu's job is done, and the list behind it is about to change:
+      // leaving it open over a row that may have moved or left the scope is a
+      // control pointing at something that is no longer there.
+      openMenu = null;
+      await read(null);
+    } catch (error) {
+      actionError =
+        error instanceof ApiError ? `Could not ${what} (${error.status}).` : `Could not ${what}.`;
+    } finally {
+      busy = null;
+    }
+  }
+
+  function startRename(thread: WorkThread): void {
+    renaming = thread.session_id;
+    titleDraft = thread.title;
+    openMenu = null;
+  }
+
+  async function commitRename(thread: WorkThread): Promise<void> {
+    const next = titleDraft.trim();
+    renaming = null;
+    if (!next || next === thread.title) return;
+    await organise(thread.session_id, "rename this thread", () =>
+      api.renameSession(thread.session_id, next),
+    );
+  }
+
+  async function addTag(thread: WorkThread): Promise<void> {
+    const draft = (tagDraft[thread.session_id] ?? "").trim();
+    if (!draft || thread.tags.includes(draft)) return;
+    tagDraft[thread.session_id] = "";
+    await organise(thread.session_id, "add the tag", () =>
+      api.setSessionTags(thread.session_id, [...thread.tags, draft]),
+    );
+  }
+
+  async function removeTag(thread: WorkThread, tag: string): Promise<void> {
+    await organise(thread.session_id, "remove the tag", () =>
+      api.setSessionTags(
+        thread.session_id,
+        thread.tags.filter((item) => item !== tag),
+      ),
+    );
+  }
 
   /**
    * The other question. Deliberately an action rather than a mode the owner
@@ -187,7 +298,27 @@
           Search message text
         </button>
       {/if}
+      <!-- BUG-303 — the way back. Archive only became movable off Sessions once
+           an archived thread could be seen and restored from the same page that
+           archived it. -->
+      {#if archivedScope || (page?.archived_count ?? 0) > 0}
+        <button
+          type="button"
+          class="chip archive-scope"
+          class:on={archivedScope}
+          aria-pressed={archivedScope}
+          onclick={() => (archivedScope = !archivedScope)}
+        >
+          {archivedScope
+            ? `Back to active (${page?.active_count ?? 0})`
+            : `Archived (${page?.archived_count ?? 0})`}
+        </button>
+      {/if}
     </div>
+  {/if}
+
+  {#if actionError}
+    <p class="action-error" role="alert">{actionError}</p>
   {/if}
 
   {#if loadError}
@@ -277,6 +408,13 @@
           <a href={conversationLink(workModeRoute(thread.origin), thread.session_id)}>
             <span class="title">
               {#if thread.kind === "routine"}<Icon name="tasks" size="sm" />{/if}
+              <!-- BUG-303 — a pin that is only an ordering is not readable as a
+                   pin: the owner cannot tell a pinned thread from the newest
+                   one. It says so on the row, with the mark Sessions has always
+                   used for the same state. -->
+              {#if thread.pinned}<span class="pin-mark" title="Pinned" aria-label="Pinned"
+                  >★</span
+                >{/if}
               {thread.title}
             </span>
             <!-- Project, state, last activity, in the one order every
@@ -289,6 +427,24 @@
               activityAt={thread.updated_at}
             />
           </a>
+          <!-- BUG-303 — the tags are part of the row because they are how the
+               owner finds it again, not a setting hidden behind a menu. -->
+          {#if thread.tags.length > 0}
+            <ul class="tags" aria-label="Tags">
+              {#each thread.tags as tag (tag)}
+                <li>
+                  <span class="tag">{tag}</span>
+                  <button
+                    type="button"
+                    class="tag-remove"
+                    aria-label={`Remove tag ${tag} from ${thread.title}`}
+                    disabled={busy === thread.session_id}
+                    onclick={() => void removeTag(thread, tag)}>×</button
+                  >
+                </li>
+              {/each}
+            </ul>
+          {/if}
           <!-- REM-THREAD-03 — the other job, kept out of the row's own reading
                order. Threads resumes work; the inspector verifies how it ran,
                and it is a link rather than the destination of the row. -->
@@ -299,7 +455,104 @@
               >
             {/if}
             <a class="row-link" href={evidenceLink(thread.session_id)}>Evidence</a>
+            <!-- BUG-303 — a routine thread belongs to its task, not to the
+                 owner's library, so it is offered none of this. -->
+            {#if thread.kind === "chat"}
+              <button
+                type="button"
+                class="row-link organise"
+                aria-expanded={openMenu === thread.session_id}
+                aria-label={`Organise ${thread.title}`}
+                disabled={busy === thread.session_id}
+                onclick={() =>
+                  (openMenu = openMenu === thread.session_id ? null : thread.session_id)}
+                >Organise</button
+              >
+            {/if}
           </span>
+          {#if thread.kind === "chat" && openMenu === thread.session_id}
+            <div class="library" role="group" aria-label={`Organise ${thread.title}`}>
+              <button
+                type="button"
+                class="chip"
+                disabled={busy === thread.session_id}
+                onclick={() =>
+                  void organise(thread.session_id, "update the pin", () =>
+                    api.setSessionPinned(thread.session_id, !thread.pinned),
+                  )}>{thread.pinned ? "Unpin" : "Pin"}</button
+              >
+              <button type="button" class="chip" onclick={() => startRename(thread)}>Rename</button>
+              <button
+                type="button"
+                class="chip"
+                disabled={busy === thread.session_id}
+                onclick={() =>
+                  void organise(thread.session_id, "update the archive state", () =>
+                    thread.archived
+                      ? api.unarchiveSession(thread.session_id)
+                      : api.archiveSession(thread.session_id),
+                  )}>{thread.archived ? "Restore" : "Archive"}</button
+              >
+              {#if projects_.length > 0}
+                <label class="move">
+                  <span class="sr-only">Move {thread.title} to a project</span>
+                  <select
+                    value={thread.project_id ?? ""}
+                    disabled={busy === thread.session_id}
+                    aria-label={`Move ${thread.title} to a project`}
+                    onchange={(event) =>
+                      void organise(thread.session_id, "move this thread", () =>
+                        api.setSessionProject(
+                          thread.session_id,
+                          (event.currentTarget as HTMLSelectElement).value || null,
+                        ),
+                      )}
+                  >
+                    <option value="">No project</option>
+                    {#each projects_ as project (project.project_id)}
+                      <option value={project.project_id}>{project.name}</option>
+                    {/each}
+                  </select>
+                </label>
+              {/if}
+              <label class="add-tag">
+                <span class="sr-only">Add a tag to {thread.title}</span>
+                <input
+                  type="text"
+                  placeholder="Add a tag…"
+                  aria-label={`Add a tag to ${thread.title}`}
+                  bind:value={tagDraft[thread.session_id]}
+                  disabled={busy === thread.session_id}
+                  onkeydown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void addTag(thread);
+                    }
+                  }}
+                />
+              </label>
+            </div>
+          {/if}
+          {#if renaming === thread.session_id}
+            <form
+              class="rename"
+              onsubmit={(event) => {
+                event.preventDefault();
+                void commitRename(thread);
+              }}
+            >
+              <label>
+                <span class="sr-only">New title for {thread.title}</span>
+                <input
+                  type="text"
+                  bind:value={titleDraft}
+                  aria-label={`New title for ${thread.title}`}
+                />
+              </label>
+              <button type="submit" class="chip">Save</button>
+              <button type="button" class="chip" onclick={() => (renaming = null)}>Cancel</button>
+            </form>
+          {/if}
         </li>
       {/each}
     </ul>
@@ -459,12 +712,95 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  /* ── BUG-303: the conversation library ──────────────────────────────── */
+  .action-error {
+    color: var(--danger);
+    font-size: var(--text-sm);
+    margin: 0 0 var(--space-3);
+  }
+  .organise {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--text-xs);
+    color: var(--text-3);
+  }
+  .organise:hover,
+  .organise:focus-visible {
+    color: var(--accent);
+  }
+  .tags,
+  .library,
+  .rename {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 0 var(--space-2) var(--space-2);
+    margin: 0;
+    list-style: none;
+  }
+  .tags li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+  }
+  /* The same chip Sessions draws, because it is the same tag: one label should
+     not look like two different things depending on which page reads it. */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    color: var(--text-1);
+    border-radius: 999px;
+    font-size: var(--text-xs);
+    line-height: 1.4;
+    padding: 0.05rem 0.45rem;
+  }
+  .tag-remove {
+    background: none;
+    border: 0;
+    color: var(--text-3);
+    cursor: pointer;
+    font-size: var(--text-xs);
+    line-height: 1;
+    padding: 0 0.15rem;
+  }
+  .tag-remove:hover,
+  .tag-remove:focus-visible {
+    color: var(--danger);
+  }
+  .library {
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-2);
+  }
+  .library select,
+  .library input,
+  .rename input {
+    background: var(--surface);
+    font-size: var(--text-sm);
+  }
+  .pin-mark {
+    color: var(--accent);
+    margin-right: 0.2rem;
+  }
+
   @media (max-width: 42rem) {
     li a {
       grid-template-columns: 1fr;
     }
     .matched {
       grid-column: auto;
+    }
+    /* The controls stack rather than overflow: a menu that scrolls sideways on
+       a phone is a menu whose last item does not exist. */
+    .library {
+      flex-direction: column;
+      align-items: stretch;
     }
   }
 </style>

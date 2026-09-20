@@ -16,10 +16,7 @@ afterEach(() => {
 
 describe("SessionMenu", () => {
   it("dismisses with Escape and restores focus to the actions trigger", async () => {
-    render(SessionMenu, {
-      sessionId: "ses_1", title: "Brief", projects: [],
-      onRename: vi.fn(), onMove: vi.fn(), onPin: vi.fn(), onArchive: vi.fn(), onDelete: vi.fn(),
-    });
+    render(SessionMenu, { sessionId: "ses_1", title: "Brief", onDelete: vi.fn() });
     const trigger = screen.getByRole("button", { name: /session actions/i });
     await fireEvent.click(trigger);
     const menu = screen.getByRole("menu", { name: /actions for brief/i });
@@ -31,37 +28,57 @@ describe("SessionMenu", () => {
     expect(trigger).toHaveFocus();
   });
 
-  it("keeps sharing local and forwards the six session actions", async () => {
+  it("keeps sharing local and deleting, and offers nothing that files a chat", async () => {
+    // BUG-303 — rename, move, pin and archive were here. They are how somebody
+    // organises the conversations they work in, and this is the evidence
+    // inspector. Delete stays because it removes the audit record itself.
     const writeText = vi.fn(async () => undefined);
     Object.assign(navigator, { clipboard: { writeText } });
-    const onRename = vi.fn();
-    const onMove = vi.fn();
-    const onPin = vi.fn();
-    const onArchive = vi.fn();
     const onDelete = vi.fn();
-    render(SessionMenu, {
-      sessionId: "ses_1", title: "Brief", projects: [{ project_id: "prj_1", name: "Alpha" }],
-      onRename, onMove, onPin, onArchive, onDelete,
-    });
+    render(SessionMenu, { sessionId: "ses_1", title: "Brief", onDelete });
 
     await fireEvent.click(screen.getByRole("button", { name: /session actions/i }));
     await fireEvent.click(screen.getByRole("menuitem", { name: /copy local link/i }));
-    await fireEvent.click(screen.getByRole("menuitem", { name: /rename/i }));
-    await fireEvent.input(screen.getByLabelText("Session title"), { target: { value: "Updated brief" } });
-    await fireEvent.click(screen.getByRole("menuitem", { name: "Save name" }));
-    await fireEvent.click(screen.getByRole("menuitem", { name: /move to project/i }));
-    await fireEvent.click(screen.getByRole("menuitem", { name: "Alpha" }));
-    await fireEvent.click(screen.getByRole("menuitem", { name: /pin/i }));
-    await fireEvent.click(screen.getByRole("menuitem", { name: /archive/i }));
     await fireEvent.click(screen.getByRole("menuitem", { name: /delete/i }));
 
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining("/#/new-chat?session=ses_1"));
-    expect(onRename).toHaveBeenCalledWith("Updated brief");
-    expect(onMove).toHaveBeenCalledWith("prj_1");
-    expect(onMove).toHaveBeenCalledTimes(1);
-    expect(onPin).toHaveBeenCalledOnce();
-    expect(onArchive).toHaveBeenCalledOnce();
     expect(onDelete).toHaveBeenCalledOnce();
+    for (const gone of [/^rename$/i, /move to project/i, /^pin$/i, /^archive$/i]) {
+      expect(screen.queryByRole("menuitem", { name: gone })).not.toBeInTheDocument();
+    }
+    // And it says where they went, rather than leaving that to be discovered.
+    expect(screen.getByRole("menuitem", { name: /organise in threads/i })).toHaveAttribute(
+      "href",
+      "#/search-chat",
+    );
+  });
+
+  it("positions itself against the viewport, so a scrolling card cannot clip it", async () => {
+    // Found live on 2026-09-20: the session table's card scrolls horizontally,
+    // which makes the browser clip vertically too, and the menu opened 131px
+    // below the bottom of it — with Delete, the only destructive control on
+    // the page, off-screen.
+    render(SessionMenu, { sessionId: "ses_1", title: "Brief", onDelete: vi.fn() });
+    const trigger = screen.getByRole("button", { name: /session actions/i });
+    await fireEvent.click(trigger);
+
+    // The stylesheet makes it `position: fixed`; what the component supplies,
+    // and what this asserts, is the pair of viewport coordinates that makes
+    // fixed positioning land in the right place. jsdom does not resolve Svelte's
+    // scoped CSS, so the rule itself is asserted by the live capture.
+    const menu = screen.getByRole("menu", { name: /actions for brief/i });
+    expect(menu.getAttribute("style")).toMatch(/top:\s*-?\d+(\.\d+)?px/);
+    expect(menu.getAttribute("style")).toMatch(/right:\s*-?\d+(\.\d+)?px/);
+  });
+
+  it("closes when the page moves under it", async () => {
+    render(SessionMenu, { sessionId: "ses_1", title: "Brief", onDelete: vi.fn() });
+    await fireEvent.click(screen.getByRole("button", { name: /session actions/i }));
+    expect(screen.getByRole("menu", { name: /actions for brief/i })).toBeVisible();
+
+    await fireEvent.scroll(window);
+
+    expect(screen.queryByRole("menu", { name: /actions for brief/i })).not.toBeInTheDocument();
   });
 
   it("allows share only on loopback hosts", () => {

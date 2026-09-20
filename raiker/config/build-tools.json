@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "tools": [
+    {
+      "name": "appimagetool",
+      "version": "1.9.0",
+      "os": "linux",
+      "purpose": "Builds the Linux .AppImage installer.",
+      "artifacts": {
+        "x86_64": {
+          "url": "https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-x86_64.AppImage",
+          "sha256": "46fdd785094c7f6e545b61afcfb0f3d98d8eab243f644b4b17698c01d06083d1"
+        },
+        "arm64": {
+          "url": "https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-aarch64.AppImage",
+          "sha256": "04f45ea45b5aa07bb2b071aed9dbf7a5185d3953b11b47358c1311f11ea94a96"
+        }
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 // Route-level coverage for Search Chat: state grammar (prompt/loading/error)
 // plus the preserved resume link into a matched conversation.
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SearchChatView from "./SearchChatView.svelte";
 import { stubFetch } from "../test-helpers";
@@ -33,6 +33,10 @@ function thread(partial: Record<string, unknown> = {}) {
     turn_count: 4,
     project_id: null,
     project_name: null,
+    // BUG-303 — the library state the index now carries.
+    pinned: false,
+    archived: false,
+    tags: [],
     ...partial,
   };
 }
@@ -72,6 +76,8 @@ function pageOf(
     total: threads.length,
     projects,
     kinds,
+    archived_count: 0,
+    active_count: threads.length,
     scan_truncated: false,
     ...overrides,
   };
@@ -333,5 +339,215 @@ describe("SearchChatView", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/couldn't load your threads/i);
     expect(alert).toHaveTextContent(/unavailable \(404\)/i);
+  });
+});
+
+/**
+ * BUG-303 — the conversation library, where the conversations are.
+ *
+ * Rename, move to a project, pin, archive and the tag editor were on Sessions,
+ * the page whose job is *audit*. They are how somebody organises the chats they
+ * work in, and the page work is resumed from could not express any of them.
+ */
+describe("SearchChatView organises the threads it lists", () => {
+  const PROJECTS = {
+    projects: [
+      { project_id: "prj_1", name: "Alpha", is_archived: false },
+      { project_id: "prj_2", name: "Archived one", is_archived: true },
+    ],
+    active_project_id: null,
+  };
+
+  const openOrganise = async (title: string) => {
+    const row = screen.getByText(title).closest("li")!;
+    await fireEvent.click(within(row).getByRole("button", { name: `Organise ${title}` }));
+    return row;
+  };
+
+  it("pins a thread and re-reads the index that decides the order", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/work-threads/page": pageOf([thread()]),
+      "GET /api/projects": PROJECTS,
+      "PUT /api/sessions/sess_1/pin": { ok: true, session_id: "sess_1", pinned: true },
+    });
+    render(SearchChatView);
+    await waitFor(() => expect(screen.getByText("Release planning")).toBeInTheDocument());
+
+    const row = await openOrganise("Release planning");
+    await fireEvent.click(within(row).getByRole("button", { name: "Pin" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/sessions/sess_1/pin",
+        expect.objectContaining({ method: "PUT" }),
+      ),
+    );
+    // A pin changes the order, and the order is the index's answer — so the
+    // page is re-read rather than patched in the browser.
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.filter((call) =>
+          String(call[0]).startsWith("/api/work-threads/page"),
+        ).length,
+      ).toBeGreaterThan(1),
+    );
+  });
+
+  it("says on the row which threads are pinned", async () => {
+    stubFetch({
+      "GET /api/work-threads/page": pageOf([thread({ pinned: true })]),
+      "GET /api/projects": PROJECTS,
+    });
+    render(SearchChatView);
+    expect(await screen.findByLabelText("Pinned")).toBeInTheDocument();
+  });
+
+  it("renames, archives and moves a thread to a project", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/work-threads/page": pageOf([thread()]),
+      "GET /api/projects": PROJECTS,
+      "PUT /api/sessions/sess_1/rename": { ok: true, session_id: "sess_1", title: "Renamed" },
+      "PUT /api/sessions/sess_1/archive": { ok: true, session_id: "sess_1", archived: true },
+      "PUT /api/sessions/sess_1/project": { ok: true, session_id: "sess_1" },
+    });
+    render(SearchChatView);
+    await waitFor(() => expect(screen.getByText("Release planning")).toBeInTheDocument());
+
+    let row = await openOrganise("Release planning");
+    await fireEvent.click(within(row).getByRole("button", { name: "Rename" }));
+    await fireEvent.input(screen.getByLabelText("New title for Release planning"), {
+      target: { value: "Renamed" },
+    });
+    await fireEvent.submit(screen.getByLabelText("New title for Release planning").closest("form")!);
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (item) => String(item[0]) === "/api/sessions/sess_1/rename",
+      );
+      expect(JSON.parse(String(call![1]!.body))).toEqual({ title: "Renamed" });
+    });
+
+    row = await openOrganise("Release planning");
+    // Only projects that still exist as somewhere to work are offered.
+    const move = within(row).getByLabelText("Move Release planning to a project");
+    expect(within(move).queryByText("Archived one")).toBeNull();
+    await fireEvent.change(move, { target: { value: "prj_1" } });
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (item) => String(item[0]) === "/api/sessions/sess_1/project",
+      );
+      expect(JSON.parse(String(call![1]!.body))).toEqual({ project_id: "prj_1" });
+    });
+
+    row = await openOrganise("Release planning");
+    await fireEvent.click(within(row).getByRole("button", { name: "Archive" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/sessions/sess_1/archive",
+        expect.objectContaining({ method: "PUT" }),
+      ),
+    );
+  });
+
+  it("adds and removes a tag on the row that carries it", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/work-threads/page": pageOf([thread({ tags: ["alpha"] })]),
+      "GET /api/projects": PROJECTS,
+      "PUT /api/sessions/sess_1/tags": { ok: true, session_id: "sess_1", tags: [] },
+    });
+    render(SearchChatView);
+    await waitFor(() => expect(screen.getByText("Release planning")).toBeInTheDocument());
+
+    await fireEvent.click(
+      screen.getByRole("button", { name: "Remove tag alpha from Release planning" }),
+    );
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (item) => String(item[0]) === "/api/sessions/sess_1/tags",
+      );
+      expect(JSON.parse(String(call![1]!.body)).tags).toEqual([]);
+    });
+
+    const row = await openOrganise("Release planning");
+    const input = within(row).getByLabelText("Add a tag to Release planning");
+    await fireEvent.input(input, { target: { value: "beta" } });
+    await fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.filter(
+        (item) => String(item[0]) === "/api/sessions/sess_1/tags",
+      );
+      expect(JSON.parse(String(calls.at(-1)![1]!.body)).tags).toEqual(["alpha", "beta"]);
+    });
+  });
+
+  it("offers a routine thread none of it, because it is not in the library", async () => {
+    stubFetch({
+      "GET /api/work-threads/page": pageOf([
+        thread({ session_id: "sess_r", title: "Overnight research", kind: "routine" }),
+      ]),
+      "GET /api/projects": PROJECTS,
+    });
+    render(SearchChatView);
+    await waitFor(() => expect(screen.getByText("Overnight research")).toBeInTheDocument());
+
+    expect(screen.queryByRole("button", { name: /Organise Overnight research/ })).toBeNull();
+  });
+
+  it("gives an archived thread somewhere visible to be restored from", async () => {
+    // Archive could not move off Sessions until this was true: a control whose
+    // effect the owner cannot undo from the surface they used it on is worse
+    // than one that has not moved.
+    const fetchMock = stubFetch({
+      "GET /api/projects": PROJECTS,
+      "PUT /api/sessions/sess_1/unarchive": { ok: true, session_id: "sess_1", archived: false },
+    });
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if ((init?.method ?? "GET") === "GET" && url.startsWith("/api/work-threads/page")) {
+        const archived = url.includes("archived=true");
+        return {
+          ok: true,
+          status: 200,
+          json: async () =>
+            pageOf(archived ? [thread({ title: "Filed away", archived: true })] : [thread()], {
+              archived_count: 1,
+              active_count: 1,
+            }),
+        } as Response;
+      }
+      if ((init?.method ?? "GET") === "GET" && url.startsWith("/api/projects")) {
+        return { ok: true, status: 200, json: async () => PROJECTS } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    render(SearchChatView);
+    await waitFor(() => expect(screen.getByText("Release planning")).toBeInTheDocument());
+
+    await fireEvent.click(screen.getByRole("button", { name: /^Archived \(1\)$/ }));
+    await waitFor(() => expect(screen.getByText("Filed away")).toBeInTheDocument());
+
+    const row = await openOrganise("Filed away");
+    await fireEvent.click(within(row).getByRole("button", { name: "Restore" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/sessions/sess_1/unarchive",
+        expect.objectContaining({ method: "PUT" }),
+      ),
+    );
+    // And the way back out of the archived scope is named.
+    expect(screen.getByRole("button", { name: /Back to active \(1\)/ })).toBeInTheDocument();
+  });
+
+  it("says so when the runtime refuses, rather than appearing to have worked", async () => {
+    stubFetch({
+      "GET /api/work-threads/page": pageOf([thread()]),
+      "GET /api/projects": PROJECTS,
+    });
+    render(SearchChatView);
+    await waitFor(() => expect(screen.getByText("Release planning")).toBeInTheDocument());
+
+    const row = await openOrganise("Release planning");
+    await fireEvent.click(within(row).getByRole("button", { name: "Pin" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not update the pin/i);
   });
 });

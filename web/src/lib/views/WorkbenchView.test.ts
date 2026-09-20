@@ -25,6 +25,9 @@ const SESSION = {
   turn_count: 3,
   project_id: null,
   project_name: null,
+  pinned: false,
+  archived: false,
+  tags: [],
 };
 
 const ROUTINE_THREAD = {
@@ -35,6 +38,9 @@ const ROUTINE_THREAD = {
   turn_count: 6,
   project_id: null,
   project_name: null,
+  pinned: false,
+  archived: false,
+  tags: [],
   task_id: "t_agent",
   cadence: "daily",
 };

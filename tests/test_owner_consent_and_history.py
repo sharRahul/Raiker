@@ -24,7 +24,11 @@ from raiker.models.policy_state import (
     gate_explicitly_disabled,
     provider_runtime_policy_from_gates,
 )
-from raiker.runtime.conversation_history import conversation_messages, history_char_budget
+from raiker.runtime.conversation_history import (
+    ConversationHistoryUnavailable,
+    conversation_messages,
+    history_char_budget,
+)
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -178,3 +182,81 @@ class TestConversationHistory:
 
     def test_a_missing_store_yields_no_history_rather_than_failing(self) -> None:
         assert conversation_messages(None, "sess_1") == []
+
+
+class TestOversizedNewestExchange:
+    """GCR-35 — the newest exchange alone being over budget lost every exchange.
+
+    The budget is there to drop the *oldest* context. A single exchange larger
+    than the whole budget used to end the walk before anything had been kept,
+    so a follow-up to a long answer reached the model with no conversation at
+    all — indistinguishable, from inside the model, from an opening message.
+    """
+
+    def _turn(self, store: SQLiteStore, session: str, turn: str, prompt: str, reply: str) -> None:
+        store.insert_turn(session, turn, prompt)
+        store.complete_turn(turn, "completed", reply)
+
+    def test_an_oversized_newest_exchange_is_elided_rather_than_dropped(
+        self, store: SQLiteStore
+    ) -> None:
+        store.create_session("sess_1", "cli")
+        self._turn(store, "sess_1", "turn_1", "older prompt", "older reply")
+        self._turn(store, "sess_1", "turn_2", "Q" * 4000, "A" * 4000)
+        messages = conversation_messages(store, "sess_1", char_budget=1000)
+        assert messages, "the newest exchange must survive in some form"
+        assert [m.role for m in messages] == ["user", "assistant"]
+        assert sum(len(m.content) for m in messages) <= 1000
+        assert "Q" in messages[0].content
+        assert "A" in messages[1].content
+
+    def test_the_elision_says_how_much_was_taken_out(self, store: SQLiteStore) -> None:
+        store.create_session("sess_1", "cli")
+        self._turn(store, "sess_1", "turn_1", "Q" * 4000, "A" * 4000)
+        messages = conversation_messages(store, "sess_1", char_budget=1000)
+        assert "elided" in messages[0].content
+        assert "elided" in messages[1].content
+
+    def test_a_short_question_with_a_huge_answer_keeps_the_question_whole(
+        self, store: SQLiteStore
+    ) -> None:
+        store.create_session("sess_1", "cli")
+        self._turn(store, "sess_1", "turn_1", "what does this file do?", "A" * 9000)
+        messages = conversation_messages(store, "sess_1", char_budget=600)
+        assert messages[0].content == "what does this file do?"
+        assert sum(len(m.content) for m in messages) <= 600
+
+    def test_an_older_exchange_is_still_dropped_before_a_newer_one(
+        self, store: SQLiteStore
+    ) -> None:
+        # The oldest-first rule is unchanged where it applies: once something
+        # newer fits, the walk stops rather than reaching past a gap.
+        store.create_session("sess_1", "cli")
+        self._turn(store, "sess_1", "turn_1", "x" * 100, "y" * 100)
+        self._turn(store, "sess_1", "turn_2", "m" * 400, "n" * 400)
+        self._turn(store, "sess_1", "turn_3", "recent prompt", "recent reply")
+        messages = conversation_messages(store, "sess_1", char_budget=900)
+        assert "x" * 100 not in [m.content for m in messages]
+        assert messages[-2].content == "recent prompt"
+
+
+class TestHistoryUnavailable:
+    """GCR-36 — a transcript that could not be read is not an empty one.
+
+    Both look like `[]` to the caller, and the model cannot tell them apart:
+    it answers a follow-up as a first turn while neither the owner nor the
+    operator is told the store failed.
+    """
+
+    class _BrokenStore:
+        def list_turns(self, session_id: str, limit: int = 50) -> list[dict[str, object]]:
+            raise OSError("disk I/O error")
+
+    def test_an_unreadable_transcript_is_raised_rather_than_returned_empty(self) -> None:
+        with pytest.raises(ConversationHistoryUnavailable) as raised:
+            conversation_messages(self._BrokenStore(), "sess_1")
+        assert raised.value.reason == "conversation_history_unreadable:OSError"
+
+    def test_an_empty_conversation_is_still_simply_empty(self, store: SQLiteStore) -> None:
+        store.create_session("sess_1", "cli")
+        assert conversation_messages(store, "sess_1") == []

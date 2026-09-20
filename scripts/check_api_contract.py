@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Compare the TypeScript API mirror against the backend DTOs it mirrors.
 
 GCR-42. ``web/src/lib/apiTypes.ts`` says of itself that it mirrors the backend

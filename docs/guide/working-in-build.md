@@ -271,6 +271,22 @@ completion menu writes, so reading a file leads straight to asking about it.
 A GitHub repository is a coordinate, not a checkout: there are no files on this
 machine to browse, and the panel says so rather than showing an empty tree.
 
+### The workbench
+
+Beside the conversation, one pane shows four views of the same workspace —
+**Changes**, **Preview**, **Terminal** and **Runs** — rather than four panels
+competing for the column. Which one is in front follows what just happened:
+opening a file brings Preview forward, starting a command brings Terminal, and a
+turn that changed files brings Changes — except while you are reading that
+turn's own output, because you are already looking at the thing the event is
+about. A turn finishing never *opens* a closed pane; it is not a request to look
+at anything.
+
+Where you left it is where it comes back. The view you were reading and whether
+the pane was open survive a reload, the same way the file explorer's width and
+open state do — and, like the explorer, neither is restored as a drawer over a
+narrow window you did not ask to open.
+
 ## Finding your way around code
 
 Turning on **Code map** lets Raiker index the repository Build points at, so the

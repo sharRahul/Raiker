@@ -145,6 +145,8 @@ names.
 | [BUG-302](FIXED_ITEMS.md#fixed-558--four-events-describing-themselves-with-one-borrowed-sentence) | Low | Observability / audit summaries | **Closed 2026-09-18 (FIXED-558)** |
 | [BUG-303](FIXED_ITEMS.md#fixed-576--the-conversation-library-lived-in-the-evidence-inspector) | Low | Sessions / Threads | **Closed 2026-09-20 ([FIXED-576](FIXED_ITEMS.md#fixed-576--the-conversation-library-lived-in-the-evidence-inspector))** — the work index grew `pinned`, `archived` and tags first, so Archive could move without becoming a control nothing could undo |
 | [BUG-304](FIXED_ITEMS.md#fixed-577--delete-was-off-the-bottom-of-the-menu-it-lived-in) | Medium | Sessions / web UI | **Closed 2026-09-20 ([FIXED-577](FIXED_ITEMS.md#fixed-577--delete-was-off-the-bottom-of-the-menu-it-lived-in))** — raised and closed in the same run, found while capturing BUG-303's evidence: the row menu was clipped by the card it opened inside, so Delete could not be clicked |
+| [BUG-305](#bug-305--two-source-controllers-and-nothing-that-owns-both) | Low | Memory / Knowledge Map | Open — raised 2026-09-20 while closing REM-MEM-03 as [FIXED-587](FIXED_ITEMS.md#fixed-587--the-recall-engines-controls-were-on-the-page-for-reading-your-own-memories). The engine half shipped; one controller over both kinds of source has not |
+| [BUG-306](#bug-306--three-surfaces-carry-their-own-conversation-menu) | Low | Chat / Threads / Sessions | Open — raised 2026-09-20 from REM-CHAT-02, the one §18.3 row left after that round |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (18 complete, 2 partial; B14 closed 2026-09-04 as [FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one), B10 2026-09-03 as FIXED-366, B13 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, B16 by BUG-206 slice D. B15 and B20 remain partial on [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution)) |
 | VIS | — | Visual / information hierarchy | **Complete.** 24 findings; the document was removed 2026-09-15 when its last implementation item closed |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (16 complete, 1 partial, 1 open; C15 closed by C1/C4, C11 2026-09-03 as FIXED-367, C18 as FIXED-368, C17 2026-08-29 as FIXED-311. C10 is partial — the notification half ships as [FIXED-374](FIXED_ITEMS.md#fixed-374--a-routine-ran-all-night-and-told-nobody); C12 stays an architecture decision) |
@@ -1959,3 +1961,81 @@ it removes.
 
 ---
 
+
+## BUG-304 — Delete was off the bottom of the menu it lived in
+
+**Closed 2026-09-20 as
+[FIXED-577](FIXED_ITEMS.md#fixed-577--delete-was-off-the-bottom-of-the-menu-it-lived-in).**
+The session row's menu was absolutely positioned inside a card that scrolls, so
+on a workspace holding one conversation it opened below the card's own bottom
+and was clipped. The menu is `position: fixed` now, measured from its trigger,
+and closes on scroll rather than being left pointing at a row that has moved.
+
+---
+
+## BUG-305 — Two source controllers, and nothing that owns both
+
+**Severity: Low. Area: Memory / Knowledge Map. Status: Open — raised 2026-09-20
+while closing
+[REM-MEM-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions)
+as [FIXED-587](FIXED_ITEMS.md#fixed-587--the-recall-engines-controls-were-on-the-page-for-reading-your-own-memories).**
+
+**What is left.** REM-MEM-03 has two clauses. The first — engine controls out of
+the personal review — is closed: the recall backend and the index builder are
+**Settings → Memory engine**, and Memory keeps the health sentence and the link.
+The second is *"merge source administration with Map … one source controller
+owns scope and indexing"*, and it is not.
+
+**What exists today.** Two controllers, over two different objects:
+
+| Surface | Controller | Object |
+|---|---|---|
+| Memory → Sources | `FileLibrary` over `/api/managed-files` | Files **copied into** Raiker's managed memory storage |
+| Knowledge Map | `api.addBrainSource` / `brainSourceRoots` | Folders Raiker indexes **where they already live** |
+
+They are not duplicates — the lifecycles genuinely differ, and merging them
+naively would mean either copying a folder nobody asked to copy, or holding a
+managed upload as a path that can move. What is missing is the thing the row
+asks for: one place that answers *what can Raiker read*, with add, revoke and
+import shared across both, and revocation and tombstones proved to suppress
+recall **and** graph output without deleting the original external file.
+
+**Interim.** Memory → Sources names the Knowledge Map as where indexed folders
+are administered, so the second half is one link rather than a discovery, and
+Raiker does not claim the library is the whole answer.
+
+**Required outcome.** One source controller behind both surfaces. Adding,
+revoking and importing a source reads and writes the same records whichever page
+the owner used; a revoked source disappears from recall and from the graph in
+one act; and the external file it was indexed from is untouched, with a test
+that asserts the file is still on disk after the revocation.
+
+---
+
+## BUG-306 — Three surfaces carry their own conversation menu
+
+**Severity: Low. Area: Chat / Threads / Sessions. Status: Open — raised
+2026-09-20 as the one §18.3 row left after that round, from
+[REM-CHAT-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+
+**Observed.** Rename, archive, branch, retry and the model override are each
+reachable from more than one place, and each place implements them itself:
+Chat's header menu, Threads' Organise control (moved there by
+[FIXED-576](FIXED_ITEMS.md#fixed-576--the-conversation-library-lived-in-the-evidence-inspector))
+and the session detail. Nothing today makes them disagree, which is exactly the
+condition under which they start to: the next change lands in one of the three.
+
+**Required outcome.** The row's own words, and they are the acceptance criteria:
+one command set behind all three entry points, with context-specific permissions
+retained and destructive confirmation explicit. Two cases have to be covered
+rather than assumed — a retry after an ambiguous external effect, which must not
+be offered as though the first attempt certainly did nothing, and discovering an
+archived conversation from whichever surface archived it.
+
+**Why it is filed rather than done.** It is a refactor across three views with
+no user-visible defect to point at today, and the round it came from was closing
+ten rows that did have one. Doing it badly — a shared controller that flattens
+the permission differences between the three surfaces — is worse than the
+duplication.
+
+---

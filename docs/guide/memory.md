@@ -129,10 +129,18 @@ prepare a preview, but only a human can confirm permanent deletion.
 
 ## Recall backend and token budget
 
+**Where the controls are.** Memory is for your own facts — what Raiker has been
+allowed to remember, what is waiting on a decision, what has expired. Which
+embedding space recall searches, and building one, are engine configuration and
+live under **Settings → Memory engine**. Memory's **Recall & indexing** tab
+keeps the one thing you need while reading your memories — whether recall is
+matching meaning or only words — and a link to that page when it is not what you
+wanted.
+
 The default lexical fallback, `raiker-local-hash-v1`, works offline and matches shared
 words. It is lexical rather than meaning-based, so paraphrases may not match.
 
-**Build a meaning-based index** can create provider- or local-model embeddings
+**Build a meaning-based index** (Settings → Memory engine) can create provider- or local-model embeddings
 for approved, non-sensitive memories. This is a governed write operation: the
 confirmation names the destination and number of memories before text leaves
 the machine. Re-running it indexes only eligible approved memories not already

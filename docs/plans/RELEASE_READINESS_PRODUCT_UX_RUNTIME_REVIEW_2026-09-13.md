@@ -91,6 +91,45 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-09-20 (P2 rows).** Ten of the eleven P2 rows
+> that were still open in §18.3 closed, each recorded in
+> [`FIXED_ITEMS.md`](FIXED_ITEMS.md) with the live evidence behind it:
+> REM-SET-GIT as
+> [FIXED-578](FIXED_ITEMS.md#fixed-578--the-git-credential-answered-whichever-host-git-happened-to-ask-about),
+> REM-SET-WEB as
+> [FIXED-579](FIXED_ITEMS.md#fixed-579--deployment-configuration-looked-like-policy-this-page-could-change),
+> REM-SET-RUNTIME as
+> [FIXED-580](FIXED_ITEMS.md#fixed-580--runtime-configuration-taught-adapter-internals-before-it-guided-a-target),
+> REM-CHAT-01 as
+> [FIXED-581](FIXED_ITEMS.md#fixed-581--a-turns-own-evidence-was-on-another-route),
+> REM-BUILD-01 as
+> [FIXED-582](FIXED_ITEMS.md#fixed-582--builds-workbench-closed-itself-on-every-reload),
+> REM-MODEL-01 as
+> [FIXED-583](FIXED_ITEMS.md#fixed-583--first-run-asked-whether-a-provider-was-configured-not-whether-it-worked),
+> REM-TASK-01 as
+> [FIXED-584](FIXED_ITEMS.md#fixed-584--when-work-runs-and-how-it-runs-were-one-row-of-chips),
+> REM-PROJ-02 as
+> [FIXED-585](FIXED_ITEMS.md#fixed-585--a-project-was-six-things-stacked-in-one-column),
+> REM-DESIGN-02 as
+> [FIXED-586](FIXED_ITEMS.md#fixed-586--the-picture-design-had-just-made-went-to-the-top-of-a-list)
+> and REM-MEM-03 as
+> [FIXED-587](FIXED_ITEMS.md#fixed-587--the-recall-engines-controls-were-on-the-page-for-reading-your-own-memories).
+>
+> **Two of them were not layout rows once they were written down.** REM-SET-GIT
+> asks that host and operation scope precede secret entry; looking for what the
+> page should *say* about the scope found that the credential had none — the
+> helper a governed push installed answered whichever host git asked about, and
+> git asks about the URL it is currently contacting rather than the one the
+> remote names. REM-MODEL-01 asks for one readiness controller; the two
+> onboarding surfaces each answered "is this reachable" out of `configured` and
+> `provider_detected`, so a provider whose key the last check rejected was
+> reported ready on the last screen of first run.
+>
+> **REM-CHAT-02 is the remainder**, filed rather than claimed, as
+> [BUG-306](TO_BE_FIXED.md#bug-306--three-surfaces-carry-their-own-conversation-menu);
+> REM-MEM-03's source-controller half is
+> [BUG-305](TO_BE_FIXED.md#bug-305--two-source-controllers-and-nothing-that-owns-both).
+>
 > **Implementation status, 2026-09-18.** Eight more rows of §18.3 closed, and
 > each of them is recorded in [`FIXED_ITEMS.md`](FIXED_ITEMS.md) with the live
 > evidence behind it: REM-THREAD-03 as
@@ -2697,11 +2736,10 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 
 ### Launch, unlock, setup and Home
 
-> **REM-HOME-02 is closed**, as
+> **Every row in this table is closed.** REM-HOME-02 closed as
 > [FIXED-506](FIXED_ITEMS.md#fixed-506--home-reported-an-unread-readiness-check-as-nothing-to-worry-about):
 > healthy running work no longer reaches the attention rail, and an unread
-> readiness check is never an all-clear. The remaining rows in this table are
-> open.
+> readiness check is never an all-clear.
 
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
@@ -2713,14 +2751,23 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 
 ### Chat, Build and Design
 
+> **Three of the four closed on 2026-09-20** — REM-CHAT-01 as
+> [FIXED-581](FIXED_ITEMS.md#fixed-581--a-turns-own-evidence-was-on-another-route),
+> REM-BUILD-01 as
+> [FIXED-582](FIXED_ITEMS.md#fixed-582--builds-workbench-closed-itself-on-every-reload)
+> and REM-DESIGN-02 as
+> [FIXED-586](FIXED_ITEMS.md#fixed-586--the-picture-design-had-just-made-went-to-the-top-of-a-list).
+> **REM-CHAT-02 is the one row left in this table**, and it is tracked as
+> [BUG-306](TO_BE_FIXED.md#bug-306--three-surfaces-carry-their-own-conversation-menu).
+
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
-| REM-CHAT-01 / P2 / M | Move routine tool payloads, IDs and governance explanation into per-turn Evidence. | ChatView coordinates many domains; answers and requested decisions deserve the primary reading order. | Keep active approval, failure, source count and runtime destination visible when relevant. Use a shared expandable turn inspector with deep links and redacted payloads; test long streams and focus preservation. |
+| ~~REM-CHAT-01~~ **closed** — [FIXED-581](FIXED_ITEMS.md#fixed-581--a-turns-own-evidence-was-on-another-route) | Move routine tool payloads, IDs and governance explanation into per-turn Evidence. | ChatView coordinates many domains; answers and requested decisions deserve the primary reading order. | Keep active approval, failure, source count and runtime destination visible when relevant. Use a shared expandable turn inspector with deep links and redacted payloads; test long streams and focus preservation. |
 | REM-CHAT-02 / P2 / M | Merge duplicated conversation menus and model-selection logic into shared commands/controllers. | Different entry points should invoke the same rename, archive, branch, retry and model override semantics. | Inventory handlers in Chat, Threads and session detail; retain context-specific permissions and explicit destructive confirmation. Test retry after an ambiguous external effect and archived conversation discovery. |
-| REM-BUILD-01 / P2 / M | Remove simultaneous default exposure of every file/artifact/command/evidence pane. | BuildView carries repository, transcript and multiple inspectors; the next action should determine which inspector is open. | Keep file tree optional and one primary inspector, preserving panel state and accessible toggles. Show approval diff before a write and failed test output when diagnosing; test narrow viewport and unsaved edits. |
+| ~~REM-BUILD-01~~ **closed** — [FIXED-582](FIXED_ITEMS.md#fixed-582--builds-workbench-closed-itself-on-every-reload) | Remove simultaneous default exposure of every file/artifact/command/evidence pane. | BuildView carries repository, transcript and multiple inspectors; the next action should determine which inspector is open. | Keep file tree optional and one primary inspector, preserving panel state and accessible toggles. Show approval diff before a write and failed test output when diagnosing; test narrow viewport and unsaved edits. |
 | ~~REM-BUILD-02~~ **closed** — [FIXED-521](FIXED_ITEMS.md#fixed-521--build-named-what-a-turn-would-touch-and-not-where-it-would-run) | Replace competing Project/repository/runtime/model selectors with one boundary summary and targeted edit actions. | These are distinct concepts but form one execution context. Simplification must make wrong-destination writes less likely. | Snapshot selection at submission; preview changed destination/scope before executing; use the same model override contract as Chat. Verify navigation and runtime loss cannot silently retarget work. |
 | ~~REM-DESIGN-01~~ **closed** — [FIXED-517](FIXED_ITEMS.md#fixed-517--design-recorded-a-size-it-never-sent) | Remove stale absence claims in comments/help and any controls unsupported by the selected endpoint/provider. | Current source includes edit source IDs and variation requests; preserve implemented functionality instead of removing it based on the old review. | Audit DesignView, shared Design components and routes_images together; generate controls from capability metadata. Test supported edits/variations and unsupported combinations, with truthful disabled reasons. |
-| REM-DESIGN-02 / P2 / M | Move generation history into an asset strip/library and advanced options into one inspector. | The selected artifact and prompt should stay central; a growing gallery should not push current work away. | Maintain version lineage, reference provenance, destination and undo/revert semantics. Reopen assets through Projects and Design and verify consistent identity after reload. Never hide provider disclosure for references. |
+| ~~REM-DESIGN-02~~ **closed** — [FIXED-586](FIXED_ITEMS.md#fixed-586--the-picture-design-had-just-made-went-to-the-top-of-a-list) | Move generation history into an asset strip/library and advanced options into one inspector. | The selected artifact and prompt should stay central; a growing gallery should not push current work away. | Maintain version lineage, reference provenance, destination and undo/revert semantics. Reopen assets through Projects and Design and verify consistent identity after reload. Never hide provider disclosure for references. |
 
 ### Models, popup and Permissions
 
@@ -2735,12 +2782,15 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 > one posture summary whose counts are the page's single status filter, the
 > read-only authority table demoted below the controls it summarises, and a row
 > whose detail asks the two questions once rather than stacking up to four
-> paragraphs about the same capability. REM-MODEL-01/02 and REM-POPUP-01 in this
-> table remain open.
+> paragraphs about the same capability. **REM-MODEL-01 closed on 2026-09-20** as
+> [FIXED-583](FIXED_ITEMS.md#fixed-583--first-run-asked-whether-a-provider-was-configured-not-whether-it-worked):
+> onboarding answered "is this provider reachable" out of `configured` and
+> `provider_detected`, so a rejected key read as usable. Every row in this table
+> is now closed.
 
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
-| REM-MODEL-01 / P2 / M | Merge duplicated provider readiness/default-model presentations across tabs and setup. | Five tabs already organize Models; adding more categories would recreate the old fragmentation. | One profile readiness controller powers onboarding, overview and composers. Keep tab-specific tasks; do not repeat an editable connection form in each. Test credential expiry and global/per-work override consistency. |
+| ~~REM-MODEL-01~~ **closed** — [FIXED-583](FIXED_ITEMS.md#fixed-583--first-run-asked-whether-a-provider-was-configured-not-whether-it-worked) | Merge duplicated provider readiness/default-model presentations across tabs and setup. | Five tabs already organize Models; adding more categories would recreate the old fragmentation. | One profile readiness controller powers onboarding, overview and composers. Keep tab-specific tasks; do not repeat an editable connection form in each. Test credential expiry and global/per-work override consistency. |
 | ~~REM-MODEL-02~~ **closed** — [FIXED-530](FIXED_ITEMS.md#fixed-530--the-routing-tab-opened-on-five-force-simulation-constants) | Move fallback/advisor routing and raw profile IDs to advanced detail. | Most users need selected model, locality, capability and cost before orchestration tuning. | Preserve explicit disclosure for a fallback that changes provider or data destination. Test no silent local-to-cloud fallback and inspectable routing evidence. |
 | ~~REM-POPUP-01~~ **closed** — [FIXED-528](FIXED_ITEMS.md#fixed-528--a-gear-opened-a-window-that-could-not-take-you-to-settings) | Replace “Settings & pages” and the overloaded gear contract with one clear navigation contract. | AllPagesDialog combines page navigation with every Settings subsection. Choose More as the launcher and provide direct Settings separately. | Keep destinations searchable, group them once, and maintain deep links. Verify keyboard focus, Escape/Back and mobile sheet behavior. Do not remove Command Palette execution features merely because page navigation overlaps. |
 | ~~REM-PERM-01~~ **closed** — [FIXED-513](FIXED_ITEMS.md#fixed-513--the-permissions-page-answered-what-am-i-looking-at-twice-and-led-with-neither) | Move the large read-only authority matrix below actionable permissions or collapse it into Details. | Top shortcuts now work; removing them would regress the repair. The matrix is useful evidence but not the owner's first task. | Keep one short effective-posture summary, actionable attention and Common permissions; full registry remains reachable. Verify matrix removal from default view cannot alter controls or hide denial explanations. |
@@ -2752,18 +2802,21 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 > **REM-THREAD-01 and REM-THREAD-02 are closed**, as
 > [FIXED-511](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace):
 > the work index filters, facets over everything that matched, and pages, and
-> the filters stay visible and applied while the owner types. The remaining rows
-> in this table are open.
+> the filters stay visible and applied while the owner types. **REM-TASK-01 and
+> REM-PROJ-02 closed on 2026-09-20**, as
+> [FIXED-584](FIXED_ITEMS.md#fixed-584--when-work-runs-and-how-it-runs-were-one-row-of-chips)
+> and [FIXED-585](FIXED_ITEMS.md#fixed-585--a-project-was-six-things-stacked-in-one-column):
+> every row in this table is now closed.
 
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
 | ~~REM-THREAD-01~~ **closed** — [FIXED-511](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace) | Remove the implicit board-to-global-search scope switch. | SearchChatView hides board filters and calls unscoped search on typing. Users should explicitly control whether search spans all work. | Preserve visible Project/kind filters in query mode; add an explicit Search all action. Implement owner-scoped server filters before paginating; test switching query modes with a Project selected. |
 | ~~REM-THREAD-02~~ **closed** — [FIXED-511](FIXED_ITEMS.md#fixed-511--threads-described-a-hundred-rows-and-called-it-a-workspace) | Replace the first-100 list masquerading as a complete filtered inventory. | workThreads defaults to 100 and the view derives Project choices from those results. Older projects can disappear. | Add bounded cursor pagination and independent authorized filter facets; show loading/has-more and empty-match versus empty-account states. Test over 100 threads and older-project results. Do not remove request bounds. |
 | ~~REM-THREAD-03~~ **closed** — [FIXED-559](FIXED_ITEMS.md#fixed-559--every-thread-opened-in-chat-including-the-ones-that-were-not) | Move technical session/turn inspection out of ordinary Threads results. | Threads resumes work; Observability Sessions verifies execution history. They should share detail links without becoming duplicate conversation libraries. | Route result rows to the proper work mode and matching turn; add Evidence to open the technical inspector. Preserve legacy session URLs and archived lookup. |
-| REM-TASK-01 / P2 / M | Separate timing from run mode; move parent/priority/internal orchestration controls into Details. | Keep Project and When visible because they materially change scope and execution. | Human schedule builder with timezone/preview; shared task commands power Home and Messaging. Verify cadence changes, missed runs and approval pauses without duplicate execution. |
+| ~~REM-TASK-01~~ **closed** — [FIXED-584](FIXED_ITEMS.md#fixed-584--when-work-runs-and-how-it-runs-were-one-row-of-chips) | Separate timing from run mode; move parent/priority/internal orchestration controls into Details. | Keep Project and When visible because they materially change scope and execution. | Human schedule builder with timezone/preview; shared task commands power Home and Messaging. Verify cadence changes, missed runs and approval pauses without duplicate execution. |
 | ~~REM-TASK-02~~ **closed** — [FIXED-533](FIXED_ITEMS.md#fixed-533--one-run-three-stop-buttons-and-two-of-them-threw-the-reason-away) | Merge competing Home/Tasks/live-board task lifecycle controls. | One run must have one Stop/Resume/Retry meaning; presentation may differ. | Shared controller reports requested versus completed cancellation and outcome_unknown. Keep live visualization optional; test repeated clicks and reconnects. |
 | ~~REM-PROJ-01~~ **closed** — [FIXED-529](FIXED_ITEMS.md#fixed-529--delete-was-the-same-size-and-one-click-away-as-new-chat) | Move Archive/Move/Delete from equal-weight card actions into a lifecycle menu. | Open/Continue and New work are primary; rare destructive actions need deliberate access. | Preserve typed/fresh confirmation where required, archive restore and exact managed-versus-attached deletion impact. Test continuing an archived project and moving without hierarchy cycles. |
-| REM-PROJ-02 / P2 / M | Replace the long detail stack with Overview plus Files/Work/Assets/Evidence sections. | ProjectsView currently stacks context, sessions, images, tasks and checkpoints. | Reuse Threads, artifact and evidence components scoped to the Project; avoid copied databases or mutation logic. Verify selection races, unsaved context and asset filing. |
+| ~~REM-PROJ-02~~ **closed** — [FIXED-585](FIXED_ITEMS.md#fixed-585--a-project-was-six-things-stacked-in-one-column) | Replace the long detail stack with Overview plus Files/Work/Assets/Evidence sections. | ProjectsView currently stacks context, sessions, images, tasks and checkpoints. | Reuse Threads, artifact and evidence components scoped to the Project; avoid copied databases or mutation logic. Verify selection races, unsaved context and asset filing. |
 
 ### Memory, Knowledge Map and usage
 
@@ -2772,14 +2825,17 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 > and
 > [FIXED-508](FIXED_ITEMS.md#fixed-508--the-folder-an-owner-added-was-not-always-the-folder-they-reviewed):
 > the graph states its own freshness, outdated requests are discarded, and a
-> reviewed source is the source that gets added. The remaining rows in this
-> table are open.
+> reviewed source is the source that gets added. **REM-MEM-03 closed on
+> 2026-09-20** as
+> [FIXED-587](FIXED_ITEMS.md#fixed-587--the-recall-engines-controls-were-on-the-page-for-reading-your-own-memories)
+> — in part: the two source controllers it also names are
+> [BUG-305](TO_BE_FIXED.md#bug-305--two-source-controllers-and-nothing-that-owns-both).
 
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
 | ~~REM-MEM-01~~ **closed** — [FIXED-561](FIXED_ITEMS.md#fixed-561--seven-equally-prominent-actions-on-every-memory-card) | Move card-level lifecycle/score controls into one record drawer. | Keep Edit, Pin and More plus provenance/expiry summary; avoid seven equally prominent actions. | Drawer uses canonical memory revision and exposes archive/expiry/delete consequences separately. Test conflict recovery and old bookmarked records. |
 | ~~REM-MEM-02~~ **closed** — [FIXED-518](FIXED_ITEMS.md#fixed-518--last-used-collapsed-five-events-into-one-word) | Remove ambiguous “age” or “used” claims that collapse separate timestamps/events. | Created, verified, included in context, cited and expires are distinct; retrieval is not proof the model relied on a fact. | Extend existing usage data rather than duplicating counters. Show meaningful labels and source turns; treat pinned stale facts as review candidates, not immortal truth. |
-| REM-MEM-03 / P2 / M | Move embedding/backend controls from personal review into engine settings; merge source administration with Map. | Memory owns approved facts/retention, Map explains relationships, and one source controller owns scope/indexing. | Keep recall health and repair link in Memory; share add/revoke/import flows. Verify revocation/tombstones suppress recall and graph output without deleting original external files. |
+| ~~REM-MEM-03~~ **closed** — [FIXED-587](FIXED_ITEMS.md#fixed-587--the-recall-engines-controls-were-on-the-page-for-reading-your-own-memories) | Move embedding/backend controls from personal review into engine settings; merge source administration with Map. | Memory owns approved facts/retention, Map explains relationships, and one source controller owns scope/indexing. | Keep recall health and repair link in Memory; share add/revoke/import flows. Verify revocation/tombstones suppress recall and graph output without deleting original external files. |
 | ~~REM-MAP-01~~ **closed** — [FIXED-530](FIXED_ITEMS.md#fixed-530--the-routing-tab-opened-on-five-force-simulation-constants) | Move Groups/Display/Forces/Motion from all-open panels into advanced display settings. | BrainView opens five settings disclosures simultaneously; force constants are visualization tuning, not knowledge management. | Default to search, filters, Fit and selected record; preserve advanced preferences. Keep reduced-motion behavior and test keyboard graph navigation. |
 | ~~REM-MAP-02~~ **closed** — [FIXED-552](FIXED_ITEMS.md#fixed-552--a-brand-new-knowledge-map-was-given-three-records-nobody-had-made) | Replace synthetic starter graph nodes with a clear empty state and optional labelled illustration. | Existing nodes are flagged is_real:false and Starter view, so they are not covert fabricated records. Removing their selectable record-like behavior reduces confusion. | Offer Add source and Open Memory; exclude instructional objects from counts, search, provenance, export and selection actions. Verify truly empty versus filtered-empty states. |
 | ~~REM-MAP-03~~ **closed** — [FIXED-507](FIXED_ITEMS.md#fixed-507--a-stale-knowledge-graph-called-itself-live-and-a-failed-refresh-erased-it), [FIXED-508](FIXED_ITEMS.md#fixed-508--the-folder-an-owner-added-was-not-always-the-folder-they-reviewed) | Replace stale “Live workspace graph” and overlapping source-review state. | See NEW-MAP-01/02; these are correctness changes, not cosmetic simplification. | Timestamp actual successful data, discard outdated requests, snapshot reviewed source identity and show stale/error state. Test slow responses, changing source and closing the dialog. |
@@ -2818,9 +2874,9 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 | ~~REM-SET-SECURITY~~ **closed** — [FIXED-566](FIXED_ITEMS.md#fixed-566--four-security-lifecycles-under-one-heading) | Split the long Security & sign-in stack into sign-in/devices, vault, findings and standing access. | Encryption, TOTP, scanning and grants have different operational lifecycles. | Use contextual sections without weakening controls; emergency pause stays readily available. Verify revocation, recovery and redacted secrets. |
 | ~~REM-SET-PRIVACY~~ **closed** — [FIXED-520](FIXED_ITEMS.md#fixed-520--privacy-was-one-toggle-under-a-heading-that-named-the-whole-subject) | Replace broad privacy slogans with specific retained-data and outbound-data inventory. | Privacy.svelte focuses on retained working; hosted model and channel behavior must remain explicit. | Link retention/recall controls and per-service destinations; distinguish local records from external copies and backup limits. |
 | ~~REM-SET-ACCOUNT~~ **closed** — [FIXED-547](FIXED_ITEMS.md#fixed-547--a-lost-response-was-reported-as-a-failed-deletion) / P1 / S | Remove internal principal language and misleading cancellation during deletion. | Use authorized display name/username while ownership stays immutable; fresh confirmation remains. | Recheck current Account deletion handling before editing; test pending deletion, lost response and account rename across surfaces. Do not repeat an already fixed defect as current. |
-| REM-SET-WEB / P2 / M | Move immutable deployment configuration into read-only Details; retain editable destination rules and a bounded check. | WebAccess's “Set outside this app” should explain who can remedy it, not appear as editable policy. | Show source/effective revision and private-service grant policy. Test redirects, denied probes and stale rules. |
-| REM-SET-GIT / P2 / M | Move manual token entry and standing command grants behind guided credential setup. | Repository/host/operation scope should precede secret entry. | Prefer supported OAuth/credential manager, preserve scoped token fallback; test expiry, revoke and wrong-host requests. |
-| REM-SET-RUNTIME / P2 / M | Move ports/host keys/TTL internals into Advanced; merge duplicated readiness displays with Models/Observability. | Runtime settings should guide execution target and access boundary, not teach all adapter internals first. | Keep host-key verification and scope preview mandatory when applicable; test remote loss with no silent host fallback. |
+| ~~REM-SET-WEB~~ **closed** — [FIXED-579](FIXED_ITEMS.md#fixed-579--deployment-configuration-looked-like-policy-this-page-could-change) | Move immutable deployment configuration into read-only Details; retain editable destination rules and a bounded check. | WebAccess's “Set outside this app” should explain who can remedy it, not appear as editable policy. | Show source/effective revision and private-service grant policy. Test redirects, denied probes and stale rules. |
+| ~~REM-SET-GIT~~ **closed** — [FIXED-578](FIXED_ITEMS.md#fixed-578--the-git-credential-answered-whichever-host-git-happened-to-ask-about) | Move manual token entry and standing command grants behind guided credential setup. | Repository/host/operation scope should precede secret entry. | Prefer supported OAuth/credential manager, preserve scoped token fallback; test expiry, revoke and wrong-host requests. |
+| ~~REM-SET-RUNTIME~~ **closed** — [FIXED-580](FIXED_ITEMS.md#fixed-580--runtime-configuration-taught-adapter-internals-before-it-guided-a-target) | Move ports/host keys/TTL internals into Advanced; merge duplicated readiness displays with Models/Observability. | Runtime settings should guide execution target and access boundary, not teach all adapter internals first. | Keep host-key verification and scope preview mandatory when applicable; test remote loss with no silent host fallback. |
 | ~~REM-SET-UPDATES~~ **closed** — [FIXED-515](FIXED_ITEMS.md#fixed-515--an-installation-nobody-had-checked-reported-itself-up-to-date) | Remove any success wording based only on a version check. | Available, downloaded, verified, installed and restart-required are different states. | Preserve signed verification, release notes, schema compatibility and supported rollback. Test interrupted installation and tampered artifact. |
 | ~~REM-SET-STORAGE~~ **closed** — [FIXED-537](FIXED_ITEMS.md#fixed-537--a-settings-page-nobody-could-reach-said-everything-stays-on-this-machine) / P2 / S | Delete Storage.svelte only if full reference checks prove it unused; remove its misleading copy wherever reused. | Current module presents record counts as Local usage and claims everything stays on one machine. Neither establishes storage bytes or global privacy. | Search imports, tests, generated routes and packaging; if retained, rename to record counts and state actual data location. Do not delete user databases or migrations. |
 | ~~REM-APPROVAL~~ **closed** — [FIXED-519](FIXED_ITEMS.md#fixed-519--an-approval-with-no-diff-answered-what-would-this-do-with-a-request-body) | Move raw payloads below consequence previews; merge duplicated prompt/detail mutation handlers. | Approval must remain prominent and decision-quality, with destination/diff/scope/expiry visible before confirmation. | One decision controller resolves exactly one revision; test changed arguments, expired request and deny/revoke. Keep redacted full evidence available. |

@@ -4,6 +4,7 @@
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
+  import TabStrip from "../components/TabStrip.svelte";
   import PageState from "../components/PageState.svelte";
   import PathPicker from "../components/PathPicker.svelte";
   import ProjectTreeNode from "../components/ProjectTreeNode.svelte";
@@ -52,6 +53,41 @@
 
 
   let detail = $state<ProjectDetail | null>(null);
+  /**
+   * REM-PROJ-02 — the project's own sections, rather than one long column.
+   *
+   * The detail stacked context, files, sessions, images, tasks and checkpoints
+   * on top of each other, all open, every time: an owner who came to read the
+   * instructions scrolled past four lists to find them, and an owner who came
+   * for the checkpoints scrolled past everything. These are five different
+   * jobs, so they are five sections, and the one that answers "what is this
+   * project" leads.
+   *
+   * Nothing is fetched per section: the project's detail, tasks and images are
+   * read once on selection, exactly as before. Switching sections shows what is
+   * already in hand.
+   */
+  const DETAIL_SECTIONS = [
+    { id: "overview", label: "Overview" },
+    { id: "files", label: "Files" },
+    { id: "work", label: "Work" },
+    { id: "assets", label: "Assets" },
+    { id: "evidence", label: "Evidence" },
+  ] as const;
+  type DetailSection = (typeof DETAIL_SECTIONS)[number]["id"];
+  let detailSection = $state<DetailSection>("overview");
+  /**
+   * The instructions as they were read, so an unsaved edit can say it is unsaved.
+   *
+   * Moving the context behind a section makes losing track of an unsaved edit
+   * possible in a way a single column did not, so the page says so instead: the
+   * edit is kept, the section that holds it is marked, and the mark goes when it
+   * is saved.
+   */
+  let contextBaseline = $state("");
+  const contextDirty = $derived(
+    detail !== null && (detail.context.instructions ?? "") !== contextBaseline,
+  );
   let detailError = $state<string | null>(null);
   /*
    * BUG-282 — the images made while this project was the working one.
@@ -141,6 +177,8 @@
     contextError = null;
     try {
       await api.saveProjectContext(detail.project.project_id, detail.context);
+      // Saved is the new baseline, so the section stops saying it is unsaved.
+      contextBaseline = detail.context.instructions ?? "";
     } catch (e) {
       contextError = e instanceof ApiError ? `Could not save context (${e.status}).` : "Could not save context.";
     } finally {
@@ -360,6 +398,8 @@
   function closeDetail() {
     selectionSeq += 1;
     detail = null;
+    detailSection = "overview";
+    contextBaseline = "";
     detailError = null;
     files = null;
     filesError = null;
@@ -384,6 +424,9 @@
       const loaded = await api.project(projectId);
       if (seq !== selectionSeq) return;
       detail = loaded;
+      // A new project opens on its overview, with nothing unsaved.
+      detailSection = "overview";
+      contextBaseline = loaded.context.instructions ?? "";
       await loadProjectContext(projectId, seq);
     } catch (e) {
       if (seq !== selectionSeq) return;
@@ -702,16 +745,40 @@
           </div>
         </div>
         {#if exportError}<p class="error" role="alert">{exportError}</p>{/if}
+
+        <TabStrip
+          tabs={DETAIL_SECTIONS.map((section) => ({ id: section.id, label: section.label }))}
+          selected={detailSection}
+          onselect={(id: string) => (detailSection = id as DetailSection)}
+          label="Project sections"
+        />
+        {#if contextDirty && detailSection !== "overview"}
+          <p class="sub unsaved" role="status">
+            Project context has unsaved changes. They are kept — open
+            <strong>Overview</strong> to save them.
+          </p>
+        {/if}
+
+        {#if detailSection === "overview"}
         <h3 class="kicker">Project context</h3>
         <p class="sub">Instructions and shared files are included only in chats already assigned to this project. Project memory follows this folder's setting or its nearest ancestor.</p>
-        <textarea class="input context-input" aria-label="Project instructions" bind:value={detail.context.instructions} maxlength="4000" placeholder="Project-specific instructions…"></textarea>
-        <label class="check-row">Project memory
+        <!-- REM-PROJ-02 — the two context fields as two fields. A `<textarea>`
+             sizes itself from its `cols` default, so it sat at about a fifth of
+             the card with the memory control beside it, reading as a caption on
+             a dropdown rather than as the project's instructions. -->
+        <div class="context-fields">
+        <label class="context-field">
+          <span>Instructions</span>
+          <textarea class="input context-input" aria-label="Project instructions" bind:value={detail.context.instructions} maxlength="4000" placeholder="Project-specific instructions…"></textarea>
+        </label>
+        <label class="context-field">Project memory
           <select class="input" bind:value={detail.context.memory_mode} aria-label="Project memory setting">
             <option value="inherit">Inherit from parent</option>
             <option value="enabled">Include approved project memory</option>
             <option value="disabled">Do not include project memory</option>
           </select>
         </label>
+        </div>
         <p class="sub">Shared attachment IDs: {detail.context.attachment_ids.length ? detail.context.attachment_ids.join(", ") : "none"}</p>
         <button type="button" class="btn btn-sm" onclick={() => void saveContext()} disabled={savingContext}>{savingContext ? "Saving…" : "Save context"}</button>
         {#if contextError}<p class="error" role="alert">{contextError}</p>{/if}
@@ -728,6 +795,17 @@
           </div>
         {/if}
         {#if attachError}<p class="error" role="alert">{attachError}</p>{/if}
+        <!-- The overview ends with what the project *is*: how many of each kind
+             of thing is under it, so a section is opened deliberately rather
+             than to find out whether it holds anything. -->
+        <dl class="section-counts">
+          <div><dt>Files</dt><dd>{files?.files.length ?? 0}{files?.truncated ? "+" : ""}</dd></div>
+          <div><dt>Sessions</dt><dd>{detail.sessions.length}</dd></div>
+          <div><dt>Tasks</dt><dd>{projectTasks.length}</dd></div>
+          <div><dt>Images</dt><dd>{projectImages.length}</dd></div>
+          <div><dt>Checkpoints</dt><dd>{detail.checkpoints.length}</dd></div>
+        </dl>
+        {:else if detailSection === "files"}
         <ProjectExplorer
           projectId={detail.project.project_id}
           rootKind={detailRootKind}
@@ -739,6 +817,7 @@
                line rather than the file list, which no longer depends on it. -->
           <p class="sub" role="status">{filesError}</p>
         {/if}
+        {:else if detailSection === "work"}
         <h3 class="kicker">Sessions</h3>
         {#if detail.sessions.length === 0}
           <p class="sub">No sessions yet — chats started while this project is active land here.</p>
@@ -753,9 +832,29 @@
             {/each}
           </ul>
         {/if}
+        <h3 class="kicker">Work under this project</h3>
+        {#if projectTasks.length === 0}
+          <p class="sub">
+            No tasks are scoped to this project. Tasks created while it is active land here.
+          </p>
+        {:else}
+          <ul class="plain-list">
+            {#each projectTasks.slice(0, 8) as task (task.task_id)}
+              <li>
+                <span>{task.title}</span>
+                <span class="sub">{humanize(task.status)}</span>
+                <span class="sub" title={task.updated_at}>{relativeTime(task.updated_at)}</span>
+              </li>
+            {/each}
+          </ul>
+          <a class="cross-link" href="#/tasks">Open Tasks</a>
+        {/if}
+
         <!-- BUG-282 / the Work project — "generated images belong to the Project
              automatically when created there". They are material, so they sit
-             with the files rather than in a gallery of their own. -->
+             with the project's own things rather than in a gallery of their
+             own; REM-PROJ-02 gives them the Assets section beside Files. -->
+        {:else if detailSection === "assets"}
         <h3 class="kicker">Images</h3>
         {#if projectImages.length === 0}
           <p class="sub">
@@ -795,24 +894,8 @@
           >
         {/if}
 
-        <h3 class="kicker">Work under this project</h3>
-        {#if projectTasks.length === 0}
-          <p class="sub">
-            No tasks are scoped to this project. Tasks created while it is active land here.
-          </p>
-        {:else}
-          <ul class="plain-list">
-            {#each projectTasks.slice(0, 8) as task (task.task_id)}
-              <li>
-                <span>{task.title}</span>
-                <span class="sub">{humanize(task.status)}</span>
-                <span class="sub" title={task.updated_at}>{relativeTime(task.updated_at)}</span>
-              </li>
-            {/each}
-          </ul>
-          <a class="cross-link" href="#/tasks">Open Tasks</a>
-        {/if}
 
+        {:else if detailSection === "evidence"}
         <h3 class="kicker">Checkpoints</h3>
         {#if detail.checkpoints.length === 0}
           <p class="sub">No checkpoints for this project's sessions yet.</p>
@@ -827,6 +910,7 @@
             {/each}
           </ul>
           <a class="cross-link" href="#/checkpoints">Open the checkpoint timeline</a>
+        {/if}
         {/if}
       </section>
     {/if}
@@ -976,6 +1060,21 @@
     margin-top: 0.6rem;
     flex-wrap: wrap;
   }
+  .context-fields { display: grid; gap: var(--space-3); margin: var(--space-3) 0; }
+  .context-field { display: grid; gap: 0.35rem; color: var(--text-2); font-size: var(--text-sm); }
+  .context-field > span { font-weight: 650; }
+  .context-input { width: 100%; min-height: 6rem; resize: vertical; }
+  /* REM-PROJ-02 — the project's counts, so a section is opened deliberately
+     rather than to find out whether it holds anything. */
+  .section-counts {
+    display: flex; flex-wrap: wrap; gap: var(--space-4);
+    margin: var(--space-4) 0 0; padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+  }
+  .section-counts div { display: grid; gap: 0.1rem; }
+  .section-counts dt { color: var(--text-3); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; }
+  .section-counts dd { margin: 0; color: var(--text-1); font-size: var(--text-lg); }
+  .unsaved { margin-top: var(--space-3); }
   .detail-head {
     display: flex;
     align-items: center;

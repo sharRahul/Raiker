@@ -42,5 +42,9 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { id: "web-access", label: "Web access", icon: "connections", group: "Developer & runtime" },
   { id: "git-credential", label: "Git credential", icon: "branch", group: "Developer & runtime" },
   { id: "runtime", label: "Runtime configuration", icon: "system", group: "Developer & runtime" },
+  // REM-MEM-03 — the recall engine's own configuration. Memory keeps the
+  // owner's facts and the sentence that says whether recall matches meaning;
+  // which space it searches, and building one, are engine settings.
+  { id: "memory-engine", label: "Memory engine", icon: "memory", group: "Developer & runtime" },
   { id: "updates", label: "Updates", icon: "refresh", group: "Developer & runtime" },
 ];

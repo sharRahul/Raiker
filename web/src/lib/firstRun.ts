@@ -22,6 +22,7 @@
  */
 import type { ModelProfile } from "./apiTypes";
 import { providerName } from "./format";
+import { isReachableProfile } from "./modelReadiness.svelte";
 
 /** The stages first launch actually shows, in order. */
 export const SETUP_STAGES = ["welcome", "model", "privacy", "finish"] as const;
@@ -91,8 +92,13 @@ export interface RecommendedPath {
  * inventing one would be a screen guessing on the owner's behalf.
  */
 export function recommendedPath(profiles: ModelProfile[]): RecommendedPath | null {
+  // REM-MODEL-01 — the recommendation passes through the one reachability
+  // answer, so a runtime this machine is running but whose last check found no
+  // model, or a connected account whose key was rejected, is not offered as the
+  // cheapest path to a working model.
   const detected = profiles.find(
-    (profile) => profile.local_only && profile.provider_detected === true,
+    (profile) =>
+      profile.local_only && profile.provider_detected === true && isReachableProfile(profile),
   );
   if (detected) {
     return {
@@ -103,7 +109,9 @@ export function recommendedPath(profiles: ModelProfile[]): RecommendedPath | nul
         "It needs no account and no API key, and its models never leave this device.",
     };
   }
-  const connected = profiles.find((profile) => profile.connection_configured === true);
+  const connected = profiles.find(
+    (profile) => profile.connection_configured === true && isReachableProfile(profile),
+  );
   if (connected) {
     return {
       profileId: connected.profile_id,

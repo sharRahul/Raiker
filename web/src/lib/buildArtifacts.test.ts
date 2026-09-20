@@ -1,6 +1,15 @@
 // The pane focuses itself, and knows when not to.
-import { describe, expect, it } from "vitest";
-import { ARTIFACT_TABS, changesSummary, focusFor, type ArtifactTab } from "./buildArtifacts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  ARTIFACT_TABS,
+  changesSummary,
+  focusFor,
+  readWorkbenchOpen,
+  readWorkbenchTab,
+  rememberWorkbenchOpen,
+  rememberWorkbenchTab,
+  type ArtifactTab,
+} from "./buildArtifacts";
 
 describe("the tab list", () => {
   it("is the four views the review names, in that order", () => {
@@ -75,5 +84,60 @@ describe("changesSummary", () => {
     const summary = changesSummary({ entries: [{ path: "a" }, { path: "b" }, { path: "c" }] });
     expect(summary.count).toBe(3);
     expect(summary.text).toBe("3 files changed and not committed.");
+  });
+});
+
+/**
+ * REM-BUILD-01 — the workbench comes back where it was left.
+ *
+ * The next action still decides which view comes forward; this is the other
+ * half, and the one the explorer has had since B13: a pane that closes itself
+ * on every reload is one an owner stops opening.
+ */
+describe("what the workbench remembers", () => {
+  afterEach(() => {
+    window.localStorage.removeItem("raiker.build.workbenchOpen");
+    window.localStorage.removeItem("raiker.build.workbenchTab");
+  });
+
+  it("starts closed on Changes, before anyone has left it anywhere", () => {
+    expect(readWorkbenchOpen()).toBe(false);
+    expect(readWorkbenchTab()).toBe("changes");
+  });
+
+  it("keeps the view and the open state it was left with", () => {
+    rememberWorkbenchOpen(true);
+    rememberWorkbenchTab("terminal");
+    expect(readWorkbenchOpen()).toBe(true);
+    expect(readWorkbenchTab()).toBe("terminal");
+  });
+
+  it("forgets an open pane that was closed again", () => {
+    rememberWorkbenchOpen(true);
+    rememberWorkbenchOpen(false);
+    expect(readWorkbenchOpen()).toBe(false);
+  });
+
+  it("selects Changes rather than nothing when the stored view is not a view", () => {
+    window.localStorage.setItem("raiker.build.workbenchTab", "diagnostics");
+    expect(readWorkbenchTab()).toBe("changes");
+  });
+
+  it("survives a storage that refuses to answer", () => {
+    const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    try {
+      expect(readWorkbenchOpen()).toBe(false);
+      expect(readWorkbenchTab()).toBe("changes");
+      expect(() => rememberWorkbenchOpen(true)).not.toThrow();
+      expect(() => rememberWorkbenchTab("runs")).not.toThrow();
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+    }
   });
 });

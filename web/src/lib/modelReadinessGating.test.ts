@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelReadinessView } from "./apiTypes";
 import {
   blocksSending,
+  isReachableProfile,
   isRevalidating,
   readinessForSelection,
   revalidateSelectedModel,
@@ -189,5 +190,72 @@ describe("what the composer says when nothing is selected", () => {
   it("blocks the turn either way — this is wording, not authority", () => {
     expect(blocksSending(readinessForSelection(null, 11))).toBe(true);
     expect(blocksSending(readinessForSelection(null, 0))).toBe(true);
+  });
+});
+
+
+/**
+ * REM-MODEL-01 — onboarding, the overview and the composers answer
+ * "could Raiker reach this profile right now" from one place.
+ *
+ * The first-run screen and the recommendation each used to answer it out of
+ * `configured` and `provider_detected`, neither of which has ever meant
+ * reachable: a provider whose key the last check rejected read as usable, so
+ * the last screen of first-run called a mode ready and the composer behind it
+ * could not send.
+ */
+describe("isReachableProfile", () => {
+  it("refuses a connected account whose last check rejected the key", () => {
+    expect(
+      isReachableProfile({
+        connection_configured: true,
+        off_machine: true,
+        readiness_state: "authentication_failed",
+      }),
+    ).toBe(false);
+  });
+
+  it("refuses a connected account that has run out of credit", () => {
+    expect(
+      isReachableProfile({
+        connection_configured: true,
+        off_machine: true,
+        readiness_state: "quota_exhausted",
+      }),
+    ).toBe(false);
+  });
+
+  it("refuses a detected runtime whose last check found no model", () => {
+    expect(
+      isReachableProfile({ provider_detected: true, readiness_state: "model_missing" }),
+    ).toBe(false);
+  });
+
+  it("accepts a connected account nothing has found fault with", () => {
+    expect(
+      isReachableProfile({
+        connection_configured: true,
+        off_machine: true,
+        readiness_state: "ready",
+      }),
+    ).toBe(true);
+  });
+
+  it("accepts a runtime this machine is running", () => {
+    expect(isReachableProfile({ provider_detected: true })).toBe(true);
+  });
+
+  it("accepts an aged-out observation, which is not a fault", () => {
+    expect(
+      isReachableProfile({ connection_configured: true, readiness_state: "stale" }),
+    ).toBe(true);
+  });
+
+  it("refuses a hosted provider with no credential, however configured", () => {
+    expect(isReachableProfile({ off_machine: true, configured: true })).toBe(false);
+  });
+
+  it("refuses a local profile that is neither configured nor detected", () => {
+    expect(isReachableProfile({ provider_detected: false })).toBe(false);
   });
 });

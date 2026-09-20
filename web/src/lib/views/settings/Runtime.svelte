@@ -266,31 +266,6 @@
   {/if}
 </section>
 
-<section class="settings-card" aria-labelledby="model-readiness-heading">
-  <div class="card-heading">
-    <span class="eyebrow">Model readiness</span>
-    <h3 id="model-readiness-heading">How long a model check stays good for</h3>
-  </div>
-  <label>
-    <span>Re-confirm after</span>
-    <small>Between 1 and 120 minutes. The default is 5.</small>
-    <input
-      type="number"
-      min="1"
-      max="120"
-      step="1"
-      value={readinessTtl}
-      onchange={(event) =>
-        save({
-          "models.readiness_ttl_minutes": Math.min(
-            120,
-            Math.max(1, Number(event.currentTarget.value) || 5),
-          ),
-        })}
-    />
-  </label>
-</section>
-
 <section class="settings-card environment-settings">
   <div class="card-heading"><span class="eyebrow">Execution targets</span><h3>Local, remote, and cloud environments</h3></div>
   {#if environments}
@@ -387,19 +362,58 @@
         <label>Pinned host public key<input bind:value={hostPublicKey} required placeholder="ssh-ed25519 AAAA…" /></label>
         <label>Host fingerprint<input bind:value={hostKeySha256} required pattern={"SHA256:[A-Za-z0-9+/]{43}"} placeholder="SHA256:…" /></label>
       {:else if environmentKind === "daytona"}
-        <label>Sandbox ID<input bind:value={sandboxId} required placeholder="sandbox-id" /></label><label>Maximum run cost (USD)<input type="number" min="0.01" step="0.01" bind:value={maxCost} /></label>
+        <label>Sandbox ID<input bind:value={sandboxId} required placeholder="sandbox-id" /></label>
+        <details class="form-advanced"><summary>Advanced</summary><label>Maximum run cost (USD)<input type="number" min="0.01" step="0.01" bind:value={maxCost} /></label></details>
       {:else}
         <label>Container runtime<select bind:value={containerRuntime}>{#each environments?.container_options?.runtimes ?? [] as runtime}<option value={runtime}>{runtimeName(runtime)}</option>{/each}</select></label>
         <label>Approved image<select bind:value={containerImage}>{#each environments?.container_options?.images ?? [] as image}<option value={image}>{image}</option>{/each}</select></label>
         <fieldset><legend>Container tools</legend>{#each environments?.container_options?.supported_tools ?? [] as tool}<label class="tool-choice"><input type="checkbox" checked={selectedContainerTools.includes(tool)} onchange={(event) => toggleContainerTool(tool, event.currentTarget.checked)} /> {tool}</label>{/each}</fieldset>
         <label>Allowed network domains<input bind:value={egressDomains} placeholder="api.example.com, *.packages.example" /><small>Exact domains or boundary-safe wildcards. Empty keeps networking off.</small></label>
-        <label>Allowed destination ports<input bind:value={egressPorts} inputmode="numeric" placeholder="443" /><small>Usually 443. Configuration alone never enables egress.</small></label>
+        <!-- The scope preview stays in the open — it is what the profile will
+             actually do to the repository — while the port list, which is 443
+             unless something unusual is going on, goes below it. -->
         <div class="boundary-preview"><span>Repository</span><strong>Read only</strong><i>→</i><span>Output</span><strong>Writable</strong></div>
+        <details class="form-advanced"><summary>Advanced</summary><label>Allowed destination ports<input bind:value={egressPorts} inputmode="numeric" placeholder="443" /><small>Usually 443. Configuration alone never enables egress.</small></label></details>
       {/if}
       {#if environmentKind !== "container"}<label>Credential environment variable<input bind:value={credentialEnv} required pattern={"[A-Z][A-Z0-9_]{2,127}"} /></label>
       <small>{environmentKind === "ssh" ? "The variable must contain the path to an OpenSSH private key; known-host verification stays strict." : "The variable must contain the Daytona API key. Every run reserves against cumulative spend; estimates remain reserved when provider billing data is unavailable."}</small>{/if}
       <button class="btn btn-primary" disabled={busy}>Save environment</button>
     </form>
+  </details>
+</section>
+
+<!-- REM-SET-RUNTIME — the page's first job is the execution target and the
+     boundary it runs behind, which is the decision an owner comes here to make.
+     The tuning below it is real and stays reachable, but it is an interval and a
+     port number: it does not belong above the thing it tunes. Model readiness in
+     particular is *reported* on Models and Observability — this is only the
+     window those two re-check on, so it says where it is read rather than
+     drawing a second readiness display here. -->
+<section class="settings-card advanced">
+  <details>
+    <summary>Advanced</summary>
+    <label>
+      <span>Re-confirm a model check after</span>
+      <small>
+        Between 1 and 120 minutes. The default is 5. Readiness itself is shown on
+        <a href="#/models">Models</a> and <a href="#/observe">Observability</a>; this is
+        the window they re-check on.
+      </small>
+      <input
+        type="number"
+        min="1"
+        max="120"
+        step="1"
+        value={readinessTtl}
+        onchange={(event) =>
+          save({
+            "models.readiness_ttl_minutes": Math.min(
+              120,
+              Math.max(1, Number(event.currentTarget.value) || 5),
+            ),
+          })}
+      />
+    </label>
   </details>
 </section>
 
@@ -468,6 +482,11 @@
   .reset-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:.45rem; }
   .reset-actions .danger { color:var(--danger); }
   details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; min-width:0; color:var(--text-2); font-size:var(--text-sm); } /* `minmax(0,1fr)` on the track is only half of it: a grid item's automatic minimum is its content, and a <select> is at least as wide as its longest option ('Daytona cloud workspace'), so the label held a 183px minimum inside a 152px track and bled at 390px. Found by the width sweep once it started covering Settings — FIXED-416. */ .environment-form input,.environment-form select { min-width:0; max-width:100%; background:var(--sunken); } .environment-form small,.environment-form button,.environment-form fieldset,.boundary-preview { grid-column:1/-1; } .environment-form fieldset { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:0; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-form fieldset legend { padding:0 .35rem; color:var(--text-2); font-size:var(--text-sm); } .environment-form .tool-choice { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:.35rem; color:var(--text-1); font-family:var(--font-mono); } .environment-form .tool-choice input { min-height:0; } .boundary-preview { display:grid; grid-template-columns:auto auto 1fr auto auto; align-items:center; gap:.55rem; padding:.7rem .8rem; border-left:3px solid var(--accent); background:var(--sunken); color:var(--text-3); font-size:var(--text-xs); } .boundary-preview strong { color:var(--text-1); } .boundary-preview i { text-align:center; color:var(--accent); font-style:normal; }
+  .advanced { margin-top: var(--space-5); }
+  .advanced summary { color: var(--text-2); }
+  .advanced label { margin-top: var(--space-3); }
+  .form-advanced { grid-column: 1 / -1; margin-top: 0; }
+  .form-advanced label { max-width: none; }
   .status { color: var(--ok); font-size: var(--text-sm); } .status.stopped { color: var(--warn); }
   .eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: .08em; font-size: var(--text-xs); font-weight: 700; }
   dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); padding: var(--space-4) 0; border-block: 1px solid var(--border); } dl div { display: grid; gap: .2rem; } dt { color: var(--text-3); font-size: var(--text-xs); } dd { margin: 0; }

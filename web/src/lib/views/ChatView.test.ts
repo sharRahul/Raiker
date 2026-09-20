@@ -2,7 +2,7 @@
 // response must actually re-render (Svelte 5 signals track the $state-proxied
 // turn, so mutations must go through it — this suite caught the raw-object
 // mutation bug where the UI stayed on "Working…" after the stream finished).
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
 import { stubFetch, openComposerAttach } from "../test-helpers";
@@ -729,8 +729,13 @@ describe("ChatView streaming transcript", () => {
     render(ChatView, { props: { sessionId: "sess_tools" } });
 
     await waitFor(() => expect(screen.getByText("Two lines changed.")).toBeInTheDocument());
-    expect(screen.getByText("Read file")).toBeInTheDocument();
-    expect(screen.getByText("README.md")).toBeInTheDocument();
+    // Scoped to the transcript's own list: REM-CHAT-01 added a collapsed
+    // evidence inspector under the turn that pairs each call with its action
+    // id, so the label is deliberately in two places — the reading order, and
+    // the record behind it.
+    const activity = within(screen.getByRole("list", { name: "What Raiker did in this turn" }));
+    expect(activity.getByText("Read file")).toBeInTheDocument();
+    expect(activity.getByText("README.md")).toBeInTheDocument();
   });
 
   it("shows an honest error when persisted history cannot be loaded", async () => {

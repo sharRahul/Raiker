@@ -271,6 +271,29 @@ that owns the conversation.
 **Build does the same thing**, except that a cited source opens *inline* under
 the answer rather than in a side pane — Build does not have one yet.
 
+### Evidence, under the turn it belongs to
+
+Every settled turn carries an **Evidence** disclosure. It is closed: the answer,
+the calls Raiker made, the approval it asked for and the sources it read are
+what the transcript is for, and none of them moves. Open it when you want to
+check how a turn happened rather than what it said, and it holds:
+
+- **the turn's own coordinate**, with a copy action, so you can name this exact
+  exchange somewhere else;
+- **each call paired with the action id** that identifies it in the audit log;
+- **the governed events the runtime recorded** for the turn, in time order —
+  the same records Observability holds, read where the turn is;
+- **Open the full record**, which opens this turn inside the
+  [Sessions inspector](dashboard-and-observability.md).
+
+Nothing is read until you open it, so a long conversation costs nothing to
+scroll. If the record cannot be read, the disclosure says so rather than showing
+an empty list — an empty list would be a claim that the turn did nothing.
+
+**Build has the same disclosure**, and while a turn is still running it shows
+the phases that turn is producing — gather, plan, act, verify — rather than
+waiting for a record that does not exist yet.
+
 ## Exporting a conversation
 
 The `⋯` menu above the transcript offers **Export conversation…** in both Chat

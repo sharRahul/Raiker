@@ -599,6 +599,16 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-575](#fixed-575--the-guard-against-contract-drift-was-a-second-hand-written-copy-of-the-contract) | Medium | API contract / CI | Fixed 2026-09-20 |
 | [FIXED-576](#fixed-576--the-conversation-library-lived-in-the-evidence-inspector) | Low | Sessions / Threads / web UI | Fixed 2026-09-20 |
 | [FIXED-577](#fixed-577--delete-was-off-the-bottom-of-the-menu-it-lived-in) | Medium | Sessions / web UI | Fixed 2026-09-20 |
+| [FIXED-578](#fixed-578--the-git-credential-answered-whichever-host-git-happened-to-ask-about) | Medium | Git credential / web UI | Fixed 2026-09-20 |
+| [FIXED-579](#fixed-579--deployment-configuration-looked-like-policy-this-page-could-change) | Low | Web access / web UI | Fixed 2026-09-20 |
+| [FIXED-580](#fixed-580--runtime-configuration-taught-adapter-internals-before-it-guided-a-target) | Low | Runtime settings / web UI | Fixed 2026-09-20 |
+| [FIXED-581](#fixed-581--a-turns-own-evidence-was-on-another-route) | Medium | Chat / Build / web UI | Fixed 2026-09-20 |
+| [FIXED-582](#fixed-582--builds-workbench-closed-itself-on-every-reload) | Low | Build / web UI | Fixed 2026-09-20 |
+| [FIXED-583](#fixed-583--first-run-asked-whether-a-provider-was-configured-not-whether-it-worked) | Medium | Models / onboarding | Fixed 2026-09-20 |
+| [FIXED-584](#fixed-584--when-work-runs-and-how-it-runs-were-one-row-of-chips) | Low | Tasks / web UI | Fixed 2026-09-20 |
+| [FIXED-585](#fixed-585--a-project-was-six-things-stacked-in-one-column) | Low | Projects / web UI | Fixed 2026-09-20 |
+| [FIXED-586](#fixed-586--the-picture-design-had-just-made-went-to-the-top-of-a-list) | Low | Design / web UI | Fixed 2026-09-20 |
+| [FIXED-587](#fixed-587--the-recall-engines-controls-were-on-the-page-for-reading-your-own-memories) | Low | Memory / settings | Fixed 2026-09-20 |
 
 ---
 
@@ -25431,3 +25441,340 @@ viewport coordinates, and closes when the page moves under it — and, live,
 `web/e2e/gcr-p2-and-bug-303-live.spec.ts`, which asserts that the element at
 Delete's own centre point *is* Delete. Reproduced by putting `position:
 absolute` back and watching the live assertion report "covered by MAIN".
+
+---
+
+## FIXED-578 — The git credential answered whichever host git happened to ask about
+
+**Severity: Medium. Area: Git credential / web UI. Status: Fixed 2026-09-20.
+Closes [REM-SET-GIT](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+
+**Observed — the page.** Settings → Git credential opened on a password field.
+An owner's first act was to paste a credential, and only afterwards could they
+find out what it would be used for, which host it would be offered to, or how
+to take it back. The row's decision is one sentence: *repository/host/operation
+scope should precede secret entry.*
+
+**Observed — the runtime.** Looking for what the page should say about the
+scope found that there was not one. The credential helper a governed push
+installed was three words long:
+
+```
+!f() { echo username=x-access-token; echo "password=$RAIKER_GIT_PUSH_TOKEN"; }; f
+```
+
+and it was installed as a plain `credential.helper`. Git asks a helper about
+the URL it is **currently contacting**, which is not always the URL the remote
+names — a redirect, an `insteadOf` rewrite or a submodule sends it somewhere
+else — and this one answered every one of them with the owner's GitHub token.
+`GitCredentialBroker.lend()` handed the same unscoped helper to any caller that
+passed its mapping to a child.
+
+**Root cause.** The host check lived one layer above the credential.
+`push_branch` refuses a remote whose host is not `github.com` (`GIT_PUSH_
+CREDENTIAL_HOSTS`), which is why this was not exploitable through a push today
+— but nothing about the *credential* knew which host it belonged to, so the
+property held by the arrangement of the callers rather than by the credential.
+
+**Fixed, in two layers that cannot both be lost.** `credential_config()` installs
+the helper under `credential.https://github.com.helper` and
+`credential.https://www.github.com.helper`, so git does not consult it for an
+address the credential does not belong to; and `credential_helper()` reads git's
+request off stdin and answers only when the `host=` line matches, so a caller
+that installs it unscoped still gets nothing for another host. Only `get` is
+answered, so nothing git decides to cache can write back through it. The host
+list has one definition: `GIT_PUSH_CREDENTIAL_HOSTS` is now `frozenset(CREDENTIAL_HOSTS)`.
+
+**Fixed — the page.** Three numbered steps, in the order a person decides: where
+it may be used (the hosts and operations, read from the runtime rather than
+written down again here), how it may be supplied, and then the field. The second
+step also says what Raiker deliberately does **not** use and why — a keychain
+answers for whichever account signed in last, which Raiker cannot name, scope or
+withdraw.
+
+**Evidence.** `tests/test_git_credential_grant.py` runs the real
+`git credential fill` against the real helper: GitHub is answered, two other
+hosts are not, and the in-helper check still holds when the helper is installed
+unscoped. `web/src/lib/views/settings/GitCredential.test.ts` holds the ordering
+and the scope's provenance. Live:
+`web/e2e/rem-p2-rows-2026-09-20-live.spec.ts` measures the field's `y` against
+the scope heading's on the rendered page —
+`docs/screenshots/2026-09-20-p2-rows/03-git-credential-scope-first.png`.
+
+---
+
+## FIXED-579 — Deployment configuration looked like policy this page could change
+
+**Severity: Low. Area: Web access / web UI. Status: Fixed 2026-09-20. Closes
+[REM-SET-WEB](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+
+**Observed.** Settings → Web access showed *Set outside this app* as a card of
+the same weight as the owner's own rules, immediately below them. It said the
+rules "cannot be removed here" and stopped — it never said who **could** remove
+them, so an owner who wanted one gone had nowhere to go. The page also never
+stated the number a fetch is actually evaluated against: `effective_count` came
+back on every read and was rendered nowhere, so an owner had to add three lists
+up themselves and hope the total matched. And the private-address guard said
+"This is not a setting" without answering the next question, which is whether
+some approval lifts it.
+
+**Fixed.** The fixed rules are a closed `<details>` marked *Read-only*, and each
+source names its own remedy: the environment list is set by whoever starts
+Raiker on this machine, before launch; the built-in list ships with the build.
+The blocked-destinations card leads with the effective total and the three
+sources that add up to it. The guard says, from `address_guard.editable` rather
+than from prose, that no setting and no approval lifts it.
+
+**Evidence.** `web/src/lib/views/settings/WebAccess.test.ts` — the count, both
+remedies, the disclosure closed by default, and the editable rules still in the
+open. Live, with the host started carrying one environment rule so the card has
+both sources:
+`docs/screenshots/2026-09-20-p2-rows/04-web-access-read-only-detail.png`.
+
+---
+
+## FIXED-580 — Runtime configuration taught adapter internals before it guided a target
+
+**Severity: Low. Area: Runtime settings / web UI. Status: Fixed 2026-09-20.
+Closes [REM-SET-RUNTIME](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+
+**Observed.** The page's second card was *Model readiness* — one number, the
+window a readiness check stays good for — above the execution targets, which are
+the decision an owner comes to this page to make. Readiness itself is reported
+on Models and Observability, so the card was also a third place the subject
+appeared. Inside the add-profile form, a container's destination **ports** sat
+beside the domains at the same weight as the boundary preview.
+
+**Fixed.** Agent runtime, then execution targets, then **Advanced**. The
+readiness window is inside the Advanced disclosure and says where readiness is
+actually read, linking both pages rather than drawing a third display of it. In
+the form, the scope preview stays in the open — it is what the profile will do
+to the repository — and the port list is in its own Advanced disclosure. Host
+key and fingerprint stay required and visible, as the row asks.
+
+**Evidence.** `web/src/lib/views/settings/Runtime.test.ts` — the target above
+the tuning, the disclosure closed, the window still reported to the runtime, and
+the container preview visible with the ports folded. Live, the ordering measured
+on the rendered page: `docs/screenshots/2026-09-20-p2-rows/05-runtime-advanced.png`.
+
+---
+
+## FIXED-581 — A turn's own evidence was on another route
+
+**Severity: Medium. Area: Chat / Build / web UI. Status: Fixed 2026-09-20.
+Closes [REM-CHAT-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+
+**Observed.** Chat's transcript says what a turn did in the owner's language,
+which is right. What it could not say was anything about **how**: the turn's
+coordinate, each call's action id, and the governed events the runtime wrote
+down all lived in the Sessions inspector. Checking one turn meant leaving the
+conversation, finding the session again and matching by timestamp. Build had
+half of it — a *How this turn was governed* disclosure built from the stream —
+and Chat had none, so the same question was answered two different ways on two
+surfaces and not at all on the third.
+
+**Fixed.** One shared component, `TurnEvidence.svelte`, under every settled turn
+in Chat and in place of Build's own disclosure. It is collapsed, so the primary
+reading order — the answer, the calls, the approval, the failure, the sources —
+is unchanged, and it **fetches nothing until it is opened**: a hundred-turn
+conversation issues no requests to render a hundred closed disclosures. Opened,
+it carries the turn's coordinate with a copy action and a deep link to the full
+record, each call paired with the action id that identifies it, and the governed
+events the runtime recorded. A record that cannot be read says so rather than
+rendering an empty list, because an empty list is a claim that the turn did
+nothing. Build keeps what only Build had: the phases of a turn that is still
+running, passed in rather than fetched.
+
+**Evidence.** `web/src/lib/components/TurnEvidence.test.ts` — nothing read until
+opened, read once, the action id, the deep link, the honest failure, and a
+running turn served from its phases. Live, against a real Anthropic turn:
+`docs/screenshots/2026-09-20-p2-rows/01-chat-evidence-closed.png` and
+`02-chat-evidence-open.png`, where the events are the ones this turn actually
+produced.
+
+---
+
+## FIXED-582 — Build's workbench closed itself on every reload
+
+**Severity: Low. Area: Build / web UI. Status: Fixed 2026-09-20. Closes
+[REM-BUILD-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+
+**Observed.** The row asks that the next action decide which inspector is open,
+and that panel state be preserved. The first half already shipped —
+`focusFor()` brings a tab forward for the event that just happened and returns
+null where pulling the owner away would interrupt them — and the second did
+not. Build's file explorer has remembered its width and its open state since
+B13, for the reason stated in `buildExplorer.ts`: a panel that closes itself
+every time is one an owner stops opening. The workbench did not, so an owner
+reading a failing command's output came back after a reload to a closed pane.
+
+**Fixed.** `readWorkbenchOpen`/`readWorkbenchTab` and their writers, beside the
+tab list they validate against, with the same discipline the width has: an
+unknown stored tab resolves to Changes rather than selecting nothing, and a
+storage that refuses to answer costs a preference rather than a panel. It is
+restored on mount and never as a drawer over a narrow window nobody asked to
+open, exactly as the explorer is not.
+
+**Evidence.** `web/src/lib/buildArtifacts.test.ts` — the default, the round
+trip, the close, the unknown tab and the blocked storage. Live, across a real
+reload: `docs/screenshots/2026-09-20-p2-rows/12-build-workbench-terminal.png`
+and `13-build-workbench-after-reload.png`.
+
+---
+
+## FIXED-583 — First run asked whether a provider was configured, not whether it worked
+
+**Severity: Medium. Area: Models / onboarding. Status: Fixed 2026-09-20. Closes
+[REM-MODEL-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+
+**Observed.** The row asks for one profile readiness controller behind
+onboarding, the overview and the composers. `modelReadiness.svelte.ts` already
+served the composers and the overview — and the two onboarding surfaces each
+answered the question themselves. `ModelSetupView.usable()` read
+`connection_configured || configured || provider_detected`, and
+`firstRun.recommendedPath()` read `provider_detected` and
+`connection_configured`. None of those has ever meant *reachable*: a provider
+whose key the last check **rejected** satisfies all of them.
+
+The cost is the one BUG-198 first found, one layer in. The last screen of first
+run calls a work mode ready from `usable()`, so an owner whose key had expired
+was told Chat was ready and met a composer that could not send — and the
+recommendation offered "the cheapest path to a working model" naming a backend
+the last check said does not work.
+
+**Fixed.** `isReachableProfile()` in the controller, beside `isChoosableModel()`
+and sharing its measured-bad gate. The two questions stay two functions because
+they have different right answers — a local profile nobody has checked is a
+legitimate *choice*, since the server takes the first check before admitting a
+turn, and is not something to call reachable — but neither can now be answered
+without the rule that a check which answered badly disqualifies the profile.
+Both onboarding call sites go through it.
+
+**Evidence.** `web/src/lib/modelReadinessGating.test.ts` — a rejected key, an
+exhausted quota and a runtime with no model are all refused; an aged-out
+observation, which is not a fault, is not. `web/src/lib/firstRun.test.ts` — the
+recommendation names neither of the first two.
+
+---
+
+## FIXED-584 — When work runs and how it runs were one row of chips
+
+**Severity: Low. Area: Tasks / web UI. Status: Fixed 2026-09-20. Closes
+[REM-TASK-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+
+**Observed.** The task composer offered `Task · Once · Routine · Background`,
+which is two questions wearing one control: two of those chips answer *when*
+and two answer *how*. An owner who wanted a background agent had to know the
+answer was filed under the timing row. And a schedule was a cadence and a
+`datetime-local` — no statement of which zone the time was read in, and no
+sight of the runs it would produce.
+
+**Fixed.** Two groups: **When to run** (Now · At a time · Repeating) and, only
+under *Now*, **How it runs** (One pass · Until it is done), because a background
+agent starts now and the runtime has no scheduled variant of it. `cadenceFor()`
+maps the pair back onto the same four `TaskCadence` values the runtime already
+accepts, so no combination it does not have can be composed. Parent, priority
+and the work method stay in Details, and Project and When stay visible, as the
+row requires.
+
+The start-time field says which zone it is read in, and a repeating schedule
+previews its next three runs — computed the way `next_run_after` computes them,
+anchored to the slot the owner picked and **skipping** slots that have already
+passed, so the preview cannot imply a backlog the scheduler would not run.
+
+**Evidence.** `web/src/lib/taskComposer.test.ts` — the round trip for all four
+shapes and five preview cases including the skipped slots.
+`tests/test_task_schedule_preview_contract.py` reads the preview's interval
+table out of the web module and holds it against
+`raiker.tasks.scheduler.RECURRING_INTERVALS`, so a cadence added or re-timed on
+one side and not the other fails in CI rather than on an owner's calendar. Live:
+`docs/screenshots/2026-09-20-p2-rows/08-tasks-two-questions.png` and
+`09-tasks-schedule-preview.png`.
+
+---
+
+## FIXED-585 — A project was six things stacked in one column
+
+**Severity: Low. Area: Projects / web UI. Status: Fixed 2026-09-20. Closes
+[REM-PROJ-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+
+**Observed.** The project detail stacked context, files, sessions, images, tasks
+and checkpoints, all open, every time. Whichever of the six an owner came for,
+they scrolled past the others to reach it. The instructions field made it worse:
+a `<textarea>` sizes itself from its `cols` default, so the project's
+instructions sat at about a fifth of the card with the memory control beside
+them, reading as a caption on a dropdown.
+
+**Fixed.** Overview, Files, Work, Assets, Evidence — the sections the row names,
+through the same `TabStrip` every other hub uses. Overview leads and ends with
+the project's own counts, so a section is opened deliberately rather than to
+find out whether it holds anything. Nothing is fetched per section: the
+project's detail, files, tasks and images are read once on selection, exactly as
+before, and the existing selection-race guard is untouched. The context fields
+are two stacked fields.
+
+Moving the context behind a section makes losing an unsaved edit possible in a
+way one column did not, so the page says so instead: the edit is kept, the other
+sections carry a line naming where it is, and the line goes when it is saved.
+
+**Evidence.** `web/src/lib/views/ProjectsView.test.ts` — the opening section,
+one section's content at a time, the unsaved-edit notice and its disappearance.
+Live: `docs/screenshots/2026-09-20-p2-rows/10-project-overview.png` and
+`11-project-unsaved-context.png`.
+
+---
+
+## FIXED-586 — The picture Design had just made went to the top of a list
+
+**Severity: Low. Area: Design / web UI. Status: Fixed 2026-09-20. Closes
+[REM-DESIGN-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+
+**Observed.** The row's rule is that the selected artifact and prompt stay
+central and a growing gallery does not push current work away. Design selected
+nothing after a generation: the canvas an owner had been composing on emptied
+itself at the moment their request succeeded, and the result arrived as the
+first row of a history that grows all day. The asset rail beside the canvas was
+an unnamed column of thumbnails, which reads as "some recent ones" rather than
+as the library it is.
+
+**Fixed.** A successful generation puts its own picture on the canvas — the
+generation the request returned, looked up after the reload, and only when it
+has an image: a refusal is recorded as a generation too, and a refusal has
+nothing to put on a canvas. It is read in the history, where its reason is. The
+rail says what it is and how many it holds.
+
+**Evidence.** `web/src/lib/views/DesignView.test.ts` — the canvas opens on the
+new picture, and does not open on a refusal. Found while writing it: that file's
+own fixture routed the capability gates to `/api/capabilities/gates`, which is
+not the route `api.capabilityGates()` reads, so every test in it had been
+running against an empty gate list and a composer that could not send. Invisible
+until something tried to send; corrected with the tests.
+
+---
+
+## FIXED-587 — The recall engine's controls were on the page for reading your own memories
+
+**Severity: Low. Area: Memory / settings. Status: Fixed 2026-09-20. Closes
+[REM-MEM-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions)
+in part; see [BUG-305](TO_BE_FIXED.md#bug-305--two-source-controllers-and-nothing-that-owns-both)
+for the half that remains.**
+
+**Observed.** Memory's *Recall & indexing* tab carried the embedding-space
+select and the index builder beside the owner's own approved facts. Which space
+recall searches is engine configuration; what Raiker has been allowed to
+remember is not. The row's decision is explicit about which half stays: *keep
+recall health and repair link in Memory.*
+
+**Fixed.** **Settings → Memory engine**, a new section in the Developer &
+runtime group, holds the recall-backend select and the index builder — including
+the confirmation that states how many records would leave this machine and
+where, which moved with the control rather than being left behind. Memory keeps
+the sentence that says whether recall is matching meaning or only words, and one
+link to the page that changes it.
+
+**Evidence.** `web/src/lib/views/settings/MemoryEngine.test.ts` — the build, the
+confirmation's wording, the backend change reaching the runtime, and the empty
+case. `web/src/lib/views/MemoryView.test.ts` asserts the health sentence, the
+repair link and that neither control is on that page any more. Live:
+`docs/screenshots/2026-09-20-p2-rows/06-memory-recall-health.png` and
+`07-settings-memory-engine.png`.

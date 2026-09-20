@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from raiker.runtime.git_credential import CREDENTIAL_HOSTS, credential_config
 from raiker.tools.filesystem import (
     PROTECTED_WORKSPACE_DIRS,
     resolve_workspace_path,
@@ -542,17 +543,21 @@ def create_commit(
 GIT_PUSH_TOKEN_ENV = "RAIKER_GITHUB_TOKEN"
 # The token above is a GitHub credential. Sending it to another forge because a
 # remote happens to be HTTPS would be a credential leak dressed up as a feature,
-# so a push is only offered for the host the credential belongs to.
-GIT_PUSH_CREDENTIAL_HOSTS: frozenset[str] = frozenset({"github.com", "www.github.com"})
+# so a push is only offered for the host the credential belongs to — and the
+# same list is what the credential helper below will answer for, so the check
+# above the push and the check inside the child cannot drift apart.
+GIT_PUSH_CREDENTIAL_HOSTS: frozenset[str] = frozenset(CREDENTIAL_HOSTS)
 _PUSH_TIMEOUT = 120
 _MAX_PREVIEW_COMMITS = 50
 # The value the inline credential helper reads. It is passed in the child's
 # environment rather than on the command line, so the token never appears in the
 # process table or in a captured command string.
 _PUSH_TOKEN_VAR = "RAIKER_GIT_PUSH_TOKEN"
-_CREDENTIAL_HELPER = (
-    f'!f() {{ echo username=x-access-token; echo "password=${_PUSH_TOKEN_VAR}"; }}; f'
-)
+
+
+def _credential_args() -> list[str]:
+    """The ``-c`` pairs that install the host-scoped credential helper."""
+    return [item for value in credential_config(_PUSH_TOKEN_VAR) for item in ("-c", value)]
 
 
 def push_egress_allowlist() -> frozenset[str]:
@@ -765,11 +770,10 @@ def push_branch(
         *_NO_HOOKS,
         # An empty helper first clears whatever the host has configured, so a
         # system keychain cannot quietly supply a different account's credential
-        # than the one the owner governed.
-        "-c",
-        "credential.helper=",
-        "-c",
-        f"credential.helper={_CREDENTIAL_HELPER}",
+        # than the one the owner governed; the entries after it install Raiker's
+        # helper against the credential's own hosts, so a redirect or a rewrite
+        # that sends git elsewhere is never offered this token.
+        *_credential_args(),
         "push",
         "--set-upstream",
         remote_name,

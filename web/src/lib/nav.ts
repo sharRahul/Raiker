@@ -208,6 +208,7 @@ export const HUB_TABS: Record<string, string[]> = {
     "web-access",
     "git-credential",
     "runtime",
+    "memory-engine",
     "updates",
   ],
 };

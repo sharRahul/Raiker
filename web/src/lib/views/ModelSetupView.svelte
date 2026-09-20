@@ -19,6 +19,7 @@
   import { api } from "../api";
   import type { ModelProfile, SetupState } from "../apiTypes";
   import { modelName } from "../modelPresentation";
+  import { isReachableProfile } from "../modelReadiness.svelte";
   import {
     PERMISSIONS_NOTE,
     PRIVACY_CHOICES,
@@ -145,18 +146,13 @@
     if (state === null) return false;
     return !state.model_deferred && (state.selected_model ?? "") !== "";
   });
-  /** A profile Raiker could actually reach: detected locally or connected. */
-  function usable(profile: ModelProfile): boolean {
-    return (
-      profile.connection_configured === true ||
-      profile.configured === true ||
-      profile.provider_detected === true
-    );
-  }
+  // REM-MODEL-01 — "could Raiker reach this" is answered in one place. This
+  // screen used to answer it here, out of `configured` and `provider_detected`,
+  // and so called a provider whose key the last check rejected usable.
   const imageReady = $derived(
     profiles.some(
       (profile) =>
-        usable(profile) &&
+        isReachableProfile(profile) &&
         ((profile.image_model ?? "") !== "" || (profile.image_models?.length ?? 0) > 0),
     ),
   );

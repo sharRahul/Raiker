@@ -609,6 +609,11 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-585](#fixed-585--a-project-was-six-things-stacked-in-one-column) | Low | Projects / web UI | Fixed 2026-09-20 |
 | [FIXED-586](#fixed-586--the-picture-design-had-just-made-went-to-the-top-of-a-list) | Low | Design / web UI | Fixed 2026-09-20 |
 | [FIXED-587](#fixed-587--the-recall-engines-controls-were-on-the-page-for-reading-your-own-memories) | Low | Memory / settings | Fixed 2026-09-20 |
+| [FIXED-588](#fixed-588--approving-an-action-held-the-whole-server-while-it-ran) | Medium | API / runtime concurrency | Fixed 2026-09-20 |
+| [FIXED-589](#fixed-589--a-backend-change-could-not-break-the-web-client-because-the-web-client-was-never-built) | Medium | CI | Fixed 2026-09-20 |
+| [FIXED-590](#fixed-590--a-turn-that-failed-blamed-the-local-runtime-for-it) | Medium | Chat / Build / provider errors | Fixed 2026-09-20 |
+| [FIXED-591](#fixed-591--retry-looked-the-same-whether-the-turn-had-sent-an-email-or-nothing) | Medium | Chat / Build / conversation commands | Fixed 2026-09-20 |
+| [FIXED-592](#fixed-592--two-kinds-of-source-and-nowhere-that-answered-what-can-raiker-read) | Low | Memory / Knowledge Map | Fixed 2026-09-20 |
 
 ---
 
@@ -25778,3 +25783,217 @@ case. `web/src/lib/views/MemoryView.test.ts` asserts the health sentence, the
 repair link and that neither control is on that page any more. Live:
 `docs/screenshots/2026-09-20-p2-rows/06-memory-recall-health.png` and
 `07-settings-memory-engine.png`.
+
+---
+
+## FIXED-588 — Approving an action held the whole server while it ran
+
+**Severity: Medium. Area: API / runtime concurrency. Status: Fixed 2026-09-20.
+Closes [GCR-05](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-05--run_coro-blocks-an-active-event-loop-thread).**
+
+**Observed.** Raiker's tool execution is synchronous by design — the broker
+walks a batch of governed actions one at a time — while every provider call
+underneath it is `async`. `raiker.runtime.async_bridge.run_coro` crosses that
+boundary, and when it is reached with a loop already running it moves the
+coroutine to a worker thread so it cannot conflict with that loop.
+
+The coroutine is then safe. The *caller* is not: it blocks until the coroutine
+finishes, and three `async def` routes were performing that synchronous
+execution inline, so the thread they blocked was the ASGI event loop.
+
+| Route | What it executes |
+|---|---|
+| `POST /api/images` | A hosted image generation |
+| `POST /api/memory/embedding-index` | Every eligible memory, through an embedding provider |
+| `POST /api/approvals/{id}` and the paired-channel relay | Whatever capability the approval approved |
+
+There was no error anywhere. The symptom was a server that stopped answering
+while one owner waited for a picture. A one-shot `ThreadPoolExecutor` was also
+created and destroyed per call, which is the smaller half of the same finding.
+
+**Root cause.** The hop off the loop was inside the bridge, which is one layer
+too late. By the time `run_coro` is reached, the synchronous work has already
+started on the loop's thread.
+
+**Fixed.** Each of those routes goes off the loop *before* the synchronous work
+starts, with `asyncio.to_thread` — the same hop the orchestrator already makes
+for the tool broker, for the reason recorded there: "cheap enough to run inline"
+is exactly the reasoning that put a `web_fetch` on the loop. `run_coro` then
+sees no running loop and takes the `asyncio.run` path, so the pool churn goes
+with it.
+
+**Guarded, not just fixed.** The bridge counts the calls that arrive with a loop
+already running. `tests/test_governed_execution_off_the_loop.py` drives each
+route with work that crosses the bridge and asserts the count never moves — and
+proves the guard works by doing what the routes used to do and watching it
+register. Removing the hop from `routes_images.py` and re-running was tried: the
+assertion fails with `1 == 0`.
+
+---
+
+## FIXED-589 — A backend change could not break the web client, because the web client was never built
+
+**Severity: Medium. Area: CI. Status: Fixed 2026-09-20. Closes the remainder of
+[GCR-15](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-15--backend-api-changes-can-bypass-frontend-ci).**
+
+**Observed.** `.github/workflows/web.yml` triggered on `web/**` and the workflow
+file. The web client consumes contracts the backend produces, so a backend-only
+change to an API route or a read DTO merged without the client ever being
+compiled against it and without the mocked end-to-end suite being run.
+
+Half of this closed earlier, in the Python job:
+[FIXED-575](#fixed-575--the-guard-against-contract-drift-was-a-second-hand-written-copy-of-the-contract)
+derives a field-for-field comparison between the backend dataclasses and
+`web/src/lib/apiTypes.ts`, so a dropped field fails there. What that cannot see
+is everything past the field names — a contract that matches exactly while the
+page reading it no longer builds.
+
+**Fixed.** The trigger names what the job is a guard for rather than where the
+files are: `raiker/api/**`, the four DTO modules the contract checker reads, and
+the checker itself. Both triggers share one anchored list, so a pull request and
+a push to `main` cannot be guarded by different rules.
+
+**Evidence.** `tests/test_web_workflow.py` holds the trigger against
+`scripts/check_api_contract.py`'s own `DTO_MODULES`: a module added to the
+checker but not to the trigger fails there rather than silently. It also asserts
+the job still does the thing the field comparison cannot — build the client and
+run the mocked suite — because widening a trigger onto a job that stopped doing
+either would be worse than not widening it.
+
+---
+
+## FIXED-590 — A turn that failed blamed the local runtime for it
+
+**Severity: Medium. Area: Chat / Build / provider errors. Status: Fixed
+2026-09-20. Closes [BUG-285](TO_BE_FIXED.md#bug-285--an-ollama-cloud-model-tests-and-runs-in-ollama-but-chat-cannot-use-it).**
+
+**Observed.** An Ollama model that passed the Models page's **Test connection**,
+and that answered under `ollama run`, ended a Chat turn with **"Could not reach
+the local runtime."**
+
+**Root cause, and it is the surface rather than the provider.** Chat and Build
+each ended a failed turn the same two ways, and both throw away the only part an
+owner can act on:
+
+* an `ApiError` became `Stream failed (500).` — the HTTP status and nothing
+  else, although the error carries the `reason_code` the runtime refused with,
+  and the status number cannot tell a rejected key from an exhausted quota from
+  a scope decision;
+* anything else became the blanket sentence, which is often simply false. A turn
+  that had already streamed tool rows plainly reached the runtime.
+
+The backend was already right: a provider failure yields a turn whose text is
+`provider_failure_message(code)` — a named sentence with the machine code — and
+writes `model_request_failed` with `safe_error_code`. Nothing about that reached
+the surfaces' own catch.
+
+**Fixed.** `web/src/lib/turnFailure.ts` is the one answer both surfaces use. A
+refusal carrying a reason code is reported as the runtime's own explanation with
+the code kept in the sentence; one carrying none says so with its status; and a
+dropped connection says the connection ended — naming what is known — and, when
+the turn had already produced something, says that what arrived is above.
+`reasonCodes.ts` gained the three scope refusals a turn can actually meet.
+
+**Interface outcome, met.** A turn reports the specific refusal rather than a
+generic reachability message. **The other branch of the entry's outcome — that
+a cloud-tagged Ollama model completes a turn — is not claimed**: it needs a host
+running Ollama with a `-cloud` profile, which this round did not have. What is
+fixed is that such a turn now says which refusal it met instead of blaming a
+service that is running.
+
+**Evidence.** `web/src/lib/turnFailure.test.ts` (five cases, including that the
+sentence no longer contains the old claim) and
+`web/src/lib/views/ChatView.test.ts`, whose "honest error" case now asserts the
+connection sentence and the absence of the reachability one.
+
+---
+
+## FIXED-591 — Retry looked the same whether the turn had sent an email or nothing
+
+**Severity: Medium. Area: Chat / Build / conversation commands. Status: Fixed
+2026-09-20. Closes [BUG-306](TO_BE_FIXED.md#bug-306--three-surfaces-carry-their-own-conversation-menu)
+and REM-CHAT-02, the last §18.3 row.**
+
+**Observed — the row.** Rename, archive, pin, move and retry are reachable from
+more than one place, and each place owned its own copy: its own API call, its
+own decision about whether to confirm, its own sentence when it failed. Nothing
+made them disagree, which is the condition under which the next change makes one
+of them disagree quietly.
+
+**Observed — what was actually wrong.** Writing the inventory found it.
+`retryPrompt` re-sent the prompt unconditionally:
+
+```ts
+function retryPrompt(text: string) {
+  if (streaming || text.trim() === "") return;
+  draft.text = text;
+  void submit();
+}
+```
+
+Retry re-runs the turn. A turn that wrote a file, ran a command or sent a
+message **does it again** — and the control looked identical whether the first
+attempt had done nothing or had pushed a branch. Build is where this is most
+expensive, and Build had the same four lines.
+
+**Fixed.** `web/src/lib/conversationCommands.ts` holds both halves. Each command
+carries its label, whether it confirms, and its failure sentence, so Threads no
+longer decides what "archive" means or how a refusal reads; archiving — the one
+command that takes a thread off the board it is resumed from — asks first, and
+the question says what is kept.
+
+And `retryConsequence` reads the turn's own settled calls. A call that
+*succeeded* in an effectful family — a write, a command, a repository, a
+connector, or a family Raiker does not recognise — is something a retry would do
+again, so the retry asks and **names what would happen twice**. A turn that only
+read is not asked about: a warning on every retry is a warning nobody reads. A
+refused or failed call is not counted, because it did not happen.
+
+**Evidence.** `web/src/lib/conversationCommands.test.ts` (nine cases, including
+that an unknown tool family counts as an effect rather than as a read),
+`web/src/lib/views/ChatView.test.ts` — the dialog names `Write file — notes.md`
+and declining sends nothing — and `web/src/lib/views/SearchChatView.test.ts`,
+where archiving now confirms and declining leaves the thread alone. Live, on a
+real Anthropic turn that used no tools:
+`web/e2e/bug-305-306-2026-09-20-live.spec.ts` asserts no dialog appears and the
+retry goes straight through.
+
+---
+
+## FIXED-592 — Two kinds of source, and nowhere that answered "what can Raiker read"
+
+**Severity: Low. Area: Memory / Knowledge Map. Status: Fixed 2026-09-20. Closes
+[BUG-305](TO_BE_FIXED.md#bug-305--two-source-controllers-and-nothing-that-owns-both),
+and with it the second clause of REM-MEM-03.**
+
+**Observed.** Raiker has two kinds of source. A **managed file** is bytes Raiker
+holds, copied into its own storage under `.raiker/memory-files/`. A **granted
+folder** is somewhere on this machine Raiker may read *in place*. Memory listed
+the first; the Knowledge Map listed the second; nothing listed both, so an owner
+asking what Raiker can read had to already know the distinction in order to find
+out.
+
+**What was not done, and why.** They are not merged into one store. The
+lifecycles genuinely differ, and merging them naively means either copying a
+folder nobody asked to copy or holding an upload as a path that can move. The
+two controllers stay two.
+
+**Fixed.** One inventory over both, and one door that stops a source — each
+still handled by the controller that owns it, so no revocation semantics are
+re-implemented. `GET /api/knowledge-sources` returns every source with the
+property that decides everything: `held`. A row says which kind it is, whether
+recall and the graph can currently reach it, and when it was added. **Memory →
+Sources** leads with it; adding stays where each kind's own add path is, which
+is the part that genuinely differs.
+
+**The property the row asks for, proved.** Revoking a granted folder drops every
+source indexed under it — so recall and the graph both stop answering from it —
+and **the owner's file is still on disk afterwards**. Revoking a managed file
+takes Raiker's own copy with it, which is the opposite, and getting either the
+wrong way round is a data-loss bug. Both directions are asserted.
+
+**Evidence.** `tests/test_knowledge_sources_inventory.py` — six cases, including
+the folder that survives its own revocation and the copy that does not — and
+`web/src/lib/components/KnowledgeSources.test.ts`, where the confirmation states
+which of those two will happen before either does. Live:
+`docs/screenshots/2026-09-20-sources-and-commands/02-knowledge-sources.png`.

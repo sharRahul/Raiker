@@ -57,7 +57,7 @@ The third pass adds more urgent correctness issues; see the companion document a
 | GCR-02 | High | P1 | `ModelRouter.select_profile()` and `launch()` can leak provider HTTP clients — **Closed 2026-09-06 ([FIXED-430](FIXED_ITEMS.md#fixed-430--five-surfaces-asked-would-this-model-run-by-building-one-and-dropping-it))** |
 | GCR-03 | Medium/High | P1 | `ModelRouter.set_reasoning()` validates against the first registry profile rather than the active/default runtime profile — **Closed 2026-09-06 ([FIXED-431](FIXED_ITEMS.md#fixed-431--a-reasoning-setting-judged-against-whichever-profile-was-first-in-the-file))** |
 | GCR-04 | Medium | P2 | `ModelRouter.generate()` accepts `context` but ignores it — **Closed 2026-09-06 ([FIXED-434](FIXED_ITEMS.md#fixed-434--two-public-parameters-that-changed-nothing))** |
-| GCR-05 | Medium | P1 | `run_coro()` blocks an already-running event loop and creates a thread pool per call |
+| GCR-05 | Medium | P1 | `run_coro()` blocks an already-running event loop and creates a thread pool per call — **Closed 2026-09-20 ([FIXED-588](FIXED_ITEMS.md#fixed-588--approving-an-action-held-the-whole-server-while-it-ran))** |
 | GCR-06 | High | P0/P1 | Module-global command workspace creates a cross-instance/concurrency race — **Closed 2026-09-06 ([FIXED-432](FIXED_ITEMS.md#fixed-432--two-commands-running-at-once-could-be-judged-against-each-others-workspace))** |
 | GCR-07 | High | P1 | Mounted Raiker instances do not receive their own FastAPI lifespan workers |
 | GCR-08 | High | P1 | Instance creation can leave a partially created/mounted instance when account registration fails |
@@ -164,7 +164,17 @@ This API is misleading: a caller can supply context believing it affects generat
 
 ## GCR-05 — `run_coro()` blocks an active event-loop thread
 
-**Severity: Medium — Priority: P1 — Confidence: High**
+**Severity: Medium — Priority: P1 — Confidence: High. Status: Closed 2026-09-20
+([FIXED-588](FIXED_ITEMS.md#fixed-588--approving-an-action-held-the-whole-server-while-it-ran)),
+by this entry's own recommendation.** Three `async def` routes — generating an
+image, building the memory embedding index, and resolving an approval that
+executes on resolution — performed the synchronous governed execution inline, so
+the thread they blocked was the ASGI event loop. Each hops off it with
+`asyncio.to_thread` before the synchronous work starts, which is where the
+recommendation puts the boundary; the bridge then takes its `asyncio.run` path
+and the per-call thread pool goes with it. The bridge counts any call that still
+arrives with a loop running, and a test asserts the count stays at zero across
+those routes.
 
 When no loop is running, `run_coro()` correctly uses `asyncio.run()`. When called from a thread already running an event loop, it creates a one-worker `ThreadPoolExecutor`, submits `asyncio.run(coro)` to that thread and immediately waits on `.result()`.
 
@@ -300,7 +310,15 @@ This is lifecycle-correct for the normal async methods but loses HTTP keep-alive
 
 **Severity: Medium — Priority: P2 — Confidence: High**
 
-**Status: Reduced 2026-09-20 — [FIXED-575](FIXED_ITEMS.md#fixed-575--the-guard-against-contract-drift-was-a-second-hand-written-copy-of-the-contract)**, which closed the deeper pass's GCR-42 by taking this entry's *second* recommendation: a contract check that is derived rather than transcribed and runs in the **Python** job, so a backend-only change is checked for contract drift even though the web job does not run for one. **What remains** is the rest of what the web job does — compilation and the mocked end-to-end suite still do not run for a backend-only change, and a contract that matches field-for-field can still break a page.
+**Status: Closed 2026-09-20.** Taken in two passes, one per recommendation.
+[FIXED-575](FIXED_ITEMS.md#fixed-575--the-guard-against-contract-drift-was-a-second-hand-written-copy-of-the-contract)
+took the *second* — a contract check that is derived rather than transcribed,
+running in the Python job — which closed the deeper pass's GCR-42 and caught
+field drift. [FIXED-589](FIXED_ITEMS.md#fixed-589--a-backend-change-could-not-break-the-web-client-because-the-web-client-was-never-built)
+took the *first*: the web workflow's trigger now names the backend paths that
+produce those contracts, so the client is compiled and the mocked end-to-end
+suite is run for a backend-only change as well. A test holds the trigger against
+the contract checker's own module list, so the two cannot drift.
 
 `.github/workflows/web.yml` is triggered only when `apps/web/**` or the workflow itself changes. It runs lint, Svelte/TypeScript checks, tests, build and mocked Playwright.
 

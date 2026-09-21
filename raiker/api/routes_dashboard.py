@@ -1043,6 +1043,34 @@ async def browse_brain_sources(
         ) from exc
 
 
+@router.get("/api/knowledge-sources")
+async def list_knowledge_sources(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """BUG-305 — one answer to "what can Raiker read", over both kinds."""
+    return _service(request).knowledge_sources(owner_principal_id=auth_data[0].principal_id)
+
+
+@router.delete("/api/knowledge-sources")
+async def revoke_knowledge_source(
+    kind: str,
+    source_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Stop reading one source. The controller that owns it does the work."""
+    try:
+        return _service(request).revoke_knowledge_source(
+            kind, source_id, owner_principal_id=auth_data[0].principal_id
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": str(exc)},
+        ) from exc
+
+
 @router.get("/api/brain/sources/roots")
 async def list_brain_source_roots(
     request: Request,

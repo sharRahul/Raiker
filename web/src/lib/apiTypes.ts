@@ -3052,6 +3052,31 @@ export interface GitCredentialStatus {
   checked_at: string;
 }
 
+// ── BUG-305 — one answer to "what can Raiker read" ─────────────────────────
+// Two controllers, one inventory. `held` is the whole distinction and decides
+// what revoking does: a managed file is a copy Raiker made and takes with it, a
+// granted folder is the owner's own and is only stopped being read.
+export type KnowledgeSourceKind = "managed_file" | "granted_folder";
+
+export interface KnowledgeSource {
+  source_id: string;
+  kind: KnowledgeSourceKind;
+  label: string;
+  location: string;
+  scope: string;
+  held: boolean;
+  index_state: string;
+  recall: boolean;
+  graph: boolean;
+  added_at: string;
+}
+
+export interface KnowledgeSourcesView {
+  sources: KnowledgeSource[];
+  held_count: number;
+  granted_count: number;
+}
+
 // ── Managed knowledge files ─────────────────────────────────────────────────
 // One catalogue entry per stored original. `index_state` is the honest answer
 // to "can Raiker read this?": `ready` means its text is searchable,

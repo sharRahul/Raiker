@@ -67,6 +67,13 @@ Outside the composer, on the page itself:
 | **New chat** | — | Start a fresh conversation. Disabled while the current chat is still empty. |
 | **⋯** | `Conversation actions` | **Export conversation…** and **Print / Save as PDF**. Both are also in Build. |
 | **⋯ on your own message** | `More actions for this message` | **Branch**, **Summarise up to here**, and **Rewind to before this**. Copy, Edit and Retry stay on the row itself. |
+
+**Retry sends the prompt again, and that means the turn runs again.** If the
+first attempt only answered, Retry just answers again. If it *did* something —
+wrote a file, ran a command, sent a message — Raiker asks first and names what
+would happen a second time, because it cannot know whether repeating those is
+safe and you can. A turn that only read is never asked about: a question on
+every retry is a question nobody reads.
 | **Background work** | `Background work` | Hands the turn to the background queue instead of waiting on it |
 
 ### Approval policy
@@ -354,8 +361,13 @@ from. **Organise** on a chat row offers Pin or Unpin, Rename, Archive or
 Restore, and Move to a project, and it carries a box for adding a tag; existing
 tags show on the row with an × to take one off. A pinned thread says so and
 comes first. Archiving takes a thread out of the default board without deleting
-anything: **Archived (n)** switches to what you have filed away, where the same
-control offers **Restore**, and **Back to active (n)** brings you back. A
+anything, and it asks first, naming what it keeps — the thread's turns, its
+evidence and its tags all stay: **Archived (n)** switches to what you have filed
+away, where the same control offers **Restore**, and **Back to active (n)**
+brings you back. It is the one library command that asks, because it is the one
+that takes a thread off the board you resume from; renaming, pinning and moving
+change what a thread is called or where it is filed and are undone from the same
+row. A
 routine's row is offered none of this — that thread belongs to its task, and
 Tasks is where it is managed.
 

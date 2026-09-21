@@ -10,6 +10,7 @@ approved project memory from the turn context.
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -406,8 +407,13 @@ async def build_memory_embedding_index(
     """
     provider = str(body.get("provider", "")).strip()
     model = str(body.get("model", "")).strip()
-    result = _service(request).build_memory_embedding_index(
-        provider, model, auth_data[0].principal_id
+    # GCR-05 — off the loop before the synchronous work starts. This embeds
+    # every eligible memory through a provider; inline it would hold the ASGI
+    # event loop for the whole run.
+    result = await asyncio.to_thread(
+        lambda: _service(request).build_memory_embedding_index(
+            provider, model, auth_data[0].principal_id
+        )
     )
     if not result.ok:
         raise HTTPException(

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
 import { stubFetch, openComposerAttach } from "../test-helpers";
 import { resetModels } from "../models.svelte";
+import { ApiError } from "../api";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
 vi.mock("../api", async (importOriginal) => {
@@ -593,7 +594,10 @@ describe("ChatView streaming transcript", () => {
     expect(screen.queryByText("archive.zip")).not.toBeInTheDocument();
   });
 
-  it("shows an honest error when the stream cannot be reached", async () => {
+  // BUG-285 — honest means "says what is known". A dropped connection is a
+  // dropped connection; it is not evidence that the local runtime is
+  // unreachable, and saying so sent owners to check a service that was running.
+  it("says the connection ended, rather than blaming the local runtime", async () => {
     stubFetch(MODELS_ROUTE);
     streamPromptMock.mockRejectedValue(new Error("connection refused"));
 
@@ -603,9 +607,82 @@ describe("ChatView streaming transcript", () => {
     await fireEvent.keyDown(box, { key: "Enter" });
 
     await waitFor(() => {
-      expect(screen.getByText(/could not reach the local runtime/i)).toBeInTheDocument();
+      expect(screen.getByText(/connection to Raiker ended/i)).toBeInTheDocument();
     });
+    expect(screen.queryByText(/could not reach the local runtime/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/working/i)).not.toBeInTheDocument();
+  });
+
+  it("reports the refusal the runtime named rather than its status number", async () => {
+    stubFetch(MODELS_ROUTE);
+    streamPromptMock.mockRejectedValue(
+      new ApiError(422, "build_requires_project", "Stream failed: 422"),
+    );
+
+    render(ChatView);
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "hi" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(screen.getByText(/build_requires_project/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Build works inside a project/)).toBeInTheDocument();
+  });
+
+  /**
+   * BUG-306 — Retry re-sends the prompt, so a turn that already wrote a file or
+   * ran a command will do it again. Raiker cannot know whether that is safe.
+   */
+  it("asks before repeating a turn that already had an effect", async () => {
+    const asked: string[] = [];
+    vi.stubGlobal("confirm", (question: string) => {
+      asked.push(question);
+      return false;
+    });
+    stubFetch({
+      ...MODELS_ROUTE,
+      "GET /api/sessions/sess_effect": {
+        session: {
+          session_id: "sess_effect",
+          title: "Prior chat",
+          status: "open",
+          created_at: "2026-09-20T10:00:00Z",
+          updated_at: "2026-09-20T10:00:10Z",
+          turn_count: 1,
+        },
+        turns: [
+          {
+            turn_id: "turn_1",
+            session_id: "sess_effect",
+            turn_type: "prompt",
+            status: "completed",
+            prompt_text: "tidy the notes",
+            created_at: "2026-09-20T10:00:00Z",
+            completed_at: "2026-09-20T10:00:10Z",
+            summary: "Done.",
+            tool_rows: [
+              {
+                action_id: "act_1",
+                tool_name: "write_file",
+                family: "file-write",
+                label: "Write file",
+                action: "notes.md",
+                status: "success",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    render(ChatView, { props: { sessionId: "sess_effect" } });
+    await waitFor(() => expect(screen.getByText("Done.")).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("button", { name: "Send this message again" }));
+
+    expect(asked[0]).toContain("Write file — notes.md");
+    // Declined, so nothing was re-sent.
+    expect(streamPromptMock).not.toHaveBeenCalled();
   });
 
   it("shows a route-level loading state while persisted history is fetched", async () => {

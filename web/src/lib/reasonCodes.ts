@@ -8,6 +8,22 @@ interface ReasonCopy {
 }
 
 const REASON_CODES: Record<string, ReasonCopy> = {
+  // BUG-285 — the refusals a *turn* can meet before its stream opens. Chat and
+  // Build used to render these as an HTTP status number, or as "Could not reach
+  // the local runtime", which sends an owner to check a service that is running
+  // and says nothing about the scope decision that actually refused them.
+  chat_has_no_project_scope: {
+    plain: "This conversation is not filed under a project, so it cannot use one's files.",
+    remediation: "Choose a project in the composer, or ask without one.",
+  },
+  build_requires_project: {
+    plain: "Build works inside a project, and this turn named none.",
+    remediation: "Choose a project in the composer before sending.",
+  },
+  build_project_not_found: {
+    plain: "The project this turn named is not one you have.",
+    remediation: "Choose a project that exists in the composer.",
+  },
   // Principal / role / scope denials (router.py).
   principal_not_active: {
     plain: "Your account/principal is not active.",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hmac
 import json
 import os
@@ -533,11 +534,15 @@ async def receive_approval_response(
         if bridge.executes_on_resolution(
             str(approval.get("tool_name") or ""), principal_id, critical=False
         ):
-            execution = bridge.execute(
-                approval,
-                principal,
-                session_id="channel_approval",
-                reason=(body.reason or "approved over paired owner channel")[:500],
+            # GCR-05 — off the loop, for the same reason the inbox route is:
+            # resolving an approval here executes the action it approved.
+            execution = await asyncio.to_thread(
+                lambda: bridge.execute(
+                    approval,
+                    principal,
+                    session_id="channel_approval",
+                    reason=(body.reason or "approved over paired owner channel")[:500],
+                )
             )
             if not execution.ok:
                 raise HTTPException(status_code=409, detail={"ok": False, "reason_code": execution.reason_code})

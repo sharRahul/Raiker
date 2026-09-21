@@ -105,7 +105,7 @@ names.
 | [BUG-282](FIXED_ITEMS.md#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier) | Medium | Documentation / memory | **Closed 2026-09-04 ([FIXED-393](FIXED_ITEMS.md#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier))** — the guide told owners semantic recall was half-built, nine days after FIXED-292 finished it |
 | [BUG-283](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others) | Low | Web UI / information architecture | **Closed 2026-09-04 ([FIXED-394](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others))** — 244 words of explanation to the guide, one contract that was stated twice, and two tabs that were copies of other surfaces |
 | [BUG-284](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything) | Medium | Web UI / responsive layout | **Closed 2026-09-04 ([FIXED-395](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything))** — found by running the width sweep against a workspace that had been worked in; reproduced on unmodified `main` |
-| [BUG-285](#bug-285--an-ollama-cloud-model-tests-and-runs-in-ollama-but-chat-cannot-use-it) | Medium | Models / Ollama cloud chat | Open — raised 2026-09-08 during the provider restart round |
+| [BUG-285](FIXED_ITEMS.md#fixed-590--a-turn-that-failed-blamed-the-local-runtime-for-it) | Medium | Models / Ollama cloud chat | **Closed 2026-09-20 ([FIXED-590](FIXED_ITEMS.md#fixed-590--a-turn-that-failed-blamed-the-local-runtime-for-it))** — the entry's second interface outcome: a failed turn reports the refusal the runtime named. The message was the surface's, not the provider's |
 | [BUG-289](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running) | Low | Models / provider errors | **Closed 2026-09-14 ([FIXED-526](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running))** — a hosted provider gets a remedy an owner can act on |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
@@ -145,8 +145,8 @@ names.
 | [BUG-302](FIXED_ITEMS.md#fixed-558--four-events-describing-themselves-with-one-borrowed-sentence) | Low | Observability / audit summaries | **Closed 2026-09-18 (FIXED-558)** |
 | [BUG-303](FIXED_ITEMS.md#fixed-576--the-conversation-library-lived-in-the-evidence-inspector) | Low | Sessions / Threads | **Closed 2026-09-20 ([FIXED-576](FIXED_ITEMS.md#fixed-576--the-conversation-library-lived-in-the-evidence-inspector))** — the work index grew `pinned`, `archived` and tags first, so Archive could move without becoming a control nothing could undo |
 | [BUG-304](FIXED_ITEMS.md#fixed-577--delete-was-off-the-bottom-of-the-menu-it-lived-in) | Medium | Sessions / web UI | **Closed 2026-09-20 ([FIXED-577](FIXED_ITEMS.md#fixed-577--delete-was-off-the-bottom-of-the-menu-it-lived-in))** — raised and closed in the same run, found while capturing BUG-303's evidence: the row menu was clipped by the card it opened inside, so Delete could not be clicked |
-| [BUG-305](#bug-305--two-source-controllers-and-nothing-that-owns-both) | Low | Memory / Knowledge Map | Open — raised 2026-09-20 while closing REM-MEM-03 as [FIXED-587](FIXED_ITEMS.md#fixed-587--the-recall-engines-controls-were-on-the-page-for-reading-your-own-memories). The engine half shipped; one controller over both kinds of source has not |
-| [BUG-306](#bug-306--three-surfaces-carry-their-own-conversation-menu) | Low | Chat / Threads / Sessions | Open — raised 2026-09-20 from REM-CHAT-02, the one §18.3 row left after that round |
+| [BUG-305](FIXED_ITEMS.md#fixed-592--two-kinds-of-source-and-nowhere-that-answered-what-can-raiker-read) | Low | Memory / Knowledge Map | **Closed 2026-09-20 ([FIXED-592](FIXED_ITEMS.md#fixed-592--two-kinds-of-source-and-nowhere-that-answered-what-can-raiker-read))** — one inventory and one revoke door over both controllers, with the folder that survives its own revocation asserted |
+| [BUG-306](FIXED_ITEMS.md#fixed-591--retry-looked-the-same-whether-the-turn-had-sent-an-email-or-nothing) | Low → Medium | Chat / Threads / Sessions | **Closed 2026-09-20 ([FIXED-591](FIXED_ITEMS.md#fixed-591--retry-looked-the-same-whether-the-turn-had-sent-an-email-or-nothing))** — the inventory found a defect rather than only duplication: **Retry** re-ran a turn's effects with no warning |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (18 complete, 2 partial; B14 closed 2026-09-04 as [FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one), B10 2026-09-03 as FIXED-366, B13 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, B16 by BUG-206 slice D. B15 and B20 remain partial on [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution)) |
 | VIS | — | Visual / information hierarchy | **Complete.** 24 findings; the document was removed 2026-09-15 when its last implementation item closed |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (16 complete, 1 partial, 1 open; C15 closed by C1/C4, C11 2026-09-03 as FIXED-367, C18 as FIXED-368, C17 2026-08-29 as FIXED-311. C10 is partial — the notification half ships as [FIXED-374](FIXED_ITEMS.md#fixed-374--a-routine-ran-all-night-and-told-nobody); C12 stays an architecture decision) |
@@ -1413,27 +1413,17 @@ needs the words *not filed to it yet*.
 
 ## BUG-285 — An Ollama Cloud model tests and runs in Ollama but Chat cannot use it
 
-**Severity: Medium. Area: Models / Ollama cloud chat. Status: Open — raised
-2026-09-08.**
-
-**Observed.** The Models page discovers `gemma4:31b-cloud` and its **Test
-connection** action succeeds. `ollama run gemma4:31b-cloud` also returned the
-requested answer on this host. Selecting the same profile in Raiker Chat ended
-with **Could not reach the local runtime** instead of a model response.
-
-**Why it remains.** The connection probe and direct Ollama invocation prove the
-runtime and model are reachable, while the Chat path fails later in the adapter
-or stream. The memory capability fix does not own that provider path. OpenAI
-completed the same live memory-write scenario, isolating this as an Ollama
-cloud-chat defect.
-
-**Proposed fix.** Trace the Ollama provider request and streaming response for
-cloud-tagged models, retain the provider's typed error in the turn, and add a
-live regression using an available `-cloud` profile.
-
-**Interface outcome that has to be true before this closes.** A model that
-passes Ollama's provider test can complete a Chat turn, or Chat reports the
-specific provider/runtime refusal rather than a generic reachability message.
+**Closed 2026-09-20 as
+[FIXED-590](FIXED_ITEMS.md#fixed-590--a-turn-that-failed-blamed-the-local-runtime-for-it).**
+The entry offered two interface outcomes and the second is the one that was
+reachable: a failed turn reports the specific refusal rather than a generic
+reachability message. The message turned out to be the *surface's* — Chat and
+Build reduced an `ApiError` to its HTTP status and everything else to "Could not
+reach the local runtime", while the runtime had already named the refusal and
+carried the code. Proving the first outcome — that a cloud-tagged Ollama model
+completes a turn — still needs a host running Ollama with such a profile, which
+this round did not have; it is no longer *hidden* by a message that blames a
+service that is running.
 
 ---
 
@@ -1975,67 +1965,28 @@ and closes on scroll rather than being left pointing at a row that has moved.
 
 ## BUG-305 — Two source controllers, and nothing that owns both
 
-**Severity: Low. Area: Memory / Knowledge Map. Status: Open — raised 2026-09-20
-while closing
-[REM-MEM-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions)
-as [FIXED-587](FIXED_ITEMS.md#fixed-587--the-recall-engines-controls-were-on-the-page-for-reading-your-own-memories).**
-
-**What is left.** REM-MEM-03 has two clauses. The first — engine controls out of
-the personal review — is closed: the recall backend and the index builder are
-**Settings → Memory engine**, and Memory keeps the health sentence and the link.
-The second is *"merge source administration with Map … one source controller
-owns scope and indexing"*, and it is not.
-
-**What exists today.** Two controllers, over two different objects:
-
-| Surface | Controller | Object |
-|---|---|---|
-| Memory → Sources | `FileLibrary` over `/api/managed-files` | Files **copied into** Raiker's managed memory storage |
-| Knowledge Map | `api.addBrainSource` / `brainSourceRoots` | Folders Raiker indexes **where they already live** |
-
-They are not duplicates — the lifecycles genuinely differ, and merging them
-naively would mean either copying a folder nobody asked to copy, or holding a
-managed upload as a path that can move. What is missing is the thing the row
-asks for: one place that answers *what can Raiker read*, with add, revoke and
-import shared across both, and revocation and tombstones proved to suppress
-recall **and** graph output without deleting the original external file.
-
-**Interim.** Memory → Sources names the Knowledge Map as where indexed folders
-are administered, so the second half is one link rather than a discovery, and
-Raiker does not claim the library is the whole answer.
-
-**Required outcome.** One source controller behind both surfaces. Adding,
-revoking and importing a source reads and writes the same records whichever page
-the owner used; a revoked source disappears from recall and from the graph in
-one act; and the external file it was indexed from is untouched, with a test
-that asserts the file is still on disk after the revocation.
+**Closed 2026-09-20 as
+[FIXED-592](FIXED_ITEMS.md#fixed-592--two-kinds-of-source-and-nowhere-that-answered-what-can-raiker-read).**
+The two controllers stay two, for the reason this entry gives — the lifecycles
+genuinely differ. What they now share is the owner's question: one inventory
+over both, and one door that stops a source, each handled by the controller that
+owns it. The property the entry asks for is asserted in both directions:
+revoking a granted folder drops everything indexed under it and leaves the
+owner's file on disk, and revoking a managed file takes Raiker's own copy with
+it.
 
 ---
 
 ## BUG-306 — Three surfaces carry their own conversation menu
 
-**Severity: Low. Area: Chat / Threads / Sessions. Status: Open — raised
-2026-09-20 as the one §18.3 row left after that round, from
-[REM-CHAT-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
-
-**Observed.** Rename, archive, branch, retry and the model override are each
-reachable from more than one place, and each place implements them itself:
-Chat's header menu, Threads' Organise control (moved there by
-[FIXED-576](FIXED_ITEMS.md#fixed-576--the-conversation-library-lived-in-the-evidence-inspector))
-and the session detail. Nothing today makes them disagree, which is exactly the
-condition under which they start to: the next change lands in one of the three.
-
-**Required outcome.** The row's own words, and they are the acceptance criteria:
-one command set behind all three entry points, with context-specific permissions
-retained and destructive confirmation explicit. Two cases have to be covered
-rather than assumed — a retry after an ambiguous external effect, which must not
-be offered as though the first attempt certainly did nothing, and discovering an
-archived conversation from whichever surface archived it.
-
-**Why it is filed rather than done.** It is a refactor across three views with
-no user-visible defect to point at today, and the round it came from was closing
-ten rows that did have one. Doing it badly — a shared controller that flattens
-the permission differences between the three surfaces — is worse than the
-duplication.
+**Closed 2026-09-20 as
+[FIXED-591](FIXED_ITEMS.md#fixed-591--retry-looked-the-same-whether-the-turn-had-sent-an-email-or-nothing).**
+The inventory this entry asked for found a defect rather than only duplication.
+**Retry** re-sends the prompt, so a turn that wrote a file, ran a command or
+sent a message does it again — and the control looked identical whether the
+first attempt had done nothing or had pushed a branch. It now reads the turn's
+own settled calls and asks, naming what would happen twice, while a turn that
+only read is not asked about at all. The commands themselves moved behind one
+set that owns each one's label, its confirmation and its failure sentence.
 
 ---

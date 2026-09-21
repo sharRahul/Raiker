@@ -71,6 +71,9 @@ in the process environment.
 | `provider_connection_failed` | The provider was unreachable — check network, endpoint, and the fallback sequence |
 | "X could not be reached. Check this device's network access, and any proxy or firewall between it and the provider." | A **hosted** provider Raiker could not classify a refusal from, because nothing answered. Raiker does not guess at a cause here; what it can tell you is which remedies exist. A corporate proxy or an egress rule that does not allow the provider's host is the usual one. |
 | "X could not be reached. Check that it is running and reachable from this device." | The same, for a **local** runtime — Ollama, LM Studio, llama.cpp. Here starting the service is a thing you can actually do, which is why the two sentences differ. |
+| "The connection to Raiker ended before this turn finished." | The browser lost the stream — Raiker itself may still be running. It says this rather than blaming the local runtime, which it has no way to know is unreachable; if the turn had already shown you something, that is kept and the sentence says so. Check Observability, or send it again. |
+| A turn ends with a sentence naming a `reason_code` in brackets | Raiker refused the turn before the model saw it, and the code is the refusal. The sentence is the runtime's own explanation; the code is what to quote when asking for help. It replaced an HTTP status number, which could not tell a rejected key from a scope decision. |
+| Raiker asks "Send this again?" and lists what the first attempt did | **Retry re-runs the turn.** The first attempt wrote a file, ran a command or sent a message, and retrying does those again. Raiker cannot tell whether repeating them is safe, so it names them and leaves the decision to you. A turn that only read is never queried. |
 
 ## Server and session
 

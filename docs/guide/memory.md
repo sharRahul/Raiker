@@ -127,6 +127,25 @@ Memory is filtered before ranking:
 The model has no permanent-purge tool. A model may help identify a target or
 prepare a preview, but only a human can confirm permanent deletion.
 
+## What Raiker can read
+
+**Memory → Sources** opens with one list of every source Raiker may read, of
+either kind, because "what can Raiker read?" is one question:
+
+| Kind | What it is | What stopping it does |
+|---|---|---|
+| **Kept by Raiker** | A document you imported. Raiker holds the bytes, under its own managed storage. | Deletes Raiker's copy. Whatever you imported it *from* is untouched. |
+| **Read where it is** | A folder on this machine you granted on the [Knowledge Map](#the-knowledge-map). Nothing is copied. | Raiker stops reading it and forgets what it indexed. Nothing in the folder is deleted — it is yours. |
+
+Each row says whether recall and the Knowledge Map can currently reach it. A
+folder you have granted but not indexed reads *Not indexed yet*, which is the
+honest answer: Raiker may read it and has not.
+
+**Stop reading** asks first, and the question says which of the two things above
+will happen. Adding stays where each kind's own path is — a document is imported
+from the library below, a folder is granted on the Map with its picker — because
+adding is the part where the two genuinely differ.
+
 ## Recall backend and token budget
 
 **Where the controls are.** Memory is for your own facts — what Raiker has been

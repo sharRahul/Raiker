@@ -14,6 +14,7 @@ apply — the same long way round the telemetry export and the audit export take
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -88,15 +89,22 @@ async def list_images(request: Request) -> dict[str, Any]:
 @router.post("/api/images")
 async def generate_image(body: GenerateImageRequest, request: Request) -> dict[str, Any]:
     _, principal = _auth(request)
-    result = _service(request).generate_image(
-        principal.principal_id,
-        profile_id=body.profile_id.strip(),
-        prompt=body.prompt.strip(),
-        size=body.size.strip(),
-        model=body.model.strip(),
-        source_generation_id=body.source_generation_id.strip(),
-        variations=body.variations,
-        project_id=body.project_id.strip(),
+    # GCR-05 — off the loop before the synchronous work starts. Governed
+    # execution is sync all the way down and ends in a provider call; run inline
+    # here it holds the ASGI event loop for the length of an image generation,
+    # and every other request on this host waits behind it. Same reason, and the
+    # same hop, as the orchestrator's own tool dispatch.
+    result = await asyncio.to_thread(
+        lambda: _service(request).generate_image(
+            principal.principal_id,
+            profile_id=body.profile_id.strip(),
+            prompt=body.prompt.strip(),
+            size=body.size.strip(),
+            model=body.model.strip(),
+            source_generation_id=body.source_generation_id.strip(),
+            variations=body.variations,
+            project_id=body.project_id.strip(),
+        )
     )
     if not result.ok:
         # The refusal is already recorded against the owner by the executor, so

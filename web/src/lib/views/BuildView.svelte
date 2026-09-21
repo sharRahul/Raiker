@@ -45,6 +45,8 @@
   import PlanChecklist from "../components/PlanChecklist.svelte";
   import ReasoningBlock from "../components/ReasoningBlock.svelte";
   import ToolActivity from "../components/ToolActivity.svelte";
+  import { turnFailureMessage } from "../turnFailure";
+  import { retryConfirmation, retryConsequence } from "../conversationCommands";
   import TurnEvidence from "../components/TurnEvidence.svelte";
   import RewindPanel from "../components/RewindPanel.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
@@ -137,7 +139,7 @@
   import { composerMenu } from "../composerCapabilities";
   import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
-  import { collectReasoning, hasRunningTool, toolActivity } from "../chatPresentation";
+  import { collectReasoning, hasRunningTool, toolActivity, type ToolCallRow } from "../chatPresentation";
   import {
     citedSourceIds,
     renderableCitations,
@@ -1318,8 +1320,15 @@
   }
 
   /** Send the same prompt again, under the mode that is selected now. */
-  function retryPrompt(text: string) {
+  /**
+   * BUG-306 — see ChatView. Build is where this matters most: its turns write
+   * files, run commands and push, so a Retry offered as though the first
+   * attempt had done nothing is the most expensive version of that mistake.
+   */
+  function retryPrompt(text: string, rows: ToolCallRow[] = []) {
     if (streaming || text.trim() === "") return;
+    const consequence = retryConsequence(rows);
+    if (consequence.repeats && !window.confirm(retryConfirmation(consequence))) return;
     draft.text = text;
     void submit();
   }
@@ -1502,10 +1511,11 @@
         openModelSetup(activeProfile);
         return;
       }
-      turn.error =
-        error instanceof ApiError
-          ? `The turn could not be streamed (${error.status}).`
-          : "Could not reach the local runtime.";
+      // BUG-285 — see ChatView: the named refusal, and nothing claimed about
+      // reachability that a turn which already streamed disproves.
+      turn.error = turnFailureMessage(error, {
+        produced: answerText(turn) !== "" || toolActivity(turn.events).length > 0,
+      });
     } finally {
       turn.streaming = false;
       streaming = false;
@@ -2209,7 +2219,7 @@
                 text={turn.prompt}
                 disabled={streaming}
                 onedit={editPrompt}
-                onretry={retryPrompt}
+                onretry={(text: string) => retryPrompt(text, toolRows)}
                 onrewind={turn.response?.turn_id
                   ? () => void rewindFromTurn(turn.response?.turn_id ?? "")
                   : undefined}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -666,8 +667,15 @@ async def resolve_approval(
             critical=bool(approval_row.get("critical")),
         )
     ):
-        execution = bridge.execute(
-            approval_row, principal, session_id=session.session_id, reason=body.reason
+        # GCR-05 — off the loop before the synchronous work starts. Approving
+        # an action executes it, synchronously and all the way down to whatever
+        # the capability reaches; inline it held the ASGI event loop for the
+        # length of that call, and a model-backed capability made that a
+        # provider round trip with every other request queued behind it.
+        execution = await asyncio.to_thread(
+            lambda: bridge.execute(
+                approval_row, principal, session_id=session.session_id, reason=body.reason
+            )
         )
         if not execution.ok:
             raise HTTPException(

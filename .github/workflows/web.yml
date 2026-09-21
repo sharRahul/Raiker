@@ -1,16 +1,31 @@
 name: Web UI
 
+# GCR-15 — the trigger covers what this job is a guard for, not where the files
+# are. The web client consumes contracts the backend produces, so a backend-only
+# change to a route or a read DTO could merge without the client ever being
+# compiled against it or the mocked end-to-end suite being run.
+#
+# `scripts/check_api_contract.py` closed half of that in the Python job: it
+# derives a field-for-field comparison, so a dropped field fails there. What it
+# cannot see is everything past the field names — a contract that still matches
+# exactly while the page that reads it no longer builds. The paths below are the
+# ones that produce those contracts, and `tests/test_web_workflow.py` holds them
+# against the checker's own module list so the two cannot drift.
 on:
   pull_request:
-    paths:
+    paths: &contract_paths
       - "web/**"
+      - "raiker/api/**"
+      - "raiker/control/dtos.py"
+      - "raiker/control/dashboard.py"
+      - "raiker/control/service.py"
+      - "raiker/control/web_read_models.py"
+      - "scripts/check_api_contract.py"
       - ".github/workflows/web.yml"
   push:
     branches:
       - main
-    paths:
-      - "web/**"
-      - ".github/workflows/web.yml"
+    paths: *contract_paths
 
 permissions:
   contents: read

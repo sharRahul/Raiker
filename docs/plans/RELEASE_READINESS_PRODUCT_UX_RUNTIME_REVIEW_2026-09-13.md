@@ -125,10 +125,16 @@ end contract.
 > `provider_detected`, so a provider whose key the last check rejected was
 > reported ready on the last screen of first run.
 >
-> **REM-CHAT-02 is the remainder**, filed rather than claimed, as
-> [BUG-306](TO_BE_FIXED.md#bug-306--three-surfaces-carry-their-own-conversation-menu);
-> REM-MEM-03's source-controller half is
-> [BUG-305](TO_BE_FIXED.md#bug-305--two-source-controllers-and-nothing-that-owns-both).
+> **Both remainders closed the same day.** REM-CHAT-02 closed as
+> [FIXED-591](FIXED_ITEMS.md#fixed-591--retry-looked-the-same-whether-the-turn-had-sent-an-email-or-nothing)
+> and REM-MEM-03's source-controller half as
+> [FIXED-592](FIXED_ITEMS.md#fixed-592--two-kinds-of-source-and-nowhere-that-answered-what-can-raiker-read),
+> so **every row of §18.3 is closed**. Each found something the row had not
+> named: taking the conversation-command inventory found that **Retry** re-ran a
+> turn's external effects without asking, and building the one source inventory
+> was the first thing to assert, in both directions, that revoking a granted
+> folder leaves the owner's file on disk while revoking a managed file takes
+> Raiker's own copy with it.
 >
 > **Implementation status, 2026-09-18.** Eight more rows of §18.3 closed, and
 > each of them is recorded in [`FIXED_ITEMS.md`](FIXED_ITEMS.md) with the live
@@ -2757,13 +2763,17 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 > [FIXED-582](FIXED_ITEMS.md#fixed-582--builds-workbench-closed-itself-on-every-reload)
 > and REM-DESIGN-02 as
 > [FIXED-586](FIXED_ITEMS.md#fixed-586--the-picture-design-had-just-made-went-to-the-top-of-a-list).
-> **REM-CHAT-02 is the one row left in this table**, and it is tracked as
-> [BUG-306](TO_BE_FIXED.md#bug-306--three-surfaces-carry-their-own-conversation-menu).
+> **REM-CHAT-02 closed on 2026-09-20** as
+> [FIXED-591](FIXED_ITEMS.md#fixed-591--retry-looked-the-same-whether-the-turn-had-sent-an-email-or-nothing),
+> and taking the inventory it asks for found a defect rather than only
+> duplication: **Retry** re-ran a turn's effects — a file written, a command
+> run, a message sent — with no warning at all. **Every row in §18.3 is now
+> closed.**
 
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |
 | ~~REM-CHAT-01~~ **closed** — [FIXED-581](FIXED_ITEMS.md#fixed-581--a-turns-own-evidence-was-on-another-route) | Move routine tool payloads, IDs and governance explanation into per-turn Evidence. | ChatView coordinates many domains; answers and requested decisions deserve the primary reading order. | Keep active approval, failure, source count and runtime destination visible when relevant. Use a shared expandable turn inspector with deep links and redacted payloads; test long streams and focus preservation. |
-| REM-CHAT-02 / P2 / M | Merge duplicated conversation menus and model-selection logic into shared commands/controllers. | Different entry points should invoke the same rename, archive, branch, retry and model override semantics. | Inventory handlers in Chat, Threads and session detail; retain context-specific permissions and explicit destructive confirmation. Test retry after an ambiguous external effect and archived conversation discovery. |
+| ~~REM-CHAT-02~~ **closed** — [FIXED-591](FIXED_ITEMS.md#fixed-591--retry-looked-the-same-whether-the-turn-had-sent-an-email-or-nothing) | Merge duplicated conversation menus and model-selection logic into shared commands/controllers. | Different entry points should invoke the same rename, archive, branch, retry and model override semantics. | Inventory handlers in Chat, Threads and session detail; retain context-specific permissions and explicit destructive confirmation. Test retry after an ambiguous external effect and archived conversation discovery. |
 | ~~REM-BUILD-01~~ **closed** — [FIXED-582](FIXED_ITEMS.md#fixed-582--builds-workbench-closed-itself-on-every-reload) | Remove simultaneous default exposure of every file/artifact/command/evidence pane. | BuildView carries repository, transcript and multiple inspectors; the next action should determine which inspector is open. | Keep file tree optional and one primary inspector, preserving panel state and accessible toggles. Show approval diff before a write and failed test output when diagnosing; test narrow viewport and unsaved edits. |
 | ~~REM-BUILD-02~~ **closed** — [FIXED-521](FIXED_ITEMS.md#fixed-521--build-named-what-a-turn-would-touch-and-not-where-it-would-run) | Replace competing Project/repository/runtime/model selectors with one boundary summary and targeted edit actions. | These are distinct concepts but form one execution context. Simplification must make wrong-destination writes less likely. | Snapshot selection at submission; preview changed destination/scope before executing; use the same model override contract as Chat. Verify navigation and runtime loss cannot silently retarget work. |
 | ~~REM-DESIGN-01~~ **closed** — [FIXED-517](FIXED_ITEMS.md#fixed-517--design-recorded-a-size-it-never-sent) | Remove stale absence claims in comments/help and any controls unsupported by the selected endpoint/provider. | Current source includes edit source IDs and variation requests; preserve implemented functionality instead of removing it based on the old review. | Audit DesignView, shared Design components and routes_images together; generate controls from capability metadata. Test supported edits/variations and unsupported combinations, with truthful disabled reasons. |

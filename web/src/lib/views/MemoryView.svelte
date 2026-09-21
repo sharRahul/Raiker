@@ -9,6 +9,7 @@
   import GuideLink from "../components/GuideLink.svelte";
   import MemoryRecordDrawer from "../components/MemoryRecordDrawer.svelte";
   import FileLibrary from "../components/FileLibrary.svelte";
+  import KnowledgeSources from "../components/KnowledgeSources.svelte";
   import TabStrip from "../components/TabStrip.svelte";
   import { HUB_TABS } from "../nav";
   import {
@@ -575,6 +576,13 @@
          sentence are different kinds of thing, and mixing them into one list
          makes it impossible to tell which one answered a question. A tab of its
          own is the same separation, stated by the page's structure. -->
+  <!-- BUG-305 — the owner's question answered once, over both controllers. The
+       library below stays: it is how a document is *added*, and adding is where
+       the two kinds genuinely differ. -->
+  <section class="memory-section" aria-label="Sources Raiker can read">
+    <KnowledgeSources onchange={() => void load()} />
+  </section>
+
   <section class="memory-section library-section" aria-label="Memory document library">
     <FileLibrary
       scope="memory"
@@ -582,14 +590,12 @@
       description="Files kept under Raiker's managed memory storage. Uploaded content is data, never instructions."
       onLibraryChange={() => void load()}
     />
-    <!-- REM-MEM-03 — the other half of "what Raiker can read". This library
-         holds files kept under managed memory storage; the folders Raiker
-         indexes in place are administered on the Knowledge Map. They are
-         different objects with different lifecycles, so they are not merged
-         here — but an owner asking "what can Raiker read" should not have to
-         know that to find the second one. -->
+    <!-- BUG-305 — adding is where the two kinds differ and stay separate: a
+         document is imported here, a folder is granted on the Map with its own
+         picker. What they can no longer differ about is the inventory above,
+         which lists both and stops either. -->
     <p class="control-note">
-      Folders Raiker indexes where they already live are added and revoked on the
+      To let Raiker read a folder where it already lives, grant it on the
       <a href="#/brain">Knowledge Map</a>.
     </p>
   </section>

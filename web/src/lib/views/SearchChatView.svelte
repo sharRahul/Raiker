@@ -53,6 +53,12 @@
   import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
+  import {
+    archiveConfirmation,
+    command,
+    commandFailure,
+    type CommandId,
+  } from "../conversationCommands";
   import type { ProjectView, SessionSummary, WorkThread, WorkThreadPage } from "../apiTypes";
   import { groupByDay, relativeTime } from "../format";
   import { cadenceLabel } from "../agentCadence";
@@ -170,9 +176,12 @@
    */
   async function organise(
     sessionId: string,
-    what: string,
+    id: CommandId,
     run: () => Promise<unknown>,
   ): Promise<void> {
+    // BUG-306 — the command says what it is, whether it is confirmed, and how
+    // it reads when it fails. This page renders and calls; it no longer also
+    // decides.
     actionError = null;
     busy = sessionId;
     try {
@@ -183,11 +192,25 @@
       openMenu = null;
       await read(null);
     } catch (error) {
-      actionError =
-        error instanceof ApiError ? `Could not ${what} (${error.status}).` : `Could not ${what}.`;
+      actionError = commandFailure(id, error instanceof ApiError ? error.status : undefined);
     } finally {
       busy = null;
     }
+  }
+
+  /**
+   * BUG-306 — archiving takes a thread off the board it is resumed from, which
+   * is the one library command whose effect an owner can lose track of. The
+   * command set says it confirms; the question it asks says what is kept.
+   */
+  async function archiveOrRestore(thread: WorkThread): Promise<void> {
+    const id: CommandId = thread.archived ? "restore" : "archive";
+    if (command(id).confirms && !window.confirm(archiveConfirmation(thread.title))) return;
+    await organise(thread.session_id, id, () =>
+      thread.archived
+        ? api.unarchiveSession(thread.session_id)
+        : api.archiveSession(thread.session_id),
+    );
   }
 
   function startRename(thread: WorkThread): void {
@@ -200,7 +223,7 @@
     const next = titleDraft.trim();
     renaming = null;
     if (!next || next === thread.title) return;
-    await organise(thread.session_id, "rename this thread", () =>
+    await organise(thread.session_id, "rename", () =>
       api.renameSession(thread.session_id, next),
     );
   }
@@ -209,13 +232,13 @@
     const draft = (tagDraft[thread.session_id] ?? "").trim();
     if (!draft || thread.tags.includes(draft)) return;
     tagDraft[thread.session_id] = "";
-    await organise(thread.session_id, "add the tag", () =>
+    await organise(thread.session_id, "tag", () =>
       api.setSessionTags(thread.session_id, [...thread.tags, draft]),
     );
   }
 
   async function removeTag(thread: WorkThread, tag: string): Promise<void> {
-    await organise(thread.session_id, "remove the tag", () =>
+    await organise(thread.session_id, "untag", () =>
       api.setSessionTags(
         thread.session_id,
         thread.tags.filter((item) => item !== tag),
@@ -477,7 +500,7 @@
                 class="chip"
                 disabled={busy === thread.session_id}
                 onclick={() =>
-                  void organise(thread.session_id, "update the pin", () =>
+                  void organise(thread.session_id, thread.pinned ? "unpin" : "pin", () =>
                     api.setSessionPinned(thread.session_id, !thread.pinned),
                   )}>{thread.pinned ? "Unpin" : "Pin"}</button
               >
@@ -487,11 +510,7 @@
                 class="chip"
                 disabled={busy === thread.session_id}
                 onclick={() =>
-                  void organise(thread.session_id, "update the archive state", () =>
-                    thread.archived
-                      ? api.unarchiveSession(thread.session_id)
-                      : api.archiveSession(thread.session_id),
-                  )}>{thread.archived ? "Restore" : "Archive"}</button
+                  void archiveOrRestore(thread)}>{thread.archived ? "Restore" : "Archive"}</button
               >
               {#if projects_.length > 0}
                 <label class="move">
@@ -501,7 +520,7 @@
                     disabled={busy === thread.session_id}
                     aria-label={`Move ${thread.title} to a project`}
                     onchange={(event) =>
-                      void organise(thread.session_id, "move this thread", () =>
+                      void organise(thread.session_id, "move", () =>
                         api.setSessionProject(
                           thread.session_id,
                           (event.currentTarget as HTMLSelectElement).value || null,

@@ -85,7 +85,9 @@
   import { rememberSessionInRoute } from "../sessionRoute";
   import { forgetTurnInRoute, revealTurn } from "../turnAnchor";
   import { hasSteps, planFromEvent } from "../agentPlan";
-  import { collectReasoning, hasRunningTool, toolActivity } from "../chatPresentation";
+  import { collectReasoning, hasRunningTool, toolActivity, type ToolCallRow } from "../chatPresentation";
+  import { turnFailureMessage } from "../turnFailure";
+  import { retryConfirmation, retryConsequence } from "../conversationCommands";
   import {
     citedSourceIds,
     renderableCitations,
@@ -1095,8 +1097,12 @@
         openModelSetup(activeProfile);
         return;
       }
-      turn.error =
-        e instanceof ApiError ? `Stream failed (${e.status}).` : "Could not reach the local runtime.";
+      // BUG-285 — the refusal the runtime named, not the status number it came
+      // with, and no blanket reachability claim about a turn that had already
+      // streamed something.
+      turn.error = turnFailureMessage(e, {
+        produced: answerText(turn) !== "" || toolActivity(turn.events).length > 0,
+      });
     } finally {
       turn.streaming = false;
       streaming = false;
@@ -1357,9 +1363,19 @@
     });
   }
 
-  /** Send the same prompt again, unchanged, as a new turn. */
-  function retryPrompt(text: string) {
+  /**
+   * Send the same prompt again, unchanged, as a new turn.
+   *
+   * BUG-306 — **Retry** looked identical whether the first attempt had done
+   * nothing or had written a file, run a command or sent a message. Re-sending
+   * runs those again, and Raiker cannot tell whether doing them twice is safe:
+   * that is the owner's decision, so it is put to them, with what would be
+   * repeated named rather than implied.
+   */
+  function retryPrompt(text: string, rows: ToolCallRow[] = []) {
     if (streaming || text.trim() === "") return;
+    const consequence = retryConsequence(rows);
+    if (consequence.repeats && !window.confirm(retryConfirmation(consequence))) return;
     draft.text = text;
     void submit();
   }
@@ -1957,7 +1973,7 @@
               text={turn.prompt}
               disabled={streaming}
               onedit={editPrompt}
-              onretry={retryPrompt}
+              onretry={(text: string) => retryPrompt(text, toolRows)}
               onbranch={turn.response?.turn_id
                 ? () => void branchFromTurn(turn.response?.turn_id ?? "")
                 : undefined}

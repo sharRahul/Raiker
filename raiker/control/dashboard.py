@@ -2483,6 +2483,104 @@ class DashboardService:
         except ScopeError as exc:
             raise ValueError(exc.reason) from exc
 
+    # ── BUG-305 — one answer to "what can Raiker read" ──────────────────
+    #
+    # There are two kinds of source and they are genuinely different objects: a
+    # *managed file* is bytes Raiker holds, copied into its own storage, and a
+    # *granted folder* is somewhere on this machine Raiker may read in place.
+    # Merging them into one store would mean either copying a folder nobody
+    # asked to copy, or holding an upload as a path that can move — so they stay
+    # two controllers.
+    #
+    # What they did not have is one place that answers the owner's question.
+    # Memory listed the copies; the Knowledge Map listed the folders; nothing
+    # listed both, and an owner asking what Raiker can read had to know the
+    # distinction before they could find out. This is that list, and the one
+    # door that revokes an entry from it — each still handled by the controller
+    # that owns it, so no revocation semantics are re-implemented here.
+
+    def knowledge_sources(self, *, owner_principal_id: str) -> dict[str, Any]:
+        """Everything Raiker may read, both kinds, in the order it was added."""
+        entries: list[dict[str, Any]] = []
+        for row in self.store.list_managed_files(owner_principal_id):
+            scope_kind = str(row.get("scope_kind") or "memory")
+            project_id = str(row.get("project_id") or "")
+            state = str(row.get("index_state") or "")
+            entries.append(
+                {
+                    "source_id": str(row.get("file_id") or ""),
+                    "kind": "managed_file",
+                    "label": str(row.get("filename") or row.get("relative_path") or ""),
+                    "location": str(row.get("relative_path") or ""),
+                    "scope": f"project:{project_id}" if project_id else scope_kind,
+                    # Raiker wrote these bytes, so revoking takes them with it.
+                    # The exception — a project whose root the owner attached —
+                    # is the indexer's own rule and is not second-guessed here.
+                    "held": True,
+                    "index_state": state,
+                    # `ready` is the only state whose text retrieval can search.
+                    "recall": state == "ready",
+                    "graph": False,
+                    "added_at": str(row.get("created_at") or ""),
+                }
+            )
+        for grant in self.store.list_brain_source_grants(owner_principal_id):
+            root_id = str(grant.get("root_id") or "")
+            indexed = [
+                source
+                for source in self.store.list_brain_sources(owner_principal_id)
+                if source == root_id or source.startswith(f"{root_id}/")
+            ]
+            entries.append(
+                {
+                    "source_id": root_id,
+                    "kind": "granted_folder",
+                    "label": str(grant.get("label") or grant.get("path") or root_id),
+                    "location": str(grant.get("path") or ""),
+                    "scope": "folder",
+                    # Read where it lives. Revoking never touches it.
+                    "held": False,
+                    "index_state": "indexed" if indexed else "granted",
+                    "recall": bool(indexed),
+                    "graph": bool(indexed),
+                    "added_at": str(grant.get("created_at") or ""),
+                }
+            )
+        entries.sort(key=lambda entry: (str(entry["added_at"]), str(entry["source_id"])))
+        return {
+            "sources": entries,
+            "held_count": sum(1 for entry in entries if entry["held"]),
+            "granted_count": sum(1 for entry in entries if not entry["held"]),
+        }
+
+    def revoke_knowledge_source(
+        self, kind: str, source_id: str, *, owner_principal_id: str
+    ) -> dict[str, Any]:
+        """Stop reading one source, whichever controller owns it.
+
+        Neither branch is new behaviour: a managed file goes through the
+        indexer's own retire — which deletes the bytes Raiker wrote and leaves
+        an attached root's own files alone — and a granted folder goes through
+        the grant revocation, which also drops every source indexed under it so
+        the graph stops answering from a folder the owner just closed.
+        """
+        cleaned = (source_id or "").strip()
+        if not cleaned:
+            raise ValueError("knowledge_source_not_named")
+        if kind == "granted_folder":
+            return self.revoke_brain_source_folder(cleaned, owner_principal_id=owner_principal_id)
+        if kind == "managed_file":
+            from raiker.knowledge.files import ManagedFileError
+            from raiker.knowledge.indexing import ManagedFileIndexer
+
+            indexer = ManagedFileIndexer(self.workspace_root, self.store)
+            try:
+                record = indexer.retire(cleaned, owner_principal_id)
+            except ManagedFileError as exc:
+                raise ValueError(str(exc)) from exc
+            return {"ok": True, "source_id": record.file_id}
+        raise ValueError("unknown_knowledge_source_kind")
+
     def brain_source_roots(self, *, owner_principal_id: str) -> dict[str, Any]:
         """What the picker opens on: the boundary itself, named."""
         return {"roots": [root.to_dict() for root in self._scope_roots(owner_principal_id)]}

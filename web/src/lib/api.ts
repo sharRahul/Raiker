@@ -132,6 +132,8 @@ import type {
   WorkThread,
   WorkThreadPage,
   GitCredentialStatus,
+  KnowledgeSourceKind,
+  KnowledgeSourcesView,
   ManagedFile,
   ManagedFileImportResponse,
   ManagedFileList,
@@ -1421,6 +1423,16 @@ export const api = {
     } = {},
   ) => request<EventEntry[]>(withQuery("/api/events", params)),
   brain: () => request<BrainView>("/api/brain"),
+  /**
+   * BUG-305 — everything Raiker may read, both kinds, from one route. The two
+   * controllers stay two; the owner's question has one answer.
+   */
+  knowledgeSources: () => request<KnowledgeSourcesView>("/api/knowledge-sources"),
+  revokeKnowledgeSource: (kind: KnowledgeSourceKind, sourceId: string) =>
+    request<{ ok: boolean }>(
+      withQuery("/api/knowledge-sources", { kind, source_id: sourceId }),
+      { method: "DELETE" },
+    ),
   addBrainSource: (path: string) =>
     postJson<BrainSourceResult>("/api/brain/sources", { path }),
   /** An empty path answers with the roots themselves, not with a listing. */

@@ -438,6 +438,14 @@ describe("SearchChatView organises the threads it lists", () => {
       expect(JSON.parse(String(call![1]!.body))).toEqual({ project_id: "prj_1" });
     });
 
+    // BUG-306 — archiving is the one library command that takes a thread off
+    // the board it is resumed from, so the shared command set marks it as
+    // confirmed and the question names what is kept.
+    const asked: string[] = [];
+    vi.stubGlobal("confirm", (question: string) => {
+      asked.push(question);
+      return true;
+    });
     row = await openOrganise("Release planning");
     await fireEvent.click(within(row).getByRole("button", { name: "Archive" }));
     await waitFor(() =>
@@ -446,6 +454,26 @@ describe("SearchChatView organises the threads it lists", () => {
         expect.objectContaining({ method: "PUT" }),
       ),
     );
+    expect(asked[0]).toContain("Release planning");
+    expect(asked[0]).toContain("Restore brings it back");
+  });
+
+  it("does not archive a thread the owner declined to archive", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/work-threads/page": pageOf([thread()]),
+      "GET /api/projects": PROJECTS,
+      "PUT /api/sessions/sess_1/archive": { ok: true, session_id: "sess_1", archived: true },
+    });
+    vi.stubGlobal("confirm", () => false);
+    render(SearchChatView);
+    await waitFor(() => expect(screen.getByText("Release planning")).toBeInTheDocument());
+
+    const row = await openOrganise("Release planning");
+    await fireEvent.click(within(row).getByRole("button", { name: "Archive" }));
+
+    expect(
+      fetchMock.mock.calls.some((item) => String(item[0]).endsWith("/archive")),
+    ).toBe(false);
   });
 
   it("adds and removes a tag on the row that carries it", async () => {
@@ -548,6 +576,8 @@ describe("SearchChatView organises the threads it lists", () => {
     const row = await openOrganise("Release planning");
     await fireEvent.click(within(row).getByRole("button", { name: "Pin" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/could not update the pin/i);
+    // BUG-306 — the failure sentence is the command's, not this page's, so the
+    // same refusal reads the same way wherever the command is offered from.
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not pin this thread/i);
   });
 });

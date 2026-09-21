@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from raiker.build_identity import version as raiker_version
 from raiker.contracts.ids import utc_now
 from raiker.contracts.models import ClientMetadata
 from raiker.events.types import make_event
@@ -19,7 +20,7 @@ _PREVIEW_SOURCE = "proposal_approval_preview"
 
 
 def _preview_client() -> ClientMetadata:
-    return ClientMetadata(type="cli", name="raiker-approval-preview", version="0.0.0")
+    return ClientMetadata(type="cli", name="raiker-approval-preview", version=raiker_version())
 
 
 def _preview_id(proposal_id: str) -> str:

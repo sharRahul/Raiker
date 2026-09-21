@@ -56,3 +56,45 @@ def test_underscore_provider_alias_resolves(registry: ModelProfileRegistry) -> N
     resolved = registry.resolve("llama_cpp", "local-gguf")
     assert resolved.provider == "llama.cpp"
     assert resolved.model == "local-gguf"
+
+
+# ── GCR-17 ───────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("written", "expected"),
+    [
+        ("llama_cpp", "llama.cpp"),
+        ("llama-cpp", "llama.cpp"),
+        ("llama.cpp", "llama.cpp"),
+        ("LLAMA_CPP", "llama.cpp"),
+        ("Anthropic", "anthropic"),
+        ("lm_studio", "lm-studio"),
+        (" ollama ", "ollama"),
+    ],
+)
+def test_every_lookup_spells_a_provider_name_the_same_way(
+    registry: ModelProfileRegistry, written: str, expected: str
+) -> None:
+    """GCR-17 — `resolve`, `find` and `profiles_for_provider` had three rules.
+
+    `find()` replaced underscores and stopped there, so `find("llama_cpp", …)`
+    was empty about a profile `resolve("llama_cpp", …)` returns: a caller that
+    checked before it resolved concluded the profile did not exist. None of the
+    three lowercased, so a saved connection naming `Anthropic` resolved nowhere
+    and ran perfectly once it did.
+    """
+    profiles = registry.profiles_for_provider(written)
+    assert profiles, f"no profile for {written}"
+    assert {profile.provider for profile in profiles} == {expected}
+
+    model = profiles[0].model
+    assert registry.resolve(written, model).provider == expected
+    assert [profile.provider for profile in registry.find(written, model)] == [expected]
+
+
+def test_an_unknown_provider_still_fails_closed(registry: ModelProfileRegistry) -> None:
+    assert registry.profiles_for_provider("not-a-provider") == []
+    assert registry.find("not-a-provider", "whatever") == []
+    with pytest.raises(RegistryError, match="unknown_model_profile"):
+        registry.resolve("not-a-provider", "whatever")

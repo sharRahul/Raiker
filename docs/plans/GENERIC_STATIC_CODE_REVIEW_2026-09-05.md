@@ -41,11 +41,11 @@ The largest issues found in this first generic pass are:
 
 1. multiple `ModelRouter` code paths construct providers differently, causing configuration inconsistency and leaked clients — **closed 2026-09-06 ([FIXED-430](FIXED_ITEMS.md#fixed-430--five-surfaces-asked-would-this-model-run-by-building-one-and-dropping-it))**;
 2. multi-instance execution shares module-global command workspace state — **closed 2026-09-06 ([FIXED-432](FIXED_ITEMS.md#fixed-432--two-commands-running-at-once-could-be-judged-against-each-others-workspace))**;
-3. mounted Raiker instances are built as FastAPI sub-applications with their own lifespan workers, but mounted sub-app lifespans do not run under FastAPI;
-4. instance creation is non-transactional and mutates the live route table from a synchronous worker thread;
-5. `SQLiteStore` performs bootstrap/migration work in every constructor while hot request paths repeatedly construct stores;
+3. mounted Raiker instances are built as FastAPI sub-applications with their own lifespan workers, but mounted sub-app lifespans do not run under FastAPI — **closed 2026-09-21 ([FIXED-593](FIXED_ITEMS.md#fixed-593--a-second-person-on-this-machine-had-a-raiker-with-no-background-work))**;
+4. instance creation is non-transactional and mutates the live route table from a synchronous worker thread — **closed 2026-09-21 ([FIXED-594](FIXED_ITEMS.md#fixed-594--a-half-made-instance-blocked-the-retry-it-told-you-to-make))**;
+5. `SQLiteStore` performs bootstrap/migration work in every constructor while hot request paths repeatedly construct stores — **closed 2026-09-21 ([FIXED-595](FIXED_ITEMS.md#fixed-595--every-repository-object-was-a-schema-event))**;
 6. prompt submit and prompt streaming have duplicated orchestration with differing error semantics;
-7. frontend CI is path-filtered so backend API contract changes can bypass frontend type/build/E2E checks.
+7. frontend CI is path-filtered so backend API contract changes can bypass frontend type/build/E2E checks — **closed 2026-09-20 ([FIXED-589](FIXED_ITEMS.md#fixed-589--a-backend-change-could-not-break-the-web-client-because-the-web-client-was-never-built))**.
 
 The third pass adds more urgent correctness issues; see the companion document above before implementing this backlog.
 
@@ -59,17 +59,17 @@ The third pass adds more urgent correctness issues; see the companion document a
 | GCR-04 | Medium | P2 | `ModelRouter.generate()` accepts `context` but ignores it — **Closed 2026-09-06 ([FIXED-434](FIXED_ITEMS.md#fixed-434--two-public-parameters-that-changed-nothing))** |
 | GCR-05 | Medium | P1 | `run_coro()` blocks an already-running event loop and creates a thread pool per call — **Closed 2026-09-20 ([FIXED-588](FIXED_ITEMS.md#fixed-588--approving-an-action-held-the-whole-server-while-it-ran))** |
 | GCR-06 | High | P0/P1 | Module-global command workspace creates a cross-instance/concurrency race — **Closed 2026-09-06 ([FIXED-432](FIXED_ITEMS.md#fixed-432--two-commands-running-at-once-could-be-judged-against-each-others-workspace))** |
-| GCR-07 | High | P1 | Mounted Raiker instances do not receive their own FastAPI lifespan workers |
-| GCR-08 | High | P1 | Instance creation can leave a partially created/mounted instance when account registration fails |
-| GCR-09 | High | P1 | Instance registry/routing mutation is non-atomic and performed from a sync route worker thread |
-| GCR-10 | Medium/High | P1 | `SQLiteStore` bootstraps on every construction; hot paths construct several stores per request |
+| GCR-07 | High | P1 | Mounted Raiker instances do not receive their own FastAPI lifespan workers — **Closed 2026-09-21 ([FIXED-593](FIXED_ITEMS.md#fixed-593--a-second-person-on-this-machine-had-a-raiker-with-no-background-work))** |
+| GCR-08 | High | P1 | Instance creation can leave a partially created/mounted instance when account registration fails — **Closed 2026-09-21 ([FIXED-594](FIXED_ITEMS.md#fixed-594--a-half-made-instance-blocked-the-retry-it-told-you-to-make))** |
+| GCR-09 | High | P1 | Instance registry/routing mutation is non-atomic and performed from a sync route worker thread — **Closed 2026-09-21 ([FIXED-594](FIXED_ITEMS.md#fixed-594--a-half-made-instance-blocked-the-retry-it-told-you-to-make))** |
+| GCR-10 | Medium/High | P1 | `SQLiteStore` bootstraps on every construction; hot paths construct several stores per request — **Closed 2026-09-21 ([FIXED-595](FIXED_ITEMS.md#fixed-595--every-repository-object-was-a-schema-event))** |
 | GCR-11 | Medium | P2 | `sqlite.py` has become a large persistence/migration god module |
 | GCR-12 | Medium | P2 | Prompt submit and stream paths duplicate orchestration and already expose different error semantics |
 | GCR-13 | Medium | P2 | API redaction middleware buffers almost every JSON API response in full |
-| GCR-14 | Medium | P2 | Provider calls do not reuse an app/router-scoped HTTP client/connection pool |
+| GCR-14 | Medium | P2 | Provider calls do not reuse an app/router-scoped HTTP client/connection pool — **Closed 2026-09-21 ([FIXED-596](FIXED_ITEMS.md#fixed-596--every-model-call-built-a-new-connection-to-a-host-it-was-already-talking-to))** |
 | GCR-15 | Medium | P2 | Frontend CI does not run for backend/API contract-only changes |
-| GCR-16 | Low/Medium | P2 | Version metadata is split between hard-coded `0.0.0`, FastAPI `0.1.0`, and release input versions |
-| GCR-17 | Low | P3 | Model registry lookup normalization differs between `resolve`, `profiles_for_provider`, and `find` |
+| GCR-16 | Low/Medium | P2 | Version metadata is split between hard-coded `0.0.0`, FastAPI `0.1.0`, and release input versions — **Closed 2026-09-21 ([FIXED-598](FIXED_ITEMS.md#fixed-598--four-version-numbers-and-which-one-you-got-depended-on-where-you-looked))** |
+| GCR-17 | Low | P3 | Model registry lookup normalization differs between `resolve`, `profiles_for_provider`, and `find` — **Closed 2026-09-21 ([FIXED-597](FIXED_ITEMS.md#fixed-597--three-spellings-of-one-provider-name))** |
 | GCR-18 | Low | P3 | Public method parameters exist that are unused (`health_timeout`, `context`) and weaken API clarity — **Closed 2026-09-06 ([FIXED-434](FIXED_ITEMS.md#fixed-434--two-public-parameters-that-changed-nothing))** |
 
 ---
@@ -204,6 +204,8 @@ This is not thread-local or request-local. With multiple mounted Raiker instance
 
 **Severity: High — Priority: P1 — Confidence: High**
 
+**Status: Closed 2026-09-21 — [FIXED-593](FIXED_ITEMS.md#fixed-593--a-second-person-on-this-machine-had-a-raiker-with-no-background-work).** The parent-owned `InstanceRuntime` this entry recommends; mounted routing stays routing.
+
 Each secondary instance is created by recursively calling `create_app(workspace, ...)` and mounted with Starlette `Mount`. The `create_app()` lifespan is responsible for starting that workspace's task scheduler, approval continuation worker, attached-root watcher and runtime shutdown cleanup.
 
 FastAPI documents that lifespan events run only for the main application, not mounted sub-applications. Therefore using a mounted child FastAPI app as the lifecycle owner does not start the child lifespan workers.
@@ -217,6 +219,8 @@ FastAPI documents that lifespan events run only for the main application, not mo
 ## GCR-08 — Instance creation is not transactional
 
 **Severity: High — Priority: P1 — Confidence: High**
+
+**Status: Closed 2026-09-21 — [FIXED-594](FIXED_ITEMS.md#fixed-594--a-half-made-instance-blocked-the-retry-it-told-you-to-make).** Registered in a staged workspace first, published atomically, rolled back on any failure.
 
 The `/api/instances` route first calls `create_and_mount_instance()` and only afterwards calls `AccountService(workspace).register(...)` when initial account data was provided.
 
@@ -232,6 +236,8 @@ If account registration fails, the route returns an error but does not unmount t
 
 **Severity: High — Priority: P1 — Confidence: High**
 
+**Status: Closed 2026-09-21 — [FIXED-594](FIXED_ITEMS.md#fixed-594--a-half-made-instance-blocked-the-retry-it-told-you-to-make).** Creation is serialized, the registry is written by atomic replace, and the route is published from the event loop.
+
 `instances.json` is updated with a read-modify-`write_text` flow without a per-registry lock or atomic temp-file replace. Concurrent creates can lose names or expose a partially written JSON file.
 
 The instance route itself is a synchronous FastAPI handler, so it may execute in the framework threadpool. `_mount_instance()` directly mutates `app.router.routes` while the application can concurrently route requests.
@@ -243,6 +249,8 @@ The instance route itself is a synchronous FastAPI handler, so it may execute in
 ## GCR-10 — `SQLiteStore` bootstraps on every construction
 
 **Severity: Medium/High — Priority: P1 — Confidence: High**
+
+**Status: Closed 2026-09-21 — [FIXED-595](FIXED_ITEMS.md#fixed-595--every-repository-object-was-a-schema-event).** Once per workspace per process. Writing it found that three of bootstrap's passes are not schema at all — they adopt rows written with no owner — so those stay on the cheap path.
 
 `SQLiteStore.__init__()` calls `self.bootstrap()` under process-global `_BOOTSTRAP_LOCK`. Bootstrap performs schema/migration checks.
 
@@ -298,6 +306,8 @@ Some differences are transport-appropriate, but preparation/business orchestrati
 
 **Severity: Medium — Priority: P2 — Confidence: High**
 
+**Status: Closed 2026-09-21 — [FIXED-596](FIXED_ITEMS.md#fixed-596--every-model-call-built-a-new-connection-to-a-host-it-was-already-talking-to).** Keyed by endpoint and timeout as recommended, and by event loop besides, because an `httpx` client belongs to the loop that made it.
+
 `ModelRouter` creates a provider for each chat, stream, embed, health and model-list call and then closes it. Without an injected client, each provider creates its own `httpx.AsyncClient`.
 
 This is lifecycle-correct for the normal async methods but loses HTTP keep-alive/HTTP2 connection reuse and repeatedly builds pools/TLS connections.
@@ -332,6 +342,8 @@ A backend-only change to API routes, DTOs or schema can therefore merge without 
 
 **Severity: Low/Medium — Priority: P2 — Confidence: High**
 
+**Status: Closed 2026-09-21 — [FIXED-598](FIXED_ITEMS.md#fixed-598--four-version-numbers-and-which-one-you-got-depended-on-where-you-looked).** One resolver, and commit/build identity beside it on the surface an owner reads.
+
 The Python package declares `0.0.0`; the web package declares `0.0.0`; prompt client metadata also uses `0.0.0`; FastAPI reports `0.1.0`; and release workflow version is supplied separately through `workflow_dispatch`.
 
 This makes diagnostic/support output and compatibility metadata depend on which surface is read rather than one build identity.
@@ -343,6 +355,8 @@ This makes diagnostic/support output and compatibility metadata depend on which 
 ## GCR-17 — Provider-name normalization is inconsistent
 
 **Severity: Low — Priority: P3 — Confidence: High**
+
+**Status: Closed 2026-09-21 — [FIXED-597](FIXED_ITEMS.md#fixed-597--three-spellings-of-one-provider-name).** One `_normalize_provider()`, and it lowercases too — the factory always did, and the registry did not.
 
 `ModelProfileRegistry.resolve()` normalizes underscores/hyphens and aliases `llama-cpp` to `llama.cpp`. `profiles_for_provider()` performs the alias too, but `find()` only replaces underscores with hyphens.
 

@@ -3,6 +3,7 @@
   import Icon from "../../components/Icon.svelte";
   import { api } from "../../api";
   import type { UpdateStatusView } from "../../apiTypes";
+  import { clientBuild, clientIsStale, describeBuild } from "../../buildIdentity";
 
   let update = $state<UpdateStatusView | null>(null);
   let busy = $state<"checking" | "applying" | null>(null);
@@ -27,6 +28,27 @@
     available: "A newer release is offered",
     unreachable: "Channel unreachable — unknown",
   };
+
+  /**
+   * GCR-16 — the build identity, said once and in one place.
+   *
+   * "Installed version" was the only thing this page said about which Raiker
+   * this is, and it was one of four numbers that disagreed. It now names the
+   * commit the artifact was built from and when it was built, and it names the
+   * build of the page reading it, because a browser holding a bundle cached from
+   * before an update is exactly the state neither number describes on its own.
+   */
+  const buildLabel = $derived(
+    update === null
+      ? ""
+      : describeBuild(update.installation.version, update.installation.commit),
+  );
+  const builtLabel = $derived(
+    update === null || update.installation.built_at === null
+      ? "Not recorded"
+      : new Date(update.installation.built_at).toLocaleString(),
+  );
+  const stale = $derived(update !== null && clientIsStale(update.installation.version));
 
   const checkedLabel = $derived(
     update === null || update.checked_at === null
@@ -81,7 +103,14 @@
   {:else}
     <p class="description">{update.message}</p>
     <dl>
-      <div><dt>Installed version</dt><dd>{update.installation.version}</dd></div>
+      <div><dt>Installed build</dt><dd>{buildLabel}</dd></div>
+      <div><dt>Built</dt><dd>{builtLabel}</dd></div>
+      <div>
+        <dt>This page</dt>
+        <dd>
+          {clientBuild === update.installation.version ? "Same build" : describeBuild(clientBuild, null)}
+        </dd>
+      </div>
       <div><dt>Channel</dt><dd>{update.channel ? update.channel.channel : "Not configured"}</dd></div>
       {#if update.recovery_points.length}<div><dt>Recovery</dt><dd>{update.recovery_points.map((point) => point.version).join(", ")}</dd></div>{/if}
       <!-- The licence was permanent prose at the foot of the
@@ -103,6 +132,12 @@
         <dd>{checkedLabel}</dd>
       </div>
     </dl>
+    {#if stale}
+      <p class="notice" role="status">
+        This page was loaded from an older build than the one now running. Reload
+        Raiker so the page and the host are the same release.
+      </p>
+    {/if}
     {#if update.available}
       <p class="description">
         Version {update.available.version} is offered on the channel. Nothing has been downloaded

@@ -142,3 +142,48 @@ export function hubReachability(page: import("@playwright/test").Page): {
       refused ? errors.filter((text) => !/Failed to load resource.*5\d\d/.test(text)) : [...errors],
   };
 }
+
+/**
+ * Wait for a routed view to have finished *arriving*, not merely to exist.
+ *
+ * Several views render their shell immediately and then hydrate API-backed
+ * panels. Reading or capturing before those settle files a screenshot of a
+ * loading state under the name of the page it was going to become — the same
+ * class of wrong evidence FIXED-313 is about, one layer up.
+ *
+ * **Found live on 2026-09-21.** Four specs each carried their own copy of this,
+ * and all four matched any text *beginning* with `loading`, `reading`,
+ * `checking` or `verifying`. The composer's readiness strip says **"Checking
+ * this model — you can still send."** — a sentence whose whole point is that
+ * the page is usable, shown whenever a model's readiness observation has aged
+ * out (the five-minute TTL of BUG-83). So the width sweep, which exists to be
+ * re-runnable against a workspace that has been worked in, timed out on Chat
+ * the moment anyone had worked in it, and reported a stuck panel that was a
+ * standing state.
+ *
+ * The rule is the product's own convention rather than a list of exceptions: a
+ * label that is still loading ends in an ellipsis (`Loading projects…`,
+ * `Verifying runtime…`, `Checking providers…`). A finished sentence does not.
+ * One copy, so the next surface that phrases a state this way is one edit.
+ */
+export async function settled(
+  page: import("@playwright/test").Page,
+  { timeout = 20_000, settleMs = 0 }: { timeout?: number; settleMs?: number } = {},
+): Promise<void> {
+  await page.waitForFunction(
+    () =>
+      ![...document.querySelectorAll("main#main *")].some((element) => {
+        const node = element as HTMLElement;
+        const visible = node.offsetWidth > 0 || node.offsetHeight > 0;
+        const text = (node.textContent ?? "").trim();
+        return (
+          visible &&
+          /^(loading|reading|checking|verifying)\b/i.test(text) &&
+          /(…|\.\.\.)$/.test(text)
+        );
+      }),
+    undefined,
+    { timeout },
+  );
+  if (settleMs > 0) await page.waitForTimeout(settleMs);
+}

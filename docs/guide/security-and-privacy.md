@@ -123,6 +123,23 @@ address that passed, with every redirect re-checked and your token never sent on
 after the origin changes. See
 [Extensions and MCP](extensions-and-mcp.md#where-a-remote-server-may-be).
 
+## The dashboard's own boundary
+
+The page you read Raiker in is held to the same rule as everything else it may
+reach: a **Content-Security-Policy** that names its own origin as the only place
+scripts, styles, fonts and API calls may come from. It cannot be framed, it has
+no base URL to rewrite, and it submits no form by navigation.
+
+The exceptions are named rather than implied, and each is something Raiker
+genuinely does: an attachment, a generated image, a PDF preview and a dictation
+clip are fetched with your session and handed to the page as an object URL —
+precisely so the bytes never travel as a link anything else could follow.
+
+The interactive API documentation at `/api/docs` is the one surface outside the
+policy. It loads its viewer from a public CDN, it is a developer surface on a
+loopback bind rather than part of Raiker, and leaving it blank would say nothing
+about why.
+
 ## Records and privacy choices
 
 The append-only audit log records conversations and governed steps, scoped to

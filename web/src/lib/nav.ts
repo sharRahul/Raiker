@@ -316,6 +316,22 @@ export function sectionFromHash(hash: string): string | null {
   return requested !== null && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(requested) ? requested : null;
 }
 
+/**
+ * The project a `?project=` deep link names, or null.
+ *
+ * UX-BUILD-05 — every work surface named the Project it was running inside and
+ * linked to the *list* of projects. Coming back from Build to the project that
+ * started the work meant recognising its name among the others and pressing it
+ * again, which is the weak navigation the review describes. A project id is an
+ * opaque identifier, so this validates the shape and lets the view decide
+ * whether the owner actually owns it — an id that names nothing opens the list,
+ * exactly as before.
+ */
+export function projectFromHash(hash: string): string | null {
+  const requested = new URLSearchParams(hash.split("?", 2)[1] ?? "").get("project");
+  return requested !== null && /^[A-Za-z0-9_.:-]{1,128}$/.test(requested) ? requested : null;
+}
+
 export function tabFromHash(hash: string): string | null {
   const segments = rawSegments(hash);
   const raw = segments[0] ?? "";

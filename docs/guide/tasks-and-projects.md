@@ -135,6 +135,11 @@ lives.
 To move an existing conversation in, drag a recent chat onto the project, or use
 **Move to project** from the session's `⋯` menu.
 
+**Getting back to it.** Chat, Build, Design and Tasks each name the project a
+turn runs inside, in the context line beside the composer. Opening that line
+gives you **Open project work**, which opens *that* project rather than the list
+of them.
+
 Opening a project shows what belongs to it, in five sections rather than one
 long column:
 

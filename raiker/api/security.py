@@ -29,6 +29,52 @@ _SECURITY_HEADERS: tuple[tuple[bytes, bytes], ...] = (
     (b"permissions-policy", b"geolocation=(), microphone=(self), camera=()"),
 )
 
+#: CR-07 — the one header the review found missing, and the only one that limits
+#: what an injected string can *reach* rather than how the browser labels it.
+#:
+#: Everything Raiker's page needs is its own origin. The script bundle, the
+#: stylesheet, the fonts and the API are all served by this process, so the
+#: default is `'self'` and the exceptions below are each a thing the product
+#: actually does:
+#:
+#: * ``style-src 'unsafe-inline'`` — Svelte writes component state into `style`
+#:   attributes (a progress bar's width, the logo's size). Removing it means a
+#:   nonce on every such attribute, which CSP has no mechanism for.
+#: * ``img-src``/``media-src``/``object-src`` ``blob:`` and ``data:`` — an
+#:   attachment, a generated image, a PDF preview and a dictation clip are all
+#:   fetched with the owner's bearer token and handed to the element as an
+#:   object URL, precisely so the bytes never travel as a URL anything else
+#:   could follow.
+#: * ``frame-ancestors 'none'`` says what ``X-Frame-Options: DENY`` says, to the
+#:   browsers that read only this one.
+#: * ``base-uri`` and ``form-action`` are ``'none'`` because Raiker has no
+#:   ``<base>`` and posts nothing by form navigation; both are the levers an
+#:   injected tag would otherwise have.
+_CONTENT_SECURITY_POLICY = b"; ".join(
+    (
+        b"default-src 'self'",
+        b"script-src 'self'",
+        b"style-src 'self' 'unsafe-inline'",
+        b"img-src 'self' data: blob:",
+        b"font-src 'self' data:",
+        b"media-src 'self' data: blob:",
+        b"object-src 'self' blob:",
+        b"connect-src 'self'",
+        b"worker-src 'self' blob:",
+        b"frame-ancestors 'none'",
+        b"base-uri 'none'",
+        b"form-action 'none'",
+    )
+)
+
+#: The interactive API documentation FastAPI generates loads Swagger/ReDoc from
+#: a public CDN, so the policy above would leave a developer looking at a blank
+#: page and a console full of refusals. It is a developer surface on a loopback
+#: bind, it is not part of the product's own UI, and misreporting the reason a
+#: page is empty is its own defect — so the three paths are named here rather
+#: than the policy being loosened for everything.
+_CSP_EXEMPT_PATHS = frozenset({"/api/docs", "/api/redoc", "/api/openapi.json"})
+
 
 async def _send_json(send: Send, status_code: int, body: dict[str, object]) -> None:
     raw = json.dumps(body).encode("utf-8")
@@ -59,6 +105,7 @@ class SecurityHeadersMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+        policed = str(scope.get("path", "")) not in _CSP_EXEMPT_PATHS
 
         async def wrapped(message: Message) -> None:
             if message["type"] == "http.response.start":
@@ -67,6 +114,8 @@ class SecurityHeadersMiddleware:
                 for key, value in _SECURITY_HEADERS:
                     if key not in existing:
                         headers.append((key, value))
+                if policed and b"content-security-policy" not in existing:
+                    headers.append((b"content-security-policy", _CONTENT_SECURITY_POLICY))
                 if self._hsts and b"strict-transport-security" not in existing:
                     headers.append(
                         (b"strict-transport-security", b"max-age=63072000; includeSubDomains")
@@ -78,11 +127,24 @@ class SecurityHeadersMiddleware:
 
 
 class MaxBodySizeMiddleware:
-    """Rejects requests whose declared Content-Length exceeds ``max_bytes`` (413).
+    """Rejects a request body larger than ``max_bytes`` (413), by the bytes sent.
 
     ``path_overrides`` grants a different (still hard) cap to specific exact
     paths — used so the attachment-upload endpoint can accept a base64 image
     without loosening the tight default for every other route.
+
+    CR-06 — this used to read the declared ``Content-Length`` and nothing else.
+    A declaration is a claim by the sender, and the two ways of getting past it
+    are the two ordinary ways of sending a body: omit the header, or send
+    ``Transfer-Encoding: chunked``, which has no ``Content-Length`` at all. Either
+    way the cap this middleware exists to enforce was never consulted, and an
+    unbounded body reached the route and whatever buffered it.
+
+    Both halves now hold. The declared length is still checked first, because
+    refusing before a single byte is read is the cheap answer and the one an
+    honest oversized client should get. What actually enforces the cap is the
+    count of bytes received: the body stream is wrapped, and the request is
+    refused at the moment it goes over whatever it said it would be.
     """
 
     def __init__(
@@ -109,11 +171,62 @@ class MaxBodySizeMiddleware:
                     declared = 0
                 if declared > limit:
                     await _send_json(
-                        send, 413,
+                        send,
+                        413,
                         {"ok": False, "reason_code": "request_body_too_large"},
                     )
                     return
-        await self.app(scope, receive, send)
+
+        received = 0
+        refused = False
+
+        async def counted() -> Message:
+            """The body, refused the moment it exceeds the cap."""
+            nonlocal received, refused
+            message = await receive()
+            if message["type"] != "http.request":
+                return message
+            received += len(message.get("body", b"") or b"")
+            if received <= limit:
+                return message
+            refused = True
+            # The route never sees the bytes that went over, and is told the
+            # client has gone rather than handed a truncated body it would
+            # parse as though it were whole.
+            return {"type": "http.disconnect"}
+
+        answered = False
+
+        async def guarded(message: Message) -> None:
+            """Answer 413 rather than whatever the route made of a cut-off body."""
+            nonlocal answered
+            if not refused:
+                await send(message)
+                return
+            if message["type"] != "http.response.start" or answered:
+                return
+            answered = True
+            await _send_json(
+                send,
+                413,
+                {"ok": False, "reason_code": "request_body_too_large"},
+            )
+
+        try:
+            await self.app(scope, counted, guarded)
+        except Exception:
+            # A framework that reads a disconnected body raises rather than
+            # returning; when this middleware is the reason it disconnected,
+            # the honest answer is the refusal, not a 500 about it.
+            if not refused:
+                raise
+        if refused and not answered:
+            answered = True
+            await _send_json(
+                send,
+                413,
+                {"ok": False, "reason_code": "request_body_too_large"},
+            )
 
 
 class RateLimitMiddleware:

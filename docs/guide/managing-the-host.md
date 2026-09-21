@@ -137,6 +137,14 @@ update through Git and rebuild the dashboard.
 The same thing is in the app, at **Settings → Updates**. It names this build's
 provenance, the pinned channel, the last explicit check and any recovery point,
 and — for a signed package on a pinned channel — offers **Update and restart**.
+
+**Installed build** is the one identity: the release, the commit it was built
+from, and when it was built. Beside it, **This page** names the build of the
+dashboard you are reading, which is a separate fact — a browser can hold a page
+from before an update — and the card says so when the two differ. A source
+checkout reads *Unreleased build* rather than a version number, because it has
+never been released and pretending otherwise is the failure mode this page
+exists to avoid.
 Opening the page contacts nothing; only **Check for updates** does. Applying
 never happens inside the web server: a short-lived helper waits for the host to
 stop, verifies the release again, swaps the installation atomically, and

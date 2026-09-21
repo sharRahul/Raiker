@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-21 | Targeted | `2026-09-21-static-review-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering real turns; OpenAI and OpenRouter keys entered through the Connect dialog and refused by this host's egress policy; Ollama Cloud unreachable for the same reason | Ten items from `docs/plans/`: the static reviews' remaining instance, storage, transport, registry and version findings, the two API-hardening findings of the security review, and UX-BUILD-05. Proved live: two real turns over one pooled connection, every page under the new Content-Security-Policy with **no console refusals at four widths**, the build identity in Settings, and Build reopening the project it is running inside. **Four defects found by the round and fixed in it** — the live suite was never type-checked, four copies of one wait helper read a usable page as a stuck one, and `bug-242-build-restore` carried four separate stale assertions |
 | 2026-09-20 | Targeted | `2026-09-20-round/` | Anthropic (`claude-haiku-4-5-20251001`), the key entered through the Connect dialog | Four scenarios on a workspace reset for the round, covering the nine items this run closed: a follow-up after a very long exchange answered *from* it, the conversation library organising a thread on the board it is resumed from (pin, rename, tag, archive and restore), the evidence inspector left with Delete and a line saying where the rest went, and the attached-root watcher named among Diagnostics' background passes. **One Medium defect found by the work and fixed in it** — the session row's menu was clipped by the card it opened inside, so **Delete** could not be clicked |
 | 2026-09-18 | Targeted | `2026-09-18-round/` | Anthropic (`claude-haiku-4-5-20251001`), the key entered through the Connect dialog | Ten scenarios on a workspace reset for the round: the guide's own cross-references opening a chapter in place, four closing events describing four different things, a thread resuming on the surface it was done on, the evidence inspector with one routed way back, one memory record drawer, an exception-led Observability overview, an extensions inventory, one Add-skill entry, a non-animated live board and four security lifecycles. **Three defects found by the work and fixed in it** — every chat thread reported "0 turns", the Extensions lead undercounted by three of the five kinds, and two settings pages each drew their own copy of the page's guide link |
 | 2026-09-16 | Targeted | `docs/screenshots/` (five captures, no prefix) | Anthropic (`claude-haiku-4-5-20251001`), the key entered through the Connect dialog | Five scenarios on a workspace reset for the round: a declared table surviving an export, a reopened turn in the evidence inspector, a Knowledge Map that says it is empty instead of drawing three records nobody made, the same records as a list with the canvas stopped, and Build opening the guide chapter the product had been shipping and could not reach. **The first attempt found a High-severity runtime defect** — a turn that wrote anything before calling a tool stored a different answer than it showed — which is why the round had nothing to export until it was fixed |
@@ -75,6 +76,86 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-09-21 — Ten static-review items, and a test suite nothing was checking
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py`.
+Providers: Anthropic `claude-haiku-4-5-20251001` answering real turns, with
+OpenAI and OpenRouter keys entered through the Connect dialog; both are refused
+by this host's egress proxy, as is `ollama.com`. Every key was entered through
+the UI and none is written to the repository. Captures:
+[`docs/screenshots/2026-09-21-static-review-round/`](../screenshots/2026-09-21-static-review-round).**
+
+Ten items: GCR-07, GCR-08, GCR-09, GCR-10, GCR-14, GCR-16 and GCR-17 of the
+generic static review, CR-06 and CR-07 of the security review, and UX-BUILD-05
+of the release-readiness review. Most are proved by unit tests, because most are
+conditions a test can *create* and a live round cannot — a failed account
+registration, fifty overlapping registry writes, an event loop that has gone.
+Four are not, and those are the four run here.
+
+**What it proved.**
+
+1. **Two real Anthropic turns in one conversation**, over a pooled connection
+   rather than a new TLS handshake each (GCR-14), on a provider resolved through
+   the registry lookups GCR-17 unified. The Models page afterwards reads
+   *1 model used · 2 turns · $0.0007*.
+2. **Every page under the new Content-Security-Policy, with nothing refused.**
+   The full sweep and both width sweeps ran at four widths against a workspace
+   that had been worked in, and the console recorded no CSP refusal and no
+   error. The policy is `default-src 'self'`; the exceptions it needs — object
+   URLs for an attachment, a generated image, a PDF preview and a dictation clip
+   — are each named in the header rather than assumed.
+3. **Settings → Updates names this build**, the commit it came from, when it was
+   built, and the build of the page reading it. On a source checkout it says
+   *Unreleased build* rather than inventing a release number, which is the
+   honest answer and the one four separate `0.0.0`s could not give.
+4. **Build reopens the project it is running inside.** A project created,
+   started in Build, and reached again from Build's own context line — landing on
+   that project's overview rather than on the list of projects.
+
+**The three providers this host cannot reach, entered anyway.** OpenAI and
+OpenRouter keys were saved through the Connect dialog and both cards read
+*Connection saved · Not checked*; neither claims a verification it has not made.
+Ollama reads *Not installed on this machine* beside *Cloud inference*, and
+Ollama Cloud reads *Not connected*. This is [BUG-290](TO_BE_FIXED.md#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host)
+reconfirmed for the third round running: the egress proxy answers `403` to
+`CONNECT` for `api.openai.com`, `openrouter.ai` and `ollama.com`, and it is the
+environment rather than the code.
+
+**What the round found, and the round fixed.**
+
+* **The live suite was never type-checked.** `web/tsconfig.json` covered `src/`
+  and not `e2e/`, so the suite that produces every `FIXED_ITEMS` entry's
+  evidence was outside `npm run check`. Bringing it in found seven errors,
+  including a helper in `bug-69-model-readiness-live.spec.ts` that read a `page`
+  that is not in its scope — every call threw. Recorded as
+  [FIXED-601](FIXED_ITEMS.md#fixed-601--the-suite-that-proves-everything-was-never-type-checked).
+* **Four copies of one wait helper read a usable page as a stuck one.** The
+  composer says *"Checking this model — you can still send."* whenever a
+  model's readiness observation has aged out, and all four copies treated any
+  text beginning with `checking` as an unfinished load. So the width sweep —
+  which exists to be re-runnable against a workspace that has been worked in —
+  timed out on Chat the moment anyone had worked in it. One copy now, in
+  `destinations.ts`, using the product's own convention: a label that is still
+  loading ends in an ellipsis.
+* **`bug-242-build-restore-mem-09-live` carried four separate stale
+  assertions**, each from a change the product had made and the spec had not:
+  the project select moved behind `+` (COMPOSER-03), Build's primary action is
+  `Run` rather than `Send` (COMPOSER-15), a reload no longer signs the owner out
+  (FIXED-353), and the memory integrity report moved into *Runtime health, in
+  detail* (FIXED-562). It also kept its own sign-in, which is
+  [BUG-248](TO_BE_FIXED.md#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body)'s
+  remainder; it uses the shared helper now. All five of its tests pass, with no
+  console errors.
+
+**What it did not prove.** Nothing about a second *instance*: GCR-07's and
+GCR-08's evidence is `tests/test_instance_runtime_lifecycle.py`, because the
+condition — a mounted workspace whose scheduler never started — is a silence,
+and a live round cannot photograph one. The image-provider round trip
+([BUG-287](TO_BE_FIXED.md#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider))
+is still unrun on this host for the same egress reason as the three providers
+above.
 
 ## 2026-09-20 — Nine static-review items, and the menu that could not be clicked
 

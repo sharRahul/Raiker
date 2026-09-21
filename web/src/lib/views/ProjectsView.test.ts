@@ -11,6 +11,9 @@ import ProjectsView from "./ProjectsView.svelte";
 import { resetWorkProject, workProject } from "../workProject.svelte";
 
 afterEach(() => {
+  // UX-BUILD-05 — the deep-link tests write the address bar, and a hash left
+  // behind would open a project in the next test that never asked for one.
+  window.location.hash = "";
   setToken(null);
   vi.useRealTimers();
   vi.unstubAllGlobals();
@@ -607,6 +610,67 @@ describe("ProjectsView context home", () => {
     await openSection("Files");
     await screen.findByRole("tree", { name: /project files/i });
     expect(screen.queryByRole("button", { name: "Attach a folder" })).not.toBeInTheDocument();
+  });
+
+  // ── UX-BUILD-05 ───────────────────────────────────────────────────────────
+
+  /**
+   * Build, Chat, Design and Tasks all name the Project a turn runs inside and
+   * all linked to the *list* of projects. Coming back from Build to the project
+   * that started the work meant recognising its name among the others and
+   * pressing it again. They now link to it, and this is the half that lands.
+   */
+  it("opens the project a deep link names, without a press", async () => {
+    window.location.hash = "#/projects?project=proj_1";
+    stubFetch(routes());
+    render(ProjectsView);
+
+    expect(await screen.findByRole("heading", { name: "Alpha" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("tab", { name: "Overview" }),
+    ).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("follows a second deep link while it is already open", async () => {
+    window.location.hash = "#/projects?project=proj_1";
+    stubFetch({
+      ...routes({
+        "GET /api/projects": {
+          projects: [project({}), project({ project_id: "proj_2", name: "Beta" })],
+          active_project_id: null,
+        },
+      }),
+      "GET /api/projects/proj_2": { ...DETAIL, project: project({ project_id: "proj_2", name: "Beta" }) },
+      "GET /api/projects/proj_2/files": { ...FILES, project_id: "proj_2" },
+      "GET /api/projects/proj_2/browse": BROWSE,
+      "GET /api/projects/proj_2/root/status": STATUS,
+      "GET /api/projects/proj_2/managed-files": {
+        ok: true,
+        scope_kind: "project",
+        project_id: "proj_2",
+        files: [],
+      },
+    });
+    render(ProjectsView);
+    await screen.findByRole("heading", { name: "Alpha" });
+
+    window.location.hash = "#/projects?project=proj_2";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    expect(await screen.findByRole("heading", { name: "Beta" })).toBeInTheDocument();
+  });
+
+  it("opens the list for a project that is not the owner's, rather than an error", async () => {
+    // A deleted or archived project is the ordinary case, and the list is what
+    // the link used to do.
+    window.location.hash = "#/projects?project=proj_gone";
+    stubFetch(routes());
+    render(ProjectsView);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /open project alpha/i })).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("heading", { name: "Alpha" })).toBeNull();
+    expect(screen.queryByText(/Could not load project/)).toBeNull();
   });
 });
 

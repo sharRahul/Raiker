@@ -106,7 +106,11 @@ names.
 | [BUG-283](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others) | Low | Web UI / information architecture | **Closed 2026-09-04 ([FIXED-394](FIXED_ITEMS.md#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others))** — 244 words of explanation to the guide, one contract that was stated twice, and two tabs that were copies of other surfaces |
 | [BUG-284](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything) | Medium | Web UI / responsive layout | **Closed 2026-09-04 ([FIXED-395](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything))** — found by running the width sweep against a workspace that had been worked in; reproduced on unmodified `main` |
 | [BUG-285](FIXED_ITEMS.md#fixed-590--a-turn-that-failed-blamed-the-local-runtime-for-it) | Medium | Models / Ollama cloud chat | **Closed 2026-09-20 ([FIXED-590](FIXED_ITEMS.md#fixed-590--a-turn-that-failed-blamed-the-local-runtime-for-it))** — the entry's second interface outcome: a failed turn reports the refusal the runtime named. The message was the surface's, not the provider's |
+| [BUG-286](FIXED_ITEMS.md#fixed-525--a-composer-with-no-default-chosen-opened-naming-a-model-nobody-had-chosen) | Low | Chat/Build composer / model decision | **Closed 2026-09-14 ([FIXED-525](FIXED_ITEMS.md#fixed-525--a-composer-with-no-default-chosen-opened-naming-a-model-nobody-had-chosen))** — the decision answered a registry default where the owner had stored none, and the menu reported it honestly |
+| [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open — the same egress limit as [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host); since [FIXED-542](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all) a live round has a second thing to prove — that turning **Image generation** off refuses a generation |
+| [BUG-288](FIXED_ITEMS.md#fixed-545--a-turn-could-only-answer-in-prose) | Low | Chat / typed output | **Closed 2026-09-15 ([FIXED-545](FIXED_ITEMS.md#fixed-545--a-turn-could-only-answer-in-prose))** — VIS-19, and the last implementation item in the visual review that was removed when it closed |
 | [BUG-289](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running) | Low | Models / provider errors | **Closed 2026-09-14 ([FIXED-526](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running))** — a hosted provider gets a remedy an owner can act on |
+| [BUG-307](#bug-307--the-content-security-policy-still-allows-inline-styles) | Low | Web UI / security headers | Open — raised 2026-09-21 while closing [CR-07](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-07--browser-responses-lack-content-security-policy) as [FIXED-599](FIXED_ITEMS.md#fixed-599--the-body-cap-counted-a-claim-and-nothing-said-where-a-page-may-reach) |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -115,7 +119,7 @@ names.
 | [BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more) | Low | Live test harness / evidence | **Closed 2026-09-15 ([FIXED-541](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more))** — six rounds blocked on a key, then three stale selectors |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
-| [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-04 to **twelve**; eight more converted and each re-run against a used workspace, three must keep their own |
+| [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-21 to **eleven**; `bug-242-build-restore-mem-09-live` was converted after its own sign-in went stale in exactly the way BUG-229 records, waiting for a workbench greeting a saved startup route never shows. Three must keep their own |
 | [BUG-249](FIXED_ITEMS.md#fixed-326--a-fixed_items-link-pointed-at-a-heading-that-does-not-exist) | Low | Documentation / CI | **Closed 2026-08-30 (FIXED-326)** — one line, and `test_docs_consistency` is green |
 | [BUG-250](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject) | Low | Live test harness | **Closed 2026-09-15 ([FIXED-549](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject))** — `roundName()` gives each round its own subject |
 | [BUG-251](FIXED_ITEMS.md#fixed-352--every-path-an-owner-typed-was-a-path-they-had-to-know) | Medium | Web UI / file and folder selection | **Closed 2026-09-03 (FIXED-352)** — the host lists directory names and one `PathPicker` serves all four fields |
@@ -1267,7 +1271,7 @@ returns for an edit or a set of variations has not been seen.
 **Severity: Low. Area: composer. Status: Closed 2026-09-15 as
 [FIXED-540](FIXED_ITEMS.md#fixed-540--the-two-surfaces-that-kept-their-own-composer-had-stopped-keeping-it).
 Raised while implementing
-[COMPOSER-10 and COMPOSER-11](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md).**
+COMPOSER-10 and COMPOSER-11 of the composer redesign, removed 2026-09-21.**
 
 Closed by the work it was raised beside, and recorded late. COMPOSER-10 rebuilt
 task creation on `Composer.svelte`, and both surfaces this entry names — `tasks`
@@ -1558,6 +1562,42 @@ that cannot be reached offers a remedy an owner can act on, and a local one stil
 offers the one that applies to it — with a capture of each.
 
 ---
+
+---
+
+## BUG-307 — The Content-Security-Policy still allows inline styles
+
+**Severity: Low. Area: Web UI / security headers. Raised 2026-09-21 while
+closing [CR-07](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-07--browser-responses-lack-content-security-policy)
+as [FIXED-599](FIXED_ITEMS.md#fixed-599--the-body-cap-counted-a-claim-and-nothing-said-where-a-page-may-reach).**
+
+**Observed.** Raiker now sends a policy, and `script-src` is `'self'` with no
+inline allowance — which is the half that matters for an injected string.
+`style-src` keeps `'unsafe-inline'`.
+
+**Why.** Svelte writes component state into `style` attributes — a progress
+bar's width, the logo's size, a task's percentage — and CSP has no nonce
+mechanism for an attribute. So the choice is not "nonce or `'unsafe-inline'`";
+it is "remove the attributes or `'unsafe-inline'`". CR-07's recommendation asks
+for a nonce/hash-based policy, and this is the one directive that does not meet
+it.
+
+**What it costs.** An injected string that reached the DOM could style the page
+— reposition or disguise a control — but could not fetch, connect, execute or
+exfiltrate: `default-src`, `script-src` and `connect-src` are all `'self'`, and
+`base-uri` and `form-action` are `'none'`. CSS-only exfiltration channels
+(`background-image: url(...)`) are closed by `img-src` naming this origin,
+`data:` and `blob:` and nothing else.
+
+**Proposed fix.** Replace the dynamic `style` attributes with CSS custom
+properties set from a stylesheet-declared class, or a small set of precomputed
+classes, and then drop `'unsafe-inline'`. Roughly a dozen components use them,
+so it is a contained change — and it is worth doing on its own rather than as
+part of shipping the header, which is why the header shipped first.
+
+**Required user-interface outcome.** No visual change: every control that sizes
+itself from state keeps doing so, and the page's own policy no longer permits a
+style it did not ship.
 
 ## BUG-290 — Three of the four providers this round was given keys for cannot be reached from this host
 

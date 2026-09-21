@@ -22,6 +22,24 @@ IDs went out of the codebase with it
 did the same for five earlier removals), so no comment cites a file that is not
 in the tree.
 
+The unified composer redesign went on 2026-09-21, when the last of its twenty
+items had closed. COMPOSER-01 through COMPOSER-20 are recorded as
+[FIXED-454](FIXED_ITEMS.md#fixed-454--the-composer-grew-one-permanent-button-at-a-time),
+[FIXED-455](FIXED_ITEMS.md#fixed-455--two-reads-whose-shape-nothing-checked-took-the-page-down),
+[FIXED-461](FIXED_ITEMS.md#fixed-461--four-derivations-of-one-fact-about-what-a-turn-can-read),
+[FIXED-470](FIXED_ITEMS.md#fixed-470--tasks-asked-to-be-filled-in-rather-than-instructed),
+[FIXED-471](FIXED_ITEMS.md#fixed-471--one-primary-action-that-did-not-say-what-it-would-do),
+[FIXED-478](FIXED_ITEMS.md#fixed-478--a-work-draft-was-lost-at-every-mode-switch),
+[FIXED-479](FIXED_ITEMS.md#fixed-479--a-large-paste-could-hide-the-conversation-it-belonged-to),
+[FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach)
+and [FIXED-540](FIXED_ITEMS.md#fixed-540--the-two-surfaces-that-kept-their-own-composer-had-stopped-keeping-it).
+The two image controls it lists that are still absent — outpaint and reference
+images — are absent *by* its own acceptance test 19: an exposed action that
+reaches no runtime path is omitted rather than shipped inert. Proving the three
+that did land against a real provider is
+[BUG-287](TO_BE_FIXED.md#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider),
+which is a live-evidence gap and lives in the open ledger.
+
 The typed channel's other half closed on 2026-09-16 as
 [FIXED-551](FIXED_ITEMS.md#fixed-551--a-declared-table-was-a-table-in-the-conversation-and-json-everywhere-else):
 an exported, reopened or spoken answer is the same answer the conversation
@@ -57,7 +75,6 @@ When these disagree with an older topic review's current-status prose, re-verify
 | `MEMORY_RELIABILITY_PLAN.md` | Memory reliability evidence/closure ledger |
 | `RAIKER_LIVE_MANUAL_TEST_PLAN.md` | Active manual verification procedure |
 | `SECURITY_COMPLIANCE_GAP_ASSESSMENT_2026-09-05.md` | Standards/control mapping evidence, not a certification claim |
-| `UNIFIED_COMPOSER_REDESIGN_2026-09-06.md` | Composer design/implementation history |
 | `screenshots/` | Legacy screenshot evidence only; canonical current screenshots live under `docs/screenshots/` |
 
 ## Documentation governance

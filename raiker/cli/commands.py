@@ -23,6 +23,7 @@ from raiker.approvals.readiness_registry import (
     approval_readiness_summary,
     render_approval_readiness,
 )
+from raiker.build_identity import version as raiker_version
 from raiker.channels.readiness_registry import channel_readiness_summary, render_channel_readiness
 from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
@@ -112,7 +113,7 @@ def terminal_client() -> ClientMetadata:
     return ClientMetadata(
         type="tui",
         name="raiker-terminal",
-        version="0.0.0",
+        version=raiker_version(),
         interface_status="equal_primary_when_enabled",
     )
 

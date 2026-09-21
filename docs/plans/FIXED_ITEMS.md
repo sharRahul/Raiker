@@ -614,6 +614,16 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-590](#fixed-590--a-turn-that-failed-blamed-the-local-runtime-for-it) | Medium | Chat / Build / provider errors | Fixed 2026-09-20 |
 | [FIXED-591](#fixed-591--retry-looked-the-same-whether-the-turn-had-sent-an-email-or-nothing) | Medium | Chat / Build / conversation commands | Fixed 2026-09-20 |
 | [FIXED-592](#fixed-592--two-kinds-of-source-and-nowhere-that-answered-what-can-raiker-read) | Low | Memory / Knowledge Map | Fixed 2026-09-20 |
+| [FIXED-593](#fixed-593--a-second-person-on-this-machine-had-a-raiker-with-no-background-work) | **High** | Instances / runtime lifecycle | Fixed 2026-09-21 (closes GCR-07) |
+| [FIXED-594](#fixed-594--a-half-made-instance-blocked-the-retry-it-told-you-to-make) | **High** | Instances / registry | Fixed 2026-09-21 (closes GCR-08, GCR-09) |
+| [FIXED-595](#fixed-595--every-repository-object-was-a-schema-event) | Medium/High | Storage | Fixed 2026-09-21 (closes GCR-10) |
+| [FIXED-596](#fixed-596--every-model-call-built-a-new-connection-to-a-host-it-was-already-talking-to) | Medium | Models / provider transport | Fixed 2026-09-21 (closes GCR-14) |
+| [FIXED-597](#fixed-597--three-spellings-of-one-provider-name) | Low | Models / registry | Fixed 2026-09-21 (closes GCR-17) |
+| [FIXED-598](#fixed-598--four-version-numbers-and-which-one-you-got-depended-on-where-you-looked) | Low/Medium | Build identity / Settings | Fixed 2026-09-21 (closes GCR-16) |
+| [FIXED-599](#fixed-599--the-body-cap-counted-a-claim-and-nothing-said-where-a-page-may-reach) | **High** | API hardening | Fixed 2026-09-21 (closes CR-06, CR-07) |
+| [FIXED-600](#fixed-600--build-named-the-project-and-sent-you-to-the-list-of-them) | Low | Build / Chat / Design / Tasks navigation | Fixed 2026-09-21 (closes UX-BUILD-05) |
+| [FIXED-601](#fixed-601--the-suite-that-proves-everything-was-never-type-checked) | Medium | Live test harness | Fixed 2026-09-21 — raised and closed in the same run |
+| [FIXED-602](#fixed-602--the-open-ledgers-index-left-out-three-of-its-own-entries-one-of-them-open) | Low | Documentation / CI | Fixed 2026-09-21 |
 
 ---
 
@@ -20316,8 +20326,8 @@ fix. Live evidence: `live-models-overview.png`, `live-models-inventory.png`,
 ## FIXED-454 — The composer grew one permanent button at a time
 
 **Severity: High. Area: composer. Status: Fixed 2026-09-07. Raised as
-COMPOSER-01 through COMPOSER-20 in
-[the composer redesign](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md).**
+COMPOSER-01 through COMPOSER-20 in `UNIFIED_COMPOSER_REDESIGN_2026-09-06.md`,
+removed 2026-09-21 once every one of them had closed.**
 
 **Observed.** Every capability Raiker gained arrived as one more permanent
 control, because a permanent control is the cheapest thing to add and nothing
@@ -20449,8 +20459,7 @@ Live evidence: `live-models-inventory.png`.
 ## FIXED-458 — A mobile sheet that was 32px short of being one
 
 **Severity: Low. Area: composer / mobile. Status: Fixed 2026-09-07. Raised as
-part of
-[COMPOSER-16](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md#composer-16--mobile-behavior).**
+COMPOSER-16 (mobile behaviour) of the composer redesign, removed 2026-09-21.**
 
 **Observed.** The composer's `+` and Tools menus are bottom sheets below the
 split, because a dropdown anchored to a 44px control at the bottom of a phone
@@ -20893,9 +20902,8 @@ composer's context line; switching surface or reloading keeps it.
 
 ## FIXED-470 — Tasks asked to be filled in rather than instructed
 
-**Severity: Medium. Area: tasks. Status: Fixed 2026-09-07. Found in
-[UNIFIED_COMPOSER_REDESIGN_2026-09-06.md](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md)
-(COMPOSER-10).**
+**Severity: Medium. Area: tasks. Status: Fixed 2026-09-07. Found as COMPOSER-10
+of `UNIFIED_COMPOSER_REDESIGN_2026-09-06.md`, removed 2026-09-21.**
 
 **Observed.** Creating a task meant completing an admin form — a title field, a
 separate objective, its own model picker, recurrence and notification controls
@@ -20926,9 +20934,8 @@ Live-verified in the round of 2026-09-07; screenshot
 
 ## FIXED-471 — One primary action that did not say what it would do
 
-**Severity: Low. Area: composer. Status: Fixed 2026-09-07. Found in
-[UNIFIED_COMPOSER_REDESIGN_2026-09-06.md](UNIFIED_COMPOSER_REDESIGN_2026-09-06.md)
-(COMPOSER-15).**
+**Severity: Low. Area: composer. Status: Fixed 2026-09-07. Found as COMPOSER-15
+of `UNIFIED_COMPOSER_REDESIGN_2026-09-06.md`, removed 2026-09-21.**
 
 **Observed.** Build's primary action read **Send** in every mode. In Plan mode
 it sends nothing to be applied; in Edit mode it does not apply either, because
@@ -25997,3 +26004,363 @@ the folder that survives its own revocation and the copy that does not — and
 `web/src/lib/components/KnowledgeSources.test.ts`, where the confirmation states
 which of those two will happen before either does. Live:
 `docs/screenshots/2026-09-20-sources-and-commands/02-knowledge-sources.png`.
+
+---
+
+## FIXED-593 — A second person on this machine had a Raiker with no background work
+
+**Severity: High. Area: Instances / runtime lifecycle. Status: Fixed 2026-09-21.
+Closes [GCR-07](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-07--mounted-instance-lifespans-are-not-application-lifecycle-management).**
+
+**Observed.** A second Raiker user on the same host is a second workspace:
+`POST /api/instances` creates one, and `create_app(workspace)` mounts its own
+application at `/instances/<name>`. It answers every request correctly. None of
+its background work was running.
+
+**Root cause.** Starlette runs a lifespan for the **top-level** application
+only. A `Mount` is routing; a mounted sub-application's lifespan is never
+entered. Everything that workspace needs in the background lived in that
+lifespan: the fifteen-second task tick, the approval-continuation worker, the
+model-capacity refresh, the telemetry cadence, the abandoned-operation recovery
+and the attached-root watcher. So on a secondary instance a scheduled task never
+became due, an approval granted in the browser waited for a sweep that did not
+exist, governed events never left, a folder attached to a project was never
+re-read, and a model download the host had restarted away from stayed `running`
+for ever.
+
+**Why it was invisible.** Every one of those is a *silence*. Nothing errors when
+a scheduler is not running; work simply does not start. The instance's own pages
+render, its turns answer, and the only symptom is that time stops passing for it.
+
+**Fixed.** The services did not change; they got an owner.
+`raiker/api/instance_runtime.py` is one `InstanceRuntime` per workspace, holding
+exactly the passes the lifespan held, with `start()` and `aclose()`. The root
+application's lifespan starts one for itself **and one for every instance it
+mounts**, and stops them newest-first on the way out. An instance created while
+the host is already running gets its runtime immediately rather than at the next
+restart. Routing stays routing.
+
+**Evidence.** `tests/test_instance_runtime_lifecycle.py` — a mounted instance
+has a runtime over its own workspace, an instance present at boot is started by
+the root lifespan, and leaving the lifespan stops everything it started.
+
+---
+
+## FIXED-594 — A half-made instance blocked the retry it told you to make
+
+**Severity: High. Area: Instances / registry. Status: Fixed 2026-09-21. Closes
+[GCR-08](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-08--instance-creation-is-not-transactional)
+and [GCR-09](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-09--instance-registry-and-route-mutation-are-race-prone).**
+
+**Observed (GCR-08).** `POST /api/instances` created the workspace directory,
+appended the name to `instances.json` and mounted the route — and *then* tried to
+register the first account. A registration that failed returned
+`account_creation_failed` and left all three behind. The retry that error invites
+answered `instance_already_exists`, about an instance that had never worked, and
+the only way out was to find and delete a directory the API deliberately never
+names.
+
+**Observed (GCR-09).** `instances.json` was maintained by read-modify-
+`write_text` from a **synchronous** route handler, so it ran on whichever
+threadpool worker FastAPI chose. Two concurrent creates each read the list, each
+appended their own name and each wrote the whole thing back: the second write
+lost the first name. `write_text` also truncates before it writes, so a reader
+arriving in between saw an empty or partial document — and on the next boot, an
+instance that is not in that file is not mounted.
+
+**Fixed.** The account is created in the staged workspace *before* anything is
+published, and any failure removes the staged directory and re-raises: an
+instance exists completely or does not exist at all. The whole create-and-publish
+sequence runs under one process lock, and the registry is written to a
+neighbouring file and `os.replace`d, so a reader sees the old list or the new one
+and never half of one. Publishing the route and starting the runtime happen on
+the event loop that serves requests, because `create_and_mount_instance` is now a
+coroutine.
+
+**Evidence.** `tests/test_instance_runtime_lifecycle.py` — a failed registration
+leaves no directory, no registry entry and no route, *and the retry then
+succeeds*; fifty overlapping writes are each read back as a whole document, with
+no staging file left behind; two concurrent creates both survive.
+
+---
+
+## FIXED-595 — Every repository object was a schema event
+
+**Severity: Medium/High. Area: Storage. Status: Fixed 2026-09-21. Closes
+[GCR-10](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-10--sqlitestore-bootstraps-on-every-construction).**
+
+**Observed.** `SQLiteStore.__init__` called `self.bootstrap()` under a
+process-global lock. The architecture builds stores freely and by design:
+handling one prompt constructs them for session ownership, project resolution,
+readiness, attachment references, generated files and the gateway, and every read
+route does the same. Each construction re-walked the entire migration catalogue —
+several hundred statements — while holding the lock the others were waiting on.
+
+**Fixed.** A workspace is brought up to date once per process, remembered
+together with the database file it was proved against, and forgotten when that
+workspace is handed back (`invalidate_workspace_connections`, which is what a
+host shutting down, a key rotating and a live reset all call). A database that is
+simply gone is never assumed present, however recently this process bootstrapped
+one at that path.
+
+**What the fix had to keep, and nearly did not.** Not everything `bootstrap()`
+does is schema. Three of its passes **adopt** rows written with no owner — a
+session started by the CLI is the one that made this visible — and they are how
+those rows come to belong to the owner at all. Skipping them changed who a
+session belonged to, and `test_same_session_accepts_cli_and_rest_prompt` caught
+it. They are three guarded statements against an owner's own rows, so they stay
+on the cheap path; only the catalogue above them is skipped.
+
+**Evidence.** `tests/test_storage_sqlite.py` — ten stores over one workspace
+bootstrap once, a second workspace gets its own, an invalidated or deleted
+database is proved again, and the adoption pass still runs on every store.
+
+---
+
+## FIXED-596 — Every model call built a new connection to a host it was already talking to
+
+**Severity: Medium. Area: Models / provider transport. Status: Fixed 2026-09-21.
+Closes [GCR-14](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-14--provider-connection-pools-are-recreated-per-operation).**
+
+**Observed.** `ModelRouter` builds a provider for each chat, stream, embed,
+health and model-list call and closes it in a `finally`. That is
+lifecycle-correct — nothing is left open — but without an injected client each
+provider constructs its own `httpx.AsyncClient`, and closing it throws away the
+connection pool with it. So a turn, the readiness probe behind it and the
+catalogue refresh beside it each paid for a fresh TCP connection and a fresh TLS
+handshake to a host Raiker had been talking to seconds earlier, and HTTP/2
+multiplexing and keep-alive applied to nothing.
+
+**Fixed.** `raiker/models/transport.py` holds one `httpx.AsyncClient` per event
+loop, origin and timeout, and the router hands it to every provider it builds.
+Nothing about how a request is made changed: the providers already took an
+injected client and already only closed the one they owned.
+
+**Why one client per endpoint is safe, and needs no invalidation.** Both
+providers merge their headers — the owner's key included — into each *request*
+rather than onto the client, so a pooled connection carries no owner's secret and
+is never reused *as* an authorization. A changed connection is therefore a
+different request header on the same socket, and a changed endpoint is a
+different key in the pool.
+
+**Loops, not processes.** An `httpx.AsyncClient` holds connections bound to the
+loop that created them, so the pool is keyed by the running loop as well. A loop
+that has gone is a set of clients that can no longer be used or even closed, and
+they are dropped rather than handed to a caller that would fail on them. The
+pool is closed once at host shutdown, after every workspace has stopped using it.
+
+**Evidence.** `tests/test_provider_client_pool.py` — one client per origin and
+timeout, none across event loops, no credential on a pooled client, a provider
+that does not close what it does not own, and a router whose five successive
+provider builds all travel over one connection. Live:
+`docs/screenshots/2026-09-21-static-review-round/02-two-turns-one-connection.png`,
+two real Anthropic turns in one conversation.
+
+---
+
+## FIXED-597 — Three spellings of one provider name
+
+**Severity: Low. Area: Models / registry. Status: Fixed 2026-09-21. Closes
+[GCR-17](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-17--provider-name-normalization-is-inconsistent).**
+
+**Observed.** `ModelProfileRegistry` normalised a provider name three different
+ways. `resolve()` folded underscores to hyphens and aliased `llama-cpp` to
+`llama.cpp`; `profiles_for_provider()` did both; `find()` did only the first. So
+`find("llama_cpp", model)` returned nothing about a profile
+`resolve("llama_cpp", model)` returns, and a caller that checked before it
+resolved concluded the profile did not exist.
+
+None of the three lowercased, while the provider factory does
+(`ModelProviderFactory.resolve`) — so a name written `Ollama` resolved nowhere in
+the registry and then ran perfectly once something else had resolved it.
+
+**Fixed.** One `_normalize_provider()`, used by all three lookups, that trims,
+lowercases, folds underscores and applies the alias table. Unknown providers
+still fail closed.
+
+**Evidence.** `tests/test_model_registry_resolve_fallback.py` — seven spellings
+of four providers resolve identically through `resolve`, `find` and
+`profiles_for_provider`, and a name that is not a provider is still empty in all
+three.
+
+---
+
+## FIXED-598 — Four version numbers, and which one you got depended on where you looked
+
+**Severity: Low/Medium. Area: Build identity / Settings. Status: Fixed
+2026-09-21. Closes
+[GCR-16](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-16--version-metadata-has-multiple-independent-values).**
+
+**Observed.** `pyproject.toml` declared `0.0.0` and `raiker.__version__`
+repeated it; the FastAPI application declared `0.1.0`; every `ClientMetadata` a
+turn was recorded against carried a hard-coded `0.0.0`; `web/package.json`
+declared its own `0.0.0`; and the release workflow is handed a version through
+`workflow_dispatch` that none of them ever saw. A support question as ordinary
+as *what are you running* had four answers, and an audit record could not tell
+two releases of Raiker apart.
+
+**Fixed.** `raiker/build_identity.py` resolves it once, in an order where each
+step is evidence rather than inference: the installation record the release
+pipeline wrote **inside this artifact**, then the installed distribution's own
+metadata, then `0.0.0` — which is the honest answer for a tree that has never
+been released, not a version. `raiker.__version__`, the API's declared version
+and every recorded client version now come from it.
+
+**Interface outcome.** Settings → Updates names the build, the commit it was
+built from and when it was built — and, beside them, **the build of the page
+reading it**, stamped into the bundle by `vite.config.ts` from the same release
+version. That last one is the half neither the host nor the bundle can report
+alone: a browser holding a bundle cached from before an update is exactly the
+state two separate numbers describe and one cannot. The page says so when they
+differ, and stays quiet when both are unreleased, because two development
+checkouts disagreeing is not news.
+
+**Evidence.** `web/src/lib/buildIdentity.test.ts`,
+`web/src/lib/views/settings/Updates.test.ts`. Live:
+`docs/screenshots/2026-09-21-static-review-round/04-build-identity.png`.
+
+---
+
+## FIXED-599 — The body cap counted a claim, and nothing said where a page may reach
+
+**Severity: High. Area: API hardening. Status: Fixed 2026-09-21. Closes
+[CR-06](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-06--request-body-limit-checks-only-declared-content-length)
+and [CR-07](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-07--browser-responses-lack-content-security-policy).**
+
+**Observed (CR-06).** `MaxBodySizeMiddleware` read the declared
+`Content-Length` and nothing else. A declaration is a claim by the sender, and
+the two ways past it are the two ordinary ways of sending a body: omit the
+header, or send `Transfer-Encoding: chunked`, which has no `Content-Length` at
+all. Either way the check never ran, and an unbounded body reached the route and
+whatever buffered it.
+
+**Observed (CR-07).** No `Content-Security-Policy` was sent. It is the one
+header that limits what an injected string can *reach*, rather than how the
+browser labels a response — and Raiker renders model output, tool results and
+attachment text.
+
+**Fixed (CR-06).** The declared length is still refused first, because refusing
+before a byte is read is the cheap answer an honest oversized client should get.
+What now *enforces* the cap is the count of bytes received: the body stream is
+wrapped, the request is refused the moment it goes over, and the route is told
+the client disconnected rather than handed a truncated body it would parse as
+though it were whole. Whatever the framework then does, the answer that reaches
+the client is the 413.
+
+**Fixed (CR-07).** `default-src 'self'` with named exceptions, each of them
+something the product actually does: `'unsafe-inline'` for styles, because
+Svelte writes component state into `style` attributes and CSP has no nonce for
+those; `blob:` and `data:` for images, media and objects, because an attachment,
+a generated image, a PDF preview and a dictation clip are all fetched with the
+owner's bearer token and handed to the element as an object URL — precisely so
+the bytes never travel as a URL anything else could follow. `frame-ancestors`,
+`base-uri` and `form-action` are `'none'`.
+
+**The one exception, named rather than hidden.** `/api/docs`, `/api/redoc` and
+`/api/openapi.json` load Swagger and ReDoc from a public CDN. They are a
+developer surface on a loopback bind, not the product's UI, and an empty page
+with a console full of refusals is its own defect — so those three paths are
+listed, rather than the policy being loosened for everything.
+
+**Evidence.** `tests/test_api_rest_hardening.py` — a chunked body with no
+declared length is refused by what it sent, a body inside the cap is unaffected,
+the policy's directives are asserted one by one, and the documentation paths are
+exempt while still carrying every other header. Live: the full page sweep
+(`all-pages-live.spec.ts`) passes at four widths under the policy with **no
+console refusals**, and this round's own spec asserts that explicitly.
+
+---
+
+## FIXED-600 — Build named the project and sent you to the list of them
+
+**Severity: Low. Area: Build / Chat / Design / Tasks navigation. Status: Fixed
+2026-09-21. Closes UX-BUILD-05 of the
+[release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#33-build).**
+
+**Observed.** Build's context line names the Project the turn runs inside, with
+a link. The link went to `#/projects` — the whole list — so coming back from
+Build to the project that started the work meant recognising its name among the
+others and pressing it again. Chat, Design and Tasks all did the same thing, for
+the same reason: the id was right there and the link did not carry it.
+
+**Fixed.** All four surfaces link to `#/projects?project=<id>`, and the action
+says **Open project work** rather than *Manage* or *Projects*. Projects reads
+the parameter on mount and on a later hash change, so a second link followed
+while the page is already open lands too.
+
+**An id that names nothing is not an error.** A project that has since been
+deleted or archived opens the list — which is what the link used to do, and the
+right answer.
+
+**Evidence.** `web/src/lib/nav.test.ts` for the parameter,
+`web/src/lib/views/ProjectsView.test.ts` for all three landings. Live:
+`docs/screenshots/2026-09-21-static-review-round/05-build-context-names-the-project.png`
+and `06-back-in-the-project.png` — a project created, started in Build, and
+reopened from Build's own context line, on its overview.
+
+---
+
+## FIXED-601 — The suite that proves everything was never type-checked
+
+**Severity: Medium. Area: Live test harness. Status: Fixed 2026-09-21. Raised
+and closed in the same run, while running this round's evidence.**
+
+**Observed.** `web/tsconfig.json` included `src/**` and `vite.config.ts`. It did
+not include `e2e/**`, so the live suite — the thing that produces the evidence
+behind every entry in this document — was never type-checked and `npm run check`
+never looked at it. Bringing it in found seven errors, two of them references to
+identifiers that do not exist:
+
+* `bug-69-model-readiness-live.spec.ts` called `openModelDialog(page, card)`
+  from a module-level helper with no `page` in scope. Every call threw
+  `ReferenceError: page is not defined`.
+* Five specs passed a `RegExp` where `connectHostedProvider` and
+  `useHostedModel` declared `string`. Playwright's `getByLabel` takes both, so
+  the *helper's* type was wrong rather than strict.
+
+**Also observed, and the reason the round found it.** Four specs each carried
+their own copy of "wait until the view has finished arriving", and all four
+treated any text beginning with `loading`, `reading`, `checking` or `verifying`
+as an unfinished load. The composer's readiness strip says **"Checking this
+model — you can still send."** — a sentence whose whole point is that the page is
+usable — whenever a model's readiness observation has aged out. So the width
+sweep, which exists to be re-runnable *against a workspace that has been worked
+in*, timed out on Chat the moment anyone had worked in it and reported a stuck
+panel that was a standing state.
+
+**Fixed.** `e2e/**` and `playwright.config.ts` are in the project's type check,
+which CI already runs — 748 files became 880. The helper's parameter says
+`string | RegExp`, which is what its callers pass and what Playwright takes. And
+`settled()` lives once, in `destinations.ts`, using the product's own convention
+rather than a list of exceptions: a label that is still loading ends in an
+ellipsis (`Loading projects…`, `Verifying runtime…`), and a finished sentence
+does not.
+
+**Evidence.** `npm run check` now covers the live suite and is green. Live: the
+full sweep and both width sweeps pass against the worked-in workspace this round
+left behind.
+
+---
+
+## FIXED-602 — The open ledger's index left out three of its own entries, one of them open
+
+**Severity: Low. Area: Documentation / CI. Status: Fixed 2026-09-21.**
+
+**Observed.** `TO_BE_FIXED.md` states its own contract: *"A row marked Fixed is
+kept in the index so a reader arriving with that number is not left wondering."*
+Three entries were not in it at all — BUG-286, BUG-287 and BUG-288 — and
+**BUG-287 is open**. Anyone reading the table rather than scrolling the file was
+told the ledger held less open work than it does.
+
+**Why the existing guard missed it.** `test_plan_tracker_indexes_cover_and_link_their_authoritative_headings`
+checks four trackers and requires each row to link to its own heading. That is
+right where every entry lives in the file, and wrong for this ledger, whose
+convention is the opposite: a closed row links into `FIXED_ITEMS.md`, where the
+closure record is. So `TO_BE_FIXED.md` was simply not in the list.
+
+**Fixed.** The three rows are there, and
+`test_the_open_defect_ledger_indexes_every_entry_it_carries` requires a row for
+every `## BUG-N` section without constraining where it points. Run against the
+state before this change, it names exactly those three.
+
+**Evidence.** `tests/test_docs_consistency.py`.

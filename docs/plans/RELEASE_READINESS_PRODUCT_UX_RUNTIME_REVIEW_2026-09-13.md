@@ -91,6 +91,23 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-09-21.** UX-BUILD-05 closed as
+> [FIXED-600](FIXED_ITEMS.md#fixed-600--build-named-the-project-and-sent-you-to-the-list-of-them):
+> Build, Chat, Design and Tasks all named the Project a turn runs inside and all
+> linked to the *list* of projects, so the way back was to recognise its name
+> among the others. They now link to it. UX-PROJ-02's row is marked here at the
+> same time — it closed on 2026-09-14 as
+> [FIXED-529](FIXED_ITEMS.md#fixed-529--delete-was-the-same-size-and-one-click-away-as-new-chat)
+> and this document had gone on listing it as open.
+>
+> The same run closed the static reviews' remaining P1 work and two of the
+> security review's findings, which are release-gate material rather than UX:
+> a mounted instance had been serving requests with none of its background work
+> running ([FIXED-593](FIXED_ITEMS.md#fixed-593--a-second-person-on-this-machine-had-a-raiker-with-no-background-work)),
+> the API body cap counted a header rather than bytes, and no
+> Content-Security-Policy was sent at all
+> ([FIXED-599](FIXED_ITEMS.md#fixed-599--the-body-cap-counted-a-claim-and-nothing-said-where-a-page-may-reach)).
+
 > **Implementation status, 2026-09-20 (P2 rows).** Ten of the eleven P2 rows
 > that were still open in §18.3 closed, each recorded in
 > [`FIXED_ITEMS.md`](FIXED_ITEMS.md) with the live evidence behind it:
@@ -424,7 +441,7 @@ never need to visit Settings to understand why Send is disabled.
 | UX-BUILD-02 | P1 | Repository, project, runtime and model are separate concepts but can read as competing “where work happens” selectors. | Present one “Work boundary” summary: Project → repository → environment → model, with only the currently actionable control expanded. |
 | UX-BUILD-03 | P1 | The page can expose file tree, transcript, artifact panel, terminal output and approval review simultaneously. | Use task-aware panel priority and one right-side inspector at a time; preserve state when switching. |
 | UX-BUILD-04 | P1 | Autonomous completion is not proven by UI sophistication alone. | Release acceptance must cover edit → test → diagnose → retry → green → summary, including failure and approval interruption. |
-| UX-BUILD-05 | P2 | “Start in Build” is clear, but later navigation back to the originating Project is weak. | Add a persistent Project breadcrumb and “Open project work” backlink. |
+| ~~UX-BUILD-05~~ **closed** — [FIXED-600](FIXED_ITEMS.md#fixed-600--build-named-the-project-and-sent-you-to-the-list-of-them) | P2 | “Start in Build” is clear, but later navigation back to the originating Project is weak. | Add a persistent Project breadcrumb and “Open project work” backlink. |
 
 ### Runtime expectation
 
@@ -723,7 +740,7 @@ Show counts and trends without exposing content to telemetry:
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
 | UX-PROJ-01 | P1 | “New chat” from a Project does not set the selected work project before routing. | Pass an explicit project handoff or call the same selection contract used by Build. Keep Chat retrieval owner-wide while filing the new session to the project. |
-| UX-PROJ-02 | P1 | Five card actions compete: Start Build, New chat, Archive, Move and Delete. | Use Open/Continue as primary, New work as secondary and move lifecycle actions into an overflow menu. |
+| ~~UX-PROJ-02~~ **closed** — [FIXED-529](FIXED_ITEMS.md#fixed-529--delete-was-the-same-size-and-one-click-away-as-new-chat) | P1 | Five card actions compete: Start Build, New chat, Archive, Move and Delete. | Use Open/Continue as primary, New work as secondary and move lifecycle actions into an overflow menu. |
 | UX-PROJ-03 | P1 | Project detail is an information stack rather than a workspace overview. | Lead with Continue work, recent activity and needs attention; place files/tasks/sessions/checkpoints in tabs or grouped sections. |
 | UX-PROJ-04 | P1 | Shared attachment IDs can appear as raw identifiers. | Resolve user-facing filenames/type/size; retain IDs only in provenance details. |
 | UX-PROJ-05 | P1 | Archive is visible but a clear archive browser/restore journey is not. | Add Active/Archived filter with restore and retention behavior. |
@@ -2287,7 +2304,7 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 | UX-BUILD-02 | Present one “Work boundary” summary: Project → repository → environment → model, with only the currently actionable control expanded. | A single summary makes the execution destination reviewable before a write. |
 | UX-BUILD-03 | Use task-aware panel priority and one right-side inspector at a time; preserve state when switching. | Exclusive inspectors reduce simultaneous cognitive load without losing user state. |
 | UX-BUILD-04 | Release acceptance must cover edit → test → diagnose → retry → green → summary, including failure and approval interruption. | A passing tool call is insufficient evidence of a working change; require the entire recovery loop. |
-| UX-BUILD-05 | Add a persistent Project breadcrumb and “Open project work” backlink. | Explicit navigation preserves continuity across work modes. |
+| ~~UX-BUILD-05~~ **closed** — [FIXED-600](FIXED_ITEMS.md#fixed-600--build-named-the-project-and-sent-you-to-the-list-of-them) | Add a persistent Project breadcrumb and “Open project work” backlink. | Explicit navigation preserves continuity across work modes. |
 
 ## 14.4 DESIGN decisions
 
@@ -2365,7 +2382,7 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 | Finding | Decision | Explanation |
 | --- | --- | --- |
 | UX-PROJ-01 | Pass an explicit project handoff or call the same selection contract used by Build. Keep Chat retrieval owner-wide while filing the new session to the project. | Use a typed handoff shared with Build; do not change owner-wide Chat retrieval as a side effect. |
-| UX-PROJ-02 | Use Open/Continue as primary, New work as secondary and move lifecycle actions into an overflow menu. | Prioritize continuation; lifecycle actions need deliberate discovery and confirmation. |
+| ~~UX-PROJ-02~~ **closed** — [FIXED-529](FIXED_ITEMS.md#fixed-529--delete-was-the-same-size-and-one-click-away-as-new-chat) | Use Open/Continue as primary, New work as secondary and move lifecycle actions into an overflow menu. | Prioritize continuation; lifecycle actions need deliberate discovery and confirmation. |
 | UX-PROJ-03 | Lead with Continue work, recent activity and needs attention; place files/tasks/sessions/checkpoints in tabs or grouped sections. | Summaries answer what to do next before presenting specialist inventories. |
 | UX-PROJ-04 | Resolve user-facing filenames/type/size; retain IDs only in provenance details. | Resolve labels through authorized metadata queries; raw identifiers remain available for diagnostics. |
 | UX-PROJ-05 | Add Active/Archived filter with restore and retention behavior. | Archive must have a find-and-restore path and a documented retention contract. |

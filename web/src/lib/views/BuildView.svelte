@@ -831,12 +831,18 @@
   const contextFacts = $derived([
     ...(selectedProject !== null
       ? [
+          /*
+           * UX-BUILD-05 — the link goes to this project, not to the list of
+           * them. Naming the project and then opening a page where the owner
+           * has to find it again is the weak return path the review names; the
+           * id is already here, so the link can carry it.
+           */
           {
             label: "Project",
             value: selectedProject.name,
             short: selectedProject.name,
-            href: "#/projects",
-            action: "Manage",
+            href: `#/projects?project=${encodeURIComponent(selectedProject.project_id)}`,
+            action: "Open project work",
           },
         ]
       : []),

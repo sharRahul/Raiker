@@ -10,28 +10,19 @@
  */
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
-import { DESTINATIONS, horizontalBleed, hubReachability, WIDTHS } from "./destinations";
+import { DESTINATIONS, horizontalBleed, hubReachability, settled, WIDTHS } from "./destinations";
 import { signInAsOwner } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 
 /** Wait for the routed view to have finished arriving, not merely to exist. */
-async function settled(page: import("@playwright/test").Page): Promise<void> {
+async function settle(page: import("@playwright/test").Page): Promise<void> {
   await expect(page.locator("main#main")).toBeVisible();
   await page.waitForLoadState("networkidle");
-  // Several views render their shell immediately and then hydrate multiple
-  // API-backed panels. Do not read or capture until every visible loading label
-  // has gone; a slow or stuck panel should fail this evidence run.
-  await page.waitForFunction(
-    () =>
-      ![...document.querySelectorAll("main#main *")].some((element) => {
-        const node = element as HTMLElement;
-        const visible = node.offsetWidth > 0 || node.offsetHeight > 0;
-        return visible && /^(loading|reading|checking|verifying)\b/i.test((node.textContent ?? "").trim());
-      }),
-    undefined,
-    { timeout: 20_000 },
-  );
+  // `settled` is shared with the two width sweeps and the Build restore spec:
+  // all four had their own copy, and all four read the composer's "Checking
+  // this model — you can still send." as an unfinished load.
+  await settled(page);
 }
 
 test("capture every application page from a live instance", async ({ page }) => {
@@ -55,7 +46,7 @@ test("capture every application page from a live instance", async ({ page }) => 
 
   for (const { route, name } of DESTINATIONS) {
     await page.goto(`${BASE}/#/${route}`);
-    await settled(page);
+    await settle(page);
     await page.waitForTimeout(name === "home" ? 10_000 : 1_000);
     if (name === "models-huggingface" && hub.refused()) {
       await expect(page.getByText("Hugging Face could not be reached")).toBeVisible();
@@ -96,7 +87,7 @@ test("no destination bleeds sideways at any width", async ({ page }) => {
     await page.setViewportSize({ width: size.width, height: size.height });
     for (const { route } of DESTINATIONS) {
       await page.goto(`${BASE}/#/${route}`);
-      await settled(page);
+      await settle(page);
       for (const offender of await horizontalBleed(page)) {
         bleeds.push(`${size.label}px · #/${route} · ${offender}`);
       }

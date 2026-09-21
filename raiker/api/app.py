@@ -4,7 +4,10 @@ import asyncio
 import hashlib
 import json
 import logging
-from collections.abc import AsyncIterator, Awaitable
+import os
+import shutil
+import threading
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
@@ -15,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.routing import Mount
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from raiker.api.instance_runtime import InstanceRuntime
 from raiker.api.redaction import redact_response_body
 from raiker.api.routes_approvals import router as approvals_router
 from raiker.api.routes_attachments import router as attachments_router
@@ -50,13 +54,15 @@ from raiker.api.security import (
     SecurityHeadersMiddleware,
     StaticCacheMiddleware,
 )
+from raiker.build_identity import version as raiker_version
 from raiker.control.knowledge_scope import MAX_KNOWLEDGE_UPLOAD_BYTES
 from raiker.models.speech_runtime import MAX_AUDIO_BYTES as MAX_SPEECH_AUDIO_BYTES
+from raiker.models.transport import close_provider_clients
 from raiker.runtime.attachments import MAX_ATTACHMENT_BYTES
 from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.skills.package import MAX_BUNDLE_BYTES as MAX_SKILL_BUNDLE_BYTES
 from raiker.storage.internal_paths import display_path, internal_io_path
-from raiker.storage.sqlite import SQLiteStore, StoreUnavailableError
+from raiker.storage.sqlite import StoreUnavailableError
 from raiker.tasks.wakeup import SchedulerWakeup
 
 _LOG = logging.getLogger(__name__)
@@ -236,6 +242,15 @@ def _instances_registry(root: Path) -> Path:
     return internal_io_path(root / ".raiker" / "instances.json")
 
 
+#: GCR-09 — instance creation is serialized here rather than left to whichever
+#: threadpool worker FastAPI handed the request to. Two concurrent creates used
+#: to read ``instances.json``, each append their own name, and each write the
+#: whole list back: the second write lost the first name, and a reader arriving
+#: between the two saw a truncated file. Creation is rare and cheap, so one
+#: process-wide lock costs nothing and removes the class.
+_INSTANCE_LOCK = threading.Lock()
+
+
 def _stored_instance_names(root: Path) -> list[str]:
     try:
         raw = json.loads(_instances_registry(root).read_text(encoding="utf-8"))
@@ -245,14 +260,38 @@ def _stored_instance_names(root: Path) -> list[str]:
 
 
 def _write_instance_names(root: Path, names: list[str]) -> None:
+    """Publish the registry atomically, so no reader ever sees half of it.
+
+    GCR-09 — ``write_text`` truncates and then writes. A reader that opened the
+    file in between got an empty or partial document and concluded the host had
+    no instances, which on the next boot means none of them are mounted. Write a
+    neighbouring temporary file and rename it: on every platform Raiker supports
+    that replacement is atomic, so the registry is either the old list or the new
+    one.
+    """
     registry = _instances_registry(root)
     registry.parent.mkdir(parents=True, exist_ok=True)
-    registry.write_text(json.dumps(names), encoding="utf-8")
+    staging = registry.with_name(f"{registry.name}.{os.getpid()}.tmp")
+    try:
+        staging.write_text(json.dumps(names), encoding="utf-8")
+        os.replace(staging, registry)
+    finally:
+        with suppress(OSError):
+            staging.unlink()
 
 
-def _mount_instance(app: FastAPI, name: str, workspace: Path) -> None:
+def _mount_instance(app: FastAPI, name: str, workspace: Path) -> FastAPI | None:
+    """Publish one instance's ASGI app under ``/instances/<name>``.
+
+    Returns the child application, or ``None`` when the route was already
+    published. The caller needs it: routing is only half of an instance, and the
+    other half is the :class:`InstanceRuntime` the root lifespan starts over it.
+    """
+    instances: dict[str, FastAPI] = app.state.instance_apps
+    if name in instances:
+        return None
     if any(getattr(route, "path", "") == f"/instances/{name}" for route in app.router.routes):
-        return
+        return None
     ui_dir = getattr(app.state, "instance_ui_dir", None)
     instance = create_app(
         workspace,
@@ -269,18 +308,62 @@ def _mount_instance(app: FastAPI, name: str, workspace: Path) -> None:
         len(app.router.routes),
     )
     app.router.routes.insert(static_index, route)
+    instances[name] = instance
+    return instance
 
 
-def create_and_mount_instance(app: FastAPI, name: str, root: Path) -> Path:
-    """Create one isolated workspace and mount its independent ASGI app."""
+async def create_and_mount_instance(
+    app: FastAPI,
+    name: str,
+    root: Path,
+    *,
+    register_account: Callable[[Path], None] | None = None,
+) -> Path:
+    """Create one isolated workspace and mount its independent ASGI app.
+
+    GCR-08 — this used to create the directory, publish the registry entry and
+    mount the route, and only then let the route try to register the first
+    account. A registration that failed returned an error and left all three
+    behind, so the retry the owner was invited to make answered
+    ``instance_already_exists`` about an instance that had never worked. The
+    account is now created in the staged workspace *before* anything is
+    published, and a failure at any point removes the staged directory and
+    re-raises: an instance either exists completely or does not exist at all.
+    """
     internal_workspace = internal_io_path(root / ".raiker" / "instances" / name)
-    if internal_workspace.exists():
-        raise FileExistsError(name)
-    internal_workspace.mkdir(parents=True)
     workspace = Path(display_path(internal_workspace))
-    names = _stored_instance_names(root)
-    _write_instance_names(root, [*names, name])
-    _mount_instance(app, name, workspace)
+    loop = asyncio.get_running_loop()
+
+    def staged() -> Path:
+        # GCR-09 — the whole create/publish sequence under one lock, so two
+        # requests cannot both find the directory absent and both create it.
+        with _INSTANCE_LOCK:
+            if internal_workspace.exists() or name in app.state.instance_apps:
+                raise FileExistsError(name)
+            internal_workspace.mkdir(parents=True)
+            try:
+                if register_account is not None:
+                    register_account(workspace)
+            except BaseException:
+                # Nothing has been published yet, so the rollback is the staged
+                # directory and nothing else.
+                shutil.rmtree(internal_workspace, ignore_errors=True)
+                raise
+            _write_instance_names(root, [*_stored_instance_names(root), name])
+        return workspace
+
+    # The staging above is filesystem and SQLCipher work; the publication below
+    # mutates ``app.router.routes`` and starts asyncio tasks. GCR-09 asks for the
+    # second to happen on the event loop that serves requests, and this function
+    # is a coroutine, so it already does.
+    await loop.run_in_executor(None, staged)
+    instance = _mount_instance(app, name, workspace)
+    if instance is not None and getattr(app.state, "runtime_started", False):
+        # GCR-07 — an instance created while the host is already running needs
+        # its background services now, not at the next restart.
+        runtime = InstanceRuntime(instance, name=name)
+        app.state.instance_runtimes[name] = runtime
+        await runtime.start()
     return workspace
 
 
@@ -297,145 +380,48 @@ def create_app(
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        from raiker.tasks.scheduler import TaskScheduler
+        """Start and stop the background work of this workspace *and its instances*.
 
-        stop = asyncio.Event()
-        wakeup: SchedulerWakeup = app.state.scheduler_wakeup
-        # One pass at a time, whichever worker asked for it. Exactly-once
-        # resumption is enforced in the store by `claim_suspended_turn`, so this
-        # is not a correctness lock — it keeps a nudge and a tick from doing the
-        # same sweep twice and writing two identical "continuing" cards.
-        resuming = asyncio.Lock()
-
-        async def resume_approved(scheduler: TaskScheduler) -> None:
-            async with resuming:
-                await scheduler.resume_approved()
-
-        async def contained(pass_name: str, work: Awaitable[Any]) -> None:
-            """Run one host-tick pass, isolated from the others and *recorded*.
-
-            GCR-38 — every pass used to be `with suppress(Exception)`. The
-            isolation is right: a telemetry collector that is down must not stop
-            due work from starting. Suppressing in silence was not: a pass could
-            throw every fifteen seconds for days while the product reported a
-            healthy host, because nothing counted it, nothing logged it, and no
-            surface could show it. The exception is still swallowed — the tick
-            must not die — and now it leaves a row and a log line behind.
-            """
-            store = SQLiteStore(app.state.workspace_root)
-            try:
-                await work
-            except Exception as exc:  # noqa: BLE001 — the record below is the report
-                _LOG.warning(
-                    "background pass %s failed: %s", pass_name, type(exc).__name__
-                )
-                with suppress(Exception):
-                    store.record_background_pass(pass_name, error_class=type(exc).__name__)
-                return
-            with suppress(Exception):
-                store.record_background_pass(pass_name)
-
-        async def tick() -> None:
-            scheduler = TaskScheduler(app.state.workspace_root)
-            while not stop.is_set():
-                await contained("scheduled_tasks", scheduler.run_due())
-                # Continuing approved work is a separate pass from starting due
-                # work, and it is contained separately: a continuation that
-                # throws must not stop the next tick from starting due runs, and
-                # a failed due run must not stop approved work from finishing
-                # (BUG-25).
-                await contained("approved_continuations", resume_approved(scheduler))
-                await contained("model_capacity_refresh", scheduler.refresh_model_capacities())
-                # BUG-276 — the governed record leaves on the cadence its
-                # destination carries, not only when somebody presses a button.
-                # Contained on its own like every pass above it: a collector
-                # that is down must not stop due work from starting.
-                await contained("telemetry_delivery", scheduler.deliver_due_telemetry())
-                with suppress(TimeoutError):
-                    await asyncio.wait_for(stop.wait(), timeout=15)
-
-        async def continuations() -> None:
-            """Start explicitly requested work or a continuation without delay.
-
-            The tick above still sweeps every 15 seconds and is what recovers a
-            decision this worker never heard about (one made through another
-            process, or while this pass was already running). This worker exists
-            so the ordinary case — the owner grants an approval in the browser —
-            does not wait for that sweep.
-            """
-            scheduler = TaskScheduler(app.state.workspace_root)
-            while not stop.is_set():
-                if not await wakeup.wait(timeout=15):
-                    continue
-                if stop.is_set():
-                    return
-                # BUG-64 — the Run now route only records intent atomically;
-                # this resident worker claims it through the ordinary scheduler.
-                with suppress(Exception):
-                    await scheduler.run_due()
-                with suppress(Exception):
-                    await resume_approved(scheduler)
-
-        # GCR-25 — model pulls, conversions and deploys are durable rows driven
-        # by in-process workers. A host that stopped mid-download left the row
-        # behind and the worker with it, so the product came back showing
-        # `running` work nothing was advancing and a progress bar that would
-        # never move again. Settle them before the first request is served:
-        # each becomes a failed operation naming `host_restarted`, which is a
-        # state Retry can start from. Contained like every other pass — a
-        # recovery sweep that throws must not stop the host from booting.
-        from raiker.models.local_operations import ModelOperationService
-
-        try:
-            recovered = ModelOperationService(
-                SQLiteStore(app.state.workspace_root)
-            ).recover_abandoned()
-            if recovered:
-                _LOG.info(
-                    "recovered %d model operation(s) abandoned by a host restart",
-                    recovered,
-                )
-        except Exception as exc:  # noqa: BLE001 — boot must not depend on this
-            _LOG.warning(
-                "model-operation recovery failed: %s", type(exc).__name__
-            )
-
-        worker = asyncio.create_task(tick())
-        nudged = asyncio.create_task(continuations())
-        # A folder attached to a project is edited by whatever the owner uses,
-        # and none of it tells Raiker anything. This worker is why an edit
-        # reaches recall in seconds; the reconcile pass behind it is why recall
-        # is still correct when watching fails.
-        from raiker.knowledge.watcher import AttachedRootWatcher
-
-        watcher = AttachedRootWatcher(app.state.workspace_root)
-        app.state.attached_root_watcher = watcher
-        watching = asyncio.create_task(watcher.run(stop))
+        GCR-07 — Starlette runs a lifespan for the top-level application only, so
+        the child app mounted at ``/instances/<name>`` never entered its own. A
+        secondary instance therefore served requests with no task tick, no
+        approval-continuation worker, no telemetry cadence and no attached-root
+        watcher. Mounting is routing; the lifecycle belongs to whoever owns the
+        process, which is this application. Each instance still gets its own
+        :class:`InstanceRuntime` over its own workspace — nothing is shared
+        between them but the moment they start and stop.
+        """
+        runtimes = [InstanceRuntime(app)]
+        for name, instance in sorted(getattr(app.state, "instance_apps", {}).items()):
+            runtimes.append(InstanceRuntime(instance, name=name))
+        app.state.instance_runtimes = {runtime.name: runtime for runtime in runtimes}
+        app.state.runtime_started = True
+        for runtime in runtimes:
+            await runtime.start()
         try:
             yield
         finally:
-            stop.set()
-            wakeup.request()
-            worker.cancel()
-            nudged.cancel()
-            watching.cancel()
-            for task in (worker, nudged, watching):
-                with suppress(asyncio.CancelledError):
-                    await task
-            from raiker.storage.sqlite import invalidate_workspace_connections
-
-            app.state.managed_llama_runtime.stop()
-            app.state.managed_mlx_runtime.stop()
-
-            command_service = getattr(app.state, "command_service", None)
-            if command_service is not None:
-                command_service.shutdown()
-
-            invalidate_workspace_connections(app.state.workspace_root)
+            app.state.runtime_started = False
+            # Newest first, so an instance mounted during the run is stopped
+            # before the workspace that holds it.
+            for runtime in reversed(list(app.state.instance_runtimes.values())):
+                with suppress(Exception):
+                    await runtime.aclose()
+            app.state.instance_runtimes = {}
+            # GCR-14 — the provider connections this process kept open, closed
+            # once and after every workspace has stopped using them rather than
+            # per instance: the pool is keyed by endpoint, and two instances
+            # talking to one provider share a socket and no credential.
+            with suppress(Exception):
+                await close_provider_clients()
 
     app = FastAPI(
         title="Raiker API",
-        version="0.1.0",
+        # GCR-16 — the declared API version is this build's identity rather
+        # than a fifth independent number. A client reading
+        # ``/api/openapi.json`` and an owner reading Settings now see the
+        # same release.
+        version=raiker_version(),
         docs_url="/api/docs",
         redoc_url="/api/redoc",
         openapi_url="/api/openapi.json",
@@ -465,6 +451,12 @@ def create_app(
     app.state.managed_llama_runtime = ManagedLlamaRuntime()
     app.state.managed_mlx_runtime = ManagedMlxRuntime()
     app.state.instance_ui_dir = Path(ui_dir) if ui_dir is not None else None
+    # GCR-07 — the child applications this one mounts, and the background
+    # services this one runs for them. Routing lives in ``app.router.routes``;
+    # these two say who owns the lifecycle of what is behind each route.
+    app.state.instance_apps = {}
+    app.state.instance_runtimes = {}
+    app.state.runtime_started = False
     # Boot key material: ensure the internal app key exists (encrypts MFA seeds)
     # and load the connector vault key-file into the environment when the env var
     # is unset. The vault key remains fail-closed if neither is present.

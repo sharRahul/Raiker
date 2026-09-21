@@ -24,6 +24,7 @@
     TaskView,
   } from "../apiTypes";
   import { humanize, isRedacted, relativeTime, shortId } from "../format";
+  import { projectFromHash } from "../nav";
   import { explainReasonCode } from "../reasonCodes";
 
   let { onchanged }: { onchanged?: () => void } = $props();
@@ -488,7 +489,37 @@
     return list.projects.map((p) => ({ project_id: p.project_id, name: p.name }));
   }
 
-  onMount(load);
+  /**
+   * UX-BUILD-05 — open the project a `#/projects?project=<id>` link names.
+   *
+   * Build, Chat, Design and Tasks all name the Project a turn runs inside and
+   * all linked here, to the list. Coming back meant finding that project among
+   * the others and pressing it again. They now link to it, and this is the half
+   * that makes the link land.
+   *
+   * An id that names no owned project is not an error: the list opens, which is
+   * what the link used to do, and is the right answer for a project that has
+   * since been deleted or archived.
+   */
+  async function openRequestedProject() {
+    const requested = projectFromHash(window.location.hash);
+    if (requested === null) {
+      return;
+    }
+    if (detail !== null && detail.project.project_id === requested) return;
+    if (list === null) await load();
+    if (!list?.projects.some((project) => project.project_id === requested)) return;
+    await open(requested);
+  }
+
+  onMount(() => {
+    void load().then(openRequestedProject);
+    // A second link to a different project, followed while this page is already
+    // open, is a navigation the shell does not remount for.
+    const onHashChange = () => void openRequestedProject();
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  });
 </script>
 
 <div class="head-row">

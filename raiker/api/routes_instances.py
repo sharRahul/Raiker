@@ -27,7 +27,7 @@ def _require_loopback(request: Request) -> None:
 
 
 @router.post("/api/instances")
-def create_instance(body: InstanceCreateRequest, request: Request) -> dict[str, Any]:
+async def create_instance(body: InstanceCreateRequest, request: Request) -> dict[str, Any]:
     """Create an isolated workspace and, when supplied, its first account."""
     _require_loopback(request)
     name = body.name.strip().lower()
@@ -46,20 +46,28 @@ def create_instance(body: InstanceCreateRequest, request: Request) -> dict[str, 
     from raiker.api.app import create_and_mount_instance
 
     root = Path(request.app.state.workspace_root).resolve()  # type: ignore[attr-defined]
+
+    # GCR-08 — the account is created inside the staged workspace, before the
+    # registry entry and the route exist. A registration that fails takes the
+    # staged directory with it, so the retry this route invites is a retry the
+    # host can actually carry out rather than `instance_already_exists` about an
+    # instance that never worked.
+    def register_account(workspace: Path) -> None:
+        if body.username is None:
+            return
+        AccountService(workspace).register(body.username, body.password or "")
+
     try:
-        workspace = create_and_mount_instance(request.app, name, root)
+        await create_and_mount_instance(request.app, name, root, register_account=register_account)
     except FileExistsError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={"reason_code": "instance_already_exists"},
         ) from exc
-    if body.username is not None:
-        try:
-            AccountService(workspace).register(body.username, body.password or "")
-        except AuthError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail={"reason_code": "account_creation_failed"},
-            ) from exc
+    except AuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"reason_code": "account_creation_failed"},
+        ) from exc
     # The absolute workspace path is intentionally never exposed to the browser.
     return {"name": name, "url": f"/instances/{name}/"}

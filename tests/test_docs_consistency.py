@@ -236,3 +236,33 @@ def test_plan_tracker_indexes_cover_and_link_their_authoritative_headings() -> N
                 failures.append(f"{path}: {item_id} links to {target}, expected {expected}")
 
     assert failures == [], "plan tracker index drift:\n" + "\n".join(failures)
+
+
+def test_the_open_defect_ledger_indexes_every_entry_it_carries() -> None:
+    """Every ``## BUG-N`` section in `TO_BE_FIXED.md` has a row in its index.
+
+    The document's own preamble states the contract: "A row marked *Fixed* is
+    kept in the index so a reader arriving with that number is not left
+    wondering." Three entries had drifted out of it — BUG-286, BUG-287 and
+    BUG-288 — and one of them was **open**, so the ledger under-reported its own
+    remaining work to anyone who read the table rather than scrolling the file.
+
+    This is a weaker check than
+    :func:`test_plan_tracker_indexes_cover_and_link_their_authoritative_headings`
+    on purpose. That one requires a row to link to its own heading, which is
+    right for a tracker where every entry lives in the file. This ledger's
+    convention is the opposite for a closed entry: the row links into
+    ``FIXED_ITEMS.md``, where the closure record is. So what is required here is
+    that a row exists, not where it points.
+    """
+    path = Path("docs/plans/TO_BE_FIXED.md")
+    text = path.read_text(encoding="utf-8")
+    sections = {
+        match.group(1)
+        for match in re.finditer(r"^## (BUG-\d+)(?:,| )", text, re.MULTILINE)
+    }
+    rows = _first_id_table(text)
+    indexed = {match.group(1) for match in re.finditer(r"\[(BUG-\d+)\]", rows)}
+
+    missing = sorted(sections - indexed, key=lambda item: int(item.split("-")[1]))
+    assert missing == [], f"{path}: entries with no row in the index: {missing}"

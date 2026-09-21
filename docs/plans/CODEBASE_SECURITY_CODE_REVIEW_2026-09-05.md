@@ -27,6 +27,24 @@ Priority review covered runtime authority and approvals, command/process executi
 
 Previously inspected `raiker/security/injection_scan.py`, `raiker/runtime/web_policy.py`, `raiker/context/redaction.py`, and `raiker/api/auth.py` were also considered where relevant.
 
+## Status — 2026-09-21
+
+This review had never been revisited, so every finding below still read as open.
+Two are closed here, in the pass that also re-verified the rest against source:
+
+| Finding | Now | Record |
+|---|---|---|
+| CR-02 | **Closed 2026-09-13** | [FIXED-500](FIXED_ITEMS.md#fixed-500--every-local-mcp-server-was-handed-raikers-whole-environment) — the stdio child gets a constructed environment |
+| CR-06 | **Closed 2026-09-21** | [FIXED-599](FIXED_ITEMS.md#fixed-599--the-body-cap-counted-a-claim-and-nothing-said-where-a-page-may-reach) — the cap is enforced against bytes received |
+| CR-07 | **Closed 2026-09-21** | [FIXED-599](FIXED_ITEMS.md#fixed-599--the-body-cap-counted-a-claim-and-nothing-said-where-a-page-may-reach) — a policy ships, with one named exception |
+| CR-08 | **Closed 2026-09-13** | [FIXED-504](FIXED_ITEMS.md#fixed-504--five-destinations-one-label-and-the-owners-token-sent-to-all-of-them) — five destination classes, named and decided |
+| CR-01 | Reduced | [FIXED-505](FIXED_ITEMS.md#fixed-505--the-four-capabilities-that-reach-furthest-into-an-owners-accounts-explained-themselves-least) and [FIXED-542](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all) build the CI cross-check this asks for; the opaque `AuthorityContext` is what remains, and is tracked as RR-AUTHORITY-01 |
+
+Everything else — CR-03, CR-04, CR-05, CR-09, CR-10, CR-11, CR-12, CR-13 — was
+re-read against source in this pass and is unchanged. Each entry keeps its
+original analysis; a closed one carries a **Status** line naming the record that
+closed it, so the finding and its evidence stay together.
+
 ## Executive judgement
 
 Raiker is significantly more defensive than a typical agent wrapper. The command layer avoids `shell=True`; the approval relay binds execution to stored intent and re-routes approved work through governance; SSRF controls are explicit; attachment parsing is bounded and type-aware; plugin/container trust tiers are separated; and CI pins reviewed GitHub Actions to immutable SHAs.
@@ -139,6 +157,11 @@ The shared runner sanitizes environment variables, but it does not create a netw
 
 **Severity: High — Priority: P1 — Confidence: High**
 
+**Status: Closed 2026-09-21 — [FIXED-599](FIXED_ITEMS.md#fixed-599--the-body-cap-counted-a-claim-and-nothing-said-where-a-page-may-reach).**
+Exactly as recommended: the declared length stays as the early reject, and the
+limit is enforced against cumulative bytes received. The acceptance case is
+asserted with a chunked request, which carries no `Content-Length` at all.
+
 `MaxBodySizeMiddleware` in `raiker/api/security.py` rejects an excessive declared `Content-Length`, but it does not wrap ASGI `receive()` and count actual `http.request.body` bytes.
 
 Missing or malformed lengths therefore bypass this middleware's intended size boundary; a malformed length is treated as `0`.
@@ -154,6 +177,17 @@ Missing or malformed lengths therefore bypass this middleware's intended size bo
 ## CR-07 — Browser responses lack Content Security Policy
 
 **Severity: Medium — Priority: P1 — Confidence: High**
+
+**Status: Closed 2026-09-21 — [FIXED-599](FIXED_ITEMS.md#fixed-599--the-body-cap-counted-a-claim-and-nothing-said-where-a-page-may-reach).**
+Every directive this entry names is set, `object-src` excepted: it is
+`'self' blob:` rather than `'none'`, because the PDF preview hands an `<object>`
+an object URL fetched with the owner's bearer token. **The policy is not
+nonce-based.** `script-src` is `'self'` with no inline allowance, which is the
+half that matters for an injected string; `style-src` keeps `'unsafe-inline'`
+because Svelte writes component state into `style` attributes and CSP has no
+nonce mechanism for those. Tightening that means removing the attributes, not
+adding a nonce, and is worth doing on its own rather than as part of shipping the
+header.
 
 `raiker/api/security.py` sets `nosniff`, frame denial, referrer policy, COOP/CORP, Permissions-Policy and optional HSTS. No `Content-Security-Policy` was identified in `_SECURITY_HEADERS` or `SecurityHeadersMiddleware`.
 

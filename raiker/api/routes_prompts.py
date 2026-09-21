@@ -14,6 +14,7 @@ from raiker.api.redaction import redact_response_body
 from raiker.api.routes_settings import load_composer_approval_mode
 from raiker.api.schemas import InterruptRequest, PromptRequest
 from raiker.api.sessions import ApiSession
+from raiker.build_identity import version as raiker_version
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import (
     DEFAULT_MAX_TOOL_CALLS,
@@ -53,8 +54,11 @@ from raiker.tools.filesystem import FilesystemSafetyError, resolve_writable_work
 
 router = APIRouter()
 
-WEB_UI_CLIENT = ClientMetadata(type="web_ui", name="raiker-web", version="0.0.0")
-REST_CLIENT = ClientMetadata(type="rest", name="raiker-rest", version="0.0.0")
+# GCR-16 — a turn is recorded against the build that ran it. Both of these
+# said `0.0.0` on every release, so an audit record could not tell two
+# versions of Raiker apart.
+WEB_UI_CLIENT = ClientMetadata(type="web_ui", name="raiker-web", version=raiker_version())
+REST_CLIENT = ClientMetadata(type="rest", name="raiker-rest", version=raiker_version())
 # Only these origins may be claimed over the API; both are governed identically
 # and both authenticate as the single owner. Anything else falls back to web_ui.
 _PROMPT_CLIENTS = {"web_ui": WEB_UI_CLIENT, "rest": REST_CLIENT}

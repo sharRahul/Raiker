@@ -488,6 +488,24 @@ _OWNER_THREADS: dict[int, weakref.ReferenceType[threading.Thread]] = {}
 # instance in this process. SQLite's busy timeout cannot resolve two deferred
 # transactions that both try to upgrade to writers.
 _BOOTSTRAP_LOCK = threading.RLock()
+#: Workspaces whose schema this process has already brought up to date, keyed by
+#: resolved root and mapped to the database file the bootstrap was carried out
+#: against.
+#:
+#: GCR-10 — ``SQLiteStore.__init__`` ran the whole migration catalogue under a
+#: process-global lock. The architecture builds stores freely: handling one
+#: prompt constructs them for session ownership, project resolution, readiness,
+#: attachment references, generated files and the gateway, and every read route
+#: does the same. Each construction re-walked every migration and every backfill
+#: while holding the lock the others were waiting on, so an ordinary repository
+#: object was coupled to the schema lifecycle of the whole workspace.
+#:
+#: Bootstrap is idempotent, so doing it once per workspace per process reaches
+#: the same schema by a much shorter route. The database file is remembered with
+#: it: a workspace whose store has been removed — which the tests and
+#: ``scripts/reset_live_workspace.py`` both do — is bootstrapped again rather
+#: than assumed.
+_BOOTSTRAPPED: dict[Path, Path] = {}
 _LOG = logging.getLogger(__name__)
 # The model-operation columns a lifecycle write may set. An allowlist, so a
 # transition can never reach the owner, the kind, the recorded payload, or the
@@ -856,6 +874,13 @@ def _releasable_locked(owner: int) -> list[sqlite3.Connection]:
 def invalidate_workspace_connections(workspace_root: str | Path) -> None:
     """Close every cached SQLCipher connection for one workspace."""
     root = Path(workspace_root).resolve()
+    with _BOOTSTRAP_LOCK:
+        # The next store built for this workspace proves the schema again. A
+        # workspace is invalidated when it is being handed back — a host
+        # shutting down, a key rotating, a live round resetting — and none of
+        # those may leave a later store trusting this process's memory of a
+        # database that is no longer the same file (GCR-10).
+        _BOOTSTRAPPED.pop(root, None)
     with _CONNECTIONS_LOCK:
         doomed = [key for key in _CONNECTIONS if key[0] == root]
         connections = [_CONNECTIONS.pop(key) for key in doomed]
@@ -866,6 +891,8 @@ def invalidate_workspace_connections(workspace_root: str | Path) -> None:
 
 def close_cached_connections() -> None:
     """Close all keyed connections during process shutdown."""
+    with _BOOTSTRAP_LOCK:
+        _BOOTSTRAPPED.clear()
     with _CONNECTIONS_LOCK:
         connections = list(_CONNECTIONS.values())
         _CONNECTIONS.clear()
@@ -923,7 +950,20 @@ class SQLiteStore:
         self.paths.ensure()
         self.db_path = self.paths.db_path
         with _BOOTSTRAP_LOCK:
-            self.bootstrap()
+            proved = _BOOTSTRAPPED.get(self.paths.workspace_root)
+            if proved != self.db_path or not self.db_path.exists():
+                self.bootstrap()
+                _BOOTSTRAPPED[self.paths.workspace_root] = self.db_path
+            else:
+                # Not everything `bootstrap()` does is schema. Three of its
+                # passes *adopt* rows that were written with no owner — a
+                # session started by the CLI, context and memory belonging to a
+                # workspace that predates ownership — and they are how those
+                # rows come to belong to the owner at all. They are three
+                # guarded statements against an owner's own rows, so they stay
+                # on the cheap path; the migration catalogue above them does
+                # not.
+                self.assign_legacy_data_to_original_owner()
 
     def _open_keyed(self) -> sqlite3.Connection:
         """Open one keyed connection under the resolved memory-security policy."""

@@ -31,6 +31,7 @@ from raiker.models.factory import (
 from raiker.models.health import ProviderHealth
 from raiker.models.registry import ModelProfileRegistry, RegistryError
 from raiker.models.subscription_limits import LimitWindowSink
+from raiker.models.transport import ProviderClientPool, provider_client_pool
 
 
 @dataclass(frozen=True)
@@ -58,9 +59,17 @@ class ModelRouter:
         runtime_policy: ProviderRuntimePolicy | None = None,
         connection_resolver: Callable[[str], dict[str, str] | None] | None = None,
         limit_window_sink: LimitWindowSink | None = None,
+        client_pool: ProviderClientPool | None = None,
     ) -> None:
         self.registry = registry
         self.writer = writer
+        # GCR-14 — the connections this router's providers reuse. Every method
+        # below still builds a provider per call and closes it in a `finally`,
+        # which is right; what it must not also do is throw away the TCP
+        # connection and TLS session to a host it was talking to seconds ago.
+        # The shared pool is the default because a router with no pool is the
+        # behaviour this defect describes.
+        self.client_pool = client_pool if client_pool is not None else provider_client_pool()
         # BUG-254 — handed to every provider this router builds, so a
         # subscription that states its remaining window has somewhere to state
         # it. A router built without one still runs every turn.
@@ -82,6 +91,7 @@ class ModelRouter:
             policy=self.runtime_policy,
             connection=connection,
             limit_window_sink=self.limit_window_sink,
+            client_pool=self.client_pool,
         )
 
     def _profile(self, provider: str, model: str) -> ModelProfile:

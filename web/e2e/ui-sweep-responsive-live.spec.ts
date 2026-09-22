@@ -14,7 +14,7 @@
  */
 import { mkdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { DESTINATIONS, hubReachability } from "./destinations";
+import { DESTINATIONS, hubReachability, settled } from "./destinations";
 import { signInAsOwner } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE_URL ?? "http://127.0.0.1:8765";
@@ -63,23 +63,10 @@ async function signIn(page: import("@playwright/test").Page) {
 
 async function settle(page: import("@playwright/test").Page) {
   await expect(page.locator("main#main")).toBeVisible();
-  await page
-    .waitForFunction(
-      () =>
-        ![...document.querySelectorAll("main#main *")].some((element) => {
-          const node = element as HTMLElement;
-          const visible = node.offsetWidth > 0 || node.offsetHeight > 0;
-          return (
-            visible &&
-            /^(loading|reading|checking|verifying)\b/i.test(
-              (node.textContent ?? "").trim(),
-            )
-          );
-        }),
-      undefined,
-      { timeout: 20_000 },
-    )
-    .catch(() => undefined);
+  // One shared rule, in `destinations.ts`: a label that is still loading ends
+  // in an ellipsis. This copy read the composer's "Checking this model — you
+  // can still send." as an unfinished load.
+  await settled(page).catch(() => undefined);
 
   // Keep the virtual pointer away from product controls so evidence does not
   // accidentally capture a hover state left by the previous route.

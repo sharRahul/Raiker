@@ -6,6 +6,7 @@ from typing import Any
 from raiker.approval_audit_registry import approval_audit_summary
 from raiker.approval_preview_registry import approval_preview_summary
 from raiker.approvals.readiness_registry import approval_readiness_summary
+from raiker.build_identity import version as raiker_version
 from raiker.channels.readiness_registry import channel_readiness_summary
 from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
@@ -46,7 +47,7 @@ def inspection_client(client_type: str) -> ClientMetadata:
     return ClientMetadata(
         type=_CLIENT_TYPE_MAP[client_type],
         name=f"raiker-{client_type}-inspection",
-        version="0.0.0",
+        version=raiker_version(),
         interface_status="equal_primary_when_enabled",
     )
 

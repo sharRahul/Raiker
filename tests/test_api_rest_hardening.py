@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+import json
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -172,6 +173,92 @@ def test_oversized_body_rejected(workspace: Path) -> None:
     )
     assert resp.status_code == 413
     assert resp.json()["reason_code"] == "request_body_too_large"
+
+
+def test_an_undeclared_oversized_body_is_rejected_by_what_it_sent(workspace: Path) -> None:
+    """CR-06 — the cap read a claim by the sender and nothing else.
+
+    ``Content-Length`` is a declaration. A chunked request does not carry one at
+    all, so the check never ran and an unbounded body reached the route and
+    whatever buffered it. What enforces the cap is the count of bytes received.
+    """
+    client = TestClient(create_app(workspace, max_body_bytes=50))
+
+    def chunked() -> Iterator[bytes]:
+        for _ in range(20):
+            yield b"x" * 100
+
+    resp = client.post(
+        "/api/prompts",
+        content=chunked(),
+        headers={**_headers(workspace), "content-type": "application/json"},
+    )
+    assert "content-length" not in {name.lower() for name in resp.request.headers}
+    assert resp.status_code == 413
+    assert resp.json()["reason_code"] == "request_body_too_large"
+
+
+def test_a_body_inside_the_cap_is_unaffected(workspace: Path) -> None:
+    """The counter must not refuse a request that never went over."""
+    client = TestClient(create_app(workspace, max_body_bytes=4096))
+
+    def chunked() -> Iterator[bytes]:
+        yield json.dumps({"text": "hello"}).encode()
+
+    resp = client.post(
+        "/api/prompts",
+        content=chunked(),
+        headers={**_headers(workspace), "content-type": "application/json"},
+    )
+    # Whatever the route makes of it, it is not the size refusal.
+    assert resp.status_code != 413
+
+
+# ── Content-Security-Policy ──
+
+
+def test_every_page_carries_a_content_security_policy(workspace: Path) -> None:
+    """CR-07 — no enforced CSP was identified in HTTP middleware, and there was none.
+
+    It is the one header that limits what an injected string can *reach* rather
+    than how the browser labels the response.
+    """
+    client = TestClient(create_app(workspace))
+    policy = client.get("/api/events", headers=_headers(workspace)).headers.get(
+        "content-security-policy", ""
+    )
+    directives = {
+        part.strip().split(" ", 1)[0]: part.strip() for part in policy.split(";") if part.strip()
+    }
+    assert directives["default-src"] == "default-src 'self'"
+    # Nothing Raiker's page runs comes from anywhere else.
+    assert directives["script-src"] == "script-src 'self'"
+    assert directives["connect-src"] == "connect-src 'self'"
+    # The levers an injected tag would otherwise have.
+    assert directives["base-uri"] == "base-uri 'none'"
+    assert directives["form-action"] == "form-action 'none'"
+    assert directives["frame-ancestors"] == "frame-ancestors 'none'"
+    # And the things the product genuinely does: object URLs for an attachment,
+    # a generated image, a PDF preview and a dictation clip.
+    assert "blob:" in directives["img-src"]
+    assert "blob:" in directives["object-src"]
+    assert "blob:" in directives["media-src"]
+
+
+def test_the_generated_api_documentation_is_not_left_blank(workspace: Path) -> None:
+    """Swagger and ReDoc load from a CDN, and are a developer surface, not the UI.
+
+    Naming the two paths is the honest form of the exception: the alternative is
+    loosening the policy for the whole product, or an empty page and a console
+    full of refusals that say nothing about why.
+    """
+    client = TestClient(create_app(workspace))
+    for path in ("/api/docs", "/api/redoc", "/api/openapi.json"):
+        response = client.get(path)
+        assert response.status_code == 200, path
+        assert "content-security-policy" not in response.headers, path
+        # Every other header this middleware adds still applies.
+        assert response.headers.get("x-content-type-options") == "nosniff", path
 
 
 # ── Phase 8 gate: same session accepts a CLI turn and a REST prompt ──

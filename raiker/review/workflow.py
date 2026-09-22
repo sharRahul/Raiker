@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from raiker.build_identity import version as raiker_version
 from raiker.context.gatherer import ContextGatherer
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id
@@ -48,7 +49,7 @@ class ReviewPathError(ReviewError):
 
 
 def _review_client() -> ClientMetadata:
-    return ClientMetadata(type="cli", name="raiker-review", version="0.0.0")
+    return ClientMetadata(type="cli", name="raiker-review", version=raiker_version())
 
 
 class CodeReviewWorkflow:

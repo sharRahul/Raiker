@@ -198,9 +198,7 @@ class ModelProfileRegistry:
         return list(self.profiles)
 
     def resolve(self, provider: str, model: str) -> ModelProfile:
-        normal_provider = provider.replace("_", "-")
-        aliases = {"llama-cpp": "llama.cpp"}
-        normal_provider = aliases.get(normal_provider, normal_provider)
+        normal_provider = _normalize_provider(provider)
         # 1) Exact (provider, model) match wins.
         for profile in self.profiles:
             if profile.provider == normal_provider and profile.model == model:
@@ -225,18 +223,36 @@ class ModelProfileRegistry:
         raise RegistryError(f"unknown_model_profile_id:{profile_id}")
 
     def find(self, provider: str, model: str) -> list[ModelProfile]:
-        normal_provider = provider.replace("_", "-")
+        normal_provider = _normalize_provider(provider)
         return [p for p in self.profiles if p.provider == normal_provider and p.model == model]
 
     def profiles_for_provider(self, provider: str) -> list[ModelProfile]:
-        normal_provider = provider.replace("_", "-")
-        aliases = {"llama-cpp": "llama.cpp"}
-        normal_provider = aliases.get(normal_provider, normal_provider)
+        normal_provider = _normalize_provider(provider)
         return [p for p in self.profiles if p.provider == normal_provider]
 
     def register(self, profile: ModelProfile) -> None:
         """Add a runtime-resolved profile so ``resolve(provider, model)`` can find it."""
         self.profiles.append(profile)
+
+
+#: The one place a provider name a caller wrote becomes the name the registry
+#: files profiles under.
+#:
+#: GCR-17 — there were three. ``resolve()`` folded underscores to hyphens and
+#: aliased ``llama-cpp`` to ``llama.cpp``; ``profiles_for_provider()`` did both
+#: too; ``find()`` did only the first. So ``find("llama_cpp", model)`` returned
+#: nothing about a profile ``resolve("llama_cpp", model)`` returns, and a caller
+#: that checked before it resolved concluded the profile did not exist. Case was
+#: the same story from the other side: the provider factory lowercases
+#: (``ModelProviderFactory.resolve``) and the registry did not, so ``"Ollama"``
+#: resolved nowhere and then ran perfectly once something else had.
+_PROVIDER_ALIASES = {"llama-cpp": "llama.cpp"}
+
+
+def _normalize_provider(provider: str) -> str:
+    """Return the registry's own spelling of one provider name."""
+    normal = provider.strip().lower().replace("_", "-")
+    return _PROVIDER_ALIASES.get(normal, normal)
 
 
 def _is_placeholder_model(model: str) -> bool:

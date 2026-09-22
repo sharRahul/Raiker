@@ -282,7 +282,11 @@ export async function connectHostedProvider(
   page: Page,
   base: string,
   provider: string,
-  keyLabel: string,
+  // `string | RegExp` because that is what `getByLabel` takes and what five
+  // specs already pass. The narrower type was wrong rather than strict: it
+  // described the helper's callers inaccurately, and nothing noticed until
+  // `e2e/` was brought into the project's type check on 2026-09-21.
+  keyLabel: string | RegExp,
   key: string,
 ): Promise<Locator> {
   const card = await hostedProviderCard(page, base, provider);
@@ -478,7 +482,7 @@ export async function keepModelAvailable(
 export async function useHostedModel(
   page: Page,
   base: string,
-  options: { provider: string; keyLabel: string; key: string; model: string },
+  options: { provider: string; keyLabel: string | RegExp; key: string; model: string },
 ): Promise<Locator> {
   const card = await connectHostedProvider(
     page,

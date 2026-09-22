@@ -6,6 +6,7 @@ import {
   NAV_GROUPS,
   NAV_ITEMS,
   navItem,
+  projectFromHash,
   routeFromHash,
   sectionFromHash,
   tabFromHash,
@@ -318,5 +319,28 @@ describe("a settings section addressed the other way", () => {
 
   it("still falls back to General for a section that does not exist", () => {
     expect(tabFromHash("#/settings?section=nonsense")).toBe("general");
+  });
+});
+
+// ── UX-BUILD-05 ──────────────────────────────────────────────────────────────
+
+describe("projectFromHash", () => {
+  it("reads the project a deep link names", () => {
+    expect(projectFromHash("#/projects?project=proj_abc123")).toBe("proj_abc123");
+    expect(projectFromHash("#/projects?tab=x&project=proj_abc123")).toBe("proj_abc123");
+  });
+
+  it("is null when no project is named, or the name is not one", () => {
+    expect(projectFromHash("#/projects")).toBeNull();
+    expect(projectFromHash("")).toBeNull();
+    // Not an id: the view would go looking for it and the list is the right
+    // answer, which is what a null gets.
+    expect(projectFromHash("#/projects?project=")).toBeNull();
+    expect(projectFromHash("#/projects?project=../../etc/passwd")).toBeNull();
+    expect(projectFromHash(`#/projects?project=${"a".repeat(129)}`)).toBeNull();
+  });
+
+  it("does not change which route the hash selects", () => {
+    expect(routeFromHash("#/projects?project=proj_abc123")).toBe("projects");
   });
 });

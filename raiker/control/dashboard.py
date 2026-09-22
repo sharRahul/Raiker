@@ -21,6 +21,7 @@ from uuid import uuid4
 
 from raiker.approval_previews import redact_secret_like_text
 from raiker.auth.app_key import ensure_app_key
+from raiker.build_identity import version as raiker_version
 from raiker.checkpoints.capture import MAX_PRE_IMAGE_BYTES
 from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dtos import ControlResult
@@ -8767,7 +8768,7 @@ class DashboardService:
                 event_type=event_type,
                 actor="web_ui",
                 payload=payload,
-                client=ClientMetadata(type="web_ui", name="raiker-web", version="0.0.0"),
+                client=ClientMetadata(type="web_ui", name="raiker-web", version=raiker_version()),
             )
         )
 

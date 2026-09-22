@@ -20,6 +20,7 @@ from raiker.models.providers.anthropic_messages import AsyncAnthropicMessagesPro
 from raiker.models.providers.codex_app_server import AsyncCodexAppServerProvider
 from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider
 from raiker.models.subscription_limits import LimitWindowSink
+from raiker.models.transport import ProviderClientPool
 
 
 def capabilities_from_profile(profile: ModelProfile) -> ModelCapabilities:
@@ -98,6 +99,13 @@ class ModelProviderFactory:
     allow_private_network_provider: bool = False
     require_api_key_for_hosted: bool = True
     client: httpx.AsyncClient | None = None
+    # GCR-14 — where a provider's HTTP connection comes from when the caller did
+    # not hand one in. Every call used to build its own client and close it in a
+    # `finally`, so a turn, the readiness probe behind it and the catalogue
+    # refresh beside it each paid for a fresh TCP connection and TLS handshake
+    # to a host Raiker had been talking to seconds earlier. A factory built
+    # without a pool behaves exactly as before.
+    client_pool: ProviderClientPool | None = None
     connection: dict[str, str] | None = None
     # BUG-254 — where a provider hands on the limit windows it volunteers with a
     # turn. Optional throughout: a factory built without one produces providers
@@ -111,9 +119,11 @@ class ModelProviderFactory:
         policy: ProviderRuntimePolicy | None = None,
         connection: dict[str, str] | None = None,
         limit_window_sink: LimitWindowSink | None = None,
+        client_pool: ProviderClientPool | None = None,
         **kwargs: Any,
     ) -> None:
         object.__setattr__(self, "client", client)
+        object.__setattr__(self, "client_pool", client_pool)
         object.__setattr__(self, "connection", connection)
         object.__setattr__(self, "limit_window_sink", limit_window_sink)
         if policy is None:
@@ -280,12 +290,26 @@ class ModelProviderFactory:
         """Raise if this profile would not run, and open nothing if it would."""
         self.resolve(profile, require_model=require_model)
 
+    def _client_for(self, endpoint: str, timeout: float) -> httpx.AsyncClient | None:
+        """The client this provider should use, or ``None`` to let it open one.
+
+        An explicitly injected client always wins — that is how the tests and the
+        embedded hosts hand in a transport. Otherwise the pool answers, and a
+        factory with neither behaves exactly as it did before GCR-14.
+        """
+        if self.client is not None:
+            return self.client
+        if self.client_pool is None:
+            return None
+        return self.client_pool.client(endpoint=endpoint, timeout=timeout)
+
     def create(self, profile: ModelProfile, *, require_model: bool = True) -> Any:
         resolved = self.resolve(profile, require_model=require_model)
         provider = resolved.provider
         raw = profile.raw
         headers = resolved.headers
         endpoint = resolved.endpoint
+        timeout = float(raw.get("timeout_seconds", 120.0))
         if provider == "chatgpt-codex":
             return AsyncCodexAppServerProvider(
                 profile_id=profile.profile_id,
@@ -300,12 +324,12 @@ class ModelProviderFactory:
                 model=resolved.served_model,
                 endpoint=endpoint,
                 capabilities=capabilities_from_profile(profile),
-                timeout=float(raw.get("timeout_seconds", 120.0)),
+                timeout=timeout,
                 max_tokens=int(raw.get("max_tokens", 1024)),
                 models_path=str(raw.get("models_path", "/v1/models")),
                 chat_path=str(raw.get("chat_path", "/v1/messages")),
                 extra_headers=headers,
-                client=self.client,
+                client=self._client_for(endpoint, timeout),
             )
         return AsyncOpenAICompatibleProvider(
             profile_id=profile.profile_id,
@@ -313,7 +337,7 @@ class ModelProviderFactory:
             model=resolved.served_model,
             endpoint=endpoint,
             capabilities=capabilities_from_profile(profile),
-            timeout=float(raw.get("timeout_seconds", 120.0)),
+            timeout=timeout,
             temperature=float(raw.get("temperature", 0.2)),
             max_tokens=int(raw.get("max_tokens", 1024)),
             tool_call_mode=str(raw.get("tool_call_mode", "text_json")),
@@ -322,5 +346,5 @@ class ModelProviderFactory:
             chat_path=str(raw.get("chat_path", "/v1/chat/completions")),
             embeddings_path=str(raw.get("embeddings_path", "/v1/embeddings")),
             extra_headers=headers,
-            client=self.client,
+            client=self._client_for(endpoint, timeout),
         )

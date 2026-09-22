@@ -918,6 +918,30 @@ class RuntimePaths:
 
 
 class SQLiteStore:
+    #: The migration ids this database already records, read once at the top of
+    #: a :meth:`bootstrap` pass and ``None`` outside one. Only
+    #: :meth:`_apply_migration` reads it, and only :meth:`bootstrap` calls that.
+    #:
+    #: GCR-10 — ``bootstrap()`` runs on every ``SQLiteStore`` construction, and
+    #: the architecture builds stores freely: handling one prompt constructs
+    #: them for session ownership, project resolution, readiness, attachment
+    #: references, generated files and the gateway, and every read route does
+    #: the same. Each construction asked the ``migrations`` table **once per
+    #: migration** — a hundred and sixty-odd round trips to answer one question,
+    #: while holding the process-global bootstrap lock the others were waiting
+    #: on.
+    #:
+    #: **What this deliberately does not do is skip the pass.** ``bootstrap()``
+    #: is not only schema setup, it is the store's self-repair: a marker
+    #: somebody deleted gets its migration re-applied, an index an older release
+    #: left on FTS4 is converted in place, a legacy project path is rebuilt from
+    #: its parent links. Caching "this workspace is fine" across constructions
+    #: removes that, and the suite says so in six places —
+    #: ``test_repeated_store_facade_rechecks_deleted_migration_marker`` is named
+    #: for the contract. So the pass still runs, every time. What changed is how
+    #: many queries it takes to find out there is nothing to do.
+    _applied: set[str] | None = None
+
     def __init__(self, workspace_root: str | Path) -> None:
         self.paths = RuntimePaths(Path(workspace_root).resolve())
         self.paths.ensure()
@@ -1039,6 +1063,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "INSERT OR IGNORE INTO migrations (migration_id, applied_at) VALUES (?, ?)",
                 (PHASE_1_MIGRATION_ID, utc_now()),
             )
+
+            # Read once, before anything in this pass applies, which is what
+            # makes it equivalent to asking per migration: an id absent here is
+            # applied and then recorded, and `INSERT OR IGNORE` keeps that safe
+            # either way.
+            self._applied = {
+                str(row["migration_id"])
+                for row in connection.execute("SELECT migration_id FROM migrations")
+            }
 
             self._apply_migration(PHASE_2_MIGRATION_ID, PHASE_2_MIGRATION_SQL, connection)
             self._apply_migration(
@@ -1716,6 +1749,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ):
                 with contextlib.suppress(sqlite3.OperationalError):
                     connection.execute(_alter_sql)
+        # The pass is over; anything that asks again asks the table.
+        self._applied = None
 
     def _migrate_plaintext_database(self) -> None:
         """Convert a legacy stdlib-SQLite file before SQLCipher opens it."""
@@ -1794,11 +1829,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return ";".join(kept)
 
     def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:
-        row = connection.execute(
-            "SELECT applied_at FROM migrations WHERE migration_id = ?", (migration_id,)
-        ).fetchone()
-        if row is not None:
-            return
+        if self._applied is not None:
+            if migration_id in self._applied:
+                return
+        else:
+            row = connection.execute(
+                "SELECT applied_at FROM migrations WHERE migration_id = ?", (migration_id,)
+            ).fetchone()
+            if row is not None:
+                return
         # `executescript` commits implicitly, so a script cannot share a
         # transaction with its own bookkeeping row: a crash between the two is
         # always possible. Idempotency is what makes that safe — the re-run
@@ -1810,6 +1849,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             "INSERT OR IGNORE INTO migrations (migration_id, applied_at) VALUES (?, ?)",
             (migration_id, utc_now()),
         )
+        if self._applied is not None:
+            self._applied.add(migration_id)
 
     # ── Text-search engine (RAIKER-2025) ─────────────────────────────────────
 

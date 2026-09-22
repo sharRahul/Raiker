@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from raiker.build_identity import version as raiker_version
 from raiker.contracts.ids import utc_now
 from raiker.contracts.models import ClientMetadata
 from raiker.events.types import make_event
@@ -18,7 +19,7 @@ _LIFECYCLE_SOURCE = "review_propose_fixes_save"
 
 
 def _lifecycle_client() -> ClientMetadata:
-    return ClientMetadata(type="cli", name="raiker-proposal-lifecycle", version="0.0.0")
+    return ClientMetadata(type="cli", name="raiker-proposal-lifecycle", version=raiker_version())
 
 
 class ProposalLifecycleError(ValueError):

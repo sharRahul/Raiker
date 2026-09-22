@@ -45,11 +45,25 @@ the findings themselves are marked closed in
 | GCR-33 | Two expired calls presented the same refresh token | [FIXED-440](FIXED_ITEMS.md#fixed-440--two-expired-calls-presented-the-same-refresh-token-and-one-was-already-retired) |
 | GCR-40 | An orphan JSONL line was invisible to the integrity check | [FIXED-441](FIXED_ITEMS.md#fixed-441--an-event-the-index-never-heard-of-was-invisible-to-the-check-for-exactly-that) |
 
-**Still open, and next by the same order:** GCR-08 (transactional instance
-creation), GCR-28 (local runtime slot concurrency), GCR-33 (OAuth refresh
-single-flight), GCR-40 (event dual-write recovery), GCR-24/25 (a cancellable
-conversion subprocess and an app-owned durable job runner), GCR-26, GCR-41, and
-the P2 architecture work below them.
+**Still open, and next by the same order:** GCR-41's hash-locked dependency set
+and GCR-43 (`dashboard.py`). Everything else this paragraph named has closed:
+GCR-24 as FIXED-555, GCR-25 as FIXED-437, GCR-26 as FIXED-556, GCR-28 as
+FIXED-438, GCR-33 as FIXED-440, GCR-40 as FIXED-441, and GCR-41's build-tool half
+as FIXED-574.
+
+**2026-09-21.** The first-pass companion's remaining P1 work closed in one pass,
+and the two this document's order put next closed with it: GCR-08 as
+[FIXED-594](FIXED_ITEMS.md#fixed-594--a-half-made-instance-blocked-the-retry-it-told-you-to-make),
+alongside GCR-07 as
+[FIXED-593](FIXED_ITEMS.md#fixed-593--a-second-person-on-this-machine-had-a-raiker-with-no-background-work)
+— which is the more serious of the two, and was not in either document's
+headline: a mounted instance served requests with none of its background work
+running, because Starlette enters a lifespan for the top-level application only.
+GCR-09, GCR-14, GCR-16 and GCR-17 closed in the same pass, and GCR-10 was
+reduced rather than closed — its measured cost is gone, and the half that asks
+for bootstrap to leave the constructor is refused with a reason, because that
+pass is also the store's self-repair. The first-pass document carries their
+records.
 
 ## Executive judgement
 

@@ -122,3 +122,42 @@ it("requires a second confirmation when an update would interrupt work", async (
   expect(await screen.findByText(/helper for 2\.0\.0 has started/)).toBeInTheDocument();
   expect(screen.getByText(/Nothing on this installation has changed yet/)).toBeInTheDocument();
 });
+
+// ── GCR-16 ───────────────────────────────────────────────────────────────────
+
+it("names the build this is, the commit it came from, and the build of the page", async () => {
+  vi.spyOn(api, "hostUpdate").mockResolvedValue(
+    status({
+      installation: {
+        ...signedPackage.installation,
+        version: "1.2.3",
+        commit: "abc1234def5678",
+        built_at: "2026-09-01T10:00:00Z",
+      },
+    }),
+  );
+  render(Updates);
+
+  // The version and the commit it was built from, as one identity rather than
+  // one of four numbers that disagreed.
+  expect(await screen.findByText("1.2.3 (abc1234)", { selector: "dd" })).toBeInTheDocument();
+  expect(screen.getByText("Built", { selector: "dt" })).toBeInTheDocument();
+  // And the build of the page reading it, which is the half neither the host
+  // nor the bundle can report alone.
+  expect(screen.getByText("This page", { selector: "dt" })).toBeInTheDocument();
+  expect(screen.getByText("Unreleased build", { selector: "dd" })).toBeInTheDocument();
+});
+
+it("stays quiet about a mismatch this build cannot have", async () => {
+  // Two unreleased builds are two development checkouts. Calling that a
+  // mismatch would put a warning on every developer's screen for ever. The
+  // released case is proved directly in `buildIdentity.test.ts`, because a test
+  // bundle is by definition never a released client.
+  vi.spyOn(api, "hostUpdate").mockResolvedValue(
+    status({ installation: { ...signedPackage.installation, version: "0.0.0" } }),
+  );
+  render(Updates);
+
+  await screen.findByText("Installed build", { selector: "dt" });
+  expect(screen.queryByText(/older build than the one now running/)).toBeNull();
+});

@@ -92,7 +92,11 @@ async function connectProvider(page: Page, leg: ProviderLeg): Promise<Locator> {
   return card;
 }
 
-async function chooseModel(card: Locator, preferred?: string) {
+// `page` was read from the enclosing module and is not there: every call to
+// this helper threw `ReferenceError: page is not defined`. Found on 2026-09-21
+// by putting `e2e/` into the project's own type check, which had never covered
+// the live suite — the thing that produces every FIXED entry's evidence.
+async function chooseModel(page: Page, card: Locator, preferred?: string) {
   const dialog = await openModelDialog(page, card);
   const custom = dialog.getByLabel("Custom model name");
   const values = await offeredModelIds(dialog);
@@ -248,6 +252,7 @@ test("BUG-69 first-run gate and readiness state machine, per available provider"
   } else {
     await page.goto(`${BASE}/#/models?tab=local`);
     await chooseModel(
+      page,
       page.locator(".local-row").filter({ hasText: "Ollama" }),
       localModel,
     );
@@ -263,6 +268,7 @@ test("BUG-69 first-run gate and readiness state machine, per available provider"
   for (const leg of available) {
     await page.goto(`${BASE}/#/models?tab=hosted`);
     await chooseModel(
+      page,
       page.locator("article.provider-card").filter({ hasText: leg.provider }),
       leg.preferredModel,
     );

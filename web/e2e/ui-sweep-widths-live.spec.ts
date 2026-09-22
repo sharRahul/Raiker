@@ -36,7 +36,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
-import { DESTINATIONS, hubReachability } from "./destinations";
+import { DESTINATIONS, hubReachability, settled } from "./destinations";
 import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
@@ -71,17 +71,11 @@ type Finding = { route: string; width: string; kind: string; detail: string };
 async function settle(page: import("@playwright/test").Page): Promise<void> {
   await expect(page.locator("main#main")).toBeVisible();
   await page.waitForLoadState("networkidle");
-  await page.waitForFunction(
-    () =>
-      ![...document.querySelectorAll("main#main *")].some((element) => {
-        const node = element as HTMLElement;
-        const visible = node.offsetWidth > 0 || node.offsetHeight > 0;
-        return visible && /^(loading|reading|checking|verifying)\b/i.test((node.textContent ?? "").trim());
-      }),
-    undefined,
-    { timeout: 20_000 },
-  );
-  await page.waitForTimeout(400);
+  // One shared rule, in `destinations.ts`: a label that is still loading ends
+  // in an ellipsis. This copy read the composer's "Checking this model — you
+  // can still send." as an unfinished load, so a sweep against a workspace
+  // anyone had worked in timed out on Chat.
+  await settled(page, { settleMs: 400 });
 }
 
 test("every page fits, contains itself, and names its controls at four widths", async ({ page }) => {

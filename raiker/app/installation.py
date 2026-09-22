@@ -38,12 +38,14 @@ from raiker.app.update import (
     recovery_points,
     select_update,
 )
+from raiker.build_identity import INSTALLATION_FILE as BUILD_INSTALLATION_FILE
+from raiker.build_identity import UNKNOWN_VERSION as BUILD_UNKNOWN_VERSION
 
-INSTALLATION_FILE = "installation.json"
-#: The version an installation reports when it has no record to read. Kept
-#: identical to the placeholder in ``pyproject.toml`` so nothing invents a
-#: release number for a checkout that has never been released.
-UNKNOWN_VERSION = "0.0.0"
+INSTALLATION_FILE = BUILD_INSTALLATION_FILE
+#: The version an installation reports when it has no record to read. Defined
+#: once, in :mod:`raiker.build_identity`, so this and every other surface that
+#: has to say "nothing has been released here" says it identically (GCR-16).
+UNKNOWN_VERSION = BUILD_UNKNOWN_VERSION
 
 
 @dataclass(frozen=True)

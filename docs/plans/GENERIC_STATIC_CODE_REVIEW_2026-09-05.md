@@ -43,7 +43,7 @@ The largest issues found in this first generic pass are:
 2. multi-instance execution shares module-global command workspace state — **closed 2026-09-06 ([FIXED-432](FIXED_ITEMS.md#fixed-432--two-commands-running-at-once-could-be-judged-against-each-others-workspace))**;
 3. mounted Raiker instances are built as FastAPI sub-applications with their own lifespan workers, but mounted sub-app lifespans do not run under FastAPI — **closed 2026-09-21 ([FIXED-593](FIXED_ITEMS.md#fixed-593--a-second-person-on-this-machine-had-a-raiker-with-no-background-work))**;
 4. instance creation is non-transactional and mutates the live route table from a synchronous worker thread — **closed 2026-09-21 ([FIXED-594](FIXED_ITEMS.md#fixed-594--a-half-made-instance-blocked-the-retry-it-told-you-to-make))**;
-5. `SQLiteStore` performs bootstrap/migration work in every constructor while hot request paths repeatedly construct stores — **closed 2026-09-21 ([FIXED-595](FIXED_ITEMS.md#fixed-595--every-repository-object-was-a-schema-event))**;
+5. `SQLiteStore` performs bootstrap/migration work in every constructor while hot request paths repeatedly construct stores — **reduced 2026-09-21 ([FIXED-595](FIXED_ITEMS.md#fixed-595--a-hundred-and-sixty-eight-queries-to-find-out-there-was-nothing-to-do))**: the pass costs 3 queries where it cost 168, and still runs every time, because it is also the store's self-repair;
 6. prompt submit and prompt streaming have duplicated orchestration with differing error semantics;
 7. frontend CI is path-filtered so backend API contract changes can bypass frontend type/build/E2E checks — **closed 2026-09-20 ([FIXED-589](FIXED_ITEMS.md#fixed-589--a-backend-change-could-not-break-the-web-client-because-the-web-client-was-never-built))**.
 
@@ -62,7 +62,7 @@ The third pass adds more urgent correctness issues; see the companion document a
 | GCR-07 | High | P1 | Mounted Raiker instances do not receive their own FastAPI lifespan workers — **Closed 2026-09-21 ([FIXED-593](FIXED_ITEMS.md#fixed-593--a-second-person-on-this-machine-had-a-raiker-with-no-background-work))** |
 | GCR-08 | High | P1 | Instance creation can leave a partially created/mounted instance when account registration fails — **Closed 2026-09-21 ([FIXED-594](FIXED_ITEMS.md#fixed-594--a-half-made-instance-blocked-the-retry-it-told-you-to-make))** |
 | GCR-09 | High | P1 | Instance registry/routing mutation is non-atomic and performed from a sync route worker thread — **Closed 2026-09-21 ([FIXED-594](FIXED_ITEMS.md#fixed-594--a-half-made-instance-blocked-the-retry-it-told-you-to-make))** |
-| GCR-10 | Medium/High | P1 | `SQLiteStore` bootstraps on every construction; hot paths construct several stores per request — **Closed 2026-09-21 ([FIXED-595](FIXED_ITEMS.md#fixed-595--every-repository-object-was-a-schema-event))** |
+| GCR-10 | Medium/High | P1 | `SQLiteStore` bootstraps on every construction; hot paths construct several stores per request — **Reduced 2026-09-21 ([FIXED-595](FIXED_ITEMS.md#fixed-595--a-hundred-and-sixty-eight-queries-to-find-out-there-was-nothing-to-do))**; the lifecycle half is refused with a reason |
 | GCR-11 | Medium | P2 | `sqlite.py` has become a large persistence/migration god module |
 | GCR-12 | Medium | P2 | Prompt submit and stream paths duplicate orchestration and already expose different error semantics |
 | GCR-13 | Medium | P2 | API redaction middleware buffers almost every JSON API response in full |
@@ -250,7 +250,21 @@ The instance route itself is a synchronous FastAPI handler, so it may execute in
 
 **Severity: Medium/High — Priority: P1 — Confidence: High**
 
-**Status: Closed 2026-09-21 — [FIXED-595](FIXED_ITEMS.md#fixed-595--every-repository-object-was-a-schema-event).** Once per workspace per process. Writing it found that three of bootstrap's passes are not schema at all — they adopt rows written with no owner — so those stay on the cheap path.
+**Status: Reduced 2026-09-21 — [FIXED-595](FIXED_ITEMS.md#fixed-595--a-hundred-and-sixty-eight-queries-to-find-out-there-was-nothing-to-do).**
+The measured cost is gone: the applied set is read once per pass rather than
+once per migration, so a construction with nothing to apply costs 3 queries
+where it cost 168.
+
+**The recommendation's first half is refused, with a reason.** Bootstrapping a
+workspace once and making construction cheap was implemented and reverted: the
+pass is not only schema setup, it is the store's **self-repair** — a deleted
+marker is re-applied, an index left on FTS4 by an older release is converted in
+place, a legacy project path is rebuilt, rows written with no owner are
+adopted. Eight tests caught it, one of them named
+`test_repeated_store_facade_rechecks_deleted_migration_marker`. Moving
+bootstrap out of the constructor means deciding which callers stop being
+self-healing, which is an instance-lifecycle decision rather than a storage
+one, and is what remains of this entry.
 
 `SQLiteStore.__init__()` calls `self.bootstrap()` under process-global `_BOOTSTRAP_LOCK`. Bootstrap performs schema/migration checks.
 

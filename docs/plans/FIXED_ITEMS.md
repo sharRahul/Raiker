@@ -616,7 +616,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-592](#fixed-592--two-kinds-of-source-and-nowhere-that-answered-what-can-raiker-read) | Low | Memory / Knowledge Map | Fixed 2026-09-20 |
 | [FIXED-593](#fixed-593--a-second-person-on-this-machine-had-a-raiker-with-no-background-work) | **High** | Instances / runtime lifecycle | Fixed 2026-09-21 (closes GCR-07) |
 | [FIXED-594](#fixed-594--a-half-made-instance-blocked-the-retry-it-told-you-to-make) | **High** | Instances / registry | Fixed 2026-09-21 (closes GCR-08, GCR-09) |
-| [FIXED-595](#fixed-595--every-repository-object-was-a-schema-event) | Medium/High | Storage | Fixed 2026-09-21 (closes GCR-10) |
+| [FIXED-595](#fixed-595--a-hundred-and-sixty-eight-queries-to-find-out-there-was-nothing-to-do) | Medium/High | Storage | Fixed 2026-09-21 (reduces GCR-10; its lifecycle half refused with a reason) |
 | [FIXED-596](#fixed-596--every-model-call-built-a-new-connection-to-a-host-it-was-already-talking-to) | Medium | Models / provider transport | Fixed 2026-09-21 (closes GCR-14) |
 | [FIXED-597](#fixed-597--three-spellings-of-one-provider-name) | Low | Models / registry | Fixed 2026-09-21 (closes GCR-17) |
 | [FIXED-598](#fixed-598--four-version-numbers-and-which-one-you-got-depended-on-where-you-looked) | Low/Medium | Build identity / Settings | Fixed 2026-09-21 (closes GCR-16) |
@@ -26084,36 +26084,57 @@ no staging file left behind; two concurrent creates both survive.
 
 ---
 
-## FIXED-595 — Every repository object was a schema event
+## FIXED-595 — A hundred and sixty-eight queries to find out there was nothing to do
 
-**Severity: Medium/High. Area: Storage. Status: Fixed 2026-09-21. Closes
-[GCR-10](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-10--sqlitestore-bootstraps-on-every-construction).**
+**Severity: Medium/High. Area: Storage. Status: Fixed 2026-09-21. Reduces
+[GCR-10](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-10--sqlitestore-bootstraps-on-every-construction);
+its "bootstrap once in the application lifecycle" half is **refused, with a
+reason** — see below.**
 
-**Observed.** `SQLiteStore.__init__` called `self.bootstrap()` under a
-process-global lock. The architecture builds stores freely and by design:
-handling one prompt constructs them for session ownership, project resolution,
-readiness, attachment references, generated files and the gateway, and every read
-route does the same. Each construction re-walked the entire migration catalogue —
-several hundred statements — while holding the lock the others were waiting on.
+**Observed.** `SQLiteStore.__init__` calls `bootstrap()` under a process-global
+lock. The architecture builds stores freely and by design: handling one prompt
+constructs them for session ownership, project resolution, readiness,
+attachment references, generated files and the gateway, and every read route
+does the same. Each construction walked the whole migration catalogue, asking
+the `migrations` table **once per migration** — measured at **168 queries** on
+a workspace with nothing to apply — while holding the lock the other
+constructions were waiting on.
 
-**Fixed.** A workspace is brought up to date once per process, remembered
-together with the database file it was proved against, and forgotten when that
-workspace is handed back (`invalidate_workspace_connections`, which is what a
-host shutting down, a key rotating and a live reset all call). A database that is
-simply gone is never assumed present, however recently this process bootstrapped
-one at that path.
+**What was refused, and why.** GCR-10 asks to "bootstrap a workspace once in
+application/instance lifecycle … and make normal repository/store construction
+cheap". The first version of this fix did exactly that: a per-process record of
+which workspaces had been proved, skipped on the next construction. **It is the
+wrong fix, and the suite said so in eight places.**
 
-**What the fix had to keep, and nearly did not.** Not everything `bootstrap()`
-does is schema. Three of its passes **adopt** rows written with no owner — a
-session started by the CLI is the one that made this visible — and they are how
-those rows come to belong to the owner at all. Skipping them changed who a
-session belonged to, and `test_same_session_accepts_cli_and_rest_prompt` caught
-it. They are three guarded statements against an owner's own rows, so they stay
-on the cheap path; only the catalogue above them is skipped.
+`bootstrap()` is not only schema setup. It is the store's **self-repair**: a
+migration marker somebody deleted is re-applied, an index an older release left
+on FTS4 is converted in place, a legacy project path is rebuilt from its parent
+links, and rows written with no owner are adopted. Caching "this workspace is
+fine" removes all of it.
+`test_repeated_store_facade_rechecks_deleted_migration_marker` is named for the
+contract; `test_a_workspace_written_by_an_fts5_less_release_upgrades_without_losing_anything`
+and four others depend on it. Editing eight tests to fit the cache would have
+been changing the evidence to fit the answer.
 
-**Evidence.** `tests/test_storage_sqlite.py` — ten stores over one workspace
-bootstrap once, a second workspace gets its own, an invalidated or deleted
-database is proved again, and the adoption pass still runs on every store.
+**Fixed.** The pass still runs, every time, and every repair it performs still
+happens. What changed is how many queries it takes to find out there is nothing
+to do: the applied set is read **once** at the top of a pass and consulted from
+memory, so 168 per-migration reads become 3 — the handful of backfills that
+guard themselves on their own marker still ask by id. The snapshot is taken
+before anything in the pass applies, which is what makes it equivalent: an id
+absent from it is applied and then recorded, and `INSERT OR IGNORE` keeps that
+safe either way. It is `None` outside a pass, and `_apply_migration` — whose
+only caller is `bootstrap()` — falls back to the table when it is.
+
+**What is left of GCR-10.** Moving bootstrap out of the constructor altogether
+is still worth doing, and it is a larger change than the entry suggests,
+because it means deciding which callers stop being self-healing. That is an
+instance-lifecycle decision, not a storage one.
+
+**Evidence.** `tests/test_storage_sqlite.py` — one whole-table read and fewer
+than ten by id where there were 168; a deleted marker still repaired by the
+next store; the snapshot `None` outside a pass. The six pre-existing tests that
+caught the first attempt all pass unchanged.
 
 ---
 

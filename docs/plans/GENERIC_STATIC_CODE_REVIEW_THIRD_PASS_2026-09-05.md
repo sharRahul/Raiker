@@ -59,8 +59,11 @@ alongside GCR-07 as
 — which is the more serious of the two, and was not in either document's
 headline: a mounted instance served requests with none of its background work
 running, because Starlette enters a lifespan for the top-level application only.
-GCR-09, GCR-10, GCR-14, GCR-16 and GCR-17 closed in the same pass; the
-first-pass document carries their records.
+GCR-09, GCR-14, GCR-16 and GCR-17 closed in the same pass, and GCR-10 was
+reduced rather than closed — its measured cost is gone, and the half that asks
+for bootstrap to leave the constructor is refused with a reason, because that
+pass is also the store's self-repair. The first-pass document carries their
+records.
 
 ## Executive judgement
 

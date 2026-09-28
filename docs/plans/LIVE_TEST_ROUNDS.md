@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-28 (second) | Targeted | `2026-09-28-review-closure-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that asked to run `python`, the key entered through the Connect dialog | Nine items from `docs/plans/` that closed three review documents: BUG-308 (CR-05, CR-09) by the owner's decision, CR-01, GCR-10, GCR-11, GCR-13, GCR-41 and GCR-43. Proved live: Permissions naming *Code with this machine's network* and saying, measured on this host, where scripts run; a real model's `python hello.py` approved under that capability, run, and recorded as `code_placement_classified`; a plugin card saying where its code would run; no stored key in four redacted answers; and every destination at four widths through the split store and service with **no console error**. **Five defects found by the round and fixed in it** — a fresh capability that would have refused `python` to an owner who had turned shell on, an approval that named the tool rather than the capability the code would run under, the same approval promising a rewind a command cannot have, and an approval card covering the composer's **Send** and staying over Approvals |
 | 2026-09-28 | Targeted | `2026-09-28-docs-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering and streaming real turns, the key entered through the Connect dialog | Ten items from `docs/plans/`: the owner's GEP-02 decision, six security-review findings, BUG-307, GCR-12 and GEP-03. Proved live: the stop switch counting and stopping **an answer being streamed** with no task running, the stopped turn keeping its text, the next turn answering; and every destination at four widths under `style-src 'self'` with **no CSP refusal**. **Two defects found by the round and fixed in it** — the first stop-all reported one answer as "1 answer being written and 1 task", and Home called a readiness read still in flight a failed one |
 | 2026-09-21 | Targeted | `2026-09-21-static-review-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering real turns; OpenAI and OpenRouter keys entered through the Connect dialog and refused by this host's egress policy; Ollama Cloud unreachable for the same reason | Ten items from `docs/plans/`: the static reviews' remaining instance, storage, transport, registry and version findings, the two API-hardening findings of the security review, and UX-BUILD-05. Proved live: two real turns over one pooled connection, every page under the new Content-Security-Policy with **no console refusals at four widths**, the build identity in Settings, and Build reopening the project it is running inside. **Four defects found by the round and fixed in it** — the live suite was never type-checked, four copies of one wait helper read a usable page as a stuck one, and `bug-242-build-restore` carried four separate stale assertions. GCR-10 was reduced rather than closed: its first fix removed the store's self-repair and eight tests said so |
 | 2026-09-20 | Targeted | `2026-09-20-round/` | Anthropic (`claude-haiku-4-5-20251001`), the key entered through the Connect dialog | Four scenarios on a workspace reset for the round, covering the nine items this run closed: a follow-up after a very long exchange answered *from* it, the conversation library organising a thread on the board it is resumed from (pin, rename, tag, archive and restore), the evidence inspector left with Delete and a line saying where the rest went, and the attached-root watcher named among Diagnostics' background passes. **One Medium defect found by the work and fixed in it** — the session row's menu was clipped by the card it opened inside, so **Delete** could not be clicked |
@@ -75,6 +76,91 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-09-28 (second) — Code says where it runs, and three review documents close
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` with `RAIKER_PLUGIN_RUNTIME_ALLOWLIST=acme-runner` on a workspace
+reset for the round and holding a one-line `hello.py`; restarted after each
+backend fix. Provider: Anthropic `claude-haiku-4-5-20251001`, answering a real
+turn. The key was entered through the Connect dialog and is not written to the
+repository. Browser: the pre-installed Chromium, through
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE`. Spec:
+`web/e2e/review-closure-round-2026-09-28-live.spec.ts`. Captures:
+[`docs/screenshots/2026-09-28-review-closure-round/`](../screenshots/2026-09-28-review-closure-round).**
+
+Nine items, which between them closed the two generic static reviews and the
+security code review: BUG-308 — CR-05 and CR-09 — by the owner's decision, CR-01,
+GCR-10 by the owner's decision, GCR-11, GCR-13, GCR-41 and GCR-43, recorded as
+FIXED-614 to FIXED-620. GCR-10 changes nothing, GCR-41 changes a release job and
+CR-01 a boundary no surface shows; those are proved by unit tests. The rest
+change what the owner sees or what every page reads through, and those are the
+ones run here.
+
+**What it proved.**
+
+1. **Permissions names the new capability, and says where code runs here.**
+   *Code with this machine's network* is listed under Execution, and the shell
+   row says *On this machine*: this host has no native sandbox runner, so
+   scripts would run with the network — measured by the same probe the command
+   service uses, not assumed.
+2. **Turning shell on turns it on beside it.** A fresh account's owner enables
+   *Shell commands*, and *Code with this machine's network* is on too, its mode
+   at *Ask me*.
+3. **A real turn asking to run `python` is governed as what it is.** The model
+   called the shell tool with `python hello.py`; the turn waited for approval;
+   the approval named *Code with this machine's network*; **Approve and execute
+   once** ran it; and the workspace's own event log recorded
+   `code_placement_classified` naming `host_network_code_execution`.
+4. **A plugin card says where its code would run.** An allowlisted plugin with
+   no container runtime set up reads *with this machine's network*.
+5. **No stored key comes back through a redacted answer.** Four JSON answers
+   read by the signed-in page — models, connections, capability gates and
+   diagnostics — hold no part of the key, and each parses whole: the bytes the
+   middleware now forwards without buffering are complete.
+6. **Every destination through the split store and service.** Every destination
+   in the nav at 360, 768, 1024 and 1440, each reading its own API, with no
+   console error and no 5xx.
+
+**What the round found, and the round fixed.**
+
+* **A switch the owner had never seen would have refused `python`.** On an
+  account a capability with no stored row reads as off, so an owner who had
+  turned shell on found the new capability off. A migration carries shell's and
+  process's *on* over once, and turning either on later turns it on beside it.
+  Recorded in
+  [FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so).
+* **The approval named the tool, not what would run.** A turn's shell action is
+  parked before it is routed, so the approval said *Shell commands* above a
+  script that would run with the network. It asks the same placement rule now.
+  Also in FIXED-620.
+* **An approval command promised a rewind.** The same approval said *the
+  previous file contents are checkpointed first, so it can be rewound* above a
+  command, which has no pre-image. Also in FIXED-620.
+* **An approval card covered the composer's Send — and stayed on Approvals.**
+  With an approval pending from another conversation, the next chat could not
+  choose a model or send; and arriving at Approvals by a link left the card over
+  the decision note, because the page check read the address once.
+  [FIXED-621](FIXED_ITEMS.md#fixed-621--an-approval-card-from-another-conversation-covered-the-composers-send).
+
+**Raised, not fixed.** On Approvals the notice dock still repeats the approval
+being reviewed and draws its *unread* link over the queue's header —
+[BUG-309](TO_BE_FIXED.md#bug-309--on-approvals-the-notice-dock-repeats-the-approval-and-covers-the-queues-header).
+
+**BUG-248, two more.** `review-readiness-probe-live` and
+`c17-b14-recall-and-inline-diff-live` now use the shared sign-in. Both signed in
+on the first run and then failed on steps the product had moved since — the
+Hosted tab the Models redesign removed, and a memory import that moved to
+Recall & indexing — and both were brought up to the product rather than
+relaxed, then re-run.
+[BUG-248](TO_BE_FIXED.md#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body).
+
+**What it did not prove.** Code running *inside* the native sandbox: this host
+has no sandbox runner, which is exactly the case the capability exists for; the
+sandboxed placement is proved by the unit tests. The plugin container hand-off
+needs `docker` and a runtime image, neither of which this host has.
 
 ---
 

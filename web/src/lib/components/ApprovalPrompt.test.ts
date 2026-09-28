@@ -156,3 +156,44 @@ it("respects the owner's preference even when the browser would allow it", async
   await new Promise((resolve) => setTimeout(resolve, 20));
   expect(raised).toHaveLength(0);
 });
+
+// Found live on 2026-09-28: docked bottom-right, the card covered the model
+// picker and Send of a composer on the same corner of the screen.
+it("rises above a composer it would cover, and stays in its corner otherwise", async () => {
+  vi.spyOn(api, "approvals").mockResolvedValue([approval()]);
+  Object.defineProperty(window, "innerWidth", { value: 1440, configurable: true });
+  Object.defineProperty(window, "innerHeight", { value: 1000, configurable: true });
+  render(ApprovalPrompt);
+  const card = (await screen.findByText("Approval needed")).closest("section") as HTMLElement;
+  expect(card.style.bottom).toBe("18px");
+
+  const composer = document.createElement("div");
+  composer.className = "composer-card";
+  composer.getBoundingClientRect = () =>
+    ({ top: 800, bottom: 980, left: 286, right: 1410, width: 1124, height: 180 }) as DOMRect;
+  document.body.appendChild(composer);
+  window.dispatchEvent(new Event("resize"));
+
+  // 1000 − 800 + 12 = 212 above the bottom edge: clear of the composer.
+  await waitFor(() => expect(card.style.bottom).toBe("212px"));
+  composer.remove();
+  window.dispatchEvent(new Event("resize"));
+  await waitFor(() => expect(card.style.bottom).toBe("18px"));
+});
+
+// Found live on 2026-09-28: the card stayed on screen over the Approvals page
+// when the owner arrived there by a link, because the address was read once.
+it("leaves the screen when the owner navigates to Approvals, and returns after", async () => {
+  vi.spyOn(api, "approvals").mockResolvedValue([approval()]);
+  window.location.hash = "#/new-chat";
+  render(ApprovalPrompt);
+  expect(await screen.findByText("Approval needed")).toBeTruthy();
+
+  window.location.hash = "#/approvals";
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
+  await waitFor(() => expect(screen.queryByText("Approval needed")).toBeNull());
+
+  window.location.hash = "#/new-chat";
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
+  expect(await screen.findByText("Approval needed")).toBeTruthy();
+});

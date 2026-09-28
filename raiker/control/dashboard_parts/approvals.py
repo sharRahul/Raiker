@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import difflib
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -19,6 +20,12 @@ from raiker.approval_previews import redact_secret_like_text
 from raiker.checkpoints.capture import MAX_PRE_IMAGE_BYTES
 from raiker.contracts.ids import utc_now
 from raiker.control.dashboard import ApprovalDetailView, ApprovalView, IdentityView
+from raiker.execution.code_placement import (
+    COMMAND_CAPABILITIES,
+    HOST_NETWORK_CODE_CAPABILITY,
+    argv_of,
+    place_code,
+)
 from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
 from raiker.tools.filesystem import (
     FilesystemSafetyError,
@@ -55,7 +62,42 @@ class ApprovalService:
         positions = self.store.suspended_turn_queue_positions(
             [str(row.get("approval_id", "")) for row in rows]
         )
-        return [self._approval_view(row, queue=positions) for row in rows]
+        return [
+            self._placed_approval_view(
+                row, self._approval_view(row, queue=positions), principal_id
+            )
+            for row in rows
+        ]
+
+    def _placed_approval_view(
+        self: DashboardService,
+        row: dict[str, Any],
+        view: ApprovalView,
+        principal_id: str | None,
+    ) -> ApprovalView:
+        """Name the capability a code-running command will really run under (BUG-308).
+
+        The router reclassifies a `shell` or `process` action whose program runs
+        code on the host to `host_network_code_execution` when it executes, and
+        the approval is what the owner reads before that. Labelling it by the
+        tool alone said *Shell commands* above a `python` run with this machine's
+        network — so the same placement rule is asked here.
+        """
+        if view.capability not in COMMAND_CAPABILITIES:
+            return view
+        try:
+            arguments = json.loads(str(row.get("arguments_json") or "{}"))
+        except (ValueError, TypeError):
+            return view
+        if not isinstance(arguments, dict):
+            return view
+        owner = principal_id or str(row.get("owner_principal_id") or row.get("principal_id") or "")
+        placement = place_code(
+            self.store, owner, argv_of(view.capability, arguments), self.workspace_root
+        )
+        if not placement.needs_host_network_capability:
+            return view
+        return replace(view, capability=HOST_NETWORK_CODE_CAPABILITY)
 
     def get_approval(
         self: DashboardService,
@@ -152,8 +194,12 @@ class ApprovalService:
         from raiker.approvals.execution import ApprovalExecutionBridge
 
         approval_id = str(row["approval_id"])
-        view = self._approval_view(
-            row, queue=self.store.suspended_turn_queue_positions([approval_id])
+        view = self._placed_approval_view(
+            row,
+            self._approval_view(
+                row, queue=self.store.suspended_turn_queue_positions([approval_id])
+            ),
+            principal_id,
         )
         try:
             raw_args = json.loads(str(row.get("arguments_json", "{}")))
@@ -229,6 +275,23 @@ class ApprovalService:
                 "check. The restore captures its own pre-image first, so it appears "
                 "as a new checkpoint and can be rewound the same way. Files marked "
                 "skipped are left exactly as they are."
+            )
+        elif relays and view.tool_name in {"shell", "process"}:
+            # Found live on 2026-09-28: a `python hello.py` approval fell through
+            # to the file-write wording below and promised a checkpointed rewind.
+            # A command is not a file write — nothing it changes has a pre-image —
+            # and when its code runs with this machine's network, that is the
+            # one fact the owner is deciding on.
+            where = (
+                "It runs on this machine, with this machine's network: anything "
+                "it sends has left and cannot be taken back."
+                if view.capability == HOST_NETWORK_CODE_CAPABILITY
+                else "It runs where Permissions says commands run."
+            )
+            notice = (
+                "Approving this runs the command above, once, under a fresh "
+                f"capability, policy and posture check. {where} A command is not a "
+                "checkpointed file write, so what it changes cannot be rewound."
             )
         elif relays:
             # BUG-233 — the rewind sentence was a constant for the whole

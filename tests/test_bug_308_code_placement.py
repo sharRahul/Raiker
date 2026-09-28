@@ -374,3 +374,163 @@ class TestThePluginCardSaysWhereItsCodeRuns:
         )
         assert outcome == "ran-in-container"
         assert seen == [action.action_id]
+
+
+class TestNothingThatWorkedStartsRefusing:
+    """The owner's decision: a script that ran before still runs — now asking.
+
+    Found by this round's live run: on an account, an unset row reads as off, so
+    an owner who had turned *Shell commands* on would have found `python`
+    refused by a switch they had never seen. The carry-over is a stored row, not
+    an inference, so Permissions shows it and the owner can turn it off.
+    """
+
+    def test_an_account_that_already_had_shell_on_gets_the_new_capability_on(
+        self, tmp_path: Path
+    ) -> None:
+        from raiker.storage.migrations import HOST_NETWORK_CODE_CARRY_OVER_SQL
+
+        store = SQLiteStore(tmp_path)
+        now = utc_now()
+        store.upsert_principal_capability_gate_state(
+            OWNER,
+            {
+                "capability": "shell_execution",
+                "state": "enabled_runtime",
+                "requested_by": OWNER,
+                "requested_at": now,
+                "activated_by": OWNER,
+                "activated_at": now,
+                "reason": "before BUG-308",
+                "readiness_snapshot_json": "",
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
+        with store.connect() as connection:
+            connection.executescript(HOST_NETWORK_CODE_CARRY_OVER_SQL)
+        carried = store.get_principal_capability_gate_state(OWNER, HOST_NETWORK_CODE_CAPABILITY)
+        assert carried is not None
+        assert carried["state"] == "enabled_runtime"
+        assert carried["requested_by"] == "system_bug_308_carry_over"
+
+    def test_the_carry_over_never_replaces_a_row_the_owner_wrote(self, tmp_path: Path) -> None:
+        from raiker.storage.migrations import HOST_NETWORK_CODE_CARRY_OVER_SQL
+
+        store = SQLiteStore(tmp_path)
+        now = utc_now()
+        for capability, state in (
+            ("shell_execution", "enabled_runtime"),
+            (HOST_NETWORK_CODE_CAPABILITY, "disabled"),
+        ):
+            store.upsert_principal_capability_gate_state(
+                OWNER,
+                {
+                    "capability": capability,
+                    "state": state,
+                    "requested_by": OWNER,
+                    "requested_at": now,
+                    "activated_by": OWNER,
+                    "activated_at": now,
+                    "reason": "owner",
+                    "readiness_snapshot_json": "",
+                    "created_at": now,
+                    "updated_at": now,
+                },
+            )
+        with store.connect() as connection:
+            connection.executescript(HOST_NETWORK_CODE_CARRY_OVER_SQL)
+        kept = store.get_principal_capability_gate_state(OWNER, HOST_NETWORK_CODE_CAPABILITY)
+        assert kept is not None and kept["state"] == "disabled"
+
+    def test_turning_shell_on_turns_the_new_capability_on_once(self, tmp_path: Path) -> None:
+        from raiker.cli.principal_resolver import bootstrap_owner
+        from raiker.control.service import RuntimeControlService
+
+        bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+        control = RuntimeControlService(tmp_path)
+        control.activate_runtime_mode("local_single_user_runtime", None, "test")
+        store = SQLiteStore(tmp_path)
+        with store.connect() as connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) "
+                "VALUES (?, ?, ?, ?)",
+                ("shell_execution", "principal_owner", utc_now(), "docs/threat-models/shell-execution.md"),
+            )
+        assert store.get_principal_capability_gate_state(
+            "principal_owner", HOST_NETWORK_CODE_CAPABILITY
+        ) is None
+
+        result = control.set_capability_state(
+            "shell_execution", "enabled_runtime", None, "run the tests", confirmation_token="confirm"
+        )
+        assert result.ok is True, result.reason_code
+
+        # Written to whichever table shell's own row went to.
+        shell = store.get_principal_capability_gate_state(
+            "principal_owner", "shell_execution"
+        )
+        carried = (
+            store.get_principal_capability_gate_state(
+                "principal_owner", HOST_NETWORK_CODE_CAPABILITY
+            )
+            if shell is not None
+            else store.get_capability_gate_state(HOST_NETWORK_CODE_CAPABILITY)
+        )
+        assert carried is not None
+        assert carried["state"] not in {"disabled", "planned"}
+        assert "Turned on with shell_execution" in str(carried["reason"])
+
+
+class TestTheApprovalSaysWhatItWillRunAs:
+    """Found by the live round: the approval for a `python` run said *Shell commands*."""
+
+    def _approval(self, store: SQLiteStore, command: str) -> str:
+        from raiker.contracts.models import ToolAction
+
+        action = ToolAction(
+            action_id=new_id("act_"),
+            tool_name="shell",
+            arguments={"command": command},
+            risk_level="high",
+            requires_approval=True,
+        )
+        store.insert_tool_action(action, "sess_1", "turn_1", "pending_approval")
+        approval_id = new_id("appr_")
+        store.insert_approval(approval_id, action)
+        return approval_id
+
+    def test_a_script_is_labelled_as_code_with_this_machines_network(
+        self, tmp_path: Path, no_sandbox: None
+    ) -> None:
+        from raiker.control.dashboard import DashboardService
+
+        service = DashboardService(tmp_path)
+        self._approval(service.store, "python build.py")
+        self._approval(service.store, "ls")
+        labels = {view.capability for view in service.list_approvals("pending")}
+        assert labels == {HOST_NETWORK_CODE_CAPABILITY, "shell_execution"}
+
+    def test_with_a_sandbox_it_stays_a_shell_command(
+        self, tmp_path: Path, with_sandbox: None
+    ) -> None:
+        from raiker.control.dashboard import DashboardService
+
+        service = DashboardService(tmp_path)
+        approval_id = self._approval(service.store, "python build.py")
+        detail = service.get_approval(approval_id)
+        assert detail is not None
+        assert detail.approval.capability == "shell_execution"
+
+    def test_the_approval_never_promises_a_rewind_it_cannot_give(
+        self, tmp_path: Path, no_sandbox: None
+    ) -> None:
+        """Found live: a `python` approval promised the file-write checkpoint."""
+        from raiker.control.dashboard import DashboardService
+
+        service = DashboardService(tmp_path)
+        detail = service.get_approval(self._approval(service.store, "python build.py"))
+        assert detail is not None
+        assert "checkpointed first" not in detail.metadata_only_notice
+        assert "cannot be rewound" in detail.metadata_only_notice
+        assert "this machine's network" in detail.metadata_only_notice

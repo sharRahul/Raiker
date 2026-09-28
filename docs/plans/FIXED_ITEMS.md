@@ -642,6 +642,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-618](#fixed-618--construction-time-self-repair-stays-by-the-owners-decision) | Medium/High | Storage | Closed 2026-09-28 by the owner's decision (closes GCR-10) |
 | [FIXED-619](#fixed-619--a-real-executor-could-be-fetched-and-run-with-nothing-governing-it) | **High** | Governance / executors | Fixed 2026-09-28 (closes CR-01; reduces RR-AUTHORITY-01) |
 | [FIXED-620](#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so) | Medium | Commands / plugins / sandbox | Fixed 2026-09-28 by the owner's decision (closes BUG-308, CR-05, CR-09) |
+| [FIXED-621](#fixed-621--an-approval-card-from-another-conversation-covered-the-composers-send) | Medium | Web UI / approvals | Fixed 2026-09-28 — raised and closed in the same run |
 
 ---
 
@@ -26895,9 +26896,68 @@ starting at *Ask me*.
   machine's network. Each reclassification is recorded as
   `code_placement_classified`.
 
-**Evidence.** `tests/test_bug_308_code_placement.py` (32 tests: placement, the
+**Found by the live round, and fixed in it.** On an account, a capability with
+no stored row reads as off. So an owner who had turned *Shell commands* on would
+have found `python` refused by a switch they had never seen — exactly what the
+decision ruled out. Two stored rows answer it, never an inference at read time:
+migration `RAIKER-2072-host-network-code-carry-over` turns the new capability on,
+once, for every account and workspace table that already has shell or process
+on; and the first time an owner turns shell or process on, the new capability is
+turned on beside it with a reason saying so. A row the owner wrote is never
+replaced by either, and neither copies a decision mode — it starts at *Ask me*.
+
+The same round found the approval saying less than the router would. A turn's
+`shell` action is parked for approval before it is routed, so the approval —
+the one thing the owner reads before it runs — said *Shell commands* above a
+`python hello.py` that would run with this machine's network. The approvals
+list and the approval detail now ask the same placement rule and name
+*Code with this machine's network* when that is where the code will run; the
+tool column still says which tool asked. The approval's sentence about what
+approving does had the same fault from before this change: a command fell
+through to the file-write wording and promised that *the previous file contents
+are checkpointed first, so it can be rewound*. A command has no pre-image. It
+now says the command runs once, that it cannot be rewound, and — when it runs
+with this machine's network — that anything it sends has left.
+
+**Evidence.** `tests/test_bug_308_code_placement.py` (38 tests: placement, the
 command service refusing and running, the router's switch, shell-off and *Never*
-carrying over, the event, the Permissions sentence, the plugin card and the
-hand-off to the container); `tests/test_phase_4_plugin_runtime.py` and
+carrying over, the event, the Permissions sentence, the plugin card, the
+hand-off to the container, the carry-over in both forms, and the approval's
+label and sentence); `tests/test_phase_4_plugin_runtime.py` and
 `test_phase_4_plugin_sandboxed_runtime.py` (an unpinned or changed entrypoint does
 not run). Threat model: [`host-network-code.md`](../threat-models/host-network-code.md).
+
+---
+
+## FIXED-621 — An approval card from another conversation covered the composer's Send
+
+**Severity: Medium. Area: Web UI / approvals. Status: Fixed 2026-09-28 — found
+by the 2026-09-28 review-closure live round and fixed in it.**
+
+**Observed.** The pending-approval card is docked to the bottom-right corner of
+every page except Approvals. So is every composer's model picker and **Send**.
+With one approval waiting — from a turn in another conversation — the live
+round's next chat could not choose a model or send: the card sat on top of both,
+and the only way through was to dismiss a card about something else. A
+Playwright click reported the card intercepting the pointer, which is what an
+owner's click would have met.
+
+**Fixed.** `ApprovalPrompt.svelte` measures any `.composer-card` it would
+overlap — by the card's own width and the composer's position — and rises just
+above it, returning to its corner when there is none. It re-measures on resize
+and once a second while it is shown, since a composer grows as the owner types.
+
+**And it left Approvals alone only on a fresh load.** The same round's capture of
+Approvals showed the card over the decision note of the approval being
+reviewed. Whether the page was Approvals was a `$derived` of
+`window.location.hash`, which is not reactive state, so it was read once when the
+shell mounted: arriving at Approvals by a link — the card's own **Details**, the
+nav — left the card on screen over the queue it points to. The address is state
+now, followed on `hashchange`.
+
+**Evidence.** `web/src/lib/components/ApprovalPrompt.test.ts` — *rises above a
+composer it would cover, and stays in its corner otherwise*, and *leaves the
+screen when the owner navigates to Approvals, and returns after*; and the live
+round's python turn, which now chooses its model and sends with an earlier
+approval still pending
+([`2026-09-28-review-closure-round/`](../screenshots/2026-09-28-review-closure-round)).

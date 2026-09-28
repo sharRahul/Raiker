@@ -41,6 +41,17 @@ like every capability's, starts at *Ask me*.
 | A sandbox probe that is stale by the time the command runs | Classification may reuse a probe for 30 seconds; the run always probes again, and a sandbox that fails at launch refuses rather than falling back to the host | `sandbox_available`, the native backend |
 | Code the owner approved for the host finding a sandbox at run time | It runs inside the sandbox — only ever stricter than what was approved | `CommandService._place_code` |
 
+## Nothing that worked starts refusing
+
+On an account a capability with no stored row reads as off, which would have
+refused a script for an owner who had turned *Shell commands* on. Two stored
+rows prevent that, never an inference at read time: migration
+`RAIKER-2072-host-network-code-carry-over` turns this capability on once for
+every account and workspace table that already had shell or process on, and the
+first time an owner turns either on it is turned on beside it
+(`RuntimeAuthority._carry_command_enable_to_host_network_code`). Neither replaces
+a row the owner wrote, and neither copies a decision mode.
+
 ## What the owner sees
 
 - **Permissions** lists *Code with this machine's network* under Execution, and

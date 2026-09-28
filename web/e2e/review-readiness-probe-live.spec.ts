@@ -1,7 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { OWNER_CREDENTIALS, keepOffered, offeredModelIds, openModelDialog } from "./hosted-provider";
+import {
+  checkModelReady,
+  connectHostedProvider,
+  hostedProviderCard,
+  keepOffered,
+  offeredModelIds,
+  openModelDialog,
+  signInAsOwner,
+} from "./hosted-provider";
 
 /**
  * What the **Test** control on a hosted provider card actually does.
@@ -15,7 +23,6 @@ import { OWNER_CREDENTIALS, keepOffered, offeredModelIds, openModelDialog } from
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
-const PASSWORD = OWNER_CREDENTIALS.password;
 const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 
 test("Test on a connected provider card resolves the pinned model's readiness", async ({
@@ -32,39 +39,18 @@ test("Test on a connected provider card resolves the pinned model's readiness", 
     if (r.url().includes("/api/")) calls.push(`← ${r.status()} ${r.url().replace(BASE, "")}`);
   });
 
-  await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 60_000 });
-  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  const confirm = page.getByLabel("Confirm password");
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill(PASSWORD);
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await page.getByRole("button", { name: "Unlock Raiker" }).click();
-  }
-  for (const name of ["Skip for now", "Decide later", "Balanced", "Set up later", "Open Workbench"]) {
-    const b = page.getByRole("button", { name, exact: true });
-    if (await b.isVisible().catch(() => false)) await b.click();
-  }
+  // BUG-248 — the shared sign-in rather than a copy of it.
+  await signInAsOwner(page, BASE);
 
-  await page.goto(`${BASE}/#/models?tab=hosted`);
-  for (const name of ["Skip for now", "Decide later", "Balanced", "Set up later", "Open Workbench"]) {
-    const b = page.getByRole("button", { name, exact: true });
-    if (await b.isVisible().catch(() => false)) await b.click();
-  }
-  await expect(page.getByRole("tab", { name: "Hosted" })).toBeVisible({ timeout: 60_000 });
-
-  const card = page.locator("article.provider-card").filter({ hasText: "Anthropic" }).first();
-  await expect(card).toBeVisible({ timeout: 60_000 });
-
-  const connect = card.getByRole("button", { name: "Connect", exact: true });
-  if (await connect.isVisible().catch(() => false)) {
-    await connect.click();
-    await page.getByLabel("Anthropic API key").fill(KEY);
-    await page.locator(".signin-connect").click();
-    await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 120_000 });
-  }
+  // The Models redesign removed the Hosted tab this spec waited for; the
+  // provider cards live under Add now, and the shared helpers know where.
+  const unconnected = await (await hostedProviderCard(page, BASE, "Anthropic"))
+    .getByRole("button", { name: "Connect", exact: true })
+    .isVisible()
+    .catch(() => false);
+  const card = unconnected
+    ? await connectHostedProvider(page, BASE, "Anthropic", "Anthropic API key", KEY)
+    : await hostedProviderCard(page, BASE, "Anthropic");
 
   const dialog = await openModelDialog(page, card);
   const values = await offeredModelIds(dialog);
@@ -75,18 +61,13 @@ test("Test on a connected provider card resolves the pinned model's readiness", 
   await keepOffered(dialog, model);
   console.log("PINNED:", model);
 
-  await page.goto(`${BASE}/#/models?tab=hosted`);
-  const pinned = page.locator("article.provider-card").filter({ hasText: "Anthropic" }).first();
-  await expect(pinned).toBeVisible({ timeout: 60_000 });
-
+  const pinned = await hostedProviderCard(page, BASE, "Anthropic");
   console.log("BEFORE TEST:", (await pinned.innerText()).replace(/\s+/g, " "));
   calls.length = 0;
-  await pinned.getByRole("button", { name: "Test", exact: true }).click();
-
-  for (const wait of [3_000, 7_000, 15_000, 30_000, 60_000]) {
-    await page.waitForTimeout(wait);
-    console.log(`AFTER ${wait}ms:`, (await pinned.innerText()).replace(/\s+/g, " "));
-  }
+  // **Test** has to settle on an outcome for the pinned model — not stay at
+  // "Not checked" — which is what this probe exists to show.
+  await checkModelReady(page, pinned);
+  console.log("AFTER TEST:", (await pinned.innerText()).replace(/\s+/g, " "));
   console.log("NETWORK DURING TEST:\n" + calls.join("\n"));
   await capture(page, join(SHOTS, "review-readiness-probe.png"));
 });

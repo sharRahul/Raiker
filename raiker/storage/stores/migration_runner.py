@@ -88,6 +88,8 @@ from raiker.storage.migrations import (
     GIST_MEMORY_SQL,
     GIT_CREDENTIAL_GRANT_MIGRATION_ID,
     GIT_CREDENTIAL_GRANT_SQL,
+    HOST_NETWORK_CODE_CARRY_OVER_MIGRATION_ID,
+    HOST_NETWORK_CODE_CARRY_OVER_SQL,
     IMAGE_GENERATIONS_MIGRATION_ID,
     IMAGE_GENERATIONS_SQL,
     IMAGE_LINEAGE_MIGRATION_ID,
@@ -1047,6 +1049,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MEMORY_VECTOR_SEARCH_REVISION_MIGRATION_ID,
                 MEMORY_VECTOR_SEARCH_REVISION_SQL,
+                connection,
+            )
+            self._apply_migration(
+                HOST_NETWORK_CODE_CARRY_OVER_MIGRATION_ID,
+                HOST_NETWORK_CODE_CARRY_OVER_SQL,
                 connection,
             )
             # Before the backfills: converting an index and then deciding it is

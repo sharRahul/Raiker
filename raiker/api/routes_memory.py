@@ -14,9 +14,10 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, Request, status
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import refusal
 from raiker.api.schemas import serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.contracts.ids import utc_now
@@ -31,11 +32,6 @@ router = APIRouter()
 def _service(request: Request) -> DashboardService:
     ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
     return DashboardService(ws)
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
-    return AuthMiddleware(ws).authenticate(request)
 
 
 @router.get("/api/memory")
@@ -75,9 +71,9 @@ async def decide_memory_proposal(
     )
     if not result.ok:
         conflict = result.reason_code in {"stale_memory_proposal"}
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT if conflict else status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
+        raise refusal(
+            status.HTTP_409_CONFLICT if conflict else status.HTTP_403_FORBIDDEN,
+            result.reason_code,
         )
     return {"ok": True, **result.data}
 
@@ -101,10 +97,7 @@ async def scan_memory_relationships(
 ) -> dict[str, Any]:
     result = _service(request).scan_memory_relationships(auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -123,14 +116,9 @@ async def decide_memory_relationship_proposal(
         acting_principal_id=auth_data[0].principal_id,
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=(
-                status.HTTP_409_CONFLICT
+        raise refusal(status.HTTP_409_CONFLICT
                 if result.reason_code == "stale_memory_relationship_proposal"
-                else status.HTTP_403_FORBIDDEN
-            ),
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+                else status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -148,14 +136,9 @@ async def reject_memory_relationship(
         acting_principal_id=auth_data[0].principal_id,
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=(
-                status.HTTP_409_CONFLICT
+        raise refusal(status.HTTP_409_CONFLICT
                 if result.reason_code == "stale_memory_relationship"
-                else status.HTTP_403_FORBIDDEN
-            ),
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+                else status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -170,10 +153,7 @@ async def set_memory_pinned(
     pinned = bool(body.get("pinned", False))
     result = _service(request).set_memory_pinned(memory_id, pinned, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -184,10 +164,7 @@ async def export_memories(
 ) -> dict[str, Any]:
     result = _service(request).export_memories(auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -206,10 +183,7 @@ async def preview_memory_import(
     memories = raw_memories if isinstance(raw_memories, list) else []
     result = _service(request).preview_memory_import(memories, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -228,10 +202,7 @@ async def import_memories(
         memories, auth_data[0].principal_id, skip_duplicates=skip_duplicates
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -242,7 +213,7 @@ async def reconcile_memory_indexes(
     """Owner-started reconciliation for FTS and projection lifecycle state."""
     result = _service(request).reconcile_memory_indexes(auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -257,10 +228,7 @@ async def memory_integrity(
     """
     result = _service(request).memory_integrity(auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -271,10 +239,7 @@ async def rebuild_conversation_index(
     """MEM-09's repair for a drifted conversation index."""
     result = _service(request).rebuild_conversation_index(auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -285,10 +250,7 @@ async def list_observations(
     """MEM-04 — what the runtime captured while it worked, and what it refused."""
     result = _service(request).list_observations(auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -300,12 +262,9 @@ async def delete_observations(
     observation_ids = {str(item) for item in raw_ids} if isinstance(raw_ids, list) else set()
     result = _service(request).delete_observations(observation_ids, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND
+        raise refusal(status.HTTP_404_NOT_FOUND
             if result.reason_code == "unknown_observation"
-            else status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+            else status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -315,12 +274,9 @@ async def discard_gist(
 ) -> dict[str, Any]:
     result = _service(request).discard_gist(gist_id, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND
+        raise refusal(status.HTTP_404_NOT_FOUND
             if result.reason_code == "unknown_gist"
-            else status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+            else status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -334,7 +290,7 @@ async def cleanup_expired_observations(
         observation_ids, str(body.get("now", utc_now())), auth_data[0].principal_id
     )
     if not result.ok:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"ok": False, "reason_code": result.reason_code})
+        raise refusal(status.HTTP_409_CONFLICT, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -360,10 +316,7 @@ async def set_memory_incognito(
     incognito = bool(body.get("incognito", False))
     result = _service(request).set_memory_incognito(incognito, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -382,12 +335,9 @@ async def set_memory_embedding_backend(
     backend = str(body.get("embedding_backend", "auto")).strip() or "auto"
     result = _service(request).set_memory_embedding_backend(backend, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN
+        raise refusal(status.HTTP_403_FORBIDDEN
             if result.reason_code != "embedding_backend_unknown"
-            else status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+            else status.HTTP_409_CONFLICT, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -416,17 +366,14 @@ async def build_memory_embedding_index(
         )
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT
+        raise refusal(status.HTTP_409_CONFLICT
             if result.reason_code
             in {
                 "embedding_model_not_named",
                 "embedding_model_not_offered",
                 "no_memories_to_index",
             }
-            else status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+            else status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -439,10 +386,7 @@ async def forget_memory(
     """Forget a memory through the governed path (human-only)."""
     result = _service(request).forget_memory_controlled(memory_id, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -475,10 +419,7 @@ async def get_memory_source(
         None,
     )
     if memory is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "memory_not_found"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "memory_not_found")
     ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
     service = SourceProvenanceService(SQLiteStore(ws))
     excerpt = service.resolve(dict(memory.provenance), memory.text, principal_id)
@@ -493,10 +434,7 @@ async def get_memory_history(
 ) -> dict[str, Any]:
     result = _service(request).memory_history(memory_id, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -516,9 +454,9 @@ async def change_memory_scope(
     )
     if not result.ok:
         conflict = result.reason_code == "stale_memory_scope_change"
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT if conflict else status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
+        raise refusal(
+            status.HTTP_409_CONFLICT if conflict else status.HTTP_403_FORBIDDEN,
+            result.reason_code,
         )
     return {"ok": True, **result.data}
 
@@ -527,7 +465,7 @@ async def change_memory_scope(
 async def set_memory_archived(memory_id: str, request: Request, body: dict[str, Any], auth_data: tuple[ApiSession, Principal] = Depends(_auth)) -> dict[str, Any]:
     result = _service(request).set_memory_archived(memory_id, bool(body.get("archived", True)), auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -535,7 +473,7 @@ async def set_memory_archived(memory_id: str, request: Request, body: dict[str, 
 async def preview_memory_purge(memory_id: str, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)) -> dict[str, Any]:
     result = _service(request).preview_memory_purge(memory_id, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -543,7 +481,10 @@ async def preview_memory_purge(memory_id: str, request: Request, auth_data: tupl
 async def purge_memory(memory_id: str, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth), x_memory_purge_confirm: str | None = Header(default=None)) -> dict[str, Any]:
     result = _service(request).purge_memory(memory_id, x_memory_purge_confirm, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT if result.reason_code == "memory_purge_confirmation_required" else status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+        raise refusal(
+            status.HTTP_409_CONFLICT if result.reason_code == "memory_purge_confirmation_required" else status.HTTP_403_FORBIDDEN,
+            result.reason_code,
+        )
     return {"ok": True, **result.data}
 
 
@@ -558,10 +499,7 @@ async def edit_memory(
         memory_id, str(body.get("text", "")), auth_data[0].principal_id
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -573,7 +511,7 @@ async def correct_memory(
         memory_id, str(body.get("text", "")), str(body.get("reason", "")), auth_data[0].principal_id
     )
     if not result.ok:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"ok": False, "reason_code": result.reason_code})
+        raise refusal(status.HTTP_409_CONFLICT, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -588,10 +526,7 @@ async def set_memory_search_enabled(
         memory_id, bool(body.get("enabled", True)), auth_data[0].principal_id
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -606,8 +541,5 @@ async def set_memory_expiry(
     expires_at = None if raw_expires_at in (None, "") else str(raw_expires_at)
     result = _service(request).set_memory_expiry(memory_id, expires_at, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}

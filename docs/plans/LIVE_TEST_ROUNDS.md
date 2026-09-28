@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-28 (third) | Targeted | `2026-09-28-docs-items-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that asked to run `python`, the key entered through the Connect dialog | Ten items from `docs/plans/`: BUG-309, Wave 0 and OPT-03, -04, -07, -12, -14 and -19, two stale index rows, and BUG-248's sign-ins. Proved live: readiness naming the provider from the registry; an approval notice docked on Home, opening Approvals, and absent there at 1440 and 390 wide with the bell agreeing; a misspelled field refused with 422; and every destination at both capture widths with **no 422, no 5xx and no console error**. **One defect found by the round and fixed in it** — the bell kept counting a notice the dock had just read |
 | 2026-09-28 (second) | Targeted | `2026-09-28-review-closure-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that asked to run `python`, the key entered through the Connect dialog | Nine items from `docs/plans/` that closed three review documents: BUG-308 (CR-05, CR-09) by the owner's decision, CR-01, GCR-10, GCR-11, GCR-13, GCR-41 and GCR-43. Proved live: Permissions naming *Code with this machine's network* and saying, measured on this host, where scripts run; a real model's `python hello.py` approved under that capability, run, and recorded as `code_placement_classified`; a plugin card saying where its code would run; no stored key in four redacted answers; and every destination at four widths through the split store and service with **no console error**. **Five defects found by the round and fixed in it** — a fresh capability that would have refused `python` to an owner who had turned shell on, an approval that named the tool rather than the capability the code would run under, the same approval promising a rewind a command cannot have, and an approval card covering the composer's **Send** and staying over Approvals |
 | 2026-09-28 | Targeted | `2026-09-28-docs-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering and streaming real turns, the key entered through the Connect dialog | Ten items from `docs/plans/`: the owner's GEP-02 decision, six security-review findings, BUG-307, GCR-12 and GEP-03. Proved live: the stop switch counting and stopping **an answer being streamed** with no task running, the stopped turn keeping its text, the next turn answering; and every destination at four widths under `style-src 'self'` with **no CSP refusal**. **Two defects found by the round and fixed in it** — the first stop-all reported one answer as "1 answer being written and 1 task", and Home called a readiness read still in flight a failed one |
 | 2026-09-21 | Targeted | `2026-09-21-static-review-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering real turns; OpenAI and OpenRouter keys entered through the Connect dialog and refused by this host's egress policy; Ollama Cloud unreachable for the same reason | Ten items from `docs/plans/`: the static reviews' remaining instance, storage, transport, registry and version findings, the two API-hardening findings of the security review, and UX-BUILD-05. Proved live: two real turns over one pooled connection, every page under the new Content-Security-Policy with **no console refusals at four widths**, the build identity in Settings, and Build reopening the project it is running inside. **Four defects found by the round and fixed in it** — the live suite was never type-checked, four copies of one wait helper read a usable page as a stuck one, and `bug-242-build-restore` carried four separate stale assertions. GCR-10 was reduced rather than closed: its first fix removed the store's self-repair and eight tests said so |
@@ -76,6 +77,58 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-09-28 (third) — The dock leaves Approvals alone, and seven optimisation items close
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py` and
+holding a one-line `hello.py`, reset again after the round's first fix.
+Provider: Anthropic `claude-haiku-4-5-20251001`, answering a real turn that
+asked to run `python`. The key was entered through the Connect dialog and is not
+written to the repository. Browser: the pre-installed Chromium, through
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE`. Spec:
+`web/e2e/docs-items-round-2026-09-28-live.spec.ts`. Captures:
+[`docs/screenshots/2026-09-28-docs-items-round/`](../screenshots/2026-09-28-docs-items-round).**
+
+Ten items from `docs/plans/`: BUG-309, Wave 0 and OPT-03, -04, -07, -12, -14 and
+-19 of the optimisation review (FIXED-622 to FIXED-629), two stale index rows
+(FIXED-630), and BUG-248's sign-ins. Wave 0, OPT-07, OPT-12 and OPT-19 change
+nothing an owner sees and are proved by unit tests and byte-for-byte
+before/after comparisons; the rest reach every page, and those are run here.
+
+**What it proved.**
+
+1. **Readiness names the provider from the registry.** After the key was
+   entered and the model pinned, **Test** answered *Anthropic can reach
+   claude-haiku-4-5-20251001.* — built by the new classifier table, with the
+   name read from `model-profiles.json` rather than a table in the code.
+2. **An approval notice is shown where it helps, and answered by Approvals.**
+   A real turn's `python hello.py` parked for approval and wrote an *Approval
+   needed* notice. On Home the dock showed it. Opening it went to Approvals —
+   not the notification record — where the dock no longer repeated it, at 1440
+   and 390 wide, nothing docked touched the queue's header, the notice read as
+   read, and the bell counted nothing.
+3. **A field a route never reads is refused.** `langauge` sent to the language
+   check came back 422 `extra_forbidden`; before OPT-03 it was dropped and the
+   check ran in the default locale.
+4. **Every destination at both capture widths, on a database the migration
+   registry built**, reading every page's API through the shared route
+   dependencies: no 422 from any page, no 5xx and no console error.
+
+**What the round found, and the round fixed.**
+
+* **The bell disagreed with the dock for up to a poll.** The first capture of
+  Approvals showed the dock correctly empty and the bell still saying *1*: the
+  two components read notifications separately. A mark by either is now
+  announced on `window` and both re-read. Recorded in
+  [FIXED-622](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing).
+* **The spec's own mobile step waited for a heading the 390px layout does not
+  have**, and its capture was taken while the queue was still loading. It now
+  waits for the queue's filter and its first row.
+
+BUG248_PLACEHOLDER
 
 ---
 

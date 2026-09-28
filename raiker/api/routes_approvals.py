@@ -3,13 +3,15 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
 from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import refusal
+from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.routes_prompts import _record_generated_file_attachments_for_turn, _sse
 from raiker.api.schemas import (
     AnswerOwnerQuestionRequest,
@@ -62,16 +64,8 @@ _EXECUTION_ERRORS = {
 }
 
 
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[no-any-return]
-
-
 def _service(request: Request) -> DashboardService:
     return DashboardService(_ws(request))
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(_ws(request)).authenticate(request)
 
 
 def _record_resume_outcome(
@@ -273,10 +267,7 @@ def _checked_answers(
     for asked, chosen in submitted.items():
         question = by_text.get(str(asked))
         if question is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail={"ok": False, "reason_code": "unknown_question"},
-            )
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "unknown_question")
         offered = {
             str(option.get("label", ""))
             for option in question.get("options", [])
@@ -286,22 +277,13 @@ def _checked_answers(
         if not picked:
             continue
         if len(picked) > 1 and not question.get("multiSelect"):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail={"ok": False, "reason_code": "single_select_question"},
-            )
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "single_select_question")
         for label in picked:
             if str(label) not in offered:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                    detail={"ok": False, "reason_code": "unknown_option"},
-                )
+                raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "unknown_option")
         answers[str(asked)] = [str(label) for label in picked] if len(picked) > 1 else str(picked[0])
     if not answers:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": "no_answer_given"},
-        )
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "no_answer_given")
     return answers
 
 
@@ -326,15 +308,9 @@ async def answer_owner_question(
     user_id = store.principal_user_id(session.principal_id)
     approval_row = store.load_approval(approval_id, user_id=user_id)
     if approval_row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "approval_not_found"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "approval_not_found")
     if str(approval_row.get("tool_name", "")) != OWNER_QUESTION_TOOL:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": "approval_is_not_a_question"},
-        )
+        raise refusal(status.HTTP_409_CONFLICT, "approval_is_not_a_question")
 
     questions = _parked_questions(approval_row)
     response = (body.response or "").strip() or None
@@ -342,10 +318,7 @@ async def answer_owner_question(
         answers = _checked_answers(questions, body.answers)
     else:
         if len(response) > MAX_FREE_TEXT_ANSWER_CHARS:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail={"ok": False, "reason_code": "answer_too_long"},
-            )
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "answer_too_long")
         answers = {}
 
     recorded = store.answer_owner_question(
@@ -359,10 +332,7 @@ async def answer_owner_question(
     if not recorded:
         # Already answered. Refused rather than overwritten: the first answer is
         # the one the turn resumed on.
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": "question_already_answered"},
-        )
+        raise refusal(status.HTTP_409_CONFLICT, "question_already_answered")
     EventLogWriter(store).append(
         make_event(
             session_id=str(approval_row.get("session_id") or f"question_{session.principal_id}"),
@@ -441,46 +411,28 @@ async def replace_approval_with_edit(
     user_id = store.principal_user_id(session.principal_id)
     approval_row = store.load_approval(approval_id, user_id=user_id)
     if approval_row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "approval_not_found"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "approval_not_found")
     if str(approval_row.get("status", "")) != "pending":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": "approval_already_resolved"},
-        )
+        raise refusal(status.HTTP_409_CONFLICT, "approval_already_resolved")
     # A critical approval keeps the human-only, step-up lifecycle. Replacing one
     # here would route it around that floor, so it is refused rather than
     # quietly downgraded.
     if approval_row.get("critical"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": "critical_approval_requires_lifecycle"},
-        )
+        raise refusal(status.HTTP_400_BAD_REQUEST, "critical_approval_requires_lifecycle")
     tool_name = str(approval_row.get("tool_name", ""))
     original = approval_arguments(approval_row)
     if tool_name not in _PATCH_TOOLS or not str(original.get("patch", "")).strip():
         # Only a patch can be edited as text. Offering the control on anything
         # else would be a control with nothing behind it.
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": "action_is_not_a_patch"},
-        )
+        raise refusal(status.HTTP_409_CONFLICT, "action_is_not_a_patch")
 
     edited = body.patch
     if not edited.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": "replacement_patch_empty"},
-        )
+        raise refusal(status.HTTP_400_BAD_REQUEST, "replacement_patch_empty")
     original_targets = patch_target_paths(str(original.get("patch", "")))
     edited_targets = patch_target_paths(edited)
     if not edited_targets:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": "replacement_patch_unreadable"},
-        )
+        raise refusal(status.HTTP_400_BAD_REQUEST, "replacement_patch_unreadable")
     # A correction changes the same files. This is not the authority boundary —
     # the new approval is — but a "replacement" that reaches a file the review
     # never mentioned is a different change wearing a review's clothes, and the
@@ -498,10 +450,7 @@ async def replace_approval_with_edit(
     if edited == str(original.get("patch", "")):
         # Nothing was corrected, so there is nothing to replace. Denying and
         # re-raising an identical proposal would only churn the audit trail.
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": "replacement_unchanged"},
-        )
+        raise refusal(status.HTTP_409_CONFLICT, "replacement_unchanged")
 
     session_id = str(approval_row.get("session_id", ""))
     turn_id = str(approval_row.get("turn_id", "")) or None
@@ -536,10 +485,7 @@ async def replace_approval_with_edit(
             user_id=user_id,
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=_RESOLVE_ERRORS.get(str(exc), status.HTTP_409_CONFLICT),
-            detail={"ok": False, "reason_code": str(exc)},
-        ) from exc
+        raise refusal(_RESOLVE_ERRORS.get(str(exc), status.HTTP_409_CONFLICT), str(exc)) from exc
 
     EventLogWriter(store).append(
         make_event(
@@ -592,10 +538,7 @@ async def resolve_approval(
             "SELECT * FROM connector_write_intents WHERE approval_id=?", (approval_id,)
         ).fetchone()
     if pending_intent_row is not None and pending_intent_row["principal_id"] != session.principal_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": "connector_intent_principal_mismatch"},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, "connector_intent_principal_mismatch")
     # A connector-store write is owned by the principal named on its intent
     # (checked above), not by a chat session: those actions are recorded against
     # the synthetic "connector_store" session id, which has no sessions row to
@@ -603,17 +546,14 @@ async def resolve_approval(
     owner_user_id = None if pending_intent_row is not None else user_id
     approval_row = store.load_approval(approval_id, user_id=owner_user_id)
     if approval_row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"ok": False, "reason_code": "approval_not_found"})
+        raise refusal(status.HTTP_404_NOT_FOUND, "approval_not_found")
     # ADD-22 — a question is not an approval and cannot be approved. Refused
     # here rather than tolerated, because "approve" on a question would have to
     # mean something, and every meaning it could have is wrong: it grants
     # nothing, so approving it is empty, and answering it with a yes/no would
     # put words in the owner's mouth that they did not choose.
     if str(approval_row.get("tool_name", "")) == OWNER_QUESTION_TOOL:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": "approval_is_a_question"},
-        )
+        raise refusal(status.HTTP_409_CONFLICT, "approval_is_a_question")
 
     # B14 — the owner accepted part of the change set. Recorded as a decision
     # before anything runs, so what executes is decided by a row rather than by
@@ -622,18 +562,12 @@ async def resolve_approval(
     # already approved.
     if body.accepted_hunks is not None:
         if not body.approve:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"ok": False, "reason_code": "hunk_selection_requires_approval"},
-            )
+            raise refusal(status.HTTP_400_BAD_REQUEST, "hunk_selection_requires_approval")
         approved_patch = str(approval_arguments(approval_row).get("patch", ""))
         if not approved_patch.strip():
             # Only a patch has hunks. Offering a selection on anything else
             # would be a control with nothing behind it.
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={"ok": False, "reason_code": "action_has_no_hunks"},
-            )
+            raise refusal(status.HTTP_409_CONFLICT, "action_has_no_hunks")
         unknown = unknown_hunk_ids(approved_patch, body.accepted_hunks)
         if unknown:
             raise HTTPException(
@@ -645,10 +579,7 @@ async def resolve_approval(
                 },
             )
         if not body.accepted_hunks:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"ok": False, "reason_code": "no_hunk_accepted"},
-            )
+            raise refusal(status.HTTP_400_BAD_REQUEST, "no_hunk_accepted")
         store.save_approval_decision_scope(approval_id, body.accepted_hunks)
 
     # BUG-06 — an approved file mutation is actually performed. The relay needs
@@ -678,12 +609,9 @@ async def resolve_approval(
             )
         )
         if not execution.ok:
-            raise HTTPException(
-                status_code=_EXECUTION_ERRORS.get(
+            raise refusal(_EXECUTION_ERRORS.get(
                     execution.reason_code or "", status.HTTP_409_CONFLICT
-                ),
-                detail={"ok": False, "reason_code": execution.reason_code},
-            )
+                ), execution.reason_code)
         _record_generated_file_attachments_for_turn(
             _ws(request),
             session_id=str(approval_row.get("session_id", "")),
@@ -752,10 +680,7 @@ async def resolve_approval(
         )
     except ValueError as exc:
         code = str(exc)
-        raise HTTPException(
-            status_code=_RESOLVE_ERRORS.get(code, status.HTTP_400_BAD_REQUEST),
-            detail={"ok": False, "reason_code": code},
-        ) from exc
+        raise refusal(_RESOLVE_ERRORS.get(code, status.HTTP_400_BAD_REQUEST), code) from exc
     # Connector write intents are the deliberately narrow exception to Raiker's
     # metadata-only approval resolution. The intent is immutable, principal-
     # bound, single-use, and executes only after this exact approval is accepted.
@@ -774,10 +699,7 @@ async def resolve_approval(
                     (intent["intent_id"],),
                 )
             if claimed.rowcount != 1:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail={"ok": False, "reason_code": "connector_intent_already_consumed"},
-                )
+                raise refusal(status.HTTP_409_CONFLICT, "connector_intent_already_consumed")
             try:
                 output = await ConnectorInvoker(store).invoke(
                     session.principal_id,
@@ -791,10 +713,7 @@ async def resolve_approval(
                         "UPDATE connector_write_intents SET status='failed', executed_at=? WHERE intent_id=?",
                         (utc_now(), intent["intent_id"]),
                     )
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail={"ok": False, "reason_code": str(exc)},
-                ) from exc
+                raise refusal(status.HTTP_409_CONFLICT, str(exc)) from exc
             with store.connect() as connection:
                 connection.execute(
                     "UPDATE connector_write_intents SET status='executed', executed_at=? WHERE intent_id=?",
@@ -864,10 +783,7 @@ _RESUME_ERRORS = {
 
 def _resume_error(exc: TurnSuspensionError) -> HTTPException:
     code = str(exc)
-    return HTTPException(
-        status_code=_RESUME_ERRORS.get(code, status.HTTP_409_CONFLICT),
-        detail={"ok": False, "reason_code": code},
-    )
+    return refusal(_RESUME_ERRORS.get(code, status.HTTP_409_CONFLICT), code)
 
 
 @router.post("/api/approvals/{approval_id}/resume")
@@ -901,10 +817,7 @@ async def stream_resume_after_approval(
     except TurnSuspensionError as exc:
         raise _resume_error(exc) from exc
     except StopAsyncIteration:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": "suspended_turn_produced_no_events"},
-        ) from None
+        raise refusal(status.HTTP_409_CONFLICT, "suspended_turn_produced_no_events") from None
 
     async def gen() -> AsyncIterator[str]:
         yield _sse(first)
@@ -926,15 +839,9 @@ async def resolve_critical_approval(
     user_id = store.principal_user_id(session.principal_id)
     approval = store.load_approval(approval_id, user_id=user_id)
     if approval is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "approval_not_found"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "approval_not_found")
     if not approval.get("critical"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": "not_a_critical_approval"},
-        )
+        raise refusal(status.HTTP_400_BAD_REQUEST, "not_a_critical_approval")
 
     result = RuntimeAuthority(store, EventLogWriter(store)).resolve_critical_approval(
         approval_id,

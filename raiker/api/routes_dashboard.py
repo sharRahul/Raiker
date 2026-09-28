@@ -7,7 +7,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import FileResponse, Response
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import refusal
+from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.routes_instances import _require_loopback
 from raiker.api.schemas import (
     AuthSessionRequest,
@@ -79,16 +81,6 @@ router = APIRouter()
 def _service(request: Request) -> DashboardService:
     ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
     return DashboardService(ws)
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
-    return AuthMiddleware(ws).authenticate(request)
-
-
-def _ws(request: Request) -> str | Path:
-    ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
-    return ws
 
 
 def _codex_sessions(request: Request) -> CodexSubscriptionSessions:
@@ -174,17 +166,11 @@ async def mint_session(
     _require_loopback(request)
     ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
     if SQLiteStore(ws).list_accounts():
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": "login_required"},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, "login_required")
     service = _service(request)
     result = service.mint_owner_session(body.as_principal)
     if not isinstance(result, AuthSessionView):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     body_out = dict(serialize_dto(result))
     # BUG-253 — the bootstrap path gets the same reload-surviving session the
     # lock screen does. Without this, the one install that has no account yet is
@@ -372,7 +358,7 @@ def _mcp_result(result: Any) -> dict[str, Any]:
         code = status.HTTP_422_UNPROCESSABLE_CONTENT
     else:
         code = status.HTTP_403_FORBIDDEN
-    raise HTTPException(status_code=code, detail={"ok": False, "reason_code": result.reason_code})
+    raise refusal(code, result.reason_code)
 
 
 @router.post("/api/mcp/servers")
@@ -699,10 +685,7 @@ async def get_session_export_manifest(
         principal_id=session.principal_id,
     )
     if transcript is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "session_not_found"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "session_not_found")
     return dict(transcript.manifest())
 
 
@@ -724,10 +707,7 @@ async def export_session_transcript(
     session, principal = auth_data
     export_format = (body.format or "html").lower()
     if export_format not in EXPORT_FORMATS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": "export_format_unsupported"},
-        )
+        raise refusal(status.HTTP_400_BAD_REQUEST, "export_format_unsupported")
     service = _service(request)
     transcript = service.build_session_transcript(
         session_id,
@@ -735,10 +715,7 @@ async def export_session_transcript(
         principal_id=session.principal_id,
     )
     if transcript is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "session_not_found"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "session_not_found")
     payload, media_type = render(transcript, export_format)
     service.record_transcript_export(
         session_id,
@@ -773,10 +750,7 @@ async def set_session_pinned(
         session_id, body.pinned, auth_data[0].principal_id
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -800,14 +774,8 @@ async def rename_session(
     if not result.ok:
         reason = result.reason_code or ""
         if reason.startswith("invalid_title"):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail={"ok": False, "reason_code": result.reason_code},
-            )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, result.reason_code)
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -827,10 +795,7 @@ async def archive_session(
         session_id, True, auth_data[0].principal_id
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -848,10 +813,7 @@ async def unarchive_session(
         session_id, False, auth_data[0].principal_id
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -863,10 +825,7 @@ async def delete_sessions(
 ) -> dict[str, Any]:
     result = _service(request).delete_sessions(body.session_ids, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -884,16 +843,10 @@ async def delete_session(
     delete another account's session.
     """
     if x_session_delete_confirm != session_id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": "session_delete_confirmation_required"},
-        )
+        raise refusal(status.HTTP_409_CONFLICT, "session_delete_confirmation_required")
     result = _service(request).delete_session(session_id, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -917,10 +870,7 @@ async def set_session_project(
         session_id, body.project_id, auth_data[0].principal_id
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -944,14 +894,8 @@ async def set_session_tags(
     if not result.ok:
         reason = result.reason_code or ""
         if reason.startswith("invalid_tag"):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail={"ok": False, "reason_code": result.reason_code},
-            )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, result.reason_code)
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1014,10 +958,7 @@ async def add_brain_source(
     try:
         return _service(request).add_brain_source(body.path, owner_principal_id=auth_data[0].principal_id)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": str(exc)},
-        ) from exc
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 @router.get("/api/brain/sources/browse")
@@ -1037,10 +978,7 @@ async def browse_brain_sources(
             path, owner_principal_id=auth_data[0].principal_id
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": str(exc)},
-        ) from exc
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 @router.get("/api/knowledge-sources")
@@ -1065,10 +1003,7 @@ async def revoke_knowledge_source(
             kind, source_id, owner_principal_id=auth_data[0].principal_id
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": str(exc)},
-        ) from exc
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 @router.get("/api/brain/sources/roots")
@@ -1091,10 +1026,7 @@ async def grant_brain_source_folder(
             body.path, owner_principal_id=auth_data[0].principal_id
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": str(exc)},
-        ) from exc
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 @router.delete("/api/brain/sources/grants")
@@ -1108,10 +1040,7 @@ async def revoke_brain_source_folder(
             root_id, owner_principal_id=auth_data[0].principal_id
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": str(exc)},
-        ) from exc
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 @router.post("/api/brain/sources/upload")
@@ -1134,10 +1063,7 @@ async def upload_brain_source_file(
             owner_principal_id=auth_data[0].principal_id,
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": str(exc)},
-        ) from exc
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 @router.post("/api/brain/sources/review")
@@ -1151,10 +1077,7 @@ async def review_brain_source(
             body.path, owner_principal_id=auth_data[0].principal_id
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": str(exc)},
-        ) from exc
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 @router.get("/api/brain/settings")
@@ -1179,10 +1102,7 @@ async def save_brain_preferences(
             settings, owner_principal_id=auth_data[0].principal_id
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": str(exc)},
-        ) from exc
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 @router.delete("/api/brain/sources")
@@ -1210,7 +1130,7 @@ async def configure_execution_environment(
 ) -> dict[str, Any]:
     raw_config = body.get("config", {})
     if not isinstance(raw_config, dict):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"ok": False, "reason_code": "invalid_execution_config"})
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid_execution_config")
     result = _service(request).configure_execution_environment(
         profile_id=str(body["profile_id"]) if body.get("profile_id") else None,
         kind=str(body.get("kind", "")), name=str(body.get("name", "")),
@@ -1218,7 +1138,7 @@ async def configure_execution_environment(
         owner_principal_id=auth_data[0].principal_id,
     )
     if not result.ok:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"ok": False, "reason_code": result.reason_code})
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1242,20 +1162,14 @@ async def probe_execution_environment(
     if profile_id != "native_sandbox" and (
         remote is None or str(remote.get("profile_type")) not in {"ssh", "cloud"}
     ):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": "execution_environment_not_probeable"},
-        )
+        raise refusal(status.HTTP_409_CONFLICT, "execution_environment_not_probeable")
     view = _service(request).execution_environments(owner)
     measured = next(
         (item for item in view["environments"] if item["profile_id"] == profile_id),
         None,
     )
     if measured is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "execution_environment_not_found"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "execution_environment_not_found")
     return {"ok": True, "environment": measured}
 
 
@@ -1269,7 +1183,7 @@ async def select_execution_environment(
         str(body.get("profile_id", "")), auth_data[0].principal_id
     )
     if not result.ok:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"ok": False, "reason_code": result.reason_code})
+        raise refusal(status.HTTP_409_CONFLICT, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1293,10 +1207,7 @@ async def reset_execution_environment(
         owner_principal_id=auth_data[0].principal_id,
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_409_CONFLICT, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1334,10 +1245,7 @@ async def connect_code_repo(
     service = _service(request)
     if body.kind == "local":
         if not body.path:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail={"ok": False, "reason_code": "repo_path_required"},
-            )
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "repo_path_required")
         result = service.connect_local_repo(
             body.path,
             owner_principal_id=session.principal_id,
@@ -1345,10 +1253,7 @@ async def connect_code_repo(
         )
     else:
         if not body.owner or not body.repo:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail={"ok": False, "reason_code": "github_owner_and_repo_required"},
-            )
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "github_owner_and_repo_required")
         result = service.connect_github_repo(
             body.owner,
             body.repo,
@@ -1357,10 +1262,7 @@ async def connect_code_repo(
             user_id=principal.delegated_by_user_id,
         )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1375,10 +1277,7 @@ async def select_code_repo(
         body.repo_id, owner_principal_id=auth_data[0].principal_id
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1428,10 +1327,7 @@ async def rebuild_code_map(
         user_id=principal.delegated_by_user_id,
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_409_CONFLICT, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1449,10 +1345,7 @@ async def disconnect_code_repo(
         user_id=principal.delegated_by_user_id,
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1502,14 +1395,9 @@ async def create_project(
     if not result.ok:
         # An attachment the owner asked for and the server refused is a bad
         # request about that folder, not a claim they may not create projects.
-        raise HTTPException(
-            status_code=(
-                status.HTTP_400_BAD_REQUEST
+        raise refusal(status.HTTP_400_BAD_REQUEST
                 if body.attach_path is not None
-                else status.HTTP_403_FORBIDDEN
-            ),
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+                else status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1526,10 +1414,7 @@ async def select_project(
     session, _principal = auth_data
     result = _service(request).select_project(body.project_id, session.principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1569,10 +1454,7 @@ async def export_project(
             if result.reason_code == f"unknown_project:{project_id}"
             else status.HTTP_403_FORBIDDEN
         )
-        raise HTTPException(
-            status_code=status_code,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status_code, result.reason_code)
     export_path = result.data["export_path"]
     if export_path is not None:
         return FileResponse(
@@ -1603,10 +1485,7 @@ async def save_project_context(
         acting_principal_id=auth_data[0].principal_id,
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1618,13 +1497,10 @@ async def delete_project(
     x_project_delete_confirm: str | None = Header(default=None),
 ) -> dict[str, Any]:
     if x_project_delete_confirm != project_id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": "project_delete_confirmation_required"},
-        )
+        raise refusal(status.HTTP_409_CONFLICT, "project_delete_confirmation_required")
     result = _service(request).delete_project(project_id, auth_data[0].principal_id, confirm=True)
     if not result.ok:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1642,7 +1518,7 @@ async def move_project(
     """
     result = _service(request).move_project(project_id, body.parent_id, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1655,7 +1531,7 @@ async def archive_project(
     """Soft-delete a project subtree (human-only)."""
     result = _service(request).archive_project(project_id, auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1713,10 +1589,7 @@ async def get_task_detail(
         task_id, user_id=auth_data[1].delegated_by_user_id
     )
     if view is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "task_not_found"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "task_not_found")
     return serialize_dto(view)
 
 
@@ -1731,19 +1604,16 @@ async def create_task(
     if not title:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="task_title_required")
     if body.recurrence is not None and body.recurrence not in TASK_RECURRENCES:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": f"invalid_recurrence:{body.recurrence}"},
+        raise refusal(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"invalid_recurrence:{body.recurrence}",
         )
     store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
     if (
         body.project_id is not None
         and store.load_project(body.project_id, principal.delegated_by_user_id) is None
     ):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": f"unknown_project:{body.project_id}"},
-        )
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, f"unknown_project:{body.project_id}")
     if body.description.strip():
         try:
             # BUG-238 — a task whose model observation aged out is not a task
@@ -1782,10 +1652,7 @@ async def create_task(
             attachments=body.attachments,
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": str(exc)},
-        ) from exc
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
     return serialize_dto(view)
 
 
@@ -1808,10 +1675,7 @@ async def run_task(
             if reason == "task_not_found"
             else status.HTTP_409_CONFLICT
         )
-        raise HTTPException(
-            status_code=code,
-            detail={"ok": False, "reason_code": reason},
-        ) from exc
+        raise refusal(code, reason) from exc
     wakeup = getattr(request.app.state, "scheduler_wakeup", None)
     if wakeup is not None:
         wakeup.request()
@@ -1839,10 +1703,7 @@ async def resume_task(
     workspace: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
     result = await TaskScheduler(workspace).resume_task(task_id, session.principal_id)
     if result.get("reason_code") == "task_not_found":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "task_not_found"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "task_not_found")
     return result
 
 
@@ -2063,10 +1924,7 @@ async def connect_chatgpt_codex(
             detail={"reason_code": safe_error(str(exc))},
         ) from exc
     if not account.signed_in:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": "chatgpt_subscription_signed_out"},
-        )
+        raise refusal(status.HTTP_409_CONFLICT, "chatgpt_subscription_signed_out")
     _record_codex_connection(request, session.principal_id, signed_in=True)
     return {
         "ok": True,
@@ -2192,14 +2050,9 @@ async def set_model_price(
         acting_principal_id=session.principal_id,
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=(
-                status.HTTP_403_FORBIDDEN
+        raise refusal(status.HTTP_403_FORBIDDEN
                 if result.reason_code == "not_authorized_gate_manager"
-                else status.HTTP_400_BAD_REQUEST
-            ),
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+                else status.HTTP_400_BAD_REQUEST, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -2232,10 +2085,7 @@ async def refresh_model_pricing(
     session, _principal = auth_data
     result = _service(request).refresh_model_pricing(session.principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_400_BAD_REQUEST, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -2246,7 +2096,7 @@ async def get_model_capacities(
 ) -> dict[str, Any]:
     result = _service(request).model_capacity_status(auth_data[0].principal_id)
     if not result.ok:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"ok": False, "reason_code": result.reason_code})
+        raise refusal(status.HTTP_400_BAD_REQUEST, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -2260,7 +2110,7 @@ async def refresh_model_capacities(
         auth_data[0].principal_id, force=force
     )
     if not result.ok:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"ok": False, "reason_code": result.reason_code})
+        raise refusal(status.HTTP_400_BAD_REQUEST, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -2275,18 +2125,15 @@ async def set_model_capacity(
     try:
         tokens = None if raw_tokens in (None, "") else int(str(raw_tokens))
     except (TypeError, ValueError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": "model_context_capacity_invalid"},
-        ) from exc
+        raise refusal(status.HTTP_400_BAD_REQUEST, "model_context_capacity_invalid") from exc
     result = _service(request).set_model_context_capacity(
         profile_id, str(body.get("model", "")), tokens,
         str(body.get("reason", "")), auth_data[0].principal_id,
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN if result.reason_code == "not_authorized_gate_manager" else status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": result.reason_code},
+        raise refusal(
+            status.HTTP_403_FORBIDDEN if result.reason_code == "not_authorized_gate_manager" else status.HTTP_400_BAD_REQUEST,
+            result.reason_code,
         )
     return {"ok": True, **result.data}
 
@@ -2307,10 +2154,7 @@ async def set_model_selection(
         body.profile_id, body.model, session.principal_id
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -2409,10 +2253,7 @@ async def set_model_advisor(
     session, _principal = auth_data
     result = _service(request).set_model_advisor(body.profile_id, session.principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -2426,10 +2267,7 @@ async def set_model_fallback(
     session, _principal = auth_data
     result = _service(request).set_model_fallback_sequence(body.profile_ids, session.principal_id)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     return {"ok": True, **result.data}
 
 

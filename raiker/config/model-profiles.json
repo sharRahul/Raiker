@@ -1,6 +1,20 @@
 {
   "schema_version": "1.0",
   "description": "Built-in Raiker model profiles for the async Raiker-owned model runtime. httpx.AsyncClient is the only runtime HTTP transport; SDK wrappers are intentionally not used. The managed llama.cpp and MLX profiles each expose four separate loopback slots, so several local models can serve different surfaces at once.",
+  "providers": {
+    "llama.cpp": {"display_name": "llama.cpp"},
+    "mlx": {"display_name": "MLX"},
+    "ollama": {"display_name": "Ollama"},
+    "ollama-cloud": {"display_name": "Ollama Cloud"},
+    "lm-studio": {"display_name": "LM Studio"},
+    "openai-compatible": {"display_name": "OpenAI-compatible"},
+    "openrouter": {"display_name": "OpenRouter"},
+    "huggingface": {"display_name": "Hugging Face"},
+    "anthropic": {"display_name": "Anthropic"},
+    "openai": {"display_name": "OpenAI"},
+    "chatgpt-codex": {"display_name": "ChatGPT subscription"},
+    "gemini": {"display_name": "Gemini"}
+  },
   "profiles": [
     {
       "profile_id": "raiker-local-llama-cpp",

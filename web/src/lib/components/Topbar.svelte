@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { Notification as RaikerNotification } from "../apiTypes";
+  import { NOTICES_CHANGED, announceNoticesChanged } from "../noticeDestination";
   import { api } from "../api";
   import { relativeTime } from "../format";
   import Icon from "./Icon.svelte";
@@ -79,17 +80,22 @@
     marking = true;
     try {
       for (const n of unread) await api.markNotificationRead(n.notification_id);
-      await loadNotifications();
     } catch {
-      await loadNotifications();
+      // Whatever was marked is marked; the re-read below says which.
     } finally {
       marking = false;
+      announceNoticesChanged();
     }
   }
 
   onMount(() => {
     void loadNotifications();
     void loadApprovals();
+    // BUG-309 — the dock marks a notice read when the page shows its subject.
+    // The count re-reads then, instead of disagreeing until the next poll.
+    const reread = () => void loadNotifications();
+    window.addEventListener(NOTICES_CHANGED, reread);
+    return () => window.removeEventListener(NOTICES_CHANGED, reread);
   });
 
   $effect(() => {

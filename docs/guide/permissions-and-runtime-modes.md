@@ -624,4 +624,6 @@ is *not* visible, and it announces each decision once. Muting is not deciding:
 an approval nobody is alerted about still waits for you, and Raiker still does
 not act. Nothing leaves this machine: it is
 the browser's notification, not an email or a push service. The Approvals inbox
-remains the record, and a decision you defer waits there.
+remains the record, and a decision you defer waits there. Opening an *Approval
+needed* notice takes you to that inbox, and once you are there the notice is
+read and no longer docked over the queue.

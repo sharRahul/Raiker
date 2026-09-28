@@ -112,7 +112,7 @@ names.
 | [BUG-289](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running) | Low | Models / provider errors | **Closed 2026-09-14 ([FIXED-526](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running))** — a hosted provider gets a remedy an owner can act on |
 | [BUG-307](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true) | Low | Web UI / security headers | **Closed 2026-09-28 ([FIXED-609](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true))** — `style-src 'self'`; Svelte 5 styles through the CSSOM, and a live sweep of every destination at four widths found nothing refused |
 | [BUG-308](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so) | Medium | Plugins / commands / sandbox | **Closed 2026-09-28 ([FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so))** — by the owner's decision: code runs in the sandbox where there is one, and otherwise under *Code with this machine's network*, its own switch, starting at *Ask me* |
-| [BUG-309](#bug-309--on-approvals-the-notice-dock-repeats-the-approval-and-covers-the-queues-header) | Low | Web UI / notifications | Open — raised 2026-09-28 by the review-closure live round |
+| [BUG-309](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing) | Low | Web UI / notifications | **Closed 2026-09-28 ([FIXED-622](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing))** — a notice whose subject is the page on screen is not docked there and is read; running it live found the bell disagreeing for a poll, fixed with it |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2092,30 +2092,11 @@ set that owns each one's label, its confirmation and its failure sentence.
 
 ## BUG-309 — On Approvals, the notice dock repeats the approval and covers the queue's header
 
-**Severity: Low. Area: Web UI / notifications. Status: Open — raised 2026-09-28
-by the [second 2026-09-28 live round](LIVE_TEST_ROUNDS.md#2026-09-28-second--code-says-where-it-runs-and-three-review-documents-close).**
-
-**Observed.** The round's capture of Approvals
-(`docs/screenshots/2026-09-28-review-closure-round/06-approval-names-the-script.png`)
-shows the notice dock — docked top-right by design, so it never pushes a page's
-composer below the fold — holding *Approval needed … run 'write_file'* over the
-queue that lists that same approval, with its *3 unread notices* link drawn
-across the table's **Status** header. The approval card no longer shows on
-Approvals ([FIXED-621](FIXED_ITEMS.md#fixed-621--an-approval-card-from-another-conversation-covered-the-composers-send));
-the notice about the same approval still does.
-
-**Why it was not fixed in the round.** The dock's placement is a measured
-decision recorded in `NotificationCenter.svelte`, and the question is which
-notices a page makes redundant — an approval notice on Approvals, a task notice
-on Tasks — rather than one position. That is a rule for every destination, not a
-one-page patch.
-
-**Proposed fix.** Suppress a notice whose subject is the page being shown (an
-approval notice on Approvals), marking it read, as the approval card does; and
-give the dock's *unread* link a surface so it never reads as part of the page
-beneath it.
-
-**Required user-interface outcome.** On Approvals, nothing docked repeats a row
-of the queue, and no header is drawn over.
+**Closed 2026-09-28 as
+[FIXED-622](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing).**
+The rule is one for every destination rather than a one-page patch, as this
+entry asked: a notice kind with a page of its own is answered by that page —
+not docked there, and marked read on arrival — and the *unread* count sits on
+the card's own surface.
 
 ---

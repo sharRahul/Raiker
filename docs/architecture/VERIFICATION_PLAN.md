@@ -6,14 +6,19 @@ updated.
 
 ## What CI runs
 
-Four workflows run on a pull request and on a push to `main`; a fifth is
-`workflow_dispatch` only.
+Three workflows run on a pull request and on a push to `main`; a fourth is
+`workflow_dispatch` only. The Python set-up every job repeated — the pinned
+interpreter and, where a job needs it, the package installed with its dev
+extras — is one local composite action, `.github/actions/setup-python`, pinned
+the same way as every third-party action it uses.
 
 ### `ci.yml` — the main gate
 
 | Job | What it does |
 |---|---|
 | **Python 3.11** | Installs the package with `[dev]`; asserts a real `httpx` import; **asserts the SQLCipher build provides FTS5**, because a wheel that lost it would silently drop both text indexes to FTS4 and recency ordering with every test still passing; **asserts the SQLCipher memory-security probe** on the Linux host; runs the full pytest suite with `RAIKER_SQLCIPHER_MEMORY_SECURITY=off`; re-runs `tests/test_sqlcipher_memory_security.py` and `tests/test_memory_sqlcipher.py` **without** that job-wide override, in the same process a contributor uses, because `cipher_memory_security` is a process-global one-way latch and the override made the gate blind to an ordering defect (BUG-205); then Ruff, mypy over `raiker apps tests`, and `compileall`. |
+| **Source measurement** | `scripts/measure_loc.py --json loc-report.json`, kept as the `loc-report` artifact for 90 days. Handwritten production and test lines per language, comment and docstring lines apart, the largest files, Python functions over 150 lines and the bundle size — the baseline a simplification reports against. It measures and never fails a change. |
+| **Dependency vulnerabilities** | `pip-audit` over the runtime dependencies and the locked release set, and `uv lock --check` with the release exports compared against the lock. |
 | **Native runner (`ubuntu-latest`, `windows-latest`)** | `cargo fmt --check`, `cargo clippy --all-targets -D warnings`, `cargo test --all`, then `scripts/build_native_runner.py`. The sandbox runner is the only non-Python part of Raiker and the part that builds the operating-system boundary; a boundary that compiles on one machine is not a boundary. |
 
 ### `licensing.yml`
@@ -23,11 +28,12 @@ Validates licences and generates an SPDX SBOM
 validates them (`--dist-dir dist`). Web dependencies are installed from the
 lockfile with `npm ci`.
 
-### `phase-status.yml`
+### The documentation validators
 
-`scripts/validate_phase_status.py` — asserts that `README.md` and four
-documents exist and still contain the markers that make their status claims
-falsifiable. **A documentation change that removes one of those phrases fails
+`scripts/validate_phase_status.py` used to have a workflow of its own; it and the
+other four validators below now run inside the ordinary pytest suite, from
+`tests/test_documentation_validators.py`. Two of the five had run nowhere at
+all. **A documentation change that removes one of the phrases they guard fails
 CI**, which is deliberate: the phrases are the claims.
 
 ### `web.yml` — only when `web/**` changes
@@ -67,7 +73,8 @@ end-to-end commands in [LOCAL_VALIDATION_GATE.md](LOCAL_VALIDATION_GATE.md).
 ## What the five validators check
 
 They are documentation gates, not code gates. Each exists because a specific
-untrue sentence once shipped.
+untrue sentence once shipped, and each runs in CI through
+`tests/test_documentation_validators.py`.
 
 | Script | What it asserts |
 |---|---|

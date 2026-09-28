@@ -36,7 +36,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import refusal
+from raiker.api.dependencies import workspace_path as _ws
 from raiker.api.sessions import ApiSession
 from raiker.knowledge.extractors import resolve_extractable_media_type
 from raiker.knowledge.reconcile import IGNORED_DIRECTORY_NAMES
@@ -64,27 +66,13 @@ MAX_CHANGES_DIFF_CHARS = 200_000
 MAX_VIEW_BYTES = 400_000
 
 
-def _ws(request: Request) -> Path:
-    return Path(str(request.app.state.workspace_root))
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(_ws(request)).authenticate(request)
-
-
 def _not_found(reason_code: str) -> HTTPException:
     """404 for everything the caller may not see, so an id cannot be probed."""
-    return HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail={"ok": False, "reason_code": reason_code},
-    )
+    return refusal(status.HTTP_404_NOT_FOUND, reason_code)
 
 
 def _bad_request(reason_code: str) -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail={"ok": False, "reason_code": reason_code},
-    )
+    return refusal(status.HTTP_400_BAD_REQUEST, reason_code)
 
 
 def _names_its_own_root(supplied: str) -> bool:

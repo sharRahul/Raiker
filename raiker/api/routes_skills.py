@@ -18,12 +18,13 @@ from __future__ import annotations
 
 import base64
 import binascii
-from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import refusal
+from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.schemas import (
     BuildSkillRequest,
     RenameSkillRequest,
@@ -66,14 +67,6 @@ _INVALID_REASONS = frozenset(
 )
 
 
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[no-any-return]
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(_ws(request)).authenticate(request)
-
-
 def _service(request: Request) -> SkillsService:
     return SkillsService(_ws(request))
 
@@ -90,7 +83,7 @@ def _result(result: Any) -> dict[str, Any]:
         code = status.HTTP_422_UNPROCESSABLE_CONTENT
     else:
         code = status.HTTP_403_FORBIDDEN
-    raise HTTPException(status_code=code, detail={"ok": False, "reason_code": reason})
+    raise refusal(code, reason)
 
 
 @router.get("/api/skills")
@@ -113,17 +106,11 @@ async def upload_skill(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     if len(body.data_base64) > _MAX_BASE64_CHARS:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail={"ok": False, "reason_code": "skill_too_large"},
-        )
+        raise refusal(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "skill_too_large")
     try:
         data = base64.b64decode(body.data_base64, validate=True)
     except (binascii.Error, ValueError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": "invalid_base64"},
-        ) from exc
+        raise refusal(status.HTTP_400_BAD_REQUEST, "invalid_base64") from exc
     return _result(
         _service(request).install_upload(auth_data[0].principal_id, body.filename, data)
     )
@@ -183,10 +170,7 @@ async def download_skill(
     """
     found = _service(request).get_download(auth_data[0].principal_id, skill_id)
     if found is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "unknown_skill"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "unknown_skill")
     filename, payload = found
     return Response(
         content=payload,

@@ -7,12 +7,12 @@ governed API; only MFA verification upgrades it to a ``control`` session.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.routes_instances import _require_loopback
 from raiker.api.schemas import (
     ChangePasswordRequest,
@@ -30,10 +30,6 @@ from raiker.api.sessions import ApiSessionStore
 from raiker.auth.accounts import AccountService, AuthError
 
 router = APIRouter()
-
-
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[attr-defined]
 
 
 def _service(request: Request) -> AccountService:

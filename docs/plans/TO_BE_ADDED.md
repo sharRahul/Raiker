@@ -94,7 +94,7 @@ that would put Raiker ahead of the field.
 | [ADD-19](#add-19--code-provenance-watermarking-and-signed-commits) | Tier 6 | Build / code provenance watermarking | Proposal |
 | [ADD-20](#add-20--continuous-chaos-injection) | Tier 6 | Verification / continuous chaos injection | Proposal |
 | [ADD-21](#add-21--conformance-to-the-agent-skills-open-standard) | Tier 2 | Skills / Agent Skills interoperability | Implemented 2026-08-24 as FIXED-281 |
-| [ADD-22](#add-22--a-structured-question-to-the-owner-mid-turn) | Tier 1 | Runtime / structured mid-turn question | Proposal |
+| [ADD-22](#add-22--a-structured-question-to-the-owner-mid-turn) | Tier 1 | Runtime / structured mid-turn question | Done 2026-08-29 as [FIXED-308](FIXED_ITEMS.md#fixed-308--raiker-could-ask-permission-and-could-not-ask-what-you-meant); this row read *Proposal* until 2026-09-28 ([FIXED-630](FIXED_ITEMS.md#fixed-630--two-indexes-still-called-closed-work-open)) |
 | [ADD-23](#add-23--governed-browser-control-as-a-narrow-tool-set) | Tier 3 | Browser / governed control | Proposal — owner decision |
 | [ADD-24](#add-24--mcp-apps-sandboxed-server-contributed-interactive-ui) | Tier 3 | MCP / server-contributed UI | Proposal — after BUG-234; supersedes plugin panels |
 | [ADD-25](#add-25--post-stage-j-memory-expansion) | Tier 4 | Memory / temporal, polyglot, context and transactions | Proposal — after Stage J |

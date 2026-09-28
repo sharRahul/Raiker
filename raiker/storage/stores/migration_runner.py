@@ -21,342 +21,13 @@ from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
 
 from raiker.contracts.ids import utc_now
 from raiker.storage.migrations import (
-    AGENT_PLANS_MIGRATION_ID,
-    AGENT_PLANS_SQL,
-    API_SESSIONS_MIGRATION_ID,
-    API_SESSIONS_SQL,
-    APPROVAL_DECISION_SCOPE_MIGRATION_ID,
-    APPROVAL_DECISION_SCOPE_SQL,
-    ATTACHMENT_STORE_MIGRATION_ID,
-    ATTACHMENT_STORE_SQL,
-    BACKGROUND_WORKER_HEALTH_MIGRATION_ID,
-    BACKGROUND_WORKER_HEALTH_SQL,
-    BRAIN_PREFERENCES_MIGRATION_ID,
-    BRAIN_PREFERENCES_SQL,
-    BRAIN_SOURCE_GRANTS_MIGRATION_ID,
-    BRAIN_SOURCE_GRANTS_SQL,
-    BRAIN_SOURCES_MIGRATION_ID,
-    BRAIN_SOURCES_SQL,
-    CALENDAR_EVENTS_MIGRATION_ID,
-    CALENDAR_EVENTS_SQL,
-    CAPABILITY_DECISION_MODE_MIGRATION_ID,
-    CAPABILITY_DECISION_MODE_SQL,
-    CAPABILITY_MONITORING_MIGRATION_ID,
-    CAPABILITY_MONITORING_SQL,
-    CHANNEL_ROUTING_MIGRATION_ID,
-    CHANNEL_ROUTING_SQL,
-    CHECKPOINT_CAPTURE_HEALTH_MIGRATION_ID,
-    CHECKPOINT_CAPTURE_HEALTH_SQL,
-    CHECKPOINT_CAPTURE_MANIFEST_MIGRATION_ID,
-    CHECKPOINT_CAPTURE_MANIFEST_SQL,
-    CLOUD_EXECUTION_COST_LEDGER_MIGRATION_ID,
-    CLOUD_EXECUTION_COST_LEDGER_SQL,
-    CODE_MAP_MIGRATION_ID,
-    CODE_MAP_SQL,
-    CODE_REPOS_MIGRATION_ID,
-    CODE_REPOS_SQL,
-    COMMAND_AUTHORITY_EVIDENCE_MIGRATION_ID,
-    COMMAND_AUTHORITY_EVIDENCE_SQL,
-    COMMAND_CREDENTIAL_DELTAS_MIGRATION_ID,
-    COMMAND_CREDENTIAL_DELTAS_SQL,
-    COMMAND_EGRESS_MIGRATION_ID,
-    COMMAND_EGRESS_SQL,
-    COMMAND_RUNS_MIGRATION_ID,
-    COMMAND_RUNS_SQL,
-    CONFIGURED_MODELS_MIGRATION_ID,
-    CONFIGURED_MODELS_SQL,
-    CONNECTOR_ECOSYSTEM_MIGRATION_ID,
-    CONNECTOR_ECOSYSTEM_SQL,
-    CONNECTOR_INVOCATIONS_MIGRATION_ID,
-    CONNECTOR_INVOCATIONS_SQL,
-    CONVERSATION_COMPACTIONS_MIGRATION_ID,
-    CONVERSATION_COMPACTIONS_SQL,
-    CONVERSATION_FTS_MIGRATION_ID,
-    CREDENTIAL_SECURITY_MIGRATION_ID,
-    CREDENTIAL_SECURITY_SQL,
-    CRITICAL_APPROVAL_LIFECYCLE_MIGRATION_ID,
-    CRITICAL_APPROVAL_LIFECYCLE_SQL,
-    EIDETIC_CAPTURE_MIGRATION_ID,
-    EIDETIC_CAPTURE_SQL,
-    EIDETIC_OBSERVATIONS_MIGRATION_ID,
-    EIDETIC_OBSERVATIONS_SQL,
-    EMAIL_DRAFTS_MIGRATION_ID,
-    EMAIL_DRAFTS_SQL,
-    EXECUTION_ENVIRONMENT_CONTROL_MIGRATION_ID,
-    EXECUTION_ENVIRONMENT_CONTROL_SQL,
-    GIST_MEMORY_MIGRATION_ID,
-    GIST_MEMORY_SQL,
-    GIT_CREDENTIAL_GRANT_MIGRATION_ID,
-    GIT_CREDENTIAL_GRANT_SQL,
-    HOST_NETWORK_CODE_CARRY_OVER_MIGRATION_ID,
-    HOST_NETWORK_CODE_CARRY_OVER_SQL,
-    IMAGE_GENERATIONS_MIGRATION_ID,
-    IMAGE_GENERATIONS_SQL,
-    IMAGE_LINEAGE_MIGRATION_ID,
-    IMAGE_LINEAGE_SQL,
     LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
-    LOCAL_RUNTIME_PRESENCE_MIGRATION_ID,
-    LOCAL_RUNTIME_PRESENCE_SQL,
-    LOCK_SCREEN_MIGRATION_ID,
-    LOCK_SCREEN_SQL,
-    MACHINE_ACTION_ATTRIBUTION_MIGRATION_ID,
-    MACHINE_ACTION_ATTRIBUTION_SQL,
-    MACHINE_ACTION_IDENTITY_SNAPSHOT_MIGRATION_ID,
-    MACHINE_ACTION_IDENTITY_SNAPSHOT_SQL,
-    MACHINE_IDENTITIES_MIGRATION_ID,
-    MACHINE_IDENTITIES_SQL,
-    MANAGED_FILE_CHUNK_FTS_MIGRATION_ID,
-    MANAGED_FILE_CHUNK_VECTORS_MIGRATION_ID,
-    MANAGED_FILE_CHUNK_VECTORS_SQL,
-    MANAGED_FILE_CHUNKS_MIGRATION_ID,
-    MANAGED_FILE_CHUNKS_SQL,
-    MANAGED_FILES_MIGRATION_ID,
-    MANAGED_FILES_SQL,
-    MCP_CONTAINMENT_MIGRATION_ID,
-    MCP_CONTAINMENT_SQL,
-    MCP_MONITORING_MIGRATION_ID,
-    MCP_MONITORING_SQL,
-    MCP_PROTOCOL_VERSION_MIGRATION_ID,
-    MCP_PROTOCOL_VERSION_SQL,
-    MCP_REMOTE_ENDPOINT_MIGRATION_ID,
-    MCP_REMOTE_ENDPOINT_SQL,
-    MCP_SERVER_FEATURES_MIGRATION_ID,
-    MCP_SERVER_FEATURES_SQL,
-    MCP_SERVER_RUNTIME_MIGRATION_ID,
-    MCP_SERVER_RUNTIME_SQL,
-    MCP_SERVERS_MIGRATION_ID,
-    MCP_SERVERS_SQL,
-    MCP_TOOL_SCHEMAS_MIGRATION_ID,
-    MCP_TOOL_SCHEMAS_SQL,
-    MEMORY_ARCHIVE_MIGRATION_ID,
-    MEMORY_ARCHIVE_SQL,
-    MEMORY_AUDIT_RATE_LIMIT_MIGRATION_ID,
-    MEMORY_AUDIT_RATE_LIMIT_SQL,
-    MEMORY_BACKUP_CATALOG_MIGRATION_ID,
-    MEMORY_BACKUP_CATALOG_SQL,
-    MEMORY_CONTENT_CHECKSUM_MIGRATION_ID,
-    MEMORY_CONTENT_CHECKSUM_SQL,
-    MEMORY_CONTROLS_MIGRATION_ID,
-    MEMORY_CONTROLS_SQL,
-    MEMORY_EMBEDDING_BACKEND_MIGRATION_ID,
-    MEMORY_EMBEDDING_BACKEND_SQL,
-    MEMORY_ENTITY_GRAPH_MIGRATION_ID,
-    MEMORY_ENTITY_GRAPH_SQL,
-    MEMORY_EVALUATION_CONTEXT_MIGRATION_ID,
-    MEMORY_EVALUATION_CONTEXT_SQL,
-    MEMORY_FTS_MIGRATION_ID,
-    MEMORY_JOBS_MIGRATION_ID,
-    MEMORY_JOBS_SQL,
-    MEMORY_LIFECYCLE_AUDIT_IMMUTABILITY_MIGRATION_ID,
-    MEMORY_LIFECYCLE_AUDIT_IMMUTABILITY_SQL,
-    MEMORY_PROJECTIONS_MIGRATION_ID,
-    MEMORY_PROJECTIONS_SQL,
-    MEMORY_PURGE_MIGRATION_ID,
-    MEMORY_PURGE_SQL,
-    MEMORY_RELATIONSHIP_EXTRACTION_MIGRATION_ID,
-    MEMORY_RELATIONSHIP_EXTRACTION_SQL,
-    MEMORY_RELATIONSHIP_REVIEW_MIGRATION_ID,
-    MEMORY_RELATIONSHIP_REVIEW_SQL,
-    MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID,
-    MEMORY_RETRIEVAL_AUTHORITY_SQL,
-    MEMORY_SQLCIPHER_FTS_MIGRATION_ID,
-    MEMORY_TEMPORAL_EVALUATION_MIGRATION_ID,
-    MEMORY_TEMPORAL_EVALUATION_SQL,
-    MEMORY_VECTOR_SEARCH_REVISION_MIGRATION_ID,
-    MEMORY_VECTOR_SEARCH_REVISION_SQL,
-    MODEL_ADVISOR_MIGRATION_ID,
-    MODEL_ADVISOR_SQL,
-    MODEL_CAPACITY_CONTROL_MIGRATION_ID,
-    MODEL_CAPACITY_CONTROL_SQL,
-    MODEL_FALLBACK_SEQUENCE_MIGRATION_ID,
-    MODEL_FALLBACK_SEQUENCE_SQL,
-    MODEL_LIBRARY_MIGRATION_ID,
-    MODEL_LIBRARY_SQL,
-    MODEL_OPERATION_PAYLOAD_MIGRATION_ID,
-    MODEL_OPERATION_PAYLOAD_SQL,
-    MODEL_OPERATIONS_MIGRATION_ID,
-    MODEL_OPERATIONS_SQL,
-    MODEL_PRICE_REGISTRY_MIGRATION_ID,
-    MODEL_PRICE_REGISTRY_SQL,
-    MODEL_READINESS_MIGRATION_ID,
-    MODEL_READINESS_SQL,
-    MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
-    MODEL_SESSION_RESOLVED_MODEL_SQL,
-    MODEL_SETUP_STATE_MIGRATION_ID,
-    MODEL_SETUP_STATE_SQL,
-    MODEL_USAGE_LEDGER_MIGRATION_ID,
-    MODEL_USAGE_LEDGER_SQL,
-    MODEL_USAGE_ROLLING_WINDOW_MIGRATION_ID,
-    MODEL_USAGE_ROLLING_WINDOW_SQL,
-    OWNED_CONTEXT_DATA_MIGRATION_ID,
-    OWNED_CONTEXT_DATA_SQL,
-    OWNED_MEMORY_METADATA_MIGRATION_ID,
-    OWNED_MEMORY_METADATA_SQL,
-    OWNER_QUESTION_ANSWER_MIGRATION_ID,
-    OWNER_QUESTION_ANSWER_SQL,
+    MIGRATIONS,
     PHASE_1_MIGRATION_ID,
     PHASE_1_SQL,
-    PHASE_2_MIGRATION_ID,
-    PHASE_2_MIGRATION_SQL,
-    PHASE_3_APPROVAL_PREVIEW_PERSISTENCE_READINESS_MIGRATION_ID,
-    PHASE_3_APPROVAL_PREVIEW_PERSISTENCE_READINESS_SQL,
-    PHASE_3_EXTERNAL_CHANNELS_NOTIFICATIONS_READINESS_MIGRATION_ID,
-    PHASE_3_EXTERNAL_CHANNELS_NOTIFICATIONS_READINESS_SQL,
-    PHASE_3_GRAPH_CODEMAP_READINESS_MIGRATION_ID,
-    PHASE_3_GRAPH_CODEMAP_READINESS_SQL,
-    PHASE_3_PLUGIN_SERVER_STARTUP_READINESS_MIGRATION_ID,
-    PHASE_3_PLUGIN_SERVER_STARTUP_READINESS_SQL,
-    PHASE_3_REMOTE_CONTAINER_CLOUD_READINESS_MIGRATION_ID,
-    PHASE_3_REMOTE_CONTAINER_CLOUD_READINESS_SQL,
-    PHASE_3_SEMANTIC_MEMORY_READINESS_MIGRATION_ID,
-    PHASE_3_SEMANTIC_MEMORY_READINESS_SQL,
-    PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_MIGRATION_ID,
-    PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SQL,
-    PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_MIGRATION_ID,
-    PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SQL,
-    PHASE_3_STORAGE_CLEANUP_EXECUTION_READINESS_MIGRATION_ID,
-    PHASE_3_STORAGE_CLEANUP_EXECUTION_READINESS_SQL,
-    PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_MIGRATION_ID,
-    PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_SQL,
-    PHASE_3_STORAGE_LIFECYCLE_MIGRATION_ID,
-    PHASE_3_STORAGE_LIFECYCLE_RETENTION_MIGRATION_ID,
-    PHASE_3_STORAGE_LIFECYCLE_RETENTION_SQL,
-    PHASE_3_STORAGE_LIFECYCLE_SQL,
-    PHASE_4_MEMORY_GOVERNANCE_HARDENING_MIGRATION_ID,
-    PHASE_4_MEMORY_GOVERNANCE_HARDENING_SQL,
-    PHASE_4_MEMORY_MVP_MIGRATION_ID,
-    PHASE_4_MEMORY_MVP_SQL,
-    PHASE_4_SCHEDULED_ROUTINES_MIGRATION_ID,
-    PHASE_4_SCHEDULED_ROUTINES_SQL,
-    PHASE_5_AUDIT_EXPORT_MIGRATION_ID,
-    PHASE_5_AUDIT_EXPORT_SQL,
-    PHASE_5_BUDGET_RECORDS_MIGRATION_ID,
-    PHASE_5_BUDGET_RECORDS_SQL,
-    PHASE_5_HOSTED_ROUTINES_MIGRATION_ID,
-    PHASE_5_HOSTED_ROUTINES_SQL,
-    PHASE_5_MANAGED_POLICY_MIGRATION_ID,
-    PHASE_5_MANAGED_POLICY_SQL,
-    PHASE_5_ORG_ROLES_MIGRATION_ID,
-    PHASE_5_ORG_ROLES_SQL,
-    PHASE_5_PLUGIN_MARKETPLACE_MIGRATION_ID,
-    PHASE_5_PLUGIN_MARKETPLACE_SQL,
-    PHASE_5_RETENTION_POLICIES_MIGRATION_ID,
-    PHASE_5_RETENTION_POLICIES_SQL,
-    PHASE_6_APPROVAL_RELAY_MIGRATION_ID,
-    PHASE_6_APPROVAL_RELAY_SQL,
-    PHASE_6_CHANNEL_PAIRINGS_MIGRATION_ID,
-    PHASE_6_CHANNEL_PAIRINGS_SQL,
-    PHASE_6_REMOTE_EXECUTION_MIGRATION_ID,
-    PHASE_6_REMOTE_EXECUTION_SQL,
-    PHASE_6_SUBAGENTS_MIGRATION_ID,
-    PHASE_6_SUBAGENTS_SQL,
-    PHASE_6_TEAMS_MIGRATION_ID,
-    PHASE_6_TEAMS_SQL,
-    PHASE_7_DESKTOP_SESSIONS_MIGRATION_ID,
-    PHASE_7_DESKTOP_SESSIONS_SQL,
-    PHASE_7_GRAPH_INDEX_MIGRATION_ID,
-    PHASE_7_GRAPH_INDEX_SQL,
-    PHASE_7_IDE_SESSIONS_MIGRATION_ID,
-    PHASE_7_IDE_SESSIONS_SQL,
-    PHASE_7_PLUGIN_EXECUTION_MIGRATION_ID,
-    PHASE_7_PLUGIN_EXECUTION_SQL,
-    PHASE_7_SEMANTIC_MEMORY_MIGRATION_ID,
-    PHASE_7_SEMANTIC_MEMORY_SQL,
-    PHASE_7_WEB_SESSIONS_MIGRATION_ID,
-    PHASE_7_WEB_SESSIONS_SQL,
-    PHASE_9_PROJECT_GRAPH_MIGRATION_ID,
-    PHASE_9_PROJECT_GRAPH_SQL,
-    PHASE_9_SKILL_CANDIDATES_MIGRATION_ID,
-    PHASE_9_SKILL_CANDIDATES_SQL,
-    PHASE_9_SYMBOL_GRAPH_MIGRATION_ID,
-    PHASE_9_SYMBOL_GRAPH_SQL,
-    PHASE_9_VECTOR_INDEX_MIGRATION_ID,
-    PHASE_9_VECTOR_INDEX_SQL,
-    PHASE_10_CAPABILITY_GATE_STATE_MIGRATION_ID,
-    PHASE_10_CAPABILITY_GATE_STATE_SQL,
-    PHASE_10_RUNTIME_AUTHORITY_MIGRATION_ID,
-    PHASE_10_RUNTIME_AUTHORITY_SQL,
-    PHASE_10_RUNTIME_MODE_STATE_MIGRATION_ID,
-    PHASE_10_RUNTIME_MODE_STATE_SQL,
-    PRINCIPAL_CONTROL_SCOPE_MIGRATION_ID,
-    PRINCIPAL_CONTROL_SCOPE_SQL,
-    PROJECT_CONTEXT_MIGRATION_ID,
-    PROJECT_CONTEXT_SQL,
-    PROJECT_MEMORY_INHERITANCE_MIGRATION_ID,
-    PROJECT_MEMORY_INHERITANCE_SQL,
     PROJECT_SELF_INCLUSIVE_PATH_MIGRATION_ID,
-    PROJECTS_MIGRATION_ID,
-    PROJECTS_NESTING_MIGRATION_ID,
-    PROJECTS_NESTING_SQL,
-    PROJECTS_SQL,
-    PROVIDER_CATALOGUE_MIGRATION_ID,
-    PROVIDER_CATALOGUE_SQL,
-    PROVIDER_USAGE_SNAPSHOTS_MIGRATION_ID,
-    PROVIDER_USAGE_SNAPSHOTS_SQL,
-    REMINDERS_MIGRATION_ID,
-    REMINDERS_SQL,
-    SESSION_ARCHIVE_MIGRATION_ID,
-    SESSION_ARCHIVE_SQL,
-    SESSION_ATTACHMENT_REFS_MIGRATION_ID,
-    SESSION_ATTACHMENT_REFS_SQL,
-    SESSION_ATTACHMENT_SOURCE_MIGRATION_ID,
-    SESSION_ATTACHMENT_SOURCE_SQL,
-    SESSION_COMMAND_GRANTS_MIGRATION_ID,
-    SESSION_COMMAND_GRANTS_SQL,
-    SESSION_ORIGIN_MIGRATION_ID,
-    SESSION_ORIGIN_SQL,
-    SESSION_TAGS_MIGRATION_ID,
-    SESSION_TAGS_SQL,
-    SETUP_STATE_MIGRATION_ID,
-    SETUP_STATE_SQL,
-    SKILL_COMMANDS_MIGRATION_ID,
-    SKILL_COMMANDS_SQL,
-    SKILLS_MIGRATION_ID,
-    SKILLS_SQL,
-    STANDING_GRANTS_MIGRATION_ID,
-    STANDING_GRANTS_SQL,
-    SUBAGENT_BUDGETS_MIGRATION_ID,
-    SUBAGENT_BUDGETS_SQL,
-    SURFACE_MODEL_DEFAULT_MIGRATION_ID,
-    SURFACE_MODEL_DEFAULT_SQL,
-    SUSPENDED_TURN_QUEUE_MIGRATION_ID,
-    SUSPENDED_TURN_QUEUE_SQL,
-    SUSPENDED_TURNS_MIGRATION_ID,
-    SUSPENDED_TURNS_SQL,
-    TASK_ATTACHMENTS_MIGRATION_ID,
-    TASK_ATTACHMENTS_SQL,
-    TASK_MODEL_CHOICES_MIGRATION_ID,
-    TASK_MODEL_CHOICES_SQL,
-    TASK_SURFACE_MIGRATION_ID,
-    TASK_SURFACE_SQL,
-    TASK_THREAD_SESSION_MIGRATION_ID,
-    TASK_THREAD_SESSION_SQL,
-    TELEMETRY_CADENCE_MIGRATION_ID,
-    TELEMETRY_CADENCE_SQL,
-    TELEMETRY_DESTINATIONS_MIGRATION_ID,
-    TELEMETRY_DESTINATIONS_SQL,
-    THREAT_MODEL_ACKS_MIGRATION_ID,
-    THREAT_MODEL_ACKS_SQL,
-    TURN_CONTROLS_MIGRATION_ID,
-    TURN_CONTROLS_SQL,
-    TURN_MEMORY_PROVENANCE_MIGRATION_ID,
-    TURN_MEMORY_PROVENANCE_SQL,
-    TURN_REASONING_MIGRATION_ID,
-    TURN_REASONING_SQL,
-    TURN_RECALL_MIGRATION_ID,
-    TURN_RECALL_SQL,
-    TURN_SOURCE_ANCHORS_MIGRATION_ID,
-    TURN_SOURCE_ANCHORS_SQL,
-    TURN_SOURCE_LOCATOR_INDEX_MIGRATION_ID,
-    TURN_SOURCE_LOCATOR_INDEX_SQL,
-    TURN_SOURCES_MIGRATION_ID,
-    TURN_SOURCES_SQL,
-    WEB_BLOCKLIST_MIGRATION_ID,
-    WEB_BLOCKLIST_SQL,
-    conversation_fts_sql,
-    managed_file_chunk_fts_sql,
-    memory_fts_sql,
-    memory_sqlcipher_fts_sql,
+    Migration,
+    SearchMigration,
 )
 
 if TYPE_CHECKING:
@@ -395,690 +66,123 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 str(row["migration_id"])
                 for row in connection.execute("SELECT migration_id FROM migrations")
             }
-
-            self._apply_migration(PHASE_2_MIGRATION_ID, PHASE_2_MIGRATION_SQL, connection)
-            self._apply_migration(
-                MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
-                MODEL_SESSION_RESOLVED_MODEL_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_3_STORAGE_LIFECYCLE_MIGRATION_ID, PHASE_3_STORAGE_LIFECYCLE_SQL, connection
-            )
-            self._apply_migration(
-                PHASE_3_STORAGE_LIFECYCLE_RETENTION_MIGRATION_ID,
-                PHASE_3_STORAGE_LIFECYCLE_RETENTION_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_MIGRATION_ID,
-                PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_3_GRAPH_CODEMAP_READINESS_MIGRATION_ID,
-                PHASE_3_GRAPH_CODEMAP_READINESS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_3_SEMANTIC_MEMORY_READINESS_MIGRATION_ID,
-                PHASE_3_SEMANTIC_MEMORY_READINESS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_3_APPROVAL_PREVIEW_PERSISTENCE_READINESS_MIGRATION_ID,
-                PHASE_3_APPROVAL_PREVIEW_PERSISTENCE_READINESS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_3_STORAGE_CLEANUP_EXECUTION_READINESS_MIGRATION_ID,
-                PHASE_3_STORAGE_CLEANUP_EXECUTION_READINESS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_3_PLUGIN_SERVER_STARTUP_READINESS_MIGRATION_ID,
-                PHASE_3_PLUGIN_SERVER_STARTUP_READINESS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_3_EXTERNAL_CHANNELS_NOTIFICATIONS_READINESS_MIGRATION_ID,
-                PHASE_3_EXTERNAL_CHANNELS_NOTIFICATIONS_READINESS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_3_REMOTE_CONTAINER_CLOUD_READINESS_MIGRATION_ID,
-                PHASE_3_REMOTE_CONTAINER_CLOUD_READINESS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_MIGRATION_ID,
-                PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_MIGRATION_ID,
-                PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_4_MEMORY_MVP_MIGRATION_ID,
-                PHASE_4_MEMORY_MVP_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_4_MEMORY_GOVERNANCE_HARDENING_MIGRATION_ID,
-                PHASE_4_MEMORY_GOVERNANCE_HARDENING_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_5_MANAGED_POLICY_MIGRATION_ID,
-                PHASE_5_MANAGED_POLICY_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_5_ORG_ROLES_MIGRATION_ID,
-                PHASE_5_ORG_ROLES_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_5_AUDIT_EXPORT_MIGRATION_ID,
-                PHASE_5_AUDIT_EXPORT_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_5_PLUGIN_MARKETPLACE_MIGRATION_ID,
-                PHASE_5_PLUGIN_MARKETPLACE_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_5_HOSTED_ROUTINES_MIGRATION_ID,
-                PHASE_5_HOSTED_ROUTINES_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_5_BUDGET_RECORDS_MIGRATION_ID,
-                PHASE_5_BUDGET_RECORDS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_5_RETENTION_POLICIES_MIGRATION_ID,
-                PHASE_5_RETENTION_POLICIES_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_6_CHANNEL_PAIRINGS_MIGRATION_ID,
-                PHASE_6_CHANNEL_PAIRINGS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_6_APPROVAL_RELAY_MIGRATION_ID,
-                PHASE_6_APPROVAL_RELAY_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_6_SUBAGENTS_MIGRATION_ID,
-                PHASE_6_SUBAGENTS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_6_TEAMS_MIGRATION_ID,
-                PHASE_6_TEAMS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_6_REMOTE_EXECUTION_MIGRATION_ID,
-                PHASE_6_REMOTE_EXECUTION_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_7_DESKTOP_SESSIONS_MIGRATION_ID,
-                PHASE_7_DESKTOP_SESSIONS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_7_WEB_SESSIONS_MIGRATION_ID,
-                PHASE_7_WEB_SESSIONS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_7_PLUGIN_EXECUTION_MIGRATION_ID,
-                PHASE_7_PLUGIN_EXECUTION_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_7_GRAPH_INDEX_MIGRATION_ID,
-                PHASE_7_GRAPH_INDEX_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_7_SEMANTIC_MEMORY_MIGRATION_ID,
-                PHASE_7_SEMANTIC_MEMORY_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_7_IDE_SESSIONS_MIGRATION_ID,
-                PHASE_7_IDE_SESSIONS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_9_VECTOR_INDEX_MIGRATION_ID,
-                PHASE_9_VECTOR_INDEX_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_9_SYMBOL_GRAPH_MIGRATION_ID,
-                PHASE_9_SYMBOL_GRAPH_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_9_PROJECT_GRAPH_MIGRATION_ID,
-                PHASE_9_PROJECT_GRAPH_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_9_SKILL_CANDIDATES_MIGRATION_ID,
-                PHASE_9_SKILL_CANDIDATES_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_10_RUNTIME_AUTHORITY_MIGRATION_ID,
-                PHASE_10_RUNTIME_AUTHORITY_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_10_RUNTIME_MODE_STATE_MIGRATION_ID,
-                PHASE_10_RUNTIME_MODE_STATE_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PHASE_10_CAPABILITY_GATE_STATE_MIGRATION_ID,
-                PHASE_10_CAPABILITY_GATE_STATE_SQL,
-                connection,
-            )
-            with contextlib.suppress(sqlite3.OperationalError):
-                connection.execute("ALTER TABLE vector_records ADD COLUMN embedding TEXT")
-            with contextlib.suppress(sqlite3.OperationalError):
-                connection.execute("ALTER TABLE events_index ADD COLUMN prev_event_sha256 TEXT")
-            with contextlib.suppress(sqlite3.OperationalError):
-                connection.execute(
-                    "ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(user_id)"
-                )
-            self._apply_migration(
-                CAPABILITY_DECISION_MODE_MIGRATION_ID, CAPABILITY_DECISION_MODE_SQL, connection
-            )
-            self._apply_migration(REMINDERS_MIGRATION_ID, REMINDERS_SQL, connection)
-            for _col in (
-                "ALTER TABLE reminders ADD COLUMN delivery_status TEXT NOT NULL DEFAULT 'active'",
-                "ALTER TABLE reminders ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0",
-                "ALTER TABLE reminders ADD COLUMN max_retries INTEGER NOT NULL DEFAULT 3",
-                "ALTER TABLE reminders ADD COLUMN delivered_at TEXT",
-            ):
-                with contextlib.suppress(sqlite3.OperationalError):
-                    connection.execute(_col)
-            self._apply_migration(CALENDAR_EVENTS_MIGRATION_ID, CALENDAR_EVENTS_SQL, connection)
-            self._apply_migration(EMAIL_DRAFTS_MIGRATION_ID, EMAIL_DRAFTS_SQL, connection)
-            self._apply_migration(API_SESSIONS_MIGRATION_ID, API_SESSIONS_SQL, connection)
-            self._apply_migration(THREAT_MODEL_ACKS_MIGRATION_ID, THREAT_MODEL_ACKS_SQL, connection)
-            self._apply_migration(
-                PHASE_4_SCHEDULED_ROUTINES_MIGRATION_ID, PHASE_4_SCHEDULED_ROUTINES_SQL, connection
-            )
-            self._apply_migration(
-                MODEL_FALLBACK_SEQUENCE_MIGRATION_ID, MODEL_FALLBACK_SEQUENCE_SQL, connection
-            )
-            self._apply_migration(MODEL_ADVISOR_MIGRATION_ID, MODEL_ADVISOR_SQL, connection)
-            self._apply_migration(ATTACHMENT_STORE_MIGRATION_ID, ATTACHMENT_STORE_SQL, connection)
-            self._apply_migration(PROJECTS_MIGRATION_ID, PROJECTS_SQL, connection)
-            self._apply_migration(MANAGED_FILES_MIGRATION_ID, MANAGED_FILES_SQL, connection)
-            self._apply_migration(
-                MANAGED_FILE_CHUNKS_MIGRATION_ID, MANAGED_FILE_CHUNKS_SQL, connection
-            )
-            self._apply_migration(
-                MANAGED_FILE_CHUNK_FTS_MIGRATION_ID,
-                managed_file_chunk_fts_sql(self.text_search_engine(connection)),
-                connection,
-            )
-            self._apply_migration(PROJECT_CONTEXT_MIGRATION_ID, PROJECT_CONTEXT_SQL, connection)
-            self._apply_migration(
-                CONNECTOR_ECOSYSTEM_MIGRATION_ID, CONNECTOR_ECOSYSTEM_SQL, connection
-            )
-            self._apply_migration(
-                CONNECTOR_INVOCATIONS_MIGRATION_ID, CONNECTOR_INVOCATIONS_SQL, connection
-            )
-            with contextlib.suppress(sqlite3.OperationalError):
-                connection.execute(
-                    "ALTER TABLE sessions ADD COLUMN project_id TEXT REFERENCES projects(project_id)"
-                )
-            # Conversation organisation: a per-session pin/bookmark flag. It is
-            # an organizing label only (like projects) — it grants nothing and
-            # changes no gate, policy, or authority. Default 0 (unpinned).
-            with contextlib.suppress(sqlite3.OperationalError):
-                connection.execute(
-                    "ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0"
-                )
-            with contextlib.suppress(sqlite3.OperationalError):
-                connection.execute(
-                    "ALTER TABLE projects ADD COLUMN owner_user_id TEXT REFERENCES users(user_id)"
-                )
-            # A project's root is now one of two things. `root_kind` says which,
-            # and `root_grant_id` names the owner's grant when the root is a
-            # folder they already had. Defaulting to 'managed' makes this a
-            # no-op for every project that exists today.
-            for _root_column in (
-                "ALTER TABLE projects ADD COLUMN root_kind TEXT NOT NULL DEFAULT 'managed'",
-                "ALTER TABLE projects ADD COLUMN root_grant_id TEXT",
-                # Bytes Raiker discovered rather than wrote need a cheap change
-                # signal, or every reconcile re-hashes the whole tree.
-                "ALTER TABLE managed_files ADD COLUMN source_mtime_ns INTEGER",
-            ):
-                with contextlib.suppress(sqlite3.OperationalError):
-                    connection.execute(_root_column)
-            # Two projects over one folder would put a single file inside two
-            # mutually exclusive "only this project" boundaries, so the database
-            # refuses it rather than trusting every caller to check.
-            with contextlib.suppress(sqlite3.OperationalError):
-                connection.execute(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_attached_root "
-                    "ON projects(root_grant_id) WHERE root_grant_id IS NOT NULL"
-                )
-            self._apply_migration(LOCK_SCREEN_MIGRATION_ID, LOCK_SCREEN_SQL, connection)
-            self._backfill_legacy_account_data_owner(connection)
-            self._apply_migration(
-                OWNED_CONTEXT_DATA_MIGRATION_ID, OWNED_CONTEXT_DATA_SQL, connection
-            )
-            self._backfill_owned_context_data(connection)
-            self._apply_migration(
-                OWNED_MEMORY_METADATA_MIGRATION_ID, OWNED_MEMORY_METADATA_SQL, connection
-            )
-            self._backfill_owned_memory_metadata(connection)
-            self._apply_migration(
-                PRINCIPAL_CONTROL_SCOPE_MIGRATION_ID, PRINCIPAL_CONTROL_SCOPE_SQL, connection
-            )
-            self._apply_migration(BRAIN_SOURCES_MIGRATION_ID, BRAIN_SOURCES_SQL, connection)
-            self._apply_migration(
-                BRAIN_SOURCE_GRANTS_MIGRATION_ID, BRAIN_SOURCE_GRANTS_SQL, connection
-            )
-            # The grant stops implying read-only and starts saying what it
-            # allows, so one record can serve the Knowledge Map's read-only
-            # folders and a project's writable root. Applied here rather than in
-            # the projects block above, because that runs before this table
-            # exists.
-            with contextlib.suppress(sqlite3.OperationalError):
-                connection.execute(
-                    "ALTER TABLE brain_source_grants "
-                    "ADD COLUMN write_enabled INTEGER NOT NULL DEFAULT 0"
-                )
-            self._apply_migration(BRAIN_PREFERENCES_MIGRATION_ID, BRAIN_PREFERENCES_SQL, connection)
-            self._apply_migration(
-                EXECUTION_ENVIRONMENT_CONTROL_MIGRATION_ID,
-                EXECUTION_ENVIRONMENT_CONTROL_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MODEL_CAPACITY_CONTROL_MIGRATION_ID, MODEL_CAPACITY_CONTROL_SQL, connection
-            )
-            self._backfill_legacy_brain_sources(connection)
-            self._backfill_legacy_account_bootstrap_roles(connection)
-            self._migrate_legacy_controls_to_original_owner(connection)
-            self._apply_migration(MEMORY_CONTROLS_MIGRATION_ID, MEMORY_CONTROLS_SQL, connection)
-            self._apply_migration(SESSION_TAGS_MIGRATION_ID, SESSION_TAGS_SQL, connection)
-            self._apply_migration(SESSION_ARCHIVE_MIGRATION_ID, SESSION_ARCHIVE_SQL, connection)
-            self._apply_migration(PROJECTS_NESTING_MIGRATION_ID, PROJECTS_NESTING_SQL, connection)
-            self._apply_migration(
-                PROJECT_MEMORY_INHERITANCE_MIGRATION_ID,
-                PROJECT_MEMORY_INHERITANCE_SQL,
-                connection,
-            )
-            self._backfill_self_inclusive_project_paths(connection)
-            self._apply_migration(MEMORY_ARCHIVE_MIGRATION_ID, MEMORY_ARCHIVE_SQL, connection)
-            self._apply_migration(
-                EIDETIC_OBSERVATIONS_MIGRATION_ID, EIDETIC_OBSERVATIONS_SQL, connection
-            )
-            self._apply_migration(EIDETIC_CAPTURE_MIGRATION_ID, EIDETIC_CAPTURE_SQL, connection)
-            self._apply_migration(MEMORY_PURGE_MIGRATION_ID, MEMORY_PURGE_SQL, connection)
-            self._apply_migration(GIST_MEMORY_MIGRATION_ID, GIST_MEMORY_SQL, connection)
-            self._apply_migration(
-                MEMORY_PROJECTIONS_MIGRATION_ID, MEMORY_PROJECTIONS_SQL, connection
-            )
-            engine = self.text_search_engine(connection)
-            self._apply_migration(MEMORY_FTS_MIGRATION_ID, memory_fts_sql(engine), connection)
-            self._apply_migration(
-                MEMORY_SQLCIPHER_FTS_MIGRATION_ID, memory_sqlcipher_fts_sql(engine), connection
-            )
-            self._apply_migration(
-                MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID,
-                MEMORY_RETRIEVAL_AUTHORITY_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MEMORY_TEMPORAL_EVALUATION_MIGRATION_ID,
-                MEMORY_TEMPORAL_EVALUATION_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MEMORY_CONTENT_CHECKSUM_MIGRATION_ID,
-                MEMORY_CONTENT_CHECKSUM_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MEMORY_EVALUATION_CONTEXT_MIGRATION_ID,
-                MEMORY_EVALUATION_CONTEXT_SQL,
-                connection,
-            )
-            rows = connection.execute(
-                "SELECT memory_id, text FROM approved_memory WHERE content_checksum IS NULL"
-            ).fetchall()
-            connection.executemany(
-                "UPDATE approved_memory SET content_checksum = ? WHERE memory_id = ?",
-                (
-                    (hashlib.sha256(str(row["text"]).encode()).hexdigest(), row["memory_id"])
-                    for row in rows
-                ),
-            )
-            self._apply_migration(
-                MEMORY_ENTITY_GRAPH_MIGRATION_ID, MEMORY_ENTITY_GRAPH_SQL, connection
-            )
-            self._apply_migration(
-                MEMORY_RELATIONSHIP_REVIEW_MIGRATION_ID, MEMORY_RELATIONSHIP_REVIEW_SQL, connection
-            )
-            self._apply_migration(
-                MEMORY_BACKUP_CATALOG_MIGRATION_ID, MEMORY_BACKUP_CATALOG_SQL, connection
-            )
-            self._apply_migration(MEMORY_JOBS_MIGRATION_ID, MEMORY_JOBS_SQL, connection)
-            self._apply_migration(
-                MEMORY_AUDIT_RATE_LIMIT_MIGRATION_ID, MEMORY_AUDIT_RATE_LIMIT_SQL, connection
-            )
-            self._apply_migration(
-                MEMORY_LIFECYCLE_AUDIT_IMMUTABILITY_MIGRATION_ID,
-                MEMORY_LIFECYCLE_AUDIT_IMMUTABILITY_SQL,
-                connection,
-            )
-            self._apply_migration(MCP_SERVERS_MIGRATION_ID, MCP_SERVERS_SQL, connection)
-            self._apply_migration(
-                MCP_SERVER_RUNTIME_MIGRATION_ID, MCP_SERVER_RUNTIME_SQL, connection
-            )
-            self._apply_migration(
-                MCP_REMOTE_ENDPOINT_MIGRATION_ID, MCP_REMOTE_ENDPOINT_SQL, connection
-            )
-            self._apply_migration(MCP_MONITORING_MIGRATION_ID, MCP_MONITORING_SQL, connection)
-            self._apply_migration(MCP_CONTAINMENT_MIGRATION_ID, MCP_CONTAINMENT_SQL, connection)
-            self._apply_migration(
-                CREDENTIAL_SECURITY_MIGRATION_ID, CREDENTIAL_SECURITY_SQL, connection
-            )
-            self._apply_migration(
-                CHECKPOINT_CAPTURE_MANIFEST_MIGRATION_ID,
-                CHECKPOINT_CAPTURE_MANIFEST_SQL,
-                connection,
-            )
-            self._apply_migration(STANDING_GRANTS_MIGRATION_ID, STANDING_GRANTS_SQL, connection)
-            self._apply_migration(
-                CRITICAL_APPROVAL_LIFECYCLE_MIGRATION_ID,
-                CRITICAL_APPROVAL_LIFECYCLE_SQL,
-                connection,
-            )
-            self._apply_migration(SUBAGENT_BUDGETS_MIGRATION_ID, SUBAGENT_BUDGETS_SQL, connection)
-            self._apply_migration(CODE_REPOS_MIGRATION_ID, CODE_REPOS_SQL, connection)
-            self._apply_migration(CODE_MAP_MIGRATION_ID, CODE_MAP_SQL, connection)
-            self._apply_migration(
-                CAPABILITY_MONITORING_MIGRATION_ID, CAPABILITY_MONITORING_SQL, connection
-            )
-            self._apply_migration(
-                MODEL_USAGE_LEDGER_MIGRATION_ID, MODEL_USAGE_LEDGER_SQL, connection
-            )
-            self._apply_migration(
-                MODEL_USAGE_ROLLING_WINDOW_MIGRATION_ID,
-                MODEL_USAGE_ROLLING_WINDOW_SQL,
-                connection,
-            )
-            self._apply_migration(
-                PROVIDER_USAGE_SNAPSHOTS_MIGRATION_ID,
-                PROVIDER_USAGE_SNAPSHOTS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                CONVERSATION_COMPACTIONS_MIGRATION_ID,
-                CONVERSATION_COMPACTIONS_SQL,
-                connection,
-            )
-            self._apply_migration(SUSPENDED_TURNS_MIGRATION_ID, SUSPENDED_TURNS_SQL, connection)
-            self._apply_migration(
-                SUSPENDED_TURN_QUEUE_MIGRATION_ID, SUSPENDED_TURN_QUEUE_SQL, connection
-            )
-            self._apply_migration(
-                SESSION_ATTACHMENT_REFS_MIGRATION_ID, SESSION_ATTACHMENT_REFS_SQL, connection
-            )
-            self._apply_migration(
-                SESSION_ATTACHMENT_SOURCE_MIGRATION_ID,
-                SESSION_ATTACHMENT_SOURCE_SQL,
-                connection,
-            )
-            self._apply_migration(
-                SESSION_COMMAND_GRANTS_MIGRATION_ID,
-                SESSION_COMMAND_GRANTS_SQL,
-                connection,
-            )
-            self._apply_migration(SESSION_ORIGIN_MIGRATION_ID, SESSION_ORIGIN_SQL, connection)
-            self._apply_migration(CONFIGURED_MODELS_MIGRATION_ID, CONFIGURED_MODELS_SQL, connection)
-            self._apply_migration(
-                PROVIDER_CATALOGUE_MIGRATION_ID, PROVIDER_CATALOGUE_SQL, connection
-            )
-            self._apply_migration(
-                TASK_MODEL_CHOICES_MIGRATION_ID, TASK_MODEL_CHOICES_SQL, connection
-            )
-            self._apply_migration(
-                MODEL_PRICE_REGISTRY_MIGRATION_ID, MODEL_PRICE_REGISTRY_SQL, connection
-            )
-            self._apply_migration(
-                CLOUD_EXECUTION_COST_LEDGER_MIGRATION_ID,
-                CLOUD_EXECUTION_COST_LEDGER_SQL,
-                connection,
-            )
-            self._apply_migration(TASK_ATTACHMENTS_MIGRATION_ID, TASK_ATTACHMENTS_SQL, connection)
-            self._apply_migration(SKILLS_MIGRATION_ID, SKILLS_SQL, connection)
-            self._apply_migration(AGENT_PLANS_MIGRATION_ID, AGENT_PLANS_SQL, connection)
-            self._apply_migration(TURN_CONTROLS_MIGRATION_ID, TURN_CONTROLS_SQL, connection)
-            self._apply_migration(TURN_SOURCES_MIGRATION_ID, TURN_SOURCES_SQL, connection)
-            self._apply_migration(
-                TURN_SOURCE_ANCHORS_MIGRATION_ID, TURN_SOURCE_ANCHORS_SQL, connection
-            )
-            self._apply_migration(TURN_RECALL_MIGRATION_ID, TURN_RECALL_SQL, connection)
-            self._apply_migration(
-                MACHINE_IDENTITIES_MIGRATION_ID, MACHINE_IDENTITIES_SQL, connection
-            )
-            self._apply_migration(
-                MACHINE_ACTION_ATTRIBUTION_MIGRATION_ID,
-                MACHINE_ACTION_ATTRIBUTION_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MACHINE_ACTION_IDENTITY_SNAPSHOT_MIGRATION_ID,
-                MACHINE_ACTION_IDENTITY_SNAPSHOT_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MODEL_READINESS_MIGRATION_ID,
-                MODEL_READINESS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MODEL_SETUP_STATE_MIGRATION_ID,
-                MODEL_SETUP_STATE_SQL,
-                connection,
-            )
-            self._apply_migration(SETUP_STATE_MIGRATION_ID, SETUP_STATE_SQL, connection)
-            self._apply_migration(
-                MODEL_OPERATIONS_MIGRATION_ID,
-                MODEL_OPERATIONS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MODEL_OPERATION_PAYLOAD_MIGRATION_ID,
-                MODEL_OPERATION_PAYLOAD_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MODEL_LIBRARY_MIGRATION_ID,
-                MODEL_LIBRARY_SQL,
-                connection,
-            )
-            self._apply_migration(
-                SURFACE_MODEL_DEFAULT_MIGRATION_ID,
-                SURFACE_MODEL_DEFAULT_SQL,
-                connection,
-            )
-            self._apply_migration(
-                CONVERSATION_FTS_MIGRATION_ID,
-                conversation_fts_sql(self.text_search_engine(connection)),
-                connection,
-            )
-            self._apply_migration(WEB_BLOCKLIST_MIGRATION_ID, WEB_BLOCKLIST_SQL, connection)
-            self._apply_migration(
-                GIT_CREDENTIAL_GRANT_MIGRATION_ID, GIT_CREDENTIAL_GRANT_SQL, connection
-            )
-            self._apply_migration(COMMAND_RUNS_MIGRATION_ID, COMMAND_RUNS_SQL, connection)
-            self._apply_migration(
-                COMMAND_CREDENTIAL_DELTAS_MIGRATION_ID,
-                COMMAND_CREDENTIAL_DELTAS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                COMMAND_AUTHORITY_EVIDENCE_MIGRATION_ID,
-                COMMAND_AUTHORITY_EVIDENCE_SQL,
-                connection,
-            )
-            self._apply_migration(COMMAND_EGRESS_MIGRATION_ID, COMMAND_EGRESS_SQL, connection)
-            self._apply_migration(
-                CHECKPOINT_CAPTURE_HEALTH_MIGRATION_ID,
-                CHECKPOINT_CAPTURE_HEALTH_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MEMORY_RELATIONSHIP_EXTRACTION_MIGRATION_ID,
-                MEMORY_RELATIONSHIP_EXTRACTION_SQL,
-                connection,
-            )
-            self._apply_migration(
-                TURN_MEMORY_PROVENANCE_MIGRATION_ID,
-                TURN_MEMORY_PROVENANCE_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MCP_PROTOCOL_VERSION_MIGRATION_ID,
-                MCP_PROTOCOL_VERSION_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MANAGED_FILE_CHUNK_VECTORS_MIGRATION_ID,
-                MANAGED_FILE_CHUNK_VECTORS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                CHANNEL_ROUTING_MIGRATION_ID, CHANNEL_ROUTING_SQL, connection
-            )
-            self._apply_migration(
-                SKILL_COMMANDS_MIGRATION_ID, SKILL_COMMANDS_SQL, connection
-            )
-            self._apply_migration(
-                OWNER_QUESTION_ANSWER_MIGRATION_ID, OWNER_QUESTION_ANSWER_SQL, connection
-            )
-            self._apply_migration(
-                LOCAL_RUNTIME_PRESENCE_MIGRATION_ID,
-                LOCAL_RUNTIME_PRESENCE_SQL,
-                connection,
-            )
-            self._apply_migration(
-                TASK_THREAD_SESSION_MIGRATION_ID,
-                TASK_THREAD_SESSION_SQL,
-                connection,
-            )
-            self._apply_migration(
-                APPROVAL_DECISION_SCOPE_MIGRATION_ID,
-                APPROVAL_DECISION_SCOPE_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MCP_TOOL_SCHEMAS_MIGRATION_ID,
-                MCP_TOOL_SCHEMAS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MCP_SERVER_FEATURES_MIGRATION_ID,
-                MCP_SERVER_FEATURES_SQL,
-                connection,
-            )
-            self._apply_migration(
-                TELEMETRY_DESTINATIONS_MIGRATION_ID,
-                TELEMETRY_DESTINATIONS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                TASK_SURFACE_MIGRATION_ID,
-                TASK_SURFACE_SQL,
-                connection,
-            )
-            self._apply_migration(
-                TELEMETRY_CADENCE_MIGRATION_ID,
-                TELEMETRY_CADENCE_SQL,
-                connection,
-            )
-            self._apply_migration(
-                IMAGE_GENERATIONS_MIGRATION_ID,
-                IMAGE_GENERATIONS_SQL,
-                connection,
-            )
-            self._apply_migration(
-                IMAGE_LINEAGE_MIGRATION_ID,
-                IMAGE_LINEAGE_SQL,
-                connection,
-            )
-            self._apply_migration(
-                BACKGROUND_WORKER_HEALTH_MIGRATION_ID,
-                BACKGROUND_WORKER_HEALTH_SQL,
-                connection,
-            )
-            self._apply_migration(TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection)
-            self._apply_migration(
-                MEMORY_EMBEDDING_BACKEND_MIGRATION_ID,
-                MEMORY_EMBEDDING_BACKEND_SQL,
-                connection,
-            )
-            self._apply_migration(
-                TURN_SOURCE_LOCATOR_INDEX_MIGRATION_ID,
-                TURN_SOURCE_LOCATOR_INDEX_SQL,
-                connection,
-            )
-            self._apply_migration(
-                MEMORY_VECTOR_SEARCH_REVISION_MIGRATION_ID,
-                MEMORY_VECTOR_SEARCH_REVISION_SQL,
-                connection,
-            )
-            self._apply_migration(
-                HOST_NETWORK_CODE_CARRY_OVER_MIGRATION_ID,
-                HOST_NETWORK_CODE_CARRY_OVER_SQL,
-                connection,
-            )
-            # Before the backfills: converting an index and then deciding it is
-            # empty enough to need populating is one read, not two rebuilds.
-            self._migrate_text_search_engine(connection)
-            self._backfill_memory_fts(connection)
-            self._backfill_conversation_fts(connection)
-            for _alter_sql in (
-                "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
-                "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
-                "ALTER TABLE api_sessions ADD COLUMN last_seen_at TEXT",
-                "ALTER TABLE api_sessions ADD COLUMN device_label TEXT",
-                "ALTER TABLE tasks ADD COLUMN priority TEXT",
-                "ALTER TABLE tasks ADD COLUMN scheduled_at TEXT",
-                "ALTER TABLE tasks ADD COLUMN recurrence TEXT",
-                "ALTER TABLE tasks ADD COLUMN reminder_at TEXT",
-                # Project-scoped schedules (backlog item 1): a task/schedule
-                # belongs to the project it was created under, so project work
-                # stays project-scoped. Organizing scope only — grants nothing.
-                "ALTER TABLE tasks ADD COLUMN project_id TEXT REFERENCES projects(project_id)",
-            ):
-                with contextlib.suppress(sqlite3.OperationalError):
-                    connection.execute(_alter_sql)
+            for step in MIGRATIONS:
+                if isinstance(step, Migration):
+                    self._apply_migration(step.id, step.sql, connection)
+                elif isinstance(step, SearchMigration):
+                    self._apply_migration(
+                        step.id, step.sql_for(self.text_search_engine(connection)), connection
+                    )
+                else:
+                    getattr(self, step.method)(connection)
         # The pass is over; anything that asks again asks the table.
         self._applied = None
+
+    def _add_early_columns(self: SQLiteStore, connection: sqlite3.Connection) -> None:
+        """Columns added before migrations were recorded by id: vector embeddings, the event hash chain and session ownership."""
+        with contextlib.suppress(sqlite3.OperationalError):
+            connection.execute("ALTER TABLE vector_records ADD COLUMN embedding TEXT")
+        with contextlib.suppress(sqlite3.OperationalError):
+            connection.execute("ALTER TABLE events_index ADD COLUMN prev_event_sha256 TEXT")
+        with contextlib.suppress(sqlite3.OperationalError):
+            connection.execute(
+                "ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(user_id)"
+            )
+
+    def _add_reminder_delivery_columns(self: SQLiteStore, connection: sqlite3.Connection) -> None:
+        """Reminder delivery state, added in place before migrations were recorded by id."""
+        for _col in (
+            "ALTER TABLE reminders ADD COLUMN delivery_status TEXT NOT NULL DEFAULT 'active'",
+            "ALTER TABLE reminders ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE reminders ADD COLUMN max_retries INTEGER NOT NULL DEFAULT 3",
+            "ALTER TABLE reminders ADD COLUMN delivered_at TEXT",
+        ):
+            with contextlib.suppress(sqlite3.OperationalError):
+                connection.execute(_col)
+
+    def _add_project_columns(self: SQLiteStore, connection: sqlite3.Connection) -> None:
+        """Session and project columns, and the index that keeps one folder in one project."""
+        with contextlib.suppress(sqlite3.OperationalError):
+            connection.execute(
+                "ALTER TABLE sessions ADD COLUMN project_id TEXT REFERENCES projects(project_id)"
+            )
+        # Conversation organisation: a per-session pin/bookmark flag. It is
+        # an organizing label only (like projects) — it grants nothing and
+        # changes no gate, policy, or authority. Default 0 (unpinned).
+        with contextlib.suppress(sqlite3.OperationalError):
+            connection.execute(
+                "ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0"
+            )
+        with contextlib.suppress(sqlite3.OperationalError):
+            connection.execute(
+                "ALTER TABLE projects ADD COLUMN owner_user_id TEXT REFERENCES users(user_id)"
+            )
+        # A project's root is now one of two things. `root_kind` says which,
+        # and `root_grant_id` names the owner's grant when the root is a
+        # folder they already had. Defaulting to 'managed' makes this a
+        # no-op for every project that exists today.
+        for _root_column in (
+            "ALTER TABLE projects ADD COLUMN root_kind TEXT NOT NULL DEFAULT 'managed'",
+            "ALTER TABLE projects ADD COLUMN root_grant_id TEXT",
+            # Bytes Raiker discovered rather than wrote need a cheap change
+            # signal, or every reconcile re-hashes the whole tree.
+            "ALTER TABLE managed_files ADD COLUMN source_mtime_ns INTEGER",
+        ):
+            with contextlib.suppress(sqlite3.OperationalError):
+                connection.execute(_root_column)
+        # Two projects over one folder would put a single file inside two
+        # mutually exclusive "only this project" boundaries, so the database
+        # refuses it rather than trusting every caller to check.
+        with contextlib.suppress(sqlite3.OperationalError):
+            connection.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_attached_root "
+                "ON projects(root_grant_id) WHERE root_grant_id IS NOT NULL"
+            )
+
+    def _add_source_grant_write_column(self: SQLiteStore, connection: sqlite3.Connection) -> None:
+        """Whether a source grant allows writing, once the grants table exists."""
+        # The grant stops implying read-only and starts saying what it
+        # allows, so one record can serve the Knowledge Map's read-only
+        # folders and a project's writable root. Applied here rather than in
+        # the projects block above, because that runs before this table
+        # exists.
+        with contextlib.suppress(sqlite3.OperationalError):
+            connection.execute(
+                "ALTER TABLE brain_source_grants "
+                "ADD COLUMN write_enabled INTEGER NOT NULL DEFAULT 0"
+            )
+
+    def _backfill_memory_content_checksums(self: SQLiteStore, connection: sqlite3.Connection) -> None:
+        """Checksum every approved memory that predates the checksum column."""
+        rows = connection.execute(
+            "SELECT memory_id, text FROM approved_memory WHERE content_checksum IS NULL"
+        ).fetchall()
+        connection.executemany(
+            "UPDATE approved_memory SET content_checksum = ? WHERE memory_id = ?",
+            (
+                (hashlib.sha256(str(row["text"]).encode()).hexdigest(), row["memory_id"])
+                for row in rows
+            ),
+        )
+
+    def _add_session_and_task_columns(self: SQLiteStore, connection: sqlite3.Connection) -> None:
+        """API-session and task columns added in place before migrations were recorded by id."""
+        for _alter_sql in (
+            "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
+            "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
+            "ALTER TABLE api_sessions ADD COLUMN last_seen_at TEXT",
+            "ALTER TABLE api_sessions ADD COLUMN device_label TEXT",
+            "ALTER TABLE tasks ADD COLUMN priority TEXT",
+            "ALTER TABLE tasks ADD COLUMN scheduled_at TEXT",
+            "ALTER TABLE tasks ADD COLUMN recurrence TEXT",
+            "ALTER TABLE tasks ADD COLUMN reminder_at TEXT",
+            # Project-scoped schedules (backlog item 1): a task/schedule
+            # belongs to the project it was created under, so project work
+            # stays project-scoped. Organizing scope only — grants nothing.
+            "ALTER TABLE tasks ADD COLUMN project_id TEXT REFERENCES projects(project_id)",
+        ):
+            with contextlib.suppress(sqlite3.OperationalError):
+                connection.execute(_alter_sql)
 
     def _migrate_plaintext_database(self: SQLiteStore) -> None:
         """Convert a legacy stdlib-SQLite file before SQLCipher opens it."""

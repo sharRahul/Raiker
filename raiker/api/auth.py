@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
+from raiker.api.refusals import refusal
 from raiker.api.session_cookie import cookie_token, csrf_failure
 from raiker.api.sessions import ApiSession, ApiSessionStore
 from raiker.runtime.authority.models import RAIKER_RUNTIME, Principal, PrincipalType
@@ -58,10 +59,7 @@ class AuthMiddleware:
         if from_cookie:
             failure = csrf_failure(request)
             if failure is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail={"ok": False, "reason_code": failure},
-                )
+                raise refusal(status.HTTP_403_FORBIDDEN, failure)
         session = self._session_store.get_by_token(raw_token)
         if session is None:
             raise HTTPException(
@@ -90,10 +88,7 @@ class AuthMiddleware:
                 detail="Session principal not active",
             )
         if not self._scope_satisfies(session.scope, required_scope):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={"ok": False, "reason_code": "scope_insufficient"},
-            )
+            raise refusal(status.HTTP_403_FORBIDDEN, "scope_insufficient")
         return session, principal
 
     def _resolve_principal(self, principal_id: str) -> Principal | None:

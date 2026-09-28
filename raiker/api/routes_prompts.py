@@ -10,7 +10,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import refusal, require_human
+from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.redaction import redact_response_body
 from raiker.api.routes_settings import load_composer_approval_mode
 from raiker.api.schemas import InterruptRequest, PromptRequest
@@ -46,7 +48,7 @@ from raiker.runtime.attachments import (
     store_document,
     store_image,
 )
-from raiker.runtime.authority.models import Principal, PrincipalType
+from raiker.runtime.authority.models import Principal
 from raiker.runtime.identity.presentation import owner_user_metadata
 from raiker.runtime.interrupts import InterruptController
 from raiker.storage.sqlite import SQLiteStore
@@ -72,14 +74,6 @@ _ACTIVE_TASK_STATES = (
     # is its own row and is reached by the same sweep.
     "waiting_for_children",
 )
-
-
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[no-any-return]
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(_ws(request)).authenticate(request)
 
 
 async def _require_model_ready(
@@ -351,22 +345,13 @@ def _resolve_turn_project(
     surface = (body.surface or "chat").strip()
     if surface != "build":
         if requested:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail={"ok": False, "reason_code": "chat_has_no_project_scope"},
-            )
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "chat_has_no_project_scope")
         return None
     if not requested:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": "build_requires_project"},
-        )
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "build_requires_project")
     store = SQLiteStore(workspace)
     if store.load_project(requested, user_id=principal.delegated_by_user_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": "build_project_not_found"},
-        )
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "build_project_not_found")
     return requested
 
 
@@ -551,11 +536,7 @@ async def interrupts(
 ) -> dict[str, Any]:
     _session, principal = _auth_data
     # STOP / interrupts are human-only, like runtime-gate changes.
-    if principal.principal_type != PrincipalType.HUMAN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": "human_principal_required"},
-        )
+    require_human(principal)
     store = SQLiteStore(_ws(request))
     writer = EventLogWriter(store)
     controller = InterruptController(store, writer)
@@ -563,7 +544,7 @@ async def interrupts(
     user_id = store.principal_user_id(principal.principal_id)
     session = store.load_session(body.session_id)
     if session is None or session.get("user_id") != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"ok": False, "reason_code": "interrupt_target_not_found"})
+        raise refusal(status.HTTP_404_NOT_FOUND, "interrupt_target_not_found")
 
     if body.all:
         targets = [
@@ -577,7 +558,7 @@ async def interrupts(
         targets = []
 
     if body.task_id and not targets:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"ok": False, "reason_code": "interrupt_target_not_found"})
+        raise refusal(status.HTTP_404_NOT_FOUND, "interrupt_target_not_found")
     reason = body.reason or "user requested stop"
     applied: list[dict[str, str]] = []
     for task in targets:
@@ -733,11 +714,7 @@ async def stop_all(
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     _session, principal = _auth_data
-    if principal.principal_type != PrincipalType.HUMAN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": "human_principal_required"},
-        )
+    require_human(principal)
     found = _in_flight(request, principal)
     store: SQLiteStore = found["store"]
     writer = EventLogWriter(store)

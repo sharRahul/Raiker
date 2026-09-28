@@ -12,9 +12,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Request, status
+from fastapi import APIRouter, Header, Request, status
 
 from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import workspace_root as _ws
+from raiker.api.refusals import refusal
 from raiker.api.schemas import VaultKeyRequest
 from raiker.auth.accounts import AccountService
 from raiker.auth.vault_key_file import (
@@ -27,10 +29,6 @@ from raiker.storage.sqlite import SQLiteStore
 router = APIRouter()
 
 REQUIRE_MFA_KEY = "security.require_mfa_for_vault"
-
-
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[attr-defined]
 
 
 def _settings(ws: str | Path, principal_id: str) -> dict[str, Any]:
@@ -49,10 +47,7 @@ def _enforce_vault_mfa_policy(ws: str | Path, principal_id: str, mfa_code: str |
     service = AccountService(ws)
     policy_on = settings.get(REQUIRE_MFA_KEY) and service.mfa_enrolled(principal_id)
     if policy_on and (not mfa_code or not service.verify_mfa_code(principal_id, mfa_code)):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": "mfa_required_for_vault"},
-        )
+        raise refusal(status.HTTP_403_FORBIDDEN, "mfa_required_for_vault")
 
 
 @router.get("/api/vault/status")
@@ -71,10 +66,7 @@ async def set_vault_key(body: VaultKeyRequest, request: Request) -> dict[str, An
     try:
         write_vault_key(ws, body.key)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": "connector_vault_key_invalid"},
-        ) from exc
+        raise refusal(status.HTTP_400_BAD_REQUEST, "connector_vault_key_invalid") from exc
     return {"state": vault_status(ws)}
 
 

@@ -13,11 +13,10 @@
  */
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
-import { dismissFirstRunModelSetup, OWNER_CREDENTIALS, pickAnyThinkingLevel, setThinkingEffort, useHostedModel } from "./hosted-provider";
+import { pickAnyThinkingLevel, setThinkingEffort, signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
-const PASSWORD = OWNER_CREDENTIALS.password;
 const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 
@@ -25,25 +24,6 @@ test.describe.configure({ mode: "serial" });
 
 let context: BrowserContext;
 let page: Page;
-
-async function signIn(): Promise<void> {
-  await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 30_000 });
-  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  const confirm = page.getByLabel("Confirm password");
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill(PASSWORD);
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await page.getByRole("button", { name: /unlock|sign in/i }).click();
-  }
-  const welcome = page.getByRole("heading", { name: /Welcome/ });
-  const setup = page.getByRole("button", { name: /Decide later|Skip for now/ });
-  await expect(welcome.or(setup).first()).toBeVisible({ timeout: 30_000 });
-  if (await setup.isVisible().catch(() => false)) await dismissFirstRunModelSetup(page);
-  await expect(welcome).toBeVisible({ timeout: 30_000 });
-}
 
 test.beforeAll(async ({ browser }) => {
   test.skip(KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is required for this live suite.");
@@ -53,7 +33,7 @@ test.beforeAll(async ({ browser }) => {
   test.setTimeout(300_000);
   context = await browser.newContext();
   page = await context.newPage();
-  await signIn();
+  await signInAsOwner(page, BASE);
   await useHostedModel(page, BASE, {
     provider: "Anthropic",
     keyLabel: "Anthropic API key",

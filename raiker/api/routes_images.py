@@ -15,27 +15,18 @@ apply — the same long way round the telemetry export and the audit export take
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, Request, Response, status
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import refusal
+from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.schemas import GenerateImageRequest
-from raiker.api.sessions import ApiSession
-from raiker.runtime.authority.models import Principal
 from raiker.runtime.executors.tier2_image import SIZED_PROVIDERS, SUPPORTED_SIZES
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
-
-
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[no-any-return]
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(_ws(request)).authenticate(request)
 
 
 def _service(request: Request) -> Any:
@@ -109,10 +100,7 @@ async def generate_image(body: GenerateImageRequest, request: Request) -> dict[s
     if not result.ok:
         # The refusal is already recorded against the owner by the executor, so
         # the page can show it in the gallery as well as in the response.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": result.reason_code},
-        )
+        raise refusal(status.HTTP_400_BAD_REQUEST, result.reason_code)
     return {"ok": True, **(result.data or {})}
 
 
@@ -125,18 +113,12 @@ async def get_image_bytes(generation_id: str, request: Request) -> Response:
         generation_id, owner_principal_id=principal.principal_id
     )
     if row is None or not row.get("attachment_id"):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "unknown_generation"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "unknown_generation")
     attachment = store.load_attachment(
         str(row["attachment_id"]), owner_principal_id=principal.principal_id
     )
     if attachment is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "image_bytes_missing"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "image_bytes_missing")
     return Response(
         content=bytes(attachment["data"]),
         media_type=str(row.get("media_type") or "image/png"),

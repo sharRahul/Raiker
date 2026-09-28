@@ -17,38 +17,14 @@
  */
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
-import { dismissFirstRunModelSetup, OWNER_CREDENTIALS, useHostedModel } from "./hosted-provider";
+import { signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = "../../docs/plans/screenshots/working";
-const PASSWORD = OWNER_CREDENTIALS.password;
 
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 
 test.describe.configure({ mode: "serial" });
-
-async function signIn(page: import("@playwright/test").Page): Promise<void> {
-  await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 20_000 });
-  const username = page.getByLabel("Username");
-  await expect(username).toBeVisible({ timeout: 20_000 });
-  await username.fill(OWNER_CREDENTIALS.user);
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  const confirm = page.getByLabel("Confirm password");
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill(PASSWORD);
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await page.getByRole("button", { name: /Sign in|Unlock/ }).click();
-  }
-  await expect(
-    page
-      .getByRole("button", { name: "Decide later" })
-      .or(page.getByRole("heading", { name: "Welcome to your Work Dashboard" }))
-      .first(),
-  ).toBeVisible({ timeout: 60_000 });
-  await dismissFirstRunModelSetup(page);
-}
 
 test("Memory names the embedding space recall actually searches (MEM-03)", async ({ page }) => {
   test.setTimeout(180_000);
@@ -57,7 +33,7 @@ test("Memory names the embedding space recall actually searches (MEM-03)", async
     if (m.type() === "error") consoleErrors.push(m.text());
   });
 
-  await signIn(page);
+  await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/memory`);
   await expect(page.getByRole("heading", { name: "Recall backend" })).toBeVisible({
     timeout: 30_000,
@@ -105,7 +81,7 @@ test("chat search is answered by the FTS5 index, with a marked snippet (MEM-05)"
     if (m.type() === "error") consoleErrors.push(m.text());
   });
 
-  await signIn(page);
+  await signInAsOwner(page, BASE);
 
   // The credential goes in through Raiker's own dialog, not an environment
   // variable — this is the path a person takes.

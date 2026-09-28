@@ -245,6 +245,18 @@ one page still assumes the old field” defects.
 The 2026-09-05 security review is a strong historical review but its summary
 must no longer be read as current status.
 
+> **Later status, 2026-09-28.** The column below is this audit's reading on
+> 2026-09-07 and is kept as that. Since then CR-02 closed as FIXED-500, CR-06
+> and CR-07 as FIXED-599, CR-08 as FIXED-504, and on 2026-09-28 CR-03, CR-04,
+> CR-10, CR-11, CR-12 and CR-13 closed as
+> [FIXED-604](FIXED_ITEMS.md#fixed-604--a-boolean-could-tell-four-connectors-web-access-and-the-advisor-to-skip-the-owners-switch)
+> to
+> [FIXED-611](FIXED_ITEMS.md#fixed-611--nothing-failed-a-change-that-shipped-a-dependency-with-a-published-vulnerability).
+> CR-03's row below said *appears closed* on the strength of a repository search
+> with no hit; the parameter was in fact still in all six services, and it is
+> gone now. The review's own status table is the current one:
+> [`CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md`](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#status--2026-09-28).
+
 | Finding | 2026-09-07 re-verification | Current action |
 |---|---|---|
 | CR-01 governance exclusivity | **Not proven closed** | P0 typed authority-context/invariant test |

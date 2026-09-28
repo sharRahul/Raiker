@@ -39,6 +39,7 @@ from raiker.models.tool_call_validation import default_tool_specs, validate_tool
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.advisor import MAX_ANSWER_CHARS, MAX_QUESTION_CHARS, AdvisorService
+from raiker.runtime.authority.routed import routed_dispatch
 from raiker.runtime.executors import (
     REAL_EXECUTOR_CAPABILITIES,
     build_default_executor_registry,
@@ -46,6 +47,7 @@ from raiker.runtime.executors import (
 from raiker.runtime.executors.models_runtime import AdvisorModelRuntimeExecutor
 from raiker.storage.sqlite import SQLiteStore
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
+from tests.routed_execution import execute_as_routed
 
 
 @pytest.fixture
@@ -229,7 +231,7 @@ class TestAdvisorExecutor:
 
     def test_no_advisor_fails_closed(self, workspace: Path, store: SQLiteStore) -> None:
         executor = AdvisorModelRuntimeExecutor(workspace, store)
-        result = executor.execute(
+        result = execute_as_routed(executor, 
             self._action({"operation": "consult", "question": "q"}), None  # type: ignore[arg-type]
         )
         assert result.ok is False
@@ -242,7 +244,7 @@ class TestAdvisorExecutor:
         executor = AdvisorModelRuntimeExecutor(
             workspace, store, consult_fn=lambda p, m, q: "secret advisor text"
         )
-        result = executor.execute(
+        result = execute_as_routed(executor, 
             self._action({"operation": "consult", "question": "q"}), None  # type: ignore[arg-type]
         )
         assert result.ok is True
@@ -486,9 +488,10 @@ class TestAdvisorReadiness:
             seen["model"] = called_model
             return "The advisor's answer."
 
-        result = AdvisorService(
-            workspace, store, consult_fn=consult, principal_id="principal_owner"
-        ).consult("What should I do?", enforce_modes=False)
+        with routed_dispatch("advisor_model_runtime", "act_test") as authority:
+            result = AdvisorService(
+                workspace, store, consult_fn=consult, principal_id="principal_owner"
+            ).consult("What should I do?", authority=authority)
 
         assert result["status"] == "success", result
         assert seen["model"] == model

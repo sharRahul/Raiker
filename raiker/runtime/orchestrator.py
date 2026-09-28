@@ -81,6 +81,7 @@ from raiker.runtime.identity.presentation import (
     sanitize_display_name,
     user_identity_prompt,
 )
+from raiker.runtime.live_turns import live_turn
 from raiker.runtime.model_usage import ModelUsageLedger
 from raiker.runtime.planner import SimplePlanner
 from raiker.runtime.retrieval import RetrievalAugmentor
@@ -2581,6 +2582,42 @@ class RuntimeOrchestrator:
         return result, decision
 
     async def _arun_agent_loop(
+        self,
+        envelope: PromptEnvelope,
+        machine: RuntimeStateMachine,
+        messages: list[ModelMessage],
+        *,
+        stream: bool,
+        tool_calls_made: int = 0,
+        pending_calls: list[ToolCallProposal] | None = None,
+        queue_total: int = 1,
+        identity: TrustedTurnIdentity | None = None,
+    ) -> AsyncIterator[StreamEvent]:
+        """Run the loop while the turn is listed as live (GEP-02).
+
+        Listing it is what lets the stop switch find a turn that is not a task.
+        The listing ends however the loop does — including a client that
+        stopped reading, which closes this generator.
+        """
+        with live_turn(
+            self.workspace_root,
+            envelope.session_id,
+            envelope.turn_id,
+            self._turn_control_principal(envelope),
+        ):
+            async for event in self._arun_agent_loop_body(
+                envelope,
+                machine,
+                messages,
+                stream=stream,
+                tool_calls_made=tool_calls_made,
+                pending_calls=pending_calls,
+                queue_total=queue_total,
+                identity=identity,
+            ):
+                yield event
+
+    async def _arun_agent_loop_body(
         self,
         envelope: PromptEnvelope,
         machine: RuntimeStateMachine,

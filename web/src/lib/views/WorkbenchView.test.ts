@@ -287,6 +287,28 @@ describe("WorkbenchView", () => {
     expect(within(rail).queryByText("Runtime issues")).toBeNull();
   });
 
+  it("does not call a readiness read still in flight a failed one", async () => {
+    // Found live 2026-09-28: Home said "could not read its own runtime
+    // readiness" while the read was simply still on its way.
+    const routeTable = routes();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const path = url.split("?")[0];
+        if (path === "/api/diagnostics") return new Promise<Response>(() => {});
+        const key = `${(init?.method ?? "GET").toUpperCase()} ${path}`;
+        return { ok: true, status: 200, json: async () => (routeTable as Record<string, unknown>)[key] ?? [] } as Response;
+      }),
+    );
+    render(WorkbenchView);
+
+    const rail = await screen.findByRole("complementary", { name: "Needs your attention" });
+    expect(await within(rail).findByText(/still reading its own runtime readiness/i)).toBeInTheDocument();
+    expect(within(rail).queryByText(/could not read/i)).toBeNull();
+    expect(within(rail).queryByText(/nothing needs you right now/i)).toBeNull();
+  });
+
   it("keeps showing the last readiness it had, and says it is old (NEW-HOME-01)", async () => {
     // A refresh that fails must not erase the board, and must not be reported
     // as a pass either. The answer survives as stale, and says so.

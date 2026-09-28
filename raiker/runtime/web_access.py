@@ -12,6 +12,7 @@ from raiker.contracts.ids import utc_now
 from raiker.models.tool_registry import tool_risk_band
 from raiker.runtime.authority.admission import CapabilityAdmission, capability_admission
 from raiker.runtime.authority.decision_modes import DecisionMode
+from raiker.runtime.authority.routed import is_routed
 from raiker.runtime.executors.sandbox import SandboxError
 from raiker.runtime.web_extract import EXTRACT_MODES
 from raiker.runtime.web_extract import extract as extract_from_body
@@ -328,12 +329,12 @@ class WebAccessService:
         return None
 
     # ── fetch ────────────────────────────────────────────────────────────
-    def fetch(self, url: str, *, enforce_modes: bool = True) -> dict[str, Any]:
+    def fetch(self, url: str, *, authority: object | None = None) -> dict[str, Any]:
         """Read one page and return it as bounded, untrusted text."""
         url = (url or "").strip()
         if not url:
             return _failed("missing_argument:url", "web_fetch needs a url.")
-        if enforce_modes:
+        if not is_routed(authority, _CAP):
             refusal = self._governance_refusal("Web fetch")
             if refusal is not None:
                 return refusal
@@ -380,7 +381,7 @@ class WebAccessService:
 
     # ── extract ──────────────────────────────────────────────────────────
     def extract(
-        self, url: str, *, mode: str = "main_content", enforce_modes: bool = True
+        self, url: str, *, mode: str = "main_content", authority: object | None = None
     ) -> dict[str, Any]:
         """Read one page's *structure* — its main text, links, tables or metadata.
 
@@ -404,7 +405,7 @@ class WebAccessService:
                 f"web_extract_unknown_mode:{mode}",
                 "web_extract mode must be one of: " + ", ".join(EXTRACT_MODES) + ".",
             )
-        if enforce_modes:
+        if not is_routed(authority, _CAP):
             refusal = self._governance_refusal("Web extract")
             if refusal is not None:
                 return refusal
@@ -482,13 +483,13 @@ class WebAccessService:
         return bool(os.environ.get(SEARCH_ENDPOINT_ENV, "").strip())
 
     def search(
-        self, query: str, *, max_results: int = 5, enforce_modes: bool = True
+        self, query: str, *, max_results: int = 5, authority: object | None = None
     ) -> dict[str, Any]:
         """Run one query against the owner-configured search endpoint."""
         query = (query or "").strip()
         if not query:
             return _failed("missing_argument:query", "web_search needs a query.")
-        if enforce_modes:
+        if not is_routed(authority, _CAP):
             refusal = self._governance_refusal("Web search")
             if refusal is not None:
                 return refusal

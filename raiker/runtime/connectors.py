@@ -10,6 +10,7 @@ from urllib.parse import quote
 from raiker.models.tool_registry import tool_risk_band
 from raiker.runtime.authority.admission import CapabilityAdmission, capability_admission
 from raiker.runtime.authority.decision_modes import DecisionMode, auto_requires_approval
+from raiker.runtime.authority.routed import is_routed
 from raiker.runtime.executors.sandbox import (
     SandboxError,
     connector_egress_allowlist,
@@ -117,15 +118,15 @@ class GithubConnectorService:
         repo: str,
         number: Any,
         *,
-        enforce_modes: bool = True,
+        authority: object | None = None,
     ) -> dict[str, Any]:
         """Run one governed GitHub read; returns a tool-result-shaped dict.
 
-        ``enforce_modes=False`` skips the gate/decision-mode layer for callers
-        that already passed through governance (the ``connector_github_runtime``
-        executor is only reachable via ``route_action``, which applies the gate,
-        decision mode, and approval flow itself). Everything else — credential,
-        egress, and argument validation — is always enforced.
+        ``authority`` is the runtime's proof that ``route_action`` is dispatching
+        this call (:mod:`raiker.runtime.authority.routed`); only then is the
+        gate/decision-mode layer skipped, because the router applied it. Anything
+        else — including ``False`` — governs. Credential, egress and argument
+        validation are always enforced.
         """
         resource = (resource or "").strip()
         if resource not in _RESOURCE_PATHS:
@@ -143,7 +144,7 @@ class GithubConnectorService:
         if number_int <= 0:
             return _failed("invalid_number", "number must be a positive integer.")
 
-        if enforce_modes:
+        if not is_routed(authority, _CAP):
             if not self._gate_enabled():
                 return _denied(
                     "connector_gate_disabled",
@@ -218,14 +219,15 @@ class GithubConnectorService:
         issue_number: Any,
         body: str,
         *,
-        enforce_modes: bool = True,
+        authority: object | None = None,
     ) -> dict[str, Any]:
         """Post one governed comment on a GitHub issue or pull request.
 
-        ``enforce_modes=False`` skips the gate/decision-mode layer for callers
-        that already passed through governance (the ``route_action`` + approval
-        path applies those layers itself). Everything else — credential, egress,
-        and argument validation — is always enforced.
+        ``authority`` is the runtime's proof that ``route_action`` is dispatching
+        this call (:mod:`raiker.runtime.authority.routed`); only then is the
+        gate/decision-mode layer skipped, because the router applied it. Anything
+        else — including ``False`` — governs. Credential, egress and argument
+        validation are always enforced.
         """
         repo = (repo or "").strip()
         if not _REPO_RE.match(repo):
@@ -240,7 +242,7 @@ class GithubConnectorService:
         if not body_text:
             return _failed("empty_body", "comment body must not be empty.")
 
-        if enforce_modes:
+        if not is_routed(authority, _CAP):
             withheld = self._write_withheld("write")
             if withheld is not None:
                 return withheld
@@ -307,7 +309,7 @@ class GithubConnectorService:
         base: str,
         body: str = "",
         *,
-        enforce_modes: bool = True,
+        authority: object | None = None,
     ) -> dict[str, Any]:
         """Open one governed pull request on a GitHub repository (B11).
 
@@ -317,9 +319,8 @@ class GithubConnectorService:
         mode, the env-only owner credential and the owner egress allowlist —
         because it is the same credential reaching the same host.
 
-        ``enforce_modes=False`` skips the gate/decision-mode layer for callers
-        that already passed through governance (the ``route_action`` + approval
-        path applies those layers itself).
+        ``authority`` is as for :meth:`read` — the router's live token, or the
+        gate and decision mode apply.
         """
         repo = (repo or "").strip()
         if not _REPO_RE.match(repo):
@@ -337,7 +338,7 @@ class GithubConnectorService:
         if head_ref == base_ref:
             return _failed("head_equals_base", "head and base must be different branches.")
 
-        if enforce_modes:
+        if not is_routed(authority, _CAP):
             withheld = self._write_withheld("pull request")
             if withheld is not None:
                 return withheld
@@ -553,15 +554,15 @@ class GmailConnectorService:
         resource: str,
         message_id: str,
         *,
-        enforce_modes: bool = True,
+        authority: object | None = None,
     ) -> dict[str, Any]:
         """Run one governed Gmail read; returns a tool-result-shaped dict.
 
-        ``enforce_modes=False`` skips the gate/decision-mode layer for callers
-        that already passed through governance (the ``connector_gmail_runtime``
-        executor is only reachable via ``route_action``, which applies the gate,
-        decision mode, and approval flow itself). Everything else — credential,
-        egress, and argument validation — is always enforced.
+        ``authority`` is the runtime's proof that ``route_action`` is dispatching
+        this call (:mod:`raiker.runtime.authority.routed`); only then is the
+        gate/decision-mode layer skipped, because the router applied it. Anything
+        else — including ``False`` — governs. Credential, egress and argument
+        validation are always enforced.
         """
         resource = (resource or "").strip()
         if resource not in _GMAIL_RESOURCE_PATHS:
@@ -573,7 +574,7 @@ class GmailConnectorService:
         if not _GMAIL_ID_RE.match(message_id):
             return _failed("invalid_message_id", "message_id must be a Gmail id.")
 
-        if enforce_modes:
+        if not is_routed(authority, _GMAIL_CAP):
             if not self._gate_enabled():
                 return _denied(
                     "connector_gate_disabled",
@@ -777,14 +778,14 @@ class GcalConnectorService:
         calendar_id: str,
         event_id: str = "",
         *,
-        enforce_modes: bool = True,
+        authority: object | None = None,
     ) -> dict[str, Any]:
         """Run one governed Calendar read; returns a tool-result-shaped dict.
 
         ``resource`` is ``event`` (needs ``calendar_id`` + ``event_id``) or
-        ``calendar`` (calendar metadata; ``event_id`` ignored). ``enforce_modes``
-        mirrors the other connectors (the ``route_action`` executor passes
-        ``False`` because governance already ran).
+        ``calendar`` (calendar metadata; ``event_id`` ignored). ``authority``
+        mirrors the other connectors: the router's live token skips the gate
+        and decision mode it already applied, and nothing else does.
         """
         resource = (resource or "").strip()
         if resource not in _GCAL_RESOURCES:
@@ -799,7 +800,7 @@ class GcalConnectorService:
         if resource == "event" and not _GCAL_EVENT_ID_RE.match(event_id):
             return _failed("invalid_event_id", "event_id is not a valid event id.")
 
-        if enforce_modes:
+        if not is_routed(authority, _GCAL_CAP):
             if not self._gate_enabled():
                 return _denied(
                     "connector_gate_disabled",
@@ -991,13 +992,13 @@ class SlackConnectorService:
         resource: str,
         channel: str,
         *,
-        enforce_modes: bool = True,
+        authority: object | None = None,
     ) -> dict[str, Any]:
         """Run one governed Slack read; returns a tool-result-shaped dict.
 
         ``resource`` is ``channel_info`` (metadata) or ``channel_history`` (the
-        most recent messages, bounded). ``enforce_modes=False`` for the
-        already-governed ``route_action`` executor path.
+        most recent messages, bounded). ``authority`` is the router's
+        live token for the already-governed executor path, as for the others.
         """
         resource = (resource or "").strip()
         if resource not in _SLACK_RESOURCE_METHODS:
@@ -1009,7 +1010,7 @@ class SlackConnectorService:
         if not _SLACK_CHANNEL_RE.match(channel):
             return _failed("invalid_channel", "channel is not a valid Slack channel id.")
 
-        if enforce_modes:
+        if not is_routed(authority, _SLACK_CAP):
             if not self._gate_enabled():
                 return _denied(
                     "connector_gate_disabled",

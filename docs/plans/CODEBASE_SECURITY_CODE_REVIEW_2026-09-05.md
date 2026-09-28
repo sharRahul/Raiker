@@ -27,6 +27,22 @@ Priority review covered runtime authority and approvals, command/process executi
 
 Previously inspected `raiker/security/injection_scan.py`, `raiker/runtime/web_policy.py`, `raiker/context/redaction.py`, and `raiker/api/auth.py` were also considered where relevant.
 
+## Status — 2026-09-28
+
+Six more closed in this pass. Two remain open, and CR-01 remains reduced:
+
+| Finding | Now | Record |
+|---|---|---|
+| CR-03 | **Closed 2026-09-28** | [FIXED-604](FIXED_ITEMS.md#fixed-604--a-boolean-could-tell-four-connectors-web-access-and-the-advisor-to-skip-the-owners-switch) — the boolean is gone; a service skips its gate only for the router's live dispatch token |
+| CR-10 | **Closed 2026-09-28** | [FIXED-605](FIXED_ITEMS.md#fixed-605--a-security-monitor-that-could-not-look-let-the-connection-carry-on) — a session the monitor could not evaluate pauses its connection |
+| CR-11 | **Closed 2026-09-28** | [FIXED-606](FIXED_ITEMS.md#fixed-606--a-send-whose-recipients-were-nested-read-as-a-send-to-nobody) — recipients read at any depth, and a send with none it can read is critical |
+| CR-04 | **Closed 2026-09-28** | [FIXED-607](FIXED_ITEMS.md#fixed-607--an-embedding-was-as-sensitive-as-its-caller-said-it-was) — sensitivity read from the text; a label can only tighten it |
+| CR-13 | **Closed 2026-09-28** | [FIXED-608](FIXED_ITEMS.md#fixed-608--an-attached-file-was-labelled-unknown-whatever-it-said) — every extracted chunk, in six formats, held to all four properties by one test |
+| CR-12 | **Closed 2026-09-28** | [FIXED-611](FIXED_ITEMS.md#fixed-611--nothing-failed-a-change-that-shipped-a-dependency-with-a-published-vulnerability) — least-privilege permissions were already in place; the dependency-vulnerability gate is added for both ecosystems |
+| CR-05 | Open | Making the network-isolated plugin runtime the default needs a sandbox every supported host has; see [`TO_BE_FIXED.md`](TO_BE_FIXED.md#bug-308--the-bare-plugin-runtime-and-the-interpreter-commands-still-reach-the-network-directly) |
+| CR-09 | Open | Routing interpreter commands through the OS sandbox is the same dependency as CR-05, and tracked with it |
+| CR-01 | Reduced | Unchanged: the opaque `AuthorityContext` is RR-AUTHORITY-01. CR-03's token (`raiker/runtime/authority/routed.py`) is the first piece of it in code — issued only at dispatch, bound to one capability and one action — and is not yet the type boundary CR-01 asks for |
+
 ## Status — 2026-09-21
 
 This review had never been revisited, so every finding below still read as open.
@@ -105,6 +121,8 @@ Built-in MCP commands include Python and Node, and the owner can extend the comm
 
 ## CR-03 — Connector `enforce_modes=False` is a bypass primitive
 
+**Status: Closed 2026-09-28 — [FIXED-604](FIXED_ITEMS.md#fixed-604--a-boolean-could-tell-four-connectors-web-access-and-the-advisor-to-skip-the-owners-switch).**
+
 **Severity: High — Priority: P1 — Confidence: High**
 
 Methods in `raiker/runtime/connectors.py`, including GitHub operations, accept `enforce_modes: bool = True`. Passing `False` deliberately skips service-level gate and decision-mode checks because routed callers are expected to have already applied governance.
@@ -120,6 +138,8 @@ Credential, egress and argument checks remain, but authorization enforcement is 
 ---
 
 ## CR-04 — Provider embedding lacks mandatory trusted DLP/classification
+
+**Status: Closed 2026-09-28 — [FIXED-607](FIXED_ITEMS.md#fixed-607--an-embedding-was-as-sensitive-as-its-caller-said-it-was).**
 
 **Severity: High — Priority: P1 — Confidence: High**
 
@@ -227,6 +247,8 @@ Remote MCP in `raiker/runtime/executors/mcp.py` uses this transport and may atta
 
 ## CR-10 — MCP monitoring is explicitly fail-open
 
+**Status: Closed 2026-09-28 — [FIXED-605](FIXED_ITEMS.md#fixed-605--a-security-monitor-that-could-not-look-let-the-connection-carry-on).**
+
 **Severity: Medium — Priority: P1/P2 — Confidence: High**
 
 `McpConnectorExecutor._observe()` catches all exceptions from `self._monitor.observe(...)` and continues the successful session.
@@ -238,6 +260,8 @@ Remote MCP in `raiker/runtime/executors/mcp.py` uses this transport and may atta
 ---
 
 ## CR-11 — Critical recipient logic depends on raw field names
+
+**Status: Closed 2026-09-28 — [FIXED-606](FIXED_ITEMS.md#fixed-606--a-send-whose-recipients-were-nested-read-as-a-send-to-nobody).**
 
 **Severity: Medium — Priority: P2 — Confidence: Medium/High**
 
@@ -251,6 +275,8 @@ Remote MCP in `raiker/runtime/executors/mcp.py` uses this transport and may atta
 
 ## CR-12 — CI lacks explicit least-privilege token permissions and dedicated security gates
 
+**Status: Closed 2026-09-28 — [FIXED-611](FIXED_ITEMS.md#fixed-611--nothing-failed-a-change-that-shipped-a-dependency-with-a-published-vulnerability).**
+
 **Severity: Medium — Priority: P2 — Confidence: High**
 
 `.github/workflows/ci.yml` positively pins `actions/checkout` and `actions/setup-python` to immutable commit SHAs and runs broad Python/Rust quality and SQLCipher posture checks.
@@ -262,6 +288,8 @@ However, the reviewed workflow does not declare explicit top-level/job `permissi
 ---
 
 ## CR-13 — Attachment parser safety does not complete semantic content safety
+
+**Status: Closed 2026-09-28 — [FIXED-608](FIXED_ITEMS.md#fixed-608--an-attached-file-was-labelled-unknown-whatever-it-said).**
 
 **Severity: Medium — Priority: P2 — Confidence: High**
 

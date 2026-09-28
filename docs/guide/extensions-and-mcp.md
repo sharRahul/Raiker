@@ -72,7 +72,10 @@ than how integration normally starts, which is why it reads after the list:
    `workspace_ping`.
 
 Each server card shows its command, template, last connection, and recent
-monitored sessions. It lists each discovered tool on a line with what that tool
+monitored sessions. If the monitor ever cannot evaluate a session — its own
+store unreadable, say — the connection is **paused** with that reason on the
+card and a notification, exactly as a serious anomaly would pause it; **Resume**
+reopens it. A connection is never left running unwatched. It lists each discovered tool on a line with what that tool
 takes — `echo · text · optional: uppercase` — read from the server's own
 declaration. A tool that takes nothing says so; one whose server declared nothing
 says *No arguments declared*, which is a different fact and is worded as one.

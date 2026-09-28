@@ -98,6 +98,36 @@ def _token_estimate(content: str) -> int:
     return max(1, len(content) // 4)
 
 
+# CR-13 — the memory classifier's classes, folded onto the context model's four
+# levels. The fine class travels in the item's metadata as ``content_class`` so
+# nothing is lost in the folding.
+_CONTENT_CLASS_TO_CONTEXT_SENSITIVITY: dict[str, str] = {
+    "credential_like": "sensitive",
+    "secret_like": "sensitive",
+    "personal": "sensitive",
+    "project": "normal",
+    "public": "low",
+    "unknown": "unknown",
+}
+_CONTEXT_SENSITIVITY_RANK = {"unknown": 0, "low": 1, "normal": 2, "sensitive": 3}
+
+
+def _attachment_sensitivity(text: str, declared: str) -> tuple[str, str]:
+    """``(context sensitivity, content class)`` for one attachment's text.
+
+    The stricter of the declared level and the content's own; a declared level
+    can raise the label and never lower it.
+    """
+    from raiker.memory.policy import classify_memory_sensitivity
+
+    content_class = classify_memory_sensitivity(text).value
+    classified = _CONTENT_CLASS_TO_CONTEXT_SENSITIVITY.get(content_class, "unknown")
+    stricter = max(
+        (declared, classified), key=lambda level: _CONTEXT_SENSITIVITY_RANK.get(level, 0)
+    )
+    return stricter, content_class
+
+
 class ContextGatherer:
     """Builds a bounded, deterministic, safe Phase 1/2 context bundle.
 
@@ -719,6 +749,15 @@ class ContextGatherer:
         metadata: dict[str, object] | None = None,
     ) -> ContextItem:
         capped = content[: self.config.max_item_chars]
+        if source_type == "attachment" and trust_level == "untrusted_external":
+            # CR-13 — an attached file's class comes from what it says. Every
+            # attachment path used to write ``unknown`` here, so the one
+            # property the security review asked each extracted chunk to carry
+            # beside its provenance and injection scan was the one it lacked.
+            # Classified before redaction: a credential that redaction is about
+            # to remove is exactly the fact the label must keep.
+            sensitivity, content_class = _attachment_sensitivity(capped, sensitivity)
+            metadata = {**(metadata or {}), "content_class": content_class}
         redacted, changed = redact_text(capped)
         source = ContextSource(
             source_id=new_id("ctxs_"),

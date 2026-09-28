@@ -234,6 +234,9 @@ def test_every_page_carries_a_content_security_policy(workspace: Path) -> None:
     # Nothing Raiker's page runs comes from anywhere else.
     assert directives["script-src"] == "script-src 'self'"
     assert directives["connect-src"] == "connect-src 'self'"
+    # BUG-307 — no inline style allowance either: Svelte styles through the
+    # CSSOM, so the only inline style this would admit is one Raiker did not ship.
+    assert directives["style-src"] == "style-src 'self'"
     # The levers an injected tag would otherwise have.
     assert directives["base-uri"] == "base-uri 'none'"
     assert directives["form-action"] == "form-action 'none'"

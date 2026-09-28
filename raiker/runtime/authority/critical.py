@@ -15,7 +15,9 @@ ZT reference so coverage is traceable):
   web-fetch), including threat-model acknowledgments and confirmation-token
   issuance — :data:`CRITICAL_TIER2_RELAXATION`;
 * **(b)** an external send or calendar invite to any recipient/attendee not on
-  the account's allowlist — :data:`CRITICAL_EXTERNAL_SEND_UNLISTED`;
+  the account's allowlist — :data:`CRITICAL_EXTERNAL_SEND_UNLISTED` — or whose
+  recipients cannot be resolved at all —
+  :data:`CRITICAL_EXTERNAL_SEND_UNRESOLVED`;
 * **(c)** a checkpoint restore that would overwrite changes made by a *different*
   principal since the checkpoint — :data:`CRITICAL_CROSS_PRINCIPAL_RESTORE`;
 * **(d)** creating or broadening a standing approval grant (F3) —
@@ -32,6 +34,7 @@ of one of the frozen sets below weakens the floor and is a governance change.
 from __future__ import annotations
 
 import fnmatch
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -39,6 +42,7 @@ from typing import Any
 # ── criterion codes (stable; referenced by tests and audit events) ────────────
 CRITICAL_TIER2_RELAXATION = "tier2_execution_relaxation"
 CRITICAL_EXTERNAL_SEND_UNLISTED = "external_send_to_non_allowlisted_recipient"
+CRITICAL_EXTERNAL_SEND_UNRESOLVED = "external_send_with_unresolved_recipients"
 CRITICAL_CROSS_PRINCIPAL_RESTORE = "cross_principal_checkpoint_restore"
 CRITICAL_GRANT_MUTATION = "standing_grant_creation_or_broadening"
 CRITICAL_VAULT_OR_EGRESS = "vault_credential_or_egress_allowlist_operation"
@@ -103,8 +107,102 @@ _EXTERNAL_SEND_ACTIONS: frozenset[str] = frozenset({
     "calendar_sync_execution",
 })
 
-# Argument keys that carry one or more recipient/attendee identities.
-_RECIPIENT_KEYS: tuple[str, ...] = ("to", "recipient", "recipients", "attendee", "attendees", "cc", "bcc")
+# Argument keys that carry one or more recipient/attendee identities, at any
+# depth (CR-11). Compared case-insensitively. The flat seven were the whole
+# contract once; a connector that nests its recipients — ``message.to``,
+# ``attendees: [{"email": ...}]``, ``toRecipients: [{"emailAddress": ...}]`` —
+# or names them differently would have yielded an empty set and read as "sends
+# to nobody", which is not critical. Every name here is a recipient; a new one
+# is added here, and an action whose recipients still cannot be found is
+# critical by the unresolved branch below rather than ordinary by omission.
+_RECIPIENT_KEYS: frozenset[str] = frozenset({
+    "to", "cc", "bcc", "recipient", "recipients", "attendee", "attendees",
+    "torecipients", "ccrecipients", "bccrecipients", "to_recipients",
+    "cc_recipients", "bcc_recipients", "guests", "invitees", "participants",
+    "emails", "email_addresses", "destination", "destinations",
+})
+
+# Inside a structured recipient, the fields that hold the identity itself.
+_IDENTITY_KEYS: tuple[str, ...] = ("email", "address", "emailaddress", "email_address", "id", "value")
+
+# How deep the walk goes. Arguments are model-supplied; a bound keeps a hostile
+# nesting from turning classification into unbounded work.
+_MAX_RECIPIENT_DEPTH = 8
+
+_ADDRESS_IN_ANGLES = re.compile(r"<([^<>]+)>")
+
+
+def _split_identities(text: str) -> list[str]:
+    """``"Ann <a@x.io>, b@y.io; c@z.io"`` → ``["a@x.io", "b@y.io", "c@z.io"]``."""
+    found: list[str] = []
+    for part in re.split(r"[,;\n]", text):
+        part = part.strip()
+        if not part:
+            continue
+        bracketed = _ADDRESS_IN_ANGLES.search(part)
+        found.append((bracketed.group(1) if bracketed else part).strip())
+    return [item for item in found if item]
+
+
+def _identities(value: Any, depth: int = 0) -> tuple[list[str], int]:
+    """``(identities, unresolved)`` for one recipient-shaped value.
+
+    ``unresolved`` counts entries that are recipients by position but whose
+    identity could not be read — a mapping with no address field, a number, an
+    over-deep nesting. Each is treated as a recipient nobody allowlisted.
+    """
+    if depth > _MAX_RECIPIENT_DEPTH:
+        return [], 1
+    if isinstance(value, str):
+        return _split_identities(value), 0
+    if isinstance(value, Mapping):
+        lowered = {str(key).lower(): item for key, item in value.items()}
+        for key in _IDENTITY_KEYS:
+            if key in lowered and lowered[key] not in (None, ""):
+                return _identities(lowered[key], depth + 1)
+        return [], 1
+    if isinstance(value, (list, tuple, set, frozenset)):
+        found: list[str] = []
+        unresolved = 0
+        for item in value:
+            items, missing = _identities(item, depth + 1)
+            found.extend(items)
+            unresolved += missing
+        return found, unresolved
+    if value is None or value == "":
+        return [], 0
+    return [], 1
+
+
+def _recipient_fields(arguments: Mapping[str, Any]) -> tuple[list[str], int, int]:
+    """Walk the whole argument tree for recipient fields.
+
+    Returns ``(identities, unresolved, fields)`` where ``fields`` is how many
+    recipient-named keys were present at all — so an action that names none can
+    be told apart from one that names them and leaves them empty.
+    """
+    identities: list[str] = []
+    unresolved = 0
+    fields = 0
+    stack: list[tuple[Any, int]] = [(arguments, 0)]
+    while stack:
+        node, depth = stack.pop()
+        if depth > _MAX_RECIPIENT_DEPTH:
+            unresolved += 1
+            continue
+        if isinstance(node, Mapping):
+            for key, value in node.items():
+                if str(key).lower() in _RECIPIENT_KEYS:
+                    fields += 1
+                    found, missing = _identities(value, depth + 1)
+                    identities.extend(found)
+                    unresolved += missing
+                elif isinstance(value, (Mapping, list, tuple)):
+                    stack.append((value, depth + 1))
+        elif isinstance(node, (list, tuple)):
+            stack.extend((item, depth + 1) for item in node)
+    return identities, unresolved, fields
+
 
 # Standing-grant mutation action types (F3). Grants are *born* from a critical,
 # human-decided action — that is what makes their later unprompted use legitimate.
@@ -135,15 +233,8 @@ _VAULT_EGRESS_TOKENS: frozenset[str] = frozenset({
 
 
 def _recipients(arguments: Mapping[str, Any]) -> list[str]:
-    """Flatten every recipient/attendee identity found in the arguments."""
-    found: list[str] = []
-    for key in _RECIPIENT_KEYS:
-        value = arguments.get(key)
-        if isinstance(value, str) and value.strip():
-            found.append(value.strip())
-        elif isinstance(value, (list, tuple)):
-            found.extend(str(item).strip() for item in value if str(item).strip())
-    return found
+    """Every recipient/attendee identity found in the arguments, at any depth."""
+    return _recipient_fields(arguments)[0]
 
 
 def _on_allowlist(recipient: str, allowlist: Sequence[str]) -> bool:
@@ -193,13 +284,23 @@ def classify_critical(
 
     # (b) External send / calendar invite to a non-allowlisted recipient.
     if action_type in _EXTERNAL_SEND_ACTIONS:
-        recipients = _recipients(args)
+        recipients, unresolved, _fields = _recipient_fields(args)
+        if not recipients:
+            # CR-11 — a send whose destination cannot be read is not a send to
+            # nobody. Fail closed: the human-confirmation floor sees it.
+            return CriticalMatch(
+                code=CRITICAL_EXTERNAL_SEND_UNRESOLVED,
+                zt_ref="ZT-7",
+                detail="external send whose recipients could not be resolved",
+            )
         unlisted = [r for r in recipients if not _on_allowlist(r, recipient_allowlist)]
-        if unlisted:
+        if unlisted or unresolved:
             return CriticalMatch(
                 code=CRITICAL_EXTERNAL_SEND_UNLISTED,
                 zt_ref="ZT-7",
-                detail=f"{len(unlisted)} recipient(s) not on the account allowlist",
+                detail=(
+                    f"{len(unlisted) + unresolved} recipient(s) not on the account allowlist"
+                ),
             )
 
     # (c) Cross-principal checkpoint restore.

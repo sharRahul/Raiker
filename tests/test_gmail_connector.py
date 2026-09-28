@@ -46,6 +46,7 @@ from raiker.runtime.executors import (
 from raiker.runtime.executors.connectors import GmailConnectorExecutor
 from raiker.storage.sqlite import SQLiteStore
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
+from tests.routed_execution import execute_as_routed
 
 _CAP = "connector_gmail_runtime"
 _MESSAGE_JSON = json.dumps(
@@ -259,7 +260,7 @@ class TestGmailConnectorExecutor:
         _configure_creds(monkeypatch)
         executor = GmailConnectorExecutor(workspace, store, fetch_fn=_ok_fetch)
         # Reached via route_action → enforce_modes=False; still needs creds+egress.
-        result = executor.execute(
+        result = execute_as_routed(executor, 
             self._action({"operation": "read", "resource": "message", "message_id": "msg_abc123"}),
             None,  # type: ignore[arg-type]
         )

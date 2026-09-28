@@ -121,8 +121,10 @@ Memory is filtered before ranking:
 - Sensitivity rules can withhold a memory even when its words match perfectly.
 - **Incognito session** disables approved-memory and cross-conversation recall
   for new conversations and tasks. It does not delete stored records.
-- Secret-like and credential-like memories are never sent to an embedding
-  provider when building an index.
+- Secret-like and credential-like text is never sent to an embedding provider —
+  when building an index, embedding a file or embedding a question. Raiker reads
+  the text itself to decide; a label saying it is harmless cannot lower that.
+  Personal text is embedded without a plaintext preview stored beside it.
 
 The model has no permanent-purge tool. A model may help identify a target or
 prepare a preview, but only a human can confirm permanent deletion.

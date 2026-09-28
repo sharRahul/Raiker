@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-28 | Targeted | `2026-09-28-docs-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering and streaming real turns, the key entered through the Connect dialog | Ten items from `docs/plans/`: the owner's GEP-02 decision, six security-review findings, BUG-307, GCR-12 and GEP-03. Proved live: the stop switch counting and stopping **an answer being streamed** with no task running, the stopped turn keeping its text, the next turn answering; and every destination at four widths under `style-src 'self'` with **no CSP refusal**. **Two defects found by the round and fixed in it** — the first stop-all reported one answer as "1 answer being written and 1 task", and Home called a readiness read still in flight a failed one |
 | 2026-09-21 | Targeted | `2026-09-21-static-review-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering real turns; OpenAI and OpenRouter keys entered through the Connect dialog and refused by this host's egress policy; Ollama Cloud unreachable for the same reason | Ten items from `docs/plans/`: the static reviews' remaining instance, storage, transport, registry and version findings, the two API-hardening findings of the security review, and UX-BUILD-05. Proved live: two real turns over one pooled connection, every page under the new Content-Security-Policy with **no console refusals at four widths**, the build identity in Settings, and Build reopening the project it is running inside. **Four defects found by the round and fixed in it** — the live suite was never type-checked, four copies of one wait helper read a usable page as a stuck one, and `bug-242-build-restore` carried four separate stale assertions. GCR-10 was reduced rather than closed: its first fix removed the store's self-repair and eight tests said so |
 | 2026-09-20 | Targeted | `2026-09-20-round/` | Anthropic (`claude-haiku-4-5-20251001`), the key entered through the Connect dialog | Four scenarios on a workspace reset for the round, covering the nine items this run closed: a follow-up after a very long exchange answered *from* it, the conversation library organising a thread on the board it is resumed from (pin, rename, tag, archive and restore), the evidence inspector left with Delete and a line saying where the rest went, and the attached-root watcher named among Diagnostics' background passes. **One Medium defect found by the work and fixed in it** — the session row's menu was clipped by the card it opened inside, so **Delete** could not be clicked |
 | 2026-09-18 | Targeted | `2026-09-18-round/` | Anthropic (`claude-haiku-4-5-20251001`), the key entered through the Connect dialog | Ten scenarios on a workspace reset for the round: the guide's own cross-references opening a chapter in place, four closing events describing four different things, a thread resuming on the surface it was done on, the evidence inspector with one routed way back, one memory record drawer, an exception-led Observability overview, an extensions inventory, one Add-skill entry, a non-animated live board and four security lifecycles. **Three defects found by the work and fixed in it** — every chat thread reported "0 turns", the Extensions lead undercounted by three of the five kinds, and two settings pages each drew their own copy of the page's guide link |
@@ -74,6 +75,68 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-09-28 — Stop reaches the answer being written, and a policy with no inline styles
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py`, reset
+again after the round's first fix. Provider: Anthropic
+`claude-haiku-4-5-20251001`, answering and streaming real turns. The key was
+entered through the Connect dialog and is not written to the repository.
+Browser: the pre-installed Chromium, through `PLAYWRIGHT_CHROMIUM_EXECUTABLE`.
+Spec: `web/e2e/docs-round-2026-09-28-live.spec.ts`. Captures:
+[`docs/screenshots/2026-09-28-docs-round/`](../screenshots/2026-09-28-docs-round).**
+
+Ten items: GEP-02 (by the owner's decision) and GEP-03 of the entry-path
+inventory; CR-03, CR-04, CR-10, CR-11, CR-12 and CR-13 of the security review;
+BUG-307; and GCR-12. Seven change no surface and are proved by unit tests — a
+bypass that no longer exists, a monitor failure, a nested recipient, a
+mis-labelled embedding, an attachment's class, one preparation sequence and a CI
+gate are conditions a test can create and a round cannot photograph. Two change
+what an owner sees, and those are the ones run here.
+
+**What it proved.**
+
+1. **The stop switch reaches the answer being written.** A long answer
+   streaming, no task running: the switch reads *STOP 1*, the confirm says it
+   stops *1 answer being written — every answer being written, task, routine and
+   command, whether or not it reaches outside this machine*, and **Stop all**
+   reports *Stop applied at the safe boundary to 1 answer being written.* The
+   turn ends *Stopped at your request* with the text it had already written, and
+   the switch then reads *Nothing is running*. Before this round the same press
+   said *Nothing is running* while the answer streamed.
+2. **A stopped conversation does not stop the next turn.** A new turn answers
+   normally — a stop is written only for a turn that is running.
+3. **Every destination under `style-src 'self'`.** Every destination in the nav,
+   each hub tab its own, at 360, 768, 1024 and 1440, on a workspace holding
+   real turns — with the browser's own `securitypolicyviolation` event recorded
+   from before the page's first script, not only the console's wording. Nothing
+   was refused. The header carries no `'unsafe-inline'` anywhere.
+
+**What the round found, and the round fixed.**
+
+* **One answer reported as two things.** The first run said *"Stop applied at
+  the safe boundary to 1 answer being written and 1 task."* Every Chat turn runs
+  under an internal governance task that the task list hides because it *is* the
+  turn; `stop-all` cancelled it as a task and stopped the turn as a turn. It is
+  now stopped with the turn and reported as the turn, and the spec asserts the
+  result names no task. Recorded in
+  [FIXED-603](FIXED_ITEMS.md#fixed-603--the-stop-switch-could-not-see-the-answer-it-was-pressed-to-stop).
+* **Home called a read in flight a failed one.** The round's capture of Home
+  showed *"Raiker could not read its own runtime readiness"* beside a tile saying
+  *loading*. It says *still reading* now, and *could not* only when it could not.
+  [FIXED-613](FIXED_ITEMS.md#fixed-613--home-called-a-read-still-in-flight-a-read-that-failed).
+
+**What it did not prove.** An MCP monitor failure (CR-10) — pausing a connection
+because its monitor raised is a condition the unit tests create, not one a live
+host can be made to produce on request; the pause it causes is the same paused
+card a high-severity finding already produces. The image-provider round trip
+([BUG-287](TO_BE_FIXED.md#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider))
+and the three other providers
+([BUG-290](TO_BE_FIXED.md#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host))
+were not attempted: this round was given one key.
 
 ---
 

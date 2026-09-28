@@ -33,6 +33,7 @@ from raiker.models.contracts import ToolCallProposal
 from raiker.models.tool_call_validation import default_tool_specs, validate_tool_call
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
+from raiker.runtime.authority.routed import routed_dispatch
 from raiker.runtime.authority.router import GovernedAction
 from raiker.runtime.connectors import (
     GITHUB_TOKEN_ENV,
@@ -45,6 +46,7 @@ from raiker.runtime.executors import (
 from raiker.runtime.executors.connectors import GithubConnectorExecutor
 from raiker.storage.sqlite import SQLiteStore
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
+from tests.routed_execution import execute_as_routed
 
 _CAP = "connector_github_runtime"
 _ISSUE_JSON = json.dumps(
@@ -239,7 +241,7 @@ class TestGithubConnectorExecutor:
         _configure_creds(monkeypatch)
         executor = GithubConnectorExecutor(workspace, store, fetch_fn=_ok_fetch)
         # Reached via route_action → enforce_modes=False; still needs creds+egress.
-        result = executor.execute(
+        result = execute_as_routed(executor, 
             self._action({"operation": "read", "resource": "issue", "repo": "octo/repo", "number": "5"}),
             None,  # type: ignore[arg-type]
         )
@@ -253,7 +255,7 @@ class TestGithubConnectorExecutor:
     ) -> None:
         _configure_creds(monkeypatch)
         monkeypatch.setattr("raiker.runtime.connectors.post_json_url", _ok_post_json)
-        result = GithubConnectorExecutor(workspace, store).execute(
+        result = execute_as_routed(GithubConnectorExecutor(workspace, store), 
             self._action(
                 {"operation": "create_comment", "repo": "octo/repo", "number": "5", "body": "Fixed."}
             ),
@@ -431,13 +433,14 @@ class TestGithubConnectorWrite:
         assert outcome["untrusted"] is True
         assert "untrusted data" in outcome["content"]
 
-    def test_allow_without_enforce_modes_skips_gate_and_mode(
+    def test_the_routers_live_token_skips_gate_and_mode(
         self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _configure_creds(monkeypatch)
         monkeypatch.setattr("raiker.runtime.connectors.post_json_url", _ok_post_json)
-        outcome = self._service(workspace, store).create_comment(
-            "octo/repo", 5, "Fixed.", enforce_modes=False
-        )
+        with routed_dispatch("connector_github_runtime", "act_test") as authority:
+            outcome = self._service(workspace, store).create_comment(
+                "octo/repo", 5, "Fixed.", authority=authority
+            )
         assert outcome["status"] == "success"
         assert outcome["comment_id"] == "42"

@@ -16,7 +16,10 @@ appearing beside the governed ones.
 It exists because a claim nobody can check is not a control. Written **2026-08-23**,
 derived from the code rather than from the other documents. **Revised 2026-08-24**:
 GEP-04's trace is complete, GEP-01's shared admission helper ships, and both are
-recorded below with what the trace found.
+recorded below with what the trace found. **Revised 2026-09-28**: the owner
+answered GEP-02 and it closed with GEP-03, so §6 holds no open item. The document
+stays: it is the canonical enumeration of entry paths, not a review, and it is
+the one to change when a path is added.
 
 ---
 
@@ -487,7 +490,20 @@ before that question is answered.
 
 ### GEP-02 — The stop switch's scope is undefined for read paths
 
-**Severity: Low. Area: governance semantics. Status: Open — raised 2026-08-23.**
+**Severity: Low. Area: governance semantics. Status: Closed 2026-09-28 —
+[FIXED-603](FIXED_ITEMS.md#fixed-603--the-stop-switch-could-not-see-the-answer-it-was-pressed-to-stop).
+Raised 2026-08-23.**
+
+> **The owner's answer, 2026-09-27.** *"The Stop switch is to stop all the
+> current chat, response, build workflow, routine item or tasks currently being
+> performed. Irrespective of it is leaving the system or not."* Neither of the
+> two readings below: stop is about **the work in progress**, all of it, and
+> whether a piece of it leaves the machine does not decide whether it stops.
+> The switch now reaches every live turn, task, routine and running command
+> through each one's own existing stop, at its safe boundary. What it does not
+> do is change the runtime's persisted status: `CapabilityAdmission.runtime_active`
+> is still reported rather than enforced, because the owner's answer was about
+> the switch, not about that state, and nothing in it asks for the second.
 
 **Observed.** `check_runtime_gate_enable` is applied in `route_action` only.
 A `web_fetch`, an MCP tool call, an advisor consult and a GitHub connector read
@@ -510,7 +526,10 @@ an owner's decision.
 
 ### GEP-03 — `NESTED_BOUNDARIES_ARCHITECTURE.md:278` overstates the architecture
 
-**Severity: Low. Area: documentation. Status: Open — raised 2026-08-23.**
+**Severity: Low. Area: documentation. Status: Closed 2026-09-28 —
+[FIXED-612](FIXED_ITEMS.md#fixed-612--the-architecture-named-one-chokepoint-and-the-code-has-two).
+Raised 2026-08-23.** The section now names both chokepoints, what each applies
+and which kind of action takes which, and points here for the enumeration.
 
 **Observed.** It names one non-bypass path that "every tool, command, plugin
 action, channel action, memory write, graph query, checkpoint restore, model

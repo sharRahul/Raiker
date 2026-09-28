@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from raiker.runtime.authority.routed import current_routed_authority
 from raiker.runtime.executors.base import ExecutionResult
 
 if TYPE_CHECKING:
@@ -52,7 +53,7 @@ class GithubConnectorExecutor:
                 str(action.arguments.get("repo", "")),
                 action.arguments.get("number"),
                 str(action.arguments.get("body", "")),
-                enforce_modes=False,
+                authority=current_routed_authority(action.action_id),
             )
             if outcome.get("status") != "success":
                 error = outcome.get("error", {})
@@ -77,7 +78,7 @@ class GithubConnectorExecutor:
                 str(action.arguments.get("head", "")),
                 str(action.arguments.get("base", "")),
                 str(action.arguments.get("body", "")),
-                enforce_modes=False,
+                authority=current_routed_authority(action.action_id),
             )
             if outcome.get("status") != "success":
                 error = outcome.get("error", {})
@@ -102,7 +103,7 @@ class GithubConnectorExecutor:
             str(action.arguments.get("resource", "")),
             str(action.arguments.get("repo", "")),
             action.arguments.get("number"),
-            enforce_modes=False,
+            authority=current_routed_authority(action.action_id),
         )
         if outcome.get("status") != "success":
             error = outcome.get("error", {})
@@ -176,7 +177,7 @@ class GmailConnectorExecutor:
         outcome = service.read(
             str(action.arguments.get("resource", "")),
             str(action.arguments.get("message_id", "")),
-            enforce_modes=False,
+            authority=current_routed_authority(action.action_id),
         )
         if outcome.get("status") != "success":
             error = outcome.get("error", {})
@@ -244,7 +245,7 @@ class GcalConnectorExecutor:
             str(action.arguments.get("resource", "")),
             str(action.arguments.get("calendar_id", "")),
             str(action.arguments.get("event_id", "")),
-            enforce_modes=False,
+            authority=current_routed_authority(action.action_id),
         )
         if outcome.get("status") != "success":
             error = outcome.get("error", {})
@@ -312,7 +313,7 @@ class SlackConnectorExecutor:
         outcome = service.read(
             str(action.arguments.get("resource", "")),
             str(action.arguments.get("channel", "")),
-            enforce_modes=False,
+            authority=current_routed_authority(action.action_id),
         )
         if outcome.get("status") != "success":
             error = outcome.get("error", {})

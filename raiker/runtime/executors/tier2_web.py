@@ -27,6 +27,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from raiker.runtime.authority.routed import current_routed_authority
 from raiker.runtime.executors.base import ExecutionResult
 
 if TYPE_CHECKING:
@@ -55,7 +56,7 @@ class WebFetchExecutor:
         service = WebAccessService(
             self._workspace_root, self._store, principal_id=principal.principal_id
         )
-        result = service.fetch(url, enforce_modes=False)
+        result = service.fetch(url, authority=current_routed_authority(action.action_id))
         if result.get("status") != "success":
             error = result.get("error") or {}
             reason = str(error.get("type") or "web_fetch_failed")

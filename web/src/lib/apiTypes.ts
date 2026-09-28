@@ -2409,6 +2409,23 @@ export interface SessionAttachmentsView {
   files: SessionAttachment[];
 }
 
+/** GEP-02 — everything the stop switch would reach, counted server-side. */
+export interface WorkInFlight {
+  tasks: number;
+  turns: number;
+  /** `null` when the command store could not be read: unknown, never zero. */
+  commands: number | null;
+  turn_sessions: string[];
+}
+
+export interface StopAllResult {
+  tasks: { task_id: string; result: string }[];
+  turns: { session_id: string; turn_id: string }[];
+  commands: { run_id: string; state: string }[];
+  failed: { kind: string; reason_code: string; run_id?: string }[];
+  safe_boundary: boolean;
+}
+
 export interface InterruptRequestBody {
   session_id: string;
   task_id?: string;

@@ -35,6 +35,7 @@ from raiker.runtime.executors import (
 from raiker.runtime.executors.connectors import SlackConnectorExecutor
 from raiker.storage.sqlite import SQLiteStore
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
+from tests.routed_execution import execute_as_routed
 
 _CAP = "connector_slack_runtime"
 _INFO_JSON = json.dumps(
@@ -249,7 +250,7 @@ class TestSlackConnectorExecutor:
     ) -> None:
         _configure_creds(monkeypatch)
         executor = SlackConnectorExecutor(workspace, store, fetch_fn=_ok_fetch)
-        result = executor.execute(
+        result = execute_as_routed(executor, 
             self._action({"operation": "read", "resource": "channel_info", "channel": "C123ABC"}),
             None,  # type: ignore[arg-type]
         )

@@ -33,6 +33,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -44,6 +45,8 @@ from raiker.runtime.executors.base import ExecutionResult
 from raiker.runtime.executors.sandbox import SandboxError, delete_mcp_session, post_json_rpc
 from raiker.runtime.mcp_endpoint_policy import evaluate_endpoint
 from raiker.security.mcp_monitor import (
+    MONITOR_SOURCE,
+    McpContainment,
     McpSessionMonitor,
     McpSessionTelemetry,
     shape_sensitivity,
@@ -55,6 +58,37 @@ if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
     from raiker.runtime.authority.router import GovernedAction
     from raiker.storage.sqlite import SQLiteStore
+
+
+# CR-10 — connections whose last session the monitor could not evaluate *and*
+# could not be paused in the store (the store being what failed). Keyed by
+# workspace so one instance's broken store does not hold another's connections.
+# An ad-hoc session with no stored profile is held under the empty server id.
+MONITOR_UNAVAILABLE_REASON = (
+    "The security monitor could not evaluate this connection's last session, so it "
+    "is paused until you resume it."
+)
+_UNMONITORED: set[tuple[str, str, str]] = set()
+_UNMONITORED_LOCK = threading.Lock()
+
+
+def _unmonitored_key(workspace: Path, principal_id: str, server_id: str | None) -> tuple[str, str, str]:
+    return (str(workspace), principal_id, server_id or "")
+
+
+def _hold_unmonitored(workspace: Path, principal_id: str, server_id: str | None) -> None:
+    with _UNMONITORED_LOCK:
+        _UNMONITORED.add(_unmonitored_key(workspace, principal_id, server_id))
+
+
+def _release_unmonitored(workspace: Path, principal_id: str, server_id: str | None) -> None:
+    with _UNMONITORED_LOCK:
+        _UNMONITORED.discard(_unmonitored_key(workspace, principal_id, server_id))
+
+
+def _is_unmonitored(workspace: Path, principal_id: str, server_id: str | None) -> bool:
+    with _UNMONITORED_LOCK:
+        return _unmonitored_key(workspace, principal_id, server_id) in _UNMONITORED
 
 # Fixed, reviewed registry of interpreters a local stdio MCP server may run
 # under. An owner may extend it (never replace it) via the env allowlist; a
@@ -509,6 +543,14 @@ class McpConnectorExecutor:
         contained = self._containment_reason(action, principal_id)
         if contained is not None:
             return self._fail(action.action_id, contained)
+        unmonitored = self._unmonitored_reason(
+            principal_id,
+            self._resolve_server_id(
+                action, principal_id, [str(part) for part in action.arguments.get("command", [])]
+            ),
+        )
+        if unmonitored is not None:
+            return self._fail(action.action_id, unmonitored)
         try:
             requested = float(action.arguments.get("timeout", MCP_SESSION_TIMEOUT))
         except (TypeError, ValueError):
@@ -720,13 +762,59 @@ class McpConnectorExecutor:
 
     # ── monitoring: hand redacted telemetry to the session monitor ──
     def _observe(self, telemetry: McpSessionTelemetry) -> None:
-        """Best-effort: a monitoring hiccup must never turn a successful governed
-        session into a failure, so storage/event errors are swallowed. A raised
-        finding is still visible through the finding store + audit event."""
+        """Hand the session to the monitor; if it cannot look, stop trusting.
+
+        A monitoring hiccup still never turns a finished session into a failure
+        — the session already happened, and reporting it as failed would be a
+        different lie. What changed (CR-10) is what happens *next*. The monitor
+        is not only telemetry: its findings trip the auto-pause circuit breaker,
+        so a monitor that raised is a containment control that is not running.
+        Carrying on as though it were is the fail-open the finding names.
+
+        So a session the monitor could not evaluate pauses its connection, with
+        the reason on the card and a notification, exactly as a high-severity
+        finding would — revocable by the owner's Resume, which is the posture:
+        allow, monitor, and pause when monitoring is what went wrong. If even
+        the pause cannot be written, the connection is held in this process and
+        refused until the monitor answers again.
+        """
         try:
             self._monitor.observe(telemetry)
-        except Exception:  # noqa: BLE001 - monitoring must not fail the session
+        except Exception:  # noqa: BLE001 - the session stands; the connection does not
+            self._contain_unmonitored(telemetry)
             return
+        _release_unmonitored(self._ws, telemetry.principal_id, telemetry.server_id)
+
+    def _contain_unmonitored(self, telemetry: McpSessionTelemetry) -> None:
+        paused = False
+        if telemetry.server_id:
+            try:
+                paused = McpContainment(self._store).pause(
+                    telemetry.principal_id,
+                    telemetry.server_id,
+                    reason=MONITOR_UNAVAILABLE_REASON,
+                    source=MONITOR_SOURCE,
+                )
+            except Exception:  # noqa: BLE001 - the store that failed the monitor may fail this too
+                paused = False
+        if not paused:
+            _hold_unmonitored(self._ws, telemetry.principal_id, telemetry.server_id)
+
+    def _unmonitored_reason(self, principal_id: str, server_id: str | None) -> str | None:
+        """Refuse a connection held unmonitored until the monitor can read again.
+
+        The probe is the monitor's own first read — this connection's session
+        history. If it answers, the hold lifts and the session runs (and is
+        observed); if not, nothing has changed and the session is refused.
+        """
+        if not _is_unmonitored(self._ws, principal_id, server_id):
+            return None
+        try:
+            self._store.list_mcp_session_logs(server_id or "", principal_id, limit=1)
+        except Exception:  # noqa: BLE001 - still unreadable: still unmonitored
+            return "mcp_monitor_unavailable"
+        _release_unmonitored(self._ws, principal_id, server_id)
+        return None
 
     def _observe_failure(
         self,

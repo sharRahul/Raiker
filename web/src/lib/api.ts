@@ -58,6 +58,8 @@ import type {
   InterruptRequestBody,
   InstanceLaunchResult,
   InterruptResult,
+  StopAllResult,
+  WorkInFlight,
   McpAgentAccess,
   ChannelsView,
   McpOffer,
@@ -2324,6 +2326,10 @@ export const api = {
   // Issue a governed safe-boundary interrupt for one task or all active tasks in a session.
   interrupt: (body: InterruptRequestBody) =>
     postJson<InterruptResult>("/api/interrupts", body),
+  // GEP-02 — what the stop switch would reach beyond the task list: the turns
+  // writing an answer right now and the commands still running.
+  workInFlight: () => request<WorkInFlight>("/api/work-in-flight"),
+  stopAll: () => postJson<StopAllResult>("/api/stop-all", {}),
 
   // ── Approvals (resolution is metadata-only: records a decision, never executes) ──
   approvals: (statusFilter = "pending") =>

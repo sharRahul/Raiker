@@ -33,6 +33,7 @@ from raiker.runtime.authority.models import (
     RiskLevelValue,
     normalize_runtime_mode,
 )
+from raiker.runtime.authority.routed import routed_dispatch
 from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.storage.internal_paths import display_path
 from raiker.storage.sqlite import SQLiteStore
@@ -1545,7 +1546,10 @@ class RuntimeAuthority:
             pre_image, checkpoint_capture = self._snapshot_pre_image(
                 capability, action.arguments
             )
-            result = executor.execute(action, principal)
+            # CR-03 — the one place a service may be told governance already
+            # happened. The token lives only for this call.
+            with routed_dispatch(capability, action.action_id):
+                result = executor.execute(action, principal)
             if pre_image is not None and result.ok:
                 checkpoint_capture = self._commit_pre_image(pre_image, action, principal)
             execution_artifacts = dict(result.artifacts)

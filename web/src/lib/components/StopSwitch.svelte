@@ -1,6 +1,6 @@
 <script lang="ts">
-  // STOP switch (top bar). Wired to the governed interrupt path: it requests
-  // cancellation of all active tasks at the next safe boundary — NOT an instant force-kill.
+  // STOP switch (top bar). Wired to the governed stop path: it requests that all
+  // work in progress stop at the next safe boundary — NOT an instant force-kill.
   //
   // Found live 2026-09-05, walking every destination at four widths.
   //
@@ -29,14 +29,26 @@
   // Beyond the reference set: Claude Code, Cowork and Codex all surface a stop
   // while a turn runs. None of them tells you *how much* it would reach before
   // you commit to it, because none of them has a governed queue to count.
+  //
+  // **GEP-02 (owner decision, 2026-09-27).** "Stop" means stop *everything*
+  // currently being performed — the answer being written in Chat, a Build turn,
+  // a routine, a task, a running command — whether or not it leaves the
+  // machine. The switch used to read the task list alone, so the one thing an
+  // owner most often wants to stop, the turn they are watching, was invisible to
+  // it: a chat turn is not a task. It now counts tasks the way every surface
+  // does (`isActiveTask` over `GET /api/tasks`) and adds what
+  // `GET /api/work-in-flight` reports — live turns and running commands — and
+  // one press sends one `POST /api/stop-all`, which applies each kind of work's
+  // own existing stop at its safe boundary.
   import { onMount } from "svelte";
   import Icon from "./Icon.svelte";
   import { api, ApiError } from "../api";
   import { humanize } from "../format";
   import { isActiveTask } from "../statusMaps";
-  import type { EventEntry, TaskView } from "../apiTypes";
+  import type { EventEntry, StopAllResult, TaskView } from "../apiTypes";
 
   type Phase = "checking" | "confirm" | "working" | "done" | "empty" | "error";
+  type Counts = { tasks: number; turns: number; commands: number };
 
   const INTERRUPT_EVENT_TYPES = ["interrupt_received", "safe_boundary_reached", "task_cancelled"];
   /** How often the idle badge re-reads. The same cadence the work surfaces use. */
@@ -44,12 +56,28 @@
 
   let open = $state(false);
   let phase = $state<Phase>("confirm");
-  let appliedCount = $state(0);
-  let activeCount = $state(0);
+  let counts = $state<Counts>({ tasks: 0, turns: 0, commands: 0 });
+  let result = $state<StopAllResult | null>(null);
   let resultEvents = $state<EventEntry[]>([]);
   let errorText = $state<string | null>(null);
   let dialogEl: HTMLDivElement | undefined = $state();
+  const activeCount = $derived(counts.tasks + counts.turns + counts.commands);
   const live = $derived(activeCount > 0);
+
+  function plural(n: number, one: string, many: string): string {
+    return `${n} ${n === 1 ? one : many}`;
+  }
+
+  /** "2 tasks, 1 answer being written and 1 command" — only the kinds present. */
+  function describe(c: Counts): string {
+    const parts = [
+      c.turns ? plural(c.turns, "answer being written", "answers being written") : "",
+      c.tasks ? plural(c.tasks, "task", "tasks") : "",
+      c.commands ? plural(c.commands, "command", "commands") : "",
+    ].filter(Boolean);
+    if (parts.length <= 1) return parts[0] ?? "";
+    return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  }
 
   /** The active tasks, counted the way every other surface counts them. */
   async function activeTasks(): Promise<TaskView[]> {
@@ -57,9 +85,26 @@
     return tasks.filter((task) => isActiveTask(task.status));
   }
 
+  /**
+   * Tasks from the task list, turns and commands from the in-flight read. The
+   * two reads fail separately: a failed in-flight read keeps the last known
+   * turn and command counts rather than zeroing them, for the same reason a
+   * failed task read keeps the task count.
+   */
+  async function readCounts(): Promise<Counts> {
+    const [tasks, inFlight] = await Promise.allSettled([activeTasks(), api.workInFlight()]);
+    if (tasks.status === "rejected") throw tasks.reason;
+    const next: Counts = { ...counts, tasks: tasks.value.length };
+    if (inFlight.status === "fulfilled") {
+      next.turns = inFlight.value.turns;
+      if (inFlight.value.commands !== null) next.commands = inFlight.value.commands;
+    }
+    return next;
+  }
+
   async function refreshCount() {
     try {
-      activeCount = (await activeTasks()).length;
+      counts = await readCounts();
     } catch {
       // A failed read keeps the last known count. Blanking it would turn a
       // network hiccup into "nothing is running", which is the one thing this
@@ -84,18 +129,14 @@
 
   async function show() {
     phase = "checking";
-    appliedCount = 0;
+    result = null;
     resultEvents = [];
     errorText = null;
     open = true;
     try {
-      const active = await activeTasks();
-      activeCount = active.length;
-      phase = active.length === 0 ? "empty" : "confirm";
+      counts = await readCounts();
+      phase = activeCount === 0 ? "empty" : "confirm";
     } catch (e) {
-      // The stop itself re-reads, so a failed count is not a failed stop: offer
-      // the decision rather than refusing to open on a read that is only there
-      // to describe it.
       errorText =
         e instanceof ApiError
           ? `Could not read what is running (${e.status}).`
@@ -114,36 +155,19 @@
     phase = "working";
     errorText = null;
     try {
-      // Re-read rather than trusting the count the dialog opened on: the
-      // decision is made against what is running *now*, not what was running
-      // when the owner reached for the button.
-      const active = await activeTasks();
-      activeCount = active.length;
-      if (active.length === 0) {
-        phase = "empty";
-        return;
-      }
-      // Interrupt is per-session and required by the backend schema; group active tasks by
-      // session and issue one safe-boundary cancel-all per affected session.
-      const sessions = [...new Set(active.map((t) => t.session_id))];
-      let applied = 0;
-      for (const sessionId of sessions) {
-        const result = await api.interrupt({
-          session_id: sessionId,
-          all: true,
-          action_type: "cancel",
-          reason: "user requested stop (web UI)",
-        });
-        applied += result.applied.length;
-      }
-      appliedCount = applied;
-      // Surface the resulting governed events as confirmation.
+      result = await api.stopAll();
+      const sessions = [
+        ...new Set([
+          ...result.turns.map((t) => t.session_id),
+          ...(await activeTasks().catch(() => [] as TaskView[])).map((t) => t.session_id),
+        ]),
+      ];
       resultEvents = await loadInterruptEvents(sessions);
       phase = "done";
       void refreshCount();
     } catch (e) {
       errorText =
-        e instanceof ApiError ? `Interrupt failed (${e.status}).` : "Could not reach the local runtime.";
+        e instanceof ApiError ? `Stop failed (${e.status}).` : "Could not reach the local runtime.";
       phase = "error";
     }
   }
@@ -155,7 +179,8 @@
         const evs = await api.events({ session_id: sessionId, limit: 50 });
         collected.push(...evs.filter((e) => INTERRUPT_EVENT_TYPES.includes(e.event_type)));
       } catch {
-        // Confirmation events are best-effort; the interrupt itself already succeeded.
+        // The stop already happened; a failed evidence read must not undo the
+        // "done" the owner is owed.
       }
     }
     return collected;
@@ -178,7 +203,7 @@
   aria-label={live
     ? `Stop all work (${activeCount} active)`
     : "Stop all work (nothing is running)"}
-  title={live ? `Stop ${activeCount} active task${activeCount === 1 ? "" : "s"}` : "Nothing is running"}
+  title={live ? `Stop ${describe(counts)}` : "Nothing is running"}
 >
   <Icon name="stop" size="md" />
   {#if live}<span class="stop-label">STOP</span><span class="stop-count">{activeCount}</span>{/if}
@@ -186,7 +211,7 @@
 <!-- Polite, and outside the button, so a screen reader hears work starting
      without the button's own label being re-announced on every poll. -->
 <span class="sr-only" role="status" aria-live="polite">
-  {live ? `${activeCount} active task${activeCount === 1 ? "" : "s"}` : ""}
+  {live ? `${activeCount} active` : ""}
 </span>
 
 {#if open}
@@ -201,7 +226,7 @@
       onkeydown={onKeydown}
     >
       <h2 id="stop-title">
-        {phase === "empty" ? "Nothing is running" : "Stop all active tasks?"}
+        {phase === "empty" ? "Nothing is running" : "Stop all work in progress?"}
       </h2>
 
       {#if phase === "checking"}
@@ -209,34 +234,48 @@
       {:else if phase === "confirm"}
         <p>
           {#if activeCount > 0}
-            This stops <strong>{activeCount}</strong>
-            task{activeCount === 1 ? "" : "s"} — everything queued, running, paused, or waiting
-            for your approval — at the next
+            This stops <strong>{describe(counts)}</strong> — every answer being written, task,
+            routine and command, whether or not it reaches outside this machine — at the next
           {:else}
-            This requests cancellation of every task that is queued, running, paused, or waiting
-            for your approval, at the next
+            This stops every answer being written, task, routine and command, whether or not it
+            reaches outside this machine, at the next
           {/if}
           <strong>safe boundary</strong>. It is governed and audited — not a force-kill.
         </p>
         {#if errorText}<p class="error-line" role="alert">{errorText}</p>{/if}
         <div class="actions">
           <button type="button" class="btn" onclick={close}>Cancel</button>
-          <button type="button" class="btn btn-danger" onclick={confirmStop}>Stop tasks</button>
+          <button type="button" class="btn btn-danger" onclick={confirmStop}>Stop all</button>
         </div>
       {:else if phase === "working"}
         <p role="status">Requesting safe-boundary stop…</p>
       {:else if phase === "empty"}
         <!-- Reached from the count taken when this opened, so it costs the owner
              a press rather than a press plus a confirmation plus an interrupt. -->
-        <p role="status">Nothing is queued, running, paused, or waiting for approval.</p>
+        <p role="status">
+          No answer is being written, and no task, routine or command is queued, running, paused
+          or waiting for approval.
+        </p>
         <div class="actions">
           <button type="button" class="btn" onclick={() => void show()}>Check again</button>
           <button type="button" class="btn" onclick={close}>Close</button>
         </div>
       {:else if phase === "done"}
         <p role="status" class="ok-line">
-          Stop applied to {appliedCount} task{appliedCount === 1 ? "" : "s"} at the safe boundary.
+          {#if result}
+            Stop applied at the safe boundary to {describe({
+              tasks: result.tasks.length,
+              turns: result.turns.length,
+              commands: result.commands.length,
+            }) || "nothing — it had already finished"}.
+          {/if}
         </p>
+        {#if result && result.failed.length > 0}
+          <p role="alert" class="error-line">
+            {plural(result.failed.length, "item", "items")} could not be stopped:
+            {result.failed.map((f) => humanize(f.reason_code)).join(", ")}.
+          </p>
+        {/if}
         {#if resultEvents.length > 0}
           <ul class="events">
             {#each resultEvents as ev (ev.event_id)}

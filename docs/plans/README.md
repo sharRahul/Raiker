@@ -66,11 +66,11 @@ When these disagree with an older topic review's current-status prose, re-verify
 | Document | Role now |
 |---|---|
 | `CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md` | Historical optimization review; several architecture recommendations remain active |
-| `CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md` | Historical security findings; current re-verification is in the deep audit |
+| `CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md` | Security findings; its **2026-09-28 status table is current** — CR-05 and CR-09 remain open as [BUG-308](TO_BE_FIXED.md#bug-308--the-bare-plugin-runtime-and-the-interpreter-commands-still-reach-the-network-directly), CR-01 is reduced (RR-AUTHORITY-01) |
 | `GAP_BUILD_CHAT.md` | Build/Chat gap ledger; row-level status is stronger evidence than old narrative paragraphs |
 | `GENERIC_STATIC_CODE_REVIEW_2026-09-05.md` | Historical static review |
 | `GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md` | Historical deeper review; contains some stale “still open” prose beside later closed rows |
-| `GOVERNANCE_ENTRY_PATHS.md` | Governance entry-path inventory; candidate for registry-backed validation |
+| `GOVERNANCE_ENTRY_PATHS.md` | Canonical governance entry-path inventory; no open item since 2026-09-28 (GEP-02 and GEP-03 closed). Kept as the enumeration, not as a review |
 | `LIVE_TEST_ROUNDS.md` | Historical live-test evidence by round |
 | `MEMORY_RELIABILITY_PLAN.md` | Memory reliability evidence/closure ledger |
 | `RAIKER_LIVE_MANUAL_TEST_PLAN.md` | Active manual verification procedure |

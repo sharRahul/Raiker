@@ -44,7 +44,7 @@ The largest issues found in this first generic pass are:
 3. mounted Raiker instances are built as FastAPI sub-applications with their own lifespan workers, but mounted sub-app lifespans do not run under FastAPI — **closed 2026-09-21 ([FIXED-593](FIXED_ITEMS.md#fixed-593--a-second-person-on-this-machine-had-a-raiker-with-no-background-work))**;
 4. instance creation is non-transactional and mutates the live route table from a synchronous worker thread — **closed 2026-09-21 ([FIXED-594](FIXED_ITEMS.md#fixed-594--a-half-made-instance-blocked-the-retry-it-told-you-to-make))**;
 5. `SQLiteStore` performs bootstrap/migration work in every constructor while hot request paths repeatedly construct stores — **reduced 2026-09-21 ([FIXED-595](FIXED_ITEMS.md#fixed-595--a-hundred-and-sixty-eight-queries-to-find-out-there-was-nothing-to-do))**: the pass costs 3 queries where it cost 168, and still runs every time, because it is also the store's self-repair;
-6. prompt submit and prompt streaming have duplicated orchestration with differing error semantics;
+6. prompt submit and prompt streaming have duplicated orchestration with differing error semantics — **closed 2026-09-28 ([FIXED-610](FIXED_ITEMS.md#fixed-610--two-copies-of-how-a-turn-starts-and-they-had-begun-to-differ))**;
 7. frontend CI is path-filtered so backend API contract changes can bypass frontend type/build/E2E checks — **closed 2026-09-20 ([FIXED-589](FIXED_ITEMS.md#fixed-589--a-backend-change-could-not-break-the-web-client-because-the-web-client-was-never-built))**.
 
 The third pass adds more urgent correctness issues; see the companion document above before implementing this backlog.
@@ -64,10 +64,10 @@ The third pass adds more urgent correctness issues; see the companion document a
 | GCR-09 | High | P1 | Instance registry/routing mutation is non-atomic and performed from a sync route worker thread — **Closed 2026-09-21 ([FIXED-594](FIXED_ITEMS.md#fixed-594--a-half-made-instance-blocked-the-retry-it-told-you-to-make))** |
 | GCR-10 | Medium/High | P1 | `SQLiteStore` bootstraps on every construction; hot paths construct several stores per request — **Reduced 2026-09-21 ([FIXED-595](FIXED_ITEMS.md#fixed-595--a-hundred-and-sixty-eight-queries-to-find-out-there-was-nothing-to-do))**; the lifecycle half is refused with a reason |
 | GCR-11 | Medium | P2 | `sqlite.py` has become a large persistence/migration god module |
-| GCR-12 | Medium | P2 | Prompt submit and stream paths duplicate orchestration and already expose different error semantics |
+| GCR-12 | Medium | P2 | Prompt submit and stream paths duplicate orchestration and already expose different error semantics — **Closed 2026-09-28 ([FIXED-610](FIXED_ITEMS.md#fixed-610--two-copies-of-how-a-turn-starts-and-they-had-begun-to-differ))** |
 | GCR-13 | Medium | P2 | API redaction middleware buffers almost every JSON API response in full |
 | GCR-14 | Medium | P2 | Provider calls do not reuse an app/router-scoped HTTP client/connection pool — **Closed 2026-09-21 ([FIXED-596](FIXED_ITEMS.md#fixed-596--every-model-call-built-a-new-connection-to-a-host-it-was-already-talking-to))** |
-| GCR-15 | Medium | P2 | Frontend CI does not run for backend/API contract-only changes |
+| GCR-15 | Medium | P2 | Frontend CI does not run for backend/API contract-only changes — **Closed 2026-09-20 ([FIXED-575](FIXED_ITEMS.md#fixed-575--the-guard-against-contract-drift-was-a-second-hand-written-copy-of-the-contract), [FIXED-589](FIXED_ITEMS.md#fixed-589--a-backend-change-could-not-break-the-web-client-because-the-web-client-was-never-built))** |
 | GCR-16 | Low/Medium | P2 | Version metadata is split between hard-coded `0.0.0`, FastAPI `0.1.0`, and release input versions — **Closed 2026-09-21 ([FIXED-598](FIXED_ITEMS.md#fixed-598--four-version-numbers-and-which-one-you-got-depended-on-where-you-looked))** |
 | GCR-17 | Low | P3 | Model registry lookup normalization differs between `resolve`, `profiles_for_provider`, and `find` — **Closed 2026-09-21 ([FIXED-597](FIXED_ITEMS.md#fixed-597--three-spellings-of-one-provider-name))** |
 | GCR-18 | Low | P3 | Public method parameters exist that are unused (`health_timeout`, `context`) and weaken API clarity — **Closed 2026-09-06 ([FIXED-434](FIXED_ITEMS.md#fixed-434--two-public-parameters-that-changed-nothing))** |
@@ -291,6 +291,12 @@ The broad migration import list itself demonstrates how many product domains dep
 ## GCR-12 — Prompt JSON and SSE routes duplicate orchestration
 
 **Severity: Medium — Priority: P2 — Confidence: High**
+
+**Status: Closed 2026-09-28 — [FIXED-610](FIXED_ITEMS.md#fixed-610--two-copies-of-how-a-turn-starts-and-they-had-begun-to-differ).** One `_prepare_turn` in
+`raiker/api/routes_prompts.py` performs the sequence in one order and returns a
+prepared turn or a typed refusal; each route only renders a refusal in its own
+transport — a `409` or a JSON body, or the stream's single final event. A test
+holds the two to the same verdict for the same request.
 
 `submit_prompt()` and `stream_prompt()` both independently perform session ownership checks, project resolution, envelope building, project binding, readiness checks, attachment recording, gateway construction and generated-file recording.
 

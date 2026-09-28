@@ -275,7 +275,32 @@ machine is the actor recorded on the action. Child-agent boundaries mint child
 principals with explicit parent ancestry. No interface, plugin relay, scheduled
 run, resume path, or CLI agentic path may bypass this gate.
 
-This is the non-bypass path every tool, command, plugin action, channel action, memory write, graph query, checkpoint restore, model control, or execution adapter must follow.
+**There are two chokepoints, and which one an action takes depends on whether
+it reads or acts.** This used to say there was one non-bypass path that every
+tool, command, plugin action, channel action, memory write, graph query,
+checkpoint restore, model control or execution adapter followed. Measured
+against the code that was not accurate
+([GEP-03](../plans/GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture)),
+and the inaccuracy was an undocumented design rather than a hole:
+
+| Chokepoint | What crosses it | What it applies |
+|---|---|---|
+| **A — `PolicyEngine.review`** (`raiker/policy/engine.py`) | Every model-proposed tool call, without exception — including every *read*: `read_file`, `grep`, `memory_get`, `knowledge_graph`, `code_map_search`, a projected MCP tool, a graph query | Managed policy, role policy, read/write shape and workspace containment, credential-like text refused before a memory write is offered, and whether approval is required. A tool in neither the allow nor the deny set is hard-denied |
+| **B — `RuntimeAuthority.route_action`** (`raiker/runtime/authority/router.py`) | Everything that **acts**: a write, a command, a checkpoint restore, a connector or MCP session, a model-provider call, a capability-gate change — whether the owner approved it, pre-authorised it for the turn, or the relay is carrying out an approval | Principal active, domain scope, no self-approval, no self-grant, the capability gate, the critical-risk floor, policy review (chokepoint A again, at execution time), the decision mode, and the executor dispatch with its audit events |
+
+A read never needs B, because it changes nothing and leaves nothing; an action
+always crosses both. The complete list of paths — which surface originates an
+action, which chokepoints it crosses, and the most it can reach — is
+[`GOVERNANCE_ENTRY_PATHS.md`](../plans/GOVERNANCE_ENTRY_PATHS.md), which is derived
+from the code and is the document to change when a path is added.
+
+Two properties hold across both. A service a chat tool reaches directly (a
+connector, web access, the advisor) enforces its own gate and decision mode, and
+skips them only for the runtime-issued token `route_action` hands its executor
+for the length of one dispatch (CR-03, `raiker/runtime/authority/routed.py`) — a
+boolean can no longer ask it to. And the owner's stop switch stops every piece of
+work in progress, whichever chokepoint it crossed and whether or not it leaves
+the machine (GEP-02).
 
 ```mermaid
 flowchart LR

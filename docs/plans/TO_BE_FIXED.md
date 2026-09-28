@@ -86,8 +86,8 @@ names.
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
 | [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in) | Low | Live test harness | **Closed 2026-08-30 (FIXED-324)** — every live spec with a sign-in function delegates to the shared helper. The per-spec password that stops two specs sharing a workspace is a different defect, [BUG-247](#bug-247--every-live-spec-brings-its-own-owner-password) |
 | [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced twice on 2026-09-04 ([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport), [FIXED-387](FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six)) and twice again on 2026-09-05 ([FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own), [FIXED-412](FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped)). The transport conforms, the card names what a server offers and Raiker does not use, every content-block shape reaches the model, a server-initiated request is answered rather than mistaken for a response, and an event stream is read and resumed correctly; **incremental** delivery, remote OAuth, MCP Apps and elicitation's owner-facing half remain |
-| [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths), [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Low | Governance architecture / documentation | Open — not duplicated here. GEP-02 is **an owner decision** and the helper now carries the answer at no cost |
-| [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open remainder — the live half closed 2026-08-30 as [FIXED-322](FIXED_ITEMS.md#fixed-322--permissions-said-off-about-a-capability-that-would-have-run): Permissions now reports what the enforcing path answers. Unifying the three resolutions is still **an owner decision** |
+| [GEP-02](FIXED_ITEMS.md#fixed-603--the-stop-switch-could-not-see-the-answer-it-was-pressed-to-stop), [GEP-03](FIXED_ITEMS.md#fixed-612--the-architecture-named-one-chokepoint-and-the-code-has-two) | Low | Governance architecture / documentation | **Closed 2026-09-28** — GEP-02 by the owner's decision: Stop halts all work in progress, whether or not it leaves the machine ([FIXED-603](FIXED_ITEMS.md#fixed-603--the-stop-switch-could-not-see-the-answer-it-was-pressed-to-stop)); GEP-03 as [FIXED-612](FIXED_ITEMS.md#fixed-612--the-architecture-named-one-chokepoint-and-the-code-has-two) |
+| [BUG-239](FIXED_ITEMS.md#fixed-544--a-new-account-was-fail-closed-about-reading-its-owners-own-repository) | Low | Capability gates / owner decision | **Closed 2026-09-15 ([FIXED-544](FIXED_ITEMS.md#fixed-544--a-new-account-was-fail-closed-about-reading-its-owners-own-repository))** — the three resolutions stay, by the owner's decision; this row still read *Open remainder* until 2026-09-28 |
 | [BUG-240](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered) | Medium → Low | Memory / retrieval | **Closed 2026-08-26 (FIXED-292, FIXED-294)** — both the provider half and the managed-file half ship; the row is kept so a reader arriving with the number is not left wondering |
 | [BUG-241](FIXED_ITEMS.md#fixed-313--fullpage-evidence-captures-stopped-at-the-first-viewport) | Low | Live test harness / evidence | **Closed 2026-08-29 (FIXED-313)** — one shared capture helper; all 56 live specs go through it |
 | [BUG-242](FIXED_ITEMS.md#fixed-309--build-opened-an-empty-conversation-after-a-reload) | Medium | Build / web UI | **Closed 2026-08-29 (FIXED-309)** — the conversation rides in the URL and Build restores it |
@@ -110,7 +110,8 @@ names.
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open — the same egress limit as [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host); since [FIXED-542](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all) a live round has a second thing to prove — that turning **Image generation** off refuses a generation |
 | [BUG-288](FIXED_ITEMS.md#fixed-545--a-turn-could-only-answer-in-prose) | Low | Chat / typed output | **Closed 2026-09-15 ([FIXED-545](FIXED_ITEMS.md#fixed-545--a-turn-could-only-answer-in-prose))** — VIS-19, and the last implementation item in the visual review that was removed when it closed |
 | [BUG-289](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running) | Low | Models / provider errors | **Closed 2026-09-14 ([FIXED-526](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running))** — a hosted provider gets a remedy an owner can act on |
-| [BUG-307](#bug-307--the-content-security-policy-still-allows-inline-styles) | Low | Web UI / security headers | Open — raised 2026-09-21 while closing [CR-07](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-07--browser-responses-lack-content-security-policy) as [FIXED-599](FIXED_ITEMS.md#fixed-599--the-body-cap-counted-a-claim-and-nothing-said-where-a-page-may-reach) |
+| [BUG-307](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true) | Low | Web UI / security headers | **Closed 2026-09-28 ([FIXED-609](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true))** — `style-src 'self'`; Svelte 5 styles through the CSSOM, and a live sweep of every destination at four widths found nothing refused |
+| [BUG-308](#bug-308--the-bare-plugin-runtime-and-the-interpreter-commands-still-reach-the-network-directly) | Medium | Plugins / commands / sandbox | Open — raised 2026-09-28 as the remainder of CR-05 and CR-09 of the security review, which share one dependency |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -1567,6 +1568,13 @@ offers the one that applies to it — with a capture of each.
 
 ## BUG-307 — The Content-Security-Policy still allows inline styles
 
+**Closed 2026-09-28 as
+[FIXED-609](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true).**
+The premise below turned out not to hold: Svelte 5 applies a dynamic style
+through the CSSOM (`element.style.cssText`, `style.setProperty`), which a policy
+does not govern, so there were no attributes to replace and the allowance could
+simply go. The entry is kept as written.
+
 **Severity: Low. Area: Web UI / security headers. Raised 2026-09-21 while
 closing [CR-07](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-07--browser-responses-lack-content-security-policy)
 as [FIXED-599](FIXED_ITEMS.md#fixed-599--the-body-cap-counted-a-claim-and-nothing-said-where-a-page-may-reach).**
@@ -1598,6 +1606,41 @@ part of shipping the header, which is why the header shipped first.
 **Required user-interface outcome.** No visual change: every control that sizes
 itself from state keeps doing so, and the page's own policy no longer permits a
 style it did not ship.
+
+## BUG-308 — The bare plugin runtime and the interpreter commands still reach the network directly
+
+**Severity: Medium. Area: Plugins / commands / sandbox. Status: Open — raised
+2026-09-28 as the remainder of
+[CR-05](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-05--bare-plugin-runtime-has-ambient-network-access)
+and [CR-09](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-09--general-purpose-interpreters-remain-in-the-command-allowlist)
+of the security review, when the other six open findings of that review closed.**
+
+**Observed.** Two execution paths run code Raiker did not write with the host's
+network: `PluginRuntimeExecutor` runs an owner-allowlisted plugin through the
+shared subprocess runner, and a governed command may name `python`, `node`,
+`npm` or `npx` against a script in the workspace. Environment sanitising,
+workspace containment and flag denial all apply; none of them is a network
+boundary, so a script can open a socket the egress policy never sees.
+
+**Why it was not closed with the others.** Both findings' recommendation is the
+same: run that code inside the network-isolated sandbox
+(`PluginSandboxedRuntimeExecutor`, the native runner) by default. That sandbox
+is not available on every host Raiker supports, and making it the default
+without it would turn a working plugin or a working test run into a refusal on
+those hosts — the owner-authoritative posture's "hard block in front of a
+legitimate choice". It needs a decision about what the default is where the
+sandbox is absent, and live evidence on a host that has it.
+
+**Proposed fix.** Default both paths to the isolated runtime where the host
+provides one; where it does not, keep the current path but classify it as the
+explicit, owner-granted "runs with network" capability it actually is, shown as
+such in Permissions, with its own switch. Revalidate the plugin artifact's hash
+immediately before execution in both cases.
+
+**Required user-interface outcome.** Permissions and the plugin card say, for
+each plugin and for interpreter commands, whether code runs inside the network
+boundary or with the host's network — never a claim of containment the host
+cannot keep.
 
 ## BUG-290 — Three of the four providers this round was given keys for cannot be reached from this host
 

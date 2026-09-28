@@ -624,6 +624,17 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-600](#fixed-600--build-named-the-project-and-sent-you-to-the-list-of-them) | Low | Build / Chat / Design / Tasks navigation | Fixed 2026-09-21 (closes UX-BUILD-05) |
 | [FIXED-601](#fixed-601--the-suite-that-proves-everything-was-never-type-checked) | Medium | Live test harness | Fixed 2026-09-21 — raised and closed in the same run |
 | [FIXED-602](#fixed-602--the-open-ledgers-index-left-out-three-of-its-own-entries-one-of-them-open) | Low | Documentation / CI | Fixed 2026-09-21 |
+| [FIXED-603](#fixed-603--the-stop-switch-could-not-see-the-answer-it-was-pressed-to-stop) | Medium | Stop switch / governance | Fixed 2026-09-28 (closes GEP-02, by the owner's decision) |
+| [FIXED-604](#fixed-604--a-boolean-could-tell-four-connectors-web-access-and-the-advisor-to-skip-the-owners-switch) | **High** | Governance / connectors | Fixed 2026-09-28 (closes CR-03) |
+| [FIXED-605](#fixed-605--a-security-monitor-that-could-not-look-let-the-connection-carry-on) | Medium | MCP / containment | Fixed 2026-09-28 (closes CR-10) |
+| [FIXED-606](#fixed-606--a-send-whose-recipients-were-nested-read-as-a-send-to-nobody) | Medium | Governance / critical classification | Fixed 2026-09-28 (closes CR-11) |
+| [FIXED-607](#fixed-607--an-embedding-was-as-sensitive-as-its-caller-said-it-was) | **High** | Models / embeddings / data classification | Fixed 2026-09-28 (closes CR-04) |
+| [FIXED-608](#fixed-608--an-attached-file-was-labelled-unknown-whatever-it-said) | Medium | Attachments / context | Fixed 2026-09-28 (closes CR-13) |
+| [FIXED-609](#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true) | Low | Web UI / security headers | Fixed 2026-09-28 (closes BUG-307) |
+| [FIXED-610](#fixed-610--two-copies-of-how-a-turn-starts-and-they-had-begun-to-differ) | Medium | API / prompt routes | Fixed 2026-09-28 (closes GCR-12) |
+| [FIXED-611](#fixed-611--nothing-failed-a-change-that-shipped-a-dependency-with-a-published-vulnerability) | Medium | CI / supply chain | Fixed 2026-09-28 (closes CR-12) |
+| [FIXED-612](#fixed-612--the-architecture-named-one-chokepoint-and-the-code-has-two) | Low | Documentation / governance | Fixed 2026-09-28 (closes GEP-03, and three stale ledger rows) |
+| [FIXED-613](#fixed-613--home-called-a-read-still-in-flight-a-read-that-failed) | Low | Home / readiness | Fixed 2026-09-28 — raised and closed in the same run |
 
 ---
 
@@ -26385,3 +26396,269 @@ every `## BUG-N` section without constraining where it points. Run against the
 state before this change, it names exactly those three.
 
 **Evidence.** `tests/test_docs_consistency.py`.
+
+---
+
+## FIXED-603 — The stop switch could not see the answer it was pressed to stop
+
+**Severity: Medium. Area: Stop switch / governance. Status: Fixed 2026-09-28.
+Closes [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths)
+by the owner's decision.**
+
+**The decision.** GEP-02 had asked since 2026-08-23 whether stop means *accept no
+new acting executions* or *accept nothing that leaves this machine*. The owner
+answered on 2026-09-27: *"The Stop switch is to stop all the current chat,
+response, build workflow, routine item or tasks currently being performed.
+Irrespective of it is leaving the system or not."* Neither reading: stop is about
+the work in progress, all of it.
+
+**Observed.** The switch read `GET /api/tasks` and sent one interrupt per session
+that had an active task. A Chat or Build turn is not in that list — its internal
+governance task is hidden from it on purpose — so with only an answer streaming
+the switch said *Nothing is running* and could not stop the one thing an owner
+watching it most wants stopped. A running command was not counted either.
+
+**Fixed.** `raiker/runtime/live_turns.py` lists every turn running in the process,
+keyed by workspace: the agent loop enters it when it starts and leaves it however
+it ends, including a client that stopped reading. `GET /api/work-in-flight` counts
+what the switch would reach, and `POST /api/stop-all` — human principals only,
+owner-scoped — applies each kind of work's *existing* stop: the governed
+safe-boundary interrupt for a task or routine, the turn control the
+conversation's own Stop button writes for a live turn, and the Commands panel's
+stop for a running command. Nothing is force-killed that was not already, and a
+stop is written only for a turn that is running, so it cannot end the next one.
+The switch counts tasks the way every surface does and adds the turns and
+commands, names each kind in the confirm, reports what it reached and what it
+could not, and keeps the last known count when a read fails.
+
+**What the round found in it, and fixed before it shipped.** The first live run
+reported one stopped answer as *"1 answer being written and 1 task"*: the turn's
+own governance task was cancelled as a task *and* the turn was stopped as a turn.
+It is now stopped with the turn and reported as the turn.
+
+**Evidence.** `tests/test_stop_all_work.py`, `StopSwitch.test.ts`. Live, against
+Anthropic `claude-haiku-4-5-20251001`: a streaming answer counted as *1 answer
+being written*, stopped at its safe boundary with the text it had written kept and
+*Stopped at your request* above it, and the next turn in a new conversation
+answered normally —
+[`docs/screenshots/2026-09-28-docs-round/`](../screenshots/2026-09-28-docs-round).
+
+---
+
+## FIXED-604 — A boolean could tell four connectors, web access and the advisor to skip the owner's switch
+
+**Severity: High. Area: Governance / connectors. Status: Fixed 2026-09-28.
+Closes [CR-03](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-03--connector-enforce_modesfalse-is-a-bypass-primitive).**
+
+**Observed.** The GitHub, Gmail, Calendar and Slack connector services, web
+access and the advisor each took `enforce_modes: bool = True`. Their executors
+passed `False`, because `route_action` had already applied the gate, the decision
+mode and the approval. Any other caller could pass it too, and one `False` in a
+future scheduler or route handler would have skipped the owner's switch with
+nothing noticing. The 2026-09-07 audit recorded CR-03 as *appears closed* on a
+repository search with no hit; all six services still had the parameter.
+
+**Fixed.** The parameter is gone. `raiker/runtime/authority/routed.py` issues a
+`RoutedAuthority` token only inside `routed_dispatch`, which `route_action` enters
+immediately around `executor.execute`; an executor asks for it by its own action
+id and hands it on. A service skips its gate and decision mode only for the live
+token of the current dispatch of *its own* capability — `False`, `True`, a string,
+a token kept past its dispatch, a token for another capability or one read on
+another thread all govern exactly as a chat tool does. The constructor refuses
+anything but the issuer. This stops the accidental bypass the finding names; it
+is not a boundary against hostile code in the same process, which is
+RR-AUTHORITY-01.
+
+**Evidence.** `tests/test_routed_authority.py` (no governed service accepts the
+boolean; every non-token caller meets the gate). Eight executor tests that stood
+in for the router now say so through `tests/routed_execution.py`.
+
+---
+
+## FIXED-605 — A security monitor that could not look let the connection carry on
+
+**Severity: Medium. Area: MCP / containment. Status: Fixed 2026-09-28. Closes
+[CR-10](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-10--mcp-monitoring-is-explicitly-fail-open).**
+
+**Observed.** `McpConnectorExecutor._observe` swallowed every exception from the
+session monitor. The monitor is not only telemetry — its high-severity findings
+trip the auto-pause circuit breaker — so a monitor that raised was a containment
+control that had stopped, and the connection went on as though it had not.
+
+**Fixed.** The session that already ran still reports what happened. The
+*connection* is paused, with the reason on its card and a notification, exactly
+as a high-severity finding pauses it, and the owner's Resume reopens it — allow,
+monitor, and pause when monitoring is what failed. If the pause cannot be written
+either, the connection is held in the process and refused with
+`mcp_monitor_unavailable` until the monitor's own read answers again.
+
+**Evidence.** `tests/test_mcp_monitor_fail_safe.py`.
+
+---
+
+## FIXED-606 — A send whose recipients were nested read as a send to nobody
+
+**Severity: Medium. Area: Governance / critical classification. Status: Fixed
+2026-09-28. Closes [CR-11](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-11--critical-recipient-logic-depends-on-raw-field-names).**
+
+**Observed.** Criterion (b) of `classify_critical` read recipients from seven
+flat keys. `message.to`, `attendees: [{"email": …}]` or `toRecipients` produced an
+empty set, and an empty set was not critical.
+
+**Fixed.** Recipient fields are found at any depth, case-insensitively, under a
+wider set of names; a structured recipient yields its address; `"Ann <a@x>, b@y"`
+is two recipients. An entry whose identity cannot be read counts as a recipient
+nobody allowlisted, the walk is bounded, and an external send with no readable
+destination at all is critical as `external_send_with_unresolved_recipients`.
+The audit detail never carries an address.
+
+**Evidence.** `tests/test_critical_recipient_normalization.py`.
+
+---
+
+## FIXED-607 — An embedding was as sensitive as its caller said it was
+
+**Severity: High. Area: Models / embeddings / data classification. Status: Fixed
+2026-09-28. Closes [CR-04](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-04--provider-embedding-lacks-mandatory-trusted-dlpclassification).**
+
+**Observed.** `ModelProviderExecutor` took `sensitivity` from the action and
+checked only that it was a string. A credential labelled `public` went to a
+hosted embedding provider, and its first 120 characters were kept beside the
+vector as a plaintext preview.
+
+**Fixed.** The text is classified by the classifier the managed-file chunk path
+already used, and the stricter of that and every declared label stands — a label
+can raise sensitivity and never lower it, and a label the runtime cannot read
+counts as the strictest. Secret- and credential-shaped text is embedded by no
+provider on any path (`embed`, `embed_query`, `index_memories`); personal text is
+embedded with no plaintext preview. File chunks now record their real class
+instead of `normal`.
+
+**Evidence.** `tests/test_embedding_trusted_classification.py`; the existing
+embedding suites unchanged.
+
+---
+
+## FIXED-608 — An attached file was labelled unknown, whatever it said
+
+**Severity: Medium. Area: Attachments / context. Status: Fixed 2026-09-28. Closes
+[CR-13](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-13--attachment-parser-safety-does-not-complete-semantic-content-safety).**
+
+**Observed.** Every attachment path wrote `sensitivity="unknown"`. Provenance,
+the untrusted label, redaction and the injection scan were all there; the review
+asked for all four properties *plus* a classification on every chunk that reaches
+a model, as a tested invariant rather than a claim, and the classification was
+the one missing.
+
+**Fixed.** An attachment item's class comes from its text, read before redaction
+removes the evidence, folded onto the context model's levels, with the fine class
+kept as `content_class`.
+
+**Evidence.** `tests/test_attachment_chunk_invariant.py` writes one payload — an
+injection attempt and a credential — into a path attachment and uploaded text,
+Markdown, CSV, PDF and DOCX, and holds each resulting chunk to all four: untrusted
+with its origin, still tripping the injection scan and citable as a source,
+classified `credential_like`, and with the credential redacted.
+
+---
+
+## FIXED-609 — The policy allowed inline styles for a reason that was not true
+
+**Severity: Low. Area: Web UI / security headers. Status: Fixed 2026-09-28.
+Closes [BUG-307](TO_BE_FIXED.md#bug-307--the-content-security-policy-still-allows-inline-styles).**
+
+**Observed.** `style-src` kept `'unsafe-inline'` on the belief that Svelte writes
+component state into `style` attributes, which CSP cannot nonce.
+
+**Root cause.** It does not. Svelte 5 applies a dynamic style through the CSSOM —
+`element.style.cssText` and `style.setProperty` — which a policy does not govern,
+and the bundle's CSS is a file this origin serves. The allowance permitted only
+the thing it exists to stop: markup reaching the page with its own `style=""` or
+`<style>`.
+
+**Fixed.** `style-src 'self'`.
+
+**Evidence.** `tests/test_api_rest_hardening.py`. Live: every destination at four
+widths, with the browser's own `securitypolicyviolation` event recorded from
+before the page's first script — nothing refused, on a workspace holding real
+turns.
+
+---
+
+## FIXED-610 — Two copies of how a turn starts, and they had begun to differ
+
+**Severity: Medium. Area: API / prompt routes. Status: Fixed 2026-09-28. Closes
+[GCR-12](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-12--prompt-json-and-sse-routes-duplicate-orchestration).**
+
+**Observed.** `/api/prompts` and `/api/prompts/stream` each carried the whole
+preparation sequence — session ownership, project resolution, envelope, project
+binding, readiness, attachment references, gateway — and the two copies had
+begun to differ.
+
+**Fixed.** One `_prepare_turn` performs it in one order and returns a prepared
+turn or a typed refusal. Each route renders a refusal in its own transport only:
+JSON answers an invalid request in the body and an unready model as `409`; a
+stream, which has already sent `200`, answers both as its single final event.
+
+**Evidence.** `tests/test_prompt_turn_preparation.py` holds the two transports to
+the same verdict for the same request; the prompt route suites are unchanged.
+
+---
+
+## FIXED-611 — Nothing failed a change that shipped a dependency with a published vulnerability
+
+**Severity: Medium. Area: CI / supply chain. Status: Fixed 2026-09-28. Closes
+[CR-12](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-12--ci-lacks-explicit-least-privilege-token-permissions-and-dedicated-security-gates).**
+
+**Observed.** Least-privilege `permissions:` were already on every workflow, and
+the licensing workflow already generates an SBOM. No gate failed a change for a
+dependency with a published advisory — and `npm audit` found three moderate ones
+in the web lockfile (`@vitest/mocker`, `vitest`, `devalue`).
+
+**Fixed.** The lockfile moves those three to patched versions within their
+existing ranges. CI's new `supply-chain` job runs a pinned `pip-audit` against
+the runtime dependencies `pyproject.toml` declares, and the web workflow runs
+`npm audit --audit-level=moderate` after `npm ci`.
+
+**Evidence.** `tests/test_ci_workflow.py`; both audits run clean on this change.
+
+---
+
+## FIXED-612 — The architecture named one chokepoint and the code has two
+
+**Severity: Low. Area: Documentation / governance. Status: Fixed 2026-09-28.
+Closes [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture).**
+
+**Observed.** `NESTED_BOUNDARIES_ARCHITECTURE.md` named one non-bypass path for
+every tool, command, memory write and graph query. A read is governed at
+`PolicyEngine.review` and never reaches `route_action`.
+
+**Fixed.** The section names both chokepoints, what each applies and which kind
+of action takes which, and points at `GOVERNANCE_ENTRY_PATHS.md` for the
+enumeration. It also records the CR-03 token and the GEP-02 answer.
+
+**Also corrected in the same pass**, each a row that said something the ledger
+beneath it no longer did: `TO_BE_FIXED.md`'s BUG-239 row read *Open remainder*
+beside a section closed on 2026-09-15; the generic review's GCR-15 summary row
+read open beside a body closed on 2026-09-20; and the 2026-09-07 audit's *CR-03
+appears closed* now carries a dated note saying it was not, and when it was.
+
+---
+
+## FIXED-613 — Home called a read still in flight a read that failed
+
+**Severity: Low. Area: Home / readiness. Status: Fixed 2026-09-28 — raised and
+closed in the same run.**
+
+**Observed.** Found by this round's own capture of Home. While the runtime
+readiness read was still on its way, *Needs your attention* said *"Raiker could
+not read its own runtime readiness, so this is not an all-clear."* The tile beside
+it said *loading*. NEW-HOME-01's scoped all-clear treated every non-current state
+as a failure.
+
+**Fixed.** A read in flight says *"Raiker is still reading its own runtime
+readiness, so this is not an all-clear yet."*; a read that failed still says it
+could not. Neither is an all-clear.
+
+**Evidence.** `WorkbenchView.test.ts` — a diagnostics read that never answers is
+reported as still reading, never as failed.

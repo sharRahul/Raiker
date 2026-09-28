@@ -34,6 +34,7 @@ from raiker.runtime.executors import (
 from raiker.runtime.executors.connectors import GcalConnectorExecutor
 from raiker.storage.sqlite import SQLiteStore
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
+from tests.routed_execution import execute_as_routed
 
 _CAP = "connector_gcal_runtime"
 _EVENT_JSON = json.dumps(
@@ -231,7 +232,7 @@ class TestGcalConnectorExecutor:
     ) -> None:
         _configure_creds(monkeypatch)
         executor = GcalConnectorExecutor(workspace, store, fetch_fn=_ok_fetch)
-        result = executor.execute(
+        result = execute_as_routed(executor, 
             self._action(
                 {"operation": "read", "resource": "event", "calendar_id": "primary", "event_id": "evt1"}
             ),

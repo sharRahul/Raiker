@@ -123,12 +123,29 @@ address that passed, with every redirect re-checked and your token never sent on
 after the origin changes. See
 [Extensions and MCP](extensions-and-mcp.md#where-a-remote-server-may-be).
 
+## Stopping everything
+
+The **Stop** control in the top bar stops all the work in progress: an answer
+being written in Chat, a Build turn, a routine, a task and a running command —
+whether or not that work reaches outside this machine. It is quiet when nothing is
+running and turns red with a count when something is. The confirm names what it
+will reach (*1 answer being written, 2 tasks and 1 command*), and the result names
+what it reached and anything it could not.
+
+It stops each kind of work the way that work is normally stopped, at its next
+**safe boundary**: an answer keeps the text it had already written and says
+*Stopped at your request*; a task or routine records its cancellation; a command
+is stopped as the Commands panel stops it. Nothing is force-killed mid-write, and
+pressing Stop leaves nothing behind that could end your *next* turn.
+
 ## The dashboard's own boundary
 
 The page you read Raiker in is held to the same rule as everything else it may
 reach: a **Content-Security-Policy** that names its own origin as the only place
 scripts, styles, fonts and API calls may come from. It cannot be framed, it has
-no base URL to rewrite, and it submits no form by navigation.
+no base URL to rewrite, and it submits no form by navigation. It allows no inline
+script and no inline style either, so markup that somehow reached the page could
+neither run nor restyle a control to disguise it.
 
 The exceptions are named rather than implied, and each is something Raiker
 genuinely does: an attachment, a generated image, a PDF preview and a dictation

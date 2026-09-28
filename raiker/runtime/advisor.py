@@ -9,6 +9,7 @@ from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
 from raiker.models.tool_registry import tool_risk_band
 from raiker.runtime.authority.admission import capability_admission
 from raiker.runtime.authority.decision_modes import DecisionMode, auto_requires_approval
+from raiker.runtime.authority.routed import is_routed
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
@@ -120,21 +121,20 @@ class AdvisorService:
         return profile.profile_id, model
 
     # ── Consult ──────────────────────────────────────────────────────────
-    def consult(self, question: str, *, enforce_modes: bool = True) -> dict[str, Any]:
+    def consult(self, question: str, *, authority: object | None = None) -> dict[str, Any]:
         """Run one governed advisor consult; returns a tool-result-shaped dict.
 
-        ``enforce_modes=False`` skips the gate/decision-mode layer for callers
-        that already passed through governance (the ``advisor_model_runtime``
-        executor is only reachable via ``route_action``, which applies the gate,
-        decision mode, and approval flow itself). Everything else — configured
-        advisor, bounded question, provider policy — is always enforced.
+        ``authority`` is the runtime's proof that ``route_action`` is dispatching
+        this call (:mod:`raiker.runtime.authority.routed`); only then is the
+        gate/decision-mode layer skipped. Anything else governs. Configured
+        advisor, bounded question and provider policy are always enforced.
         """
         if not isinstance(question, str) or not question.strip():
             return _failed("missing_argument", "question is required.")
         if len(question) > MAX_QUESTION_CHARS:
             return _failed("question_too_long", f"question exceeds {MAX_QUESTION_CHARS} chars.")
 
-        if enforce_modes:
+        if not is_routed(authority, _CAP):
             if not self._gate_enabled():
                 return _denied(
                     "advisor_gate_disabled",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -388,6 +389,82 @@ def _bind_session_project(
     store.set_session_project(session_id, project_id, user_id=principal.delegated_by_user_id)
 
 
+@dataclass(frozen=True)
+class _PreparedTurn:
+    """A turn that passed every check and is ready to hand to the gateway."""
+
+    envelope: PromptEnvelope
+    gateway: AgentGateway
+    workspace: str | Path
+    principal_id: str
+
+
+@dataclass(frozen=True)
+class _TurnRefusal:
+    """Why a turn will not start, in one shape both transports can render.
+
+    ``kind`` is ``invalid`` (the request did not validate) or ``not_ready`` (no
+    model can answer it). ``response`` is the final response the turn would
+    have ended with; ``detail`` is the readiness payload for ``not_ready``.
+    """
+
+    kind: str
+    response: AgentResponse
+    detail: dict[str, object] | None = None
+
+
+async def _prepare_turn(
+    body: PromptRequest, request: Request, session: ApiSession, principal: Principal
+) -> _PreparedTurn | _TurnRefusal:
+    """GCR-12 — everything a turn needs before its first token, done once.
+
+    ``/api/prompts`` and ``/api/prompts/stream`` each carried their own copy of
+    this sequence — session ownership, project resolution, envelope, project
+    binding, model readiness, attachment references, gateway — and the copies
+    had already begun to differ. The *order* is the contract: ownership first
+    (a stranger's session is a 404 before anything is written), the envelope
+    before the project is bound (an invalid request binds nothing), readiness
+    before attachments are recorded (a refused turn records nothing).
+
+    What stays different is only how each transport *says* a refusal, which is
+    genuinely a transport question: JSON answers ``invalid`` in the body and
+    ``not_ready`` as ``409``; a stream has already sent ``200`` by the time it
+    could, so both arrive as its final event. Neither decides anything here.
+    """
+    workspace = _ws(request)
+    if body.session_id:
+        existing = SQLiteStore(workspace).load_session(body.session_id)
+        if existing is not None and existing.get("user_id") != principal.delegated_by_user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session")
+    turn_project_id = _resolve_turn_project(body, workspace, principal)
+    try:
+        envelope = _build_envelope(body, session.principal_id, workspace)
+    except ContractValidationError as exc:
+        return _TurnRefusal(kind="invalid", response=_invalid_response(exc))
+    _bind_session_project(workspace, envelope.session_id, turn_project_id, principal)
+    try:
+        await _require_model_ready(request, session.principal_id, body.model_profile, body.model)
+    except ModelNotReady as exc:
+        return _TurnRefusal(
+            kind="not_ready",
+            response=AgentResponse(
+                request_id=envelope.request_id,
+                session_id=envelope.session_id,
+                turn_id=envelope.turn_id,
+                status="failed",
+                message=exc.readiness.summary,
+            ),
+            detail=exc.detail(),
+        )
+    _record_attachment_refs(workspace, envelope, session.principal_id)
+    return _PreparedTurn(
+        envelope=envelope,
+        gateway=AgentGateway(workspace, principal_id=session.principal_id),
+        workspace=workspace,
+        principal_id=session.principal_id,
+    )
+
+
 @router.post("/api/prompts")
 async def submit_prompt(
     body: PromptRequest,
@@ -395,29 +472,13 @@ async def submit_prompt(
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     session, principal = _auth_data
-    if body.session_id:
-        existing = SQLiteStore(_ws(request)).load_session(body.session_id)
-        if existing is not None and existing.get("user_id") != principal.delegated_by_user_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session")
-    turn_project_id = _resolve_turn_project(body, _ws(request), principal)
-    try:
-        envelope = _build_envelope(body, session.principal_id, _ws(request))
-    except ContractValidationError as exc:
-        return _invalid_response(exc).to_dict()
-    _bind_session_project(_ws(request), envelope.session_id, turn_project_id, principal)
-    try:
-        await _require_model_ready(
-            request, session.principal_id, body.model_profile, body.model
-        )
-    except ModelNotReady as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=exc.detail(),
-        ) from exc
-    _record_attachment_refs(_ws(request), envelope, session.principal_id)
-    gateway = AgentGateway(_ws(request), principal_id=session.principal_id)
-    response = await gateway.submit_prompt_async(envelope)
-    _record_generated_file_attachments(_ws(request), envelope, session.principal_id)
+    prepared = await _prepare_turn(body, request, session, principal)
+    if isinstance(prepared, _TurnRefusal):
+        if prepared.kind == "not_ready":
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=prepared.detail)
+        return prepared.response.to_dict()
+    response = await prepared.gateway.submit_prompt_async(prepared.envelope)
+    _record_generated_file_attachments(prepared.workspace, prepared.envelope, prepared.principal_id)
     return response.to_dict()
 
 
@@ -448,57 +509,36 @@ async def stream_prompt(
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> StreamingResponse:
     session, principal = _auth_data
-    if body.session_id:
-        existing = SQLiteStore(_ws(request)).load_session(body.session_id)
-        if existing is not None and existing.get("user_id") != principal.delegated_by_user_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session")
-    turn_project_id = _resolve_turn_project(body, _ws(request), principal)
-    try:
-        envelope = _build_envelope(body, session.principal_id, _ws(request))
-    except ContractValidationError as exc:
-        final = _invalid_response(exc)
+    prepared = await _prepare_turn(body, request, session, principal)
+    if isinstance(prepared, _TurnRefusal):
+        refusal = prepared
 
-        async def error_gen() -> AsyncIterator[str]:
-            yield _sse(StreamEvent(kind=FINAL, response=final))
-
-        return StreamingResponse(error_gen(), media_type="text/event-stream")
-
-    _bind_session_project(_ws(request), envelope.session_id, turn_project_id, principal)
-
-    try:
-        await _require_model_ready(
-            request, session.principal_id, body.model_profile, body.model
-        )
-    except ModelNotReady as exc:
-        refusal_detail = exc.detail()
-        refusal = AgentResponse(
-            request_id=envelope.request_id,
-            session_id=envelope.session_id,
-            turn_id=envelope.turn_id,
-            status="failed",
-            message=exc.readiness.summary,
-        )
-
-        async def readiness_error_gen() -> AsyncIterator[str]:
-            yield _sse(
-                StreamEvent(
-                    kind=FINAL,
-                    event_type="model_not_ready",
-                    payload=refusal_detail,
-                    response=refusal,
+        async def refusal_gen() -> AsyncIterator[str]:
+            if refusal.kind == "not_ready":
+                yield _sse(
+                    StreamEvent(
+                        kind=FINAL,
+                        event_type="model_not_ready",
+                        payload=refusal.detail or {},
+                        response=refusal.response,
+                    )
                 )
-            )
+            else:
+                yield _sse(StreamEvent(kind=FINAL, response=refusal.response))
 
-        return StreamingResponse(readiness_error_gen(), media_type="text/event-stream")
-
-    _record_attachment_refs(_ws(request), envelope, session.principal_id)
-    gateway = AgentGateway(_ws(request), principal_id=session.principal_id)
+        return StreamingResponse(refusal_gen(), media_type="text/event-stream")
 
     async def gen() -> AsyncIterator[str]:
-        async for event in gateway.astream_prompt(envelope):
+        async for event in prepared.gateway.astream_prompt(prepared.envelope):
             if event.kind == FINAL:
-                _record_generated_file_attachments(_ws(request), envelope, session.principal_id)
-            yield _sse(event, session_id=envelope.session_id, turn_id=envelope.turn_id)
+                _record_generated_file_attachments(
+                    prepared.workspace, prepared.envelope, prepared.principal_id
+                )
+            yield _sse(
+                event,
+                session_id=prepared.envelope.session_id,
+                turn_id=prepared.envelope.turn_id,
+            )
 
     return StreamingResponse(gen(), media_type="text/event-stream")
 
@@ -590,3 +630,177 @@ async def interrupts(
             )
 
     return {"applied": applied, "safe_boundary": True, "turn_control": turn_control}
+
+
+# ── Stop everything (GEP-02) ─────────────────────────────────────────────────
+#
+# The owner's decision, 2026-09-27: the stop switch stops *all* the work in
+# progress — the answer being written in Chat, a Build turn, a routine, a task,
+# a command — whether or not that work leaves the machine. `/api/interrupts`
+# stays what it is, one conversation's controls; this is the switch's own call.
+#
+# Every part is the control that already existed for that kind of work, applied
+# to every instance of it the owner has: a task gets the governed safe-boundary
+# interrupt, a turn gets the turn stop its own Stop button writes, a command run
+# gets the stop the Commands panel sends. Nothing new is allowed to stop work,
+# and nothing is force-killed that was not already.
+
+_LIVE_COMMAND_STATES = frozenset({"queued", "starting", "running", "finalizing"})
+
+
+def _owned_live_turns(
+    workspace: str | Path, store: SQLiteStore, principal: Principal
+) -> list[Any]:
+    from raiker.runtime.live_turns import live_turns
+
+    user_id = store.principal_user_id(principal.principal_id)
+    owned: list[Any] = []
+    for turn in live_turns(workspace):
+        if turn.control_principal_id in {principal.principal_id, user_id}:
+            owned.append(turn)
+            continue
+        session = store.load_session(turn.session_id)
+        if session is not None and session.get("user_id") == user_id:
+            owned.append(turn)
+    return owned
+
+
+def _live_command_runs(request: Request, principal: Principal) -> list[Any]:
+    from raiker.api.routes_commands import _service as command_service
+
+    service = command_service(request)
+    return [
+        run
+        for run in service.store.list_runs(principal.principal_id)
+        if str(run.state) in _LIVE_COMMAND_STATES
+    ]
+
+
+def _in_flight(request: Request, principal: Principal) -> dict[str, Any]:
+    workspace = _ws(request)
+    store = SQLiteStore(workspace)
+    user_id = store.principal_user_id(principal.principal_id)
+    active = [
+        task for task in store.list_tasks(user_id=user_id) if task.status in _ACTIVE_TASK_STATES
+    ]
+    # Every Chat turn runs under an internal governance task (`parent_turn_id`
+    # set) that the task list deliberately hides, because it *is* the turn. It is
+    # stopped with the turn and counted as the turn — found live on 2026-09-28,
+    # when one stopped answer was reported as "1 answer being written and 1 task".
+    tasks = [task for task in active if not task.parent_turn_id]
+    turn_tasks = [task for task in active if task.parent_turn_id]
+    turns = _owned_live_turns(workspace, store, principal)
+    try:
+        commands = _live_command_runs(request, principal)
+    except Exception:  # noqa: BLE001 — a command store that cannot be read is reported, not hidden
+        commands = None
+    return {
+        "store": store,
+        "tasks": tasks,
+        "turn_tasks": turn_tasks,
+        "turns": turns,
+        "commands": commands,
+    }
+
+
+@router.get("/api/work-in-flight")
+async def work_in_flight(
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """What the stop switch would reach, counted the way it would reach it."""
+    _session, principal = _auth_data
+    found = _in_flight(request, principal)
+    commands = found["commands"]
+    turn_ids = {turn.turn_id for turn in found["turns"]} | {
+        str(task.parent_turn_id) for task in found["turn_tasks"]
+    }
+    return {
+        "tasks": len(found["tasks"]),
+        "turns": len(turn_ids),
+        # `None` when the command store could not be read: unknown, not zero.
+        "commands": None if commands is None else len(commands),
+        "turn_sessions": sorted(
+            {turn.session_id for turn in found["turns"]}
+            | {task.session_id for task in found["turn_tasks"]}
+        ),
+    }
+
+
+@router.post("/api/stop-all")
+async def stop_all(
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    _session, principal = _auth_data
+    if principal.principal_type != PrincipalType.HUMAN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": "human_principal_required"},
+        )
+    found = _in_flight(request, principal)
+    store: SQLiteStore = found["store"]
+    writer = EventLogWriter(store)
+    controller = InterruptController(store, writer)
+    reason = "owner pressed stop (all work)"
+
+    def cancel(task: Any) -> str:
+        return controller.apply_at_safe_boundary(
+            InterruptAction(
+                action_id=new_id("act_"),
+                task_id=task.task_id,
+                session_id=task.session_id,
+                action_type="cancel",
+                reason=reason,
+                steer_text=None,
+            )
+        )
+
+    tasks = [{"task_id": task.task_id, "result": cancel(task)} for task in found["tasks"]]
+
+    # A turn's own governance task is cancelled too — the stream checks it on
+    # every event, so it is the quickest of the two stops to be seen — and it
+    # is reported as the turn it belongs to, never as a second piece of work.
+    turns: list[dict[str, str]] = []
+    reached: set[str] = set()
+    for task in found["turn_tasks"]:
+        cancel(task)
+        reached.add(str(task.parent_turn_id))
+        turns.append({"session_id": task.session_id, "turn_id": str(task.parent_turn_id)})
+    for turn in found["turns"]:
+        store.request_turn_stop(turn.session_id, turn.control_principal_id, reason=reason)
+        writer.append(
+            make_event(
+                session_id=turn.session_id,
+                turn_id=turn.turn_id,
+                event_type="interrupt_received",
+                actor="runtime",
+                payload={"target": "live_turn", "action_type": "cancel", "reason": reason},
+            )
+        )
+        if turn.turn_id not in reached:
+            turns.append({"session_id": turn.session_id, "turn_id": turn.turn_id})
+
+    commands: list[dict[str, str]] = []
+    failed: list[dict[str, str]] = []
+    if found["commands"] is None:
+        failed.append({"kind": "commands", "reason_code": "command_store_unreadable"})
+    else:
+        from raiker.api.routes_commands import _service as command_service
+
+        service = command_service(request)
+        for run in found["commands"]:
+            try:
+                stopped = service.stop(principal.principal_id, run.run_id)
+            except Exception as exc:  # noqa: BLE001 — one run that will not stop must not hide the rest
+                failed.append({"kind": "command", "run_id": run.run_id, "reason_code": type(exc).__name__})
+                continue
+            commands.append({"run_id": run.run_id, "state": str(stopped.state)})
+
+    return {
+        "tasks": tasks,
+        "turns": turns,
+        "commands": commands,
+        "failed": failed,
+        "safe_boundary": True,
+    }

@@ -37,9 +37,15 @@ _SECURITY_HEADERS: tuple[tuple[bytes, bytes], ...] = (
 #: default is `'self'` and the exceptions below are each a thing the product
 #: actually does:
 #:
-#: * ``style-src 'unsafe-inline'`` — Svelte writes component state into `style`
-#:   attributes (a progress bar's width, the logo's size). Removing it means a
-#:   nonce on every such attribute, which CSP has no mechanism for.
+#: * ``style-src 'self'`` with no inline allowance (BUG-307). The policy first
+#:   shipped with ``'unsafe-inline'`` on the belief that Svelte writes component
+#:   state into ``style`` *attributes*. It does not: Svelte 5 sets a dynamic
+#:   style through the CSSOM (``element.style.cssText`` and
+#:   ``style.setProperty``), which a policy does not govern, and the bundle's
+#:   CSS is a file this origin serves. What the allowance actually permitted
+#:   was the thing it exists to stop — markup reaching the page with its own
+#:   ``style=""`` or ``<style>`` — so it is gone, and a live sweep of every
+#:   destination asserts nothing is refused without it.
 #: * ``img-src``/``media-src``/``object-src`` ``blob:`` and ``data:`` — an
 #:   attachment, a generated image, a PDF preview and a dictation clip are all
 #:   fetched with the owner's bearer token and handed to the element as an
@@ -54,7 +60,7 @@ _CONTENT_SECURITY_POLICY = b"; ".join(
     (
         b"default-src 'self'",
         b"script-src 'self'",
-        b"style-src 'self' 'unsafe-inline'",
+        b"style-src 'self'",
         b"img-src 'self' data: blob:",
         b"font-src 'self' data:",
         b"media-src 'self' data: blob:",

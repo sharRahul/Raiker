@@ -26,12 +26,14 @@ checks that belong to :meth:`RuntimeAuthority.route_action` (self-approval,
 domain scope, the critical floor, the audit event) stay there; a caller that
 needs those routes an action instead of calling this.
 
-**The runtime status is reported, never enforced here.** Whether "stop the agent
-runtime" should also stop a read that leaves the machine is
-`GEP-02 <../../../docs/plans/GOVERNANCE_ENTRY_PATHS.md>`_ — an owner decision
-that no document has answered. :attr:`CapabilityAdmission.runtime_active` makes
-the answer available to every call site at no cost, and nothing consults it yet,
-so this module records the question rather than silently deciding it.
+**The runtime status is reported, never enforced here.** GEP-02 asked whether
+"stop the agent runtime" should also stop a read that leaves the machine, and
+the owner answered it on 2026-09-27 about the *stop switch*: stop halts all the
+work in progress — chat, Build, routines, tasks — whether or not it leaves the
+machine. That is carried out where work is in progress (``POST /api/stop-all``
+and :mod:`raiker.runtime.live_turns`), not here. The answer said nothing about
+the persisted runtime status, so :attr:`CapabilityAdmission.runtime_active`
+stays reported rather than enforced, and a change to that is still the owner's.
 """
 from __future__ import annotations
 
@@ -139,7 +141,7 @@ class CapabilityAdmission:
     #: The owner's decision mode for this capability (``ask`` when unset).
     decision_mode: DecisionMode
     #: Whether the agent runtime is accepting executions. Reported, not enforced
-    #: — see the module docstring and GEP-02.
+    #: — see the module docstring for GEP-02's answer and what it covers.
     runtime_active: bool
 
     @property

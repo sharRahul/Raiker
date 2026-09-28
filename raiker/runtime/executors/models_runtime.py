@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from raiker.models.endpoint_policy import classify_endpoint, model_egress_allowlist
+from raiker.runtime.authority.routed import current_routed_authority
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.runtime.executors.sandbox import SandboxError, get_url
 from raiker.vector.backends import MAX_MEMORY_INDEX_BATCH
@@ -138,6 +139,48 @@ Embedder = Callable[[str, str, str], "EmbeddingResponse"]
 _MAX_EMBED_TEXT_LEN = 20000
 _PREVIEW_LEN = 120
 
+# CR-04 — sensitivity is read from the text, not taken from the caller.
+#
+# The embed path accepted an action-supplied ``sensitivity`` and checked only
+# that it was a string, so ``"public"`` on a credential sent the credential to a
+# hosted embedding provider and stored its first 120 characters as the vector's
+# preview. A label can now only make a text *more* sensitive than its content
+# says, never less: the content is classified by the same classifier the
+# managed-file chunk path already used, and the stricter of the two stands.
+_SENSITIVITY_RANK: dict[str, int] = {
+    "public": 0,
+    "normal": 0,
+    "unknown": 0,
+    "project": 1,
+    "personal": 2,
+    "secret_like": 3,
+    "credential_like": 4,
+}
+#: Never embedded — by any provider — because a vector of a secret is a
+#: derivative of a secret, and a hosted provider would receive the secret itself.
+_NOT_EMBEDDABLE = frozenset({"secret_like", "credential_like"})
+#: Embedded, but no plaintext preview is kept beside the vector.
+_NO_PREVIEW_FROM = _SENSITIVITY_RANK["personal"]
+
+
+def effective_sensitivity(text: str, *declared: str) -> str:
+    """The strictest of the content's own class and every declared label.
+
+    An unrecognised declared label ranks as the strictest there is: a label the
+    runtime cannot read is not evidence the text is harmless.
+    """
+    from raiker.memory.policy import classify_memory_sensitivity
+
+    candidates = [classify_memory_sensitivity(text).value, *declared]
+    return max(candidates, key=lambda label: _SENSITIVITY_RANK.get(label, max(_SENSITIVITY_RANK.values())))
+
+
+def _preview(text: str, sensitivity: str) -> str:
+    """The bounded preview, or nothing for personal-and-above content."""
+    if _SENSITIVITY_RANK.get(sensitivity, _NO_PREVIEW_FROM) >= _NO_PREVIEW_FROM:
+        return ""
+    return text[:_PREVIEW_LEN]
+
 
 class ModelProviderExecutor:
     """Real executor for ``model_provider_runtime`` — provider-backed semantic embedding.
@@ -211,6 +254,9 @@ class ModelProviderExecutor:
         local_only = self._local_only_profile(provider, model)
         if not isinstance(scope, str) or not isinstance(sensitivity, str):
             return self._fail(action.action_id, "invalid_argument:scope_or_sensitivity")
+        sensitivity = effective_sensitivity(text, sensitivity)
+        if sensitivity in _NOT_EMBEDDABLE:
+            return self._fail(action.action_id, "embedding_sensitivity_not_projectable")
 
         # A loopback-only profile performs no off-machine egress. Hosted and
         # private-network profiles still fail closed without an allowlist; a
@@ -269,7 +315,7 @@ class ModelProviderExecutor:
             VectorRecord(
                 vector_id=vector_id,
                 content_hash=content_hash,
-                content_preview=text[:_PREVIEW_LEN],
+                content_preview=_preview(text, sensitivity),
                 embedding_model=embedding_model,
                 dimensions=len(vector),
                 scope=scope,
@@ -380,6 +426,12 @@ class ModelProviderExecutor:
             if not text.strip() or len(text) > _MAX_EMBED_TEXT_LEN:
                 failures.append({"memory_id": memory_id, "reason_code": "text_not_embeddable"})
                 continue
+            memory_sensitivity = effective_sensitivity(text, str(memory["sensitivity"]))
+            if memory_sensitivity in _NOT_EMBEDDABLE:
+                failures.append(
+                    {"memory_id": memory_id, "reason_code": "memory_sensitivity_not_projectable"}
+                )
+                continue
             try:
                 response = embedder(provider, model, text)
             except SandboxError as exc:
@@ -411,7 +463,7 @@ class ModelProviderExecutor:
                 memory_id=memory_id,
                 text=text,
                 scope=str(memory["scope"]),
-                sensitivity=str(memory["sensitivity"]),
+                sensitivity=memory_sensitivity,
                 embedding_model=embedding_model,
                 response=response,
                 owner=owner,
@@ -556,7 +608,7 @@ class ModelProviderExecutor:
             VectorRecord(
                 vector_id=vector_id,
                 content_hash=VectorIndex.compute_content_hash(text),
-                content_preview=text[:_PREVIEW_LEN],
+                content_preview=_preview(text, sensitivity),
                 embedding_model=embedding_model,
                 dimensions=len(vector),
                 scope=scope,
@@ -583,6 +635,7 @@ class ModelProviderExecutor:
         from raiker.vector import VectorIndex
 
         text = str(chunk["text"])
+        chunk_sensitivity = effective_sensitivity(text)
         vector = [float(value) for value in list(getattr(response, "vector", []) or [])]
         vector_id = new_id("vec_")
         scope = (
@@ -594,11 +647,11 @@ class ModelProviderExecutor:
             VectorRecord(
                 vector_id=vector_id,
                 content_hash=VectorIndex.compute_content_hash(text),
-                content_preview=text[:_PREVIEW_LEN],
+                content_preview=_preview(text, chunk_sensitivity),
                 embedding_model=embedding_model,
                 dimensions=len(vector),
                 scope=scope,
-                sensitivity="normal",
+                sensitivity=chunk_sensitivity,
                 created_at=utc_now(),
                 embedding=_dump_vector(vector),
                 owner_principal_id=owner,
@@ -761,7 +814,7 @@ class AdvisorModelRuntimeExecutor:
             consult_fn=self._consult_fn,
             principal_id=principal.principal_id if principal is not None else None,
         )
-        outcome = service.consult(question, enforce_modes=False)
+        outcome = service.consult(question, authority=current_routed_authority(action.action_id))
         if outcome.get("status") != "success":
             error = outcome.get("error", {})
             return self._fail(action.action_id, str(error.get("type", "advisor_failed")))

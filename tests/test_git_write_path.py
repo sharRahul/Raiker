@@ -42,6 +42,7 @@ from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.authority.activation import get_activation_requirement
 from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
+from raiker.runtime.authority.routed import routed_dispatch
 from raiker.runtime.authority.router import CAPABILITY_GATE_MAP, GovernedAction
 from raiker.runtime.executors import (
     REAL_EXECUTOR_CAPABILITIES,
@@ -56,6 +57,7 @@ from raiker.tools.git import (
     proposed_commit_snapshot,
 )
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
+from tests.routed_execution import execute_as_routed
 
 _CAP = "git_write_execution"
 
@@ -543,9 +545,10 @@ class TestGithubPullRequest:
             return {"status": 201, "body_bytes": len(body), "body_text": body, "truncated": False}
 
         monkeypatch.setattr("raiker.runtime.connectors.post_json_url", _post)
-        outcome = self._service(ws, SQLiteStore(ws)).create_pull_request(
-            "octo/repo", "Fix the thing", "feature/x", "main", "why", enforce_modes=False
-        )
+        with routed_dispatch("connector_github_runtime", "act_test") as authority:
+            outcome = self._service(ws, SQLiteStore(ws)).create_pull_request(
+                "octo/repo", "Fix the thing", "feature/x", "main", "why", authority=authority
+            )
         assert outcome["status"] == "success"
         assert outcome["number"] == 7
         assert outcome["untrusted"] is True
@@ -566,7 +569,7 @@ class TestGithubPullRequest:
             "raiker.runtime.connectors.post_json_url",
             lambda *a, **k: {"status": 201, "body_bytes": len(body), "body_text": body, "truncated": False},
         )
-        result = GithubConnectorExecutor(ws, SQLiteStore(ws)).execute(
+        result = execute_as_routed(GithubConnectorExecutor(ws, SQLiteStore(ws)), 
             _action(
                 "github_write",
                 {

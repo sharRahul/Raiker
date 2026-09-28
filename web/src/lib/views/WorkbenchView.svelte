@@ -495,9 +495,17 @@
              of the three things were looked at and both are clear; the third
              is named rather than counted as zero, which is what turned a
              failed read into "Nothing needs you right now." -->
+        <!-- Found live 2026-09-28: a read still in flight was reported as a
+             read that failed. "Could not read" is a claim about an answer;
+             while the answer is on its way the honest sentence is that it is
+             still being read. Neither is an all-clear. -->
         <p class="all-clear">
-          No approvals are waiting and no work is blocked. Raiker could not read
-          its own runtime readiness, so this is not an all-clear.
+          No approvals are waiting and no work is blocked.
+          {#if health.kind === "loading"}
+            Raiker is still reading its own runtime readiness, so this is not an all-clear yet.
+          {:else}
+            Raiker could not read its own runtime readiness, so this is not an all-clear.
+          {/if}
         </p>
         <StatTile
           label="Runtime health"

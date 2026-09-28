@@ -132,6 +132,21 @@ jobs:
           python-version: "3.11"
       - name: Install pip-audit
         run: python -m pip install "pip-audit==2.10.1"
+      # GCR-41 — the release builds from `requirements/release*.txt`, which are
+      # exports of `uv.lock`. A change to `pyproject.toml` that is not locked, or
+      # a lock that is not exported, fails here rather than at release time.
+      - name: Check the release constraints match the lock
+        run: |
+          python -m pip install "uv==0.8.17"
+          uv lock --check
+          uv export --frozen --no-dev --no-emit-project --format requirements-txt \
+            -o requirements/release.txt
+          uv export --frozen --no-dev --no-emit-project --extra dev --format requirements-txt \
+            -o requirements/release-build.txt
+          git diff --exit-code -- requirements/ || {
+            echo "requirements/ is stale: re-run the two uv export commands in its header" >&2
+            exit 1
+          }
       - name: Audit the runtime dependencies
         run: |
           python - <<'PY' > runtime-requirements.txt
@@ -142,6 +157,12 @@ jobs:
                   print(requirement)
           PY
           python -m pip_audit --progress-spinner off -r runtime-requirements.txt
+      # GCR-41 — and the exact versions a release ships, which since the lock
+      # are not necessarily the newest the ranges above admit.
+      - name: Audit the locked release set
+        run: |
+          python -m pip_audit --progress-spinner off --disable-pip --require-hashes \
+            -r requirements/release.txt
 
   native:
     # The sandbox runner is the only part of Raiker that is not Python, and it

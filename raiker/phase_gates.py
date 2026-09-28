@@ -48,6 +48,7 @@ PHASE_3_POLICY_READY_CAPABILITIES = {"graph_codemap_planning", "semantic_memory_
 RUNTIME_DOMAIN_CAPABILITIES = {
     "shell_execution",
     "process_execution",
+    "host_network_code_execution",
     "web_fetch",
     "file_write_execution",
     "patch_apply_execution",
@@ -211,6 +212,8 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
     # Tier-2 capability is: it reaches the network. The branch and the commit
     # beside it stay local and stay Tier 1.
     _TIER2_EXECUTED_CAPS = ("shell_execution", "process_execution", "web_fetch",
+                            # BUG-308 — code running with the host's network.
+                            "host_network_code_execution",
                             "git_push_execution",
                             # Backlog #18 — Tier 2 for the reason the rest are:
                             # it leaves the machine.

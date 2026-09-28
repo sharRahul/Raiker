@@ -56,6 +56,17 @@ ENTRY_CONTROL_PLANE = "control_plane"
 #: routing an action. §4 of ``GOVERNANCE_ENTRY_PATHS.md``.
 ENTRY_LOCAL_ADMISSION = "local_admission"
 
+#: A capability the router assigns *in place of* another, so it is reached by
+#: exactly the paths that reach the one it replaces (BUG-308). A ``shell`` or
+#: ``process`` action whose program runs code on the host is reclassified to
+#: ``host_network_code_execution`` before any gate is read — by the model tool
+#: that proposed it, and again when an approval relays it — so its entries are
+#: those two capabilities' entries, and the tests derive them that way rather
+#: than from a tool or relay list of its own.
+RECLASSIFIED_FROM: dict[str, frozenset[str]] = {
+    "host_network_code_execution": frozenset({"shell_execution", "process_execution"}),
+}
+
 ENTRY_KINDS = frozenset({
     ENTRY_MODEL_TOOL,
     ENTRY_APPROVAL_RELAY,
@@ -117,6 +128,10 @@ _ENTRIES: tuple[CapabilityEntry, ...] = (
     _own("file_write_execution", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY),
     _own("patch_apply_execution", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY),
     _own("shell_execution", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY),
+    # BUG-308 — the router reclassifies a `shell`/`process` action that runs
+    # code on the host to this capability, and `run_command` asks the same
+    # placement under a session grant; both then read this gate by name.
+    _own("host_network_code_execution", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY),
     _own("git_write_execution", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY),
     _own("git_push_execution", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY),
     _own("connector_github_runtime", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY,

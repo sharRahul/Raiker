@@ -343,7 +343,10 @@ class TestExecutorRegistryStandalone:
         executor = TrackingExecutor("read_file")
         registry.register("read_file", executor)
         assert registry.has("read_file") is True
-        assert registry.get("read_file") is executor
+        # CR-01 — handed out behind the dispatch guard, never bare.
+        fetched = registry.get("read_file")
+        assert fetched is not None
+        assert fetched.inner is executor
 
     def test_get_returns_none_for_unregistered(self) -> None:
         registry = ExecutorRegistry()
@@ -355,4 +358,6 @@ class TestExecutorRegistryStandalone:
         e2 = TrackingExecutor("cap")
         registry.register("cap", e1)
         registry.register("cap", e2)
-        assert registry.get("cap") is e2
+        fetched = registry.get("cap")
+        assert fetched is not None
+        assert fetched.inner is e2

@@ -135,6 +135,9 @@ export const COMMON_PERMISSIONS = [
   "web_fetch",
   "file_write_execution",
   "shell_execution",
+  // BUG-308 — beside shell, because it is shell's other half: the commands
+  // that run code, when they would run with this machine's network.
+  "host_network_code_execution",
   "git_push_execution",
   "external_channel_runtime",
 ] as const;

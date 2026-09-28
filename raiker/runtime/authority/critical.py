@@ -69,6 +69,8 @@ class CriticalMatch:
 TIER2_CAPABILITIES: frozenset[str] = frozenset({
     "shell_execution",
     "process_execution",
+    # BUG-308 — relaxing code-with-the-host's-network is relaxing shell.
+    "host_network_code_execution",
     "web_fetch",
 })
 

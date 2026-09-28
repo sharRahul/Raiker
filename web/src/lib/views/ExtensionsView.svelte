@@ -869,6 +869,13 @@
                   {#if plugin.signature.remediation}
                     <span class="note">{plugin.signature.remediation}</span>
                   {/if}
+                  {#if plugin.code_runtime}
+                    <!-- BUG-308 — never a claim of containment this machine
+                         cannot keep: where its own code would run, here. -->
+                    <span class="note" data-testid="plugin-code-runtime">
+                      <strong>Code:</strong> {plugin.code_runtime.summary}
+                    </span>
+                  {/if}
                 </div>
                 <span
                   class="sig"

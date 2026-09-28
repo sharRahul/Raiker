@@ -103,6 +103,10 @@ class CapabilityGateView:
     side_effect: str = ""
     ungoverned_consequence: str = ""
     authority_requirement: str = ""
+    #: BUG-308 — for a capability that runs code, where that code runs on *this*
+    #: machine: inside the native sandbox, or with the host's network. Measured,
+    #: never assumed; empty for every capability that runs no code.
+    network_boundary: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -127,6 +131,7 @@ class CapabilityGateView:
             "side_effect": self.side_effect,
             "ungoverned_consequence": self.ungoverned_consequence,
             "authority_requirement": self.authority_requirement,
+            "network_boundary": self.network_boundary,
         }
 
 

@@ -307,6 +307,57 @@ describe("ExtensionsView", () => {
     ).toBeInTheDocument();
   });
 
+  // BUG-308 — never a claim of containment the machine cannot keep.
+  it("says where a plugin's own code would run on this machine", async () => {
+    stubFetch({
+      "GET /api/plugins": {
+        plugins: [
+          {
+            record_id: "plr_net",
+            plugin_id: "acme-runner",
+            version: "1.0.0",
+            trust_level: "local_dev",
+            status: "installed",
+            source_url: null,
+            installed_at: "2026-09-28T00:00:00Z",
+            installed_by: "cli",
+            checksum_present: true,
+            signature: {
+              level: "unsigned",
+              label: "Unsigned",
+              reason: "no_signature",
+              method: "",
+              verified: false,
+              explanation: "No signature.",
+              remediation: "",
+            },
+            contributions: {
+              hooks: 0,
+              events: [],
+              skills: 0,
+              skill_names: [],
+              mcp_servers: 0,
+              mcp_server_names: [],
+              error: null,
+            },
+            code_runtime: {
+              where: "host_network",
+              summary:
+                "Its code runs as a bounded process with this machine's network: no plugin container is set up here.",
+            },
+          },
+        ],
+        signing: { configured: false, summary: "No signing key configured." },
+        contribution_kinds: [],
+      },
+    });
+    render(ExtensionsView, { props: { tab: "plugins" } });
+
+    expect(await screen.findByTestId("plugin-code-runtime")).toHaveTextContent(
+      /with this machine's network/,
+    );
+  });
+
   // BUG-221 step 2 — a contributed skill is offered, not switched on. "Provides
   // 2 skills" must not read as two skills already in every turn.
   it("names the skills a plugin provides, and says they are not on yet", async () => {

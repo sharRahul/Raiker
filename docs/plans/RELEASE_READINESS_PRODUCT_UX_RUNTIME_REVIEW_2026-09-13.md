@@ -183,6 +183,18 @@ end contract.
 > moving them needs the work index to grow a `pinned` and an `archived` facet
 > first ([BUG-303](TO_BE_FIXED.md#bug-303--the-conversation-library-controls-are-still-in-the-evidence-inspector)).
 >
+> **Implementation status, 2026-09-28.** RR-AUTHORITY-01 was reduced a third
+> time, and its first half — *broker-issued authority for every side effect* —
+> now holds:
+> [FIXED-619](FIXED_ITEMS.md#fixed-619--a-real-executor-could-be-fetched-and-run-with-nothing-governing-it)
+> hands out every registered executor behind the router's dispatch token, so a
+> direct call refuses before any side effect, and a construction of an executor
+> class outside the registry builder fails CI unless it is listed with a reason.
+> The second half — running untrusted execution outside the control process — is
+> what remains; [FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so)
+> moved code-running commands and plugins into the sandbox or container wherever
+> one exists, and says so where one does not.
+>
 > **Implementation status, 2026-09-15.** RR-AUTHORITY-01 was reduced again:
 > [FIXED-542](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all)
 > builds the per-capability registry DEC-16 step 8 asks for — threat model,
@@ -211,7 +223,7 @@ end contract.
 | ID | Priority | Status | Blocker | Evidence and reason |
 |---|---:|---|---|---|
 | RR-IDENTITY-01 | P0 | **Closed** ([FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name)) | Internal principal ID reaches owner-facing/model-facing language | The account routes already return a display name, and `UserMetadata` has a `display_name` field, but prompt envelopes populate only `id=principal_id`. The exact rendered sentence is owner-observed and not present as a static literal. |
-| RR-AUTHORITY-01 | P0 | Open (reduced twice — [FIXED-505](FIXED_ITEMS.md#fixed-505--the-four-capabilities-that-reach-furthest-into-an-owners-accounts-explained-themselves-least), [FIXED-542](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all)) | The authority *context* is not built; the registry it was asked for is | Release assurance requires a type/issuer boundary that a future route, plugin, scheduler or connector cannot bypass by convention. **Every column DEC-16 step 8 names is now CI-enforced** — executor, entry path, Permissions description, threat model, authority requirement and a per-capability negative bypass test — and writing the last three out found one capability whose owner-facing switch reached no gate at all (FIXED-542). What is left is the opaque authority context itself, which is a type boundary rather than a registry column. |
+| RR-AUTHORITY-01 | P0 | Open (reduced three times — [FIXED-505](FIXED_ITEMS.md#fixed-505--the-four-capabilities-that-reach-furthest-into-an-owners-accounts-explained-themselves-least), [FIXED-542](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all), [FIXED-619](FIXED_ITEMS.md#fixed-619--a-real-executor-could-be-fetched-and-run-with-nothing-governing-it)) | Runtime-issued authority now guards every registered executor (FIXED-619); untrusted execution outside the control process is what remains | Release assurance requires a type/issuer boundary that a future route, plugin, scheduler or connector cannot bypass by convention. **Every column DEC-16 step 8 names is now CI-enforced** — executor, entry path, Permissions description, threat model, authority requirement and a per-capability negative bypass test — and writing the last three out found one capability whose owner-facing switch reached no gate at all (FIXED-542). What is left is the opaque authority context itself, which is a type boundary rather than a registry column. |
 | RR-MCP-01 | P0/P1 | **Closed** ([FIXED-500](FIXED_ITEMS.md#fixed-500--every-local-mcp-server-was-handed-raikers-whole-environment)) | MCP stdio inherits the Raiker process environment | `raiker/runtime/executors/mcp.py` starts the subprocess without a constructed `env`, creating an ambient-secret exposure class. |
 | RR-MCP-02 | P1 | **Closed** ([FIXED-504](FIXED_ITEMS.md#fixed-504--five-destinations-one-label-and-the-owners-token-sent-to-all-of-them)) | Remote MCP trust and network reach are under-specified | URL parsing is present, but owner-added remote endpoints are treated as authorization without a shared destination trust class, redirect/DNS-rebinding contract and explicit private-network grant. |
 | RR-INSTALL-01 | P1 | Open | Linux/macOS installer runtime ownership is incomplete | A normal user must not need to supply a compatible Python toolchain or inherit unmanaged system dependencies for a supported desktop release. |

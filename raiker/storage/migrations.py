@@ -3913,3 +3913,41 @@ CREATE INDEX IF NOT EXISTS idx_image_generations_source
 CREATE INDEX IF NOT EXISTS idx_image_generations_project
   ON image_generations (owner_principal_id, project_id, created_at DESC);
 """
+
+# BUG-308 — code with this machine's network became its own permission. Before,
+# an owner who had turned *Shell commands* (or *Processes*) on could run a
+# script; after, an unset row for the new capability reads as off on an
+# account, and that script would have started refusing — which the owner's
+# decision ruled out. So an account, or a workspace table, that already has
+# either command capability on gets the new one on beside it, once, written as
+# a row that says where it came from. A row the owner wrote is never replaced
+# (`INSERT OR IGNORE`), and the decision mode is not copied: like every
+# capability it starts at *Ask me*.
+HOST_NETWORK_CODE_CARRY_OVER_MIGRATION_ID = "RAIKER-2072-host-network-code-carry-over"
+
+HOST_NETWORK_CODE_CARRY_OVER_SQL = """
+INSERT OR IGNORE INTO principal_capability_gate_state
+  (principal_id, capability, state, requested_by, requested_at, activated_by,
+   activated_at, reason, readiness_snapshot_json, created_at, updated_at)
+SELECT principal_id, 'host_network_code_execution', MIN(state),
+       'system_bug_308_carry_over', strftime('%Y-%m-%dT%H:%M:%SZ', 'now'),
+       'system_bug_308_carry_over', strftime('%Y-%m-%dT%H:%M:%SZ', 'now'),
+       'Carried over from Shell commands when code with this machine''s network became its own permission (BUG-308).',
+       '', strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+FROM principal_capability_gate_state
+WHERE capability IN ('shell_execution', 'process_execution')
+  AND state NOT IN ('disabled', 'planned')
+GROUP BY principal_id;
+INSERT OR IGNORE INTO capability_gate_state
+  (capability, state, runtime_mode, requested_by, requested_at, activated_by,
+   activated_at, reason, readiness_snapshot_json, created_at, updated_at)
+SELECT 'host_network_code_execution', MIN(state), '',
+       'system_bug_308_carry_over', strftime('%Y-%m-%dT%H:%M:%SZ', 'now'),
+       'system_bug_308_carry_over', strftime('%Y-%m-%dT%H:%M:%SZ', 'now'),
+       'Carried over from Shell commands when code with this machine''s network became its own permission (BUG-308).',
+       '', strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+FROM capability_gate_state
+WHERE capability IN ('shell_execution', 'process_execution')
+  AND state NOT IN ('disabled', 'planned')
+HAVING COUNT(*) > 0;
+"""

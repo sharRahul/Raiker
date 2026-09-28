@@ -23,6 +23,10 @@ untrusted plugin code to run with kernel-level network and filesystem isolation.
   image allowlist `container_image_allowlist()`
   (`RAIKER_CONTAINER_IMAGE_ALLOWLIST`) or the run fails closed
   (`image_not_allowed`). An empty allowlist denies everything.
+- The entrypoint is re-hashed immediately before the container starts and must
+  match the owner's pin in `RAIKER_PLUGIN_RUNTIME_DIGESTS`
+  (`plugin_entrypoint_digest_not_pinned`, `plugin_entrypoint_digest_mismatch`) —
+  BUG-308, the artifact revalidation CR-05 asked for.
 - Only interpreters in `{python3, python, node}` may be launched
   (`interpreter_not_allowed:<name>`); the entrypoint must resolve inside the
   workspace root (`outside_workspace:entrypoint`, `entrypoint_not_found`) and,

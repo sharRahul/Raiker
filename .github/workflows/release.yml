@@ -155,8 +155,14 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      # GCR-41 — the build environment is the hash-locked set exported from
+      # `uv.lock`, not whatever the resolver found today: the desktop build tool
+      # that freezes the bundle is one of its inputs too.
       - name: Install package and desktop build tool
-        run: python -m pip install -e ".[dev]"
+        run: |
+          python -m pip install --upgrade pip wheel
+          python -m pip install --require-hashes --no-deps -r requirements/release-build.txt
+          python -m pip install --no-deps -e .
       - name: Download web assets
         # actions/download-artifact v4
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -168,10 +174,16 @@ jobs:
       # packaging test on every target. Resolving them here, on the target's own
       # runner, is what makes the artifact installable without a network — and
       # what makes a failure attributable to the platform it happened on.
+      #
+      # GCR-41 — resolved, but no longer *chosen* here. Every version and every
+      # permitted digest comes from `requirements/release.txt`, exported from
+      # `uv.lock`, so two builds of one commit on different days ship the same
+      # dependency bytes or fail. Markers in that file pick this platform's
+      # subset; `--require-hashes` refuses anything the lock did not name.
       - name: Resolve this platform's wheels
         run: |
-          python -m pip install --upgrade pip wheel
-          python -m pip wheel . --wheel-dir wheels
+          python -m pip wheel --require-hashes --no-deps -r requirements/release.txt --wheel-dir wheels
+          python -m pip wheel --no-deps . --wheel-dir wheels
       - name: Assert the encrypted-database wheel is this platform's
         shell: bash
         run: |

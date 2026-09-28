@@ -51,6 +51,15 @@ There is deliberately **no escape hatch**. An unavailable environment is refused
 never rerouted to the host — see
 [§4.2](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#42-an-escape-hatch-out-of-the-sandbox).
 
+**Commands that run code are placed separately (BUG-308, 2026-09-28).** A
+command whose program is `python`, `node`, `npm`, `npx` or `pip` runs code the
+command line does not show. With no environment chosen, it runs inside
+`native_sandbox` wherever this machine has one; where it would run on the host —
+no sandbox here, the owner chose `local_native`, or a background or terminal run
+the sandbox cannot host — it answers to its own capability,
+[`host_network_code_execution`](host-network-code.md), and the gate and a
+*Never* of `shell_execution` still apply to it.
+
 ## Assets
 
 | Asset | Why it matters |
@@ -82,7 +91,8 @@ never rerouted to the host — see
 
 - **`local_native` is the default profile, and it is not a sandbox.** It is
   explicit host access with reduced isolation. The stronger boundary is a
-  deliberate opt-in because the sandbox is foreground-only.
+  deliberate opt-in because the sandbox is foreground-only — except for commands
+  that run code, which default to the sandbox wherever there is one (above).
 - **Inside the native sandbox, several controls are absent rather than
   disabled.** PTY and raw input, background execution, persistent sessions,
   filtered domain egress, credential quarantine, SSH and Daytona are **not

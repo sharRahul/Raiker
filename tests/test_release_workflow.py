@@ -54,7 +54,8 @@ def test_release_build_installs_desktop_tooling_and_native_appimagetool() -> Non
     from raiker.app.build_tools import pinned_tools
 
     install = _step(build, "Install package and desktop build tool")
-    assert 'python -m pip install -e ".[dev]"' in install["run"]
+    assert "--require-hashes --no-deps -r requirements/release-build.txt" in install["run"]
+    assert "python -m pip install --no-deps -e ." in install["run"]
     appimagetool = _step(build, "Install appimagetool")["run"]
     assert "appimagetool" in appimagetool
     # GCR-41 — the per-architecture download used to be a `case` in this shell.
@@ -117,3 +118,42 @@ def test_an_unpinned_architecture_is_refused_rather_than_guessed() -> None:
 
     with pytest.raises(ValueError, match="build_tool_not_pinned"):
         pinned_tool("appimagetool", "riscv64")
+
+
+def _locked(path: Path) -> dict[str, list[str]]:
+    """Each pinned requirement in an exported file and the digests it permits."""
+    pins: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = re.match(r"^([A-Za-z0-9_.-]+)==\S+", line)
+        if match:
+            current = match.group(1).lower().replace("_", "-")
+            pins[current] = []
+        elif current is not None and "--hash=sha256:" in line:
+            pins[current].append(line.strip())
+    return pins
+
+
+def test_the_release_wheels_come_from_the_hash_locked_set() -> None:
+    # GCR-41 — `pip wheel .` let the resolver choose on the day of the build.
+    run = _step(_workflow()["jobs"]["build"], "Resolve this platform's wheels")["run"]
+    assert "--require-hashes --no-deps -r requirements/release.txt" in run
+    assert "pip wheel --no-deps . --wheel-dir wheels" in run
+    assert "pip wheel . --wheel-dir" not in run
+
+
+def test_every_runtime_dependency_is_pinned_with_a_digest() -> None:
+    import tomllib
+
+    declared = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    locked = _locked(ROOT / "requirements" / "release.txt")
+    for requirement in declared["project"]["dependencies"]:
+        name = re.split(r"[<>=;!~\s\[]", requirement, maxsplit=1)[0].lower().replace("_", "-")
+        assert name in locked, f"{name} is declared and not in requirements/release.txt"
+    assert all(digests for digests in locked.values()), "a pin with no digest"
+
+
+def test_the_build_set_carries_the_desktop_build_tool() -> None:
+    locked = _locked(ROOT / "requirements" / "release-build.txt")
+    assert "pyinstaller" in locked
+    assert set(_locked(ROOT / "requirements" / "release.txt")) <= set(locked)

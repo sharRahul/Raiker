@@ -368,15 +368,15 @@ def test_the_models_view_actually_sends_the_declared_image_models() -> None:
     """
     import inspect
 
-    from raiker.control import dashboard
     from raiker.control.dashboard import ModelProfileView
+    from raiker.control.dashboard_parts import models as dashboard_models
 
     field = ModelProfileView.__dataclass_fields__.get("image_models")
     assert field is not None, "the models view does not carry image models"
     assert field.default == ()
     # And the builder populates it, rather than leaving every profile at the
     # default — which would reproduce the defect with the field in place.
-    source = inspect.getsource(dashboard)
+    source = inspect.getsource(dashboard_models)
     assert "image_models=declared_image_models(" in source
 
 

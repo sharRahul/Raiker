@@ -572,6 +572,21 @@ so "provides nothing" and "may not provide anything" read differently.
 
 No plugin code runs in your browser.
 
+Each plugin's card also says, under **Code**, where its own code would run on
+this machine, if you allowed it to run at all:
+
+- **not enabled** — it is not on your plugin runtime allowlist, so none runs;
+- **in a container with no network** — the plugin container is set up
+  (`RAIKER_PLUGIN_RUNTIME_IMAGE`, on your image allowlist, and `docker` present),
+  and that is where it would run;
+- **with this machine's network** — no plugin container is set up here, so it
+  would run as a bounded process on this machine.
+
+Allowing a plugin's code names *which bytes* as well as which plugin:
+`RAIKER_PLUGIN_RUNTIME_DIGESTS` takes `<plugin_id>:<sha256>` entries, and the
+entrypoint is hashed again immediately before it runs. A plugin with no pin, or a
+file that changed since you pinned it, does not run.
+
 ### A plugin's skills
 
 A plugin that asks for `skill:contribute` may ship `SKILL.md` documents. They go

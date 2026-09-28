@@ -194,6 +194,14 @@
             <dd>{gate.authority_requirement}</dd>
           </div>
         {/if}
+        {#if gate.network_boundary}
+          <div>
+            <!-- BUG-308 — measured on this machine, not configured: whether
+                 code these commands run has the network or not. -->
+            <dt>On this machine</dt>
+            <dd data-testid="network-boundary">{gate.network_boundary}</dd>
+          </div>
+        {/if}
         {#if why}
           <div>
             <!-- GEP-04 — a switch that does not decide whether its own

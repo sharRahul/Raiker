@@ -234,6 +234,12 @@ Remove hundreds of repetitive projection lines and make frontend generation prac
 
 ## OPT-06 — Break `sqlite.py` into domain stores, then deduplicate only proven CRUD patterns
 
+**Status: split done 2026-09-28 — [FIXED-616](FIXED_ITEMS.md#fixed-616--one-storage-file-held-every-domain-the-product-has).**
+`SQLiteStore` is assembled from sixteen domain parts in `raiker/storage/stores/`,
+the migration runner among them; `sqlite.py` keeps the connection core. The move
+was verbatim, so this entry's second half — deduplicating proven CRUD patterns —
+has not started, and OR-03 applies: the split did not reduce LOC.
+
 **Priority: P1 — Effort: High — LOC reduction: High potential; module-length reduction: Critical — Risk: High if done in one step**
 
 ### Evidence
@@ -321,6 +327,11 @@ Historical migration behavior must remain immutable once released.
 ---
 
 ## OPT-08 — Decompose `dashboard.py` by read-model domain and remove embedded API DTO duplication
+
+**Status: decomposition done 2026-09-28 — [FIXED-617](FIXED_ITEMS.md#fixed-617--one-service-file-held-every-page-the-product-serves).**
+`DashboardService` is assembled from eleven domain parts in
+`raiker/control/dashboard_parts/`. The view dataclasses stayed in `dashboard.py`,
+and their `asdict()` duplication is untouched — that half remains.
 
 **Priority: P1 — Effort: High — LOC reduction: Medium/High; module-length reduction: Critical — Risk: Medium**
 

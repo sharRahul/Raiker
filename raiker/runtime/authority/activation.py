@@ -129,6 +129,12 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     for cap in ("shell_execution", "process_execution", "web_fetch"):
         r[cap] = _req(cap, "2", threat_ack=True, human_confirm=True,
                       notes="Sandbox, allowlist, budget required.")
+    # BUG-308 — the same command capabilities, when what they run is code and
+    # there is no sandbox around it. Acknowledged like them, and named for what
+    # it is: the host's network, not a boundary.
+    r["host_network_code_execution"] = _req(
+        "host_network_code_execution", "2", threat_ack=True, human_confirm=True,
+        notes="python/node/npm/npx outside the native sandbox; host network, stated as such.")
     # BUG-67 — the governed push. Egress, so Tier 2 and acknowledged like the
     # rest of it; bound to the owner's own credential and the connector egress
     # allowlist, neither of which the gate can substitute for.

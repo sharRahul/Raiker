@@ -38,7 +38,11 @@ from raiker.runtime.executors.tier1_tasks import (
     TaskManagementExecutor,
 )
 from raiker.runtime.executors.tier2_image import ImageGenerationExecutor
-from raiker.runtime.executors.tier2_shell import ProcessExecutor, ShellExecutor
+from raiker.runtime.executors.tier2_shell import (
+    HostNetworkCodeExecutor,
+    ProcessExecutor,
+    ShellExecutor,
+)
 from raiker.runtime.executors.tier2_telemetry import TelemetryExportExecutor
 from raiker.runtime.executors.tier2_web import WebFetchExecutor
 from raiker.runtime.executors.tier3_core import (
@@ -82,7 +86,7 @@ __all__ = [
     "GitWriteExecutor", "GitPushExecutor",
     "MemoryWriteExecutor", "MemoryForgetExecutor",
     "TaskManagementExecutor", "ProjectAssignmentExecutor",
-    "ShellExecutor", "ProcessExecutor", "WebFetchExecutor", "TelemetryExportExecutor",
+    "ShellExecutor", "ProcessExecutor", "HostNetworkCodeExecutor", "WebFetchExecutor", "TelemetryExportExecutor",
     "ImageGenerationExecutor",
     "GraphIndexingExecutor", "CodeMapIndexExecutor", "LanguageIntelligenceExecutor",
     "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
@@ -157,6 +161,11 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # Tier 2 — sandboxed local execution / allowlisted egress
     "shell_execution",
     "process_execution",
+    # BUG-308 — a command that runs code (`python`, `node`, `npm`, `npx`) with
+    # this machine's network, because there is no sandbox here or the owner
+    # chose the host. Its own switch, so an owner can see and refuse exactly
+    # that; the same command runs inside the native sandbox wherever there is one.
+    "host_network_code_execution",
     "web_fetch",
     # BUG-67 — the governed push. Egress like the four above it, bounded by the
     # owner's connector egress allowlist and the owner's own credential; it never
@@ -288,6 +297,7 @@ def build_default_executor_registry(
     registry.register("project_assignment_runtime", ProjectAssignmentExecutor(ws, store))
     registry.register("shell_execution", ShellExecutor(ws))
     registry.register("process_execution", ProcessExecutor(ws))
+    registry.register("host_network_code_execution", HostNetworkCodeExecutor(ws))
     registry.register("web_fetch", WebFetchExecutor(ws, store))
     registry.register("telemetry_export", TelemetryExportExecutor(ws, store))
     registry.register("image_generation", ImageGenerationExecutor(ws, store))

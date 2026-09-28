@@ -49,7 +49,7 @@ def test_execution_environment_api_configures_and_selects_ssh(
     identity.write_text("test key path only", encoding="utf-8")
     monkeypatch.setenv("RAIKER_TEST_SSH_KEY", str(identity))
     monkeypatch.setattr(
-        "raiker.control.dashboard.probe_execution_profile",
+        "raiker.control.dashboard_parts.execution.probe_execution_profile",
         lambda profile, **_kwargs: ProfileProbe(
             profile, True, None, "2026-08-21T00:00:00Z", features=profile.features
         ),
@@ -84,7 +84,7 @@ def test_execution_environment_api_surfaces_native_runner_trust(
 ) -> None:
     workspace = _workspace(tmp_path)
     monkeypatch.setattr(
-        "raiker.control.dashboard.probe_execution_profile",
+        "raiker.control.dashboard_parts.execution.probe_execution_profile",
         lambda profile, **_kwargs: ProfileProbe(
             profile,
             True,

@@ -80,5 +80,6 @@ rather than a control:
 - `raiker/runtime/executors/tier3_core.py`, `raiker/memory/store.py`,
   `raiker/memory/semantic.py`, `raiker/vector/`
 - [`../MEMORY_AND_CONTEXT_STRATEGY.md`](../architecture/MEMORY_AND_CONTEXT_STRATEGY.md)
-- [`../plans/MEMORY_RELIABILITY_PLAN.md`](../plans/MEMORY_RELIABILITY_PLAN.md) — the full audit with reproductions
+- The memory reliability audit, closed in full and removed 2026-09-28 — each
+  entry's reproduction and fix is in [`../plans/FIXED_ITEMS.md`](../plans/FIXED_ITEMS.md)
 - [`vector-embedding.md`](vector-embedding.md) — the embedding capability it ranks with

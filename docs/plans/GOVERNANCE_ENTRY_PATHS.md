@@ -229,7 +229,7 @@ row, and it is recorded rather than removed for the reason this section exists.
 
 ### 3.6 Every capability with a real executor, and the path that reaches it
 
-All forty-seven, so the enumeration is complete rather than illustrative.
+All forty-eight, so the enumeration is complete rather than illustrative.
 `telemetry_export` was the forty-sixth, added 2026-09-04 with backlog item 18;
 `image_generation` is the forty-seventh, added 2026-09-05 with the Design
 surface. The invariant below is what required each to appear here at all. The
@@ -258,6 +258,18 @@ not fully traced.
 | `remote_execution_cap` | `remote_execute` |
 | `cloud_execution_cap` | `cloud_execute` |
 | `subagents` | `spawn_subagent` |
+
+**Reached by reclassification** — one, added 2026-09-28 with BUG-308.
+`host_network_code_execution` is named by no tool. The router assigns it in place
+of `shell_execution` or `process_execution` when the command's program runs code
+(`python`, `node`, `npm`, `npx`, `pip`) and that code would run on the host with
+its network, before any gate is read (`RuntimeAuthority._place_code`); a relayed
+approval is re-routed and reclassified the same way, and `run_command`'s session
+grant asks the same placement in the broker. Its entries are therefore the
+`shell` tool and the approval relay, which `RECLASSIFIED_FROM` in
+`entry_paths.py` states and the invariants derive rather than list. Where this
+machine has the native sandbox the command is placed there instead and this
+capability is never asked. That makes forty-eight.
 
 Twelve of these seventeen are also **relayed by an approval**
 (`EXECUTABLE_ON_APPROVAL`); `code_map_indexing`, `language_intelligence`,

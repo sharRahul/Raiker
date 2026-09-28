@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -75,6 +78,81 @@ def plugin_runtime_allowlist() -> frozenset[str]:
     """
     raw = os.environ.get("RAIKER_PLUGIN_RUNTIME_ALLOWLIST", "")
     return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
+def plugin_runtime_digests() -> dict[str, str]:
+    """Owner-pinned SHA-256 of each plugin's entrypoint (BUG-308, CR-05).
+
+    Read from ``RAIKER_PLUGIN_RUNTIME_DIGESTS`` as comma-separated
+    ``<plugin_id>:<sha256>`` entries, the same shape as the scopes beside it.
+    The allowlist names *which* plugin may run code; this names *which bytes*.
+    A plugin with no pin runs nothing, so a file replaced after the owner looked
+    at it is refused rather than run.
+    """
+    raw = os.environ.get("RAIKER_PLUGIN_RUNTIME_DIGESTS", "")
+    digests: dict[str, str] = {}
+    for entry in raw.split(","):
+        plugin_id, _, digest = entry.strip().partition(":")
+        plugin_id, digest = plugin_id.strip(), digest.strip().lower()
+        if plugin_id and len(digest) == 64 and all(c in "0123456789abcdef" for c in digest):
+            digests[plugin_id] = digest
+    return digests
+
+
+def entrypoint_digest_refusal(plugin_id: str, script_path: Path) -> str | None:
+    """Re-hash the entrypoint now, immediately before it runs, against the pin.
+
+    CR-05 asked for the artifact to be revalidated at the last moment rather
+    than trusted from install: an install record is about a manifest, and the
+    file that runs can change underneath it at any time after.
+    """
+    pinned = plugin_runtime_digests().get(plugin_id)
+    if pinned is None:
+        return "plugin_entrypoint_digest_not_pinned"
+    try:
+        actual = hashlib.sha256(script_path.read_bytes()).hexdigest()
+    except OSError:
+        return "plugin_entrypoint_unreadable"
+    return None if hmac.compare_digest(actual, pinned) else "plugin_entrypoint_digest_mismatch"
+
+
+def isolated_plugin_runtime_ready() -> bool:
+    """Whether a plugin's code can run in the no-network container here (BUG-308).
+
+    The three things :class:`PluginSandboxedRuntimeExecutor` needs before it
+    will run anything: an owner-chosen image, that image on the owner's image
+    allowlist, and a ``docker`` to run it with.
+    """
+    from raiker.runtime.executors.containers import container_image_allowlist
+
+    image = plugin_runtime_image()
+    return bool(image) and image in container_image_allowlist() and shutil.which("docker") is not None
+
+
+def plugin_code_runtime(plugin_id: str) -> dict[str, str]:
+    """Where an installed plugin's own code would run, for its card (BUG-308).
+
+    One of three answers, and never a claim of containment this machine cannot
+    keep: not at all, inside a container with no network, or with this
+    machine's network.
+    """
+    if plugin_id not in plugin_runtime_allowlist():
+        return {
+            "where": "not_enabled",
+            "summary": "Raiker does not run this plugin's own code: it is not on your plugin runtime allowlist.",
+        }
+    if isolated_plugin_runtime_ready():
+        return {
+            "where": "isolated",
+            "summary": "Its code runs in a container with no network, from the image you allowlisted.",
+        }
+    return {
+        "where": "host_network",
+        "summary": (
+            "Its code runs as a bounded process with this machine's network: "
+            "no plugin container is set up here."
+        ),
+    }
 
 
 def plugin_runtime_scopes() -> dict[str, str]:
@@ -590,6 +668,13 @@ class PluginRuntimeExecutor:
         self._runner: CommandRunner = runner or run_command
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        # BUG-308 — where this machine can run the plugin in the no-network
+        # container, that is where it runs. The bare subprocess below has the
+        # host's network and is only the path where no container exists.
+        if isolated_plugin_runtime_ready():
+            return PluginSandboxedRuntimeExecutor(
+                self._workspace_root, self._store, runner=self._runner
+            ).execute(action, principal)
         plugin_id = action.arguments.get("plugin_id")
         entrypoint = action.arguments.get("entrypoint")
         interpreter = action.arguments.get("interpreter", "python" if os.name == "nt" else "python3")
@@ -635,6 +720,13 @@ class PluginRuntimeExecutor:
         if scope_error is not None:
             return self._record_and_fail(
                 action, principal, plugin_id, scope_error, install=install,
+                entrypoint=str(script_path),
+            )
+
+        digest_refusal = entrypoint_digest_refusal(plugin_id, script_path)
+        if digest_refusal is not None:
+            return self._record_and_fail(
+                action, principal, plugin_id, digest_refusal, install=install,
                 entrypoint=str(script_path),
             )
 
@@ -866,6 +958,13 @@ class PluginSandboxedRuntimeExecutor:
         if scope_error is not None:
             return self._record_and_fail(
                 action, principal, plugin_id, scope_error, install=install,
+                entrypoint=str(script_path),
+            )
+
+        digest_refusal = entrypoint_digest_refusal(plugin_id, script_path)
+        if digest_refusal is not None:
+            return self._record_and_fail(
+                action, principal, plugin_id, digest_refusal, install=install,
                 entrypoint=str(script_path),
             )
 

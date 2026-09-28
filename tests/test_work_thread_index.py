@@ -17,8 +17,8 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.control import dashboard as dashboard_module
 from raiker.control.dashboard import DashboardService
+from raiker.control.dashboard_parts import sessions as sessions_part
 from raiker.storage.sqlite import SQLiteStore
 
 # The owner these cases belong to. `sessions.user_id` is a foreign key, so the
@@ -222,7 +222,8 @@ class TestTheAnswerStatesItsOwnBounds:
         self, service: DashboardService, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """An index that reads everything is the defect with a larger number."""
-        monkeypatch.setattr(dashboard_module, "WORK_THREAD_SCAN_LIMIT", 3)
+        # GCR-43 — read by the sessions part of the service, so patched there.
+        monkeypatch.setattr(sessions_part, "WORK_THREAD_SCAN_LIMIT", 3)
         for index in range(5):
             _chat(service, f"t{index}", when=f"2026-09-13T10:0{index}:00Z")
 

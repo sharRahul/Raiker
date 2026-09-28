@@ -116,6 +116,33 @@ are not switches waiting to be found; they are not built, and the card says so.
 Re-measuring the boundary opens one connection to this host's default gateway on
 a closed port, which is how the network claim is tested rather than asserted.
 
+### Commands that run code
+
+`python`, `node`, `npm`, `npx` and `pip` run code the command line does not
+show — a script can open a network connection no check on the command itself
+can see. So these are placed on their own:
+
+- **If you have not chosen an environment and this machine has the native
+  sandbox**, they run inside it, with no network. Nothing is asked beyond what
+  *Shell commands* already asks.
+- **Otherwise** — no sandbox here, you chose *on this machine*, or the command
+  runs in the background or needs a terminal, which the sandbox cannot do —
+  they run on this machine with its network, and each one answers to its own
+  permission, **Code with this machine's network**. It starts at *Ask me* like
+  every permission, and turning *Shell commands* off still stops them.
+- **If you chose a container or a remote environment**, that environment is
+  used, as for any other command.
+
+In Permissions, the *Shell commands*, *Processes* and *Code with this machine's
+network* rows say under **On this machine** which of the first two is true
+here, measured rather than assumed.
+
+Nothing that ran before stops running. If you already had *Shell commands* or
+*Processes* on, *Code with this machine's network* was turned on beside it when
+it arrived; and the first time you turn either on, it is turned on with it. Each
+time the row says why, and from then on it is its own switch — turn it off and
+scripts stop while every other command still runs.
+
 ---
 
 ## Standing grants
@@ -175,7 +202,7 @@ domains are kept out of the interactive list altogether, and named in
 |---|---|
 | Workspace | Audit export, Code map, Language intelligence, File writes, Memory store/forget, Patch apply, Task creation, Project assignment, Vector embeddings, Graph indexing, Checkpoint restore |
 | Git | Git writes, Git push, GitHub connector |
-| Execution | Shell commands, Subagents, Remote execution, Cloud execution |
+| Execution | Shell commands, Code with this machine's network, Subagents, Remote execution, Cloud execution |
 | Network | Web fetch, Telemetry export, External channels, Image generation |
 | Models | Hosted models, Home-lab models, Advisor model, Provider embeddings |
 | Connectors | Gmail, Google Calendar, Slack, Plugin install |

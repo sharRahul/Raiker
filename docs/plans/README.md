@@ -40,6 +40,20 @@ that did land against a real provider is
 [BUG-287](TO_BE_FIXED.md#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider),
 which is a live-evidence gap and lives in the open ledger.
 
+Four more went on 2026-09-28, each when its last item closed: the generic
+static code review and its third pass (GCR-10 by the owner's decision as
+[FIXED-618](FIXED_ITEMS.md#fixed-618--construction-time-self-repair-stays-by-the-owners-decision),
+GCR-11, GCR-13, GCR-41 and GCR-43 as FIXED-614 to FIXED-617), the security code
+review (CR-01 as
+[FIXED-619](FIXED_ITEMS.md#fixed-619--a-real-executor-could-be-fetched-and-run-with-nothing-governing-it),
+CR-05 and CR-09 with BUG-308, by the owner's decision, as
+[FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so)),
+and the memory reliability plan, whose fourteen MEM entries had all closed by
+2026-08-29 and whose post-Stage-J backlog is
+[ADD-25](TO_BE_ADDED.md#add-25--post-stage-j-memory-expansion). Their IDs stay in
+code comments, as COMPOSER-xx did: every closure record names the finding it
+closes, so an ID leads to its record.
+
 The typed channel's other half closed on 2026-09-16 as
 [FIXED-551](FIXED_ITEMS.md#fixed-551--a-declared-table-was-a-table-in-the-conversation-and-json-everywhere-else):
 an exported, reopened or spoken answer is the same answer the conversation
@@ -65,14 +79,10 @@ When these disagree with an older topic review's current-status prose, re-verify
 
 | Document | Role now |
 |---|---|
-| `CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md` | Historical optimization review; several architecture recommendations remain active |
-| `CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md` | Security findings; its **2026-09-28 status table is current** — CR-05 and CR-09 remain open as [BUG-308](TO_BE_FIXED.md#bug-308--the-bare-plugin-runtime-and-the-interpreter-commands-still-reach-the-network-directly), CR-01 is reduced (RR-AUTHORITY-01) |
+| `CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md` | Historical optimization review; several architecture recommendations remain active. OPT-06 and OPT-08's splits landed 2026-09-28 (FIXED-616, FIXED-617); their deduplication halves did not |
 | `GAP_BUILD_CHAT.md` | Build/Chat gap ledger; row-level status is stronger evidence than old narrative paragraphs |
-| `GENERIC_STATIC_CODE_REVIEW_2026-09-05.md` | Historical static review |
-| `GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md` | Historical deeper review; contains some stale “still open” prose beside later closed rows |
 | `GOVERNANCE_ENTRY_PATHS.md` | Canonical governance entry-path inventory; no open item since 2026-09-28 (GEP-02 and GEP-03 closed). Kept as the enumeration, not as a review |
 | `LIVE_TEST_ROUNDS.md` | Historical live-test evidence by round |
-| `MEMORY_RELIABILITY_PLAN.md` | Memory reliability evidence/closure ledger |
 | `RAIKER_LIVE_MANUAL_TEST_PLAN.md` | Active manual verification procedure |
 | `SECURITY_COMPLIANCE_GAP_ASSESSMENT_2026-09-05.md` | Standards/control mapping evidence, not a certification claim |
 | `screenshots/` | Legacy screenshot evidence only; canonical current screenshots live under `docs/screenshots/` |

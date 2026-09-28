@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -184,6 +185,11 @@ def _prepared_executor(
     store = SQLiteStore(ws)
     _install(store)
     (ws / "entry.py").write_text("print('hi')\n", encoding="utf-8")
+    # BUG-308 (CR-05) — the owner pins the bytes that may run, not only the id.
+    monkeypatch.setenv(
+        "RAIKER_PLUGIN_RUNTIME_DIGESTS",
+        f"{_PLUGIN}:{hashlib.sha256((ws / 'entry.py').read_bytes()).hexdigest()}",
+    )
     executor = PluginSandboxedRuntimeExecutor(ws, store, runner=runner)
     raw = store.get_principal("principal_owner")
     assert raw is not None
@@ -247,3 +253,24 @@ def test_sandboxed_nonzero_exit_is_failure(tmp_path: Path, monkeypatch: pytest.M
     assert result.ok is False
     assert result.reason_code == "plugin_sandbox_exit:2"
     assert SQLiteStore(ws).list_plugin_execution_records()[0]["status"] == "failed"
+
+
+def test_an_entrypoint_changed_after_it_was_pinned_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """BUG-308 (CR-05) — the file is re-hashed immediately before it runs."""
+    ws = _ws(tmp_path)
+    ran: list[list[str]] = []
+
+    def fake_runner(command: list[str], **kwargs: Any) -> dict[str, Any]:
+        ran.append(command)
+        return {"returncode": 0, "stdout_bytes": 0, "stderr_bytes": 0, "truncated": False}
+
+    executor, principal, action = _prepared_executor(ws, monkeypatch, fake_runner)
+    (ws / "entry.py").write_text("import socket\n", encoding="utf-8")
+
+    result = executor.execute(action, principal)
+
+    assert result.ok is False
+    assert result.reason_code == "plugin_entrypoint_digest_mismatch"
+    assert ran == []

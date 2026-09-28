@@ -96,6 +96,7 @@ export function canDisable(gate: CapabilityGate): boolean {
 const TIER2_STEPUP_CAPS = new Set([
   "shell_execution",
   "process_execution",
+  "host_network_code_execution",
   "web_fetch",
   "mcp_builder_runtime",
   "mcp_connector_runtime",
@@ -405,6 +406,7 @@ const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   connector_github_runtime: "Git",
   shell_execution: "Execution",
   process_execution: "Execution",
+  host_network_code_execution: "Execution",
   container_execution_cap: "Execution",
   subagents: "Execution",
   multi_agent_teams: "Execution",
@@ -669,13 +671,23 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
     description: "Phase-4 container execution contract gate.",
   },
   // Runtime domains — Tier 1/2 execution.
+  // BUG-308 — "sandboxed" was a claim of containment the default environment
+  // cannot keep: it runs on this machine. The code-running half now answers to
+  // its own capability, below, and these say where a command runs instead.
   shell_execution: {
     label: "Shell commands",
-    description: "Run sandboxed shell commands with output caps and timeouts.",
+    description:
+      "Run allowlisted commands with output caps and timeouts, in the environment you chose. Scripts run by python, node, npm or npx go into the native sandbox where this machine has one.",
   },
   process_execution: {
     label: "Processes",
-    description: "Start bounded local processes through the sandbox.",
+    description:
+      "Start bounded local processes in the environment you chose, under the same rules as shell commands.",
+  },
+  host_network_code_execution: {
+    label: "Code with this machine's network",
+    description:
+      "Scripts run by python, node, npm or npx with this machine's network, because there is no sandbox here or you chose to run on the host. Where Raiker has the native sandbox, that code runs inside it instead and this is never asked.",
   },
   web_fetch: {
     label: "Web fetch",

@@ -103,6 +103,10 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     # inventing a second one.
     "github_write": "connector_github_runtime",
     "shell": "shell_execution",
+    # BUG-308 — the router's own reclassification of a code-running command that
+    # would run with the host's network (`_place_code`). Named here so its gate,
+    # its decision mode and its executor are found like any other capability's.
+    "host_network_code_execution": "host_network_code_execution",
     "remote_execute": "remote_execution_cap",
     "cloud_execute": "cloud_execution_cap",
     "process": "process_execution",
@@ -831,7 +835,67 @@ class RuntimeAuthority:
         self._event(event_type, principal.principal_id, {
             "capability": capability, "new_state": target_state, "reason": reason,
         })
+        self._carry_command_enable_to_host_network_code(capability, target_state, principal, now)
         return None
+
+    def _carry_command_enable_to_host_network_code(
+        self, capability: str, target_state: str, principal: Principal, now: str
+    ) -> None:
+        """Turning shell on keeps `python` working, as a row the owner can see (BUG-308).
+
+        The owner's decision was that nothing that worked before starts
+        refusing. Before, turning *Shell commands* on was all it took for a
+        script to run; now that code with this machine's network is its own
+        permission, an unset row for it reads as off on an account. So the first
+        time `shell_execution` or `process_execution` is turned on, the new
+        capability is turned on beside it — written as a row that says why,
+        never inferred at read time — and from then on it is its own switch: a
+        row the owner has written is never touched again here, and turning shell
+        *off* does not need this, because shell's own gate still stops the
+        command.
+        """
+        from raiker.execution.code_placement import (
+            COMMAND_CAPABILITIES,
+            HOST_NETWORK_CODE_CAPABILITY,
+        )
+
+        if capability not in COMMAND_CAPABILITIES or target_state in ("disabled", "planned"):
+            return
+        scoped = self._uses_principal_controls(principal.principal_id)
+        existing = (
+            self.store.get_principal_capability_gate_state(
+                principal.principal_id, HOST_NETWORK_CODE_CAPABILITY
+            )
+            if scoped
+            else self.store.get_capability_gate_state(HOST_NETWORK_CODE_CAPABILITY)
+        )
+        if existing is not None:
+            return
+        carried = {
+            "capability": HOST_NETWORK_CODE_CAPABILITY,
+            "state": target_state,
+            "runtime_mode": "",
+            "requested_by": principal.principal_id,
+            "requested_at": now,
+            "activated_by": principal.principal_id,
+            "activated_at": now,
+            "reason": (
+                f"Turned on with {capability}, so a script that ran before still "
+                "runs — now under its own switch (BUG-308)."
+            ),
+            "readiness_snapshot_json": "",
+            "created_at": now,
+            "updated_at": now,
+        }
+        if scoped:
+            self.store.upsert_principal_capability_gate_state(principal.principal_id, carried)
+        else:
+            self.store.upsert_capability_gate_state(carried)
+        self._event("capability_enabled", principal.principal_id, {
+            "capability": HOST_NETWORK_CODE_CAPABILITY,
+            "new_state": target_state,
+            "reason": carried["reason"],
+        })
 
     def evaluate_effective_permissions(self, principal: Principal) -> dict[str, Any]:
         return {
@@ -1276,7 +1340,78 @@ class RuntimeAuthority:
             session_id=session_id,
         )
 
+    def _place_code(
+        self, action: GovernedAction, principal: Principal
+    ) -> tuple[GovernedAction, GovernedActionResult | None]:
+        """Name the capability a code-running command really exercises (BUG-308).
+
+        A ``shell`` or ``process`` action whose program runs code is placed by
+        :func:`raiker.execution.code_placement.place_code`. Inside the sandbox,
+        or in an environment the owner chose, it stays what it was. With the
+        host's network it becomes ``host_network_code_execution``, so that
+        capability's own switch and decision mode decide it — and the command
+        capability it arrived through still has to be on: turning shell off
+        cannot be walked around by running ``python``.
+        """
+        from raiker.execution.code_placement import (
+            COMMAND_CAPABILITIES,
+            HOST_NETWORK_CODE_CAPABILITY,
+            argv_of,
+            place_code,
+        )
+
+        base = CAPABILITY_GATE_MAP.get(action.action_type) or CAPABILITY_GATE_MAP.get(
+            action.tool_or_service_name
+        )
+        if base not in COMMAND_CAPABILITIES:
+            return action, None
+        placement = place_code(
+            self.store,
+            principal.principal_id,
+            argv_of(base, action.arguments),
+            self.store.paths.workspace_root,
+        )
+        if not placement.needs_host_network_capability:
+            return action, None
+        # Asked by the action's own names, which is how the gate map is keyed.
+        base_gate = self.check_capability_gate(
+            action.action_type, action.tool_or_service_name, principal.principal_id
+        )
+        if base_gate:
+            return action, GovernedActionResult(
+                action_id=action.action_id,
+                decision=(
+                    "disabled_by_capability_gate"
+                    if base_gate == "disabled_by_capability_gate"
+                    else "deny"
+                ),
+                message=base_gate,
+            )
+        if self._resolve_decision_mode(base, principal.principal_id) == DecisionMode.DENY:
+            return action, GovernedActionResult(
+                action_id=action.action_id,
+                decision="deny",
+                message="denied_by_decision_mode",
+            )
+        self._event(
+            event_type="code_placement_classified",
+            actor="runtime_authority",
+            payload={
+                "action_id": action.action_id,
+                "base_capability": base,
+                "capability": HOST_NETWORK_CODE_CAPABILITY,
+                "program": placement.binary,
+                "reason": placement.reason,
+            },
+            session_id=action.session_id,
+            turn_id=action.turn_id,
+        )
+        return replace(action, action_type=HOST_NETWORK_CODE_CAPABILITY), None
+
     def route_action(self, action: GovernedAction, principal: Principal) -> GovernedActionResult:
+        action, placement_refusal = self._place_code(action, principal)
+        if placement_refusal is not None:
+            return placement_refusal
         self._event(
             event_type="action_proposed",
             actor="runtime_authority",

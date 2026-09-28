@@ -89,7 +89,7 @@ MEM-10's binding leg closed on 2026-08-25.
 | A natural-language question drops the lexical leg | [FIXED-292](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered) | **Closed 2026-08-26** |
 | Retention sweep | [FIXED-284](FIXED_ITEMS.md#fixed-284--nothing-expired-because-the-sweep-the-retention-classes-describe-was-never-offered) | **Closed 2026-08-25** — what is due is shown and the owner confirms it. No daemon, by design |
 | Owner-guided summarisation of a range | [FIXED-306](FIXED_ITEMS.md#fixed-306--compaction-was-the-thresholds-decision-and-the-owner-had-no-say) | **Closed 2026-08-29** — **Summarise up to here** on any owner message, sharing the turn path's summarise-and-record step so `PreCompact` governs both |
-| Post-Stage-J temporal tiers and bounded graph context | [ADD-25](TO_BE_ADDED.md#add-25--post-stage-j-memory-expansion), [FME-02/FME-03](MEMORY_RELIABILITY_PLAN.md#post-stage-j-expansion-backlog) | Future — begins only after Stage J evidence and atomic snapshot publication |
+| Post-Stage-J temporal tiers and bounded graph context | [ADD-25](TO_BE_ADDED.md#add-25--post-stage-j-memory-expansion), FME-02/FME-03 | Future — begins only after Stage J evidence and atomic snapshot publication |
 | Premium responsive workspace shell | [ADD-26](TO_BE_ADDED.md#add-26--a-premium-responsive-workspace-shell) | **Closed 2026-08-25** — semantic palette, desktop reflow, compact overlay drawers, and 208 light/dark captures through 8K |
 | The owner's own documents | [FIXED-289](FIXED_ITEMS.md#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named), [FIXED-294](FIXED_ITEMS.md#fixed-294--managed-documents-could-only-be-recalled-with-shared-words) | **Closed 2026-08-26** — managed files have lexical and semantic passages with provenance to the exact active revision |
 | A structured question to the owner mid-turn | [FIXED-308](FIXED_ITEMS.md#fixed-308--raiker-could-ask-permission-and-could-not-ask-what-you-meant) | **Closed 2026-08-29** — the model can ask *which did you mean*, and the answer carries no authority. Its prerequisite, [FIXED-307](FIXED_ITEMS.md#fixed-307--four-risk-bands-no-definitions-and-two-of-them-unreachable), gave the four risk bands definitions and made `low` and `critical` reachable |
@@ -144,7 +144,7 @@ into children routed to Chat or Build, under the same ownership.
 | Filtered domain egress unproven | [backlog #6](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-high-effort) | Open |
 | Remote supervisor install lifecycle | [backlog #22](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Open |
 | No resolved call graph; textual find-references | [B10](GAP_BUILD_CHAT.md#b10--no-language-intelligence) | Closed 2026-09-03 as [FIXED-366](FIXED_ITEMS.md#fixed-366--build-could-read-a-repository-and-not-understand-it). Matching stays textual by design and says so; symbols, exact-name definitions and parse diagnostics ship |
-| Polyglot linker rules and polymorphic resolution | [ADD-25](TO_BE_ADDED.md#add-25--post-stage-j-memory-expansion), [FME-04](MEMORY_RELIABILITY_PLAN.md#fme-04--polyglot-linker-rules-and-polymorphic-resolution) | Future — evidence-labelled Python/Rust and TypeScript/service boundaries after snapshot isolation |
+| Polyglot linker rules and polymorphic resolution | [ADD-25](TO_BE_ADDED.md#add-25--post-stage-j-memory-expansion), FME-04 | Future — evidence-labelled Python/Rust and TypeScript/service boundaries after snapshot isolation |
 | LSP surface | [BUG-227](FIXED_ITEMS.md#fixed-366--build-could-read-a-repository-and-not-understand-it) | Closed 2026-09-03 — **decided: no**. B10's tool set delivers what Build needed without a language-server subprocess, and both plugin specs state what that costs |
 | Worktrees for parallel work | [backlog #27](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md) | Rejected — checkpoints answer the same need better for undo |
 | GAP-BUILD remainder | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | 7 items (5 open, 2 partial) |
@@ -207,7 +207,7 @@ unblocks*.
 | 4 | **Remove the second egress path** ([#3](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Deleting code, and it removes a live liability |
 | 5 | **Oversize checkpoint honesty** ([#4](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 + P3 | Makes an approval stop promising what it cannot deliver |
 | 6 | **MCP protocol revision** ([#9](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort)) | P4 | One change, three rows |
-| 7 | **Semantic memory** ([MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select)) | P1 | **Provider path done 2026-08-26** ([FIXED-283](FIXED_ITEMS.md), [FIXED-292](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered)): both halves reused the governed executor rather than adding a shortcut. The keyless curated-GGUF leg remains |
+| 7 | **Semantic memory** (MEM-10) | P1 | **Provider path done 2026-08-26** ([FIXED-283](FIXED_ITEMS.md), [FIXED-292](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered)): both halves reused the governed executor rather than adding a shortcut. The keyless curated-GGUF leg remains |
 | 8 | **Shared admission helper** ([FIXED-279](FIXED_ITEMS.md#fixed-279--eight-copies-of-one-governance-check-and-two-of-them-had-already-drifted)) | P2 + P4 | **Done 2026-08-24**, and moved up rather than waiting: GEP-04 added two call sites that needed it, so designing it once meant designing it now |
 
 **Every item in the top group is closed.** Item 7 — semantic memory — closed on
@@ -263,7 +263,6 @@ can go **incomplete**, which is worse, because it reads as a complete picture.
 When an item is opened or closed in [`TO_BE_FIXED.md`](TO_BE_FIXED.md),
 [`TO_BE_ADDED.md`](TO_BE_ADDED.md),
 [`GAP_BUILD_CHAT.md`](GAP_BUILD_CHAT.md),
-[`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md),
 [`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md) or
 [`REFERENCE_PLATFORM_COMPATIBILITY.md` §5](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog),
 it belongs in exactly one pillar here.

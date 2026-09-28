@@ -46,9 +46,16 @@
   let failure = $state<string | null>(null);
   let timer: ReturnType<typeof setTimeout> | null = null;
 
-  const onApprovals = $derived(
-    typeof window !== "undefined" && window.location.hash.startsWith("#/approvals"),
-  );
+  // The address, as state. `window.location.hash` is not reactive, so a
+  // `$derived` of it was read once, on mount: arriving at Approvals by a link
+  // left this card over the very queue it points to (found live 2026-09-28).
+  let hash = $state(typeof window !== "undefined" ? window.location.hash : "");
+  $effect(() => {
+    const follow = () => (hash = window.location.hash);
+    window.addEventListener("hashchange", follow);
+    return () => window.removeEventListener("hashchange", follow);
+  });
+  const onApprovals = $derived(hash.startsWith("#/approvals"));
   const queue = $derived(pending.filter((item) => !deferred.includes(item.approval_id)));
   const current = $derived(queue[0] ?? null);
 
@@ -151,6 +158,45 @@
     window.location.hash = "#/approvals";
   }
 
+  /**
+   * How far the card rises so it never covers a composer.
+   *
+   * Found by the 2026-09-28 live round: the card is docked bottom-right, and so
+   * is every composer's model picker and **Send**. With an approval pending from
+   * another conversation, a new chat could not choose a model or send until the
+   * owner dismissed a card about something else. The card now sits above any
+   * composer it would overlap, and back in its corner when there is none.
+   */
+  const DOCK_BOTTOM = 18;
+  const DOCK_RIGHT = 20;
+  let lift = $state(0);
+  let card = $state<HTMLElement | null>(null);
+
+  function measure() {
+    if (typeof document === "undefined") return;
+    // 21rem, the card's own width, when it has not been laid out yet.
+    const width = card?.offsetWidth || 336;
+    const left = window.innerWidth - DOCK_RIGHT - width;
+    let clearance = 0;
+    for (const composer of document.querySelectorAll<HTMLElement>(".composer-card")) {
+      const rect = composer.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0 || rect.right <= left) continue;
+      clearance = Math.max(clearance, window.innerHeight - rect.top + 12 - DOCK_BOTTOM);
+    }
+    lift = Math.max(0, clearance);
+  }
+
+  $effect(() => {
+    if (current === null) return;
+    measure();
+    const tick = setInterval(measure, 1000);
+    window.addEventListener("resize", measure);
+    return () => {
+      clearInterval(tick);
+      window.removeEventListener("resize", measure);
+    };
+  });
+
   $effect(() => {
     void poll();
     schedule();
@@ -182,7 +228,12 @@
 </script>
 
 {#if current !== null && !onApprovals}
-  <section class="approval-prompt" aria-label="Approval needed">
+  <section
+    class="approval-prompt"
+    aria-label="Approval needed"
+    bind:this={card}
+    style:bottom="{DOCK_BOTTOM + lift}px"
+  >
     <header>
       <Icon name="shield" size="sm" />
       <strong>Approval needed</strong>

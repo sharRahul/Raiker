@@ -111,7 +111,8 @@ names.
 | [BUG-288](FIXED_ITEMS.md#fixed-545--a-turn-could-only-answer-in-prose) | Low | Chat / typed output | **Closed 2026-09-15 ([FIXED-545](FIXED_ITEMS.md#fixed-545--a-turn-could-only-answer-in-prose))** — VIS-19, and the last implementation item in the visual review that was removed when it closed |
 | [BUG-289](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running) | Low | Models / provider errors | **Closed 2026-09-14 ([FIXED-526](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running))** — a hosted provider gets a remedy an owner can act on |
 | [BUG-307](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true) | Low | Web UI / security headers | **Closed 2026-09-28 ([FIXED-609](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true))** — `style-src 'self'`; Svelte 5 styles through the CSSOM, and a live sweep of every destination at four widths found nothing refused |
-| [BUG-308](#bug-308--the-bare-plugin-runtime-and-the-interpreter-commands-still-reach-the-network-directly) | Medium | Plugins / commands / sandbox | Open — raised 2026-09-28 as the remainder of CR-05 and CR-09 of the security review, which share one dependency |
+| [BUG-308](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so) | Medium | Plugins / commands / sandbox | **Closed 2026-09-28 ([FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so))** — by the owner's decision: code runs in the sandbox where there is one, and otherwise under *Code with this machine's network*, its own switch, starting at *Ask me* |
+| [BUG-309](#bug-309--on-approvals-the-notice-dock-repeats-the-approval-and-covers-the-queues-header) | Low | Web UI / notifications | Open — raised 2026-09-28 by the review-closure live round |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -120,7 +121,7 @@ names.
 | [BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more) | Low | Live test harness / evidence | **Closed 2026-09-15 ([FIXED-541](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more))** — six rounds blocked on a key, then three stale selectors |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
-| [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-21 to **eleven**; `bug-242-build-restore-mem-09-live` was converted after its own sign-in went stale in exactly the way BUG-229 records, waiting for a workbench greeting a saved startup route never shows. Three must keep their own |
+| [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-28 to **nine**; `review-readiness-probe-live` and `c17-b14-recall-and-inline-diff-live` were converted and re-run, and each then failed on steps the product had moved since — both brought up to the product, not relaxed. Three must keep their own |
 | [BUG-249](FIXED_ITEMS.md#fixed-326--a-fixed_items-link-pointed-at-a-heading-that-does-not-exist) | Low | Documentation / CI | **Closed 2026-08-30 (FIXED-326)** — one line, and `test_docs_consistency` is green |
 | [BUG-250](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject) | Low | Live test harness | **Closed 2026-09-15 ([FIXED-549](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject))** — `roundName()` gives each round its own subject |
 | [BUG-251](FIXED_ITEMS.md#fixed-352--every-path-an-owner-typed-was-a-path-they-had-to-know) | Medium | Web UI / file and folder selection | **Closed 2026-09-03 (FIXED-352)** — the host lists directory names and one `PathPicker` serves all four fields |
@@ -156,37 +157,31 @@ names.
 | VIS | — | Visual / information hierarchy | **Complete.** 24 findings; the document was removed 2026-09-15 when its last implementation item closed |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (16 complete, 1 partial, 1 open; C15 closed by C1/C4, C11 2026-09-03 as FIXED-367, C18 as FIXED-368, C17 2026-08-29 as FIXED-311. C10 is partial — the notification half ships as [FIXED-374](FIXED_ITEMS.md#fixed-374--a-routine-ran-all-night-and-told-nobody); C12 stays an architecture decision) |
 
-The memory audit of **2026-08-11** has its own document,
-[`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md), written to this
-standard. Its MEM-01 and MEM-02 are closed in
-[`FIXED_ITEMS.md`](FIXED_ITEMS.md) as FIXED-187 and FIXED-188, and MEM-03 and
-MEM-05 as FIXED-230 and FIXED-231, MEM-11, MEM-12 and MEM-13 as FIXED-232,
-FIXED-233 and FIXED-234, MEM-14 as FIXED-236, and MEM-04 as FIXED-237. Two were
-raised in their place. MEM-10: closing MEM-03 built the *selection* of an
-embedding space, and a default install still has nothing semantic to select.
-MEM-06, the binding constraint on the graph leg MEM-12 made reachable, closed
-2026-08-21 as FIXED-241. MEM-07 closed 2026-08-25 as FIXED-284, and MEM-10's
-first leg — the one that made a semantic space *producible* rather than only
-selectable — as FIXED-283. **As of 2026-08-29 that document holds no open
-entry**: MEM-09 closed as FIXED-310, MEM-10's remainder as FIXED-301, and MEM-08
-— the last of them — as FIXED-316. It stays as the record of the audit and of
-how each entry closed, not as open work.
+The memory audit of **2026-08-11** had its own document, `MEMORY_RELIABILITY_PLAN.md`,
+written to this standard. Every entry in it closed — MEM-01 and MEM-02 as
+FIXED-187 and FIXED-188, MEM-03 and MEM-05 as FIXED-230 and FIXED-231, MEM-11,
+MEM-12 and MEM-13 as FIXED-232, FIXED-233 and FIXED-234, MEM-14 as FIXED-236,
+MEM-04 as FIXED-237, MEM-06 as FIXED-241, MEM-07 as FIXED-284, MEM-10 as
+FIXED-283 and FIXED-301, MEM-09 as FIXED-310 and MEM-08 as FIXED-316 — and it was
+**removed on 2026-09-28**. Its post-Stage-J backlog is
+[ADD-25](TO_BE_ADDED.md#add-25--post-stage-j-memory-expansion) and the
+architecture plan's
+[future improvements](../architecture/HYBRID_MEMORY_IMPLEMENTATION_PLAN.md#future-improvements--post-stage-j-expansion).
 
-The generic static code review of **2026-09-05** has its own pair of documents,
-[`GENERIC_STATIC_CODE_REVIEW_2026-09-05.md`](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md)
-(GCR-01 … GCR-18) and
-[`GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md`](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md)
-(GCR-19 … GCR-47). Its findings are engineering defects rather than product
-defects, so they are not duplicated here; the third-pass document carries its own
-remediation order and states what is closed against it. **Ten are closed as of
-2026-09-05** — GCR-19 (its one P0) as [FIXED-420](FIXED_ITEMS.md#fixed-420--a-failed-conversions-cleanup-could-delete-every-model-beside-it),
-GCR-20/23 as [FIXED-421](FIXED_ITEMS.md#fixed-421--a-cancellation-could-be-overwritten-by-the-worker-it-cancelled),
-GCR-21 as [FIXED-422](FIXED_ITEMS.md#fixed-422--retry-checked-the-kind-and-the-payload-and-never-the-state),
-GCR-22 as [FIXED-423](FIXED_ITEMS.md#fixed-423--a-multi-gigabyte-download-ran-inside-the-request-that-asked-for-it),
-GCR-27 as [FIXED-424](FIXED_ITEMS.md#fixed-424--two-models-one-folder-apart-were-indexed-as-one),
-GCR-30 as [FIXED-425](FIXED_ITEMS.md#fixed-425--a-method-whose-contract-was-to-return-health-raised-instead),
-GCR-31 as [FIXED-426](FIXED_ITEMS.md#fixed-426--a-thinking-budget-that-left-the-answer-nothing),
-and GCR-38/39 as [FIXED-427](FIXED_ITEMS.md#fixed-427--a-background-pass-could-fail-every-fifteen-seconds-in-silence).
+The generic static code review of **2026-09-05** had its own pair of documents
+(GCR-01 … GCR-18, and a third pass with GCR-19 … GCR-47), and the security code
+review of the same date one more (CR-01 … CR-13). Their findings were engineering
+defects rather than product defects, so they were never duplicated here. **All
+three were removed on 2026-09-28**, when their last items closed: GCR-10 by the
+owner's decision as [FIXED-618](FIXED_ITEMS.md#fixed-618--construction-time-self-repair-stays-by-the-owners-decision),
+GCR-11 as [FIXED-616](FIXED_ITEMS.md#fixed-616--one-storage-file-held-every-domain-the-product-has),
+GCR-13 as [FIXED-614](FIXED_ITEMS.md#fixed-614--every-json-answer-was-held-whole-before-it-left-to-be-redacted-a-second-time),
+GCR-41 as [FIXED-615](FIXED_ITEMS.md#fixed-615--the-release-chose-its-dependencies-on-the-day-it-was-built),
+GCR-43 as [FIXED-617](FIXED_ITEMS.md#fixed-617--one-service-file-held-every-page-the-product-serves),
+CR-01 as [FIXED-619](FIXED_ITEMS.md#fixed-619--a-real-executor-could-be-fetched-and-run-with-nothing-governing-it),
+and CR-05 and CR-09 with BUG-308 as [FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so).
+Each closure record names the finding it closes, so an ID still cited in a code
+comment leads to its record; the reviews' reasoning is in git history.
 
 **Six more closed 2026-09-06**, taken in the order the third-pass remediation
 table gives — its next four entries, plus the two dead parameters that live in
@@ -821,8 +816,28 @@ a shared helper that knew one of the setup wizard's five stages.
 **Severity: Low. Area: live test harness. Status: Open remainder — raised
 2026-08-30 while closing [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in),
 reduced from twenty-seven to twenty the same day
-([FIXED-328](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite)), and
-to **twelve** on 2026-09-04.**
+([FIXED-328](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite)),
+to **twelve** on 2026-09-04, to eleven on 2026-09-21 and to **nine** on
+2026-09-28.**
+
+**2026-09-28 — two more, and the one reverted on 2026-09-04 among them.**
+`review-readiness-probe-live` and `c17-b14-recall-and-inline-diff-live`, run
+against the second 2026-09-28 round's workspace with a key that answers. Both
+signed in through the shared helper on the first run and then failed on the
+product having moved, never on the sign-in:
+
+* `review-readiness-probe` waited for a **Hosted** tab the Models redesign
+  removed. It now reaches the card through `hostedProviderCard`, and asserts
+  what its title claims — that **Test** settles on an outcome for the pinned
+  model — through `checkModelReady` rather than only logging the card's text.
+* C17's memory import is on *Recall & indexing* now, and a record shows on
+  *Memories*. B14 met the same Build drift `bug-242-build-restore-mem-09-live`
+  records — the project behind `+`, a model chosen for the turn, and **Run**
+  rather than **Send** — and a reset workspace with no project, so it creates
+  one first.
+
+All three tests then passed live
+([the second 2026-09-28 round](LIVE_TEST_ROUNDS.md#2026-09-28-second--code-says-where-it-runs-and-three-review-documents-close)).
 
 **2026-09-04 — eight more, each re-run against a *used* workspace.**
 `guide-surface`, `review-chat-surface`, `containment-surface`, `visual-refresh`,
@@ -862,7 +877,7 @@ described: several still key on the empty-workspace greeting.
 `all-pages-theme`, `observability`, `default-ollama`, `memory-knowledge-context`,
 `memory-semantic` and `memory-vector-index`. That found three pieces of drift
 nothing else would have, including a spec still driving a Vite dev server on port
-5174; they are recorded in FIXED-328. **Twelve are left** after the 2026-09-04 pass, and the reason they
+5174; they are recorded in FIXED-328. **Nine are left** after the 2026-09-28 pass, and the reason they
 are left is unchanged.
 
 **Why they were left.** They vary in a way the function-shaped ones did not —
@@ -1576,7 +1591,7 @@ does not govern, so there were no attributes to replace and the allowance could
 simply go. The entry is kept as written.
 
 **Severity: Low. Area: Web UI / security headers. Raised 2026-09-21 while
-closing [CR-07](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-07--browser-responses-lack-content-security-policy)
+closing CR-07 of the security code review
 as [FIXED-599](FIXED_ITEMS.md#fixed-599--the-body-cap-counted-a-claim-and-nothing-said-where-a-page-may-reach).**
 
 **Observed.** Raiker now sends a policy, and `script-src` is `'self'` with no
@@ -1609,11 +1624,12 @@ style it did not ship.
 
 ## BUG-308 — The bare plugin runtime and the interpreter commands still reach the network directly
 
-**Severity: Medium. Area: Plugins / commands / sandbox. Status: Open — raised
-2026-09-28 as the remainder of
-[CR-05](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-05--bare-plugin-runtime-has-ambient-network-access)
-and [CR-09](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-09--general-purpose-interpreters-remain-in-the-command-allowlist)
-of the security review, when the other six open findings of that review closed.**
+**Severity: Medium. Area: Plugins / commands / sandbox. Status: Closed
+2026-09-28 as [FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so),
+by the owner's decision recorded there. Raised 2026-09-28 as the remainder of
+CR-05 and CR-09 of the 2026-09-05 security code review, when the other six open
+findings of that review closed; the review itself was removed the same day, once
+this and CR-01 closed.**
 
 **Observed.** Two execution paths run code Raiker did not write with the host's
 network: `PluginRuntimeExecutor` runs an owner-allowlisted plugin through the
@@ -2071,5 +2087,35 @@ first attempt had done nothing or had pushed a branch. It now reads the turn's
 own settled calls and asks, naming what would happen twice, while a turn that
 only read is not asked about at all. The commands themselves moved behind one
 set that owns each one's label, its confirmation and its failure sentence.
+
+---
+
+## BUG-309 — On Approvals, the notice dock repeats the approval and covers the queue's header
+
+**Severity: Low. Area: Web UI / notifications. Status: Open — raised 2026-09-28
+by the [second 2026-09-28 live round](LIVE_TEST_ROUNDS.md#2026-09-28-second--code-says-where-it-runs-and-three-review-documents-close).**
+
+**Observed.** The round's capture of Approvals
+(`docs/screenshots/2026-09-28-review-closure-round/06-approval-names-the-script.png`)
+shows the notice dock — docked top-right by design, so it never pushes a page's
+composer below the fold — holding *Approval needed … run 'write_file'* over the
+queue that lists that same approval, with its *3 unread notices* link drawn
+across the table's **Status** header. The approval card no longer shows on
+Approvals ([FIXED-621](FIXED_ITEMS.md#fixed-621--an-approval-card-from-another-conversation-covered-the-composers-send));
+the notice about the same approval still does.
+
+**Why it was not fixed in the round.** The dock's placement is a measured
+decision recorded in `NotificationCenter.svelte`, and the question is which
+notices a page makes redundant — an approval notice on Approvals, a task notice
+on Tasks — rather than one position. That is a rule for every destination, not a
+one-page patch.
+
+**Proposed fix.** Suppress a notice whose subject is the page being shown (an
+approval notice on Approvals), marking it read, as the approval card does; and
+give the dock's *unread* link a surface so it never reads as part of the page
+beneath it.
+
+**Required user-interface outcome.** On Approvals, nothing docked repeats a row
+of the queue, and no header is drawn over.
 
 ---

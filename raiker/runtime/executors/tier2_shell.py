@@ -4,6 +4,7 @@ import shlex
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from raiker.execution.code_placement import HOST_NETWORK_CODE_CAPABILITY
 from raiker.execution.commands.service import CommandService, CommandServiceError
 from raiker.runtime.executors.base import ExecutionResult
 
@@ -20,9 +21,17 @@ class ShellExecutor:
         workspace_root: str | Path,
         *,
         command_service: CommandService | None = None,
+        host_network_code: bool = False,
     ) -> None:
         self._workspace_root = Path(workspace_root).resolve()
         self._commands = command_service or CommandService.for_workspace(self._workspace_root)
+        # BUG-308 — true only for the instance `HostNetworkCodeExecutor` holds,
+        # which the router reaches after `host_network_code_execution`'s own
+        # switch and decision mode. Anything else that runs code is placed in
+        # the sandbox or refused by the command service.
+        self._host_network_code = host_network_code
+        if host_network_code:
+            self.capability = HOST_NETWORK_CODE_CAPABILITY
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         source = action.arguments.get("command")
@@ -67,6 +76,7 @@ class ShellExecutor:
                 argv=command,
                 timeout_seconds=timeout,
                 max_output_bytes=max_output,
+                host_network_code=self._host_network_code,
             )
         except CommandServiceError as exc:
             return ExecutionResult(
@@ -101,9 +111,13 @@ class ProcessExecutor:
         workspace_root: str | Path,
         *,
         command_service: CommandService | None = None,
+        host_network_code: bool = False,
     ) -> None:
         self._workspace_root = Path(workspace_root).resolve()
         self._commands = command_service or CommandService.for_workspace(self._workspace_root)
+        self._host_network_code = host_network_code
+        if host_network_code:
+            self.capability = HOST_NETWORK_CODE_CAPABILITY
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         executable = str(action.arguments.get("executable", "")).strip()
@@ -136,6 +150,7 @@ class ProcessExecutor:
                 argv=command,
                 timeout_seconds=timeout,
                 max_output_bytes=max_output,
+                host_network_code=self._host_network_code,
             )
         except CommandServiceError as exc:
             return ExecutionResult(
@@ -160,3 +175,36 @@ class ProcessExecutor:
                 "truncated": result["truncated"],
             },
         )
+
+
+class HostNetworkCodeExecutor:
+    """Code that runs with this machine's network, once the owner has said so (BUG-308).
+
+    The router reclassifies a ``shell`` or ``process`` action whose program runs
+    code — ``python``, ``node``, ``npm``, ``npx`` — to
+    ``host_network_code_execution`` when it would run on the host: there is no
+    sandbox here, the owner chose the host, or the run is one the sandbox cannot
+    host. That capability's switch and decision mode have been applied by the
+    time this runs; it hands the action to the ordinary shell or process
+    executor, marked as authorised to run with the host's network.
+    """
+
+    capability = HOST_NETWORK_CODE_CAPABILITY
+
+    def __init__(
+        self,
+        workspace_root: str | Path,
+        *,
+        command_service: CommandService | None = None,
+    ) -> None:
+        self._shell = ShellExecutor(
+            workspace_root, command_service=command_service, host_network_code=True
+        )
+        self._process = ProcessExecutor(
+            workspace_root, command_service=command_service, host_network_code=True
+        )
+
+    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        if action.tool_or_service_name in {"process", "process_execution"}:
+            return self._process.execute(action, principal)
+        return self._shell.execute(action, principal)

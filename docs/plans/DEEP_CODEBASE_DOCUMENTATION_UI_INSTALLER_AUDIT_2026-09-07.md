@@ -254,8 +254,15 @@ must no longer be read as current status.
 > [FIXED-611](FIXED_ITEMS.md#fixed-611--nothing-failed-a-change-that-shipped-a-dependency-with-a-published-vulnerability).
 > CR-03's row below said *appears closed* on the strength of a repository search
 > with no hit; the parameter was in fact still in all six services, and it is
-> gone now. The review's own status table is the current one:
-> [`CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md`](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#status--2026-09-28).
+> gone now. The review's own status table was the current one until it was
+> removed on 2026-09-28, when its last three findings closed.
+>
+> **Current status, 2026-09-28: every finding in the table below is closed.**
+> CR-02 as FIXED-500, CR-06 and CR-07 as FIXED-599, CR-08 as FIXED-504, CR-03 as
+> FIXED-604, CR-10 as FIXED-605, CR-11 as FIXED-606, CR-04 as FIXED-607, CR-13 as
+> FIXED-608, CR-12 as FIXED-611, CR-01 as FIXED-619, and CR-05 and CR-09 — by the
+> owner's decision — as FIXED-620. The table is kept as the 2026-09-07
+> re-verification it was.
 
 | Finding | 2026-09-07 re-verification | Current action |
 |---|---|---|
@@ -747,17 +754,17 @@ summary that made the same statement.
 | Document | Disposition after this audit |
 |---|---|
 | `CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md` | Historical analysis + active architecture recommendations. Paths such as old `apps/web` references must not be treated as current. Contract generation and module decomposition remain useful. |
-| `CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md` | Historical findings. Use the re-verification table in this audit for current status. |
+| `CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md` | **Removed 2026-09-28**, complete. CR-01 closed as FIXED-619, CR-05 and CR-09 as FIXED-620; the rest are listed above the re-verification table. |
 | the environment-context plan | Implementation-plan history; later records say core time/weather work closed. Re-run contract tests before reopening. |
 | `FIXED_ITEMS.md` | Evidence ledger. Keep append-only in spirit; not a current-priority list. |
 | `GAP_BUILD_CHAT.md` | Useful gap ledger but contains stale old source paths and narrative statements that predate closures. Status table is more authoritative than old prose. |
-| `GENERIC_STATIC_CODE_REVIEW_2026-09-05.md` | Historical static-review evidence; closed rows stay historical. |
-| `GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md` | Valuable, but internally contradictory: its “still open” prose names some findings that its own later table marks closed. Treat row-level closure + this audit as current. GCR-41/42/43 remain especially relevant. |
+| `GENERIC_STATIC_CODE_REVIEW_2026-09-05.md` | **Removed 2026-09-28**, complete. Its last three — GCR-10 (owner's decision), GCR-11 and GCR-13 — closed as FIXED-618, FIXED-616 and FIXED-614. |
+| `GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md` | **Removed 2026-09-28**, complete. Its last two — GCR-41 and GCR-43 — closed as FIXED-615 and FIXED-617. |
 | the global model-catalogue review | Architectural invariant remains correct. Later implementation records supersede its “not reliably yet” current-state paragraph. Keep owner-level catalogue contract as regression target. |
 | the global web-read plan | Later closure record says global read parity/readiness work landed. Preserve as design/acceptance history. |
 | `GOVERNANCE_ENTRY_PATHS.md` | High-value architecture inventory. Should ultimately be generated/validated against executor/tool registries to prevent drift. |
 | `LIVE_TEST_ROUNDS.md` | Evidence history, not current product spec. Keep environment/date/provider context with every round. |
-| `MEMORY_RELIABILITY_PLAN.md` | Mostly completed reliability ledger; good evidence. Future memory scaling work should be new entries rather than reopening closed history. |
+| `MEMORY_RELIABILITY_PLAN.md` | **Removed 2026-09-28**, complete: MEM-01 … MEM-14 all closed by 2026-08-29. Future memory scaling work is ADD-25. |
 | the Models review | Historical review; current five-panel IA is implemented. Use global-catalogue contract tests for regression. |
 | `PAGE_BY_PAGE_IMPLEMENTATION_VERIFICATION_2026-09-07.md` | **Removed 2026-09-13**, its last open item — Design's canvas workspace — having closed as [FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach). It was superseded as current status by this audit long before that; what it verified now lives in the `FIXED_ITEMS.md` entries it produced, and its reasoning in git history. |
 | `PILLAR_MAP.md` | Useful executive dependency map. Must reference current ledgers rather than duplicate detailed statuses. |

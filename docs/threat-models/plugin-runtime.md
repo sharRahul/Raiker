@@ -66,13 +66,35 @@ subprocess's own filesystem access at the OS level (a scoped script can still
 read the workspace like any other process). OS-level filesystem/network jailing
 is the sandboxed-runtime path (`plugin_sandboxed_runtime_cap`).
 
+## The bytes, and the network (BUG-308, 2026-09-28)
+
+CR-05 of the 2026-09-05 security review found this runtime running
+owner-allowlisted code with the host's network, and trusting the entrypoint file
+from whenever the owner last looked at it. Two things changed.
+
+- **The owner pins the bytes, not only the id.** `RAIKER_PLUGIN_RUNTIME_DIGESTS`
+  holds comma-separated `<plugin_id>:<sha256>` entries, the same shape as the
+  scopes above. Immediately before the entrypoint runs it is read and hashed
+  again; a plugin with no pin fails closed with
+  `plugin_entrypoint_digest_not_pinned`, and a file that no longer matches with
+  `plugin_entrypoint_digest_mismatch`. The install record's checksum covers the
+  manifest, not the code, which is why the pin is the owner's and not the
+  install's. The same check runs in `plugin_sandboxed_runtime_cap`.
+- **Where a container can run it, it runs there.** When
+  `RAIKER_PLUGIN_RUNTIME_IMAGE` is set, allowlisted, and `docker` is present,
+  this capability hands the run to the no-network container runtime
+  ([plugin-sandboxed-runtime.md](plugin-sandboxed-runtime.md)). The bare
+  subprocess below — with the host's network — is only the path where no
+  container exists, and the plugin's card in Extensions says which of the three
+  answers (*not enabled*, *in a container with no network*, *with this
+  machine's network*) is true on this machine.
+
 ## Explicit non-goals
 
 - No in-process import or dynamic module loading of plugin code.
-- No network-namespace isolation (a plugin subprocess has the host's ambient
-  network, exactly as `shell_execution` does — the owner allowlist is the trust
-  anchor). Kernel-isolated network-off execution stays in the
-  `container_execution_cap` path.
+- No network-namespace isolation *in this subprocess* (it has the host's ambient
+  network, and says so on the plugin's card). Where the no-network container is
+  set up, the run goes there instead; see above.
 - No plugin package download, archive extraction, or dependency install.
 - No filesystem-write, memory, MCP, LSP, hook, monitor, agent, channel, or panel
   activation.

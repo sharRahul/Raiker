@@ -103,6 +103,10 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     # inventing a second one.
     "github_write": "connector_github_runtime",
     "shell": "shell_execution",
+    # BUG-308 — the router's own reclassification of a code-running command that
+    # would run with the host's network (`_place_code`). Named here so its gate,
+    # its decision mode and its executor are found like any other capability's.
+    "host_network_code_execution": "host_network_code_execution",
     "remote_execute": "remote_execution_cap",
     "cloud_execute": "cloud_execution_cap",
     "process": "process_execution",
@@ -1276,7 +1280,78 @@ class RuntimeAuthority:
             session_id=session_id,
         )
 
+    def _place_code(
+        self, action: GovernedAction, principal: Principal
+    ) -> tuple[GovernedAction, GovernedActionResult | None]:
+        """Name the capability a code-running command really exercises (BUG-308).
+
+        A ``shell`` or ``process`` action whose program runs code is placed by
+        :func:`raiker.execution.code_placement.place_code`. Inside the sandbox,
+        or in an environment the owner chose, it stays what it was. With the
+        host's network it becomes ``host_network_code_execution``, so that
+        capability's own switch and decision mode decide it — and the command
+        capability it arrived through still has to be on: turning shell off
+        cannot be walked around by running ``python``.
+        """
+        from raiker.execution.code_placement import (
+            COMMAND_CAPABILITIES,
+            HOST_NETWORK_CODE_CAPABILITY,
+            argv_of,
+            place_code,
+        )
+
+        base = CAPABILITY_GATE_MAP.get(action.action_type) or CAPABILITY_GATE_MAP.get(
+            action.tool_or_service_name
+        )
+        if base not in COMMAND_CAPABILITIES:
+            return action, None
+        placement = place_code(
+            self.store,
+            principal.principal_id,
+            argv_of(base, action.arguments),
+            self.store.paths.workspace_root,
+        )
+        if not placement.needs_host_network_capability:
+            return action, None
+        # Asked by the action's own names, which is how the gate map is keyed.
+        base_gate = self.check_capability_gate(
+            action.action_type, action.tool_or_service_name, principal.principal_id
+        )
+        if base_gate:
+            return action, GovernedActionResult(
+                action_id=action.action_id,
+                decision=(
+                    "disabled_by_capability_gate"
+                    if base_gate == "disabled_by_capability_gate"
+                    else "deny"
+                ),
+                message=base_gate,
+            )
+        if self._resolve_decision_mode(base, principal.principal_id) == DecisionMode.DENY:
+            return action, GovernedActionResult(
+                action_id=action.action_id,
+                decision="deny",
+                message="denied_by_decision_mode",
+            )
+        self._event(
+            event_type="code_placement_classified",
+            actor="runtime_authority",
+            payload={
+                "action_id": action.action_id,
+                "base_capability": base,
+                "capability": HOST_NETWORK_CODE_CAPABILITY,
+                "program": placement.binary,
+                "reason": placement.reason,
+            },
+            session_id=action.session_id,
+            turn_id=action.turn_id,
+        )
+        return replace(action, action_type=HOST_NETWORK_CODE_CAPABILITY), None
+
     def route_action(self, action: GovernedAction, principal: Principal) -> GovernedActionResult:
+        action, placement_refusal = self._place_code(action, principal)
+        if placement_refusal is not None:
+            return placement_refusal
         self._event(
             event_type="action_proposed",
             actor="runtime_authority",

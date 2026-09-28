@@ -957,7 +957,7 @@ fifth identity-linked key, entered through the Connect dialog. Owner: the shared
 `apps/web/e2e/gcr-third-pass-round-live.spec.ts`, four scenarios, all passing.**
 
 **What it was for.** Ten findings of the
-[third-pass static review](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md)
+third-pass static review
 closed in one change, and three of them have a surface an owner touches. A
 static finding is not evidence that the product behaves; this round is.
 
@@ -2041,7 +2041,7 @@ all four provider rounds. Filed as **BUG-196**.
 ---
 
 ## 2026-08-11 — Memory recall round
-The round that verified [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md)
+The round that verified `MEMORY_RELIABILITY_PLAN.md` (removed 2026-09-28)
 MEM-01 and MEM-02, closed as FIXED-187 through FIXED-189. Run against the
 production web build with Anthropic connected through the Models dialog.
 

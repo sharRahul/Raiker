@@ -635,6 +635,13 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-611](#fixed-611--nothing-failed-a-change-that-shipped-a-dependency-with-a-published-vulnerability) | Medium | CI / supply chain | Fixed 2026-09-28 (closes CR-12) |
 | [FIXED-612](#fixed-612--the-architecture-named-one-chokepoint-and-the-code-has-two) | Low | Documentation / governance | Fixed 2026-09-28 (closes GEP-03, and three stale ledger rows) |
 | [FIXED-613](#fixed-613--home-called-a-read-still-in-flight-a-read-that-failed) | Low | Home / readiness | Fixed 2026-09-28 — raised and closed in the same run |
+| [FIXED-614](#fixed-614--every-json-answer-was-held-whole-before-it-left-to-be-redacted-a-second-time) | Medium | API / redaction | Fixed 2026-09-28 (closes GCR-13) |
+| [FIXED-615](#fixed-615--the-release-chose-its-dependencies-on-the-day-it-was-built) | Medium/High | Release / supply chain | Fixed 2026-09-28 (closes GCR-41) |
+| [FIXED-616](#fixed-616--one-storage-file-held-every-domain-the-product-has) | Medium | Storage / maintainability | Fixed 2026-09-28 (closes GCR-11) |
+| [FIXED-617](#fixed-617--one-service-file-held-every-page-the-product-serves) | Medium | Control plane / maintainability | Fixed 2026-09-28 (closes GCR-43) |
+| [FIXED-618](#fixed-618--construction-time-self-repair-stays-by-the-owners-decision) | Medium/High | Storage | Closed 2026-09-28 by the owner's decision (closes GCR-10) |
+| [FIXED-619](#fixed-619--a-real-executor-could-be-fetched-and-run-with-nothing-governing-it) | **High** | Governance / executors | Fixed 2026-09-28 (closes CR-01; reduces RR-AUTHORITY-01) |
+| [FIXED-620](#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so) | Medium | Commands / plugins / sandbox | Fixed 2026-09-28 by the owner's decision (closes BUG-308, CR-05, CR-09) |
 
 ---
 
@@ -7564,7 +7571,7 @@ regression and the event-log suite pass with the new lock.
 ## FIXED-187 — A turn could not read a past conversation
 
 **Status: fixed in this change. Was MEM-01 in
-[`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md).**
+`MEMORY_RELIABILITY_PLAN.md` (removed 2026-09-28).**
 
 **Observed.** Asked what was decided in an earlier chat, a turn answered from
 whatever remained in its context window. It never consulted the transcript
@@ -7980,7 +7987,7 @@ The measured result is the "After" column above: **594× at 800 memories, 394× 
 
 **Not fixed here.** This is a cost fix, not a ranking fix. The retained set is
 still the *newest* matches rather than the best ones, which is
-[MEM-05](MEMORY_RELIABILITY_PLAN.md#mem-05--lexical-ranking-is-recency-order-so-the-oldest-exact-answer-is-the-first-one-dropped)
+MEM-05
 and remains open.
 
 **User-interface outcome.** No new surface. Chat, Search Chat and Memory answer
@@ -9439,7 +9446,7 @@ history, as a foreground one. Nothing about it is a second, quieter path.
 ## FIXED-230 — The vector leg searched one embedding space, and the query was embedded in another
 
 **Severity: High. Area: memory retrieval. Closes
-[MEM-03](MEMORY_RELIABILITY_PLAN.md).**
+MEM-03.**
 
 **Observed.** `retrieve_hybrid_memory` combined a lexical, a vector and a graph
 list and presented the result as hybrid retrieval. The vector leg called
@@ -9500,7 +9507,7 @@ matching embedder recalls a query that shares no token with the memory.
 ## FIXED-231 — Full-text search ranked by time, because a plan document said FTS5 was unavailable
 
 **Severity: High. Area: text search / retrieval. Closes
-[MEM-05](MEMORY_RELIABILITY_PLAN.md).**
+MEM-05.**
 
 **Observed.** Both `search_approved_memory` and `search_conversation_turns`
 ordered by `created_at DESC` and truncated at the limit. On a workspace holding
@@ -9632,7 +9639,7 @@ only on someone else's machine.
 ## FIXED-232 — The agent's memory search and the runtime's recall were two different searches
 
 **Severity: High. Area: retrieval consistency. Closes
-[MEM-11](MEMORY_RELIABILITY_PLAN.md).**
+MEM-11.**
 
 **Observed.** One turn, two answers to the same question. The context gatherer
 injected "Recalled owner context" built by `retrieve_hybrid_memory` — lexical,
@@ -9671,7 +9678,7 @@ property that was false, and no test asserted it because no test called both.
 ## FIXED-233 — The graph leg of hybrid retrieval never ran on a real turn
 
 **Severity: High. Area: retrieval quality. Closes
-[MEM-12](MEMORY_RELIABILITY_PLAN.md).**
+MEM-12.**
 
 **Observed.** `retrieve_hybrid_memory` presents three legs. The graph leg sits
 inside `if entity_id:`, and the only production caller — the context gatherer —
@@ -9718,7 +9725,7 @@ constraint rather than a second one hidden behind this.
 ## FIXED-234 — The knowledge graph could be looked at, but not asked
 
 **Severity: Medium. Area: agent reach. Closes
-[MEM-13](MEMORY_RELIABILITY_PLAN.md).**
+MEM-13.**
 
 **Observed.** Raiker stores a governed knowledge graph — entities, typed
 relationships, and the approved memory evidencing each edge. It was drawn on the
@@ -13686,7 +13693,7 @@ Unit coverage in `apps/web/src/lib/sessionRoute.test.ts` and
 ## FIXED-310 — The memory integrity report existed and nothing could reach it
 
 **Severity: Medium. Area: memory / diagnostics / web UI. Closed 2026-08-29 (was
-[MEM-09](MEMORY_RELIABILITY_PLAN.md#mem-09--conversation-index-integrity-is-not-covered-by-the-integrity-report)).**
+MEM-09).**
 
 **Observed.** `raiker/memory/integrity.py` detected stale FTS, projection and
 graph state for durable memory. `run_one_memory_job` was its only caller, and
@@ -13899,7 +13906,7 @@ it, which is what makes FIXED-311's strip appear at all.
 **The remaining case is semantic, and already has an answer.** *"Remind me about
 my nightly backups"* still recalls nothing, because *remind* is a content word
 the memory does not contain. That is what the meaning-based index exists for —
-[MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select),
+MEM-10,
 closed as FIXED-283/292/293/294 — and it is honest for a default install to fail
 that query lexically and say so.
 
@@ -13984,7 +13991,7 @@ shared panel goes wrong — all captured live against Anthropic
 ## FIXED-316 — Every turn coordinate was a dead end
 
 **Severity: Medium. Area: Chat / Build / memory / web UI. Closed 2026-08-29 (was
-[MEM-08](MEMORY_RELIABILITY_PLAN.md#mem-08--a-recalled-answer-cannot-be-opened-at-the-turn-it-came-from)).**
+MEM-08).**
 
 **Observed.** Three surfaces already held the coordinate of an exact exchange and
 not one of them was a link. `conversation_search` returns `session_id` and
@@ -19041,7 +19048,7 @@ never reached.
 
 **Severity: Critical. Area: Models / model library / destructive cleanup.
 Status: Fixed 2026-09-05. Raised as
-[GCR-19](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-19--conversion-cleanup-can-recursively-delete-unrelated-models),
+GCR-19,
 the one P0 of the third-pass static review.**
 
 **Observed.** `start_model_conversion()` persisted the approved model-library
@@ -19110,9 +19117,9 @@ half. Two web tests assert the dialog names the artifacts and never the folder.
 
 **Severity: High. Area: Models / durable operations. Status: Fixed 2026-09-05.
 Raised as
-[GCR-20](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-20--model-operation-state-transitions-can-overwrite-each-other)
+GCR-20
 and
-[GCR-23](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-23--initial-hugging-face-download-can-lose-cancellation).**
+GCR-23.**
 
 **Observed.** Every lifecycle write — `running`, `progress`, `complete`, `fail`,
 `cancel`, `cancelled`, `retry` — was load, replace, save. So:
@@ -19152,7 +19159,7 @@ The guide says so.
 
 **Severity: High. Area: Models / durable operations. Status: Fixed 2026-09-05.
 Raised as
-[GCR-21](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-21--retry-can-dispatch-duplicatenon-terminal-work).**
+GCR-21.**
 
 **Observed.** `ModelOperationService.retry()` required only that the kind was
 retryable and a payload existed. The route then dispatched a worker by kind. So
@@ -19179,7 +19186,7 @@ could be started twice from anywhere else. Both halves say the same thing now.
 
 **Severity: Medium/High. Area: Models / Hugging Face. Status: Fixed 2026-09-05.
 Raised as
-[GCR-22](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-22--initial-hugging-face-download-blocks-the-request-path).**
+GCR-22.**
 
 **Observed.** `/api/hugging-face/download` performed the whole snapshot download
 synchronously: a request worker was held for the entire pull, the browser waited
@@ -19209,7 +19216,7 @@ moment the operation reports `complete`.
 
 **Severity: High. Area: Models / local library. Status: Fixed 2026-09-05. Raised
 as
-[GCR-27](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-27--gguf-shards-from-different-directories-can-be-merged-into-one-model).**
+GCR-27.**
 
 **Observed.** `ModelLibraryService._index_root()` grouped a sharded GGUF by the
 base name in its filename. `model-00001-of-00002.gguf` is what every tool that
@@ -19243,7 +19250,7 @@ file that belongs to the row it is on.
 
 **Severity: Medium. Area: Models / provider contract. Status: Fixed 2026-09-05.
 Raised as
-[GCR-30](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-30--provider-health-contract-can-unexpectedly-raise).**
+GCR-30.**
 
 **Observed.** Both `health()` implementations caught a hand-kept list of six
 exception classes and returned a `ProviderHealth` for each. Their shared status
@@ -19271,7 +19278,7 @@ runs every status the mapper classifies through both providers' `health()`.
 
 **Severity: Medium/High. Area: Models / Anthropic provider. Status: Fixed
 2026-09-05. Raised as
-[GCR-31](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-31--anthropic-thinking-budget-clamp-can-create-an-impossible-request).**
+GCR-31.**
 
 **Observed.** For the budgeted spelling of extended thinking:
 
@@ -19307,9 +19314,9 @@ default, which no real turn uses, and now use the profile's number.
 
 **Severity: Medium/High. Area: Host lifecycle / scheduler / observability.
 Status: Fixed 2026-09-05. Raised as
-[GCR-38](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-38--scheduler-failures-are-suppressed-without-worker-health-evidence)
+GCR-38
 and
-[GCR-39](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-39--one-scheduled-task-exception-aborts-the-remainder-of-the-batch).**
+GCR-39.**
 
 **Observed, two halves.**
 
@@ -19412,9 +19419,9 @@ recorded, and this is the same lesson one layer down.
 
 **Severity: High. Area: Models / provider construction. Status: Fixed
 2026-09-06. Raised as
-[GCR-01](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-01--modelrouterlaunch-ignores-saved-connection-configuration)
+GCR-01
 and
-[GCR-02](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-02--provider-clients-can-leak-during-validation).**
+GCR-02.**
 
 **Observed.** Five places in the product only ever needed to know whether a
 profile *would* run: selecting a model (`ModelRouter.select_profile`), launching
@@ -19491,7 +19498,7 @@ at the first turn.
 
 **Severity: Medium/High. Area: Models / reasoning controls. Status: Fixed
 2026-09-06. Raised as
-[GCR-03](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-03--reasoning-settings-can-be-validated-against-the-wrong-model-profile).**
+GCR-03.**
 
 **Observed.** `ModelRouter.set_reasoning()` resolved the profile it was about to
 judge a value against as:
@@ -19538,7 +19545,7 @@ refusal is now about the model in front of the owner.
 
 **Severity: High. Area: Shell / command policy. Status: Fixed 2026-09-06. Raised
 as
-[GCR-06](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-06--command-validation-uses-process-global-workspace-state).**
+GCR-06.**
 
 **Observed.** The command policy refuses any path outside the workspace, and the
 workspace it compared against was a module global in
@@ -19587,7 +19594,7 @@ depends on nothing but the command and the workspace it was asked to run in.
 
 **Severity: Medium. Area: Models / configured-model resolution. Status: Fixed
 2026-09-06. Raised as
-[GCR-46](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-46--configured-model-read-errors-are-treated-as-an-absent-choice).**
+GCR-46.**
 
 **Observed.** A hosted profile ships a `<model>` placeholder, so the model it
 runs is the one the owner pinned, and that pin lives in
@@ -19637,9 +19644,9 @@ to go and re-choose a model that is already stored.
 ## FIXED-434 — Two public parameters that changed nothing
 
 **Severity: Low. Area: Models / API clarity. Status: Fixed 2026-09-06. Raised as
-[GCR-04](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-04--generate-context-ignores-context)
+GCR-04
 and
-[GCR-18](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-18--unused-public-parameters-make-contracts-misleading).**
+GCR-18.**
 
 **Observed.** `ModelRouter.generate(provider, model, prompt, context=None)`
 accepted a context mapping and then called `self.chat(...)` with a single user
@@ -19716,7 +19723,7 @@ connected: both tiles read *On (by connection)*, in
 
 **Severity: Medium. Area: startup / built-in configuration. Status: Fixed
 2026-09-06. Raised as
-[GCR-45](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-45--built-in-model-profile-selection-depends-on-current-working-directory).**
+GCR-45.**
 
 **Observed.** `ModelProfileRegistry.load()` defaults to
 `config/model-profiles.json`, and `_config_path()` resolved that name against
@@ -19766,7 +19773,7 @@ caller-named path is still a filesystem path.
 
 **Severity: Medium/High. Area: models / durable operations. Status: Fixed
 2026-09-06. Raised as
-[GCR-25](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-25--durable-model-operation-rows-do-not-make-the-workers-durable).**
+GCR-25.**
 
 **Observed.** Model pulls, conversions and deploys are durable rows in
 `model_operations`, executed by in-process background workers. The row outlives
@@ -19809,7 +19816,7 @@ drives it through the lifespan, which is the only place it happens.
 
 **Severity: High. Area: models / managed local runtimes. Status: Fixed
 2026-09-06. Raised as
-[GCR-28](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-28--managed-local-runtime-slot-allocation-is-not-concurrency-safe).**
+GCR-28.**
 
 **Observed.** `ManagedLlamaRuntime` and `ManagedMlxRuntime` choose a free slot
 by reading `_processes`, and the launch that makes the answer true happens
@@ -19846,7 +19853,7 @@ test asserts a failed launch gives its slot back.
 
 **Severity: Medium. Area: models / managed local runtimes. Status: Fixed
 2026-09-06. Raised as
-[GCR-29](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-29--custom-llamacpp-port-can-be-reported-incorrectly).**
+GCR-29.**
 
 **Observed.** `ManagedLlamaRuntime.start()` accepts an explicit port. A port
 outside the declared slot table runs on the first slot, launched on the port the
@@ -19875,7 +19882,7 @@ fails against the previous code.
 
 **Severity: Medium/High. Area: connectors / OAuth. Status: Fixed 2026-09-06.
 Raised as
-[GCR-33](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-33--oauth-refresh-is-vulnerable-to-refresh-token-rotation-races).**
+GCR-33.**
 
 **Observed.** When a connector credential has expired, every invocation that
 reaches it notices, and each one called `_refresh_oauth()` independently. All of
@@ -19917,7 +19924,7 @@ presented exactly once; against the previous code it is presented twice.
 
 **Severity: High. Area: observability / event integrity. Status: Fixed
 2026-09-06. Raised as
-[GCR-40](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md#gcr-40--event-jsonl-and-database-index-can-diverge-permanently).**
+GCR-40.**
 
 **Observed.** `EventLogWriter.append()` performs two writes to two different
 stores under one session lock: the serialized event is appended and flushed to
@@ -24644,7 +24651,7 @@ a relative `.md` target is not `http(s):`.
 
 **Severity: Medium. Area: Models / conversion. Status: Fixed 2026-09-16. Closes
 **GCR-24**, the largest remaining piece of owner-visible work in
-[`GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md`](GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md).**
+`GENERIC_STATIC_CODE_REVIEW_THIRD_PASS_2026-09-05.md` (removed 2026-09-28).**
 
 **Observed.** `_run_model_conversion` read the cancellation flag immediately
 before starting the conversion and immediately after it finished. In between were
@@ -25807,7 +25814,7 @@ repair link and that neither control is on that page any more. Live:
 ## FIXED-588 — Approving an action held the whole server while it ran
 
 **Severity: Medium. Area: API / runtime concurrency. Status: Fixed 2026-09-20.
-Closes [GCR-05](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-05--run_coro-blocks-an-active-event-loop-thread).**
+Closes GCR-05.**
 
 **Observed.** Raiker's tool execution is synchronous by design — the broker
 walks a batch of governed actions one at a time — while every provider call
@@ -25852,7 +25859,7 @@ assertion fails with `1 == 0`.
 ## FIXED-589 — A backend change could not break the web client, because the web client was never built
 
 **Severity: Medium. Area: CI. Status: Fixed 2026-09-20. Closes the remainder of
-[GCR-15](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-15--backend-api-changes-can-bypass-frontend-ci).**
+GCR-15.**
 
 **Observed.** `.github/workflows/web.yml` triggered on `web/**` and the workflow
 file. The web client consumes contracts the backend produces, so a backend-only
@@ -26021,7 +26028,7 @@ which of those two will happen before either does. Live:
 ## FIXED-593 — A second person on this machine had a Raiker with no background work
 
 **Severity: High. Area: Instances / runtime lifecycle. Status: Fixed 2026-09-21.
-Closes [GCR-07](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-07--mounted-instance-lifespans-are-not-application-lifecycle-management).**
+Closes GCR-07.**
 
 **Observed.** A second Raiker user on the same host is a second workspace:
 `POST /api/instances` creates one, and `create_app(workspace)` mounts its own
@@ -26060,8 +26067,8 @@ the root lifespan, and leaving the lifespan stops everything it started.
 ## FIXED-594 — A half-made instance blocked the retry it told you to make
 
 **Severity: High. Area: Instances / registry. Status: Fixed 2026-09-21. Closes
-[GCR-08](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-08--instance-creation-is-not-transactional)
-and [GCR-09](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-09--instance-registry-and-route-mutation-are-race-prone).**
+GCR-08
+and GCR-09.**
 
 **Observed (GCR-08).** `POST /api/instances` created the workspace directory,
 appended the name to `instances.json` and mounted the route — and *then* tried to
@@ -26098,7 +26105,7 @@ no staging file left behind; two concurrent creates both survive.
 ## FIXED-595 — A hundred and sixty-eight queries to find out there was nothing to do
 
 **Severity: Medium/High. Area: Storage. Status: Fixed 2026-09-21. Reduces
-[GCR-10](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-10--sqlitestore-bootstraps-on-every-construction);
+GCR-10;
 its "bootstrap once in the application lifecycle" half is **refused, with a
 reason** — see below.**
 
@@ -26152,7 +26159,7 @@ caught the first attempt all pass unchanged.
 ## FIXED-596 — Every model call built a new connection to a host it was already talking to
 
 **Severity: Medium. Area: Models / provider transport. Status: Fixed 2026-09-21.
-Closes [GCR-14](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-14--provider-connection-pools-are-recreated-per-operation).**
+Closes GCR-14.**
 
 **Observed.** `ModelRouter` builds a provider for each chat, stream, embed,
 health and model-list call and closes it in a `finally`. That is
@@ -26193,7 +26200,7 @@ two real Anthropic turns in one conversation.
 ## FIXED-597 — Three spellings of one provider name
 
 **Severity: Low. Area: Models / registry. Status: Fixed 2026-09-21. Closes
-[GCR-17](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-17--provider-name-normalization-is-inconsistent).**
+GCR-17.**
 
 **Observed.** `ModelProfileRegistry` normalised a provider name three different
 ways. `resolve()` folded underscores to hyphens and aliased `llama-cpp` to
@@ -26221,7 +26228,7 @@ three.
 
 **Severity: Low/Medium. Area: Build identity / Settings. Status: Fixed
 2026-09-21. Closes
-[GCR-16](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-16--version-metadata-has-multiple-independent-values).**
+GCR-16.**
 
 **Observed.** `pyproject.toml` declared `0.0.0` and `raiker.__version__`
 repeated it; the FastAPI application declared `0.1.0`; every `ClientMetadata` a
@@ -26256,8 +26263,8 @@ checkouts disagreeing is not news.
 ## FIXED-599 — The body cap counted a claim, and nothing said where a page may reach
 
 **Severity: High. Area: API hardening. Status: Fixed 2026-09-21. Closes
-[CR-06](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-06--request-body-limit-checks-only-declared-content-length)
-and [CR-07](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-07--browser-responses-lack-content-security-policy).**
+CR-06
+and CR-07.**
 
 **Observed (CR-06).** `MaxBodySizeMiddleware` read the declared
 `Content-Length` and nothing else. A declaration is a claim by the sender, and
@@ -26448,7 +26455,7 @@ answered normally —
 ## FIXED-604 — A boolean could tell four connectors, web access and the advisor to skip the owner's switch
 
 **Severity: High. Area: Governance / connectors. Status: Fixed 2026-09-28.
-Closes [CR-03](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-03--connector-enforce_modesfalse-is-a-bypass-primitive).**
+Closes CR-03.**
 
 **Observed.** The GitHub, Gmail, Calendar and Slack connector services, web
 access and the advisor each took `enforce_modes: bool = True`. Their executors
@@ -26478,7 +26485,7 @@ in for the router now say so through `tests/routed_execution.py`.
 ## FIXED-605 — A security monitor that could not look let the connection carry on
 
 **Severity: Medium. Area: MCP / containment. Status: Fixed 2026-09-28. Closes
-[CR-10](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-10--mcp-monitoring-is-explicitly-fail-open).**
+CR-10.**
 
 **Observed.** `McpConnectorExecutor._observe` swallowed every exception from the
 session monitor. The monitor is not only telemetry — its high-severity findings
@@ -26499,7 +26506,7 @@ either, the connection is held in the process and refused with
 ## FIXED-606 — A send whose recipients were nested read as a send to nobody
 
 **Severity: Medium. Area: Governance / critical classification. Status: Fixed
-2026-09-28. Closes [CR-11](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-11--critical-recipient-logic-depends-on-raw-field-names).**
+2026-09-28. Closes CR-11.**
 
 **Observed.** Criterion (b) of `classify_critical` read recipients from seven
 flat keys. `message.to`, `attendees: [{"email": …}]` or `toRecipients` produced an
@@ -26519,7 +26526,7 @@ The audit detail never carries an address.
 ## FIXED-607 — An embedding was as sensitive as its caller said it was
 
 **Severity: High. Area: Models / embeddings / data classification. Status: Fixed
-2026-09-28. Closes [CR-04](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-04--provider-embedding-lacks-mandatory-trusted-dlpclassification).**
+2026-09-28. Closes CR-04.**
 
 **Observed.** `ModelProviderExecutor` took `sensitivity` from the action and
 checked only that it was a string. A credential labelled `public` went to a
@@ -26542,7 +26549,7 @@ embedding suites unchanged.
 ## FIXED-608 — An attached file was labelled unknown, whatever it said
 
 **Severity: Medium. Area: Attachments / context. Status: Fixed 2026-09-28. Closes
-[CR-13](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-13--attachment-parser-safety-does-not-complete-semantic-content-safety).**
+CR-13.**
 
 **Observed.** Every attachment path wrote `sensitivity="unknown"`. Provenance,
 the untrusted label, redaction and the injection scan were all there; the review
@@ -26588,7 +26595,7 @@ turns.
 ## FIXED-610 — Two copies of how a turn starts, and they had begun to differ
 
 **Severity: Medium. Area: API / prompt routes. Status: Fixed 2026-09-28. Closes
-[GCR-12](GENERIC_STATIC_CODE_REVIEW_2026-09-05.md#gcr-12--prompt-json-and-sse-routes-duplicate-orchestration).**
+GCR-12.**
 
 **Observed.** `/api/prompts` and `/api/prompts/stream` each carried the whole
 preparation sequence — session ownership, project resolution, envelope, project
@@ -26608,7 +26615,7 @@ the same verdict for the same request; the prompt route suites are unchanged.
 ## FIXED-611 — Nothing failed a change that shipped a dependency with a published vulnerability
 
 **Severity: Medium. Area: CI / supply chain. Status: Fixed 2026-09-28. Closes
-[CR-12](CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md#cr-12--ci-lacks-explicit-least-privilege-token-permissions-and-dedicated-security-gates).**
+CR-12.**
 
 **Observed.** Least-privilege `permissions:` were already on every workflow, and
 the licensing workflow already generates an SBOM. No gate failed a change for a
@@ -26662,3 +26669,235 @@ could not. Neither is an all-clear.
 
 **Evidence.** `WorkbenchView.test.ts` — a diagnostics read that never answers is
 reported as still reading, never as failed.
+
+---
+
+## FIXED-614 — Every JSON answer was held whole before it left, to be redacted a second time
+
+**Severity: Medium. Area: API / redaction. Status: Fixed 2026-09-28. Closes
+GCR-13 of the 2026-09-05 generic static review (removed 2026-09-28; its reasoning
+is in git history).**
+
+**Observed.** `RedactionMiddleware` appended every chunk of every JSON `/api`
+response to a `bytearray`, joined it, parsed it, redacted it and serialized it
+again. [FIXED-572](#fixed-572--every-pdf-and-every-attachment-was-copied-through-a-json-redactor)
+had already let binary bodies stream through; the remaining half was the JSON
+itself — and for almost every response the structured value had been in hand one
+step earlier, before FastAPI turned it into bytes.
+
+**Fixed.** `RedactedJSONResponse` is the application's default response class
+and applies the same rule, `redact_response_body`, to the value it serializes. A
+value that is not exactly what `json.loads` would have produced — a tuple, a
+non-string key — is normalised through one round trip first, so the rule is
+never a subtly different one. The middleware still decides *whether* a request
+is redacted: it opens a scope only for the paths it would have buffered, so an
+exempt route (the owner's session token, a folder listing) renders untouched as
+before. It trusts a body as already redacted only when it is the very `bytes`
+object rendered inside that scope — identity, which no route can forge with a
+header — and forwards it unbuffered. A route's own `JSONResponse`, an exception
+handler, or a response that declares no content type still takes the buffering
+path.
+
+**Evidence.** `tests/test_redaction_middleware_content_types.py`: a DTO is
+redacted and never reaches the buffer; a route's own `JSONResponse` still does;
+an exempt path renders untouched; a tuple-and-integer-key value gets the parsed
+rule. Full Python suite green.
+
+---
+
+## FIXED-615 — The release chose its dependencies on the day it was built
+
+**Severity: Medium/High. Area: Release / supply chain. Status: Fixed 2026-09-28.
+Closes GCR-41 of the 2026-09-05 generic static review (third pass, removed
+2026-09-28); [FIXED-574](#fixed-574--two-builds-of-one-commit-could-contain-different-build-tool-bytes)
+closed its build-tool half.**
+
+**Observed.** The release job ran `pip install -e ".[dev]"` and `pip wheel .`
+on each target's runner, so the resolver picked every dependency version at
+release time. `uv.lock` existed and pinned every version and digest, and nothing
+used it.
+
+**Fixed.** `requirements/release.txt` (the runtime set) and
+`requirements/release-build.txt` (the same plus the desktop build tool) are
+exports of `uv.lock`, every line hash-locked. The build job installs the second
+with `--require-hashes --no-deps` and resolves the shipped wheels from the first
+the same way, so two builds of one commit ship the same dependency bytes or
+fail. CI's supply-chain job runs `uv lock --check`, re-exports both files and
+fails when either is stale, and `pip-audit` now also audits the exact locked set
+a release ships.
+
+**Evidence.** `tests/test_release_workflow.py` (the build uses the locked sets;
+every runtime dependency is pinned with a digest; the build set carries
+PyInstaller). Proved on Linux: the locked build set installs with
+`--require-hashes`, the locked wheel set resolves, and Raiker installs from it
+with `--no-index` and imports. `pip-audit` on the locked set: no known
+vulnerabilities.
+
+---
+
+## FIXED-616 — One storage file held every domain the product has
+
+**Severity: Medium. Area: Storage / maintainability. Status: Fixed 2026-09-28.
+Closes GCR-11 of the 2026-09-05 generic static review (removed 2026-09-28).**
+
+**Observed.** `raiker/storage/sqlite.py` was 13,238 lines and 589 KB: the
+SQLCipher connection and its cache, the memory-security posture, the migration
+runner and its catalogue import list, and the persistence methods of every
+domain — tasks, approvals, memory, models, projects, conversations — in one
+class.
+
+**Fixed.** `SQLiteStore` is assembled from sixteen domain parts in
+`raiker/storage/stores/` — the migration runner, accounts, approvals,
+attachments, code, conversations, execution, extensions, governance, knowledge,
+memory, models, monitoring, projects, records and tasks. `sqlite.py` keeps what
+every part shares: the connection, its cache and posture, and the text-search
+engine (939 lines). The migration catalogue import list went with the runner.
+The move is verbatim; every method is typed against the whole store
+(`self: SQLiteStore`), so a call from one part into another is checked by mypy
+exactly as before, and either import order assembles the class.
+
+**Evidence.** `ruff` and `mypy` clean on 29 storage files; every name any module
+or test imports from `raiker.storage.sqlite` still resolves; full Python suite
+green with no storage test edited.
+
+---
+
+## FIXED-617 — One service file held every page the product serves
+
+**Severity: Medium. Area: Control plane / maintainability. Status: Fixed
+2026-09-28. Closes GCR-43 of the 2026-09-05 generic static review (third pass,
+removed 2026-09-28).**
+
+**Observed.** `raiker/control/dashboard.py` was 9,594 lines and 438 KB, and
+`DashboardService` alone was 7,100 of them: models, tasks, sessions, memory,
+projects, approvals, extensions and security in one class every unrelated change
+touched.
+
+**Fixed.** The service is assembled from eleven domain parts in
+`raiker/control/dashboard_parts/`; the view dataclasses — the API's read
+contract, which every route and `scripts/check_api_contract.py` read from here —
+stay in `dashboard.py` (2,424 lines). Same verbatim move and the same typing as
+FIXED-616.
+
+**Found while doing it.** `tests/test_internal_path_audit.py` checks that files
+writing under `.raiker` use `internal_io_path`, by text. `dashboard.py` passed
+only because *other* code in the file used the helper; its remaining `.raiker`
+path, `_project_migration_area`, must not use it, because it has to see a
+symlinked `.raiker` in order to refuse it and the helper resolves symlinks away.
+The list now names the parts that write under `.raiker`, and says why the
+service module is not on it. Three tests that patched names by their old module
+now patch them where they are read.
+
+**Evidence.** `ruff` and `mypy` clean; the contract check unchanged; full Python
+suite green.
+
+---
+
+## FIXED-618 — Construction-time self-repair stays, by the owner's decision
+
+**Severity: Medium/High. Area: Storage. Status: Closed 2026-09-28 by the owner's
+decision. Closes GCR-10 of the 2026-09-05 generic static review (removed
+2026-09-28); [FIXED-595](#fixed-595--a-hundred-and-sixty-eight-queries-to-find-out-there-was-nothing-to-do)
+reduced it.**
+
+**The question.** FIXED-595 took the measured cost from 168 queries to 3 and
+refused the other half — bootstrap once per workspace — because the pass is also
+the store's self-repair, and moving it out of the constructor means deciding
+which callers stop healing themselves. That was left as an instance-lifecycle
+decision.
+
+**The decision (2026-09-28).** Keep self-repair on every construction. No
+behaviour changes; the three queries a construction costs are the price of a
+store that re-applies a deleted migration marker, converts an FTS4 index and
+adopts ownerless rows wherever it is opened.
+
+---
+
+## FIXED-619 — A real executor could be fetched and run with nothing governing it
+
+**Severity: High. Area: Governance / executors. Status: Fixed 2026-09-28. Closes
+CR-01 of the 2026-09-05 security code review (removed 2026-09-28), and reduces
+RR-AUTHORITY-01.**
+
+**Observed.** `ExecutorRegistry` stored an executor and handed back the same
+object. Anything holding a registry could fetch a real side-effecting executor
+and call it with no gate, mode, approval or audit. CR-03's dispatch token
+([FIXED-604](#fixed-604--a-boolean-could-tell-four-connectors-web-access-and-the-advisor-to-skip-the-owners-switch))
+existed, issued only by `RuntimeAuthority.route_action` around
+`executor.execute` for one capability and one action — and nothing required it.
+
+**Fixed.** The registry hands out every executor behind `RoutedExecutor`, which
+runs it only under the live dispatch of *its* capability for *that* action. A
+call with no dispatch, another action's, another capability's, or a token that
+outlived its dispatch returns `executor_not_routed` and never enters the
+executor. The other way in — constructing an executor class — is held by a scan
+of `raiker/`: a construction outside the registry builder fails CI unless it is
+listed with its reason, and the six listed today (the authority's own critical
+relay, a routine's read-only subagent steps, the MCP tool's governed connector,
+and three from FIXED-620) each say why they are not a way around the authority.
+
+**Found while doing it.** Three tests fetched executors from the registry and
+called them directly — the exact pattern the finding describes. They now enter
+the dispatch the way the router does.
+
+**Evidence.** `tests/test_executor_authority_boundary.py`, including the
+review's acceptance test: a direct `file_write_execution` call refuses and the
+file is not written. RR-AUTHORITY-01 remains for its other half — running
+untrusted code outside the control process.
+
+---
+
+## FIXED-620 — Code ran with this machine's network, and nothing said so
+
+**Severity: Medium. Area: Commands / plugins / sandbox. Status: Fixed 2026-09-28
+by the owner's decision. Closes [BUG-308](TO_BE_FIXED.md), and with it CR-05 and
+CR-09 of the 2026-09-05 security code review (removed 2026-09-28).**
+
+**Observed.** A governed command could name `python`, `node`, `npm` or `pip`
+against a script in the workspace, and an allowlisted plugin's entrypoint ran as
+a bare subprocess. Every argv check passed; none of them is a network boundary.
+Permissions described shell commands as "sandboxed" while the default
+environment runs them on the host. The plugin runtime trusted its entrypoint
+from whenever the owner last looked at it.
+
+**The decision (2026-09-28).** Where this machine has a sandbox, that code runs
+inside it. Where it has none, the code still runs — nothing that worked starts
+refusing — under its own capability, with its own switch, its decision mode
+starting at *Ask me*.
+
+**Fixed.**
+
+- **One placement rule**, `raiker/execution/code_placement.py`, asked by the
+  router before a gate is read and by the command service before a run starts:
+  with no environment chosen, code goes into `native_sandbox` wherever it is
+  measured available; on the host — no sandbox here, the owner chose the host,
+  or a background or terminal run the sandbox cannot host — the action is
+  reclassified to **`host_network_code_execution`**. The gate and a *Never* of
+  the command capability it arrived through still apply, so turning shell off
+  cannot be walked around by running `python`. The command service refuses
+  host-placed code not authorised under the new capability
+  (`host_network_code_not_authorized`), and `run_command`'s session grant path
+  asks the same placement and the same switch. An owner-chosen container or
+  remote environment is theirs and is left alone.
+- **Plugins.** Where the no-network container runtime is set up
+  (`RAIKER_PLUGIN_RUNTIME_IMAGE`, allowlisted, `docker` present), the bare
+  runtime hands the run to it. Both runtimes now re-hash the entrypoint
+  immediately before it runs against the owner's pin in
+  `RAIKER_PLUGIN_RUNTIME_DIGESTS` (`<plugin_id>:<sha256>`, the shape of the
+  scopes beside it); no pin, no run. The install checksum covers the manifest,
+  not the code, which is why the pin is the owner's.
+- **What the owner sees.** Permissions lists *Code with this machine's network*
+  under Execution and among the capabilities people come to change; its row and
+  the shell and process rows carry *On this machine* — measured by the same probe
+  — saying whether scripts run inside the sandbox or with the network. The shell
+  and process copy no longer claims a sandbox. Each plugin card carries
+  `code_runtime`: not enabled, in a container with no network, or with this
+  machine's network. Each reclassification is recorded as
+  `code_placement_classified`.
+
+**Evidence.** `tests/test_bug_308_code_placement.py` (32 tests: placement, the
+command service refusing and running, the router's switch, shell-off and *Never*
+carrying over, the event, the Permissions sentence, the plugin card and the
+hand-off to the container); `tests/test_phase_4_plugin_runtime.py` and
+`test_phase_4_plugin_sandboxed_runtime.py` (an unpinned or changed entrypoint does
+not run). Threat model: [`host-network-code.md`](../threat-models/host-network-code.md).

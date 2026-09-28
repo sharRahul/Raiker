@@ -25,6 +25,7 @@ acknowledging.
 | `checkpoint_restore_execution` | [Checkpoint restore and rewind](checkpoint-restore.md) |
 | `shell_execution` | [Governed command execution](shell-execution.md) |
 | `process_execution` | [Direct process execution](process-execution.md) |
+| `host_network_code_execution` | [Code with this machine's network](host-network-code.md) |
 | `git_write_execution` | [Git writes](git-write.md) |
 | `git_push_execution` | [Git push](git-push.md) |
 | `container_execution_cap` | [Local container execution](container.md) |

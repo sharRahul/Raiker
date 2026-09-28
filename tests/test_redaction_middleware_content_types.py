@@ -140,3 +140,97 @@ class TestJsonIsStillBufferedAndRedacted:
         sent = _run(RedactionMiddleware(app), _scope("/api/anything"))
         payload = json.loads(b"".join(m["body"] for m in sent if m["type"] == "http.response.body"))
         assert payload["token"] != "abc123def456ghi789"
+
+
+class TestADtoIsRedactedWhereItIsSerialized:
+    """GCR-13 — the structured value is redacted before it becomes bytes.
+
+    The middleware then forwards those bytes as they are. What it may trust is
+    narrow on purpose: the very object `RedactedJSONResponse` rendered inside
+    this request's scope. Anything else — a route's own `JSONResponse`, an
+    exception handler, a forged header — still takes the buffering path.
+    """
+
+    @staticmethod
+    def _app(route: Any) -> Any:
+        from fastapi import FastAPI
+
+        from raiker.api.redaction import RedactedJSONResponse
+
+        app = FastAPI(default_response_class=RedactedJSONResponse)
+        app.add_api_route("/api/probe", route, methods=["GET"])
+        app.add_api_route("/api/auth/session", route, methods=["GET"])
+        return RedactionMiddleware(app)
+
+    @staticmethod
+    def _counting_capture(monkeypatch: Any) -> list[bytes]:
+        import raiker.api.app as app_module
+
+        buffered: list[bytes] = []
+        original = app_module._emit_redacted
+
+        async def spy(send: Any, start: Any, raw: bytes) -> None:
+            buffered.append(raw)
+            await original(send, start, raw)
+
+        monkeypatch.setattr(app_module, "_emit_redacted", spy)
+        return buffered
+
+    def test_a_dto_is_redacted_and_never_reaches_the_buffer(self, monkeypatch: Any) -> None:
+        buffered = self._counting_capture(monkeypatch)
+
+        def route() -> dict[str, Any]:
+            return {"api_key": "sk-live-0123456789abcdef", "title": "ordinary words"}
+
+        sent = _run(self._app(route), {**_scope("/api/probe"), "query_string": b"", "headers": []})
+        raw = b"".join(m["body"] for m in sent if m["type"] == "http.response.body")
+        payload = json.loads(raw)
+        assert payload["api_key"] != "sk-live-0123456789abcdef"
+        assert payload["title"] == "ordinary words"
+        assert buffered == []
+        headers = dict(sent[0]["headers"])
+        assert int(headers[b"content-length"]) == len(raw)
+
+    def test_a_routes_own_json_response_still_takes_the_buffering_path(
+        self, monkeypatch: Any
+    ) -> None:
+        from fastapi.responses import JSONResponse
+
+        buffered = self._counting_capture(monkeypatch)
+
+        def route() -> JSONResponse:
+            return JSONResponse({"password": "hunter2"})
+
+        sent = _run(self._app(route), {**_scope("/api/probe"), "query_string": b"", "headers": []})
+        payload = json.loads(b"".join(m["body"] for m in sent if m["type"] == "http.response.body"))
+        assert payload["password"] != "hunter2"
+        assert len(buffered) == 1
+
+    def test_an_exempt_path_is_rendered_untouched(self) -> None:
+        def route() -> dict[str, Any]:
+            return {"token": "abc123def456ghi789jkl"}
+
+        sent = _run(
+            self._app(route), {**_scope("/api/auth/session"), "query_string": b"", "headers": []}
+        )
+        payload = json.loads(b"".join(m["body"] for m in sent if m["type"] == "http.response.body"))
+        assert payload["token"] == "abc123def456ghi789jkl"
+
+    def test_a_value_that_is_not_json_shaped_gets_the_parsed_rule(self) -> None:
+        from raiker.api.redaction import (
+            RENDER_REDACTION_SCOPE,
+            RedactedJSONResponse,
+            RenderedRedactionScope,
+        )
+
+        token = RENDER_REDACTION_SCOPE.set(RenderedRedactionScope())
+        try:
+            rendered = RedactedJSONResponse({1: ("sk-live-0123456789abcdef",)}).body
+        finally:
+            RENDER_REDACTION_SCOPE.reset(token)
+        assert b"sk-live-0123456789abcdef" not in rendered
+
+    def test_outside_a_scope_it_is_an_ordinary_json_response(self) -> None:
+        from raiker.api.redaction import RedactedJSONResponse
+
+        assert RedactedJSONResponse({"password": "hunter2"}).body == b'{"password":"hunter2"}'

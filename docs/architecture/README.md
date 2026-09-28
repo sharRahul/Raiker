@@ -63,8 +63,10 @@ The cross-cutting map of every authority entry path is maintained in
 | Persistence and retrieval | [Storage, database, and search](STORAGE_DATABASE_AND_SEARCH_SPEC.md) |
 | Archive-first hybrid memory design | [Hybrid memory plan](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md) |
 
-Current recall gaps and planned reliability work are tracked in
-[Memory reliability plan](../plans/MEMORY_RELIABILITY_PLAN.md).
+The 2026-08-11 memory reliability audit closed in full and its plan was removed
+on 2026-09-28; its records are in [`FIXED_ITEMS.md`](../plans/FIXED_ITEMS.md),
+and planned memory work is
+[ADD-25](../plans/TO_BE_ADDED.md#add-25--post-stage-j-memory-expansion).
 
 ## Models and execution environments
 

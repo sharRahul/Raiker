@@ -452,7 +452,7 @@ on the shipped build, not estimated.
 
 The memory items are the ones to weigh first if you are choosing Raiker for its
 memory: the full audit, with reproductions, is
-[`plans/MEMORY_RELIABILITY_PLAN.md`](../plans/MEMORY_RELIABILITY_PLAN.md).
+`plans/MEMORY_RELIABILITY_PLAN.md` (removed 2026-09-28).
 
 [`plans/TO_BE_FIXED.md`](../plans/TO_BE_FIXED.md) lists only what is still open;
 everything closed keeps its full record — observation, root cause, and the

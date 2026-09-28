@@ -82,5 +82,7 @@ governed and audited.
 - `raiker/runtime/executors/tier1_memory.py`, `raiker/memory/store.py`,
   `raiker/memory/policy.py`, `raiker/memory/governance.py`
 - Rules the write must satisfy: [`../MEMORY_GOVERNANCE_RULES.md`](../architecture/MEMORY_GOVERNANCE_RULES.md)
-- What recall can actually do with it: [`../plans/MEMORY_RELIABILITY_PLAN.md`](../plans/MEMORY_RELIABILITY_PLAN.md)
+- What recall can actually do with it: the memory reliability audit, closed in
+  full and removed 2026-09-28 — its records (MEM-01 … MEM-14) are in
+  [`../plans/FIXED_ITEMS.md`](../plans/FIXED_ITEMS.md)
 - The relay's own model: [`approval-execution-relay.md`](approval-execution-relay.md)

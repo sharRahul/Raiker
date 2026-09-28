@@ -45,7 +45,7 @@ from raiker.storage.sqlite import SQLiteStore
 from raiker.vector.backends import MAX_MEMORY_INDEX_BATCH, embedding_capable_profiles
 
 _DANGEROUS_CAPS = frozenset({
-    "shell_execution", "process_execution",
+    "shell_execution", "process_execution", "host_network_code_execution",
     "web_fetch", "email_runtime", "calendar_runtime", "finance_runtime",
     "investment_runtime", "medical_runtime", "pregnancy_baby_runtime",
     "cctv_runtime", "home_security_runtime", "plugin_execution_cap",
@@ -196,6 +196,36 @@ class RuntimeControlService:
             side_effect=side_effect_class(capability),
             ungoverned_consequence=ungoverned_consequence(capability),
             authority_requirement=authority_requirement(capability),
+            network_boundary=self._network_boundary(capability),
+        )
+
+    def _network_boundary(self, capability: str) -> str:
+        """Where code this capability runs would run on this machine (BUG-308).
+
+        Permissions has to say it plainly, because the two answers differ in the
+        one way the owner cares about: inside the sandbox a script has no
+        network; outside it, it has this machine's. The sandbox answer is the
+        same probe the command service uses, reused for a few seconds so a page
+        of rows costs one measurement.
+        """
+        from raiker.execution.code_placement import (
+            COMMAND_CAPABILITIES,
+            HOST_NETWORK_CODE_CAPABILITY,
+            sandbox_available,
+        )
+
+        if capability not in COMMAND_CAPABILITIES | {HOST_NETWORK_CODE_CAPABILITY}:
+            return ""
+        if sandbox_available(self._workspace_root):
+            return (
+                "This machine has the native sandbox: python, node, npm and npx "
+                "commands run inside it, with no network, unless you choose "
+                "another environment."
+            )
+        return (
+            "This machine has no native sandbox: python, node, npm and npx "
+            "commands run with its network, and each one answers to "
+            "Code with this machine's network."
         )
 
     def _enforced_enabled(self, capability: str, principal_id: str | None) -> bool:

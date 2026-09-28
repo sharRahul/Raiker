@@ -20,6 +20,7 @@ from raiker.contracts.ids import new_id
 from raiker.control.dashboard import DashboardService
 from raiker.control.project_roots import authority_for_project
 from raiker.runtime.authority.models import Principal, RiskLevelValue
+from raiker.runtime.authority.routed import routed_dispatch
 from raiker.runtime.authority.router import GovernedAction
 from raiker.runtime.executors import build_default_executor_registry
 from raiker.runtime.executors.tier1_files import FileWriteExecutor
@@ -197,9 +198,10 @@ class TestRegistryWiring:
 
         executor = registry.get("file_write_execution")
         assert executor is not None
-        result = executor.execute(
-            _write(str(attached.root / "b.md")), _principal(attached.service)
-        )
+        action = _write(str(attached.root / "b.md"))
+        # CR-01 — a registry executor runs only under the authority's dispatch.
+        with routed_dispatch("file_write_execution", action.action_id):
+            result = executor.execute(action, _principal(attached.service))
 
         assert result.ok, result.reason_code
         assert (attached.root / "b.md").is_file()
@@ -212,7 +214,9 @@ class TestRegistryWiring:
 
         executor = registry.get("file_write_execution")
         assert executor is not None
-        result = executor.execute(_write(str(tmp_path / "escape.md")), _principal(service))
+        action = _write(str(tmp_path / "escape.md"))
+        with routed_dispatch("file_write_execution", action.action_id):
+            result = executor.execute(action, _principal(service))
 
         assert result.ok is False
         assert "outside_workspace" in (result.reason_code or "")

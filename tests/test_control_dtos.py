@@ -138,6 +138,7 @@ class TestCapabilityGateView:
             "side_effect": "",
             "ungoverned_consequence": "",
             "authority_requirement": "",
+            "network_boundary": "",
         }
 
     def test_to_dict_no_secrets(self) -> None:
@@ -281,6 +282,7 @@ class TestRuntimeReadinessView:
                     "side_effect": "",
                     "ungoverned_consequence": "",
                     "authority_requirement": "",
+                    "network_boundary": "",
                 },
             ],
             "summary": {"owner_bootstrapped": True, "dangerous_caps_disabled": True},

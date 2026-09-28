@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+from contextvars import ContextVar
 from typing import Any
+
+from fastapi.responses import JSONResponse
 
 from raiker.context.redaction import redact_text
 from raiker.events.export import _is_secret_key, is_token_count_field
@@ -260,3 +263,77 @@ def response_json_body(response_body: bytes) -> Any:
         return json.loads(response_body)
     except (json.JSONDecodeError, ValueError):
         return response_body.decode("utf-8", errors="replace")
+
+
+# GCR-13 — redaction at serialization, so a JSON body is not buffered twice
+# ------------------------------------------------------------------------
+# `RedactionMiddleware` used to hold every JSON body the API sent: each chunk
+# appended to a `bytearray`, joined, parsed, redacted, and serialized again. For
+# the overwhelming majority of responses — a route returning a DTO that FastAPI
+# renders — the structured value was in hand one step earlier, before it became
+# bytes at all. Redacting it *there* is the same rule applied to the same value,
+# and it leaves the middleware nothing to do but forward the bytes.
+#
+# The middleware still decides *whether* a request is redacted: it opens a
+# `RenderedRedactionScope` only for the paths it would have buffered, so an
+# exempt route (the owner's own session token, a folder listing) is rendered
+# untouched exactly as before. A body is trusted as already redacted only when
+# it is the very `bytes` object this class rendered inside that request's scope —
+# identity, not a header a route could set — so a route that builds its own
+# `JSONResponse`, an exception handler, or anything else unknown still falls back
+# to the buffering path. Unknown remains no licence to skip the redactor.
+
+
+class RenderedRedactionScope:
+    """The bodies rendered, already redacted, while one request was handled."""
+
+    __slots__ = ("_rendered",)
+
+    def __init__(self) -> None:
+        # The objects themselves, not their ``id()``s: holding the reference is
+        # what stops a freed body's id being reused by an unrelated one.
+        self._rendered: list[bytes] = []
+
+    def record(self, body: bytes) -> None:
+        self._rendered.append(body)
+
+    def rendered(self, body: object) -> bool:
+        return any(body is candidate for candidate in self._rendered)
+
+
+RENDER_REDACTION_SCOPE: ContextVar[RenderedRedactionScope | None] = ContextVar(
+    "raiker_render_redaction_scope", default=None
+)
+
+
+def _json_shaped(value: Any) -> bool:
+    """Whether ``value`` is exactly what ``json.loads`` would have produced.
+
+    The middleware redacted a *parsed* body, so string keys only and lists, never
+    tuples. FastAPI's encoder already yields that shape for every DTO; anything
+    else is normalised through one round trip rather than redacted as-is, so the
+    rule applied here is never a subtly different one.
+    """
+    if isinstance(value, dict):
+        return all(isinstance(k, str) and _json_shaped(v) for k, v in value.items())
+    if isinstance(value, list):
+        return all(_json_shaped(item) for item in value)
+    return value is None or isinstance(value, (str, int, float, bool))
+
+
+class RedactedJSONResponse(JSONResponse):
+    """The API's default response class: redacts the value it serializes.
+
+    Outside a redaction scope — an exempt path, or an app with no middleware —
+    it renders exactly like ``JSONResponse``.
+    """
+
+    def render(self, content: Any) -> bytes:
+        scope = RENDER_REDACTION_SCOPE.get()
+        if scope is None:
+            return super().render(content)
+        if not _json_shaped(content):
+            content = json.loads(super().render(content))
+        body = super().render(redact_response_body(content))
+        scope.record(body)
+        return body

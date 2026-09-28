@@ -189,6 +189,10 @@ EVENT_TYPES = {
     # when the in-code classification table elevates a governed action to the
     # critical floor; metadata only (criterion code, ZT ref, declared risk).
     "critical_action_classified",
+    # BUG-308 — a `shell`/`process` action whose program runs code was named
+    # `host_network_code_execution`, because it would run with this machine's
+    # network. Metadata only: the program, the reason, both capabilities.
+    "code_placement_classified",
     # Critical approval lifecycle (Workstream F / F7, ZT-7). A critical action's
     # resting state is deny; these record the full "notify → manual human decision
     # → deny/execute" path (each carrying a posture snapshot): `created`/`notified`

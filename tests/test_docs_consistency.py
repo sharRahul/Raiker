@@ -206,7 +206,6 @@ def test_plan_tracker_indexes_cover_and_link_their_authoritative_headings() -> N
     trackers = {
         Path("docs/plans/FIXED_ITEMS.md"): r"FIXED-\d+",
         Path("docs/plans/TO_BE_ADDED.md"): r"ADD-\d+",
-        Path("docs/plans/MEMORY_RELIABILITY_PLAN.md"): r"MEM-\d+",
         Path("docs/plans/GAP_BUILD_CHAT.md"): r"[BC]\d+",
     }
     failures: list[str] = []

@@ -41,6 +41,7 @@ from raiker.phase_gates import default_capability_gates
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.authority.activation import get_activation_requirement
+from raiker.runtime.authority.routed import routed_dispatch
 from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
 from raiker.runtime.executors import (
     REAL_EXECUTOR_CAPABILITIES,
@@ -333,21 +334,24 @@ class TestApprovedWriteReallyHappens:
         registry = build_default_executor_registry(workspace, store)
         executor = registry.get(_WRITE_CAP)
         assert executor is not None
-        result = executor.execute(
-            GovernedAction(
-                action_id=new_id("act_"),
-                principal_id="principal_owner",
-                action_type="memory_write",
-                tool_or_service_name="memory_write",
-                arguments={"text": "The owner prefers metric units.", "scope": "global"},
-                risk_level="high",
-            ),
-            Principal(
-                principal_id="principal_owner",
-                principal_type=PrincipalType.HUMAN,
-                display_name="Owner",
-            ),
+        action = GovernedAction(
+            action_id=new_id("act_"),
+            principal_id="principal_owner",
+            action_type="memory_write",
+            tool_or_service_name="memory_write",
+            arguments={"text": "The owner prefers metric units.", "scope": "global"},
+            risk_level="high",
         )
+        # CR-01 — a registry executor runs only under the authority's dispatch.
+        with routed_dispatch(_WRITE_CAP, action.action_id):
+            result = executor.execute(
+                action,
+                Principal(
+                    principal_id="principal_owner",
+                    principal_type=PrincipalType.HUMAN,
+                    display_name="Owner",
+                ),
+            )
         assert result.ok is True
         memory_id = str(result.artifacts["memory_id"])
         entry = get_memory(

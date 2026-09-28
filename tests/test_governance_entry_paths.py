@@ -385,6 +385,7 @@ def test_model_tool_entries_match_the_tool_registry() -> None:
     from raiker.runtime.authority.entry_paths import (
         CAPABILITY_ENTRY_PATHS,
         ENTRY_MODEL_TOOL,
+        RECLASSIFIED_FROM,
     )
     from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
     from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
@@ -392,6 +393,9 @@ def test_model_tool_entries_match_the_tool_registry() -> None:
     by_tool = {
         CAPABILITY_GATE_MAP.get(d.name, d.name) for d in TOOL_DEFINITIONS
     } & REAL_EXECUTOR_CAPABILITIES
+    # BUG-308 — a capability the router assigns in place of a tool-named one is
+    # reached by that tool too.
+    by_tool |= {cap for cap, bases in RECLASSIFIED_FROM.items() if bases & by_tool}
     claimed = {
         cap
         for cap, entry in CAPABILITY_ENTRY_PATHS.items()
@@ -410,6 +414,7 @@ def test_approval_relay_entries_match_the_relayable_set() -> None:
     from raiker.runtime.authority.entry_paths import (
         CAPABILITY_ENTRY_PATHS,
         ENTRY_APPROVAL_RELAY,
+        RECLASSIFIED_FROM,
     )
 
     claimed = {
@@ -417,10 +422,14 @@ def test_approval_relay_entries_match_the_relayable_set() -> None:
         for cap, entry in CAPABILITY_ENTRY_PATHS.items()
         if ENTRY_APPROVAL_RELAY in entry.entries
     }
-    assert claimed == set(EXECUTABLE_ON_APPROVAL), (
+    # BUG-308 — a relayed action is re-routed, and reclassified on the way.
+    relayed = set(EXECUTABLE_ON_APPROVAL) | {
+        cap for cap, bases in RECLASSIFIED_FROM.items() if bases & EXECUTABLE_ON_APPROVAL
+    }
+    assert claimed == relayed, (
         "The set of capabilities an approval relays disagrees with the "
-        f"entry-path table: claimed_only={sorted(claimed - EXECUTABLE_ON_APPROVAL)}, "
-        f"relay_only={sorted(EXECUTABLE_ON_APPROVAL - claimed)}"
+        f"entry-path table: claimed_only={sorted(claimed - relayed)}, "
+        f"relay_only={sorted(relayed - claimed)}"
     )
 
 

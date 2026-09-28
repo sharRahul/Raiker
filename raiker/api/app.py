@@ -19,7 +19,12 @@ from starlette.routing import Mount
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from raiker.api.instance_runtime import InstanceRuntime
-from raiker.api.redaction import redact_response_body
+from raiker.api.redaction import (
+    RENDER_REDACTION_SCOPE,
+    RedactedJSONResponse,
+    RenderedRedactionScope,
+    redact_response_body,
+)
 from raiker.api.routes_approvals import router as approvals_router
 from raiker.api.routes_attachments import router as attachments_router
 from raiker.api.routes_auth import router as auth_router
@@ -187,6 +192,11 @@ class RedactionMiddleware:
         start_message: Message | None = None
         body = bytearray()
         passing_through = False
+        # GCR-13 — a DTO the route handed FastAPI is redacted as it is rendered
+        # (`RedactedJSONResponse`), inside this scope. Its bytes then need no
+        # second pass: they are forwarded as they are, never copied or parsed.
+        rendered = RenderedRedactionScope()
+        token = RENDER_REDACTION_SCOPE.set(rendered)
 
         async def capture(message: Message) -> None:
             nonlocal start_message, passing_through
@@ -203,12 +213,23 @@ class RedactionMiddleware:
             if message["type"] != "http.response.body" or passing_through:
                 await send(message)
                 return
-            body.extend(message.get("body", b""))
+            chunk = message.get("body", b"")
+            if not body and not message.get("more_body", False) and rendered.rendered(chunk):
+                # Redacted when it was serialized, and this is that very
+                # object — identity, which no route can forge with a header.
+                if start_message is not None:
+                    await send(start_message)
+                await send(message)
+                return
+            body.extend(chunk)
             if message.get("more_body", False):
                 return
             await _emit_redacted(send, start_message, bytes(body))
 
-        await self.app(scope, receive, capture)
+        try:
+            await self.app(scope, receive, capture)
+        finally:
+            RENDER_REDACTION_SCOPE.reset(token)
 
 
 async def _emit_redacted(send: Send, start_message: Message | None, raw: bytes) -> None:
@@ -426,6 +447,9 @@ def create_app(
         redoc_url="/api/redoc",
         openapi_url="/api/openapi.json",
         lifespan=lifespan,
+        # GCR-13 — every DTO a route returns is redacted as it is serialized,
+        # so `RedactionMiddleware` forwards it rather than buffering it.
+        default_response_class=RedactedJSONResponse,
     )
     app.state.workspace_root = Path(workspace_root).resolve()
     app.state.tray_bootstrap_digest = (

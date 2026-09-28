@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now, utc_plus_seconds
+from raiker.execution.code_placement import place_code
 from raiker.execution.commands.backends.base import CommandBackendError, UnavailableBackend
 from raiker.execution.commands.backends.container import (
     PersistentContainerBackend,
@@ -35,7 +36,11 @@ from raiker.execution.commands.supervisor_client import (
     SupervisorUnavailable,
 )
 from raiker.execution.commands.supervisor_client import attach as attach_supervised
-from raiker.execution.profiles import ExecutionProfile, resolve_command_environment
+from raiker.execution.profiles import (
+    DEFAULT_EXECUTION_PROFILES,
+    ExecutionProfile,
+    resolve_command_environment,
+)
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -173,6 +178,7 @@ class CommandService:
         max_output_bytes: int = 100_000,
         background: bool = False,
         interactive: bool = False,
+        host_network_code: bool = False,
     ) -> StoredCommandRun:
         resolution = (
             resolve_command_environment(
@@ -189,6 +195,14 @@ class CommandService:
         profile = resolution.profile
         if not argv:
             raise CommandServiceError("command_argv_required")
+        profile = self._place_code(
+            profile,
+            owner_principal_id,
+            argv,
+            background=background,
+            interactive=interactive,
+            host_network_code=host_network_code,
+        )
         del command
         display = shlex.join(argv)
         if not display or any(char in display for char in "\r\n\0"):
@@ -268,6 +282,52 @@ class CommandService:
         if background:
             self._hold_lease(request)
         return self.store.load(owner_principal_id, request.run_id)  # type: ignore[return-value]
+
+    def _place_code(
+        self,
+        profile: ExecutionProfile,
+        owner_principal_id: str,
+        argv: list[str],
+        *,
+        background: bool,
+        interactive: bool,
+        host_network_code: bool,
+    ) -> ExecutionProfile:
+        """Run code in the sandbox where there is one; never on the host unasked.
+
+        BUG-308 — ``python``, ``node``, ``npm`` and ``npx`` passed every argv
+        check and then ran with the host's network, which no check here can see.
+        Where this machine has the native sandbox and the owner has not chosen
+        an environment, such a command runs inside it. Where it would run on the
+        host, the caller must say it was authorised under
+        ``host_network_code_execution`` — the router does, after that
+        capability's own switch and decision mode; a command authorised only as
+        an ordinary shell command is refused rather than run.
+
+        There is no fallback in either direction. A sandbox that fails at launch
+        refuses the command (the native backend's rule), and a command the owner
+        approved for the host that now finds a sandbox runs inside it, which is
+        only ever stricter than what they approved.
+        """
+        if profile.kind != "local":
+            return profile
+        placement = place_code(
+            self.sqlite,
+            owner_principal_id,
+            argv,
+            self.workspace_root,
+            background=background,
+            interactive=interactive,
+        )
+        if placement.kind == "sandbox":
+            return next(
+                candidate
+                for candidate in DEFAULT_EXECUTION_PROFILES
+                if candidate.profile_id == "native_sandbox"
+            )
+        if placement.kind == "host_network" and not host_network_code:
+            raise CommandServiceError("host_network_code_not_authorized")
+        return profile
 
     # ── Background lifecycle (BUG-194) ───────────────────────────────────────
 

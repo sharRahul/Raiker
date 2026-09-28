@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -13,7 +14,7 @@ from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
 from raiker.plugins.registry import record_plugin_install
 from raiker.runtime.authority import GovernedAction, RuntimeAuthority
-from raiker.runtime.authority.models import Principal, RiskLevelValue
+from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
 from raiker.runtime.executors import (
     REAL_EXECUTOR_CAPABILITIES,
     PluginRuntimeExecutor,
@@ -27,6 +28,7 @@ _REVOKE_CAP = "plugin_revocation_cap"
 _REVOKE_DOC = "docs/threat-models/plugin-revocation.md"
 _PLUGIN = "local.runner"
 _ALLOWLIST_ENV = "RAIKER_PLUGIN_RUNTIME_ALLOWLIST"
+_DIGESTS_ENV = "RAIKER_PLUGIN_RUNTIME_DIGESTS"
 _SCOPES_ENV = "RAIKER_PLUGIN_RUNTIME_SCOPES"
 
 
@@ -97,8 +99,44 @@ def _run_action(principal_id: str, *, action_type: str = _CAP, **args: object) -
 
 
 def _write_entry(ws: Path, name: str, body: str) -> str:
+    (ws / name).parent.mkdir(parents=True, exist_ok=True)
     (ws / name).write_text(body, encoding="utf-8")
+    # BUG-308 (CR-05) — the owner pins the bytes that may run, not only the id.
+    # Cleared after every test by `_no_pins_between_tests`.
+    os.environ[_DIGESTS_ENV] = f"{_PLUGIN}:{hashlib.sha256(body.encode()).hexdigest()}"
     return name
+
+
+@pytest.fixture(autouse=True)
+def _no_pins_between_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(_DIGESTS_ENV, raising=False)
+
+
+def test_an_unpinned_entrypoint_does_not_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """BUG-308 (CR-05) — the allowlist names the plugin; the pin names the bytes."""
+    ws = _ws(tmp_path)
+    ran: list[list[str]] = []
+
+    def fake_runner(command: list[str], **kwargs: object) -> dict[str, object]:
+        ran.append(command)
+        return {"returncode": 0}
+
+    store = SQLiteStore(ws)
+    _install(store)
+    (ws / "entry.py").write_text("print('hi')\n", encoding="utf-8")
+    monkeypatch.setenv(_ALLOWLIST_ENV, _PLUGIN)
+    principal = Principal(
+        principal_id="principal_owner", principal_type=PrincipalType.HUMAN, display_name="Owner"
+    )
+
+    result = PluginRuntimeExecutor(ws, store, runner=fake_runner).execute(
+        _run_action(principal.principal_id, plugin_id=_PLUGIN, entrypoint="entry.py"), principal
+    )
+
+    assert result.reason_code == "plugin_entrypoint_digest_not_pinned"
+    assert ran == []
 
 
 def test_plugin_runtime_cap_is_real_executor(tmp_path: Path) -> None:

@@ -616,6 +616,13 @@ class ToolBroker:
                 argv=command,
                 max_output_bytes=100_000,
             )
+            host_refusal = self._host_network_code_refusal(
+                command, context, background=bool(args.get("background"))
+            )
+            if host_refusal == "":
+                invocation["host_network_code"] = True
+            elif host_refusal is not None:
+                return {"status": "denied", "error": {"type": host_refusal}}
             if bool(args.get("background")):
                 # BUG-194 — the same grant, the same allowlist, the same argv
                 # policy. What differs is only that the turn does not wait: the
@@ -640,6 +647,47 @@ class ToolBroker:
             reason = exc.reason_code if isinstance(exc, CommandServiceError) else str(exc)
             return {"status": "failed", "error": {"type": reason}}
         return {"status": "success", **result}
+
+    def _host_network_code_refusal(
+        self, command: list[str], context: ToolExecutionContext, *, background: bool
+    ) -> str | None:
+        """Whether a granted command that runs code may use the host's network.
+
+        BUG-308 — ``run_command`` runs under a session command grant, not through
+        the router, so the router's reclassification never sees it. The same
+        placement is asked here. ``None`` means the command is not placed on the
+        host (not code, or the sandbox will run it); ``""`` means it is, and
+        ``host_network_code_execution`` allows it; anything else is the refusal.
+
+        The grant is the owner's approval of these exact commands for this
+        session, so it stands in for *Ask me* the way a standing grant does. What
+        it cannot stand in for is the capability's switch or a *Never*.
+        """
+        from raiker.execution.code_placement import HOST_NETWORK_CODE_CAPABILITY, place_code
+        from raiker.runtime.authority.decision_modes import DecisionMode
+        from raiker.runtime.authority.router import RuntimeAuthority
+
+        if self.store is None:
+            return None
+        placement = place_code(
+            self.store,
+            context.owner_principal_id,
+            command,
+            self.command_service.workspace_root,
+            background=background,
+        )
+        if not placement.needs_host_network_capability:
+            return None
+        authority = RuntimeAuthority(self.store, self.writer or EventLogWriter(self.store))
+        gate = authority.check_capability_gate(
+            HOST_NETWORK_CODE_CAPABILITY, HOST_NETWORK_CODE_CAPABILITY, self.owner_scope
+        )
+        if gate:
+            return "host_network_code_disabled"
+        mode = authority._resolve_decision_mode(HOST_NETWORK_CODE_CAPABILITY, self.owner_scope)
+        if mode == DecisionMode.DENY:
+            return "host_network_code_denied"
+        return ""
 
     def _background_run(
         self, args: dict[str, Any], context: ToolExecutionContext

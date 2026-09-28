@@ -475,6 +475,18 @@ _AUTHORITY: tuple[CapabilityAuthority, ...] = (
         "Containment pauses the tool after repeated failures.",
     ),
     _row(
+        "host_network_code_execution",
+        SIDE_EFFECT_DESTRUCTIVE,
+        "Code in the workspace — a script `python`, `node`, `npm` or `npx` runs "
+        "— would run with this machine's network, where it can open a socket "
+        "no egress check sees.",
+        "An owner-enabled gate — this one, and also the `shell_execution` or "
+        "`process_execution` gate the command arrived through — the command "
+        "policy, and an approval carrying the exact argument vector. Where "
+        "this machine has the native sandbox, that code runs inside it and "
+        "this capability is never asked.",
+    ),
+    _row(
         "process_execution",
         SIDE_EFFECT_DESTRUCTIVE,
         "A process would be started outside the turn that asked for it, so "

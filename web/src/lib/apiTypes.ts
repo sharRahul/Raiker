@@ -105,6 +105,10 @@ export interface CapabilityGate {
   side_effect?: "" | "read" | "reversible" | "external" | "destructive" | "critical";
   ungoverned_consequence?: string;
   authority_requirement?: string;
+  // BUG-308 — for a capability that runs code, where that code runs on this
+  // machine: inside the native sandbox, or with the host's network. Measured by
+  // the backend's sandbox probe; empty for capabilities that run no code.
+  network_boundary?: string;
 }
 
 export interface ComposerApprovalModeSettings {
@@ -642,6 +646,13 @@ export interface InstalledPlugin {
   checksum_present: boolean;
   signature: PluginSignature;
   contributions: PluginContributions;
+  /** BUG-308 — where this plugin's own code would run on this machine: not
+   *  at all, in a container with no network, or with this machine's network.
+   *  Optional so older payloads and fixtures stay valid. */
+  code_runtime?: {
+    where: "not_enabled" | "isolated" | "host_network";
+    summary: string;
+  };
 }
 
 /** A kind of contribution, and whether this build accepts it yet — so

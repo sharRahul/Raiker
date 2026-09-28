@@ -1298,7 +1298,7 @@ because the honest options are a model download or provider egress, and both are
 the owner's decision rather than a default. A bundled local sentence-embedding
 model reachable through the existing llama.cpp runtime is the next step and is
 tracked as **MEM-10**, raised in this round in
-[`plans/MEMORY_RELIABILITY_PLAN.md`](../plans/MEMORY_RELIABILITY_PLAN.md).
+`plans/MEMORY_RELIABILITY_PLAN.md` (removed 2026-09-28).
 `MEM-04`, `MEM-06`, `MEM-07`, `MEM-08` and `MEM-09` are unchanged by this round.
 
 ---
@@ -1554,7 +1554,7 @@ Each is recorded where the work is tracked rather than implied to exist.
 | A slash command that shows the capability gate it would cross | **Yes** | No reference product's command surface is governed at all, so none can show this. It would make the governed shape of a shortcut visible before it runs. |
 | An `@`-mention that reports each file's index freshness | **Yes** | The code map already records when each path was last parsed; no reference product's completion can say how stale its answer is. |
 | Background execution, PTY, filtered egress, restart reattachment | **No — parity** (Claude Code, Codex, OpenClaw, Hermes) | Each is a component rather than a flag. See [`plans/TO_BE_FIXED.md`](../plans/TO_BE_FIXED.md) → BUG-194 for the per-row reason; the controls are absent from the interface rather than disabled. |
-| Surfacing the memory integrity report at all | **Parity, and a prerequisite** | `inspect_memory_integrity` has no route, no scheduler entry and no panel, so MEM-09's conversation-index check would join a report nothing displays. Re-scoped in [`plans/MEMORY_RELIABILITY_PLAN.md`](../plans/MEMORY_RELIABILITY_PLAN.md). |
+| Surfacing the memory integrity report at all | **Parity, and a prerequisite** | `inspect_memory_integrity` has no route, no scheduler entry and no panel, so MEM-09's conversation-index check would join a report nothing displays. Re-scoped in `plans/MEMORY_RELIABILITY_PLAN.md` (removed 2026-09-28). |
 
 **The pattern worth keeping.** Every row marked *Yes* is the same move: the
 reference product shows a result, and Raiker shows the result **plus what it

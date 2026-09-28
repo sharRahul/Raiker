@@ -596,3 +596,29 @@ it("drops selected permissions when refresh revokes editing access", async () =>
   await waitFor(() => expect(screen.queryByRole("toolbar", { name: "Bulk capability actions" })).not.toBeInTheDocument());
   expect(registry().getByRole("checkbox", { name: "Select Shell commands" })).toBeDisabled();
 });
+
+// BUG-308 — code that runs with this machine's network is its own permission,
+// and a row that runs code says, measured, whether it has the network here.
+it("names the host-network capability and says where code runs on this machine", async () => {
+  stubFetch({
+    "GET /api/capability-gates": [
+      makeGate({
+        capability: "host_network_code_execution",
+        phase: 2,
+        state: "enabled_runtime",
+        can_current_principal_change: true,
+        allowed_transitions: ["disabled"],
+        decision_mode: "ask",
+        network_boundary:
+          "This machine has no native sandbox: python, node, npm and npx commands run with its network, and each one answers to Code with this machine's network.",
+      }),
+    ],
+  });
+  render(CapabilitiesView);
+  const list = await registryWhenLoaded();
+  const toggle = list.getByRole("button", { name: /Code with this machine's network/ });
+  await fireEvent.click(toggle);
+  expect(await screen.findByTestId("network-boundary")).toHaveTextContent(
+    /no native sandbox: python, node, npm and npx commands run with its network/,
+  );
+});

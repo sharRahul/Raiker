@@ -52,7 +52,7 @@ def test_local_lm_studio_sends_optional_api_token(monkeypatch: pytest.MonkeyPatc
     provider = ModelProviderFactory().create(profile)
     assert isinstance(provider, AsyncOpenAICompatibleProvider)
     assert provider.endpoint == "http://127.0.0.1:1234/v1"
-    assert provider._headers["Authorization"] == "Bearer lm-secret"
+    assert provider._http.headers["Authorization"] == "Bearer lm-secret"
     run(provider.aclose())
 
 
@@ -81,7 +81,7 @@ def test_ollama_cloud_requires_hosted_gate_allowlist_and_key(
     provider = ModelProviderFactory(policy=policy).create(profile)
     assert isinstance(provider, AsyncOpenAICompatibleProvider)
     assert provider.endpoint == "https://ollama.com/v1"
-    assert provider._headers["Authorization"] == "Bearer ollama-secret"
+    assert provider._http.headers["Authorization"] == "Bearer ollama-secret"
     run(provider.aclose())
 
 
@@ -102,7 +102,7 @@ def test_huggingface_uses_router_and_hf_token(monkeypatch: pytest.MonkeyPatch) -
     assert isinstance(provider, AsyncOpenAICompatibleProvider)
     assert provider.endpoint == "https://router.huggingface.co/v1"
     assert provider.model == "openai/gpt-oss-120b:cheapest"
-    assert provider._headers["Authorization"] == "Bearer hf-secret"
+    assert provider._http.headers["Authorization"] == "Bearer hf-secret"
     run(provider.aclose())
 
 

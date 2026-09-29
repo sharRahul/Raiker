@@ -5,6 +5,7 @@ import re
 import shutil
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,10 @@ from raiker.models.local_operations import (
     ModelOperation,
     ModelOperationRequest,
     ModelOperationService,
+    OperationCancelled,
+    OperationWorker,
+    run_operation,
+    run_operation_async,
 )
 from raiker.models.local_runtime import LOCAL_SLOTS, ManagedLlamaRuntime, slot_for_profile
 from raiker.models.mlx_runtime import MLX_SLOTS, ManagedMlxRuntime
@@ -207,10 +212,23 @@ def get_model_decision(
     if requested not in SURFACES:
         raise HTTPException(status_code=422, detail={"reason_code": "unknown_surface"})
     store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
-    decision = ModelDecisionService(store, readiness=_service(request)).decide(
-        session.principal_id, requested, project_id.strip() or None
-    )
+    decision = ModelDecisionService(
+        store, readiness=_service(request), runtimes=_runtimes(request)
+    ).decide(session.principal_id, requested, project_id.strip() or None)
     return decision.to_dict()
+
+
+def _runtimes(request: Request) -> tuple[Any, ...]:
+    """The host's managed local pools, so a decision reports what they run."""
+    state = request.app.state
+    return tuple(
+        runtime
+        for runtime in (
+            getattr(state, "managed_llama_runtime", None),
+            getattr(state, "managed_mlx_runtime", None),
+        )
+        if runtime is not None
+    )
 
 
 @router.get("/api/model-decisions")
@@ -229,7 +247,9 @@ def get_model_decisions(
     """
     session, _principal = auth_data
     store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
-    service = ModelDecisionService(store, readiness=_service(request))
+    service = ModelDecisionService(
+        store, readiness=_service(request), runtimes=_runtimes(request)
+    )
     return {
         "surfaces": {
             surface: service.decide(session.principal_id, surface).to_dict()
@@ -482,21 +502,14 @@ def _run_hugging_face_download(
     (GCR-22), so cancellation, failure and completion mean the same thing
     whichever one the owner is watching.
     """
-    operations = ModelOperationService(SQLiteStore(workspace))
-    try:
-        if operations.running(owner, operation_id, phase="downloading").state != "running":
-            # Cancelled before this worker could claim it, or already settled by
-            # another. Either way it is not this worker's job any more.
-            return
+
+    def work(op: OperationWorker) -> None:
         repo_id = str(payload.get("repo_id", ""))
         revision = str(payload.get("revision", ""))
         files = tuple(part for part in str(payload.get("variant", "")).split(",") if part)
         destination = Path(str(payload.get("destination", "")))
         if not repo_id or not revision or not files or not destination.name:
             raise ValueError("hugging_face_retry_payload_incomplete")
-        if operations.cancel_requested(owner, operation_id):
-            operations.cancelled(owner, operation_id)
-            return
         variant = next(
             (
                 item
@@ -509,12 +522,16 @@ def _run_hugging_face_download(
             raise ValueError("hugging_face_selection_changed")
         service.download(repo_id, variant, destination, token=token)
         ModelLibraryService(SQLiteStore(workspace)).rescan(owner)
-        if operations.cancel_requested(owner, operation_id):
-            operations.cancelled(owner, operation_id)
-            return
-        operations.complete(owner, operation_id)
-    except Exception:  # noqa: BLE001 - durable operation exposes only a bounded code
-        operations.fail(owner, operation_id, code="hugging_face_download_failed")
+        op.check_cancelled()
+
+    run_operation(
+        ModelOperationService(SQLiteStore(workspace)),
+        owner,
+        operation_id,
+        phase="downloading",
+        failure_code="hugging_face_download_failed",
+        work=work,
+    )
 
 
 def _operation_action(
@@ -696,6 +713,28 @@ def rescan_model_library(
     return {"ok": True, "models": [model.to_dict() for model in models]}
 
 
+def _wait_until_serving(
+    op: OperationWorker, *, served: Callable[[httpx.Client], str | None], budget: float
+) -> str:
+    """Poll a just-started loopback server until it names what it serves.
+
+    The readiness wait is the long part of a deploy, so it is where Cancel has
+    to land.
+    """
+    deadline = time.monotonic() + budget
+    with httpx.Client(timeout=2.0, trust_env=False) as client:
+        while time.monotonic() < deadline:
+            try:
+                name = served(client)
+                if name is not None:
+                    return name
+            except (httpx.HTTPError, ValueError):
+                pass
+            op.check_cancelled()
+            time.sleep(0.2)
+    raise RuntimeError("local_server_not_ready")
+
+
 def _run_local_deployment(
     workspace: Path,
     owner: str,
@@ -705,14 +744,7 @@ def _run_local_deployment(
     runtime: ManagedLlamaRuntime,
     profile_id: str | None = None,
 ) -> None:
-    operations = ModelOperationService(SQLiteStore(workspace))
-    started_slot: str | None = None
-    try:
-        if operations.running(owner, operation_id, phase="starting_llama_cpp").state != "running":
-            return
-        if operations.cancel_requested(owner, operation_id):
-            operations.cancelled(owner, operation_id)
-            return
+    def work(op: OperationWorker) -> None:
         executable = shutil.which("llama-server")
         if executable is None:
             raise RuntimeError("llama_server_missing")
@@ -725,46 +757,35 @@ def _run_local_deployment(
             approved_roots=approved_roots,
             profile_id=profile_id,
         )
-        started_slot = started.slot
+        # Only this deployment's own slot is stopped on failure or Cancel.
+        # Another model already serving a surface must not be torn down by an
+        # unrelated failure, which is exactly what a bare `stop()` would do.
+        op.on_abort(lambda: runtime.stop(started.slot))
         slot = slot_for_profile(started.slot) or LOCAL_SLOTS[0]
         origin = f"http://127.0.0.1:{slot.port}"
-        deadline = time.monotonic() + 30
-        with httpx.Client(timeout=2.0, trust_env=False) as client:
-            while time.monotonic() < deadline:
-                try:
-                    health = client.get(f"{origin}/health")
-                    models = client.get(f"{origin}/v1/models")
-                    ids = [str(item.get("id")) for item in models.json().get("data", [])]
-                    if health.is_success and models.is_success and slot.alias in ids:
-                        break
-                except (httpx.HTTPError, ValueError):
-                    pass
-                # The readiness wait is the long part of a deploy, so it is where
-                # Cancel has to land. `RuntimeError` unwinds into the handler
-                # below, which stops the slot this deployment started.
-                if operations.cancel_requested(owner, operation_id):
-                    raise RuntimeError("local_model_deploy_cancelled")
-                time.sleep(0.2)
-            else:
-                raise RuntimeError("llama_server_not_ready")
+
+        def served(client: httpx.Client) -> str | None:
+            health = client.get(f"{origin}/health")
+            models = client.get(f"{origin}/v1/models")
+            ids = [str(item.get("id")) for item in models.json().get("data", [])]
+            ok = health.is_success and models.is_success and slot.alias in ids
+            return slot.alias if ok else None
+
+        _wait_until_serving(op, served=served, budget=30)
         store = SQLiteStore(workspace)
         store.save_configured_model(owner, slot.profile_id, slot.alias)
         store.invalidate_model_readiness(
-            owner,
-            slot.profile_id,
-            reason_code="local_runtime_deployed",
+            owner, slot.profile_id, reason_code="local_runtime_deployed"
         )
-        operations.complete(owner, operation_id)
-    except Exception as exc:  # noqa: BLE001 - durable operation exposes only a bounded code
-        # Only this deployment's own slot is stopped. Another model already
-        # serving a surface must not be torn down by an unrelated failure, which
-        # is exactly what a bare `stop()` would now do.
-        if started_slot is not None:
-            runtime.stop(started_slot)
-        if str(exc) == "local_model_deploy_cancelled":
-            operations.cancelled(owner, operation_id)
-        else:
-            operations.fail(owner, operation_id, code="local_model_deploy_failed")
+
+    run_operation(
+        ModelOperationService(SQLiteStore(workspace)),
+        owner,
+        operation_id,
+        phase="starting_llama_cpp",
+        failure_code="local_model_deploy_failed",
+        work=work,
+    )
 
 
 @router.post("/api/model-library/{model_id:path}/deploy")
@@ -833,14 +854,7 @@ def _run_mlx_deployment(
     runtime: ManagedMlxRuntime,
     profile_id: str | None = None,
 ) -> None:
-    operations = ModelOperationService(SQLiteStore(workspace))
-    started_slot: str | None = None
-    try:
-        if operations.running(owner, operation_id, phase="starting_mlx").state != "running":
-            return
-        if operations.cancel_requested(owner, operation_id):
-            operations.cancelled(owner, operation_id)
-            return
+    def work(op: OperationWorker) -> None:
         if sys.platform != "darwin":
             raise RuntimeError("mlx_requires_apple_silicon")
         executable = shutil.which("mlx_lm.server") or shutil.which("mlx_lm")
@@ -852,39 +866,29 @@ def _run_mlx_deployment(
             profile_id=profile_id,
             approved_roots=approved_roots,
         )
-        started_slot = started.slot
+        op.on_abort(lambda: runtime.stop(started.slot))
         slot = next(item for item in MLX_SLOTS if item.profile_id == started.slot)
-        origin = f"http://127.0.0.1:{slot.port}"
-        served_model: str | None = None
-        deadline = time.monotonic() + 60
-        with httpx.Client(timeout=2.0, trust_env=False) as client:
-            while time.monotonic() < deadline:
-                try:
-                    response = client.get(f"{origin}/v1/models")
-                    ids = [str(item.get("id")) for item in response.json().get("data", [])]
-                    if response.is_success and ids:
-                        served_model = ids[0]
-                        break
-                except (httpx.HTTPError, ValueError):
-                    pass
-                if operations.cancel_requested(owner, operation_id):
-                    raise RuntimeError("local_model_deploy_cancelled")
-                time.sleep(0.2)
-            else:
-                raise RuntimeError("mlx_server_not_ready")
+
+        def served(client: httpx.Client) -> str | None:
+            response = client.get(f"http://127.0.0.1:{slot.port}/v1/models")
+            ids = [str(item.get("id")) for item in response.json().get("data", [])]
+            return ids[0] if response.is_success and ids else None
+
+        served_model = _wait_until_serving(op, served=served, budget=60)
         store = SQLiteStore(workspace)
-        store.save_configured_model(owner, slot.profile_id, served_model or str(model_path))
+        store.save_configured_model(owner, slot.profile_id, served_model)
         store.invalidate_model_readiness(
             owner, slot.profile_id, reason_code="local_runtime_deployed"
         )
-        operations.complete(owner, operation_id)
-    except Exception as exc:  # noqa: BLE001
-        if started_slot is not None:
-            runtime.stop(started_slot)
-        if str(exc) == "local_model_deploy_cancelled":
-            operations.cancelled(owner, operation_id)
-        else:
-            operations.fail(owner, operation_id, code="local_mlx_deploy_failed")
+
+    run_operation(
+        ModelOperationService(SQLiteStore(workspace)),
+        owner,
+        operation_id,
+        phase="starting_mlx",
+        failure_code="local_mlx_deploy_failed",
+        work=work,
+    )
 
 
 @router.post("/api/model-library/{model_id:path}/deploy-mlx")
@@ -1226,37 +1230,30 @@ def preview_model_conversion(
 def _run_model_conversion(
     workspace: Path, owner: str, operation_id: str, body: ModelConversionRequestBody
 ) -> None:
-    operations = ModelOperationService(SQLiteStore(workspace))
-    try:
-        if operations.running(owner, operation_id, phase="converting").state != "running":
-            return
+    def work(op: OperationWorker) -> None:
         service = ModelConversionService()
         preview = service.preview(
             Path(body.source), Path(body.output), body.revision, body.quantization
         )
         # GCR-24 — the flag is read before the work starts, throughout it, and
-        # after. It used to be read only at the two ends, and in between sat two
-        # blocking containers under a six-hour budget: pressing Cancel on a
-        # conversion that had just begun left it at `cancel_requested` with the
-        # CPU committed, potentially for the rest of the day. The runner polls
-        # this and stops the container by name.
-        if operations.cancel_requested(owner, operation_id):
-            operations.cancelled(owner, operation_id)
-            return
+        # after: the runner polls it and stops the container by name, so Cancel
+        # on a conversion that has just begun does not leave the CPU committed.
+        op.check_cancelled()
         try:
-            service.convert(preview, lambda: operations.cancel_requested(owner, operation_id))
+            service.convert(preview, op.cancel_requested)
         except ConversionCancelled:
-            # Not a failure. The owner asked for this, and telling them their
-            # conversion broke would be a different and wrong sentence.
-            operations.cancelled(owner, operation_id)
-            return
-        if operations.cancel_requested(owner, operation_id):
-            operations.cancelled(owner, operation_id)
-            return
-        operations.complete(owner, operation_id)
-        ModelLibraryService(SQLiteStore(workspace)).rescan(owner)
-    except Exception:
-        operations.fail(owner, operation_id, code="model_conversion_failed")
+            raise OperationCancelled from None
+        op.check_cancelled()
+
+    run_operation(
+        ModelOperationService(SQLiteStore(workspace)),
+        owner,
+        operation_id,
+        phase="converting",
+        failure_code="model_conversion_failed",
+        work=work,
+        then=lambda: ModelLibraryService(SQLiteStore(workspace)).rescan(owner),
+    )
 
 
 @router.post("/api/model-conversion")
@@ -1317,10 +1314,7 @@ def start_model_conversion(
 
 
 async def _pull_ollama_model(workspace: Path, owner: str, operation_id: str, model: str) -> None:
-    operations = ModelOperationService(SQLiteStore(workspace))
-    try:
-        if operations.running(owner, operation_id, phase="contacting_ollama").state != "running":
-            return
+    async def work(op: OperationWorker) -> None:
         timeout = httpx.Timeout(connect=10.0, read=None, write=30.0, pool=10.0)
         async with (
             httpx.AsyncClient(timeout=timeout, trust_env=False) as client,
@@ -1337,32 +1331,29 @@ async def _pull_ollama_model(workspace: Path, owner: str, operation_id: str, mod
                 payload = json.loads(line)
                 if payload.get("error"):
                     raise RuntimeError("ollama_pull_rejected")
-                # BUG-75 — cancellation is cooperative, so every worker has to
-                # co-operate. Checking on each streamed progress line is the
-                # tightest bound this job offers, so Cancel reaches a terminal
-                # state in about one chunk rather than at the end of the pull.
-                if operations.cancel_requested(owner, operation_id):
-                    await response.aclose()
-                    operations.cancelled(owner, operation_id)
-                    return
-                completed = int(payload.get("completed") or 0)
+                # BUG-75 — checked on each streamed progress line, the tightest
+                # bound this job offers, so Cancel lands within about one chunk.
+                op.check_cancelled()
                 raw_total = payload.get("total")
-                total = int(raw_total) if raw_total is not None else None
-                operations.progress(
-                    owner,
-                    operation_id,
-                    completed_bytes=completed,
-                    total_bytes=total,
+                op.progress(
+                    completed_bytes=int(payload.get("completed") or 0),
+                    total_bytes=int(raw_total) if raw_total is not None else None,
                     phase=str(payload.get("status") or "pulling"),
                 )
-        operations.complete(owner, operation_id)
-        SQLiteStore(workspace).invalidate_model_readiness(
+
+    await run_operation_async(
+        ModelOperationService(SQLiteStore(workspace)),
+        owner,
+        operation_id,
+        phase="contacting_ollama",
+        failure_code="ollama_pull_failed",
+        work=work,
+        then=lambda: SQLiteStore(workspace).invalidate_model_readiness(
             owner,
             "ollama-local-openai-compatible",
             reason_code="ollama_model_catalogue_changed",
-        )
-    except Exception:
-        operations.fail(owner, operation_id, code="ollama_pull_failed")
+        ),
+    )
 
 
 @router.post("/api/ollama/pull")

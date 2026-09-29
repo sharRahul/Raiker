@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
+from contextlib import suppress
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePath
 from typing import Any
@@ -379,6 +380,125 @@ class ModelOperationService:
         work a live worker is still doing.
         """
         return self.store.fail_running_model_operations()
+
+
+class OperationCancelled(Exception):
+    """The owner asked this operation to stop; raised at a cancellation point."""
+
+
+class OperationWorker:
+    """One worker's hold on one operation (OPT-11).
+
+    The harness below owns the state mechanics every background worker used to
+    repeat — claim, check, settle — and the worker owns only its domain work.
+    Every write is still the service's expected-state transition (GCR-20), so a
+    worker that loses a race to the owner's Cancel reads the owner's decision
+    instead of overwriting it.
+    """
+
+    def __init__(self, operations: ModelOperationService, owner: str, operation_id: str) -> None:
+        self.operations = operations
+        self.owner = owner
+        self.operation_id = operation_id
+        self._cleanups: list[Callable[[], object]] = []
+
+    def cancel_requested(self) -> bool:
+        return self.operations.cancel_requested(self.owner, self.operation_id)
+
+    def check_cancelled(self) -> None:
+        """A cancellation point: stop here if the owner has pressed Cancel."""
+        if self.cancel_requested():
+            raise OperationCancelled
+
+    def on_abort(self, cleanup: Callable[[], object]) -> None:
+        """Undo something this worker started, if it ends cancelled or failed."""
+        self._cleanups.append(cleanup)
+
+    def progress(self, *, completed_bytes: int, total_bytes: int | None, phase: str) -> None:
+        self.operations.progress(
+            self.owner,
+            self.operation_id,
+            completed_bytes=completed_bytes,
+            total_bytes=total_bytes,
+            phase=phase,
+        )
+
+    def _begin(self, phase: str) -> bool:
+        """Claim the operation; False when it is no longer this worker's job."""
+        claimed = self.operations.running(self.owner, self.operation_id, phase=phase)
+        if claimed.state != "running":
+            # Cancelled before this worker could claim it, or already settled by
+            # another. Either way there is nothing to do.
+            return False
+        if self.cancel_requested():
+            self.operations.cancelled(self.owner, self.operation_id)
+            return False
+        return True
+
+    def _finish(self, then: Callable[[], object] | None) -> None:
+        # `complete` itself honours a Cancel that arrived after the last check.
+        self.operations.complete(self.owner, self.operation_id)
+        if then is not None:
+            then()
+
+    def _abort(self, error: BaseException, failure_code: str) -> None:
+        for cleanup in reversed(self._cleanups):
+            with suppress(Exception):
+                cleanup()
+        if isinstance(error, OperationCancelled):
+            # Not a failure: the owner asked for this, and telling them their
+            # job broke would be a different and wrong sentence.
+            self.operations.cancelled(self.owner, self.operation_id)
+        else:
+            # A durable operation exposes only a bounded code, never the error.
+            self.operations.fail(self.owner, self.operation_id, code=failure_code)
+
+
+def run_operation(
+    operations: ModelOperationService,
+    owner: str,
+    operation_id: str,
+    *,
+    phase: str,
+    failure_code: str,
+    work: Callable[[OperationWorker], None],
+    then: Callable[[], object] | None = None,
+) -> None:
+    """Claim, run ``work``, and settle the operation whatever ``work`` does.
+
+    ``then`` runs after completion — a library rescan, a readiness invalidation
+    — and a failure in it cannot turn a completed operation into a failed one,
+    because the terminal row refuses the write.
+    """
+    worker = OperationWorker(operations, owner, operation_id)
+    try:
+        if not worker._begin(phase):
+            return
+        work(worker)
+        worker._finish(then)
+    except Exception as error:  # noqa: BLE001 — settled to a bounded code
+        worker._abort(error, failure_code)
+
+
+async def run_operation_async(
+    operations: ModelOperationService,
+    owner: str,
+    operation_id: str,
+    *,
+    phase: str,
+    failure_code: str,
+    work: Callable[[OperationWorker], Awaitable[None]],
+    then: Callable[[], object] | None = None,
+) -> None:
+    """:func:`run_operation` for a worker whose domain work is a coroutine."""
+    worker = OperationWorker(operations, owner, operation_id)
+    try:
+        if not worker._begin(phase):
+            return
+        await work(worker)
+        worker._finish(then)
+    except Exception as error:  # noqa: BLE001 — settled to a bounded code
+        worker._abort(error, failure_code)
 
 
 def _safe_payload(payload: dict[str, Any] | None) -> dict[str, Any]:

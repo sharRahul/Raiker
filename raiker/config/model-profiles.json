@@ -18,6 +18,7 @@
   "profiles": [
     {
       "profile_id": "raiker-local-llama-cpp",
+      "managed_slot": true,
       "provider": "llama.cpp",
       "backend": "openai_compatible",
       "model": "local-gguf",
@@ -49,6 +50,7 @@
     },
     {
       "profile_id": "raiker-local-llama-cpp-2",
+      "managed_slot": true,
       "provider": "llama.cpp",
       "backend": "openai_compatible",
       "model": "local-gguf-2",
@@ -80,6 +82,7 @@
     },
     {
       "profile_id": "raiker-local-llama-cpp-3",
+      "managed_slot": true,
       "provider": "llama.cpp",
       "backend": "openai_compatible",
       "model": "local-gguf-3",
@@ -111,6 +114,7 @@
     },
     {
       "profile_id": "raiker-local-llama-cpp-4",
+      "managed_slot": true,
       "provider": "llama.cpp",
       "backend": "openai_compatible",
       "model": "local-gguf-4",
@@ -142,6 +146,7 @@
     },
     {
       "profile_id": "raiker-local-mlx",
+      "managed_slot": true,
       "provider": "mlx",
       "requires_platform": [
         "darwin"
@@ -172,6 +177,7 @@
     },
     {
       "profile_id": "raiker-local-mlx-2",
+      "managed_slot": true,
       "provider": "mlx",
       "requires_platform": [
         "darwin"
@@ -202,6 +208,7 @@
     },
     {
       "profile_id": "raiker-local-mlx-3",
+      "managed_slot": true,
       "provider": "mlx",
       "requires_platform": [
         "darwin"
@@ -232,6 +239,7 @@
     },
     {
       "profile_id": "raiker-local-mlx-4",
+      "managed_slot": true,
       "provider": "mlx",
       "requires_platform": [
         "darwin"

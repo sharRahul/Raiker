@@ -18,16 +18,11 @@ jobs:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-      - name: Set up Python
-        # actions/setup-python v6.2.0 (Node 24 runtime)
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      - name: Set up Python and install the package
+        uses: ./.github/actions/setup-python
         with:
-          python-version: "3.11"
-          cache: "pip"
-      - name: Install package and dev dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install -e ".[dev]"
+          install: dev
+          cache: pip
       - name: Verify real httpx import
         run: |
           python -c "import httpx; print(httpx.__file__)"
@@ -111,6 +106,31 @@ jobs:
         run: |
           python -m compileall -q raiker apps tests
 
+  # Wave 0 of the codebase optimisation review: a baseline taken the same way on
+  # every run, so a simplification reports what it removed instead of estimating
+  # it. Standard library only and git-tracked files only; it measures and never
+  # fails a change for being large. The report is kept as an artifact.
+  source-measurement:
+    name: Source measurement
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.1 (Node 24 runtime)
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Python
+        uses: ./.github/actions/setup-python
+      - name: Measure handwritten source
+        run: |
+          python scripts/measure_loc.py --json loc-report.json
+      - name: Keep the report
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: loc-report
+          path: loc-report.json
+          retention-days: 90
+
   # CR-12 — the review found CI with least-privilege permissions already, and no
   # gate for a dependency with a published vulnerability. This is that gate for
   # the Python side (the web workflow audits the npm lockfile). It audits the
@@ -126,10 +146,7 @@ jobs:
         # actions/checkout v5.0.1 (Node 24 runtime)
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       - name: Set up Python
-        # actions/setup-python v6.2.0 (Node 24 runtime)
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: "3.11"
+        uses: ./.github/actions/setup-python
       - name: Install pip-audit
         run: python -m pip install "pip-audit==2.10.1"
       # GCR-41 — the release builds from `requirements/release*.txt`, which are

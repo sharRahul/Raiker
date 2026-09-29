@@ -5,22 +5,19 @@ from functools import lru_cache
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.schemas import StrictRequest
 from raiker.api.sessions import ApiSession
 from raiker.runtime.authority.models import Principal
 
 router = APIRouter()
 
 
-class LanguageCheckRequest(BaseModel):
+class LanguageCheckRequest(StrictRequest):
     text: str = Field(max_length=20_000)
     language: str = Field(default="en-US", pattern=r"^en(?:-[A-Z]{2})?$")
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(request.app.state.workspace_root).authenticate(request)
 
 
 @lru_cache(maxsize=3)

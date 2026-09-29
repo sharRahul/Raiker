@@ -109,6 +109,13 @@ _CONNECTIONS_LOCK = threading.RLock()
 _OWNER_TOKENS = threading.local()
 _OWNER_SEQUENCE = itertools.count(1)
 _OWNER_THREADS: dict[int, weakref.ReferenceType[threading.Thread]] = {}
+# Handles invalidation took out of the cache while their owning thread was still
+# running — a shutdown can arrive while a cancelled ``to_thread`` worker is
+# still mid-statement, because cancelling the awaiting task does not stop the
+# thread. Closing one there is a use-after-close in that worker, which SQLCipher
+# answers with a segfault. So the owner closes its own on its next ``connect``,
+# and a handle whose owner has since exited is closed by whoever notices.
+_RETIRED: dict[int, list[sqlite3.Connection]] = {}
 # Schema/FTS bootstrap uses multiple statements and must not race another store
 # instance in this process. SQLite's busy timeout cannot resolve two deferred
 # transactions that both try to upgrade to writers.
@@ -437,7 +444,7 @@ def _live_owners_locked() -> set[int]:
             live.add(token)
         else:
             retired.append(token)
-    held = {key[1] for key in _CONNECTIONS}
+    held = {key[1] for key in _CONNECTIONS} | set(_RETIRED)
     for token in retired:
         if token not in held:
             _OWNER_THREADS.pop(token, None)
@@ -478,12 +485,37 @@ def _releasable_locked(owner: int) -> list[sqlite3.Connection]:
     return [_CONNECTIONS.pop(key) for key in doomed]
 
 
+def _reap_retired_locked(owner: int) -> list[sqlite3.Connection]:
+    """Retired handles now safe to close: this thread's own, and any dead thread's.
+
+    Called with ``_CONNECTIONS_LOCK`` held; the caller closes what it returns.
+    """
+    live = _live_owners_locked()
+    due = [token for token in _RETIRED if token == owner or token not in live]
+    return [connection for token in due for connection in _RETIRED.pop(token)]
+
+
 def invalidate_workspace_connections(workspace_root: str | Path) -> None:
-    """Close every cached SQLCipher connection for one workspace."""
+    """Take every cached SQLCipher connection for one workspace out of use.
+
+    Every handle leaves the cache at once, so nothing reuses one afterwards.
+    Only this thread's own and those of threads that have exited are closed
+    here; a live worker's is retired, to be closed by that worker on its next
+    ``connect`` — never under it (see ``_RETIRED``).
+    """
     root = Path(workspace_root).resolve()
+    owner = _owner_token()
     with _CONNECTIONS_LOCK:
+        live = _live_owners_locked()
         doomed = [key for key in _CONNECTIONS if key[0] == root]
-        connections = [_CONNECTIONS.pop(key) for key in doomed]
+        connections: list[sqlite3.Connection] = []
+        for key in doomed:
+            connection = _CONNECTIONS.pop(key)
+            if key[1] == owner or key[1] not in live:
+                connections.append(connection)
+            else:
+                _RETIRED.setdefault(key[1], []).append(connection)
+        connections += _reap_retired_locked(owner)
     for connection in connections:
         with contextlib.suppress(Exception):
             connection.close()
@@ -493,7 +525,9 @@ def close_cached_connections() -> None:
     """Close all keyed connections during process shutdown."""
     with _CONNECTIONS_LOCK:
         connections = list(_CONNECTIONS.values())
+        connections += [handle for handles in _RETIRED.values() for handle in handles]
         _CONNECTIONS.clear()
+        _RETIRED.clear()
         _OWNER_THREADS.clear()
     for connection in connections:
         with contextlib.suppress(Exception):
@@ -650,6 +684,12 @@ class SQLiteStore(
     def connect(self) -> sqlite3.Connection:
         owner = _owner_token()
         cache_key = (self.paths.workspace_root, owner)
+        with _CONNECTIONS_LOCK:
+            retired = _reap_retired_locked(owner) if _RETIRED else []
+        # This thread is not mid-statement on any of them — it is here.
+        for stale in retired:
+            with contextlib.suppress(Exception):
+                stale.close()
         with _CONNECTIONS_LOCK:
             connection = _CONNECTIONS.get(cache_key)
             if connection is not None:

@@ -16,6 +16,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.schemas import ComposerApprovalModeRequest, SettingsRequest
 from raiker.auth.accounts import AccountService
 from raiker.auth.vault_key_file import vault_status
@@ -30,10 +31,6 @@ from raiker.storage.sqlite import SQLiteStore
 router = APIRouter()
 
 SPEECH_LANGUAGES = {"auto", "en", "fr", "de", "hi", "it", "ja", "ko", "pt", "ru", "es", "tr", "uk"}
-
-
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[attr-defined]
 
 
 def _load(ws: str | Path, principal_id: str) -> dict[str, Any]:

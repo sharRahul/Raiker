@@ -85,7 +85,11 @@ Use **Observability** when you need evidence rather than a summary:
 - **Notifications** collects events that need attention. It is the record: a
   notice is kept here whether or not either alert under **Settings →
   Notifications** showed it, so turning both off loses nothing. The bell in the
-  top bar counts the unread ones from every page.
+  top bar counts the unread ones from every page. The newest unread notice is
+  also docked at the top right, except where the page already says it: an
+  approval notice is not shown on **Approvals**, a finished-run notice is not
+  shown on **Tasks**, and arriving on either marks that notice read. Nothing is
+  docked on this tab, where every notice is already a row.
 
 **Overview** answers the whole of "is this instance in a state I can work in",
 in the order that question is actually asked. What needs you comes first, then

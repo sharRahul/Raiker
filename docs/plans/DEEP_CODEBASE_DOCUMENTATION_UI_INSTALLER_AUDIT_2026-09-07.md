@@ -883,24 +883,27 @@ captures before treating screenshot refresh as complete.
 
 Following the repository's priority-before-effort rule:
 
-| Order | Item | Priority | Effort |
-|---:|---|---:|---|
-| 1 | Sanitize MCP stdio environment through common launcher | P1 | Low |
-| 2 | Enforce actual received request-body bytes | P1 | Low-Medium |
-| 3 | Pin release dependency set to `uv.lock`/hashed constraints | P1 | Low-Medium |
-| 4 | Pin/checksum appimagetool | P1 | Low |
-| 5 | Mechanical authority-context invariant | **P0** | Medium |
-| 6 | Explicit remote MCP public/private endpoint trust class | P1 | Medium |
-| 7 | Split telemetry failure from containment-health failure | P1 | Medium |
-| 8 | Bundle app-owned Python/runtime for macOS/AppImage; rationalize Debian package ownership | P1 | Medium-High |
-| 9 | Fresh-machine installer acceptance matrix | P1 | Medium |
-| 10 | Design Project asset/version/runtime foundation | P1 | High |
-| 11 | Design persistent canvas/editing UX | P1/P2 | High |
-| 12 | CodeQL/secret/dependency/container security gates | P2 | Medium |
-| 13 | Release provenance + publish SBOM/attestations | P2 | Medium |
-| 14 | Generate frontend API contracts/ordinary wrappers | P2 | Medium |
-| 15 | Simplify Permissions owner language | P2 | Medium |
-| 16 | Regenerate canonical mobile/1080p screenshot catalogue from live app | P2 | Low once live host exists |
+> **Current status, 2026-09-28.** The last column was added on 2026-09-28; the
+> first four are this audit's 2026-09-07 reading, kept as that.
+
+| Order | Item | Priority | Effort | Status 2026-09-28 |
+|---:|---|---:|---|---|
+| 1 | Sanitize MCP stdio environment through common launcher | P1 | Low | Closed — [FIXED-500](FIXED_ITEMS.md#fixed-500--every-local-mcp-server-was-handed-raikers-whole-environment) |
+| 2 | Enforce actual received request-body bytes | P1 | Low-Medium | Closed — [FIXED-599](FIXED_ITEMS.md#fixed-599--the-body-cap-counted-a-claim-and-nothing-said-where-a-page-may-reach) |
+| 3 | Pin release dependency set to `uv.lock`/hashed constraints | P1 | Low-Medium | Closed — [FIXED-615](FIXED_ITEMS.md#fixed-615--the-release-chose-its-dependencies-on-the-day-it-was-built) |
+| 4 | Pin/checksum appimagetool | P1 | Low | Closed — [FIXED-574](FIXED_ITEMS.md#fixed-574--two-builds-of-one-commit-could-contain-different-build-tool-bytes) |
+| 5 | Mechanical authority-context invariant | **P0** | Medium | Reduced — [FIXED-619](FIXED_ITEMS.md#fixed-619--a-real-executor-could-be-fetched-and-run-with-nothing-governing-it); RR-AUTHORITY-01 open |
+| 6 | Explicit remote MCP public/private endpoint trust class | P1 | Medium | Closed — [FIXED-504](FIXED_ITEMS.md#fixed-504--five-destinations-one-label-and-the-owners-token-sent-to-all-of-them) |
+| 7 | Split telemetry failure from containment-health failure | P1 | Medium | Closed — [FIXED-605](FIXED_ITEMS.md#fixed-605--a-security-monitor-that-could-not-look-let-the-connection-carry-on) |
+| 8 | Bundle app-owned Python/runtime for macOS/AppImage; rationalize Debian package ownership | P1 | Medium-High | Open — RR-INSTALL-01 |
+| 9 | Fresh-machine installer acceptance matrix | P1 | Medium | Open — RR-VERIFY-01 |
+| 10 | Design Project asset/version/runtime foundation | P1 | High | Reduced — [FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach) (edits, variations, lineage); RR-DESIGN-01 open |
+| 11 | Design persistent canvas/editing UX | P1/P2 | High | Reduced — [FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach) (canvas workspace); RR-DESIGN-01 open |
+| 12 | CodeQL/secret/dependency/container security gates | P2 | Medium | Reduced — dependency audit gates in [FIXED-611](FIXED_ITEMS.md#fixed-611--nothing-failed-a-change-that-shipped-a-dependency-with-a-published-vulnerability); CodeQL/secret/container gates open |
+| 13 | Release provenance + publish SBOM/attestations | P2 | Medium | Open |
+| 14 | Generate frontend API contracts/ordinary wrappers | P2 | Medium | Open — OPT-01/OPT-02 of the optimisation review |
+| 15 | Simplify Permissions owner language | P2 | Medium | Reduced — [FIXED-513](FIXED_ITEMS.md#fixed-513--the-permissions-page-answered-what-am-i-looking-at-twice-and-led-with-neither) |
+| 16 | Regenerate canonical mobile/1080p screenshot catalogue from live app | P2 | Low once live host exists | Closed — regenerated from a live host into `docs/screenshots/pages/` (180 captures, last on 2026-09-22) |
 
 The P0 authority invariant remains the highest **release-significance** item even
 though the first four P1 tasks are cheaper and can land safely before its larger

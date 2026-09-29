@@ -181,6 +181,30 @@ it("rises above a composer it would cover, and stays in its corner otherwise", a
   await waitFor(() => expect(card.style.bottom).toBe("18px"));
 });
 
+// Found by the third 2026-09-28 round: the card covered Settings' Save changes,
+// so a settings change could not be saved while an approval waited elsewhere.
+it("rises above any bottom action bar that asks to be kept clear", async () => {
+  vi.spyOn(api, "approvals").mockResolvedValue([approval()]);
+  Object.defineProperty(window, "innerWidth", { value: 1440, configurable: true });
+  Object.defineProperty(window, "innerHeight", { value: 1000, configurable: true });
+  render(ApprovalPrompt);
+  const card = (await screen.findByText("Approval needed")).closest("section") as HTMLElement;
+  expect(card.style.bottom).toBe("18px");
+
+  const saveBar = document.createElement("div");
+  saveBar.setAttribute("data-dock-clear", "");
+  saveBar.getBoundingClientRect = () =>
+    ({ top: 900, bottom: 970, left: 540, right: 1410, width: 870, height: 70 }) as DOMRect;
+  document.body.appendChild(saveBar);
+  window.dispatchEvent(new Event("resize"));
+
+  // 1000 − 900 + 12 = 112 above the bottom edge: clear of the save bar.
+  await waitFor(() => expect(card.style.bottom).toBe("112px"));
+  saveBar.remove();
+  window.dispatchEvent(new Event("resize"));
+  await waitFor(() => expect(card.style.bottom).toBe("18px"));
+});
+
 // Found live on 2026-09-28: the card stayed on screen over the Approvals page
 // when the owner arrived there by a link, because the address was read once.
 it("leaves the screen when the owner navigates to Approvals, and returns after", async () => {

@@ -134,6 +134,15 @@ Generate ordinary REST operations from OpenAPI. Preserve custom code only where 
 
 ## OPT-03 — Introduce one strict request base model
 
+**Status: done 2026-09-28 — [FIXED-623](FIXED_ITEMS.md#fixed-623--whether-a-route-refused-a-misspelled-field-depended-on-who-wrote-it).** `StrictRequest` and
+`StrictModelRequest` in `raiker/api/schemas.py` carry `extra="forbid"`; every
+Pydantic request model under `raiker/api` inherits one of them, and
+`tests/test_api_request_models.py` fails a new one that does not. Sixteen models
+had no config at all and silently dropped unknown fields; they refuse them now.
+The twelve `@dataclass` bodies keep ignore-unknown on purpose — they are the REST
+contract for external single-user clients — and the base class says so.
+`schemas.py`: 897 → 817 lines.
+
 **Priority: P1 — Effort: Low — LOC reduction: Small/Medium — Risk: Low**
 
 ### Evidence
@@ -167,6 +176,16 @@ Small direct LOC reduction, but larger semantic reduction: input-validation post
 ---
 
 ## OPT-04 — Centralize API dependencies and common refusal mapping
+
+**Status: done 2026-09-28 — [FIXED-624](FIXED_ITEMS.md#fixed-624--twenty-route-modules-rebuilt-the-same-helpers-and-one-refusal-was-typed-out-174-times).** `raiker/api/dependencies.py`
+holds `workspace_root`, `workspace_path`, `authenticate` and `require_human`;
+twenty-five route modules import them instead of declaring their own. The 174
+hand-built `HTTPException(status_code=…, detail={"ok": False, "reason_code": …})`
+constructions are `refusal(status, code)` from `raiker/api/refusals.py`, so the
+envelope is built in one place while the status stays each route's decision. A
+helper with a different body — the host-control scope, service lookups — was
+left where it is. `raiker/api`: −1,041 / +399 lines, plus 75 in the two new
+modules.
 
 **Priority: P1 — Effort: Low/Medium — LOC reduction: Medium — Risk: Low**
 
@@ -289,6 +308,15 @@ Add small helpers such as `_fetch_one`, `_fetch_all`, `_execute`, `_transaction`
 ---
 
 ## OPT-07 — Replace individual migration constant imports with a migration registry
+
+**Status: done 2026-09-28 — [FIXED-625](FIXED_ITEMS.md#fixed-625--the-order-a-database-is-built-in-could-only-be-read-out-of-a-700-line-method).** `MIGRATIONS` in
+`raiker/storage/migrations.py` is the ordered registry: `Migration`,
+`SearchMigration` (SQL that depends on the measured text-search engine) and
+`RunnerStep` (a named backfill or pre-registry column addition). Bootstrap
+iterates it. A fresh database applies the same 170 migration ids in the same
+order and produces the same 319 schema objects as before; `tests/test_migration_registry.py`
+holds the order. `migration_runner.py` 1,384 → 488 lines, `migrations.py`
+3,953 → 4,186: −663 net.
 
 **Priority: P1 — Effort: Medium — LOC reduction: Medium/High — Risk: Medium**
 
@@ -482,6 +510,13 @@ Implement this together with GCR-20/GCR-21 state-machine CAS rules. Do not merel
 
 ## OPT-12 — Replace giant provider-readiness exception ladders with a typed classifier
 
+**Status: done 2026-09-28 — [FIXED-626](FIXED_ITEMS.md#fixed-626--two-exception-ladders-decided-what-a-provider-refusal-meant).** `classify_provider_failure(error,
+stage=…, label=…, model=…, local_only=…) → ReadinessFailure` is one table per
+probe stage; workspace and quota keep their explicit answers. `check()` went
+from roughly 215 lines to 50, and all 56 stage × refusal × local/hosted outcomes
+were compared byte for byte before and after. OR-03 applies: `readiness.py` is
+the same length, because the ladders became a table rather than disappearing.
+
 **Priority: P2 — Effort: Medium — LOC reduction: Medium — Risk: Medium**
 
 ### Evidence
@@ -552,6 +587,13 @@ Authority must remain external to the tool definition. A tool declaration must n
 ---
 
 ## OPT-14 — Put provider display metadata in the profile registry instead of code mappings
+
+**Status: done 2026-09-28 — [FIXED-627](FIXED_ITEMS.md#fixed-627--a-providers-name-was-a-table-inside-the-readiness-code).** `model-profiles.json` carries a
+`providers` table of display names; `ModelProfileRegistry.provider_display_name`
+reads it and `_provider_label` is gone. The web app's `PROVIDER_NAMES` stays —
+pickers deliberately call llama.cpp *GGUF* — and
+`tests/test_provider_display_names.py` holds the two in step apart from that one
+recorded difference.
 
 **Priority: P2 — Effort: Low/Medium — LOC reduction: Small/Medium — Risk: Low**
 
@@ -670,6 +712,15 @@ Fewer repeated strings, fewer mappings, and less defensive frontend code.
 
 ## OPT-19 — Reduce workflow duplication with reusable setup, but do not move YAML lines into opaque shell scripts just to win LOC
 
+**Status: done 2026-09-28 — [FIXED-628](FIXED_ITEMS.md#fixed-628--a-workflow-of-its-own-to-grep-five-documents-and-two-validators-that-ran-nowhere).** `.github/actions/setup-python` is
+the pinned interpreter plus an optional editable install with dev extras, used by
+four CI jobs and the licensing workflow; its own action reference is pinned and
+`tests/test_ci_workflow.py` holds every reference pinned or local.
+`phase-status.yml` — a runner to grep five documents — is gone: all five
+documentation validators run in pytest, two of which had run nowhere. The release
+workflow is unchanged on purpose: it installs from hash-locked exports and its
+signing steps stay visible.
+
 **Priority: P3 — Effort: Medium — LOC reduction: Small/Medium — Risk: Low**
 
 ### Evidence
@@ -751,6 +802,13 @@ For these areas, clarity and independently testable checks are more valuable tha
 # Recommended implementation order — priority then effort
 
 ## Wave 0 — establish the baseline
+
+**Status: done 2026-09-28 — [FIXED-629](FIXED_ITEMS.md#fixed-629--a-simplification-could-only-estimate-what-it-had-removed).** `scripts/measure_loc.py` reports
+git-tracked handwritten production and test lines per language, comment and
+docstring lines apart, generated files apart, the thirty largest files, Python
+functions over 150 lines and the bundle size. CI's *Source measurement* job keeps
+the JSON as the `loc-report` artifact. First reading, on this change: 712
+production files, 153,778 code lines; 746 test files, 118,729 code lines.
 
 **P0 / Low effort**
 

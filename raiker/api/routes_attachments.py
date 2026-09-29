@@ -23,12 +23,13 @@ from __future__ import annotations
 
 import base64
 import binascii
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import refusal
+from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.schemas import UploadAttachmentRequest
 from raiker.api.sessions import ApiSession
 from raiker.events.types import make_event
@@ -55,14 +56,6 @@ router = APIRouter()
 _MAX_BASE64_CHARS = (MAX_ATTACHMENT_BYTES * 4) // 3 + 8
 
 
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[no-any-return]
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(_ws(request)).authenticate(request)
-
-
 @router.post("/api/attachments")
 def upload_attachment(
     body: UploadAttachmentRequest,
@@ -70,17 +63,11 @@ def upload_attachment(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, object]:
     if len(body.data_base64) > _MAX_BASE64_CHARS:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail={"ok": False, "reason_code": "attachment_too_large"},
-        )
+        raise refusal(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "attachment_too_large")
     try:
         data = base64.b64decode(body.data_base64, validate=True)
     except (binascii.Error, ValueError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": "invalid_base64"},
-        ) from exc
+        raise refusal(status.HTTP_400_BAD_REQUEST, "invalid_base64") from exc
     store = SQLiteStore(_ws(request))
     # The declared media type selects the validator. Anything on neither
     # allowlist is rejected before either store function runs (fail closed).
@@ -89,12 +76,9 @@ def upload_attachment(
     elif body.media_type in DOCUMENT_MEDIA_TYPES:
         storer = store_document
     else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "ok": False,
-                "reason_code": f"unsupported_media_type:{body.media_type or 'missing'}",
-            },
+        raise refusal(
+            status.HTTP_400_BAD_REQUEST,
+            f"unsupported_media_type:{body.media_type or 'missing'}",
         )
     try:
         stored: StoredAttachment = storer(
@@ -102,10 +86,7 @@ def upload_attachment(
             owner_principal_id=auth_data[0].principal_id,
         )
     except AttachmentValidationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": exc.reason},
-        ) from exc
+        raise refusal(status.HTTP_400_BAD_REQUEST, exc.reason) from exc
     return {
         "ok": True,
         "attachment_id": stored.attachment_id,
@@ -129,10 +110,7 @@ def _preview_service(request: Request) -> AttachmentPreviewService:
 
 
 def _not_found(reason_code: str) -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail={"ok": False, "reason_code": reason_code},
-    )
+    return refusal(status.HTTP_404_NOT_FOUND, reason_code)
 
 
 @router.get("/api/sessions/{session_id}/attachments")

@@ -45,15 +45,14 @@
  * `tests/test_api_host.py`.
  */
 import { execFileSync } from "node:child_process";
-import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { OWNER_CREDENTIALS, useHostedModel } from "./hosted-provider";
+import { signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const REPO = join(import.meta.dirname, "..", "..");
-const PASSWORD = OWNER_CREDENTIALS.password;
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
@@ -77,21 +76,25 @@ test.beforeAll(async ({ browser }: { browser: Browser }) => {
   // same signed-in session rather than sweeping the tab everything else uses.
   context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, colorScheme: "light" });
   page = await context.newPage();
-  await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 20_000 });
-  const confirm = page.getByLabel("Confirm password");
-  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill(PASSWORD);
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await page.getByRole("button", { name: /unlock|sign in/i }).click();
-  }
-  await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible({ timeout: 20_000 });
+  await signInAsOwner(page, BASE);
 });
 
 test.afterAll(async () => await context?.close());
+
+/**
+ * Personalisation's density control. It moved under the *Layout & type*
+ * disclosure, which stays closed until something in it has been changed, so
+ * the radiogroup is in the page but not shown until the disclosure opens.
+ */
+async function openDensity(): Promise<Locator> {
+  await page.getByRole("button", { name: "Personalisation" }).click();
+  const density = page.getByRole("radiogroup", { name: "Density" });
+  if (!(await density.isVisible().catch(() => false))) {
+    await page.locator("details.tuning > summary").click();
+  }
+  await expect(density).toBeVisible({ timeout: 10_000 });
+  return density;
+}
 
 test("a real Anthropic turn answers, so the rest of this file is evidence", async () => {
   test.setTimeout(240_000);
@@ -230,10 +233,15 @@ test("the finished visual language is recorded in both themes", async () => {
       await page.goto(`${BASE}/#/${route}`);
       // Models is the slow one: it reloads the provider catalogue and can run a
       // due capacity refresh against every configured runtime before rendering.
-      await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible({ timeout: 90_000 });
+      // Tasks has no page heading of its own now: it opens on the shared
+      // composer, labelled "Plan work" like the heading it replaced.
+      const landmark =
+        route === "tasks"
+          ? page.getByRole("group", { name: heading })
+          : page.getByRole("heading", { name: heading }).first();
+      await expect(landmark).toBeVisible({ timeout: 90_000 });
       if (route === "settings") {
-        await page.getByRole("button", { name: "Personalisation" }).click();
-        await expect(page.getByRole("radiogroup", { name: "Density" })).toBeVisible();
+        await expect(await openDensity()).toBeVisible();
       }
       await page.waitForTimeout(250);
       await capture(page, join(SHOTS, `${name}-${theme}.png`));
@@ -272,8 +280,7 @@ test("Compact density shortens a real row, not only the gaps around it", async (
     // one. That was FIXED-85, found here; waiting keeps this test measuring
     // density rather than re-testing the fix.
     await loaded.catch(() => undefined);
-    await page.getByRole("button", { name: "Personalisation" }).click();
-    const density = page.getByRole("radiogroup", { name: "Density" });
+    const density = await openDensity();
     await density.getByRole("radio", { name: new RegExp(mode) }).click();
     await expect(density.getByRole("radio", { name: new RegExp(mode) })).toHaveAttribute(
       "aria-checked",

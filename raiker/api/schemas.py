@@ -6,7 +6,32 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 
-class LocalModelDeployRequest(BaseModel):
+class StrictRequest(BaseModel):
+    """Every JSON request body the API validates with Pydantic.
+
+    An unknown field is refused rather than ignored, so a client that misspells
+    a field — or sends one this route never reads — is told instead of believing
+    it was honoured. Inherited, not repeated: a new request model gets this
+    posture by naming its base (OPT-03), and ``test_api_request_models`` fails a
+    ``BaseModel`` request under ``raiker/api`` that does not.
+
+    The ``@dataclass`` bodies below (prompts, interrupts, runtime modes and
+    capability controls) keep FastAPI's ignore-unknown behaviour on purpose:
+    they are the documented REST contract for external single-user clients, and
+    a client written against an older revision must not start failing because
+    it sends a field this one dropped.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StrictModelRequest(StrictRequest):
+    """A strict request with ``model_*`` fields, which Pydantic reserves by default."""
+
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+
+class LocalModelDeployRequest(StrictRequest):
     profile_id: str | None = None
 
 
@@ -118,20 +143,18 @@ class AuthSessionRequest:
     as_principal: str | None = None
 
 
-class RegisterRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class RegisterRequest(StrictRequest):
     username: str
     password: str
 
 
-class SessionCommandGrantRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class SessionCommandGrantRequest(StrictRequest):
     commands: list[list[str]]
     timeout_seconds: int = 120
     ttl_minutes: int = 120
 
 
-class AnswerOwnerQuestionRequest(BaseModel):
+class AnswerOwnerQuestionRequest(StrictRequest):
     """The owner's answer to a mid-turn question (ADD-22).
 
     `answers` is keyed by the exact question text and each value is the chosen
@@ -140,88 +163,74 @@ class AnswerOwnerQuestionRequest(BaseModel):
     map is ignored, because they said something the options did not offer.
     """
 
-    model_config = ConfigDict(extra="forbid")
     answers: dict[str, Any] = {}
     response: str | None = None
 
 
-class CompactConversationRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class CompactConversationRequest(StrictRequest):
     through_turn_id: str
 
 
-class LoginRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class LoginRequest(StrictRequest):
     username: str
     password: str
     device_label: str | None = None
 
 
-class MfaVerifyRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class MfaVerifyRequest(StrictRequest):
     ticket: str
     code: str
 
 
-class MfaCodeRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class MfaCodeRequest(StrictRequest):
     code: str
 
 
-class ElevateRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class ElevateRequest(StrictRequest):
     password: str | None = None
     mfa_code: str | None = None
 
 
-class ChangePasswordRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class ChangePasswordRequest(StrictRequest):
     old_password: str
     new_password: str
 
 
-class PasswordRecoveryBeginRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class PasswordRecoveryBeginRequest(StrictRequest):
     username: str
 
 
-class PasswordRecoveryCompleteRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class PasswordRecoveryCompleteRequest(StrictRequest):
     ticket: str
     code: str
     new_password: str
 
 
-class VaultKeyRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class VaultKeyRequest(StrictRequest):
     key: str
     mfa_code: str | None = None
 
 
-class SettingsRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class SettingsRequest(StrictRequest):
     settings: dict[str, Any]
 
 
-class ComposerApprovalModeRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class ComposerApprovalModeRequest(StrictRequest):
     approval_mode: str
 
 
-class SpeechRuntimeRequest(BaseModel):
+class SpeechRuntimeRequest(StrictModelRequest):
     """The local transcription runtime dictation should use, if any (BUG-256).
 
     Both fields are optional so a caller can set the address without restating
     the model, which is the common case: most transcription servers serve one.
     """
 
-    model_config = ConfigDict(extra="forbid", protected_namespaces=())
     endpoint: str | None = None
     model: str | None = None
 
 
-class TaskCreateRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+class TaskCreateRequest(StrictModelRequest):
     title: str
     description: str = ""
     priority: str | None = None
@@ -242,39 +251,32 @@ class TaskCreateRequest(BaseModel):
     attachments: list[dict[str, Any]] | None = None
 
 
-class SetModelSelectionRequest(BaseModel):
+class SetModelSelectionRequest(StrictModelRequest):
     # Persist the operator's model selection: a profile id plus, for providers
     # that serve several models (or ship a placeholder), the concrete model.
-    # extra="forbid" rejects unknown fields.
-    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+    # The strict base rejects unknown fields.
 
     profile_id: str
     model: str | None = None
 
 
-class ModelReadinessCheckRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", protected_namespaces=())
-
+class ModelReadinessCheckRequest(StrictModelRequest):
     profile_id: str
     model: str
 
 
-class SurfaceModelDefaultRequest(BaseModel):
+class SurfaceModelDefaultRequest(StrictModelRequest):
     """Where one work surface's model picker should start.
 
     An empty ``profile_id`` clears the surface, returning it to the global model.
     """
-
-    model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     surface: str
     profile_id: str = ""
     model: str = ""
 
 
-class ModelSetupUpdateRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", protected_namespaces=())
-
+class ModelSetupUpdateRequest(StrictModelRequest):
     status: Literal["required", "in_progress", "skipped", "complete"]
     step: Literal["choose_path", "provider", "model", "review", "ready"]
     path: Literal["provider", "ollama", "lm_studio", "local_gguf", "hugging_face"] | None = None
@@ -282,9 +284,7 @@ class ModelSetupUpdateRequest(BaseModel):
     selected_model: str | None = None
 
 
-class SetupUpdateRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", protected_namespaces=())
-
+class SetupUpdateRequest(StrictModelRequest):
     status: Literal["required", "in_progress", "skipped", "complete"]
     # `welcome` is where first launch now starts; `account` and `backup` stay
     # accepted because an instance part-way through the previous wizard has one
@@ -299,15 +299,11 @@ class SetupUpdateRequest(BaseModel):
     background_service_enabled: bool = False
 
 
-class SetupBackupRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class SetupBackupRequest(StrictRequest):
     target: str
 
 
-class ModelOperationRequestBody(BaseModel):
-    model_config = ConfigDict(extra="forbid", protected_namespaces=())
-
+class ModelOperationRequestBody(StrictModelRequest):
     kind: Literal["install", "download", "convert", "deploy", "pull"]
     target: str
     confirmed: bool = False
@@ -315,21 +311,15 @@ class ModelOperationRequestBody(BaseModel):
     destination: str | None = None
 
 
-class ModelLibraryRootRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class ModelLibraryRootRequest(StrictRequest):
     path: str
 
 
-class HuggingFaceCredentialRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class HuggingFaceCredentialRequest(StrictRequest):
     token: str
 
 
-class HuggingFaceSelectionRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class HuggingFaceSelectionRequest(StrictRequest):
     repo_id: str
     revision: str
     files: list[str]
@@ -337,9 +327,7 @@ class HuggingFaceSelectionRequest(BaseModel):
     confirmed: bool = False
 
 
-class ModelConversionRequestBody(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class ModelConversionRequestBody(StrictRequest):
     source: str
     output: str
     revision: str
@@ -347,14 +335,12 @@ class ModelConversionRequestBody(BaseModel):
     confirmed: bool = False
 
 
-class OllamaPullRequestBody(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class OllamaPullRequestBody(StrictRequest):
     model: str
     confirmed: bool = False
 
 
-class ExportSessionRequest(BaseModel):
+class ExportSessionRequest(StrictRequest):
     """Which rendering of a conversation transcript to produce (BUG-22).
 
     The format is the whole request: scope comes from the authenticated session
@@ -362,12 +348,10 @@ class ExportSessionRequest(BaseModel):
     widened by what a caller asks for.
     """
 
-    model_config = ConfigDict(extra="forbid")
-
     format: str = "html"
 
 
-class ConversationBranchRequest(BaseModel):
+class ConversationBranchRequest(StrictRequest):
     """A title for the branch, and nothing else (GAP-CHAT C14).
 
     The checkpoint is in the path and the owner comes from the authenticated
@@ -376,12 +360,10 @@ class ConversationBranchRequest(BaseModel):
     checkpoint's own summary rather than accepting a caller-chosen default.
     """
 
-    model_config = ConfigDict(extra="forbid")
-
     title: str = ""
 
 
-class ModelPriceRequest(BaseModel):
+class ModelPriceRequest(StrictModelRequest):
     """An administrator's price override for one model, per million tokens.
 
     Both input and output null clears the override and returns the model to the
@@ -395,8 +377,6 @@ class ModelPriceRequest(BaseModel):
     the row so an override is never anonymous.
     """
 
-    model_config = ConfigDict(extra="forbid", protected_namespaces=())
-
     model: str
     input_per_mtok: str | None = None
     output_per_mtok: str | None = None
@@ -407,10 +387,8 @@ class ModelPriceRequest(BaseModel):
     reason: str | None = None
 
 
-class ModelConnectionRequest(BaseModel):
+class ModelConnectionRequest(StrictRequest):
     """Encrypted per-user endpoint/key data for one model profile."""
-
-    model_config = ConfigDict(extra="forbid")
 
     endpoint: str | None = None
     api_key: str | None = None
@@ -425,75 +403,61 @@ class ModelConnectionRequest(BaseModel):
     workspace_id: str | None = None
 
 
-class ModelCatalogueRefreshRequest(BaseModel):
+class ModelCatalogueRefreshRequest(StrictRequest):
     """An owner-requested refresh of known, connected provider catalogues."""
-
-    model_config = ConfigDict(extra="forbid")
 
     profile_ids: list[str] | None = None
 
 
-class AvailableModelsRequest(BaseModel):
+class AvailableModelsRequest(StrictRequest):
     """Which of one provider's models stay offered in every model picker."""
-
-    model_config = ConfigDict(extra="forbid")
 
     models: list[str]
 
 
-class ModelWeeklyBudgetRequest(BaseModel):
+class ModelWeeklyBudgetRequest(StrictRequest):
     """Owner-defined advisory budget; null clears it."""
-
-    model_config = ConfigDict(extra="forbid")
 
     token_budget: int | None = None
 
 
-class SetModelAdvisorRequest(BaseModel):
+class SetModelAdvisorRequest(StrictRequest):
     # Persist (or clear, with null/empty) the user-owned advisor model profile.
-    # extra="forbid" rejects unknown fields.
-    model_config = ConfigDict(extra="forbid")
+    # The strict base rejects unknown fields.
 
     profile_id: str | None = None
 
 
-class UploadAttachmentRequest(BaseModel):
+class UploadAttachmentRequest(StrictRequest):
     # One base64-encoded image upload for the governed attachment store.
     # Validation is fail-closed server-side (media-type allowlist, size cap,
-    # magic-byte sniff); extra="forbid" rejects unknown fields.
-    model_config = ConfigDict(extra="forbid")
+    # magic-byte sniff); the strict base rejects unknown fields.
 
     filename: str
     media_type: str
     data_base64: str
 
 
-class UploadSkillRequest(BaseModel):
+class UploadSkillRequest(StrictRequest):
     """One base64-encoded ``SKILL.md`` or ``*.skill`` upload.
 
     Validation is fail-closed server-side (extension allowlist, size caps,
-    frontmatter contract, archive-member safety); ``extra="forbid"`` rejects
+    frontmatter contract, archive-member safety); the strict base rejects
     unknown fields.
     """
-
-    model_config = ConfigDict(extra="forbid")
 
     filename: str
     data_base64: str
 
 
-class SkillUrlRequest(BaseModel):
+class SkillUrlRequest(StrictRequest):
     """A published skill's URL, to verify or to import."""
-
-    model_config = ConfigDict(extra="forbid")
 
     url: str
 
 
-class BuildSkillRequest(BaseModel):
+class BuildSkillRequest(StrictRequest):
     """A skill Raiker authored: the name, the trigger description, the body."""
-
-    model_config = ConfigDict(extra="forbid")
 
     name: str
     description: str
@@ -501,37 +465,29 @@ class BuildSkillRequest(BaseModel):
     command_trigger: str | None = None
 
 
-class RenameSkillRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class RenameSkillRequest(StrictRequest):
     name: str
 
 
-class SetSkillActiveRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class SetSkillActiveRequest(StrictRequest):
     active: bool
 
 
-class SetSkillCommandRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class SetSkillCommandRequest(StrictRequest):
     command_trigger: str | None = None
 
 
-class BrainSourceRequest(BaseModel):
+class BrainSourceRequest(StrictRequest):
     """One location inside the Knowledge Map's boundary.
 
     Either a scoped source path (``<root_id>/<relative>``) for the source
     endpoints, or an absolute folder path for the grant endpoint.
     """
 
-    model_config = ConfigDict(extra="forbid")
-
     path: str
 
 
-class BrainSourceUploadRequest(BaseModel):
+class BrainSourceUploadRequest(StrictRequest):
     """A file the owner chose from their computer, to be *copied* into Raiker.
 
     ``store_copy`` is the permission, and it has no default: an upload duplicates
@@ -540,14 +496,12 @@ class BrainSourceUploadRequest(BaseModel):
     refused rather than treated as consent.
     """
 
-    model_config = ConfigDict(extra="forbid")
-
     filename: str
     content_base64: str
     store_copy: bool
 
 
-class ConnectCodeRepoRequest(BaseModel):
+class ConnectCodeRepoRequest(StrictRequest):
     """Reference a repository from the Build workspace.
 
     ``kind="local"`` needs ``path`` — a folder already inside this Raiker
@@ -557,8 +511,6 @@ class ConnectCodeRepoRequest(BaseModel):
     ``github_read`` tool under the ``connector_github_runtime`` gate.
     """
 
-    model_config = ConfigDict(extra="forbid")
-
     kind: Literal["local", "github"]
     path: str | None = None
     owner: str | None = None
@@ -566,33 +518,28 @@ class ConnectCodeRepoRequest(BaseModel):
     branch: str | None = None
 
 
-class SelectCodeRepoRequest(BaseModel):
+class SelectCodeRepoRequest(StrictRequest):
     """Point the Build workspace at one repository, or at none with ``null``."""
-
-    model_config = ConfigDict(extra="forbid")
 
     repo_id: str | None = None
 
 
-class InstanceCreateRequest(BaseModel):
+class InstanceCreateRequest(StrictRequest):
     """Name and optional first account for a locally isolated Raiker instance."""
-
-    model_config = ConfigDict(extra="forbid")
 
     name: str
     username: str | None = None
     password: str | None = None
 
 
-class CreateProjectRequest(BaseModel):
+class CreateProjectRequest(StrictRequest):
     # Create a named project (web-app task 5). The root subpath is derived
     # server-side from the name and contained inside the workspace — the client
-    # never supplies a path. extra="forbid" rejects unknown fields.
+    # never supplies a path. The strict base rejects unknown fields.
     # parent_id (optional) creates a nested project under the given parent.
     # attach_path is the one path a client may send, and only because the owner
     # is naming a folder they already have: the server validates it, records it
     # as a grant, and refuses one already inside the workspace.
-    model_config = ConfigDict(extra="forbid")
 
     name: str
     parent_id: str | None = None
@@ -600,17 +547,14 @@ class CreateProjectRequest(BaseModel):
     attach_writable: bool = True
 
 
-class SelectProjectRequest(BaseModel):
+class SelectProjectRequest(StrictRequest):
     # Set (or clear, with null/empty) the active project. Selecting a project
     # grants nothing — it is an organizing scope only.
-    model_config = ConfigDict(extra="forbid")
 
     project_id: str | None = None
 
 
-class SaveProjectContextRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class SaveProjectContextRequest(StrictRequest):
     instructions: str = ""
     attachment_ids: list[str] = []
     # ``memory_enabled`` remains accepted for older clients. New clients send
@@ -619,104 +563,89 @@ class SaveProjectContextRequest(BaseModel):
     memory_mode: Literal["inherit", "enabled", "disabled"] | None = None
 
 
-class MoveProjectRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class MoveProjectRequest(StrictRequest):
     parent_id: str | None = None
 
 
-class SetSessionPinnedRequest(BaseModel):
+class SetSessionPinnedRequest(StrictRequest):
     # Pin (or unpin) a session. Pinning is an organizing label only — it grants
-    # nothing. extra="forbid" rejects unknown fields.
-    model_config = ConfigDict(extra="forbid")
+    # nothing. The strict base rejects unknown fields.
 
     pinned: bool
 
 
-class BulkDeleteSessionsRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class BulkDeleteSessionsRequest(StrictRequest):
     session_ids: list[str]
 
 
-class SetSessionProjectRequest(BaseModel):
+class SetSessionProjectRequest(StrictRequest):
     # Move a chat into a project, or out of every project with a null
     # project_id. A project is an organizing scope — the move grants nothing
     # and only changes the bounded context the chat receives.
-    # extra="forbid" rejects unknown fields.
-    model_config = ConfigDict(extra="forbid")
+    # The strict base rejects unknown fields.
 
     project_id: str | None = None
 
 
-class RenameSessionRequest(BaseModel):
+class RenameSessionRequest(StrictRequest):
     # Rename one session. The title is an organizing label only — it grants
     # nothing. The server normalizes (trim, collapse whitespace, length cap) and
-    # rejects invalid input. extra="forbid" rejects unknown fields.
-    model_config = ConfigDict(extra="forbid")
+    # rejects invalid input. The strict base rejects unknown fields.
 
     title: str
 
 
-class CreateMcpServerRequest(BaseModel):
+class CreateMcpServerRequest(StrictRequest):
     # Build a local stdio MCP server from a reviewed template (Control Deck
     # task 4b). Both fields are validated/normalized server-side; the actual
     # write runs through the governed mcp_builder_runtime capability.
-    model_config = ConfigDict(extra="forbid")
 
     name: str
     template: str
 
 
-class RenameMcpServerRequest(BaseModel):
+class RenameMcpServerRequest(StrictRequest):
     # Rename one owner-scoped MCP server profile. The server normalizes the name
     # and rejects a clash with the caller's other servers.
-    model_config = ConfigDict(extra="forbid")
 
     name: str
 
 
-class CreateRemoteMcpServerRequest(BaseModel):
+class CreateRemoteMcpServerRequest(StrictRequest):
     # Add a remote (HTTP) MCP connection (monitored MCP connections, Phase A).
     # `endpoint_url` is the owner-added server URL; `auth_ref` optionally names
     # the env var holding the owner token (never the token itself).
-    model_config = ConfigDict(extra="forbid")
 
     name: str
     endpoint_url: str
     auth_ref: str | None = None
 
 
-class ContainMcpServerRequest(BaseModel):
+class ContainMcpServerRequest(StrictRequest):
     # Optional redacted reason for a pause/kill of a monitored MCP connection
     # (Phase C). The reason is human-readable copy shown back to the owner — it
-    # must never carry a payload or token. extra="forbid" rejects unknown fields.
-    model_config = ConfigDict(extra="forbid")
+    # must never carry a payload or token. The strict base rejects unknown fields.
 
     reason: str | None = None
 
 
-class BreachCheckRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class BreachCheckRequest(StrictRequest):
     password: str
     enabled: bool = False
 
 
-class SetSessionTagsRequest(BaseModel):
+class SetSessionTagsRequest(StrictRequest):
     # Replace the tag set for one session. Tags are organizing labels only —
     # they grant nothing. The server normalizes (trim, lowercase, dedupe,
-    # length/count caps) and rejects invalid input. extra="forbid" rejects
+    # length/count caps) and rejects invalid input. The strict base rejects
     # unknown fields.
-    model_config = ConfigDict(extra="forbid")
 
     tags: list[str]
 
 
-class SetModelFallbackRequest(BaseModel):
+class SetModelFallbackRequest(StrictRequest):
     # Ordered list of model profile ids to try (in order) when the selected
-    # provider is unavailable. extra="forbid" rejects unknown fields.
-    model_config = ConfigDict(extra="forbid")
+    # provider is unavailable. The strict base rejects unknown fields.
 
     profile_ids: list[str]
 
@@ -774,7 +703,7 @@ class PromptRequest:
     client_type: str | None = None
 
 
-class PairChannelRequest(BaseModel):
+class PairChannelRequest(StrictRequest):
     """Pair one connector profile. Paired is not enabled and not trusted."""
 
     connector_id: str
@@ -785,18 +714,16 @@ class PairChannelRequest(BaseModel):
     senders: list[str] | None = None
 
 
-class ChannelEnabledRequest(BaseModel):
+class ChannelEnabledRequest(StrictRequest):
     enabled: bool
 
 
-class ChannelSendersRequest(BaseModel):
+class ChannelSendersRequest(StrictRequest):
     senders: list[str]
 
 
-class ChannelRoutingRequest(BaseModel):
+class ChannelRoutingRequest(StrictRequest):
     """Owner-selected route. An inbound payload cannot override these fields."""
-
-    model_config = ConfigDict(extra="forbid")
 
     routing_mode: Literal["record_only", "new_turn", "side_question", "interrupt"]
     target_session_id: str | None = None
@@ -804,7 +731,7 @@ class ChannelRoutingRequest(BaseModel):
     approval_relay_enabled: bool = False
 
 
-class ChannelTestDeliveryRequest(BaseModel):
+class ChannelTestDeliveryRequest(StrictRequest):
     """One test delivery through the governed outbound path."""
 
     connector_id: str
@@ -813,18 +740,15 @@ class ChannelTestDeliveryRequest(BaseModel):
 
 
 
-class InboundChannelMessage(BaseModel):
+class InboundChannelMessage(StrictRequest):
     # Inbound channel payload. Always treated as untrusted; never executed.
-    model_config = ConfigDict(extra="forbid")
 
     sender_id: str
     text: str = ""
 
 
-class ChannelApprovalResponse(BaseModel):
+class ChannelApprovalResponse(StrictRequest):
     """One exact, single-use response to a pending relayed approval."""
-
-    model_config = ConfigDict(extra="forbid")
 
     sender_id: str
     relay_id: str
@@ -843,9 +767,8 @@ class InterruptRequest:
     steer_text: str | None = None
 
 
-class ResolveApprovalRequest(BaseModel):
-    # extra="forbid" rejects unknown request fields (e.g. an attempt to smuggle an edited payload).
-    model_config = ConfigDict(extra="forbid")
+class ResolveApprovalRequest(StrictRequest):
+    # The strict base rejects unknown request fields (e.g. an attempt to smuggle an edited payload).
 
     approve: bool
     reason: str
@@ -855,25 +778,23 @@ class ResolveApprovalRequest(BaseModel):
     #
     # These are *positions* in the approved diff ("<file index>:<hunk index>"),
     # never content, so this field cannot carry an edited payload — which is what
-    # `extra="forbid"` above exists to prevent. The server validates every id
+    # the strict base refusing unknown fields exists to prevent. The server validates every id
     # against the approval's own patch and refuses the decision if one names no
     # hunk in it.
     accepted_hunks: list[str] | None = None
 
 
-class ReplaceApprovalRequest(BaseModel):
+class ReplaceApprovalRequest(StrictRequest):
     """BUG-271 — the reviewer corrected a line, so this is a *different action*.
 
-    Deliberately not a field on :class:`ResolveApprovalRequest`. That model sets
-    ``extra="forbid"`` precisely so an edited payload cannot arrive on a
+    Deliberately not a field on :class:`ResolveApprovalRequest`. That model refuses
+    unknown fields precisely so an edited payload cannot arrive on a
     decision, and relaxing it would let the relay execute bytes no human read.
     An edit is submitted as a fresh proposal instead: it gets its own preview,
     its own immutable-intent hash and its own approval, and the approval it
     replaces resolves as denied with the replacement named — so the audit trail
     says what happened rather than showing an amendment.
     """
-
-    model_config = ConfigDict(extra="forbid")
 
     #: The reviewer's own unified diff. It replaces the proposed one entirely;
     #: nothing from the original patch is merged into it.
@@ -882,9 +803,8 @@ class ReplaceApprovalRequest(BaseModel):
     reason: str = ""
 
 
-class ApprovalDecisionRequest(BaseModel):
+class ApprovalDecisionRequest(StrictRequest):
     # Explicit allow/deny endpoints only accept an optional human reason; no payload edits.
-    model_config = ConfigDict(extra="forbid")
 
     reason: str = ""
 

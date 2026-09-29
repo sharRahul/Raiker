@@ -12,7 +12,8 @@ import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import ValidationError
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import require_human as _require_human
 from raiker.api.schemas import (
     HuggingFaceCredentialRequest,
     HuggingFaceSelectionRequest,
@@ -47,18 +48,13 @@ from raiker.models.mlx_runtime import MLX_SLOTS, ManagedMlxRuntime
 from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
 from raiker.models.runtime_installers import RuntimeInstallerRegistry
 from raiker.models.setup import ModelSetupState
-from raiker.runtime.authority.models import Principal, PrincipalType
+from raiker.runtime.authority.models import Principal
 from raiker.runtime.connector_ecosystem import ConnectorVault
 from raiker.storage.internal_paths import internal_io_path
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
 _OLLAMA_MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$")
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    workspace: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
-    return AuthMiddleware(workspace).authenticate(request)
 
 
 def _service(request: Request) -> ModelReadinessService:
@@ -86,14 +82,6 @@ def _hugging_face_token(request: Request, owner: str) -> str | None:
         owner, "huggingface"
     )  # type: ignore[attr-defined]
     return credential.get("token") if credential else None
-
-
-def _require_human(principal: Principal) -> None:
-    if principal.principal_type != PrincipalType.HUMAN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": "human_principal_required"},
-        )
 
 
 @router.get("/api/model-readiness")

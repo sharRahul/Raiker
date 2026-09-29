@@ -15,6 +15,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import workspace_root as _ws
+from raiker.api.refusals import refusal
 from raiker.api.schemas import SpeechRuntimeRequest
 from raiker.contracts.ids import utc_now
 from raiker.models.speech_runtime import (
@@ -29,10 +31,6 @@ from raiker.models.speech_runtime import (
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
-
-
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[attr-defined]
 
 
 def _settings_blob(ws: str | Path, principal_id: str) -> dict[str, Any]:
@@ -51,7 +49,7 @@ def load_speech_runtime(ws: str | Path, principal_id: str) -> SpeechRuntimeSetti
 
 
 def _refuse(reason: str, code: int = status.HTTP_422_UNPROCESSABLE_CONTENT) -> HTTPException:
-    return HTTPException(status_code=code, detail={"ok": False, "reason_code": reason})
+    return refusal(code, reason)
 
 
 #: Some transcription servers decide how to decode from the filename alone, so

@@ -39,6 +39,13 @@
   const weatherLocation = $derived((settings[WEATHER_LOCATION_KEY] as string) ?? "");
   /** Open when the owner has tuned either of them, so a non-default is never hidden. */
   const tuned = $derived(spacing !== "comfortable" || font !== "sans");
+  /**
+   * Once the owner opens or closes it, that is where it stays. Bound to `tuned`
+   * alone, choosing *Comfortable* inside it — the default — closed the
+   * disclosure under the owner's pointer (found by the third 2026-09-28 round).
+   */
+  let disclosure = $state<boolean | null>(null);
+  const tuningOpen = $derived(disclosure ?? tuned);
 
   // BUG-37 — density as a named mode with its consequence stated, rather than a
   // "Layout spacing" dropdown whose effect an owner had to discover by trying
@@ -96,7 +103,7 @@
 </section>
 
 <section class="settings-card">
-  <details class="tuning" open={tuned}>
+  <details class="tuning" open={tuningOpen} ontoggle={(event) => (disclosure = event.currentTarget.open)}>
     <summary>
       <span class="summary-title">Layout &amp; type</span>
       <span class="summary-hint">Density and typeface</span>

@@ -131,8 +131,20 @@ def _read_config_text(path: str | Path) -> str:
 
 
 class ModelProfileRegistry:
-    def __init__(self, profiles: list[ModelProfile]) -> None:
+    def __init__(
+        self,
+        profiles: list[ModelProfile],
+        provider_display_names: dict[str, str] | None = None,
+    ) -> None:
         self.profiles = profiles
+        # OPT-14 — how a provider is named to the owner, declared once beside
+        # the profiles it describes. Presentation only: nothing here is read by
+        # policy, endpoint classification or any gate.
+        self.provider_display_names = dict(provider_display_names or {})
+
+    def provider_display_name(self, provider: str) -> str:
+        """The owner-facing name of ``provider``; an undeclared one is title-cased."""
+        return self.provider_display_names.get(provider) or provider.replace("-", " ").title()
 
     @classmethod
     def load(cls, path: str | Path = "config/model-profiles.json") -> ModelProfileRegistry:
@@ -192,7 +204,15 @@ class ModelProfileRegistry:
                     raw=entry,
                 )
             )
-        return cls(profiles)
+        providers = data.get("providers") or {}
+        if not isinstance(providers, dict):
+            raise RegistryError("invalid_model_registry_providers")
+        display_names = {
+            str(provider): str(entry["display_name"])
+            for provider, entry in providers.items()
+            if isinstance(entry, dict) and str(entry.get("display_name") or "").strip()
+        }
+        return cls(profiles, display_names)
 
     def list_profiles(self) -> list[ModelProfile]:
         return list(self.profiles)

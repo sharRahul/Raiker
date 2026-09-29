@@ -26,7 +26,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
 from raiker.api.schemas import CompactConversationRequest
 from raiker.api.sessions import ApiSession
 from raiker.events.types import make_event
@@ -43,10 +43,6 @@ from raiker.runtime.conversation_history import ConversationHistoryUnavailable
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(request.app.state.workspace_root).authenticate(request)
 
 
 def _context_capacity(

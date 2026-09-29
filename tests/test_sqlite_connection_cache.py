@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from sqlcipher3 import dbapi2 as sqlcipher  # type: ignore[import-untyped]
 
 import raiker.storage.sqlite as sqlite_module
 from raiker.storage.migrations import COMMAND_RUNS_MIGRATION_ID
@@ -358,3 +359,61 @@ def test_an_exited_workers_ownership_token_is_forgotten(tmp_path: Path) -> None:
     assert SQLiteStore(workspace).table_names()
     assert len(sqlite_module._OWNER_THREADS) <= 2
     close_cached_connections()
+
+
+def test_invalidation_never_closes_a_live_workers_handle_under_it(tmp_path: Path) -> None:
+    """Shutdown invalidated a workspace while a cancelled ``to_thread`` worker was
+    still bootstrapping on its handle; closing it there segfaulted CI. The
+    worker's handle leaves the cache but stays open until the worker itself
+    comes back to ``connect``."""
+    store = SQLiteStore(tmp_path)
+    holding = threading.Event()
+    invalidated = threading.Event()
+    seen: dict[str, Any] = {}
+
+    def worker() -> None:
+        connection = store.connect()
+        holding.set()
+        assert invalidated.wait(10)
+        # Still usable: nobody closed it under this thread.
+        seen["mid_statement"] = connection.execute("SELECT 1").fetchone()[0]
+        replacement = store.connect()
+        seen["replaced"] = replacement is not connection
+        with pytest.raises(sqlcipher.ProgrammingError):
+            connection.execute("SELECT 1")
+        seen["closed_by_owner"] = True
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    assert holding.wait(10)
+    invalidate_workspace_connections(tmp_path)
+    invalidated.set()
+    thread.join(10)
+    assert seen == {"mid_statement": 1, "replaced": True, "closed_by_owner": True}
+    invalidate_workspace_connections(tmp_path)
+
+
+def test_a_retired_handle_whose_worker_exited_is_closed_by_whoever_notices(
+    tmp_path: Path,
+) -> None:
+    store = SQLiteStore(tmp_path)
+    handles: list[Any] = []
+    holding = threading.Event()
+    release = threading.Event()
+
+    def worker() -> None:
+        handles.append(store.connect())
+        holding.set()
+        release.wait(10)
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    assert holding.wait(10)
+    invalidate_workspace_connections(tmp_path)  # worker alive: retired, not closed
+    handles[0].execute("SELECT 1")
+    release.set()
+    thread.join(10)
+    store.connect()  # any later connect reaps a dead owner's retired handle
+    with pytest.raises(sqlcipher.ProgrammingError):
+        handles[0].execute("SELECT 1")
+    invalidate_workspace_connections(tmp_path)

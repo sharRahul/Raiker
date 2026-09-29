@@ -18,39 +18,15 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { writeFileSync } from "node:fs";
-import { dismissFirstRunModelSetup, OWNER_CREDENTIALS, useHostedModel } from "./hosted-provider";
+import { signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = "../../docs/plans/screenshots/working";
-const PASSWORD = OWNER_CREDENTIALS.password;
 
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "/tmp/raiker-live";
 
 test.describe.configure({ mode: "serial" });
-
-async function signIn(page: import("@playwright/test").Page): Promise<void> {
-  await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 20_000 });
-  const username = page.getByLabel("Username");
-  await expect(username).toBeVisible({ timeout: 20_000 });
-  await username.fill(OWNER_CREDENTIALS.user);
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  const confirm = page.getByLabel("Confirm password");
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill(PASSWORD);
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await page.getByRole("button", { name: /Sign in|Unlock/ }).click();
-  }
-  await expect(
-    page
-      .getByRole("button", { name: "Decide later" })
-      .or(page.getByRole("heading", { name: "Welcome to your Work Dashboard" }))
-      .first(),
-  ).toBeVisible({ timeout: 60_000 });
-  await dismissFirstRunModelSetup(page);
-}
 
 test("a governed read is recorded as an observation, and Memory shows it (MEM-04)", async ({
   page,
@@ -77,7 +53,7 @@ test("a governed read is recorded as an observation, and Memory shows it (MEM-04
     "utf-8",
   );
 
-  await signIn(page);
+  await signInAsOwner(page, BASE);
   const card = await useHostedModel(page, BASE, {
     provider: "Anthropic",
     keyLabel: /API key/i,
@@ -99,7 +75,9 @@ test("a governed read is recorded as an observation, and Memory shows it (MEM-04
   await expect(page.getByText(/Tuesday/i).first()).toBeVisible({ timeout: 180_000 });
   await page.waitForTimeout(2_000);
 
-  await page.goto(`${BASE}/#/memory`);
+  // Observations sit on Memory's *Suggestions* tab now, beside the other
+  // things the runtime noticed and nothing decided yet; Memory opens on Overview.
+  await page.goto(`${BASE}/#/memory?tab=suggestions`);
   const observations = page.locator("section[aria-label='Observations']");
   await expect(observations.getByRole("heading", { name: "Observations" })).toBeVisible({
     timeout: 30_000,
@@ -128,7 +106,7 @@ test("Runtime states what each boundary does between commands (BUG-194)", async 
     if (m.type() === "error") consoleErrors.push(m.text());
   });
 
-  await signIn(page);
+  await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/settings?tab=runtime`);
   const environments = page.locator("section.environment-settings");
   await expect(

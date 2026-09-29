@@ -8,13 +8,14 @@ accepts it takes it and does not read it back.
 """
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import workspace_root as _ws
+from raiker.api.schemas import StrictRequest
 from raiker.api.sessions import ApiSession
 from raiker.runtime.authority.models import Principal
 from raiker.runtime.git_credential import GitCredentialBroker, GitCredentialError
@@ -32,32 +33,24 @@ from raiker.storage.sqlite import SQLiteStore
 router = APIRouter()
 
 
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[attr-defined]
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(_ws(request)).authenticate(request)
-
-
 def _store(request: Request) -> SQLiteStore:
     return SQLiteStore(_ws(request))
 
 
-class BlocklistRuleRequest(BaseModel):
+class BlocklistRuleRequest(StrictRequest):
     rule: str = Field(min_length=1, max_length=253)
     note: str = Field(default="", max_length=500)
 
 
-class BlocklistTestRequest(BaseModel):
+class BlocklistTestRequest(StrictRequest):
     host: str = Field(min_length=1, max_length=253)
 
 
-class GitTokenRequest(BaseModel):
+class GitTokenRequest(StrictRequest):
     token: str = Field(min_length=1, max_length=512)
 
 
-class GitGrantRequest(BaseModel):
+class GitGrantRequest(StrictRequest):
     scope: str = Field(default="once")
     session_id: str | None = None
     reason: str = Field(default="", max_length=500)

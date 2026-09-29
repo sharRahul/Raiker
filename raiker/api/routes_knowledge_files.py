@@ -18,12 +18,13 @@ from __future__ import annotations
 import base64
 import binascii
 import contextlib
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import refusal
+from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.sessions import ApiSession
 from raiker.knowledge.files import (
     ManagedFileError,
@@ -50,20 +51,9 @@ _MAX_BASE64_CHARS = (MAX_MANAGED_FILE_BYTES * 4) // 3 + 8
 MAX_IMPORT_BATCH = 200
 
 
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[no-any-return]
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(_ws(request)).authenticate(request)
-
-
 def _not_found(reason_code: str) -> HTTPException:
     """404 for everything the caller may not see, so an id cannot be probed."""
-    return HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail={"ok": False, "reason_code": reason_code},
-    )
+    return refusal(status.HTTP_404_NOT_FOUND, reason_code)
 
 
 def _serialize(record: ManagedFileRecord) -> dict[str, Any]:
@@ -128,15 +118,9 @@ def _import(
     """
     raw = body.get("files")
     if not isinstance(raw, list) or not raw:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"ok": False, "reason_code": "no_files"},
-        )
+        raise refusal(status.HTTP_400_BAD_REQUEST, "no_files")
     if len(raw) > MAX_IMPORT_BATCH:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail={"ok": False, "reason_code": "too_many_files"},
-        )
+        raise refusal(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "too_many_files")
     store = SQLiteStore(_ws(request))
     service = ManagedFileService(_ws(request), store)
     indexer = ManagedFileIndexer(_ws(request), store)

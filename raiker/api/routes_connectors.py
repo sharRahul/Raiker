@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import workspace_root as _ws
+from raiker.api.schemas import StrictRequest
 from raiker.api.sessions import ApiSession
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ToolAction
@@ -25,27 +26,19 @@ from raiker.storage.sqlite import SQLiteStore
 router = APIRouter()
 
 
-class CredentialRequest(BaseModel):
+class CredentialRequest(StrictRequest):
     values: dict[str, str] = Field(min_length=1, max_length=12)
     expires_at: str | None = None
 
 
-class ManifestRequest(BaseModel):
+class ManifestRequest(StrictRequest):
     manifest: dict[str, Any]
 
 
-class ConnectorActionRequest(BaseModel):
+class ConnectorActionRequest(StrictRequest):
     operation_id: str = Field(min_length=1, max_length=200)
     arguments: dict[str, Any] = Field(default_factory=dict)
     session_id: str = Field(default="connector_store", max_length=200)
-
-
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[no-any-return]
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(_ws(request)).authenticate(request)
 
 
 def _installation(store: SQLiteStore, principal_id: str, connector_id: str) -> dict[str, Any] | None:

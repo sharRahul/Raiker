@@ -112,7 +112,7 @@ names.
 | [BUG-289](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running) | Low | Models / provider errors | **Closed 2026-09-14 ([FIXED-526](FIXED_ITEMS.md#fixed-526--an-owner-was-told-to-check-that-openrouter-was-running))** — a hosted provider gets a remedy an owner can act on |
 | [BUG-307](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true) | Low | Web UI / security headers | **Closed 2026-09-28 ([FIXED-609](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true))** — `style-src 'self'`; Svelte 5 styles through the CSSOM, and a live sweep of every destination at four widths found nothing refused |
 | [BUG-308](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so) | Medium | Plugins / commands / sandbox | **Closed 2026-09-28 ([FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so))** — by the owner's decision: code runs in the sandbox where there is one, and otherwise under *Code with this machine's network*, its own switch, starting at *Ask me* |
-| [BUG-309](#bug-309--on-approvals-the-notice-dock-repeats-the-approval-and-covers-the-queues-header) | Low | Web UI / notifications | Open — raised 2026-09-28 by the review-closure live round |
+| [BUG-309](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing) | Low | Web UI / notifications | **Closed 2026-09-28 ([FIXED-622](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing))** — a notice whose subject is the page on screen is not docked there and is read; running it live found the bell disagreeing for a poll, fixed with it |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -121,7 +121,7 @@ names.
 | [BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more) | Low | Live test harness / evidence | **Closed 2026-09-15 ([FIXED-541](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more))** — six rounds blocked on a key, then three stale selectors |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
-| [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-28 to **nine**; `review-readiness-probe-live` and `c17-b14-recall-and-inline-diff-live` were converted and re-run, and each then failed on steps the product had moved since — both brought up to the product, not relaxed. Three must keep their own |
+| [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven need a provider this host cannot reach ([BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host)) |
 | [BUG-249](FIXED_ITEMS.md#fixed-326--a-fixed_items-link-pointed-at-a-heading-that-does-not-exist) | Low | Documentation / CI | **Closed 2026-08-30 (FIXED-326)** — one line, and `test_docs_consistency` is green |
 | [BUG-250](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject) | Low | Live test harness | **Closed 2026-09-15 ([FIXED-549](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject))** — `roundName()` gives each round its own subject |
 | [BUG-251](FIXED_ITEMS.md#fixed-352--every-path-an-owner-typed-was-a-path-they-had-to-know) | Medium | Web UI / file and folder selection | **Closed 2026-09-03 (FIXED-352)** — the host lists directory names and one `PathPicker` serves all four fields |
@@ -819,6 +819,41 @@ reduced from twenty-seven to twenty the same day
 ([FIXED-328](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite)),
 to **twelve** on 2026-09-04, to eleven on 2026-09-21 and to **nine** on
 2026-09-28.**
+
+**2026-09-29 — four more, and two product defects behind them.**
+`composer-parity-and-turn-honesty-live`, `fts5-mem03-bug194-live`,
+`mem04-bug194-observations-live` and `bug-37-39-40-41-live` sign in through
+`signInAsOwner`. Each signed in on its first run and then failed on the product
+having moved — Memory's recall posture now on *Recall & indexing* with the picker
+on Settings → Memory engine, Observations on *Suggestions*, the terminal button
+named *Show the governed terminal*, Tasks opening on its composer, message search
+an explicit **Search message text**, density under a disclosure — and each was
+brought up to the product rather than relaxed. Two of the failures were the
+product, not the spec, and are fixed:
+
+* the retention step passed on one run and timed out on the next because an
+  approval card covered Settings' **Save changes**
+  ([FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes));
+* choosing *Comfortable* closed the disclosure it was chosen in
+  ([FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in)).
+
+`checkModelReady` now takes the first outcome it finds: an exhausted account
+says so twice, as a chip and as the outcome line. That is how the round found
+the provided key's credit balance exhausted part-way through, confirmed against
+the provider directly. Every step of the four was run live after its edit;
+`fts5`'s second test could not be re-run end to end after that point, so its
+corrected search step was driven on its own against the transcript its earlier
+turn had written, and passed.
+
+**The count, recounted.** This entry counted sign-ins inside a test body.
+Counting every live spec that signs in without the shared helper gives ten after
+this pass: `review-first-run-honesty`, `wizard-workbench-composer` and
+`workbench` must keep their own, and `add-01-container-providers`,
+`add-03-machine-identity-providers`, `bug-29-34`, `bug-36-38-42-43`,
+`bug-69-model-readiness`, `governed-shell-provider-matrix` and
+`review-provider-matrix` each need OpenRouter, OpenAI, Gemini or Ollama, which
+this host cannot reach — so they cannot be re-run here, and the rule below says
+they are not converted blind.
 
 **2026-09-28 — two more, and the one reverted on 2026-09-04 among them.**
 `review-readiness-probe-live` and `c17-b14-recall-and-inline-diff-live`, run
@@ -2092,30 +2127,11 @@ set that owns each one's label, its confirmation and its failure sentence.
 
 ## BUG-309 — On Approvals, the notice dock repeats the approval and covers the queue's header
 
-**Severity: Low. Area: Web UI / notifications. Status: Open — raised 2026-09-28
-by the [second 2026-09-28 live round](LIVE_TEST_ROUNDS.md#2026-09-28-second--code-says-where-it-runs-and-three-review-documents-close).**
-
-**Observed.** The round's capture of Approvals
-(`docs/screenshots/2026-09-28-review-closure-round/06-approval-names-the-script.png`)
-shows the notice dock — docked top-right by design, so it never pushes a page's
-composer below the fold — holding *Approval needed … run 'write_file'* over the
-queue that lists that same approval, with its *3 unread notices* link drawn
-across the table's **Status** header. The approval card no longer shows on
-Approvals ([FIXED-621](FIXED_ITEMS.md#fixed-621--an-approval-card-from-another-conversation-covered-the-composers-send));
-the notice about the same approval still does.
-
-**Why it was not fixed in the round.** The dock's placement is a measured
-decision recorded in `NotificationCenter.svelte`, and the question is which
-notices a page makes redundant — an approval notice on Approvals, a task notice
-on Tasks — rather than one position. That is a rule for every destination, not a
-one-page patch.
-
-**Proposed fix.** Suppress a notice whose subject is the page being shown (an
-approval notice on Approvals), marking it read, as the approval card does; and
-give the dock's *unread* link a surface so it never reads as part of the page
-beneath it.
-
-**Required user-interface outcome.** On Approvals, nothing docked repeats a row
-of the queue, and no header is drawn over.
+**Closed 2026-09-28 as
+[FIXED-622](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing).**
+The rule is one for every destination rather than a one-page patch, as this
+entry asked: a notice kind with a page of its own is answered by that page —
+not docked there, and marked read on arrival — and the *unread* count sits on
+the card's own surface.
 
 ---

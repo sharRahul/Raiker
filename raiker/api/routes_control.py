@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
 
 from raiker.api.auth import AuthMiddleware
+from raiker.api.refusals import refusal
 from raiker.api.schemas import (
     ActivateRuntimeModeRequest,
     CreateStandingGrantRequest,
@@ -45,10 +46,7 @@ def _auth(request: Request) -> tuple[ApiSession, Principal]:
 
 
 def _deny(result_reason: str | None = None) -> NoReturn:
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail={"ok": False, "reason_code": result_reason or "denied"},
-    )
+    raise refusal(status.HTTP_403_FORBIDDEN, result_reason or "denied")
 
 
 def _set_capability_decision_mode(
@@ -420,10 +418,7 @@ async def create_audit_export(
     )
     if not result.ok:
         if result.reason_code == "audit_export_empty":
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={"ok": False, "reason_code": "audit_export_empty"},
-            )
+            raise refusal(status.HTTP_409_CONFLICT, "audit_export_empty")
         _deny(result.reason_code)
     return {"ok": True, **result.data}
 
@@ -571,10 +566,7 @@ async def download_audit_export(
     exports_dir = (EventLogWriter(store).events_dir.parent / "exports").resolve()
     path = (exports_dir / f"{export_id}.jsonl").resolve()
     if path.parent != exports_dir or not path.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "audit_export_file_missing"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "audit_export_file_missing")
     return FileResponse(
         path, media_type="application/x-ndjson", filename=f"{export_id}.jsonl"
     )

@@ -6,12 +6,13 @@ import json
 import os
 import time
 from collections import defaultdict, deque
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import refusal
+from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.schemas import (
     ChannelApprovalResponse,
     ChannelEnabledRequest,
@@ -43,10 +44,6 @@ router = APIRouter()
 # authenticated by an owner-set channel secret (NOT the owner bearer token).
 # Content remains structurally untrusted; only an owner-stored route may place
 # it in a governed turn, and doing so never increases that turn's authority.
-
-
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[no-any-return]
 
 
 def _enabled_pairing(store: SQLiteStore, connector_id: str) -> dict[str, Any] | None:
@@ -124,10 +121,6 @@ def _within_inbound_budget(connector_id: str, sender_id: str) -> bool:
 # `external_channel_runtime` capability rather than posting the webhook itself.
 
 
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(_ws(request)).authenticate(request)
-
-
 def _service(request: Request) -> Any:
     from raiker.control.dashboard import DashboardService
 
@@ -152,7 +145,7 @@ def _channel_result(result: Any) -> dict[str, Any]:
         code = status.HTTP_422_UNPROCESSABLE_CONTENT
     else:
         code = status.HTTP_403_FORBIDDEN
-    raise HTTPException(status_code=code, detail={"ok": False, "reason_code": reason})
+    raise refusal(code, reason)
 
 
 @router.get("/api/channels")
@@ -274,15 +267,9 @@ def _require_channel_secret(presented: str | None) -> None:
     """
     secret = os.environ.get("RAIKER_CHANNEL_INBOUND_SECRET", "").strip()
     if not secret:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"ok": False, "reason_code": "channel_inbound_disabled"},
-        )
+        raise refusal(status.HTTP_503_SERVICE_UNAVAILABLE, "channel_inbound_disabled")
     if not presented or not hmac.compare_digest(presented, secret):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"ok": False, "reason_code": "invalid_channel_secret"},
-        )
+        raise refusal(status.HTTP_401_UNAUTHORIZED, "invalid_channel_secret")
 
 
 @router.post("/api/channels/{connector_id}/inbound")
@@ -340,10 +327,7 @@ async def _handle_inbound(
     writer = EventLogWriter(store)
     pairing = _enabled_pairing(store, connector_id)
     if pairing is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "channel_not_paired_or_disabled"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "channel_not_paired_or_disabled")
 
     try:
         allowlist = set(json.loads(pairing.get("sender_allowlist_json") or "[]"))
@@ -457,21 +441,18 @@ async def receive_approval_response(
     """
     secret = os.environ.get("RAIKER_CHANNEL_INBOUND_SECRET", "").strip()
     if not secret:
-        raise HTTPException(status_code=503, detail={"ok": False, "reason_code": "channel_inbound_disabled"})
+        raise refusal(503, "channel_inbound_disabled")
     if not x_raiker_channel_secret or not hmac.compare_digest(x_raiker_channel_secret, secret):
-        raise HTTPException(status_code=401, detail={"ok": False, "reason_code": "invalid_channel_secret"})
+        raise refusal(401, "invalid_channel_secret")
     store = SQLiteStore(_ws(request))
     pairing = _enabled_pairing(store, connector_id)
     if pairing is None or not bool(pairing.get("approval_relay_enabled")):
-        raise HTTPException(status_code=403, detail={"ok": False, "reason_code": "channel_approval_relay_not_enabled"})
+        raise refusal(403, "channel_approval_relay_not_enabled")
     owner_sender = str(pairing.get("owner_sender_id") or "")
     if not owner_sender or not hmac.compare_digest(body.sender_id, owner_sender):
-        raise HTTPException(status_code=403, detail={"ok": False, "reason_code": "channel_owner_sender_required"})
+        raise refusal(403, "channel_owner_sender_required")
     if not _within_inbound_budget(connector_id, body.sender_id):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={"ok": False, "reason_code": "rate_limited"},
-        )
+        raise refusal(status.HTTP_429_TOO_MANY_REQUESTS, "rate_limited")
     relay = store.get_approval_relay(body.relay_id)
     if (
         relay is None
@@ -479,7 +460,7 @@ async def receive_approval_response(
         or str(relay.get("action_id")) != body.action_id
         or str(relay.get("status")) != "pending"
     ):
-        raise HTTPException(status_code=409, detail={"ok": False, "reason_code": "channel_approval_relay_mismatch"})
+        raise refusal(409, "channel_approval_relay_mismatch")
 
     from raiker.approvals import ApprovalInbox
     from raiker.approvals.execution import ApprovalExecutionBridge, executable_capability
@@ -489,7 +470,7 @@ async def receive_approval_response(
     principal_id = str(pairing.get("paired_by") or "")
     principal, _ = resolve_local_principal(_ws(request), principal_id)
     if principal is None:
-        raise HTTPException(status_code=403, detail={"ok": False, "reason_code": "principal_not_resolved"})
+        raise refusal(403, "principal_not_resolved")
     user_id = store.principal_user_id(principal_id)
     # A relay is bound to the immutable tool-action id, while resolution APIs
     # load the richer joined row by approval id. Resolve the indirection first;
@@ -504,16 +485,16 @@ async def receive_approval_response(
         else None
     )
     if approval is None or str(approval.get("action_id")) != body.action_id:
-        raise HTTPException(status_code=404, detail={"ok": False, "reason_code": "approval_not_found"})
+        raise refusal(404, "approval_not_found")
     approval_id = str(approval.get("approval_id") or "")
     if bool(approval.get("critical")):
-        raise HTTPException(status_code=403, detail={"ok": False, "reason_code": "critical_approval_requires_local_step_up"})
+        raise refusal(403, "critical_approval_requires_local_step_up")
     with store.connect() as connection:
         connector_intent = connection.execute(
             "SELECT 1 FROM connector_write_intents WHERE approval_id = ?", (approval_id,)
         ).fetchone()
     if connector_intent is not None:
-        raise HTTPException(status_code=403, detail={"ok": False, "reason_code": "connector_write_requires_local_approval"})
+        raise refusal(403, "connector_write_requires_local_approval")
 
     writer = EventLogWriter(store)
     relay_status = "approved" if body.approve else "denied"
@@ -523,7 +504,7 @@ async def receive_approval_response(
     if not store.resolve_approval_relay(
         body.relay_id, status=relay_status, resolved_by=principal_id
     ):
-        raise HTTPException(status_code=409, detail={"ok": False, "reason_code": "channel_approval_relay_already_resolved"})
+        raise refusal(409, "channel_approval_relay_already_resolved")
     capability = executable_capability(str(approval.get("tool_name") or "")) or str(
         approval.get("tool_name") or ""
     )
@@ -545,7 +526,7 @@ async def receive_approval_response(
                 )
             )
             if not execution.ok:
-                raise HTTPException(status_code=409, detail={"ok": False, "reason_code": execution.reason_code})
+                raise refusal(409, execution.reason_code)
             executed = True
             capability = execution.capability
             artifacts = dict(execution.artifacts)

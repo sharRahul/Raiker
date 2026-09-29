@@ -643,6 +643,18 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-619](#fixed-619--a-real-executor-could-be-fetched-and-run-with-nothing-governing-it) | **High** | Governance / executors | Fixed 2026-09-28 (closes CR-01; reduces RR-AUTHORITY-01) |
 | [FIXED-620](#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so) | Medium | Commands / plugins / sandbox | Fixed 2026-09-28 by the owner's decision (closes BUG-308, CR-05, CR-09) |
 | [FIXED-621](#fixed-621--an-approval-card-from-another-conversation-covered-the-composers-send) | Medium | Web UI / approvals | Fixed 2026-09-28 — raised and closed in the same run |
+| [FIXED-622](#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing) | Low | Web UI / notifications | Fixed 2026-09-28 (closes BUG-309) |
+| [FIXED-623](#fixed-623--whether-a-route-refused-a-misspelled-field-depended-on-who-wrote-it) | Low | API / input validation | Fixed 2026-09-28 (closes OPT-03) |
+| [FIXED-624](#fixed-624--twenty-route-modules-rebuilt-the-same-helpers-and-one-refusal-was-typed-out-174-times) | Low | API / maintainability | Fixed 2026-09-28 (closes OPT-04) |
+| [FIXED-625](#fixed-625--the-order-a-database-is-built-in-could-only-be-read-out-of-a-700-line-method) | Low | Storage / migrations | Fixed 2026-09-28 (closes OPT-07) |
+| [FIXED-626](#fixed-626--two-exception-ladders-decided-what-a-provider-refusal-meant) | Low | Models / readiness | Fixed 2026-09-28 (closes OPT-12) |
+| [FIXED-627](#fixed-627--a-providers-name-was-a-table-inside-the-readiness-code) | Low | Models / presentation | Fixed 2026-09-28 (closes OPT-14) |
+| [FIXED-628](#fixed-628--a-workflow-of-its-own-to-grep-five-documents-and-two-validators-that-ran-nowhere) | Low | CI / workflows | Fixed 2026-09-28 (closes OPT-19) — and two validators that ran nowhere |
+| [FIXED-629](#fixed-629--a-simplification-could-only-estimate-what-it-had-removed) | Low | CI / measurement | Fixed 2026-09-28 (closes Wave 0 of the optimisation review) |
+| [FIXED-630](#fixed-630--two-indexes-still-called-closed-work-open) | Low | Documentation / plans | Fixed 2026-09-28 — raised and closed in the same run |
+| [FIXED-631](#fixed-631--shutting-a-workspace-down-closed-a-connection-another-thread-was-still-using) | Medium | Storage / concurrency | Fixed 2026-09-29 — found by this change's CI run |
+| [FIXED-632](#fixed-632--an-approval-card-covered-settings-save-changes) | Medium | Web UI / approvals | Fixed 2026-09-29 — found converting a live spec for BUG-248 |
+| [FIXED-633](#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in) | Low | Web UI / Settings | Fixed 2026-09-29 — found converting a live spec for BUG-248 |
 
 ---
 
@@ -26961,3 +26973,330 @@ screen when the owner navigates to Approvals, and returns after*; and the live
 round's python turn, which now chooses its model and sends with an earlier
 approval still pending
 ([`2026-09-28-review-closure-round/`](../screenshots/2026-09-28-review-closure-round)).
+
+---
+
+## FIXED-622 — On Approvals, the notice dock repeated the approval the queue was listing
+
+**Severity: Low. Area: Web UI / notifications. Status: Fixed 2026-09-28. Closes
+[BUG-309](TO_BE_FIXED.md#bug-309--on-approvals-the-notice-dock-repeats-the-approval-and-covers-the-queues-header).**
+
+**Observed.** The second 2026-09-28 round's capture of Approvals showed the
+notice dock holding *Approval needed … run 'write_file'* over the queue that
+listed that same approval, with its *3 unread notices* link drawn across the
+table's **Status** header. The approval card had learned to leave Approvals
+alone ([FIXED-621](#fixed-621--an-approval-card-from-another-conversation-covered-the-composers-send));
+the notice about that approval had not, and nothing knew which page a notice
+was about — opening one sent every kind but a finished run to the record.
+
+**Fixed.** One rule for every destination, in `web/src/lib/noticeDestination.ts`:
+a notice kind with a page of its own — `approval_pending` and
+`critical_approval_pending` on Approvals, `task_finished` on Tasks — is
+*answered by* that page. On it, `NotificationCenter` does not dock that notice
+and marks it read through the same route opening one uses; the next unread
+notice, if any, is shown instead. On the record itself nothing is docked and
+nothing is marked, because being on the record is not having read every row.
+Opening a notice now goes to its page (an approval notice to Approvals rather
+than the record), and the desktop notice lands there too.
+
+The *unread* count is inside the card, on its surface, so it can no longer read
+as part of the page beneath it.
+
+**And the bell disagreed for up to a poll.** Running it live found the bell
+still counting the notice the dock had just read. The two components read
+notifications separately; a mark by either is announced on `window`
+(`raiker:notices-changed`) and both re-read.
+
+**Evidence.** `web/src/lib/noticeDestination.test.ts`; three new cases in
+`web/src/lib/components/SessionMenu.test.ts` — *on the page a notice is about,
+shows the others and marks that one read*, *docks nothing on the notification
+record, and marks nothing read there*, *opens an approval notice on Approvals
+rather than on the record*; and the third 2026-09-28 live round, where a real
+turn's approval notice shows on Home, opens Approvals, is gone from the dock
+there at 1440 and 390 wide, reads as read, and the bell agrees
+([`2026-09-28-docs-items-round/`](../screenshots/2026-09-28-docs-items-round)).
+
+---
+
+## FIXED-623 — Whether a route refused a misspelled field depended on who wrote it
+
+**Severity: Low. Area: API / input validation. Status: Fixed 2026-09-28. Closes
+OPT-03 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-03--introduce-one-strict-request-base-model).**
+
+**Observed.** Sixty-nine request models each declared `extra="forbid"` for
+themselves. Sixteen did not — five in `schemas.py` (`LocalModelDeployRequest`
+and the four channel-pairing bodies) and eleven declared beside their routes
+(language check, host pause and stop, the egress blocklist and Git credential,
+the update apply, the connector store). Those accepted an unknown field and
+dropped it, so `{"enabeld": false}` to a channel's switch succeeded and changed
+nothing, and a misspelled `langauge` ran the English check in the default
+locale.
+
+**Fixed.** `StrictRequest` and `StrictModelRequest` (for `model_*` fields) in
+`raiker/api/schemas.py` carry the configuration; every Pydantic request model
+under `raiker/api` inherits one of them. The twelve `@dataclass` bodies —
+prompts, interrupts, runtime modes and capability controls — keep ignoring
+unknown keys on purpose, because they are the REST contract external
+single-user clients are written against, and the base class says so. Every
+web-client payload for the sixteen newly strict routes was read against its
+model first.
+
+**Evidence.** `tests/test_api_request_models.py` walks every module under
+`raiker/api` and fails a `BaseModel` that does not inherit the base; the live
+round sends `langauge` to `/api/language/check` and gets 422 `extra_forbidden`,
+and walks every destination at both capture widths with no 422 from any page.
+
+---
+
+## FIXED-624 — Twenty route modules rebuilt the same helpers, and one refusal was typed out 174 times
+
+**Severity: Low. Area: API / maintainability. Status: Fixed 2026-09-28. Closes
+OPT-04 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-04--centralize-api-dependencies-and-common-refusal-mapping).**
+
+**Observed.** Route modules each declared `_ws` (the workspace off the app
+state, with four spellings of one `type: ignore`), `_auth` (an
+`AuthMiddleware` over it) and, in three places, a principal-type check. And
+174 sites built `HTTPException(status_code=…, detail={"ok": False,
+"reason_code": …})` by hand.
+
+**Fixed.** `raiker/api/dependencies.py` — `workspace_root`, `workspace_path`,
+`authenticate`, `require_human` — and `raiker/api/refusals.py` — `refusal(status,
+code)`, in a module with no Raiker imports so `auth.py` can use it without a
+cycle. The replacement was mechanical and exact: an AST pass replaced only
+helpers whose body matched a canonical form and only refusal constructions with
+exactly those two keys, so the host-control scope, the control router's
+authenticator and every service lookup stayed where they were. Route signatures
+still say `Depends(_auth)`, so what a route requires is still read at the route.
+`raiker/api` lost 1,041 lines and gained 399, plus 75 in the two new modules.
+
+**Evidence.** `tests/test_api_dependencies.py` fails a route module that
+re-declares a shared helper or hand-builds the envelope, and pins
+`require_human`'s refusal; the full Python suite is unchanged, and the live
+round's destination walk reads every page's API through them.
+
+---
+
+## FIXED-625 — The order a database is built in could only be read out of a 700-line method
+
+**Severity: Low. Area: Storage / migrations. Status: Fixed 2026-09-28. Closes
+OPT-07 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-07--replace-individual-migration-constant-imports-with-a-migration-registry).**
+
+**Observed.** `migration_runner.py` imported 336 names from `migrations.py`, and
+`bootstrap` called `_apply_migration` 166 times, interleaved with column
+additions that predate recorded migrations, ten backfill methods and one inline
+backfill. Adding a
+migration meant editing it in three places, and the order — the thing an upgrade
+depends on — was visible only by reading the whole method.
+
+**Fixed.** `MIGRATIONS` in `raiker/storage/migrations.py` is the order, as data:
+`Migration(id, sql)`, `SearchMigration(id, sql_for)` for the four whose SQL
+depends on the measured text-search engine, and `RunnerStep(method)` for the
+backfills. The five blocks of pre-registry column additions and the inline
+checksum backfill became named methods, keeping their original comments. Bootstrap iterates it. The registry
+was generated from the method's own syntax tree so that nothing moved.
+
+**Evidence.** A fresh database built before and after applies the same 170
+migration ids in the same order, produces the same 319 schema objects with
+byte-identical SQL, and a second bootstrap applies nothing — compared directly
+during the change. `tests/test_migration_registry.py` holds the declared order
+against a fresh database's applied order, and fails a step naming a method the
+store does not have. `migration_runner.py` 1,384 → 488 lines; `migrations.py`
+3,953 → 4,186.
+
+---
+
+## FIXED-626 — Two exception ladders decided what a provider refusal meant
+
+**Severity: Low. Area: Models / readiness. Status: Fixed 2026-09-28. Closes
+OPT-12 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-12--replace-giant-provider-readiness-exception-ladders-with-a-typed-classifier).**
+
+**Observed.** `ProviderCatalogueProbe.check` carried two `except` ladders —
+eighteen branches, each constructing its own state, reason code, summary and
+remediation — one for listing models and one for the execution preflight. They
+differed in ways nobody could see without reading both side by side: the
+execution ladder has no policy branch, and only the catalogue ladder answers a
+local runtime differently.
+
+**Fixed.** `classify_provider_failure(error, stage, label, model, local_only) →
+ReadinessFailure` in `raiker/models/readiness.py`: one rule table per
+`ProbeStage`, a local variant on the rules that have one, an explicit answer for
+workspace and quota refusals, and one unclassified answer per stage. It is pure
+— no provider message, store or network — and `check()` shrank from about 215
+lines to 50.
+
+**Evidence.** All 56 combinations of stage, refusal class and local-or-hosted
+profile were driven through `check()` before and after with a stubbed router,
+and the results compared byte for byte. `tests/test_readiness_failure_classifier.py`
+covers the table one refusal at a time, including that an unexpected error's
+text never reaches the public result.
+
+---
+
+## FIXED-627 — A provider's name was a table inside the readiness code
+
+**Severity: Low. Area: Models / presentation. Status: Fixed 2026-09-28. Closes
+OPT-14 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-14--put-provider-display-metadata-in-the-profile-registry-instead-of-code-mappings).**
+
+**Observed.** `readiness._provider_label` mapped twelve provider ids to the name
+an owner reads, beside a registry that already describes every provider, and the
+web app keeps its own `PROVIDER_NAMES`. Nothing held the three together.
+
+**Fixed.** `model-profiles.json` carries a `providers` table of display names;
+`ModelProfileRegistry.provider_display_name` reads it, and an undeclared provider
+still reads as words. Presentation only — nothing in the table is read by policy,
+endpoint classification or a gate. The web table stays, because pickers
+deliberately call llama.cpp *GGUF*.
+
+**Evidence.** `tests/test_provider_display_names.py` fails a shipped provider
+with no declared name, and fails the web table disagreeing with the registry
+except for that one recorded difference. The live round's readiness check reads
+*Anthropic can reach claude-haiku-4-5-20251001*.
+
+---
+
+## FIXED-628 — A workflow of its own to grep five documents, and two validators that ran nowhere
+
+**Severity: Low. Area: CI / workflows. Status: Fixed 2026-09-28. Closes OPT-19
+of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-19--reduce-workflow-duplication-with-reusable-setup-but-do-not-move-yaml-lines-into-opaque-shell-scripts-just-to-win-loc).**
+
+**Observed.** Every CI job repeated the same pinned `setup-python` step, and two
+repeated the editable install beside it. `phase-status.yml` was a whole runner —
+checkout, interpreter — to run one script that greps five documents. And reading
+`VERIFICATION_PLAN.md` against the workflows found that two of its five
+"required" documentation validators, `validate_documentation_truthfulness.py`
+and `validate_local_single_user_runtime.py`, ran in no workflow and no test: a
+change deleting the sentence either guards would have merged green.
+
+**Fixed.** `.github/actions/setup-python` is the interpreter plus an optional
+editable install, used by four CI jobs and the licensing workflow; its own
+action reference is pinned. `tests/test_documentation_validators.py` runs all
+five validators in the ordinary suite, and `phase-status.yml` is deleted. The
+release workflow is untouched on purpose: it installs from hash-locked exports,
+and its signing steps stay visible.
+
+**Evidence.** `tests/test_ci_workflow.py` now fails any workflow or local action
+that references an action neither pinned to a commit nor local; the five
+validators pass in pytest; this change's own CI run.
+
+---
+
+## FIXED-629 — A simplification could only estimate what it had removed
+
+**Severity: Low. Area: CI / measurement. Status: Fixed 2026-09-28. Closes Wave 0
+of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#wave-0--establish-the-baseline).**
+
+**Observed.** The review's rules — a line moved between handwritten files scores
+nothing, generated code is counted apart — needed a baseline taken the same way
+every time, and there was none.
+
+**Fixed.** `scripts/measure_loc.py`, standard library only, reads git-tracked
+files and reports handwritten production and test lines per language, comment
+and docstring lines apart (a trailing comment's line is code), generated files
+apart, the thirty largest files, Python functions over 150 lines and the bundle
+size. CI's *Source measurement* job keeps the JSON as the `loc-report` artifact
+for 90 days; it measures and never fails a change.
+
+**Evidence.** `tests/test_measure_loc.py`. First reading, on this change: 712
+production files with 153,778 code lines, 746 test files with 118,729, and 31
+Python functions over 150 lines.
+
+---
+
+## FIXED-630 — Two indexes still called closed work open
+
+**Severity: Low. Area: Documentation / plans. Status: Fixed 2026-09-28.**
+
+**Observed.** `TO_BE_ADDED.md`'s index listed ADD-22 as *Proposal* while its own
+entry said *DONE 2026-08-29* ([FIXED-308](#fixed-308--raiker-could-ask-permission-and-could-not-ask-what-you-meant)).
+The 2026-09-07 audit's execution-order table listed as open seven items that
+have closed since — the MCP stdio environment, the streamed body cap, release
+dependencies from the lock, the pinned AppImage tool, remote MCP endpoint
+trust, monitor-health semantics and the screenshot catalogue — and nothing in
+that table said so.
+
+**Fixed.** The ADD-22 row reads *Done*, and the audit's table carries a current
+status column naming each closing record, with the table itself kept as the
+2026-09-07 reading it was.
+
+**Evidence.** `tests/test_docs_consistency.py` resolves every link the two
+documents now carry.
+
+---
+
+## FIXED-631 — Shutting a workspace down closed a connection another thread was still using
+
+**Severity: Medium. Area: Storage / concurrency. Status: Fixed 2026-09-29 —
+found by this change's own CI run, which segfaulted.**
+
+**Observed.** CI's Python job died with `Segmentation fault` in
+`test_instance_runtime_lifecycle.py`. The dump showed two threads on one
+SQLCipher handle: the knowledge-map watcher, in a `to_thread` worker,
+bootstrapping a store (`_add_reminder_delivery_columns` is only where it happened
+to be), and the app's shutdown calling `invalidate_workspace_connections`, which
+closed every cached connection for the workspace — that worker's included.
+Cancelling the task that awaits a `to_thread` call does not stop the thread, so
+the worker was still mid-statement when its handle was closed under it.
+
+**Root cause.** The module states the invariant itself — "another live worker's
+handle is still never touched: closing one would be a use-after-close in that
+worker" — and eviction and memory-pressure release keep it. Invalidation did
+not. It was the one path that closed handles by workspace rather than by owner.
+
+**Fixed.** `invalidate_workspace_connections` still takes every handle for the
+workspace out of the cache at once, so nothing reuses one. It closes this
+thread's own and those of threads that have exited; a live worker's handle is
+*retired*, and that worker closes it on its next `connect()`. A retired handle
+whose worker has since exited is closed by whichever thread next notices, and
+process exit closes the rest.
+
+**Evidence.** Two tests in `tests/test_sqlite_connection_cache.py` — a live
+worker's handle is still usable after another thread invalidates the workspace
+and is closed when the worker returns; a retired handle whose worker exited is
+closed by the next `connect()`. Both fail against the previous code, and the full
+Python suite passes locally with the fix.
+
+---
+
+## FIXED-632 — An approval card covered Settings' Save changes
+
+**Severity: Medium. Area: Web UI / approvals. Status: Fixed 2026-09-29 — found
+while converting `composer-parity-and-turn-honesty-live` for BUG-248.**
+
+**Observed.** With an approval pending from any conversation, the docked
+*Approval needed* card sat over Settings' sticky **Save changes** bar and took
+the click: Playwright reported the card intercepting pointer events 400 times
+before giving up. A setting could not be saved until the owner dismissed a card
+about something else. The retention step of the spec had passed on one run and
+timed out on the next, and the difference was whether an approval was waiting.
+
+**Root cause.** [FIXED-621](#fixed-621--an-approval-card-from-another-conversation-covered-the-composers-send)
+taught the card to rise above a `.composer-card`, and only that.
+
+**Fixed.** The card keeps clear of any bottom action bar that marks itself
+`data-dock-clear`, as well as composers; Settings' save bar does. It was the only
+other sticky bottom bar in the product.
+
+**Evidence.** `ApprovalPrompt.test.ts` — *rises above any bottom action bar that
+asks to be kept clear*; and the spec's retention step, which now saves in both
+directions with two approvals pending (8 of 8 passed).
+
+---
+
+## FIXED-633 — Choosing the default density closed the panel it was chosen in
+
+**Severity: Low. Area: Web UI / Settings. Status: Fixed 2026-09-29 — found while
+converting `bug-37-39-40-41-live` for BUG-248.**
+
+**Observed.** Density and typeface live under a *Layout & type* disclosure that
+opens by itself when either is not the default. That was its only rule
+(`open={tuned}`), so choosing **Comfortable** — the default — made `tuned` false
+and the disclosure closed under the owner's pointer, taking the control they had
+just used with it.
+
+**Fixed.** The disclosure opens by itself for a tuned value until the owner
+opens or closes it; from then on their choice holds.
+
+**Evidence.** `web/src/lib/views/settings/Personalisation.test.ts` — the second
+case fails against the previous code; and the spec's density test, which now
+chooses Comfortable, then Compact, then Comfortable again, and measures a real
+row shorten.

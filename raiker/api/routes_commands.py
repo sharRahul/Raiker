@@ -4,9 +4,10 @@ import json
 from dataclasses import asdict
 from typing import Any, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import refusal
 from raiker.api.sessions import ApiSession
 from raiker.execution.commands.models import CommandReceipt, StoredCommandRun
 from raiker.execution.commands.service import CommandService, CommandServiceError
@@ -14,10 +15,6 @@ from raiker.execution.commands.store import ReceiptImmutable
 from raiker.runtime.authority.models import Principal
 
 router = APIRouter()
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(request.app.state.workspace_root).authenticate(request)
 
 
 def _service(request: Request) -> CommandService:
@@ -51,10 +48,7 @@ def _receipt_view(receipt: CommandReceipt) -> dict[str, Any]:
 
 def _raise_service(exc: CommandServiceError) -> NoReturn:
     code = status.HTTP_404_NOT_FOUND if exc.reason_code == "command_run_not_found" else status.HTTP_409_CONFLICT
-    raise HTTPException(
-        status_code=code,
-        detail={"ok": False, "reason_code": exc.reason_code},
-    ) from exc
+    raise refusal(code, exc.reason_code) from exc
 
 
 @router.get("/api/command-runs")
@@ -166,10 +160,7 @@ def discard_credential_delta(
 ) -> dict[str, Any]:
     decision_id = str(body.get("decision_id", "")).strip()
     if not decision_id:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"ok": False, "reason_code": "credential_delta_decision_required"},
-        )
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "credential_delta_decision_required")
     try:
         changed = _service(request).store.resolve_credential_delta(
             auth_data[0].principal_id,
@@ -178,13 +169,7 @@ def discard_credential_delta(
             resolution="discarded",
         )
     except ReceiptImmutable as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"ok": False, "reason_code": str(exc)},
-        ) from exc
+        raise refusal(status.HTTP_409_CONFLICT, str(exc)) from exc
     if not changed:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"ok": False, "reason_code": "credential_delta_not_found"},
-        )
+        raise refusal(status.HTTP_404_NOT_FOUND, "credential_delta_not_found")
     return {"ok": True, "receipt": _service(request).store.get_delta_receipt(auth_data[0].principal_id, run_id)}

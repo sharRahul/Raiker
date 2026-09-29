@@ -13,6 +13,19 @@ from raiker.models.configured_models import (
     ConfiguredModelStoreUnavailable,
     pinned_model,
 )
+from raiker.models.exceptions import (
+    ProviderAuthenticationError,
+    ProviderConfigurationError,
+    ProviderConnectionError,
+    ProviderModelNotFoundError,
+    ProviderPolicyError,
+    ProviderQuotaExhaustedError,
+    ProviderRateLimitError,
+    ProviderResponseValidationError,
+    ProviderTimeoutError,
+    ProviderUnsupportedCapabilityError,
+    ProviderWorkspaceRequiredError,
+)
 
 
 class ModelReadinessState(StrEnum):
@@ -224,23 +237,6 @@ def readiness_ttl_minutes(store: Any, owner_principal_id: str) -> int:
     return max(MIN_READINESS_TTL_MINUTES, min(MAX_READINESS_TTL_MINUTES, value))
 
 
-def _provider_label(provider: str) -> str:
-    return {
-        "ollama": "Ollama",
-        "lm-studio": "LM Studio",
-        "llama.cpp": "llama.cpp",
-        "anthropic": "Anthropic",
-        "openrouter": "OpenRouter",
-        "openai": "OpenAI",
-        "chatgpt-codex": "ChatGPT subscription",
-        "gemini": "Gemini",
-        "huggingface": "Hugging Face",
-        "ollama-cloud": "Ollama Cloud",
-        "mlx": "MLX",
-        "openai-compatible": "OpenAI-compatible",
-    }.get(provider, provider.replace("-", " ").title())
-
-
 def _is_workspace_invalid(error: Exception | None) -> bool:
     """True when the refusal names the workspace the owner supplied (BUG-274).
 
@@ -275,6 +271,223 @@ def _endpoint_fingerprint(provider: str, endpoint: str) -> str:
         (parsed.scheme.casefold(), host, parsed.path.rstrip("/"), parsed.query, "")
     )
     return hashlib.sha256(f"{provider.casefold()}\0{normalized}".encode()).hexdigest()
+
+
+class ProbeStage(StrEnum):
+    """Which half of a readiness check refused: listing models, or running one."""
+
+    CATALOGUE = "catalogue"
+    EXECUTION = "execution"
+
+
+@dataclass(frozen=True)
+class ReadinessFailure:
+    """What a provider refusal means for the owner: a state, a code and a repair."""
+
+    state: ModelReadinessState
+    reason_code: str
+    summary: str
+    remediation: str
+
+
+@dataclass(frozen=True)
+class _FailureRule:
+    """One row of the classification table.
+
+    ``summary`` and ``remediation`` are templates over ``{label}`` (the provider's
+    display name) and ``{model}``. A rule with ``local_*`` values answers
+    differently for a runtime on this machine, where the repair is starting or
+    installing it rather than a network or account fix.
+    """
+
+    errors: tuple[type[Exception], ...]
+    state: ModelReadinessState
+    reason_code: str
+    summary: str
+    remediation: str
+    local_state: ModelReadinessState | None = None
+    local_reason_code: str | None = None
+
+
+_S = ModelReadinessState
+
+#: OPT-12 — the two exception ladders ``check`` used to carry, as one table per
+#: stage. Workspace and quota refusals are not rows: each has its own explicit
+#: answer below because its repair is neither a network fix nor a new key.
+_FAILURE_RULES: dict[ProbeStage, tuple[_FailureRule, ...]] = {
+    ProbeStage.CATALOGUE: (
+        _FailureRule(
+            (ProviderAuthenticationError,), _S.AUTHENTICATION_FAILED,
+            "provider_authentication_failed", "{label} rejected the saved credential.",
+            "Update the provider credential and check again.",
+        ),
+        _FailureRule(
+            (ProviderPolicyError,), _S.POLICY_BLOCKED, "provider_policy_blocked",
+            "{label} is blocked by the current model policy.",
+            "Review the provider policy and check again.",
+        ),
+        _FailureRule(
+            (ProviderConfigurationError,), _S.NOT_CONFIGURED, "provider_not_configured",
+            "{label} is not fully configured.", "Set up {label} and check again.",
+            local_state=_S.RUNTIME_MISSING, local_reason_code="local_runtime_missing",
+        ),
+        _FailureRule(
+            (ProviderModelNotFoundError,), _S.MODEL_MISSING, "provider_model_missing",
+            "{label} cannot find {model}.", "Install or select {model}, then check again.",
+            local_state=_S.MODEL_MISSING, local_reason_code="local_model_missing",
+        ),
+        _FailureRule(
+            (ProviderUnsupportedCapabilityError,), _S.UNSUPPORTED, "model_catalogue_unsupported",
+            "{label} does not support model catalogue checks.",
+            "Choose a supported provider runtime.",
+        ),
+        _FailureRule(
+            (ProviderConnectionError, ProviderTimeoutError), _S.UNREACHABLE,
+            "provider_unreachable", "{label} is not reachable.",
+            "Start or reconnect {label}, then check again.",
+            local_state=_S.RUNTIME_STOPPED, local_reason_code="local_runtime_unreachable",
+        ),
+        _FailureRule(
+            (ProviderRateLimitError,), _S.UNREACHABLE, "provider_rate_limited",
+            "{label} temporarily refused the catalogue check.", "Wait briefly, then check again.",
+        ),
+        _FailureRule(
+            (ProviderResponseValidationError,), _S.UNREACHABLE, "provider_catalogue_invalid",
+            "{label} returned an invalid model catalogue.",
+            "Check the endpoint and runtime version.",
+        ),
+    ),
+    ProbeStage.EXECUTION: (
+        _FailureRule(
+            (ProviderAuthenticationError,), _S.AUTHENTICATION_FAILED,
+            "provider_authentication_failed",
+            "{label} rejected the saved credential during execution.",
+            "Update the provider credential and check again.",
+        ),
+        _FailureRule(
+            (ProviderModelNotFoundError,), _S.MODEL_MISSING, "provider_model_missing",
+            "{label} lists {model}, but cannot execute it.",
+            "Choose a currently executable model, then check again.",
+        ),
+        _FailureRule(
+            (ProviderRateLimitError,), _S.UNREACHABLE, "provider_rate_limited",
+            "{label} temporarily refused the execution check.", "Wait briefly, then check again.",
+        ),
+        _FailureRule(
+            (ProviderConnectionError, ProviderTimeoutError), _S.UNREACHABLE,
+            "provider_execution_refused",
+            "{label} cannot execute {model} with the current account.",
+            "Review the provider credential, access, and billing, then check again.",
+        ),
+        _FailureRule(
+            (ProviderUnsupportedCapabilityError,), _S.UNSUPPORTED,
+            "provider_execution_probe_unsupported",
+            "{label} does not support an execution readiness check.",
+            "Choose a provider that supports chat completions.",
+        ),
+        _FailureRule(
+            (ProviderResponseValidationError,), _S.UNREACHABLE, "provider_execution_invalid",
+            "{label} returned an invalid execution response.",
+            "Check the endpoint and model compatibility.",
+        ),
+    ),
+}
+
+#: Anything no row names. Still a classified, owner-readable answer: a raw
+#: provider message never reaches the public result.
+_UNCLASSIFIED: dict[ProbeStage, _FailureRule] = {
+    ProbeStage.CATALOGUE: _FailureRule(
+        (), _S.UNREACHABLE, "provider_probe_failed",
+        "{label} could not complete the model check.",
+        "Check the provider connection and try again.",
+    ),
+    ProbeStage.EXECUTION: _FailureRule(
+        (), _S.UNREACHABLE, "provider_execution_probe_failed",
+        "{label} could not complete the execution check.",
+        "Check the provider account and try again.",
+    ),
+}
+
+
+def _workspace_failure(label: str, error: Exception) -> ReadinessFailure:
+    """BUG-272/BUG-274 — the key is valid and the workspace is the problem.
+
+    Its own answer for the same reason quota has one: the repair is neither
+    a network fix nor a new key. An identity-linked key is the wrong *shape*
+    of credential for a request that does not carry a workspace, and telling
+    the owner to rotate it would send them round the same loop.
+
+    Two answers, because two things can be wrong and they have opposite
+    repairs. **BUG-274** made the first one actionable: Raiker can now send
+    the workspace, so the remediation names the field instead of telling the
+    owner to go and find another key — which was a dead end for an owner who
+    only has this one. Once a workspace *is* named, a refusal means that id
+    is wrong, and repeating the first message would send them to add
+    something they have already added.
+    """
+    if _is_workspace_invalid(error):
+        return ReadinessFailure(
+            ModelReadinessState.AUTHENTICATION_FAILED,
+            "provider_workspace_invalid",
+            f"{label} did not recognise the workspace named with this key.",
+            "Check the workspace ID on this connection against the one in the "
+            f"{label} console, then check again.",
+        )
+    return ReadinessFailure(
+        ModelReadinessState.AUTHENTICATION_FAILED,
+        "provider_workspace_required",
+        f"{label} needs a workspace named alongside this kind of key.",
+        "This key is identity-linked, so it acts inside one workspace. Add that "
+        f"workspace ID to this connection — it is in the {label} console beside the "
+        "key — then check again. The key itself is fine.",
+    )
+
+
+def _quota_failure(label: str) -> ReadinessFailure:
+    """One answer for both probe stages: reachable, authorised, unpayable.
+
+    Kept separate from `unreachable` and `authentication_failed` because the
+    repair is neither a network fix nor a new key — the account needs credit
+    or a higher quota, and saying so is the whole point of an exact state.
+    """
+    return ReadinessFailure(
+        ModelReadinessState.QUOTA_EXHAUSTED,
+        "provider_quota_exhausted",
+        f"{label} accepted the credential but the account has no credit or quota left.",
+        f"Add credit or raise the quota on your {label} account, then check again.",
+    )
+
+
+def classify_provider_failure(
+    error: Exception,
+    *,
+    stage: ProbeStage,
+    label: str,
+    model: str,
+    local_only: bool,
+) -> ReadinessFailure:
+    """What ``error``, raised at ``stage`` of a readiness check, means for the owner.
+
+    Pure: no provider message, network or store is read, so the whole table is
+    testable one refusal at a time.
+    """
+    if isinstance(error, ProviderWorkspaceRequiredError):
+        return _workspace_failure(label, error)
+    if isinstance(error, ProviderQuotaExhaustedError):
+        return _quota_failure(label)
+    rule = next(
+        (rule for rule in _FAILURE_RULES[stage] if isinstance(error, rule.errors)),
+        _UNCLASSIFIED[stage],
+    )
+    state, reason_code = rule.state, rule.reason_code
+    if local_only and rule.local_state is not None and rule.local_reason_code is not None:
+        state, reason_code = rule.local_state, rule.local_reason_code
+    return ReadinessFailure(
+        state,
+        reason_code,
+        rule.summary.format(label=label, model=model),
+        rule.remediation.format(label=label, model=model),
+    )
 
 
 class ProviderCatalogueProbe:
@@ -323,89 +536,27 @@ class ProviderCatalogueProbe:
             evidence={"provider": provider},
         )
 
-    def _workspace_required(
-        self,
-        key: ModelReadinessKey,
-        label: str,
-        provider: str,
-        error: Exception | None = None,
+    def _failure(
+        self, key: ModelReadinessKey, failure: ReadinessFailure, *, provider: str
     ) -> ModelReadiness:
-        """BUG-272/BUG-274 — the key is valid and the workspace is the problem.
-
-        Its own answer for the same reason quota has one: the repair is neither
-        a network fix nor a new key. An identity-linked key is the wrong *shape*
-        of credential for a request that does not carry a workspace, and telling
-        the owner to rotate it would send them round the same loop.
-
-        Two answers, because two things can be wrong and they have opposite
-        repairs. **BUG-274** made the first one actionable: Raiker can now send
-        the workspace, so the remediation names the field instead of telling the
-        owner to go and find another key — which was a dead end for an owner who
-        only has this one. Once a workspace *is* named, a refusal means that id
-        is wrong, and repeating the first message would send them to add
-        something they have already added.
-        """
-        if _is_workspace_invalid(error):
-            return self._result(
-                key,
-                ModelReadinessState.AUTHENTICATION_FAILED,
-                f"{label} did not recognise the workspace named with this key.",
-                "provider_workspace_invalid",
-                "Check the workspace ID on this connection against the one in the "
-                f"{label} console, then check again.",
-                provider=provider,
-            )
         return self._result(
             key,
-            ModelReadinessState.AUTHENTICATION_FAILED,
-            f"{label} needs a workspace named alongside this kind of key.",
-            "provider_workspace_required",
-            "This key is identity-linked, so it acts inside one workspace. Add that "
-            f"workspace ID to this connection — it is in the {label} console beside the "
-            "key — then check again. The key itself is fine.",
-            provider=provider,
-        )
-
-    def _quota_exhausted(
-        self, key: ModelReadinessKey, label: str, provider: str
-    ) -> ModelReadiness:
-        """One answer for both probe stages: reachable, authorised, unpayable.
-
-        Kept separate from `unreachable` and `authentication_failed` because the
-        repair is neither a network fix nor a new key — the account needs credit
-        or a higher quota, and saying so is the whole point of an exact state.
-        """
-        return self._result(
-            key,
-            ModelReadinessState.QUOTA_EXHAUSTED,
-            f"{label} accepted the credential but the account has no credit or quota left.",
-            "provider_quota_exhausted",
-            f"Add credit or raise the quota on your {label} account, then check again.",
+            failure.state,
+            failure.summary,
+            failure.reason_code,
+            failure.remediation,
             provider=provider,
         )
 
     async def check(self, key: ModelReadinessKey) -> ModelReadiness:
         from raiker.models.connections import get_model_connection
-        from raiker.models.exceptions import (
-            ProviderAuthenticationError,
-            ProviderConfigurationError,
-            ProviderConnectionError,
-            ProviderModelNotFoundError,
-            ProviderPolicyError,
-            ProviderQuotaExhaustedError,
-            ProviderRateLimitError,
-            ProviderResponseValidationError,
-            ProviderTimeoutError,
-            ProviderUnsupportedCapabilityError,
-            ProviderWorkspaceRequiredError,
-        )
         from raiker.models.policy_state import provider_runtime_policy_from_gates
         from raiker.models.registry import ModelProfileRegistry, profile_with_model
         from raiker.models.router import ModelRouter
 
         registry = ModelProfileRegistry.load()
         profile = registry.resolve_profile_id(key.profile_id)
-        label = _provider_label(profile.provider)
+        label = registry.provider_display_name(profile.provider)
         connection = get_model_connection(self.store, key.owner_principal_id, key.profile_id)
         router = ModelRouter(
             registry,
@@ -415,102 +566,17 @@ class ProviderCatalogueProbe:
             ),
         )
         effective = profile_with_model(profile, key.model)
+
+        def refused(error: Exception, stage: ProbeStage) -> ModelReadiness:
+            failure = classify_provider_failure(
+                error, stage=stage, label=label, model=key.model, local_only=profile.local_only
+            )
+            return self._failure(key, failure, provider=profile.provider)
+
         try:
             models = await router.alist_models_for_profile(effective)
-        except ProviderAuthenticationError:
-            return self._result(
-                key,
-                ModelReadinessState.AUTHENTICATION_FAILED,
-                f"{label} rejected the saved credential.",
-                "provider_authentication_failed",
-                "Update the provider credential and check again.",
-                provider=profile.provider,
-            )
-        except ProviderPolicyError:
-            return self._result(
-                key,
-                ModelReadinessState.POLICY_BLOCKED,
-                f"{label} is blocked by the current model policy.",
-                "provider_policy_blocked",
-                "Review the provider policy and check again.",
-                provider=profile.provider,
-            )
-        except ProviderWorkspaceRequiredError as exc:
-            return self._workspace_required(key, label, profile.provider, exc)
-        except ProviderQuotaExhaustedError:
-            return self._quota_exhausted(key, label, profile.provider)
-        except ProviderConfigurationError:
-            state = (
-                ModelReadinessState.RUNTIME_MISSING
-                if profile.local_only
-                else ModelReadinessState.NOT_CONFIGURED
-            )
-            return self._result(
-                key,
-                state,
-                f"{label} is not fully configured.",
-                "local_runtime_missing" if profile.local_only else "provider_not_configured",
-                f"Set up {label} and check again.",
-                provider=profile.provider,
-            )
-        except ProviderModelNotFoundError:
-            return self._result(
-                key,
-                ModelReadinessState.MODEL_MISSING,
-                f"{label} cannot find {key.model}.",
-                "local_model_missing" if profile.local_only else "provider_model_missing",
-                f"Install or select {key.model}, then check again.",
-                provider=profile.provider,
-            )
-        except ProviderUnsupportedCapabilityError:
-            return self._result(
-                key,
-                ModelReadinessState.UNSUPPORTED,
-                f"{label} does not support model catalogue checks.",
-                "model_catalogue_unsupported",
-                "Choose a supported provider runtime.",
-                provider=profile.provider,
-            )
-        except (ProviderConnectionError, ProviderTimeoutError):
-            return self._result(
-                key,
-                (
-                    ModelReadinessState.RUNTIME_STOPPED
-                    if profile.local_only
-                    else ModelReadinessState.UNREACHABLE
-                ),
-                f"{label} is not reachable.",
-                "local_runtime_unreachable" if profile.local_only else "provider_unreachable",
-                f"Start or reconnect {label}, then check again.",
-                provider=profile.provider,
-            )
-        except ProviderRateLimitError:
-            return self._result(
-                key,
-                ModelReadinessState.UNREACHABLE,
-                f"{label} temporarily refused the catalogue check.",
-                "provider_rate_limited",
-                "Wait briefly, then check again.",
-                provider=profile.provider,
-            )
-        except ProviderResponseValidationError:
-            return self._result(
-                key,
-                ModelReadinessState.UNREACHABLE,
-                f"{label} returned an invalid model catalogue.",
-                "provider_catalogue_invalid",
-                "Check the endpoint and runtime version.",
-                provider=profile.provider,
-            )
-        except Exception:  # noqa: BLE001 - API output is deliberately classified
-            return self._result(
-                key,
-                ModelReadinessState.UNREACHABLE,
-                f"{label} could not complete the model check.",
-                "provider_probe_failed",
-                "Check the provider connection and try again.",
-                provider=profile.provider,
-            )
+        except Exception as exc:  # noqa: BLE001 - API output is deliberately classified
+            return refused(exc, ProbeStage.CATALOGUE)
         if not any(item.id == key.model for item in models):
             return self._result(
                 key,
@@ -523,73 +589,8 @@ class ProviderCatalogueProbe:
         if not profile.local_only:
             try:
                 await router.aprobe_model(effective)
-            except ProviderAuthenticationError:
-                return self._result(
-                    key,
-                    ModelReadinessState.AUTHENTICATION_FAILED,
-                    f"{label} rejected the saved credential during execution.",
-                    "provider_authentication_failed",
-                    "Update the provider credential and check again.",
-                    provider=profile.provider,
-                )
-            except ProviderWorkspaceRequiredError as exc:
-                return self._workspace_required(key, label, profile.provider, exc)
-            except ProviderQuotaExhaustedError:
-                return self._quota_exhausted(key, label, profile.provider)
-            except ProviderModelNotFoundError:
-                return self._result(
-                    key,
-                    ModelReadinessState.MODEL_MISSING,
-                    f"{label} lists {key.model}, but cannot execute it.",
-                    "provider_model_missing",
-                    "Choose a currently executable model, then check again.",
-                    provider=profile.provider,
-                )
-            except ProviderRateLimitError:
-                return self._result(
-                    key,
-                    ModelReadinessState.UNREACHABLE,
-                    f"{label} temporarily refused the execution check.",
-                    "provider_rate_limited",
-                    "Wait briefly, then check again.",
-                    provider=profile.provider,
-                )
-            except (ProviderConnectionError, ProviderTimeoutError):
-                return self._result(
-                    key,
-                    ModelReadinessState.UNREACHABLE,
-                    f"{label} cannot execute {key.model} with the current account.",
-                    "provider_execution_refused",
-                    "Review the provider credential, access, and billing, then check again.",
-                    provider=profile.provider,
-                )
-            except ProviderUnsupportedCapabilityError:
-                return self._result(
-                    key,
-                    ModelReadinessState.UNSUPPORTED,
-                    f"{label} does not support an execution readiness check.",
-                    "provider_execution_probe_unsupported",
-                    "Choose a provider that supports chat completions.",
-                    provider=profile.provider,
-                )
-            except ProviderResponseValidationError:
-                return self._result(
-                    key,
-                    ModelReadinessState.UNREACHABLE,
-                    f"{label} returned an invalid execution response.",
-                    "provider_execution_invalid",
-                    "Check the endpoint and model compatibility.",
-                    provider=profile.provider,
-                )
-            except Exception:  # noqa: BLE001 - public result remains classified
-                return self._result(
-                    key,
-                    ModelReadinessState.UNREACHABLE,
-                    f"{label} could not complete the execution check.",
-                    "provider_execution_probe_failed",
-                    "Check the provider account and try again.",
-                    provider=profile.provider,
-                )
+            except Exception as exc:  # noqa: BLE001 - public result remains classified
+                return refused(exc, ProbeStage.EXECUTION)
         return self._result(
             key,
             ModelReadinessState.READY,

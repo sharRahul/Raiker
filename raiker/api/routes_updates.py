@@ -26,9 +26,10 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
+from raiker.api.dependencies import workspace_root as _ws
+from raiker.api.schemas import StrictRequest
 from raiker.api.sessions import ApiSession
 from raiker.app.installation import (
     detect_installation,
@@ -44,16 +45,8 @@ from raiker.runtime.authority.models import Principal
 router = APIRouter()
 
 
-class ApplyUpdateRequest(BaseModel):
+class ApplyUpdateRequest(StrictRequest):
     confirm: bool = False
-
-
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[no-any-return]
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(_ws(request)).authenticate(request)
 
 
 def _view(payload: dict[str, Any], workspace: str | Path) -> dict[str, Any]:

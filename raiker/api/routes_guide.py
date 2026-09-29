@@ -14,16 +14,12 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
 from raiker.api.sessions import ApiSession
 from raiker.guide import list_sections, read_section
 from raiker.runtime.authority.models import Principal
 
 router = APIRouter()
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(request.app.state.workspace_root).authenticate(request)
 
 
 @router.get("/api/guide")

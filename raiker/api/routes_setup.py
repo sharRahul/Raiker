@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import authenticate as _auth
 from raiker.api.schemas import SetupBackupRequest, SetupUpdateRequest
 from raiker.api.sessions import ApiSession
 from raiker.app.backup import create_local_backup
@@ -15,10 +15,6 @@ from raiker.runtime.authority.models import Principal
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
-
-
-def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(request.app.state.workspace_root).authenticate(request)  # type: ignore[attr-defined]
 
 
 @router.get("/api/setup")

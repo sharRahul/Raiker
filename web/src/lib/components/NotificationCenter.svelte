@@ -25,6 +25,14 @@
   import { api, hasToken } from "../api";
   import { canRaiseDesktopNotice, raiseDesktopNotice } from "../desktopNotice";
   import { uiPrefs } from "../prefs.svelte";
+  import {
+    NOTICES_CHANGED,
+    NOTICE_RECORD,
+    announceNoticesChanged,
+    answeredByPage,
+    noticeDestination,
+    onNoticeRecord,
+  } from "../noticeDestination";
 
   /** How often unread notices are re-read. The record is not urgent; a notice
    *  about work that finished is still true a minute later. */
@@ -32,6 +40,43 @@
 
   let notifications = $state<RaikerNotification[]>([]);
   const unread = $derived(notifications.filter((notification) => !notification.read));
+
+  // The address, as state, for the same reason `ApprovalPrompt` keeps it:
+  // `window.location.hash` is not reactive, and a notice must leave the moment
+  // the owner arrives at the page that answers it, however they got there.
+  let hash = $state(typeof window !== "undefined" ? window.location.hash : "");
+  $effect(() => {
+    const follow = () => (hash = window.location.hash);
+    window.addEventListener("hashchange", follow);
+    return () => window.removeEventListener("hashchange", follow);
+  });
+
+  /**
+   * BUG-309 — what the dock may show on this page. A notice whose subject is
+   * the page on screen (an approval notice on Approvals, a finished run on
+   * Tasks) repeats a row of it, and on the record every notice is a row.
+   */
+  const shown = $derived(
+    onNoticeRecord(hash) ? [] : unread.filter((item) => !answeredByPage(item, hash)),
+  );
+
+  /**
+   * A notice the page has answered is read: the owner is looking at its
+   * subject. Marked through the same route opening one uses, so the bell's
+   * count agrees with the dock rather than counting what the page just showed.
+   * The record keeps it either way.
+   */
+  let marking = new Set<string>();
+  $effect(() => {
+    const answered = unread.filter(
+      (item) => answeredByPage(item, hash) && !marking.has(item.notification_id),
+    );
+    if (answered.length === 0) return;
+    for (const item of answered) marking.add(item.notification_id);
+    void Promise.allSettled(
+      answered.map((item) => api.markNotificationRead(item.notification_id)),
+    ).then(() => announceNoticesChanged());
+  });
 
   async function poll() {
     if (!hasToken()) return;
@@ -46,7 +91,14 @@
   $effect(() => {
     void poll();
     const timer = setInterval(() => void poll(), POLL_MS);
-    return () => clearInterval(timer);
+    // The bell's *Mark all read* changes what this should show; re-read now
+    // rather than keep a notice docked for up to thirty seconds after.
+    const reread = () => void poll();
+    window.addEventListener(NOTICES_CHANGED, reread);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener(NOTICES_CHANGED, reread);
+    };
   });
 
   /**
@@ -59,15 +111,14 @@
    * owner lands on the record rather than on a banner they have to ignore.
    */
   async function open(notification: RaikerNotification) {
-    window.location.hash =
-      notification.kind === "task_finished" ? "#/tasks" : "#/observe?tab=notifications";
+    window.location.hash = noticeDestination(notification.kind);
     try {
       await api.markNotificationRead(notification.notification_id);
     } catch {
       // The navigation already happened and the record is still the record.
       // A failed mark leaves the notice unread, which is the truth.
     }
-    await poll();
+    announceNoticesChanged();
   }
 
   // Mirror new unread notifications to the desktop through the one path every
@@ -85,14 +136,14 @@
         tag: item.notification_id,
         // C10 — clicking a notice about background work should land on the
         // work. Only for the kinds that have somewhere to land.
-        route: item.kind === "task_finished" ? "#/tasks" : undefined,
+        route: noticeDestination(item.kind),
       });
     }
   });
 </script>
 
-{#if uiPrefs.inApp && unread.length > 0}
-  {@const newest = unread[0]}
+{#if uiPrefs.inApp && shown.length > 0}
+  {@const newest = shown[0]}
   <section class="notifications" aria-label="Notifications">
     <!-- One, not a stack. Three docked cards covered Home's primary actions at
          1080p and most of the screen at 390px, which is a worse obstruction
@@ -101,10 +152,11 @@
     <button type="button" class="notice" onclick={() => void open(newest)}>
       <strong>{newest.title}</strong><span>{newest.body}</span>
     </button>
-    {#if unread.length > 1}
-      <a class="all" href="#/observe?tab=notifications"
-        >{unread.length} unread notices</a
-      >
+    {#if shown.length > 1}
+      <!-- Inside the card, on its surface: drawn beside it, the link read as
+           part of whatever page was underneath (BUG-309 found it across a
+           table's Status header). -->
+      <a class="all" href={NOTICE_RECORD}>{shown.length} unread notices</a>
     {/if}
   </section>
 {/if}
@@ -130,9 +182,13 @@
     z-index: var(--z-docked);
     width: min(24rem, calc(100vw - 40px));
     display: grid;
-    gap: var(--space-2);
-    justify-items: start;
+    border: 1px solid var(--warn-border, var(--neutral-border));
+    border-radius: var(--r-md);
+    background: var(--surface);
+    box-shadow: var(--shadow-2);
+    overflow: hidden;
   }
+  .notifications:hover { border-color: var(--accent-border, var(--neutral-border)); }
   .notice {
     display: grid;
     gap: 0.15rem;
@@ -140,20 +196,16 @@
     text-align: left;
     cursor: pointer;
     padding: 0.72rem 0.8rem;
-    border: 1px solid var(--warn-border, var(--neutral-border));
-    border-radius: var(--r-md);
-    background: var(--surface);
-    box-shadow: var(--shadow-2);
+    border: 0;
+    background: transparent;
   }
-  .notice:hover { border-color: var(--accent-border, var(--neutral-border)); }
   .notice strong { color: var(--text-1); font-size: var(--text-sm); }
   .notice span { color: var(--text-2); font-size: var(--text-sm); overflow-wrap: anywhere; }
   .all {
     color: var(--text-2);
     font-size: var(--text-sm);
-    padding: 0.2rem 0.5rem;
-    border-radius: var(--r-sm);
-    background: var(--surface);
-    box-shadow: var(--shadow-1);
+    padding: 0.45rem 0.8rem;
+    border-top: 1px solid var(--neutral-border);
   }
+  .all:hover { color: var(--text-1); }
 </style>

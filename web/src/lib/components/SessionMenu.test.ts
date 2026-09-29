@@ -156,6 +156,71 @@ describe("shared page feedback", () => {
     // A finished run lands on the work, not on a list about it.
     expect(window.location.hash).toBe("#/tasks");
   });
+
+  // BUG-309 — on Approvals the dock held "Approval needed" over the queue
+  // listing that approval, and its count link was drawn across the table.
+  it("on the page a notice is about, shows the others and marks that one read", async () => {
+    setToken("control-token");
+    window.location.hash = "#/approvals";
+    const fetchMock = stubFetch({
+      "GET /api/notifications": [
+        { notification_id: "ntf_a", kind: "approval_pending", title: "Approval needed", body: "Review it.", finding_id: null, subject_id: "apr_1", read: false, created_at: "2026-09-28T00:00:00Z" },
+        { notification_id: "ntf_s", kind: "security_alert", title: "Security finding", body: "Look.", finding_id: null, subject_id: null, read: false, created_at: "2026-09-28T00:00:00Z" },
+      ],
+      "POST /api/notifications/ntf_a/read": { ok: true },
+    });
+    render(NotificationCenter);
+
+    const strip = await screen.findByRole("region", { name: "Notifications" });
+    expect(strip).toHaveTextContent("Security finding");
+    expect(strip).not.toHaveTextContent("Approval needed");
+    // Only one notice is left to show, so there is no count to draw anywhere.
+    expect(screen.queryByRole("link", { name: /unread notices/ })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/notifications/ntf_a/read"),
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    window.location.hash = "";
+  });
+
+  it("docks nothing on the notification record, and marks nothing read there", async () => {
+    setToken("control-token");
+    window.location.hash = "#/observe?tab=notifications";
+    const fetchMock = stubFetch({
+      "GET /api/notifications": [
+        { notification_id: "ntf_s", kind: "security_alert", title: "Security finding", body: "Look.", finding_id: null, subject_id: null, read: false, created_at: "2026-09-28T00:00:00Z" },
+      ],
+    });
+    render(NotificationCenter);
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/notifications"), expect.anything()),
+    );
+    expect(screen.queryByRole("region", { name: "Notifications" })).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/read"),
+      expect.anything(),
+    );
+    window.location.hash = "";
+  });
+
+  it("opens an approval notice on Approvals rather than on the record", async () => {
+    setToken("control-token");
+    window.location.hash = "#/chat";
+    stubFetch({
+      "GET /api/notifications": [
+        { notification_id: "ntf_a", kind: "approval_pending", title: "Approval needed", body: "Review it.", finding_id: null, subject_id: "apr_1", read: false, created_at: "2026-09-28T00:00:00Z" },
+      ],
+      "POST /api/notifications/ntf_a/read": { ok: true },
+    });
+    render(NotificationCenter);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /Approval needed/ }));
+    expect(window.location.hash).toBe("#/approvals");
+    window.location.hash = "";
+  });
 });
 
 describe("session API contracts", () => {

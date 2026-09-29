@@ -33,10 +33,12 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from raiker.api.auth import AuthMiddleware
+from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.routes_instances import _require_loopback
+from raiker.api.schemas import StrictRequest
 from raiker.api.sessions import ApiSession
 from raiker.app.host import HostControl
 from raiker.app.service import registration
@@ -54,10 +56,6 @@ RESTART_EXIT_CODE = 75
 _STOP_DELAY_SECONDS = 0.35
 
 
-def _ws(request: Request) -> str | Path:
-    return request.app.state.workspace_root  # type: ignore[no-any-return]
-
-
 def _auth(request: Request) -> tuple[ApiSession, Principal]:
     return AuthMiddleware(_ws(request)).authenticate(request, required_scope="host_control")
 
@@ -71,11 +69,11 @@ def _port(request: Request) -> int:
     return saved if isinstance(saved, int) else 8765
 
 
-class PauseHostRequest(BaseModel):
+class PauseHostRequest(StrictRequest):
     reason: str | None = Field(default=None, max_length=200)
 
 
-class StopHostRequest(BaseModel):
+class StopHostRequest(StrictRequest):
     # False is the safe default: the first press reports what is in flight, and
     # the owner decides again knowing it.
     confirm: bool = False

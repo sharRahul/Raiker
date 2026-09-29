@@ -247,7 +247,7 @@
       <Runtime {principal} {settings} {save} />
     {/if}
     {#if dirty}
-      <div class="save-bar" role="region" aria-label="Unsaved settings changes">
+      <div class="save-bar" role="region" aria-label="Unsaved settings changes" data-dock-clear>
         <strong>You have unsaved changes</strong>
         <div><button class="btn btn-ghost" type="button" onclick={discard} disabled={saveState === "saving"}>Discard changes</button><button class="btn btn-primary" type="button" onclick={push} disabled={saveState === "saving"}>{saveState === "saving" ? "Saving…" : "Save changes"}</button></div>
       </div>

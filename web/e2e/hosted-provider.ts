@@ -383,7 +383,9 @@ export async function checkModelReady(page: Page, card: Locator): Promise<void> 
       // unclassified failure, and the helper was hanging on it — reporting a
       // provider this host cannot reach as a spec that had gone wrong.
       /can reach|could not be reached|cannot execute|not reachable|rejected|no credit|no quota|needs a workspace|identity-linked/i,
-    ),
+    ).first(),
+    // `.first()`: an exhausted account says so twice — a *No credit* chip and
+    // the outcome line — and either one is the outcome this waits for.
   ).toBeVisible({ timeout: 120_000 });
 }
 

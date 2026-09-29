@@ -25,6 +25,7 @@
   import Icon from "./Icon.svelte";
   import type { IconName } from "../icons";
   import { NAV_ITEMS, HUB_TABS, SIDEBAR_ITEM_IDS } from "../nav";
+  import { settingsSection } from "../settingsSections";
   import { activateModalDrawer, type DeactivateModalDrawer } from "../modalDrawer";
 
   let {
@@ -46,18 +47,6 @@
     href: string;
   }
 
-  const SETTINGS_LABELS: Record<string, string> = {
-    general: "General",
-    notification: "Notifications",
-    personalisation: "Personalisation",
-    security: "Security & sign-in",
-    privacy: "Privacy",
-    account: "Account",
-    "web-access": "Web access",
-    "git-credential": "Git credentials",
-    runtime: "Runtime",
-    updates: "Updates",
-  };
 
   const COMMANDS: Entry[] = [
     { id: "cmd-chat", label: "New chat", group: "Commands", hint: "Start a governed conversation", icon: "chat", href: "#/new-chat" },
@@ -80,10 +69,10 @@
 
   const SETTINGS: Entry[] = (HUB_TABS.settings ?? []).map((section) => ({
     id: `setting-${section}`,
-    label: SETTINGS_LABELS[section] ?? section,
+    label: settingsSection(section)?.label ?? section,
     group: "Settings" as const,
     hint: "Settings",
-    icon: "settings" as IconName,
+    icon: settingsSection(section)?.icon ?? ("settings" as IconName),
     href: `#/settings?tab=${section}`,
   }));
 

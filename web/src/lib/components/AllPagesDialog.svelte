@@ -31,6 +31,7 @@
    */
   import Icon from "./Icon.svelte";
   import { HUB_GROUPS, HUB_TABS } from "../nav";
+  import { settingsSection } from "../settingsSections";
   import { activateModalDrawer, type DeactivateModalDrawer } from "../modalDrawer";
 
   let {
@@ -54,20 +55,9 @@
    *
    * `HUB_TABS.settings` is the rail's order and the only list that is allowed
    * to disagree with it — the comment on that array says why. Reading it here
-   * rather than restating it means this window cannot drift from the rail.
+   * rather than restating it means this window cannot drift from the rail, and
+   * each section is named and drawn as the rail names and draws it.
    */
-  const SETTINGS_LABELS: Record<string, string> = {
-    general: "General",
-    notification: "Notifications",
-    personalisation: "Personalisation",
-    security: "Security & sign-in",
-    privacy: "Privacy",
-    account: "Account",
-    "web-access": "Web access",
-    "git-credential": "Git credentials",
-    runtime: "Runtime",
-    updates: "Updates",
-  };
 
   const groups = $derived.by(() => {
     const q = query.trim().toLowerCase();
@@ -99,9 +89,9 @@
       items: (HUB_TABS.settings ?? []).map((section) => ({
         href: `#/settings?tab=${section}`,
         id: `settings-${section}`,
-        label: SETTINGS_LABELS[section] ?? section,
+        label: settingsSection(section)?.label ?? section,
         hint: "",
-        icon: "settings" as never,
+        icon: (settingsSection(section)?.icon ?? "settings") as never,
       })),
     });
     if (q === "") return base;

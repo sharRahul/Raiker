@@ -41,6 +41,21 @@ describe("command palette", () => {
     expect(window.location.hash).toBe("#/settings?tab=privacy");
   });
 
+  it("names every settings section as the rail does", async () => {
+    // It kept a label table of its own, with no row for Memory engine — which
+    // was therefore offered as "memory-engine".
+    render(CommandPalette, { open: true });
+
+    await fireEvent.input(screen.getByRole("textbox", { name: /search pages/i }), {
+      target: { value: "engine" },
+    });
+
+    const option = screen.getByRole("option", { name: /memory engine/i });
+    expect(option).not.toHaveTextContent("memory-engine");
+    await fireEvent.click(option);
+    expect(window.location.hash).toBe("#/settings?tab=memory-engine");
+  });
+
   it("navigates with the keyboard alone", async () => {
     render(CommandPalette, { open: true });
     const box = screen.getByRole("textbox", { name: /search pages/i });

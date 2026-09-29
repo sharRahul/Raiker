@@ -48,3 +48,15 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { id: "memory-engine", label: "Memory engine", icon: "memory", group: "Developer & runtime" },
   { id: "updates", label: "Updates", icon: "refresh", group: "Developer & runtime" },
 ];
+
+const BY_ID = new Map(SETTINGS_SECTIONS.map((section) => [section.id, section]));
+
+/**
+ * One settings section by id, for the surfaces that list sections outside the
+ * rail — the command palette and All pages. They each kept a label table of
+ * their own, which had no row for Memory engine and named two sections
+ * differently from the rail (OPT-20).
+ */
+export function settingsSection(id: string): SettingsSection | undefined {
+  return BY_ID.get(id);
+}

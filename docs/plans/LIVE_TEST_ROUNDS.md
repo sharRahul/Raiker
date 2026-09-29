@@ -33,7 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
-| 2026-09-28 (third) | Targeted | `2026-09-28-docs-items-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that asked to run `python`, the key entered through the Connect dialog | Ten items from `docs/plans/`: BUG-309, Wave 0 and OPT-03, -04, -07, -12, -14 and -19, two stale index rows, and BUG-248's sign-ins. Proved live: readiness naming the provider from the registry; an approval notice docked on Home, opening Approvals, and absent there at 1440 and 390 wide with the bell agreeing; a misspelled field refused with 422; and every destination at both capture widths with **no 422, no 5xx and no console error**. **One defect found by the round and fixed in it** — the bell kept counting a notice the dock had just read |
+| 2026-09-28 (third) | Targeted | `2026-09-28-docs-items-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that asked to run `python`, the key entered through the Connect dialog | Ten items from `docs/plans/`: BUG-309, Wave 0 and OPT-03, -04, -07, -12, -14 and -19, two stale index rows, and BUG-248's sign-ins. Proved live: readiness naming the provider from the registry; an approval notice docked on Home, opening Approvals, and absent there at 1440 and 390 wide with the bell agreeing; a misspelled field refused with 422; and every destination at both capture widths with **no 422, no 5xx and no console error**. **Four defects found and fixed** — the bell kept counting a notice the dock had just read, an approval card covered Settings' **Save changes**, a disclosure closed when its default was chosen, and (by CI) shutdown closed a connection a worker was using. The key's credit ran out part-way through BUG-248's four conversions |
 | 2026-09-28 (second) | Targeted | `2026-09-28-review-closure-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that asked to run `python`, the key entered through the Connect dialog | Nine items from `docs/plans/` that closed three review documents: BUG-308 (CR-05, CR-09) by the owner's decision, CR-01, GCR-10, GCR-11, GCR-13, GCR-41 and GCR-43. Proved live: Permissions naming *Code with this machine's network* and saying, measured on this host, where scripts run; a real model's `python hello.py` approved under that capability, run, and recorded as `code_placement_classified`; a plugin card saying where its code would run; no stored key in four redacted answers; and every destination at four widths through the split store and service with **no console error**. **Five defects found by the round and fixed in it** — a fresh capability that would have refused `python` to an owner who had turned shell on, an approval that named the tool rather than the capability the code would run under, the same approval promising a rewind a command cannot have, and an approval card covering the composer's **Send** and staying over Approvals |
 | 2026-09-28 | Targeted | `2026-09-28-docs-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering and streaming real turns, the key entered through the Connect dialog | Ten items from `docs/plans/`: the owner's GEP-02 decision, six security-review findings, BUG-307, GCR-12 and GEP-03. Proved live: the stop switch counting and stopping **an answer being streamed** with no task running, the stopped turn keeping its text, the next turn answering; and every destination at four widths under `style-src 'self'` with **no CSP refusal**. **Two defects found by the round and fixed in it** — the first stop-all reported one answer as "1 answer being written and 1 task", and Home called a readiness read still in flight a failed one |
 | 2026-09-21 | Targeted | `2026-09-21-static-review-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering real turns; OpenAI and OpenRouter keys entered through the Connect dialog and refused by this host's egress policy; Ollama Cloud unreachable for the same reason | Ten items from `docs/plans/`: the static reviews' remaining instance, storage, transport, registry and version findings, the two API-hardening findings of the security review, and UX-BUILD-05. Proved live: two real turns over one pooled connection, every page under the new Content-Security-Policy with **no console refusals at four widths**, the build identity in Settings, and Build reopening the project it is running inside. **Four defects found by the round and fixed in it** — the live suite was never type-checked, four copies of one wait helper read a usable page as a stuck one, and `bug-242-build-restore` carried four separate stale assertions. GCR-10 was reduced rather than closed: its first fix removed the store's self-repair and eight tests said so |
@@ -128,7 +128,22 @@ before/after comparisons; the rest reach every page, and those are run here.
   have**, and its capture was taken while the queue was still loading. It now
   waits for the queue's filter and its first row.
 
-BUG248_PLACEHOLDER
+**BUG-248, four more — and the key ran out.** The next day's continuation
+converted `composer-parity-and-turn-honesty`, `fts5-mem03-bug194`,
+`mem04-bug194-observations` and `bug-37-39-40-41` to the shared sign-in and ran
+each against this workspace. All four signed in and then failed on product
+moves, brought up to the product; two failures were the product and were fixed
+in the round — an approval card covering Settings' **Save changes**
+([FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes)) and a disclosure that closed when its default was chosen
+([FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in)). Part-way through, the Anthropic account behind the
+round's key reported *no credit or quota left* — Raiker's readiness check said
+exactly that, and a direct request to the provider confirmed it — so the steps
+that followed were verified without a model turn:
+[BUG-248](TO_BE_FIXED.md#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body).
+
+**Found by CI, fixed.** The pull request's first CI run segfaulted: app shutdown
+closed a SQLCipher connection a still-running worker thread was using
+([FIXED-631](FIXED_ITEMS.md#fixed-631--shutting-a-workspace-down-closed-a-connection-another-thread-was-still-using)).
 
 ---
 

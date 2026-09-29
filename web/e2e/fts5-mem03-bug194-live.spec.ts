@@ -34,7 +34,10 @@ test("Memory names the embedding space recall actually searches (MEM-03)", async
   });
 
   await signInAsOwner(page, BASE);
-  await page.goto(`${BASE}/#/memory`);
+  // REM-MEM-03 moved the engine's controls off the page for reading your own
+  // memories: *Recall & indexing* keeps whether recall matches meaning or words,
+  // and links to Settings → Memory engine, where the space is chosen.
+  await page.goto(`${BASE}/#/memory?tab=recall`);
   await expect(page.getByRole("heading", { name: "Recall backend" })).toBeVisible({
     timeout: 30_000,
   });
@@ -49,25 +52,21 @@ test("Memory names the embedding space recall actually searches (MEM-03)", async
   await expect(posture).toContainText(/matches words, not meaning/i);
   // The honest half: the sentence says what this backend *cannot* do.
   await expect(posture).toHaveAttribute("data-semantic", "false");
+  await expect(card.getByRole("link", { name: /Change the recall backend/ })).toHaveAttribute(
+    "href",
+    "#/settings?tab=memory-engine",
+  );
+  await capture(page, `${SHOTS}/r0817-01-memory-recall-backend.png`);
 
   // A default install holds no semantic vectors, so "Automatic" is the only
   // honest option — the picker offers what the workspace really has, not a
-  // catalogue of what Raiker could in principle call.
-  const picker = card.getByLabel("Recall backend");
+  // catalogue of what Raiker could in principle call. MEM-11's account of what
+  // the setting governs moved to the guide's *Recall backend and token budget*.
+  await page.goto(`${BASE}/#/settings?tab=memory-engine`);
+  const picker = page.getByLabel("Recall backend");
+  await expect(picker).toBeVisible({ timeout: 30_000 });
   await expect(picker).toHaveValue("auto");
 
-  // MEM-11 — the setting used to govern only the memories Raiker attaches on
-  // its own; the search the assistant ran itself ignored it. The card may only
-  // make this claim now that both paths go through one retrieval.
-  // A plain string, not a regex: Playwright normalizes whitespace for string
-  // matchers and does not for regex ones, and this sentence wraps in the
-  // source — so the regex form fails against the raw text node for a reason
-  // that has nothing to do with the product.
-  await expect(card.locator("p.control-note")).toContainText(
-    "recalls on its own and to the ones the assistant looks up",
-  );
-
-  await capture(page, `${SHOTS}/r0817-01-memory-recall-backend.png`);
   expect(consoleErrors).toEqual([]);
 });
 
@@ -117,7 +116,9 @@ test("chat search is answered by the FTS5 index, with a marked snippet (MEM-05)"
   const search = page.getByRole("searchbox").or(page.getByRole("textbox")).first();
   await expect(search).toBeVisible({ timeout: 30_000 });
   await search.fill("rotation");
-  await page.waitForTimeout(2_500);
+  // Typing narrows the thread board; reading message text across every
+  // conversation is its own, explicit question since NEW-THREAD-01.
+  await page.getByRole("button", { name: "Search message text" }).click();
 
   // What this proves live: the FTS5 index really is what answers chat search,
   // and the hit comes back with a *marked snippet* quoting the matched term.
@@ -132,7 +133,10 @@ test("chat search is answered by the FTS5 index, with a marked snippet (MEM-05)"
   // asserting order against the group would be measuring the grouping.
   // `tests/test_text_search_fts5.py` asserts the ranking directly, against the
   // case MEM-05 describes.
-  await expect(page.getByText(/matching conversation/i)).toBeVisible({ timeout: 15_000 });
+  // The result line names the question it answered: "N conversations mention “…”".
+  await expect(page.getByText(/conversations? mentions? “rotation”/i)).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(page.getByText(/“[^”]*rotation[^”]*”/i).first()).toBeVisible({ timeout: 15_000 });
 
   await capture(page, `${SHOTS}/r0817-03-chat-search-bm25-ranked.png`);

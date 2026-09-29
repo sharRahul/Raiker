@@ -75,7 +75,9 @@ test("a governed read is recorded as an observation, and Memory shows it (MEM-04
   await expect(page.getByText(/Tuesday/i).first()).toBeVisible({ timeout: 180_000 });
   await page.waitForTimeout(2_000);
 
-  await page.goto(`${BASE}/#/memory`);
+  // Observations sit on Memory's *Suggestions* tab now, beside the other
+  // things the runtime noticed and nothing decided yet; Memory opens on Overview.
+  await page.goto(`${BASE}/#/memory?tab=suggestions`);
   const observations = page.locator("section[aria-label='Observations']");
   await expect(observations.getByRole("heading", { name: "Observations" })).toBeVisible({
     timeout: 30_000,

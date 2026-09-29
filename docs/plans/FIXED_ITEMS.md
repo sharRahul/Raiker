@@ -652,6 +652,9 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-628](#fixed-628--a-workflow-of-its-own-to-grep-five-documents-and-two-validators-that-ran-nowhere) | Low | CI / workflows | Fixed 2026-09-28 (closes OPT-19) — and two validators that ran nowhere |
 | [FIXED-629](#fixed-629--a-simplification-could-only-estimate-what-it-had-removed) | Low | CI / measurement | Fixed 2026-09-28 (closes Wave 0 of the optimisation review) |
 | [FIXED-630](#fixed-630--two-indexes-still-called-closed-work-open) | Low | Documentation / plans | Fixed 2026-09-28 — raised and closed in the same run |
+| [FIXED-631](#fixed-631--shutting-a-workspace-down-closed-a-connection-another-thread-was-still-using) | Medium | Storage / concurrency | Fixed 2026-09-29 — found by this change's CI run |
+| [FIXED-632](#fixed-632--an-approval-card-covered-settings-save-changes) | Medium | Web UI / approvals | Fixed 2026-09-29 — found converting a live spec for BUG-248 |
+| [FIXED-633](#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in) | Low | Web UI / Settings | Fixed 2026-09-29 — found converting a live spec for BUG-248 |
 
 ---
 
@@ -27217,3 +27220,83 @@ status column naming each closing record, with the table itself kept as the
 
 **Evidence.** `tests/test_docs_consistency.py` resolves every link the two
 documents now carry.
+
+---
+
+## FIXED-631 — Shutting a workspace down closed a connection another thread was still using
+
+**Severity: Medium. Area: Storage / concurrency. Status: Fixed 2026-09-29 —
+found by this change's own CI run, which segfaulted.**
+
+**Observed.** CI's Python job died with `Segmentation fault` in
+`test_instance_runtime_lifecycle.py`. The dump showed two threads on one
+SQLCipher handle: the knowledge-map watcher, in a `to_thread` worker,
+bootstrapping a store (`_add_reminder_delivery_columns` is only where it happened
+to be), and the app's shutdown calling `invalidate_workspace_connections`, which
+closed every cached connection for the workspace — that worker's included.
+Cancelling the task that awaits a `to_thread` call does not stop the thread, so
+the worker was still mid-statement when its handle was closed under it.
+
+**Root cause.** The module states the invariant itself — "another live worker's
+handle is still never touched: closing one would be a use-after-close in that
+worker" — and eviction and memory-pressure release keep it. Invalidation did
+not. It was the one path that closed handles by workspace rather than by owner.
+
+**Fixed.** `invalidate_workspace_connections` still takes every handle for the
+workspace out of the cache at once, so nothing reuses one. It closes this
+thread's own and those of threads that have exited; a live worker's handle is
+*retired*, and that worker closes it on its next `connect()`. A retired handle
+whose worker has since exited is closed by whichever thread next notices, and
+process exit closes the rest.
+
+**Evidence.** Two tests in `tests/test_sqlite_connection_cache.py` — a live
+worker's handle is still usable after another thread invalidates the workspace
+and is closed when the worker returns; a retired handle whose worker exited is
+closed by the next `connect()`. Both fail against the previous code, and the full
+Python suite passes locally with the fix.
+
+---
+
+## FIXED-632 — An approval card covered Settings' Save changes
+
+**Severity: Medium. Area: Web UI / approvals. Status: Fixed 2026-09-29 — found
+while converting `composer-parity-and-turn-honesty-live` for BUG-248.**
+
+**Observed.** With an approval pending from any conversation, the docked
+*Approval needed* card sat over Settings' sticky **Save changes** bar and took
+the click: Playwright reported the card intercepting pointer events 400 times
+before giving up. A setting could not be saved until the owner dismissed a card
+about something else. The retention step of the spec had passed on one run and
+timed out on the next, and the difference was whether an approval was waiting.
+
+**Root cause.** [FIXED-621](#fixed-621--an-approval-card-from-another-conversation-covered-the-composers-send)
+taught the card to rise above a `.composer-card`, and only that.
+
+**Fixed.** The card keeps clear of any bottom action bar that marks itself
+`data-dock-clear`, as well as composers; Settings' save bar does. It was the only
+other sticky bottom bar in the product.
+
+**Evidence.** `ApprovalPrompt.test.ts` — *rises above any bottom action bar that
+asks to be kept clear*; and the spec's retention step, which now saves in both
+directions with two approvals pending (8 of 8 passed).
+
+---
+
+## FIXED-633 — Choosing the default density closed the panel it was chosen in
+
+**Severity: Low. Area: Web UI / Settings. Status: Fixed 2026-09-29 — found while
+converting `bug-37-39-40-41-live` for BUG-248.**
+
+**Observed.** Density and typeface live under a *Layout & type* disclosure that
+opens by itself when either is not the default. That was its only rule
+(`open={tuned}`), so choosing **Comfortable** — the default — made `tuned` false
+and the disclosure closed under the owner's pointer, taking the control they had
+just used with it.
+
+**Fixed.** The disclosure opens by itself for a tuned value until the owner
+opens or closes it; from then on their choice holds.
+
+**Evidence.** `web/src/lib/views/settings/Personalisation.test.ts` — the second
+case fails against the previous code; and the spec's density test, which now
+chooses Comfortable, then Compact, then Comfortable again, and measures a real
+row shorten.

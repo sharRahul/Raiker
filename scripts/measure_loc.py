@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Measure Raiker's handwritten source, so simplification is reported, not guessed.
 
 Wave 0 of the codebase optimisation review: before any refactor claims to have

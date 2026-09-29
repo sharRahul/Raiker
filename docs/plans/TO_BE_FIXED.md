@@ -121,7 +121,7 @@ names.
 | [BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more) | Low | Live test harness / evidence | **Closed 2026-09-15 ([FIXED-541](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more))** — six rounds blocked on a key, then three stale selectors |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
-| [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-28 to **nine**; `review-readiness-probe-live` and `c17-b14-recall-and-inline-diff-live` were converted and re-run, and each then failed on steps the product had moved since — both brought up to the product, not relaxed. Three must keep their own |
+| [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven need a provider this host cannot reach ([BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host)) |
 | [BUG-249](FIXED_ITEMS.md#fixed-326--a-fixed_items-link-pointed-at-a-heading-that-does-not-exist) | Low | Documentation / CI | **Closed 2026-08-30 (FIXED-326)** — one line, and `test_docs_consistency` is green |
 | [BUG-250](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject) | Low | Live test harness | **Closed 2026-09-15 ([FIXED-549](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject))** — `roundName()` gives each round its own subject |
 | [BUG-251](FIXED_ITEMS.md#fixed-352--every-path-an-owner-typed-was-a-path-they-had-to-know) | Medium | Web UI / file and folder selection | **Closed 2026-09-03 (FIXED-352)** — the host lists directory names and one `PathPicker` serves all four fields |
@@ -819,6 +819,41 @@ reduced from twenty-seven to twenty the same day
 ([FIXED-328](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite)),
 to **twelve** on 2026-09-04, to eleven on 2026-09-21 and to **nine** on
 2026-09-28.**
+
+**2026-09-29 — four more, and two product defects behind them.**
+`composer-parity-and-turn-honesty-live`, `fts5-mem03-bug194-live`,
+`mem04-bug194-observations-live` and `bug-37-39-40-41-live` sign in through
+`signInAsOwner`. Each signed in on its first run and then failed on the product
+having moved — Memory's recall posture now on *Recall & indexing* with the picker
+on Settings → Memory engine, Observations on *Suggestions*, the terminal button
+named *Show the governed terminal*, Tasks opening on its composer, message search
+an explicit **Search message text**, density under a disclosure — and each was
+brought up to the product rather than relaxed. Two of the failures were the
+product, not the spec, and are fixed:
+
+* the retention step passed on one run and timed out on the next because an
+  approval card covered Settings' **Save changes**
+  ([FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes));
+* choosing *Comfortable* closed the disclosure it was chosen in
+  ([FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in)).
+
+`checkModelReady` now takes the first outcome it finds: an exhausted account
+says so twice, as a chip and as the outcome line. That is how the round found
+the provided key's credit balance exhausted part-way through, confirmed against
+the provider directly. Every step of the four was run live after its edit;
+`fts5`'s second test could not be re-run end to end after that point, so its
+corrected search step was driven on its own against the transcript its earlier
+turn had written, and passed.
+
+**The count, recounted.** This entry counted sign-ins inside a test body.
+Counting every live spec that signs in without the shared helper gives ten after
+this pass: `review-first-run-honesty`, `wizard-workbench-composer` and
+`workbench` must keep their own, and `add-01-container-providers`,
+`add-03-machine-identity-providers`, `bug-29-34`, `bug-36-38-42-43`,
+`bug-69-model-readiness`, `governed-shell-provider-matrix` and
+`review-provider-matrix` each need OpenRouter, OpenAI, Gemini or Ollama, which
+this host cannot reach — so they cannot be re-run here, and the rule below says
+they are not converted blind.
 
 **2026-09-28 — two more, and the one reverted on 2026-09-04 among them.**
 `review-readiness-probe-live` and `c17-b14-recall-and-inline-diff-live`, run

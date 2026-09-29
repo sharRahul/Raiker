@@ -221,7 +221,8 @@ test("a governed command names the backend that ran it", async () => {
   // BUG-197 — the run list and the receipt must agree. With no command run yet
   // the pane still states its environment, which is the surface the row joins.
   await page.goto(`${BASE}/#/build`);
-  const pane = page.getByRole("button", { name: /Governed terminal/ });
+  // Named for what pressing it does — "Show the governed terminal".
+  const pane = page.getByRole("button", { name: /governed terminal/i });
   await expect(pane).toBeVisible({ timeout: 30_000 });
   await pane.click();
   await expect(page.getByText(/Commands start through the governed agent path/)).toBeVisible();

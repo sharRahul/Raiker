@@ -166,7 +166,12 @@
    * another conversation, a new chat could not choose a model or send until the
    * owner dismissed a card about something else. The card now sits above any
    * composer it would overlap, and back in its corner when there is none.
+   *
+   * And above any other bottom action bar that says so with `data-dock-clear`:
+   * the third 2026-09-28 round found the card over Settings' **Save changes**,
+   * so a change could not be saved while an approval was waiting elsewhere.
    */
+  const KEEP_CLEAR = ".composer-card, [data-dock-clear]";
   const DOCK_BOTTOM = 18;
   const DOCK_RIGHT = 20;
   let lift = $state(0);
@@ -178,8 +183,8 @@
     const width = card?.offsetWidth || 336;
     const left = window.innerWidth - DOCK_RIGHT - width;
     let clearance = 0;
-    for (const composer of document.querySelectorAll<HTMLElement>(".composer-card")) {
-      const rect = composer.getBoundingClientRect();
+    for (const surface of document.querySelectorAll<HTMLElement>(KEEP_CLEAR)) {
+      const rect = surface.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0 || rect.right <= left) continue;
       clearance = Math.max(clearance, window.innerHeight - rect.top + 12 - DOCK_BOTTOM);
     }

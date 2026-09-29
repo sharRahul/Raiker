@@ -3,28 +3,6 @@ from __future__ import annotations
 import pytest
 
 from raiker.control.dtos import (
-    REASON_AI_CANNOT_APPROVE_OWN_ACTION,
-    REASON_AI_CANNOT_GRANT_ROLES,
-    REASON_AI_CANNOT_MANAGE_RUNTIME_GATES,
-    REASON_AI_ENABLE_RUNTIME_GATE,
-    REASON_APPROVAL_REQUIRED,
-    REASON_CANNOT_ASSIGN_HUMAN_ROLE_TO_AI,
-    REASON_CAPABILITY_REQUIRES_ACTIVATION_TASK,
-    REASON_CRITICAL_REQUIRES_HUMAN,
-    REASON_DENIED_BY_POLICY,
-    REASON_DISABLED_BY_CAPABILITY_GATE,
-    REASON_DOMAIN_SCOPE_DENIED,
-    REASON_INVALID_TARGET_STATE,
-    REASON_NOT_RUNTIME_GATE_MANAGER,
-    REASON_ONLY_GATE_MANAGER_CAN_ENABLE,
-    REASON_ONLY_GATE_MANAGER_CAN_MANAGE,
-    REASON_PRINCIPAL_EXPIRED,
-    REASON_PRINCIPAL_NOT_ACTIVE,
-    REASON_RISK_ACCEPTANCE_REQUIRED,
-    REASON_RUNTIME_MODE_NOT_ACTIVATED,
-    REASON_UNKNOWN_CAPABILITY,
-    REASON_UNKNOWN_CAPABILITY_GATE,
-    REASON_UNKNOWN_RUNTIME_MODE,
     CapabilityGateView,
     ControlPrincipalRef,
     ControlResult,
@@ -301,48 +279,3 @@ class TestRuntimeReadinessView:
         dto = RuntimeReadinessView(mode=mode)
         assert dto.gates == ()
         assert dto.summary == {}
-
-
-class TestReasonCodeConstants:
-    def test_values_match_authority_strings(self) -> None:
-        assert REASON_NOT_RUNTIME_GATE_MANAGER == "not_runtime_gate_manager"
-        assert REASON_ONLY_GATE_MANAGER_CAN_MANAGE == "only_runtime_gate_manager_can_manage_gates"
-        assert REASON_ONLY_GATE_MANAGER_CAN_ENABLE == "only_runtime_gate_manager_can_enable_gates"
-        assert REASON_AI_CANNOT_MANAGE_RUNTIME_GATES == "ai_cannot_manage_runtime_gates"
-        assert REASON_AI_ENABLE_RUNTIME_GATE == "ai_cannot_enable_runtime_gate"
-        assert REASON_DISABLED_BY_CAPABILITY_GATE == "disabled_by_capability_gate"
-        assert REASON_UNKNOWN_CAPABILITY_GATE == "unknown_capability_gate"
-        assert REASON_UNKNOWN_CAPABILITY == "unknown_capability"
-        assert REASON_INVALID_TARGET_STATE == "invalid_target_state"
-        assert REASON_RUNTIME_MODE_NOT_ACTIVATED == "runtime_mode_not_activated"
-        assert REASON_CAPABILITY_REQUIRES_ACTIVATION_TASK == "capability_requires_activation_task"
-        assert REASON_UNKNOWN_RUNTIME_MODE == "unknown_runtime_mode"
-        assert REASON_PRINCIPAL_NOT_ACTIVE == "principal_not_active"
-        assert REASON_PRINCIPAL_EXPIRED == "principal_expired"
-        assert REASON_DOMAIN_SCOPE_DENIED == "domain_scope_denied"
-        assert REASON_CANNOT_ASSIGN_HUMAN_ROLE_TO_AI == "cannot_assign_human_role_to_ai"
-        assert REASON_AI_CANNOT_APPROVE_OWN_ACTION == "ai_cannot_approve_own_action"
-        assert REASON_AI_CANNOT_GRANT_ROLES == "ai_cannot_grant_roles"
-        assert REASON_CRITICAL_REQUIRES_HUMAN == "critical_action_requires_human_confirmation"
-        assert REASON_DENIED_BY_POLICY == "denied_by_policy"
-        assert REASON_APPROVAL_REQUIRED == "approval_required"
-        assert REASON_RISK_ACCEPTANCE_REQUIRED == "risk_acceptance_required"
-
-    def test_no_secret_patterns_in_constant_values(self) -> None:
-        import raiker.control.dtos as dtos
-
-        for name in dir(dtos):
-            val = getattr(dtos, name)
-            if name.startswith("REASON_") and isinstance(val, str):
-                for pat in SECRET_PATTERNS:
-                    if pat in val.lower():
-                        pytest.fail(f"{name} value contains secret pattern '{pat}': {val}")
-
-    def test_constants_are_exported(self) -> None:
-        import raiker.control
-
-        assert raiker.control.REASON_NOT_RUNTIME_GATE_MANAGER == "not_runtime_gate_manager"
-        assert raiker.control.REASON_ONLY_GATE_MANAGER_CAN_MANAGE == "only_runtime_gate_manager_can_manage_gates"
-        assert raiker.control.REASON_ONLY_GATE_MANAGER_CAN_ENABLE == "only_runtime_gate_manager_can_enable_gates"
-        assert raiker.control.REASON_AI_CANNOT_MANAGE_RUNTIME_GATES == "ai_cannot_manage_runtime_gates"
-        assert raiker.control.REASON_AI_ENABLE_RUNTIME_GATE == "ai_cannot_enable_runtime_gate"

@@ -5,32 +5,8 @@ from typing import Any
 
 from raiker.contracts.views import View
 
-# ── ReasonCode constants ──────────────────────────────────────────────
-# Values match the denial strings returned by RuntimeAuthority so callers
-# can branch on them without coupling to prose.
-
-REASON_NOT_RUNTIME_GATE_MANAGER: str = "not_runtime_gate_manager"
-REASON_ONLY_GATE_MANAGER_CAN_MANAGE: str = "only_runtime_gate_manager_can_manage_gates"
-REASON_ONLY_GATE_MANAGER_CAN_ENABLE: str = "only_runtime_gate_manager_can_enable_gates"
-REASON_AI_CANNOT_MANAGE_RUNTIME_GATES: str = "ai_cannot_manage_runtime_gates"
-REASON_AI_ENABLE_RUNTIME_GATE: str = "ai_cannot_enable_runtime_gate"
-REASON_DISABLED_BY_CAPABILITY_GATE: str = "disabled_by_capability_gate"
-REASON_UNKNOWN_CAPABILITY_GATE: str = "unknown_capability_gate"
-REASON_UNKNOWN_CAPABILITY: str = "unknown_capability"
-REASON_INVALID_TARGET_STATE: str = "invalid_target_state"
-REASON_RUNTIME_MODE_NOT_ACTIVATED: str = "runtime_mode_not_activated"
-REASON_CAPABILITY_REQUIRES_ACTIVATION_TASK: str = "capability_requires_activation_task"
-REASON_UNKNOWN_RUNTIME_MODE: str = "unknown_runtime_mode"
-REASON_PRINCIPAL_NOT_ACTIVE: str = "principal_not_active"
-REASON_PRINCIPAL_EXPIRED: str = "principal_expired"
-REASON_DOMAIN_SCOPE_DENIED: str = "domain_scope_denied"
-REASON_CANNOT_ASSIGN_HUMAN_ROLE_TO_AI: str = "cannot_assign_human_role_to_ai"
-REASON_AI_CANNOT_APPROVE_OWN_ACTION: str = "ai_cannot_approve_own_action"
-REASON_AI_CANNOT_GRANT_ROLES: str = "ai_cannot_grant_roles"
-REASON_CRITICAL_REQUIRES_HUMAN: str = "critical_action_requires_human_confirmation"
-REASON_DENIED_BY_POLICY: str = "denied_by_policy"
-REASON_APPROVAL_REQUIRED: str = "approval_required"
-REASON_RISK_ACCEPTANCE_REQUIRED: str = "risk_acceptance_required"
+# The reasons a control action is refused are `AuthorityReason`, in
+# `raiker/runtime/authority/reason_codes.py` (OPT-18).
 
 
 # ── DTOs ──────────────────────────────────────────────────────────────

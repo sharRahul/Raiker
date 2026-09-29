@@ -24,26 +24,25 @@ if TYPE_CHECKING:
 class ExecutionStore:
 
     def insert_budget_record(self: SQLiteStore, budget: BudgetRecord) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO budget_records
-                (budget_id, name, max_cost, current_cost, currency, scope, enabled, created_by, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    budget.budget_id,
-                    budget.name,
-                    budget.max_cost,
-                    budget.current_cost,
-                    budget.currency,
-                    budget.scope,
-                    int(budget.enabled),
-                    budget.created_by,
-                    budget.created_at,
-                    budget.updated_at,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO budget_records
+            (budget_id, name, max_cost, current_cost, currency, scope, enabled, created_by, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                budget.budget_id,
+                budget.name,
+                budget.max_cost,
+                budget.current_cost,
+                budget.currency,
+                budget.scope,
+                int(budget.enabled),
+                budget.created_by,
+                budget.created_at,
+                budget.updated_at,
+            ),
+        )
 
     def list_budget_records(self: SQLiteStore, enabled_only: bool = False) -> list[dict[str, Any]]:
         query = "SELECT * FROM budget_records"
@@ -51,46 +50,40 @@ class ExecutionStore:
         if enabled_only:
             query += " WHERE enabled = 1"
         query += " ORDER BY created_at DESC"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def load_budget_record(self: SQLiteStore, budget_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM budget_records WHERE budget_id = ?", (budget_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM budget_records WHERE budget_id = ?", (budget_id,))
         return dict(row) if row else None
 
     def update_budget_cost(self: SQLiteStore, budget_id: str, additional_cost: float) -> bool:
-        with self.connect() as connection:
-            cursor = connection.execute(
-                "UPDATE budget_records SET current_cost = current_cost + ?, updated_at = ? WHERE budget_id = ?",
-                (additional_cost, utc_now(), budget_id),
-            )
-        return cursor.rowcount > 0
+        changed = self._execute(
+            "UPDATE budget_records SET current_cost = current_cost + ?, updated_at = ? WHERE budget_id = ?",
+            (additional_cost, utc_now(), budget_id),
+        )
+        return changed > 0
 
 
     def insert_remote_execution_profile(self: SQLiteStore, profile: RemoteExecutionProfile) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO remote_execution_profiles
-                (profile_id, profile_type, name, config_json, enabled, created_by, created_at, updated_at, owner_principal_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    profile.profile_id,
-                    profile.profile_type,
-                    profile.name,
-                    profile.config_json,
-                    int(profile.enabled),
-                    profile.created_by,
-                    profile.created_at,
-                    profile.updated_at,
-                    profile.created_by,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO remote_execution_profiles
+            (profile_id, profile_type, name, config_json, enabled, created_by, created_at, updated_at, owner_principal_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                profile.profile_id,
+                profile.profile_type,
+                profile.name,
+                profile.config_json,
+                int(profile.enabled),
+                profile.created_by,
+                profile.created_at,
+                profile.updated_at,
+                profile.created_by,
+            ),
+        )
 
     def list_remote_execution_profiles(
         self: SQLiteStore, enabled_only: bool = False, *, owner_principal_id: str | None = None
@@ -106,35 +99,31 @@ class ExecutionStore:
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY created_at DESC"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def load_remote_execution_profile(
         self: SQLiteStore, profile_id: str, *, owner_principal_id: str
     ) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM remote_execution_profiles WHERE profile_id = ? AND owner_principal_id = ?",
-                (profile_id, owner_principal_id),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM remote_execution_profiles WHERE profile_id = ? AND owner_principal_id = ?",
+            (profile_id, owner_principal_id),
+        )
         return dict(row) if row else None
 
     def select_execution_environment(self: SQLiteStore, owner_principal_id: str, profile_id: str) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO execution_environment_selection VALUES (?, ?, ?)
-                ON CONFLICT(owner_principal_id) DO UPDATE SET profile_id = excluded.profile_id,
-                selected_at = excluded.selected_at""",
-                (owner_principal_id, profile_id, utc_now()),
-            )
+        self._execute(
+            """INSERT INTO execution_environment_selection VALUES (?, ?, ?)
+            ON CONFLICT(owner_principal_id) DO UPDATE SET profile_id = excluded.profile_id,
+            selected_at = excluded.selected_at""",
+            (owner_principal_id, profile_id, utc_now()),
+        )
 
     def selected_execution_environment(self: SQLiteStore, owner_principal_id: str) -> str:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT profile_id FROM execution_environment_selection WHERE owner_principal_id = ?",
-                (owner_principal_id,),
-            ).fetchone()
+        row = self._row(
+            "SELECT profile_id FROM execution_environment_selection WHERE owner_principal_id = ?",
+            (owner_principal_id,),
+        )
         return str(row["profile_id"]) if row else "local_native"
 
     def execution_environment_was_chosen(self: SQLiteStore, owner_principal_id: str) -> bool:
@@ -145,11 +134,10 @@ class ExecutionStore:
         chose the host has chosen its network, and one who never chose anything
         gets the network-isolated sandbox wherever this machine has one.
         """
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT 1 FROM execution_environment_selection WHERE owner_principal_id = ?",
-                (owner_principal_id,),
-            ).fetchone()
+        row = self._row(
+            "SELECT 1 FROM execution_environment_selection WHERE owner_principal_id = ?",
+            (owner_principal_id,),
+        )
         return row is not None
 
     @staticmethod
@@ -286,35 +274,33 @@ class ExecutionStore:
             "provider_unavailable",
         }:
             raise ValueError("invalid_cloud_cost_event")
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO cloud_execution_cost_ledger
-                (event_id, owner_principal_id, profile_id, action_id, event_type, amount,
-                 provider_reference, reason, recorded_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    new_id("cost_"),
-                    owner_principal_id,
-                    profile_id,
-                    action_id,
-                    event_type,
-                    str(Decimal(str(max(amount, 0)))),
-                    provider_reference,
-                    reason,
-                    utc_now(),
-                ),
-            )
+        self._execute(
+            """INSERT INTO cloud_execution_cost_ledger
+            (event_id, owner_principal_id, profile_id, action_id, event_type, amount,
+             provider_reference, reason, recorded_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                new_id("cost_"),
+                owner_principal_id,
+                profile_id,
+                action_id,
+                event_type,
+                str(Decimal(str(max(amount, 0)))),
+                provider_reference,
+                reason,
+                utc_now(),
+            ),
+        )
 
     def cloud_execution_cost_summary(
         self: SQLiteStore, owner_principal_id: str, profile_id: str, *, max_cost: float | None = None
     ) -> dict[str, Any]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT * FROM cloud_execution_cost_ledger
-                WHERE owner_principal_id = ? AND profile_id = ?
-                ORDER BY rowid""",
-                (owner_principal_id, profile_id),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT * FROM cloud_execution_cost_ledger
+            WHERE owner_principal_id = ? AND profile_id = ?
+            ORDER BY rowid""",
+            (owner_principal_id, profile_id),
+        )
         actual, reserved, provider_spend, history = self._cloud_cost_totals(list(rows))
         limit = Decimal(str(max_cost)) if max_cost is not None else None
         committed = max(actual, provider_spend) + reserved
@@ -340,26 +326,25 @@ class ExecutionStore:
         }
 
     def insert_execution_budget(self: SQLiteStore, budget: ExecutionBudget) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO execution_budgets
-                (budget_id, name, max_cost, current_cost, currency, profile_id, enabled, created_by, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    budget.budget_id,
-                    budget.name,
-                    budget.max_cost,
-                    budget.current_cost,
-                    budget.currency,
-                    budget.profile_id,
-                    int(budget.enabled),
-                    budget.created_by,
-                    budget.created_at,
-                    budget.updated_at,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO execution_budgets
+            (budget_id, name, max_cost, current_cost, currency, profile_id, enabled, created_by, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                budget.budget_id,
+                budget.name,
+                budget.max_cost,
+                budget.current_cost,
+                budget.currency,
+                budget.profile_id,
+                int(budget.enabled),
+                budget.created_by,
+                budget.created_at,
+                budget.updated_at,
+            ),
+        )
 
     def list_execution_budgets(self: SQLiteStore, enabled_only: bool = False) -> list[dict[str, Any]]:
         query = "SELECT * FROM execution_budgets"
@@ -367,6 +352,5 @@ class ExecutionStore:
         if enabled_only:
             query += " WHERE enabled = 1"
         query += " ORDER BY created_at DESC"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]

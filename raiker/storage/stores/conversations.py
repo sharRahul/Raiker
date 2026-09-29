@@ -47,15 +47,14 @@ class ConversationStore:
         # conversation, "task" for the server-owned session a task runs in). A
         # provenance label only: it grants nothing and hides nothing, it just
         # lets a "recent conversations" list mean conversations (BUG-10).
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR IGNORE INTO sessions
-                (session_id, project_root, created_at, updated_at, status, title, user_id, project_id, origin)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (session_id, project_root, now, now, "open", title, user_id, project_id, origin),
-            )
+        self._execute(
+            """
+            INSERT OR IGNORE INTO sessions
+            (session_id, project_root, created_at, updated_at, status, title, user_id, project_id, origin)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (session_id, project_root, now, now, "open", title, user_id, project_id, origin),
+        )
 
     def set_session_origin(self: SQLiteStore, session_id: str, origin: str) -> None:
         """Stamp an existing session's provenance.
@@ -65,16 +64,10 @@ class ConversationStore:
         calls this so an Inbox created before the fix stops reading as a
         conversation. Provenance only — no gate, policy, or visibility changes.
         """
-        with self.connect() as connection:
-            connection.execute(
-                "UPDATE sessions SET origin = ? WHERE session_id = ?", (origin, session_id)
-            )
+        self._execute("UPDATE sessions SET origin = ? WHERE session_id = ?", (origin, session_id))
 
     def load_session(self: SQLiteStore, session_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM sessions WHERE session_id = ?", (session_id,))
         return dict(row) if row else None
 
     def list_sessions(
@@ -118,8 +111,7 @@ class ConversationStore:
             query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY updated_at DESC LIMIT ?"
         params.append(limit)
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def search_sessions(
@@ -150,13 +142,12 @@ class ConversationStore:
         if user_id is not None:
             conditions.append("(sessions.user_id = ? OR sessions.user_id IS NULL)")
             params.append(user_id)
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT sessions.* FROM sessions WHERE "
-                + " AND ".join(conditions)
-                + " ORDER BY sessions.updated_at DESC LIMIT ?",
-                [*params, limit],
-            ).fetchall()
+        rows = self._rows(
+            "SELECT sessions.* FROM sessions WHERE "
+            + " AND ".join(conditions)
+            + " ORDER BY sessions.updated_at DESC LIMIT ?",
+            [*params, limit],
+        )
         results: list[dict[str, Any]] = []
         for row in rows:
             record = dict(row)
@@ -200,29 +191,28 @@ class ConversationStore:
         secret is ever written here. Owner-scoped by ``principal_id``.
         """
         session_row_id = new_id("mses_")
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO mcp_session_log
-                   (session_row_id, server_id, principal_id, transport, operation,
-                    hosts_json, tool_calls, bytes_in, bytes_out, error_count,
-                    outcome, started_at, ended_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    session_row_id,
-                    server_id,
-                    principal_id,
-                    transport,
-                    operation,
-                    json.dumps(list(hosts)),
-                    int(tool_calls),
-                    int(bytes_in),
-                    int(bytes_out),
-                    int(error_count),
-                    outcome,
-                    started_at,
-                    ended_at,
-                ),
-            )
+        self._execute(
+            """INSERT INTO mcp_session_log
+               (session_row_id, server_id, principal_id, transport, operation,
+                hosts_json, tool_calls, bytes_in, bytes_out, error_count,
+                outcome, started_at, ended_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                session_row_id,
+                server_id,
+                principal_id,
+                transport,
+                operation,
+                json.dumps(list(hosts)),
+                int(tool_calls),
+                int(bytes_in),
+                int(bytes_out),
+                int(error_count),
+                outcome,
+                started_at,
+                ended_at,
+            ),
+        )
         return session_row_id
 
     def list_mcp_session_logs(
@@ -233,13 +223,12 @@ class ConversationStore:
         never be read across owners."""
         if not server_id:
             return []
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT * FROM mcp_session_log
-                   WHERE principal_id = ? AND server_id = ?
-                   ORDER BY started_at DESC, rowid DESC LIMIT ?""",
-                (principal_id, server_id, int(limit)),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT * FROM mcp_session_log
+               WHERE principal_id = ? AND server_id = ?
+               ORDER BY started_at DESC, rowid DESC LIMIT ?""",
+            (principal_id, server_id, int(limit)),
+        )
         return [self._mcp_session_log_row(row) for row in rows]
 
     def _session_owner(
@@ -348,11 +337,10 @@ class ConversationStore:
     # account's session.
 
     def list_session_tags(self: SQLiteStore, session_id: str) -> list[str]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT tag FROM session_tags WHERE session_id = ? ORDER BY tag",
-                (session_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT tag FROM session_tags WHERE session_id = ? ORDER BY tag",
+            (session_id,),
+        )
         return [str(row["tag"]) for row in rows]
 
     def list_session_tags_by_session(self: SQLiteStore, session_ids: list[str]) -> dict[str, list[str]]:
@@ -367,13 +355,12 @@ class ConversationStore:
         if not wanted:
             return {}
         placeholders = ",".join("?" for _ in wanted)
-        with self.connect() as connection:
-            rows = connection.execute(
-                f"""SELECT session_id, tag FROM session_tags
-                    WHERE session_id IN ({placeholders})
-                    ORDER BY session_id, tag""",  # noqa: S608 - placeholders only
-                tuple(wanted),
-            ).fetchall()
+        rows = self._rows(
+            f"""SELECT session_id, tag FROM session_tags
+                WHERE session_id IN ({placeholders})
+                ORDER BY session_id, tag""",
+            tuple(wanted),
+        )
         grouped: dict[str, list[str]] = {}
         for row in rows:
             grouped.setdefault(str(row["session_id"]), []).append(str(row["tag"]))
@@ -472,11 +459,10 @@ class ConversationStore:
         return True
 
     def list_turns(self: SQLiteStore, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM turns WHERE session_id = ? ORDER BY created_at ASC LIMIT ?",
-                (session_id, limit),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM turns WHERE session_id = ? ORDER BY created_at ASC LIMIT ?",
+            (session_id, limit),
+        )
         return [dict(row) for row in rows]
 
     def count_turns_by_session(self: SQLiteStore, session_ids: list[str]) -> dict[str, int]:
@@ -490,18 +476,16 @@ class ConversationStore:
         if not wanted:
             return {}
         placeholders = ",".join("?" for _ in wanted)
-        with self.connect() as connection:
-            rows = connection.execute(
-                f"""SELECT session_id, COUNT(*) AS turns FROM turns
-                    WHERE session_id IN ({placeholders})
-                    GROUP BY session_id""",  # noqa: S608 - placeholders only
-                tuple(wanted),
-            ).fetchall()
+        rows = self._rows(
+            f"""SELECT session_id, COUNT(*) AS turns FROM turns
+                WHERE session_id IN ({placeholders})
+                GROUP BY session_id""",
+            tuple(wanted),
+        )
         return {str(row["session_id"]): int(row["turns"]) for row in rows}
 
     def load_turn(self: SQLiteStore, turn_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute("SELECT * FROM turns WHERE turn_id = ?", (turn_id,)).fetchone()
+        row = self._row("SELECT * FROM turns WHERE turn_id = ?", (turn_id,))
         return dict(row) if row else None
 
     def insert_turn(
@@ -562,18 +546,17 @@ class ConversationStore:
         added = max(0, int(chars))
         if added == 0 and text is None:
             return
-        with self.connect() as connection:
-            connection.execute(
-                """UPDATE turns
-                   SET reasoning_chars = COALESCE(reasoning_chars, 0) + ?,
-                       reasoning_text = CASE
-                           WHEN ? IS NULL THEN reasoning_text
-                           WHEN reasoning_text IS NULL OR reasoning_text = '' THEN ?
-                           ELSE reasoning_text || ?
-                       END
-                   WHERE turn_id = ?""",
-                (added, text, text, f"\n\n{text}", turn_id),
-            )
+        self._execute(
+            """UPDATE turns
+               SET reasoning_chars = COALESCE(reasoning_chars, 0) + ?,
+                   reasoning_text = CASE
+                       WHEN ? IS NULL THEN reasoning_text
+                       WHEN reasoning_text IS NULL OR reasoning_text = '' THEN ?
+                       ELSE reasoning_text || ?
+                   END
+               WHERE turn_id = ?""",
+            (added, text, text, f"\n\n{text}", turn_id),
+        )
 
     @staticmethod
     def _match_terms(query: str) -> list[str]:
@@ -723,29 +706,28 @@ class ConversationStore:
         payload_sha256: str,
         prev_event_sha256: str | None = None,
     ) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO events_index
-                (event_id, session_id, turn_id, task_id, event_type, actor, timestamp, jsonl_path, jsonl_offset, payload_sha256, prev_event_sha256, risk_level, summary)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    event.event_id,
-                    event.session_id,
-                    event.turn_id,
-                    event.payload.get("task_id"),
-                    event.event_type,
-                    event.actor,
-                    event.timestamp,
-                    jsonl_path,
-                    jsonl_offset,
-                    payload_sha256,
-                    prev_event_sha256,
-                    event.payload.get("risk_level"),
-                    event.payload.get("summary"),
-                ),
-            )
+        self._execute(
+            """
+            INSERT INTO events_index
+            (event_id, session_id, turn_id, task_id, event_type, actor, timestamp, jsonl_path, jsonl_offset, payload_sha256, prev_event_sha256, risk_level, summary)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event.event_id,
+                event.session_id,
+                event.turn_id,
+                event.payload.get("task_id"),
+                event.event_type,
+                event.actor,
+                event.timestamp,
+                jsonl_path,
+                jsonl_offset,
+                payload_sha256,
+                prev_event_sha256,
+                event.payload.get("risk_level"),
+                event.payload.get("summary"),
+            ),
+        )
 
     @staticmethod
     def tool_action_payload_sha256(tool_name: str, arguments_json: str, risk_level: str) -> str:
@@ -774,53 +756,52 @@ class ConversationStore:
         machine_issued_at: str | None = None,
         machine_expires_at: str | None = None,
     ) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                  INSERT OR REPLACE INTO tool_actions
-                  (action_id, session_id, turn_id, task_id, tool_name, arguments_json,
-                   risk_level, status, proposed_at, completed_at, proposed_by,
-                   owner_principal_id, machine_subject, machine_token_id,
-                   machine_key_id, machine_issued_at, machine_expires_at)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?,
-                          COALESCE((SELECT proposed_at FROM tool_actions WHERE action_id = ?), ?),
-                          ?, ?,
-                          COALESCE(?, (SELECT owner_principal_id FROM tool_actions WHERE action_id = ?)),
-                          COALESCE(?, (SELECT machine_subject FROM tool_actions WHERE action_id = ?)),
-                          COALESCE(?, (SELECT machine_token_id FROM tool_actions WHERE action_id = ?)),
-                          COALESCE(?, (SELECT machine_key_id FROM tool_actions WHERE action_id = ?)),
-                          COALESCE(?, (SELECT machine_issued_at FROM tool_actions WHERE action_id = ?)),
-                          COALESCE(?, (SELECT machine_expires_at FROM tool_actions WHERE action_id = ?)))
-                """,
-                (
-                    action.action_id,
-                    session_id,
-                    turn_id,
-                    None,
-                    action.tool_name,
-                    json.dumps(action.arguments, sort_keys=True),
-                    action.risk_level,
-                    status,
-                    action.action_id,
-                    utc_now(),
-                    utc_now()
-                    if status in {"success", "failed", "denied", "approval_required"}
-                    else None,
-                    action.proposed_by,
-                    owner_principal_id,
-                    action.action_id,
-                    machine_subject,
-                    action.action_id,
-                    machine_token_id,
-                    action.action_id,
-                    machine_key_id,
-                    action.action_id,
-                    machine_issued_at,
-                    action.action_id,
-                    machine_expires_at,
-                    action.action_id,
-                ),
-            )
+        self._execute(
+            """
+              INSERT OR REPLACE INTO tool_actions
+              (action_id, session_id, turn_id, task_id, tool_name, arguments_json,
+               risk_level, status, proposed_at, completed_at, proposed_by,
+               owner_principal_id, machine_subject, machine_token_id,
+               machine_key_id, machine_issued_at, machine_expires_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?,
+                      COALESCE((SELECT proposed_at FROM tool_actions WHERE action_id = ?), ?),
+                      ?, ?,
+                      COALESCE(?, (SELECT owner_principal_id FROM tool_actions WHERE action_id = ?)),
+                      COALESCE(?, (SELECT machine_subject FROM tool_actions WHERE action_id = ?)),
+                      COALESCE(?, (SELECT machine_token_id FROM tool_actions WHERE action_id = ?)),
+                      COALESCE(?, (SELECT machine_key_id FROM tool_actions WHERE action_id = ?)),
+                      COALESCE(?, (SELECT machine_issued_at FROM tool_actions WHERE action_id = ?)),
+                      COALESCE(?, (SELECT machine_expires_at FROM tool_actions WHERE action_id = ?)))
+            """,
+            (
+                action.action_id,
+                session_id,
+                turn_id,
+                None,
+                action.tool_name,
+                json.dumps(action.arguments, sort_keys=True),
+                action.risk_level,
+                status,
+                action.action_id,
+                utc_now(),
+                utc_now()
+                if status in {"success", "failed", "denied", "approval_required"}
+                else None,
+                action.proposed_by,
+                owner_principal_id,
+                action.action_id,
+                machine_subject,
+                action.action_id,
+                machine_token_id,
+                action.action_id,
+                machine_key_id,
+                action.action_id,
+                machine_issued_at,
+                action.action_id,
+                machine_expires_at,
+                action.action_id,
+            ),
+        )
 
     def list_turn_tool_actions(self: SQLiteStore, session_id: str, turn_id: str | None) -> list[dict[str, Any]]:
         """Every tool action proposed in one turn, oldest first.
@@ -836,40 +817,35 @@ class ConversationStore:
         """
         if not turn_id:
             return []
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT action_id, tool_name, arguments_json, status, proposed_at
-                   FROM tool_actions
-                   WHERE session_id = ? AND turn_id = ?
-                   ORDER BY proposed_at ASC, rowid ASC""",
-                (session_id, turn_id),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT action_id, tool_name, arguments_json, status, proposed_at
+               FROM tool_actions
+               WHERE session_id = ? AND turn_id = ?
+               ORDER BY proposed_at ASC, rowid ASC""",
+            (session_id, turn_id),
+        )
         return [dict(row) for row in rows]
 
     def load_tool_action(self: SQLiteStore, action_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM tool_actions WHERE action_id = ?", (action_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM tool_actions WHERE action_id = ?", (action_id,))
         return dict(row) if row else None
 
     def insert_policy_decision(self: SQLiteStore, decision: PolicyDecision) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO policy_decisions
-                (decision_id, action_id, decision, reasons_json, policy_version, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    decision.decision_id,
-                    decision.action_id,
-                    decision.decision,
-                    json.dumps(decision.reasons),
-                    decision.policy_version,
-                    decision.timestamp or utc_now(),
-                ),
-            )
+        self._execute(
+            """
+            INSERT INTO policy_decisions
+            (decision_id, action_id, decision, reasons_json, policy_version, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                decision.decision_id,
+                decision.action_id,
+                decision.decision,
+                json.dumps(decision.reasons),
+                decision.policy_version,
+                decision.timestamp or utc_now(),
+            ),
+        )
 
 
     def save_agent_plan(
@@ -898,11 +874,10 @@ class ConversationStore:
 
     def load_agent_plan(self: SQLiteStore, session_id: str, principal_id: str) -> dict[str, Any] | None:
         """This conversation's plan, or None. Owner-scoped: never cross-account."""
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM agent_plans WHERE session_id = ? AND principal_id = ?",
-                (session_id, principal_id),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM agent_plans WHERE session_id = ? AND principal_id = ?",
+            (session_id, principal_id),
+        )
         return dict(row) if row is not None else None
 
     def clear_agent_plan(self: SQLiteStore, session_id: str, principal_id: str) -> bool:
@@ -956,12 +931,11 @@ class ConversationStore:
 
     def count_turn_sources(self: SQLiteStore, session_id: str, turn_id: str, principal_id: str) -> int:
         """How many sources this turn has already recorded, for the next id."""
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT COUNT(*) AS n FROM turn_sources "
-                "WHERE session_id = ? AND turn_id = ? AND principal_id = ?",
-                (session_id, turn_id, principal_id),
-            ).fetchone()
+        row = self._row(
+            "SELECT COUNT(*) AS n FROM turn_sources "
+            "WHERE session_id = ? AND turn_id = ? AND principal_id = ?",
+            (session_id, turn_id, principal_id),
+        )
         return int(row["n"]) if row is not None else 0
 
     def load_turn_sources(
@@ -974,19 +948,17 @@ class ConversationStore:
             query += " AND turn_id = ?"
             params.append(turn_id)
         query += " ORDER BY created_at ASC, ordinal ASC"
-        with self.connect() as connection:
-            rows = connection.execute(query, tuple(params)).fetchall()
+        rows = self._rows(query, tuple(params))
         return [dict(row) for row in rows]
 
     def load_turn_source(
         self: SQLiteStore, session_id: str, turn_id: str, source_id: str, principal_id: str
     ) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM turn_sources WHERE session_id = ? AND turn_id = ? "
-                "AND source_id = ? AND principal_id = ?",
-                (session_id, turn_id, source_id, principal_id),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM turn_sources WHERE session_id = ? AND turn_id = ? "
+            "AND source_id = ? AND principal_id = ?",
+            (session_id, turn_id, source_id, principal_id),
+        )
         return dict(row) if row is not None else None
 
     #
@@ -1024,8 +996,7 @@ class ConversationStore:
             query += " AND turn_id = ?"
             params.append(turn_id)
         query += " ORDER BY created_at ASC, ordinal ASC"
-        with self.connect() as connection:
-            rows = connection.execute(query, tuple(params)).fetchall()
+        rows = self._rows(query, tuple(params))
         return [dict(row) for row in rows]
 
     #
@@ -1072,8 +1043,7 @@ class ConversationStore:
             params.append(principal_id)
         sql += " GROUP BY s.session_id ORDER BY refs DESC, last_referenced_at DESC LIMIT ?"
         params.append(limit)
-        with self.connect() as connection:
-            rows = connection.execute(sql, params).fetchall()
+        rows = self._rows(sql, params)
         return [dict(row) for row in rows]
 
     def list_source_outlinks(
@@ -1099,8 +1069,7 @@ class ConversationStore:
             " ORDER BY refs DESC, last_referenced_at DESC LIMIT ?"
         )
         params.append(limit)
-        with self.connect() as connection:
-            rows = connection.execute(sql, params).fetchall()
+        rows = self._rows(sql, params)
         return [dict(row) for row in rows]
 
     def list_co_cited_sources(
@@ -1137,8 +1106,7 @@ class ConversationStore:
             " ORDER BY shared_sessions DESC, refs DESC, last_referenced_at DESC LIMIT ?"
         )
         params.append(limit)
-        with self.connect() as connection:
-            rows = connection.execute(sql, params).fetchall()
+        rows = self._rows(sql, params)
         return [dict(row) for row in rows]
 
     def list_source_passages(
@@ -1164,24 +1132,22 @@ class ConversationStore:
             params.append(principal_id)
         sql += " ORDER BY created_at DESC, ordinal ASC LIMIT ?"
         params.append(limit)
-        with self.connect() as connection:
-            rows = connection.execute(sql, params).fetchall()
+        rows = self._rows(sql, params)
         return [dict(row) for row in rows]
 
 
     def request_turn_stop(self: SQLiteStore, session_id: str, principal_id: str, *, reason: str) -> str:
         """Ask the turn running in this conversation to stop at its next boundary."""
         now = utc_now()
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO turn_controls
-                     (session_id, principal_id, stop_requested, stop_reason, steer_json, updated_at)
-                   VALUES (?, ?, 1, ?, '[]', ?)
-                   ON CONFLICT(session_id, principal_id) DO UPDATE SET
-                     stop_requested = 1, stop_reason = excluded.stop_reason,
-                     updated_at = excluded.updated_at""",
-                (session_id, principal_id, reason, now),
-            )
+        self._execute(
+            """INSERT INTO turn_controls
+                 (session_id, principal_id, stop_requested, stop_reason, steer_json, updated_at)
+               VALUES (?, ?, 1, ?, '[]', ?)
+               ON CONFLICT(session_id, principal_id) DO UPDATE SET
+                 stop_requested = 1, stop_reason = excluded.stop_reason,
+                 updated_at = excluded.updated_at""",
+            (session_id, principal_id, reason, now),
+        )
         return now
 
     def queue_turn_steer(self: SQLiteStore, session_id: str, principal_id: str, *, text: str) -> int:
@@ -1250,11 +1216,10 @@ class ConversationStore:
         A stop or steer that arrived between turns had no turn to act on; keeping
         it would apply the owner's decision to work they had not yet asked for.
         """
-        with self.connect() as connection:
-            connection.execute(
-                "DELETE FROM turn_controls WHERE session_id = ? AND principal_id = ?",
-                (session_id, principal_id),
-            )
+        self._execute(
+            "DELETE FROM turn_controls WHERE session_id = ? AND principal_id = ?",
+            (session_id, principal_id),
+        )
 
 
     def insert_suspended_turn(self: SQLiteStore, record: dict[str, Any]) -> None:
@@ -1264,38 +1229,37 @@ class ConversationStore:
         one turn, and re-suspending the same approval is a re-park, not a second
         row.
         """
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT OR REPLACE INTO suspended_turns
-                   (approval_id, session_id, turn_id, request_id, principal_id, action_id,
-                    tool_name, call_id, prompt_text, messages_json, options_json, client_json,
-                    tool_calls_made, status, outcome_json, created_at, resumed_at,
-                    pending_calls_json, queue_position, queue_total)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'suspended', NULL, ?, NULL,
-                           ?, ?, ?)""",
-                (
-                    record["approval_id"],
-                    record["session_id"],
-                    record["turn_id"],
-                    record["request_id"],
-                    record["principal_id"],
-                    record["action_id"],
-                    record["tool_name"],
-                    record["call_id"],
-                    record["prompt_text"],
-                    record["messages_json"],
-                    record["options_json"],
-                    record["client_json"],
-                    int(record.get("tool_calls_made", 0)),
-                    utc_now(),
-                    # ADD-02 — the rest of the batch travels with the turn. A
-                    # caller that parks a single call writes the defaults, which
-                    # are exactly the pre-queue behaviour.
-                    str(record.get("pending_calls_json") or "[]"),
-                    int(record.get("queue_position", 1)),
-                    int(record.get("queue_total", 1)),
-                ),
-            )
+        self._execute(
+            """INSERT OR REPLACE INTO suspended_turns
+               (approval_id, session_id, turn_id, request_id, principal_id, action_id,
+                tool_name, call_id, prompt_text, messages_json, options_json, client_json,
+                tool_calls_made, status, outcome_json, created_at, resumed_at,
+                pending_calls_json, queue_position, queue_total)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'suspended', NULL, ?, NULL,
+                       ?, ?, ?)""",
+            (
+                record["approval_id"],
+                record["session_id"],
+                record["turn_id"],
+                record["request_id"],
+                record["principal_id"],
+                record["action_id"],
+                record["tool_name"],
+                record["call_id"],
+                record["prompt_text"],
+                record["messages_json"],
+                record["options_json"],
+                record["client_json"],
+                int(record.get("tool_calls_made", 0)),
+                utc_now(),
+                # ADD-02 — the rest of the batch travels with the turn. A
+                # caller that parks a single call writes the defaults, which
+                # are exactly the pre-queue behaviour.
+                str(record.get("pending_calls_json") or "[]"),
+                int(record.get("queue_position", 1)),
+                int(record.get("queue_total", 1)),
+            ),
+        )
 
     def load_suspended_turn(
         self: SQLiteStore, approval_id: str, *, principal_id: str | None = None
@@ -1306,8 +1270,7 @@ class ConversationStore:
         if principal_id is not None:
             query += " AND principal_id = ?"
             params = (approval_id, principal_id)
-        with self.connect() as connection:
-            row = connection.execute(query, params).fetchone()
+        row = self._row(query, params)
         return dict(row) if row is not None else None
 
     def list_resumable_suspended_turns(
@@ -1336,8 +1299,7 @@ class ConversationStore:
             query += " AND session_id = ?"
             params = (principal_id, session_id)
         query += " ORDER BY created_at ASC"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def list_pending_suspended_turns(
@@ -1355,8 +1317,7 @@ class ConversationStore:
             query += " AND session_id = ?"
             params = (principal_id, session_id)
         query += " ORDER BY created_at ASC"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def suspended_turn_queue_positions(
@@ -1397,13 +1358,12 @@ class ConversationStore:
         Guarded on ``suspended`` so a resumed (or abandoned) turn cannot have its
         outcome rewritten after the model has already acted on it.
         """
-        with self.connect() as connection:
-            cursor = connection.execute(
-                "UPDATE suspended_turns SET outcome_json = ? "
-                "WHERE approval_id = ? AND status = 'suspended'",
-                (outcome_json, approval_id),
-            )
-        return cursor.rowcount == 1
+        changed = self._execute(
+            "UPDATE suspended_turns SET outcome_json = ? "
+            "WHERE approval_id = ? AND status = 'suspended'",
+            (outcome_json, approval_id),
+        )
+        return changed == 1
 
     def claim_suspended_turn(self: SQLiteStore, approval_id: str) -> bool:
         """Atomically claim a parked turn for resumption (suspended → resuming).
@@ -1412,31 +1372,26 @@ class ConversationStore:
         into the model exactly once, so a double-click or a racing client cannot
         run the continuation twice.
         """
-        with self.connect() as connection:
-            cursor = connection.execute(
-                "UPDATE suspended_turns SET status = 'resuming', resumed_at = ? "
-                "WHERE approval_id = ? AND status = 'suspended'",
-                (utc_now(), approval_id),
-            )
-        return cursor.rowcount == 1
+        changed = self._execute(
+            "UPDATE suspended_turns SET status = 'resuming', resumed_at = ? "
+            "WHERE approval_id = ? AND status = 'suspended'",
+            (utc_now(), approval_id),
+        )
+        return changed == 1
 
     def finalize_suspended_turn(self: SQLiteStore, approval_id: str, *, status: str) -> bool:
         """Resolve a claimed turn to a terminal state (resuming → status)."""
-        with self.connect() as connection:
-            cursor = connection.execute(
-                "UPDATE suspended_turns SET status = ? WHERE approval_id = ? AND status = 'resuming'",
-                (status, approval_id),
-            )
-        return cursor.rowcount == 1
+        changed = self._execute(
+            "UPDATE suspended_turns SET status = ? WHERE approval_id = ? AND status = 'resuming'",
+            (status, approval_id),
+        )
+        return changed == 1
 
     def load_api_session(self: SQLiteStore, session_id: str) -> dict[str, Any] | None:
         """Best-effort lookup of an API session row by id (posture snapshots)."""
         if not session_id:
             return None
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM api_sessions WHERE session_id = ?", (session_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM api_sessions WHERE session_id = ?", (session_id,))
         return dict(row) if row else None
 
     def list_event_index(
@@ -1519,8 +1474,7 @@ class ConversationStore:
             query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY events_index.timestamp DESC, events_index.rowid DESC LIMIT ?"
         params.append(str(limit))
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def all_session_ids(self: SQLiteStore) -> set[str]:
@@ -1531,8 +1485,7 @@ class ConversationStore:
         It carries no ownership, so it is never used to decide what to *show*,
         only what is not a conversation in the first place.
         """
-        with self.connect() as connection:
-            rows = connection.execute("SELECT session_id FROM sessions").fetchall()
+        rows = self._rows("SELECT session_id FROM sessions")
         return {str(row["session_id"]) for row in rows}
 
     def count_events(self: SQLiteStore, session_id: str | None = None) -> int:
@@ -1541,15 +1494,11 @@ class ConversationStore:
         if session_id is not None:
             query += " WHERE session_id = ?"
             params.append(session_id)
-        with self.connect() as connection:
-            row = connection.execute(query, params).fetchone()
+        row = self._row(query, params)
         return int(row["cnt"]) if row else 0
 
     def load_event_index(self: SQLiteStore, event_id: str) -> dict | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM events_index WHERE event_id = ?", (event_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM events_index WHERE event_id = ?", (event_id,))
         return dict(row) if row else None
 
     #
@@ -1583,8 +1532,7 @@ class ConversationStore:
             sql += " AND (owner_principal_id = ? OR owner_principal_id IS NULL OR owner_principal_id = '')"
             params.append(owner_principal_id)
         sql += " GROUP BY session_id, tool_name ORDER BY uses DESC, tool_name"
-        with self.connect() as connection:
-            rows = connection.execute(sql, params).fetchall()
+        rows = self._rows(sql, params)
         return [dict(row) for row in rows]
 
     def list_session_context_sources(
@@ -1613,8 +1561,7 @@ class ConversationStore:
             " ORDER BY last_used_at DESC LIMIT ?"
         )
         params.append(limit)
-        with self.connect() as connection:
-            rows = connection.execute(sql, params).fetchall()
+        rows = self._rows(sql, params)
         return [dict(row) for row in rows]
 
     def list_session_attached_files(
@@ -1639,8 +1586,7 @@ class ConversationStore:
             sql += " AND r.owner_principal_id = ?"
             params.append(owner_principal_id)
         sql += " ORDER BY r.created_at DESC"
-        with self.connect() as connection:
-            rows = connection.execute(sql, params).fetchall()
+        rows = self._rows(sql, params)
         return [dict(row) for row in rows]
 
     def sessions_for_events(self: SQLiteStore, event_ids: Sequence[str]) -> dict[str, str]:
@@ -1654,32 +1600,30 @@ class ConversationStore:
         if not event_ids:
             return {}
         placeholders = ",".join("?" for _ in event_ids)
-        with self.connect() as connection:
-            rows = connection.execute(
-                f"SELECT event_id, session_id FROM events_index WHERE event_id IN ({placeholders})",
-                list(event_ids),
-            ).fetchall()
+        rows = self._rows(
+            f"SELECT event_id, session_id FROM events_index WHERE event_id IN ({placeholders})",
+            list(event_ids),
+        )
         return {str(row["event_id"]): str(row["session_id"]) for row in rows if row["session_id"]}
 
     def save_model_session_state(self: SQLiteStore, state: ModelSessionState) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO model_session_state
-                (session_id, profile_id, model, reasoning_enabled, reasoning_effort, reasoning_mode, reasoning_budget_tokens, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    state.session_id,
-                    state.profile_id,
-                    state.model,
-                    int(state.reasoning_enabled),
-                    state.reasoning_effort,
-                    state.reasoning_mode,
-                    state.reasoning_budget_tokens,
-                    utc_now(),
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO model_session_state
+            (session_id, profile_id, model, reasoning_enabled, reasoning_effort, reasoning_mode, reasoning_budget_tokens, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                state.session_id,
+                state.profile_id,
+                state.model,
+                int(state.reasoning_enabled),
+                state.reasoning_effort,
+                state.reasoning_mode,
+                state.reasoning_budget_tokens,
+                utc_now(),
+            ),
+        )
 
     def events_after_cursor(
         self: SQLiteStore, *, after_timestamp: str | None, after_seq: int | None, limit: int
@@ -1706,8 +1650,7 @@ class ConversationStore:
             params.extend([after_timestamp, after_timestamp, after_seq or 0])
         query += " ORDER BY timestamp ASC, rowid ASC LIMIT ?"
         params.append(max(1, limit))
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def get_last_event_sha256(self: SQLiteStore, session_id: str) -> str | None:
@@ -1725,27 +1668,22 @@ class ConversationStore:
         `rowid` breaks any remaining tie, which covers legacy rows written before
         an offset was recorded.
         """
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT payload_sha256 FROM events_index WHERE session_id = ? "
-                "ORDER BY jsonl_offset DESC, rowid DESC LIMIT 1",
-                (session_id,),
-            ).fetchone()
+        row = self._row(
+            "SELECT payload_sha256 FROM events_index WHERE session_id = ? "
+            "ORDER BY jsonl_offset DESC, rowid DESC LIMIT 1",
+            (session_id,),
+        )
         return str(row["payload_sha256"]) if row else None
 
     def list_session_events_for_integrity(self: SQLiteStore, session_id: str) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT event_id, payload_sha256, prev_event_sha256, jsonl_path, jsonl_offset FROM events_index WHERE session_id = ? ORDER BY jsonl_offset ASC",
-                (session_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT event_id, payload_sha256, prev_event_sha256, jsonl_path, jsonl_offset FROM events_index WHERE session_id = ? ORDER BY jsonl_offset ASC",
+            (session_id,),
+        )
         return [dict(row) for row in rows]
 
     def load_model_session_state(self: SQLiteStore, session_id: str) -> ModelSessionState | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM model_session_state WHERE session_id = ?", (session_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM model_session_state WHERE session_id = ?", (session_id,))
         if row is None:
             return None
         return ModelSessionState(
@@ -1776,15 +1714,14 @@ class ConversationStore:
         """
         if not (session_id and attachment_id and owner_principal_id):
             return
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR IGNORE INTO session_attachment_refs
-                (session_id, attachment_id, owner_principal_id, turn_id, created_at, source)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (session_id, attachment_id, owner_principal_id, turn_id, utc_now(), source),
-            )
+        self._execute(
+            """
+            INSERT OR IGNORE INTO session_attachment_refs
+            (session_id, attachment_id, owner_principal_id, turn_id, created_at, source)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (session_id, attachment_id, owner_principal_id, turn_id, utc_now(), source),
+        )
 
     def session_attachment_ref_exists(
         self: SQLiteStore, *, session_id: str, attachment_id: str, owner_principal_id: str
@@ -1794,14 +1731,13 @@ class ConversationStore:
         # matches nothing rather than widening the query (fail closed).
         if not (session_id and attachment_id and owner_principal_id):
             return False
-        with self.connect() as connection:
-            row = connection.execute(
-                """
-                SELECT 1 FROM session_attachment_refs
-                WHERE session_id = ? AND attachment_id = ? AND owner_principal_id = ?
-                """,
-                (session_id, attachment_id, owner_principal_id),
-            ).fetchone()
+        row = self._row(
+            """
+            SELECT 1 FROM session_attachment_refs
+            WHERE session_id = ? AND attachment_id = ? AND owner_principal_id = ?
+            """,
+            (session_id, attachment_id, owner_principal_id),
+        )
         return row is not None
 
     def list_session_attachment_refs(
@@ -1810,15 +1746,14 @@ class ConversationStore:
         """Return this owner's attachment references for one session, oldest first."""
         if not (session_id and owner_principal_id):
             return []
-        with self.connect() as connection:
-            rows = connection.execute(
-                """
-                SELECT attachment_id, turn_id, created_at, source FROM session_attachment_refs
-                WHERE session_id = ? AND owner_principal_id = ?
-                ORDER BY created_at, rowid
-                """,
-                (session_id, owner_principal_id),
-            ).fetchall()
+        rows = self._rows(
+            """
+            SELECT attachment_id, turn_id, created_at, source FROM session_attachment_refs
+            WHERE session_id = ? AND owner_principal_id = ?
+            ORDER BY created_at, rowid
+            """,
+            (session_id, owner_principal_id),
+        )
         return [dict(row) for row in rows]
 
     def put_session_command_grant(
@@ -1830,34 +1765,32 @@ class ConversationStore:
         timeout_seconds: int,
         expires_at: str,
     ) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO session_command_grants
-                   (session_id, principal_id, commands_json, timeout_seconds, expires_at, revoked, created_at)
-                   VALUES (?, ?, ?, ?, ?, 0, ?)
-                   ON CONFLICT(session_id, principal_id) DO UPDATE SET
-                   commands_json=excluded.commands_json,
-                   timeout_seconds=excluded.timeout_seconds,
-                   expires_at=excluded.expires_at, revoked=0, created_at=excluded.created_at""",
-                (
-                    session_id,
-                    principal_id,
-                    json.dumps(commands),
-                    timeout_seconds,
-                    expires_at,
-                    utc_now(),
-                ),
-            )
+        self._execute(
+            """INSERT INTO session_command_grants
+               (session_id, principal_id, commands_json, timeout_seconds, expires_at, revoked, created_at)
+               VALUES (?, ?, ?, ?, ?, 0, ?)
+               ON CONFLICT(session_id, principal_id) DO UPDATE SET
+               commands_json=excluded.commands_json,
+               timeout_seconds=excluded.timeout_seconds,
+               expires_at=excluded.expires_at, revoked=0, created_at=excluded.created_at""",
+            (
+                session_id,
+                principal_id,
+                json.dumps(commands),
+                timeout_seconds,
+                expires_at,
+                utc_now(),
+            ),
+        )
 
     def load_session_command_grant(
         self: SQLiteStore, *, session_id: str, principal_id: str
     ) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                """SELECT * FROM session_command_grants
-                   WHERE session_id=? AND principal_id=? AND revoked=0 AND expires_at>?""",
-                (session_id, principal_id, utc_now()),
-            ).fetchone()
+        row = self._row(
+            """SELECT * FROM session_command_grants
+               WHERE session_id=? AND principal_id=? AND revoked=0 AND expires_at>?""",
+            (session_id, principal_id, utc_now()),
+        )
         if row is None:
             return None
         result = dict(row)
@@ -1865,8 +1798,7 @@ class ConversationStore:
         return result
 
     def revoke_session_command_grant(self: SQLiteStore, *, session_id: str, principal_id: str) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                "UPDATE session_command_grants SET revoked=1 WHERE session_id=? AND principal_id=?",
-                (session_id, principal_id),
-            )
+        self._execute(
+            "UPDATE session_command_grants SET revoked=1 WHERE session_id=? AND principal_id=?",
+            (session_id, principal_id),
+        )

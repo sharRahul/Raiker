@@ -359,11 +359,10 @@ class AccountStore:
             )
 
     def principal_mfa_enrolled(self: SQLiteStore, principal_id: str) -> bool:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT mfa_enrolled FROM account_credentials WHERE principal_id = ?",
-                (principal_id,),
-            ).fetchone()
+        row = self._row(
+            "SELECT mfa_enrolled FROM account_credentials WHERE principal_id = ?",
+            (principal_id,),
+        )
         return bool(row["mfa_enrolled"]) if row else False
 
     def upsert_account(
@@ -375,31 +374,24 @@ class AccountStore:
         created_at: str,
         updated_at: str,
     ) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO account_credentials
-                   (principal_id, username, password_hash, hash_algo, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(principal_id) DO UPDATE SET
-                     username=excluded.username,
-                     password_hash=excluded.password_hash,
-                     hash_algo=excluded.hash_algo,
-                     updated_at=excluded.updated_at""",
-                (principal_id, username, password_hash, hash_algo, created_at, updated_at),
-            )
+        self._execute(
+            """INSERT INTO account_credentials
+               (principal_id, username, password_hash, hash_algo, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(principal_id) DO UPDATE SET
+                 username=excluded.username,
+                 password_hash=excluded.password_hash,
+                 hash_algo=excluded.hash_algo,
+                 updated_at=excluded.updated_at""",
+            (principal_id, username, password_hash, hash_algo, created_at, updated_at),
+        )
 
     def get_account_by_username(self: SQLiteStore, username: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM account_credentials WHERE username = ?", (username,)
-            ).fetchone()
+        row = self._row("SELECT * FROM account_credentials WHERE username = ?", (username,))
         return dict(row) if row is not None else None
 
     def get_account(self: SQLiteStore, principal_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM account_credentials WHERE principal_id = ?", (principal_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM account_credentials WHERE principal_id = ?", (principal_id,))
         return dict(row) if row is not None else None
 
     def account_scope(self: SQLiteStore, principal_id: str | None) -> str | None:
@@ -420,27 +412,25 @@ class AccountStore:
         user_id = principal.get("delegated_by_user_id")
         if not user_id:
             return None
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT account_credentials.principal_id
-                   FROM account_credentials
-                   JOIN principals
-                     ON principals.principal_id = account_credentials.principal_id
-                   WHERE principals.delegated_by_user_id = ?
-                   ORDER BY account_credentials.principal_id LIMIT 2""",
-                (user_id,),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT account_credentials.principal_id
+               FROM account_credentials
+               JOIN principals
+                 ON principals.principal_id = account_credentials.principal_id
+               WHERE principals.delegated_by_user_id = ?
+               ORDER BY account_credentials.principal_id LIMIT 2""",
+            (user_id,),
+        )
         return str(rows[0]["principal_id"]) if len(rows) == 1 else None
 
     def set_account_failed(
         self: SQLiteStore, principal_id: str, failed_attempts: int, locked_until: str | None
     ) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                "UPDATE account_credentials SET failed_attempts = ?, locked_until = ? "
-                "WHERE principal_id = ?",
-                (failed_attempts, locked_until, principal_id),
-            )
+        self._execute(
+            "UPDATE account_credentials SET failed_attempts = ?, locked_until = ? "
+            "WHERE principal_id = ?",
+            (failed_attempts, locked_until, principal_id),
+        )
 
     def set_account_mfa(
         self: SQLiteStore,
@@ -449,28 +439,23 @@ class AccountStore:
         secret_encrypted: bytes | None,
         backup_codes_hashed: str | None,
     ) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                "UPDATE account_credentials SET mfa_enrolled = ?, mfa_secret_encrypted = ?, "
-                "backup_codes_hashed = ? WHERE principal_id = ?",
-                (int(enrolled), secret_encrypted, backup_codes_hashed, principal_id),
-            )
+        self._execute(
+            "UPDATE account_credentials SET mfa_enrolled = ?, mfa_secret_encrypted = ?, "
+            "backup_codes_hashed = ? WHERE principal_id = ?",
+            (int(enrolled), secret_encrypted, backup_codes_hashed, principal_id),
+        )
 
     def set_account_password(
         self: SQLiteStore, principal_id: str, password_hash: str, hash_algo: str, updated_at: str
     ) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                "UPDATE account_credentials SET password_hash = ?, hash_algo = ?, updated_at = ? "
-                "WHERE principal_id = ?",
-                (password_hash, hash_algo, updated_at, principal_id),
-            )
+        self._execute(
+            "UPDATE account_credentials SET password_hash = ?, hash_algo = ?, updated_at = ? "
+            "WHERE principal_id = ?",
+            (password_hash, hash_algo, updated_at, principal_id),
+        )
 
     def delete_account(self: SQLiteStore, principal_id: str) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                "DELETE FROM account_credentials WHERE principal_id = ?", (principal_id,)
-            )
+        self._execute("DELETE FROM account_credentials WHERE principal_id = ?", (principal_id,))
 
     @staticmethod
     def _delete_rows_orphaned_by_purge(connection: sqlite3.Connection) -> None:
@@ -620,18 +605,14 @@ class AccountStore:
                 (memory_dir / f"{memory_id}.md").unlink(missing_ok=True)
 
     def list_accounts(self: SQLiteStore) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT principal_id, username, mfa_enrolled, created_at FROM account_credentials "
-                "ORDER BY created_at ASC"
-            ).fetchall()
+        rows = self._rows(
+            "SELECT principal_id, username, mfa_enrolled, created_at FROM account_credentials "
+            "ORDER BY created_at ASC",
+        )
         return [dict(r) for r in rows]
 
     def get_user_settings(self: SQLiteStore, principal_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM user_settings WHERE principal_id = ?", (principal_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM user_settings WHERE principal_id = ?", (principal_id,))
         return dict(row) if row is not None else None
 
     def reasoning_retention_enabled(self: SQLiteStore, principal_id: str) -> bool:
@@ -662,11 +643,10 @@ class AccountStore:
         return isinstance(privacy, dict) and privacy.get("retain_reasoning") is True
 
     def put_user_settings(self: SQLiteStore, principal_id: str, settings_json: str, updated_at: str) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO user_settings (principal_id, settings_json, updated_at)
-                   VALUES (?, ?, ?)
-                   ON CONFLICT(principal_id) DO UPDATE SET
-                     settings_json=excluded.settings_json, updated_at=excluded.updated_at""",
-                (principal_id, settings_json, updated_at),
-            )
+        self._execute(
+            """INSERT INTO user_settings (principal_id, settings_json, updated_at)
+               VALUES (?, ?, ?)
+               ON CONFLICT(principal_id) DO UPDATE SET
+                 settings_json=excluded.settings_json, updated_at=excluded.updated_at""",
+            (principal_id, settings_json, updated_at),
+        )

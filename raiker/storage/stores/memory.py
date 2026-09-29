@@ -37,21 +37,20 @@ class MemoryStore:
     ) -> list[dict[str, Any]]:
         if limit < 1 or not owner_principal_id:
             return []
-        with self.connect() as connection:
-            rows = connection.execute(
-                """
-                SELECT c.* FROM managed_file_chunks c
-                JOIN managed_files f ON f.file_id = c.file_id
-                WHERE c.owner_principal_id = ? AND f.retired_at IS NULL
-                  AND NOT EXISTS (
-                    SELECT 1 FROM managed_file_chunk_vectors v
-                    WHERE v.chunk_id = c.chunk_id AND v.embedding_model = ?
-                  )
-                ORDER BY c.created_at, c.file_id, c.chunk_index
-                LIMIT ?
-                """,
-                (owner_principal_id, embedding_model, min(limit * 4, 2000)),
-            ).fetchall()
+        rows = self._rows(
+            """
+            SELECT c.* FROM managed_file_chunks c
+            JOIN managed_files f ON f.file_id = c.file_id
+            WHERE c.owner_principal_id = ? AND f.retired_at IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM managed_file_chunk_vectors v
+                WHERE v.chunk_id = c.chunk_id AND v.embedding_model = ?
+              )
+            ORDER BY c.created_at, c.file_id, c.chunk_index
+            LIMIT ?
+            """,
+            (owner_principal_id, embedding_model, min(limit * 4, 2000)),
+        )
         from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
 
         blocked = {MemorySensitivity.SECRET_LIKE, MemorySensitivity.CREDENTIAL_LIKE}
@@ -122,17 +121,16 @@ class MemoryStore:
                 params.extend(project_ids)
             else:
                 conditions.append("c.scope_kind = 'memory'")
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT c.*, f.relative_path, f.media_type, r.embedding
-                   FROM managed_file_chunk_vectors m
-                   JOIN managed_file_chunks c ON c.chunk_id = m.chunk_id
-                   JOIN managed_files f ON f.file_id = c.file_id
-                   JOIN vector_records r ON r.vector_id = m.vector_id
-                   WHERE """
-                + " AND ".join(conditions),
-                params,
-            ).fetchall()
+        rows = self._rows(
+            """SELECT c.*, f.relative_path, f.media_type, r.embedding
+               FROM managed_file_chunk_vectors m
+               JOIN managed_file_chunks c ON c.chunk_id = m.chunk_id
+               JOIN managed_files f ON f.file_id = c.file_id
+               JOIN vector_records r ON r.vector_id = m.vector_id
+               WHERE """
+            + " AND ".join(conditions),
+            params,
+        )
         from raiker.vector import VectorIndex
 
         ranked: list[tuple[float, dict[str, Any]]] = []
@@ -165,21 +163,17 @@ class MemoryStore:
     MEMORY_SETTINGS_SCOPE = "local_single_user"
 
     def set_memory_pinned(self: SQLiteStore, memory_id: str, pinned: bool) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO memory_pins (memory_id, pinned, updated_at)
-                VALUES (?, ?, ?)
-                ON CONFLICT(memory_id) DO UPDATE SET pinned = excluded.pinned, updated_at = excluded.updated_at
-                """,
-                (memory_id, 1 if pinned else 0, utc_now()),
-            )
+        self._execute(
+            """
+            INSERT INTO memory_pins (memory_id, pinned, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(memory_id) DO UPDATE SET pinned = excluded.pinned, updated_at = excluded.updated_at
+            """,
+            (memory_id, 1 if pinned else 0, utc_now()),
+        )
 
     def list_pinned_memory_ids(self: SQLiteStore) -> set[str]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT memory_id FROM memory_pins WHERE pinned = 1"
-            ).fetchall()
+        rows = self._rows("SELECT memory_id FROM memory_pins WHERE pinned = 1")
         return {str(row["memory_id"]) for row in rows}
 
     def is_memory_incognito(self: SQLiteStore, owner_principal_id: str | None = None) -> bool:
@@ -205,21 +199,20 @@ class MemoryStore:
     def set_memory_incognito(self: SQLiteStore, incognito: bool, owner_principal_id: str | None = None) -> None:
         if owner_principal_id is None:
             owner_principal_id = self.original_account_principal_id()
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO memory_settings (scope_id, incognito, updated_at)
-                VALUES (?, ?, ?)
-                ON CONFLICT(scope_id) DO UPDATE SET incognito = excluded.incognito, updated_at = excluded.updated_at
-                """,
-                (
-                    f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}"
-                    if owner_principal_id
-                    else self.MEMORY_SETTINGS_SCOPE,
-                    1 if incognito else 0,
-                    utc_now(),
-                ),
-            )
+        self._execute(
+            """
+            INSERT INTO memory_settings (scope_id, incognito, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(scope_id) DO UPDATE SET incognito = excluded.incognito, updated_at = excluded.updated_at
+            """,
+            (
+                f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}"
+                if owner_principal_id
+                else self.MEMORY_SETTINGS_SCOPE,
+                1 if incognito else 0,
+                utc_now(),
+            ),
+        )
 
 
     def get_memory_embedding_backend(self: SQLiteStore, owner_principal_id: str | None = None) -> str:
@@ -262,17 +255,16 @@ class MemoryStore:
             if owner_principal_id
             else self.MEMORY_SETTINGS_SCOPE
         )
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO memory_settings (scope_id, incognito, embedding_backend, updated_at)
-                VALUES (?, 0, ?, ?)
-                ON CONFLICT(scope_id) DO UPDATE SET
-                  embedding_backend = excluded.embedding_backend,
-                  updated_at = excluded.updated_at
-                """,
-                (scope_id, backend, utc_now()),
-            )
+        self._execute(
+            """
+            INSERT INTO memory_settings (scope_id, incognito, embedding_backend, updated_at)
+            VALUES (?, 0, ?, ?)
+            ON CONFLICT(scope_id) DO UPDATE SET
+              embedding_backend = excluded.embedding_backend,
+              updated_at = excluded.updated_at
+            """,
+            (scope_id, backend, utc_now()),
+        )
 
     def list_memories_missing_embedding(
         self: SQLiteStore,
@@ -321,8 +313,7 @@ class MemoryStore:
             params.append(owner_principal_id)
         sql += " ORDER BY m.memory_id LIMIT ?"
         params.append(max(1, int(limit)))
-        with self.connect() as connection:
-            rows = connection.execute(sql, params).fetchall()
+        rows = self._rows(sql, params)
         return [dict(row) for row in rows]
 
     def stored_memory_checksums(
@@ -360,8 +351,7 @@ class MemoryStore:
         # Oldest first, so the id reported for a checksum is the record the
         # duplicate would be a copy *of*.
         sql += " ORDER BY created_at ASC, memory_id ASC"
-        with self.connect() as connection:
-            rows = connection.execute(sql, params).fetchall()
+        rows = self._rows(sql, params)
         stored: dict[tuple[str, str], str] = {}
         for row in rows:
             key = (str(row["content_checksum"]), str(row["scope"] or ""))
@@ -426,33 +416,32 @@ class MemoryStore:
     def insert_memory_candidate(
         self: SQLiteStore, candidate: Any, *, owner_principal_id: str | None = None
     ) -> bool:
-        with self.connect() as connection:
-            cursor = connection.execute(
-                """
-                INSERT OR IGNORE INTO memory_candidates
-                (candidate_id, source_event_id, memory_type, scope, text, sensitivity,
-                 confidence, decision, created_at, owner_principal_id,
-                 source_session_id, source_turn_id, source_role, extractor_version)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    candidate.candidate_id,
-                    candidate.source_event_id,
-                    candidate.memory_type,
-                    candidate.scope,
-                    candidate.text,
-                    candidate.sensitivity,
-                    candidate.confidence,
-                    candidate.decision,
-                    candidate.created_at,
-                    owner_principal_id,
-                    getattr(candidate, "source_session_id", None),
-                    getattr(candidate, "source_turn_id", None),
-                    getattr(candidate, "source_role", None),
-                    getattr(candidate, "extractor_version", None),
-                ),
-            )
-        return cursor.rowcount > 0
+        changed = self._execute(
+            """
+            INSERT OR IGNORE INTO memory_candidates
+            (candidate_id, source_event_id, memory_type, scope, text, sensitivity,
+             confidence, decision, created_at, owner_principal_id,
+             source_session_id, source_turn_id, source_role, extractor_version)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                candidate.candidate_id,
+                candidate.source_event_id,
+                candidate.memory_type,
+                candidate.scope,
+                candidate.text,
+                candidate.sensitivity,
+                candidate.confidence,
+                candidate.decision,
+                candidate.created_at,
+                owner_principal_id,
+                getattr(candidate, "source_session_id", None),
+                getattr(candidate, "source_turn_id", None),
+                getattr(candidate, "source_role", None),
+                getattr(candidate, "extractor_version", None),
+            ),
+        )
+        return changed > 0
 
     def list_memory_candidates(
         self: SQLiteStore, decision: str | None = None, *, owner_principal_id: str | None = None
@@ -467,18 +456,16 @@ class MemoryStore:
             query += " owner_principal_id = ?"
             params.append(owner_principal_id)
         query += " ORDER BY created_at DESC"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def get_memory_candidate(
         self: SQLiteStore, candidate_id: str, *, owner_principal_id: str
     ) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM memory_candidates WHERE candidate_id = ? AND owner_principal_id = ?",
-                (candidate_id, owner_principal_id),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM memory_candidates WHERE candidate_id = ? AND owner_principal_id = ?",
+            (candidate_id, owner_principal_id),
+        )
         return dict(row) if row else None
 
     def resolve_memory_candidate(
@@ -492,21 +479,20 @@ class MemoryStore:
         resolved_at: str,
     ) -> bool:
         """Resolve exactly one proposal without allowing stale double decisions."""
-        with self.connect() as connection:
-            cursor = connection.execute(
-                """UPDATE memory_candidates
-                SET decision = ?, reason = ?, resolved_at = ?
-                WHERE candidate_id = ? AND owner_principal_id = ? AND decision = ?""",
-                (
-                    decision,
-                    reason,
-                    resolved_at,
-                    candidate_id,
-                    owner_principal_id,
-                    expected_decision,
-                ),
-            )
-        return cursor.rowcount == 1
+        changed = self._execute(
+            """UPDATE memory_candidates
+            SET decision = ?, reason = ?, resolved_at = ?
+            WHERE candidate_id = ? AND owner_principal_id = ? AND decision = ?""",
+            (
+                decision,
+                reason,
+                resolved_at,
+                candidate_id,
+                owner_principal_id,
+                expected_decision,
+            ),
+        )
+        return changed == 1
 
     def insert_approved_memory(self: SQLiteStore, entry: Any) -> None:
         with self.connect() as connection:
@@ -602,37 +588,36 @@ class MemoryStore:
         from raiker.contracts.ids import new_id
 
         evaluation_id = new_id("mev_")
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO memory_evaluation_runs (
-                    evaluation_id, corpus_version, strategy, case_count, precision_at_k,
-                    recall_at_k, mean_reciprocal_rank, ndcg_at_k, policy_leak_count,
-                    p50_latency_ms, p95_latency_ms, token_count, compute_cost_usd,
-                    storage_bytes, created_at, backend_version, scope, workload,
-                    latency_distribution_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    evaluation_id,
-                    report.corpus_version,
-                    strategy or report.strategy,
-                    report.case_count,
-                    report.precision_at_k,
-                    report.recall_at_k,
-                    report.mean_reciprocal_rank,
-                    report.ndcg_at_k,
-                    report.policy_leak_count,
-                    report.p50_latency_ms,
-                    report.p95_latency_ms,
-                    report.token_count,
-                    report.compute_cost_usd,
-                    report.storage_bytes,
-                    utc_now(),
-                    report.backend_version,
-                    report.scope,
-                    report.workload,
-                    json.dumps(report.latency_distribution, sort_keys=True),
-                ),
-            )
+        self._execute(
+            """INSERT INTO memory_evaluation_runs (
+                evaluation_id, corpus_version, strategy, case_count, precision_at_k,
+                recall_at_k, mean_reciprocal_rank, ndcg_at_k, policy_leak_count,
+                p50_latency_ms, p95_latency_ms, token_count, compute_cost_usd,
+                storage_bytes, created_at, backend_version, scope, workload,
+                latency_distribution_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                evaluation_id,
+                report.corpus_version,
+                strategy or report.strategy,
+                report.case_count,
+                report.precision_at_k,
+                report.recall_at_k,
+                report.mean_reciprocal_rank,
+                report.ndcg_at_k,
+                report.policy_leak_count,
+                report.p50_latency_ms,
+                report.p95_latency_ms,
+                report.token_count,
+                report.compute_cost_usd,
+                report.storage_bytes,
+                utc_now(),
+                report.backend_version,
+                report.scope,
+                report.workload,
+                json.dumps(report.latency_distribution, sort_keys=True),
+            ),
+        )
         return evaluation_id
 
     def upsert_memory_entity(self: SQLiteStore, entity_id: str, name: str, entity_type: str) -> None:
@@ -640,12 +625,11 @@ class MemoryStore:
         if not normalized_name or not entity_type.strip():
             raise ValueError("invalid_memory_entity")
         now = utc_now()
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO memory_entities VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(normalized_name, entity_type) DO UPDATE SET display_name = excluded.display_name, updated_at = excluded.updated_at""",
-                (entity_id, normalized_name, name.strip(), entity_type.strip(), now, now),
-            )
+        self._execute(
+            """INSERT INTO memory_entities VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(normalized_name, entity_type) DO UPDATE SET display_name = excluded.display_name, updated_at = excluded.updated_at""",
+            (entity_id, normalized_name, name.strip(), entity_type.strip(), now, now),
+        )
 
     def match_memory_entities(
         self: SQLiteStore,
@@ -705,24 +689,17 @@ class MemoryStore:
             now = utc_now()
             params.extend([owner_principal_id, now, now, now])
         params.append(limit)
-        with self.connect() as connection:
-            rows = connection.execute(
-                # The padding is what makes the containment check a *word*
-                # match. Bare `INSTR(query, name)` matches "nas" inside "nasty
-                # business", which is precisely the coincidence this method
-                # exists not to anchor a graph traversal on. Wrapping both sides
-                # in spaces means only a whole term, or a whole multi-word name,
-                # can match.
-                f"""SELECT entity_id, display_name, entity_type, normalized_name
-                    FROM memory_entities
-                    WHERE (normalized_name IN ({placeholders})
-                       OR (INSTR(' ' || ? || ' ', ' ' || normalized_name || ' ') > 0
-                           AND LENGTH(normalized_name) >= 3))
-                    {owner_filter}
-                    ORDER BY LENGTH(normalized_name) DESC, normalized_name
-                    LIMIT ?""",
-                params,
-            ).fetchall()
+        rows = self._rows(
+            f"""SELECT entity_id, display_name, entity_type, normalized_name
+                FROM memory_entities
+                WHERE (normalized_name IN ({placeholders})
+                   OR (INSTR(' ' || ? || ' ', ' ' || normalized_name || ' ') > 0
+                       AND LENGTH(normalized_name) >= 3))
+                {owner_filter}
+                ORDER BY LENGTH(normalized_name) DESC, normalized_name
+                LIMIT ?""",
+            params,
+        )
         return [dict(row) for row in rows]
 
     def link_memory_entities(
@@ -740,19 +717,18 @@ class MemoryStore:
             or self.get_active_approved_memory(evidence_memory_id) is None
         ):
             raise ValueError("invalid_memory_relationship")
-        with self.connect() as connection:
-            connection.execute(
-                "INSERT OR IGNORE INTO memory_entity_relationships VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
-                (
-                    relationship_id,
-                    subject_entity_id,
-                    predicate.strip(),
-                    object_entity_id,
-                    evidence_memory_id,
-                    confidence,
-                    utc_now(),
-                ),
-            )
+        self._execute(
+            "INSERT OR IGNORE INTO memory_entity_relationships VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
+            (
+                relationship_id,
+                subject_entity_id,
+                predicate.strip(),
+                object_entity_id,
+                evidence_memory_id,
+                confidence,
+                utc_now(),
+            ),
+        )
         self.link_memory_projection(
             evidence_memory_id, "graph", relationship_id, "memory-entity-v1"
         )
@@ -786,84 +762,80 @@ class MemoryStore:
             raise ValueError("invalid_memory_relationship_candidate")
         normalized_subject = " ".join(subject_name.casefold().split())
         normalized_object = " ".join(object_name.casefold().split())
-        with self.connect() as connection:
-            cursor = connection.execute(
-                """INSERT OR IGNORE INTO memory_relationship_candidates
-                   (candidate_id, owner_principal_id, subject_name, subject_type,
-                    normalized_subject, predicate, object_name, object_type,
-                    normalized_object, evidence_memory_id, confidence, extractor_version,
-                    decision, created_at, resolved_at, resolved_by)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                           'needs_user_review', ?, NULL, NULL)""",
-                (
-                    candidate_id,
-                    owner,
-                    subject_name.strip(),
-                    subject_type.strip(),
-                    normalized_subject,
-                    predicate.strip(),
-                    object_name.strip(),
-                    object_type.strip(),
-                    normalized_object,
-                    evidence_memory_id,
-                    confidence,
-                    extractor_version.strip(),
-                    utc_now(),
-                ),
-            )
-        return cursor.rowcount > 0
+        changed = self._execute(
+            """INSERT OR IGNORE INTO memory_relationship_candidates
+               (candidate_id, owner_principal_id, subject_name, subject_type,
+                normalized_subject, predicate, object_name, object_type,
+                normalized_object, evidence_memory_id, confidence, extractor_version,
+                decision, created_at, resolved_at, resolved_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                       'needs_user_review', ?, NULL, NULL)""",
+            (
+                candidate_id,
+                owner,
+                subject_name.strip(),
+                subject_type.strip(),
+                normalized_subject,
+                predicate.strip(),
+                object_name.strip(),
+                object_type.strip(),
+                normalized_object,
+                evidence_memory_id,
+                confidence,
+                extractor_version.strip(),
+                utc_now(),
+            ),
+        )
+        return changed > 0
 
     def get_memory_relationship_candidate(
         self: SQLiteStore, candidate_id: str, *, owner_principal_id: str | None = None
     ) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM memory_relationship_candidates WHERE candidate_id = ?"
-                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
-                (candidate_id, *([owner_principal_id] if owner_principal_id else [])),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM memory_relationship_candidates WHERE candidate_id = ?"
+            + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+            (candidate_id, *([owner_principal_id] if owner_principal_id else [])),
+        )
         return dict(row) if row else None
 
     def list_memory_relationship_candidates(
         self: SQLiteStore, owner_principal_id: str, *, decision: str = "needs_user_review"
     ) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT c.*, m.text AS evidence_text,
-                          m.source_event_id AS evidence_source_event_id
-                   FROM memory_relationship_candidates c
-                   JOIN approved_memory m ON m.memory_id = c.evidence_memory_id
-                   WHERE c.owner_principal_id = ? AND c.decision = ?
-                     AND m.owner_principal_id = ?
-                   ORDER BY c.created_at, c.candidate_id""",
-                (owner_principal_id, decision, owner_principal_id),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT c.*, m.text AS evidence_text,
+                      m.source_event_id AS evidence_source_event_id
+               FROM memory_relationship_candidates c
+               JOIN approved_memory m ON m.memory_id = c.evidence_memory_id
+               WHERE c.owner_principal_id = ? AND c.decision = ?
+                 AND m.owner_principal_id = ?
+               ORDER BY c.created_at, c.candidate_id""",
+            (owner_principal_id, decision, owner_principal_id),
+        )
         return [dict(row) for row in rows]
 
     def list_memory_relationships(self: SQLiteStore, owner_principal_id: str) -> list[dict[str, Any]]:
         """Active graph edges whose approved evidence belongs to one owner."""
         now = utc_now()
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT r.*, s.display_name AS subject_name,
-                          s.entity_type AS subject_type,
-                          o.display_name AS object_name,
-                          o.entity_type AS object_type
-                   FROM memory_entity_relationships r
-                   JOIN memory_entities s ON s.entity_id = r.subject_entity_id
-                   JOIN memory_entities o ON o.entity_id = r.object_entity_id
-                   JOIN approved_memory m ON m.memory_id = r.evidence_memory_id
-                   WHERE r.active = 1 AND m.owner_principal_id = ?
-                     AND m.deleted_at IS NULL AND m.archived_at IS NULL
-                     AND m.search_enabled = 1
-                     AND m.sensitivity NOT IN ('secret_like', 'credential_like')
-                     AND (m.expires_at IS NULL OR m.expires_at > ?)
-                     AND (m.valid_from IS NULL OR m.valid_from <= ?)
-                     AND (m.valid_until IS NULL OR m.valid_until > ?)
-                     AND m.superseded_at IS NULL
-                   ORDER BY r.created_at, r.relationship_id""",
-                (owner_principal_id, now, now, now),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT r.*, s.display_name AS subject_name,
+                      s.entity_type AS subject_type,
+                      o.display_name AS object_name,
+                      o.entity_type AS object_type
+               FROM memory_entity_relationships r
+               JOIN memory_entities s ON s.entity_id = r.subject_entity_id
+               JOIN memory_entities o ON o.entity_id = r.object_entity_id
+               JOIN approved_memory m ON m.memory_id = r.evidence_memory_id
+               WHERE r.active = 1 AND m.owner_principal_id = ?
+                 AND m.deleted_at IS NULL AND m.archived_at IS NULL
+                 AND m.search_enabled = 1
+                 AND m.sensitivity NOT IN ('secret_like', 'credential_like')
+                 AND (m.expires_at IS NULL OR m.expires_at > ?)
+                 AND (m.valid_from IS NULL OR m.valid_from <= ?)
+                 AND (m.valid_until IS NULL OR m.valid_until > ?)
+                 AND m.superseded_at IS NULL
+               ORDER BY r.created_at, r.relationship_id""",
+            (owner_principal_id, now, now, now),
+        )
         return [dict(row) for row in rows]
 
     def reject_memory_relationship(
@@ -904,13 +876,12 @@ class MemoryStore:
     ) -> bool:
         if decision not in {"approved", "denied"} or not resolved_by.strip():
             raise ValueError("invalid_memory_relationship_resolution")
-        with self.connect() as connection:
-            cursor = connection.execute(
-                """UPDATE memory_relationship_candidates SET decision = ?, resolved_at = ?, resolved_by = ?
-                WHERE candidate_id = ? AND decision = 'needs_user_review'""",
-                (decision, utc_now(), resolved_by, candidate_id),
-            )
-        return cursor.rowcount > 0
+        changed = self._execute(
+            """UPDATE memory_relationship_candidates SET decision = ?, resolved_at = ?, resolved_by = ?
+            WHERE candidate_id = ? AND decision = 'needs_user_review'""",
+            (decision, utc_now(), resolved_by, candidate_id),
+        )
+        return changed > 0
 
     def resolve_memory_relationship_candidate_atomic(
         self: SQLiteStore,
@@ -1067,8 +1038,7 @@ class MemoryStore:
         if scope:
             query += " AND m.scope = ?"
             params.append(scope)
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def mark_approved_memory_forgotten(
@@ -1129,23 +1099,19 @@ class MemoryStore:
         confirmed_at: str,
         disposition: dict[str, Any],
     ) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                "INSERT INTO memory_purge_records (purge_id, memory_id, requested_by, confirmed_at, disposition_json) VALUES (?, ?, ?, ?, ?)",
-                (
-                    purge_id,
-                    memory_id,
-                    requested_by,
-                    confirmed_at,
-                    json.dumps(disposition, sort_keys=True),
-                ),
-            )
+        self._execute(
+            "INSERT INTO memory_purge_records (purge_id, memory_id, requested_by, confirmed_at, disposition_json) VALUES (?, ?, ?, ?, ?)",
+            (
+                purge_id,
+                memory_id,
+                requested_by,
+                confirmed_at,
+                json.dumps(disposition, sort_keys=True),
+            ),
+        )
 
     def deactivate_memory_projections(self: SQLiteStore, memory_id: str) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                "UPDATE memory_projections SET active = 0 WHERE memory_id = ?", (memory_id,)
-            )
+        self._execute("UPDATE memory_projections SET active = 0 WHERE memory_id = ?", (memory_id,))
 
     def set_memory_projections_active(self: SQLiteStore, memory_id: str, active: bool) -> None:
         with self.connect() as connection:
@@ -1193,28 +1159,26 @@ class MemoryStore:
             self._sync_memory_projection_eligibility(connection, memory_id)
 
     def list_memory_projections(self: SQLiteStore, memory_id: str) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM memory_projections WHERE memory_id = ? ORDER BY projection_type, projection_id",
-                (memory_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM memory_projections WHERE memory_id = ? ORDER BY projection_type, projection_id",
+            (memory_id,),
+        )
         return [dict(row) for row in rows]
 
     def get_active_approved_memory(
         self: SQLiteStore, memory_id: str, *, owner_principal_id: str | None = None
     ) -> dict[str, Any] | None:
         now = utc_now()
-        with self.connect() as connection:
-            row = connection.execute(
-                """SELECT * FROM approved_memory WHERE memory_id = ? AND deleted_at IS NULL
-                AND archived_at IS NULL AND search_enabled = 1
-                AND sensitivity NOT IN ('secret_like', 'credential_like')
-                AND (expires_at IS NULL OR expires_at > ?)
-                AND (valid_from IS NULL OR valid_from <= ?)
-                AND (valid_until IS NULL OR valid_until > ?) AND superseded_at IS NULL"""
-                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
-                (memory_id, now, now, now, *([owner_principal_id] if owner_principal_id else [])),
-            ).fetchone()
+        row = self._row(
+            """SELECT * FROM approved_memory WHERE memory_id = ? AND deleted_at IS NULL
+            AND archived_at IS NULL AND search_enabled = 1
+            AND sensitivity NOT IN ('secret_like', 'credential_like')
+            AND (expires_at IS NULL OR expires_at > ?)
+            AND (valid_from IS NULL OR valid_from <= ?)
+            AND (valid_until IS NULL OR valid_until > ?) AND superseded_at IS NULL"""
+            + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+            (memory_id, now, now, now, *([owner_principal_id] if owner_principal_id else [])),
+        )
         return dict(row) if row else None
 
     def reconcile_memory_projections(
@@ -1394,8 +1358,7 @@ class MemoryStore:
             params.append(owner_principal_id)
         sql += f" ORDER BY {ordering} LIMIT ?"
         params.append(limit)
-        with self.connect() as connection:
-            rows = connection.execute(sql, params).fetchall()
+        rows = self._rows(sql, params)
         return [dict(row) for row in rows]
 
     def delete_approved_memory(
@@ -1433,8 +1396,7 @@ class MemoryStore:
             params.append(owner_principal_id)
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def enqueue_memory_job(self: SQLiteStore, job_type: str, dedup_key: str, max_attempts: int = 3) -> str:
@@ -1560,18 +1522,17 @@ class MemoryStore:
         }:
             raise ValueError("invalid_memory_lifecycle_action")
         audit_id = new_id("mla_")
-        with self.connect() as connection:
-            connection.execute(
-                "INSERT INTO memory_lifecycle_audit VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    audit_id,
-                    memory_id,
-                    action,
-                    actor_id,
-                    json.dumps(details or {}, sort_keys=True),
-                    utc_now(),
-                ),
-            )
+        self._execute(
+            "INSERT INTO memory_lifecycle_audit VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                audit_id,
+                memory_id,
+                action,
+                actor_id,
+                json.dumps(details or {}, sort_keys=True),
+                utc_now(),
+            ),
+        )
         return audit_id
 
     def list_memory_lifecycle_events(
@@ -1594,65 +1555,61 @@ class MemoryStore:
 
 
     def insert_semantic_memory_write(self: SQLiteStore, record: SemanticMemoryWriteRecord) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO semantic_memory_write_records
-                (write_id, content_summary, embedding_model, vector_count, status, approved_by, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record.write_id,
-                    record.content_summary,
-                    record.embedding_model,
-                    record.vector_count,
-                    record.status,
-                    record.approved_by,
-                    record.created_at,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO semantic_memory_write_records
+            (write_id, content_summary, embedding_model, vector_count, status, approved_by, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record.write_id,
+                record.content_summary,
+                record.embedding_model,
+                record.vector_count,
+                record.status,
+                record.approved_by,
+                record.created_at,
+            ),
+        )
 
     def list_semantic_memory_writes(self: SQLiteStore, limit: int = 20) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM semantic_memory_write_records ORDER BY created_at DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM semantic_memory_write_records ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        )
         return [dict(row) for row in rows]
 
 
     def insert_vector_record(self: SQLiteStore, record: VectorRecord) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO vector_records
-                (vector_id, content_hash, content_preview, embedding_model, dimensions, scope, sensitivity, embedding, created_at, owner_principal_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record.vector_id,
-                    record.content_hash,
-                    record.content_preview,
-                    record.embedding_model,
-                    record.dimensions,
-                    record.scope,
-                    record.sensitivity,
-                    record.embedding,
-                    record.created_at,
-                    record.owner_principal_id,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO vector_records
+            (vector_id, content_hash, content_preview, embedding_model, dimensions, scope, sensitivity, embedding, created_at, owner_principal_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record.vector_id,
+                record.content_hash,
+                record.content_preview,
+                record.embedding_model,
+                record.dimensions,
+                record.scope,
+                record.sensitivity,
+                record.embedding,
+                record.created_at,
+                record.owner_principal_id,
+            ),
+        )
 
     def delete_vector_record(
         self: SQLiteStore, vector_id: str, *, owner_principal_id: str | None = None
     ) -> bool:
-        with self.connect() as connection:
-            cursor = connection.execute(
-                "DELETE FROM vector_records WHERE vector_id = ?"
-                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
-                (vector_id, *([owner_principal_id] if owner_principal_id else [])),
-            )
-        return bool(cursor.rowcount)
+        changed = self._execute(
+            "DELETE FROM vector_records WHERE vector_id = ?"
+            + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+            (vector_id, *([owner_principal_id] if owner_principal_id else [])),
+        )
+        return bool(changed)
 
     def list_vector_records(
         self: SQLiteStore, scope: str | None = None, limit: int = 50, *, owner_principal_id: str | None = None
@@ -1670,20 +1627,18 @@ class MemoryStore:
             query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def get_vector_record(
         self: SQLiteStore, vector_id: str, *, owner_principal_id: str | None = None
     ) -> dict[str, Any] | None:
         """Return one vector record by id (or ``None``). Includes the stored preview."""
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM vector_records WHERE vector_id = ?"
-                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
-                (vector_id, *([owner_principal_id] if owner_principal_id else [])),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM vector_records WHERE vector_id = ?"
+            + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+            (vector_id, *([owner_principal_id] if owner_principal_id else [])),
+        )
         return dict(row) if row is not None else None
 
     def list_vector_embeddings(
@@ -1712,8 +1667,7 @@ class MemoryStore:
             query += " AND owner_principal_id = ?"
             params.append(owner_principal_id)
         query += " ORDER BY created_at"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def list_active_memory_vector_embeddings(
@@ -1742,8 +1696,7 @@ class MemoryStore:
             query += " AND m.owner_principal_id = ? AND v.owner_principal_id = ?"
             params.extend((owner_principal_id, owner_principal_id))
         query += " ORDER BY v.created_at"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def active_memory_vector_revision(self: SQLiteStore) -> int:
@@ -1754,8 +1707,5 @@ class MemoryStore:
         unrelated owner update is cheap; reusing one after an archive or scope
         change could disclose memory that the retrieval SQL would now withhold.
         """
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT revision FROM memory_vector_search_state WHERE singleton = 1"
-            ).fetchone()
+        row = self._row("SELECT revision FROM memory_vector_search_state WHERE singleton = 1")
         return int(row["revision"]) if row is not None else 0

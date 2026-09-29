@@ -54,40 +54,36 @@ class ModelStore:
                 )
 
     def load_model_setup_state(self: SQLiteStore, owner_principal_id: str) -> ModelSetupState:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM model_setup_state WHERE owner_principal_id = ?",
-                (owner_principal_id,),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM model_setup_state WHERE owner_principal_id = ?",
+            (owner_principal_id,),
+        )
         if row is None:
             return ModelSetupState(owner_principal_id=owner_principal_id)
         return ModelSetupState(**dict(row))
 
     def save_model_operation(self: SQLiteStore, operation: ModelOperation) -> ModelOperation:
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT OR REPLACE INTO model_operations
-                (operation_id, owner_principal_id, kind, target, state, phase,
-                 progress_bytes, total_bytes, progress_percent, source_url, destination,
-                 error_code, error_detail, created_at, updated_at, payload_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                tuple(operation.to_row().values()),
-            )
+        self._execute(
+            """INSERT OR REPLACE INTO model_operations
+            (operation_id, owner_principal_id, kind, target, state, phase,
+             progress_bytes, total_bytes, progress_percent, source_url, destination,
+             error_code, error_detail, created_at, updated_at, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            tuple(operation.to_row().values()),
+        )
         return operation
 
     def save_model_library_root(self: SQLiteStore, owner_principal_id: str, path: str) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                "INSERT OR IGNORE INTO model_library_roots (owner_principal_id, path, created_at) VALUES (?, ?, ?)",
-                (owner_principal_id, path, utc_now()),
-            )
+        self._execute(
+            "INSERT OR IGNORE INTO model_library_roots (owner_principal_id, path, created_at) VALUES (?, ?, ?)",
+            (owner_principal_id, path, utc_now()),
+        )
 
     def list_model_library_roots(self: SQLiteStore, owner_principal_id: str) -> list[str]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT path FROM model_library_roots WHERE owner_principal_id = ? ORDER BY path",
-                (owner_principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT path FROM model_library_roots WHERE owner_principal_id = ? ORDER BY path",
+            (owner_principal_id,),
+        )
         return [str(row["path"]) for row in rows]
 
     def delete_model_library_root(self: SQLiteStore, owner_principal_id: str, path: str) -> bool:
@@ -132,27 +128,24 @@ class ModelStore:
             )
 
     def list_local_models(self: SQLiteStore, owner_principal_id: str) -> list[LocalModel]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM local_models WHERE owner_principal_id = ? ORDER BY name, model_id",
-                (owner_principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM local_models WHERE owner_principal_id = ? ORDER BY name, model_id",
+            (owner_principal_id,),
+        )
         return [LocalModel(**(dict(row) | {"complete": bool(row["complete"])})) for row in rows]
 
     def list_model_operations(self: SQLiteStore, owner_principal_id: str) -> list[ModelOperation]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM model_operations WHERE owner_principal_id = ? ORDER BY created_at DESC",
-                (owner_principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM model_operations WHERE owner_principal_id = ? ORDER BY created_at DESC",
+            (owner_principal_id,),
+        )
         return [ModelOperation(**dict(row)) for row in rows]
 
     def require_model_operation(self: SQLiteStore, owner_principal_id: str, operation_id: str) -> ModelOperation:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM model_operations WHERE owner_principal_id = ? AND operation_id = ?",
-                (owner_principal_id, operation_id),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM model_operations WHERE owner_principal_id = ? AND operation_id = ?",
+            (owner_principal_id, operation_id),
+        )
         if row is None:
             raise KeyError("model_operation_not_found")
         return ModelOperation(**dict(row))
@@ -201,11 +194,10 @@ class ModelStore:
             return
         fields["updated_at"] = utc_now()
         assignments = ", ".join(f"{key} = ?" for key in fields)
-        with self.connect() as connection:
-            connection.execute(
-                f"UPDATE model_operations SET {assignments} WHERE operation_id = ?",  # noqa: S608 -- allowlisted column names only
-                (*fields.values(), operation_id),
-            )
+        self._execute(
+            f"UPDATE model_operations SET {assignments} WHERE operation_id = ?",
+            (*fields.values(), operation_id),
+        )
 
     def fail_running_model_operations(self: SQLiteStore) -> int:
         """Fail every non-terminal model operation. **Startup only.**
@@ -223,22 +215,20 @@ class ModelStore:
         the life of the install. The state named here is terminal and
         retryable, so the owner's next move is one press.
         """
-        with self.connect() as connection:
-            cursor = connection.execute(
-                """UPDATE model_operations SET state = 'failed', phase = 'recovery',
-                error_code = 'host_restarted', error_detail = 'The host stopped before this operation completed.',
-                updated_at = ? WHERE state IN ('queued', 'running', 'cancel_requested')""",
-                (utc_now(),),
-            )
-        return cursor.rowcount
+        changed = self._execute(
+            """UPDATE model_operations SET state = 'failed', phase = 'recovery',
+            error_code = 'host_restarted', error_detail = 'The host stopped before this operation completed.',
+            updated_at = ? WHERE state IN ('queued', 'running', 'cancel_requested')""",
+            (utc_now(),),
+        )
+        return changed
 
     def delete_model_operation(self: SQLiteStore, owner_principal_id: str, operation_id: str) -> bool:
-        with self.connect() as connection:
-            cursor = connection.execute(
-                "DELETE FROM model_operations WHERE owner_principal_id = ? AND operation_id = ?",
-                (owner_principal_id, operation_id),
-            )
-        return cursor.rowcount == 1
+        changed = self._execute(
+            "DELETE FROM model_operations WHERE owner_principal_id = ? AND operation_id = ?",
+            (owner_principal_id, operation_id),
+        )
+        return changed == 1
 
     def save_model_setup_state(self: SQLiteStore, state: ModelSetupState) -> ModelSetupState:
         now = utc_now()
@@ -253,30 +243,28 @@ class ModelStore:
             created_at=created_at,
             updated_at=now,
         )
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT OR REPLACE INTO model_setup_state
-                (owner_principal_id, status, step, path, selected_profile_id, selected_model, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    saved.owner_principal_id,
-                    saved.status,
-                    saved.step,
-                    saved.path,
-                    saved.selected_profile_id,
-                    saved.selected_model,
-                    saved.created_at,
-                    saved.updated_at,
-                ),
-            )
+        self._execute(
+            """INSERT OR REPLACE INTO model_setup_state
+            (owner_principal_id, status, step, path, selected_profile_id, selected_model, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                saved.owner_principal_id,
+                saved.status,
+                saved.step,
+                saved.path,
+                saved.selected_profile_id,
+                saved.selected_model,
+                saved.created_at,
+                saved.updated_at,
+            ),
+        )
         return saved
 
     def load_setup_state(self: SQLiteStore, owner_principal_id: str) -> SetupState:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM setup_state WHERE owner_principal_id = ?",
-                (owner_principal_id,),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM setup_state WHERE owner_principal_id = ?",
+            (owner_principal_id,),
+        )
         if row is None:
             return SetupState(owner_principal_id=owner_principal_id)
         values = dict(row)
@@ -289,55 +277,53 @@ class ModelStore:
         saved = SetupState(
             **(state.to_dict() | {"created_at": state.created_at or now, "updated_at": now})
         )
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT OR REPLACE INTO setup_state
-                (owner_principal_id, status, stage, selected_profile_id, selected_model,
-                 model_deferred, privacy_mode, privacy_acknowledged_at, backup_mode,
-                 backup_target, backup_verified_at, background_service_enabled, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    saved.owner_principal_id,
-                    saved.status,
-                    saved.stage,
-                    saved.selected_profile_id,
-                    saved.selected_model,
-                    int(saved.model_deferred),
-                    saved.privacy_mode,
-                    saved.privacy_acknowledged_at,
-                    saved.backup_mode,
-                    saved.backup_target,
-                    saved.backup_verified_at,
-                    int(saved.background_service_enabled),
-                    saved.created_at,
-                    saved.updated_at,
-                ),
-            )
+        self._execute(
+            """INSERT OR REPLACE INTO setup_state
+            (owner_principal_id, status, stage, selected_profile_id, selected_model,
+             model_deferred, privacy_mode, privacy_acknowledged_at, backup_mode,
+             backup_target, backup_verified_at, background_service_enabled, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                saved.owner_principal_id,
+                saved.status,
+                saved.stage,
+                saved.selected_profile_id,
+                saved.selected_model,
+                int(saved.model_deferred),
+                saved.privacy_mode,
+                saved.privacy_acknowledged_at,
+                saved.backup_mode,
+                saved.backup_target,
+                saved.backup_verified_at,
+                int(saved.background_service_enabled),
+                saved.created_at,
+                saved.updated_at,
+            ),
+        )
         return saved
 
     def save_principal_model_state(self: SQLiteStore, principal_id: str, state: ModelSessionState) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT OR REPLACE INTO principal_model_control
-                (principal_id, profile_id, model, reasoning_enabled, reasoning_effort, reasoning_mode,
-                 reasoning_budget_tokens, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    principal_id,
-                    state.profile_id,
-                    state.model,
-                    int(state.reasoning_enabled),
-                    state.reasoning_effort,
-                    state.reasoning_mode,
-                    state.reasoning_budget_tokens,
-                    utc_now(),
-                ),
-            )
+        self._execute(
+            """INSERT OR REPLACE INTO principal_model_control
+            (principal_id, profile_id, model, reasoning_enabled, reasoning_effort, reasoning_mode,
+             reasoning_budget_tokens, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                principal_id,
+                state.profile_id,
+                state.model,
+                int(state.reasoning_enabled),
+                state.reasoning_effort,
+                state.reasoning_mode,
+                state.reasoning_budget_tokens,
+                utc_now(),
+            ),
+        )
 
     def load_principal_model_state(self: SQLiteStore, principal_id: str) -> ModelSessionState | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM principal_model_control WHERE principal_id = ?", (principal_id,)
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM principal_model_control WHERE principal_id = ?",
+            (principal_id,),
+        )
         if row is None:
             return None
         return ModelSessionState(
@@ -352,15 +338,14 @@ class ModelStore:
 
     def save_configured_model(self: SQLiteStore, principal_id: str, profile_id: str, model: str) -> None:
         now = utc_now()
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO principal_configured_models
-                (principal_id, profile_id, model, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(principal_id, profile_id, model)
-                DO UPDATE SET updated_at = excluded.updated_at""",
-                (principal_id, profile_id, model, now, now),
-            )
+        self._execute(
+            """INSERT INTO principal_configured_models
+            (principal_id, profile_id, model, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(principal_id, profile_id, model)
+            DO UPDATE SET updated_at = excluded.updated_at""",
+            (principal_id, profile_id, model, now, now),
+        )
 
     def save_model_readiness(self: SQLiteStore, readiness: ModelReadiness) -> None:
         """Persist redacted reachability evidence for one exact model target."""
@@ -390,34 +375,33 @@ class ModelStore:
             return value
 
         key = readiness.key
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO model_readiness
-                (owner_principal_id, profile_id, model, endpoint_fingerprint,
-                 state, checked_at, expires_at, summary, reason_code, remediation, evidence_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(owner_principal_id, profile_id, model, endpoint_fingerprint)
-                DO UPDATE SET state = excluded.state,
-                  checked_at = excluded.checked_at,
-                  expires_at = excluded.expires_at,
-                  summary = excluded.summary,
-                  reason_code = excluded.reason_code,
-                  remediation = excluded.remediation,
-                  evidence_json = excluded.evidence_json""",
-                (
-                    key.owner_principal_id,
-                    key.profile_id,
-                    key.model,
-                    key.endpoint_fingerprint,
-                    readiness.state.value,
-                    readiness.checked_at,
-                    readiness.expires_at,
-                    readiness.summary,
-                    readiness.reason_code,
-                    readiness.remediation,
-                    json.dumps(redact(readiness.evidence), sort_keys=True, separators=(",", ":")),
-                ),
-            )
+        self._execute(
+            """INSERT INTO model_readiness
+            (owner_principal_id, profile_id, model, endpoint_fingerprint,
+             state, checked_at, expires_at, summary, reason_code, remediation, evidence_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(owner_principal_id, profile_id, model, endpoint_fingerprint)
+            DO UPDATE SET state = excluded.state,
+              checked_at = excluded.checked_at,
+              expires_at = excluded.expires_at,
+              summary = excluded.summary,
+              reason_code = excluded.reason_code,
+              remediation = excluded.remediation,
+              evidence_json = excluded.evidence_json""",
+            (
+                key.owner_principal_id,
+                key.profile_id,
+                key.model,
+                key.endpoint_fingerprint,
+                readiness.state.value,
+                readiness.checked_at,
+                readiness.expires_at,
+                readiness.summary,
+                readiness.reason_code,
+                readiness.remediation,
+                json.dumps(redact(readiness.evidence), sort_keys=True, separators=(",", ":")),
+            ),
+        )
 
     @staticmethod
     def _model_readiness_from_row(row: sqlite3.Row) -> ModelReadiness:
@@ -442,18 +426,17 @@ class ModelStore:
         )
 
     def load_model_readiness(self: SQLiteStore, key: ModelReadinessKey) -> ModelReadiness | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                """SELECT * FROM model_readiness
-                WHERE owner_principal_id = ? AND profile_id = ? AND model = ?
-                  AND endpoint_fingerprint = ?""",
-                (
-                    key.owner_principal_id,
-                    key.profile_id,
-                    key.model,
-                    key.endpoint_fingerprint,
-                ),
-            ).fetchone()
+        row = self._row(
+            """SELECT * FROM model_readiness
+            WHERE owner_principal_id = ? AND profile_id = ? AND model = ?
+              AND endpoint_fingerprint = ?""",
+            (
+                key.owner_principal_id,
+                key.profile_id,
+                key.model,
+                key.endpoint_fingerprint,
+            ),
+        )
         return self._model_readiness_from_row(row) if row is not None else None
 
     def list_model_readiness(
@@ -467,8 +450,7 @@ class ModelStore:
             query += " AND profile_id = ?"
             params.append(profile_id)
         query += " ORDER BY profile_id, model, endpoint_fingerprint"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [self._model_readiness_from_row(row) for row in rows]
 
     def invalidate_model_readiness(
@@ -478,23 +460,22 @@ class ModelStore:
         *,
         reason_code: str = "readiness_invalidated",
     ) -> int:
-        with self.connect() as connection:
-            cursor = connection.execute(
-                """UPDATE model_readiness
-                SET state = ?, expires_at = ?, reason_code = ?,
-                    summary = ?, remediation = ?
-                WHERE owner_principal_id = ? AND profile_id = ?""",
-                (
-                    ModelReadinessState.STALE.value,
-                    utc_now(),
-                    reason_code,
-                    "This model connection must be checked again.",
-                    "Check this model again before sending.",
-                    owner_principal_id,
-                    profile_id,
-                ),
-            )
-        return int(cursor.rowcount)
+        affected = self._execute(
+            """UPDATE model_readiness
+            SET state = ?, expires_at = ?, reason_code = ?,
+                summary = ?, remediation = ?
+            WHERE owner_principal_id = ? AND profile_id = ?""",
+            (
+                ModelReadinessState.STALE.value,
+                utc_now(),
+                reason_code,
+                "This model connection must be checked again.",
+                "Check this model again before sending.",
+                owner_principal_id,
+                profile_id,
+            ),
+        )
+        return affected
 
     def save_surface_model_default(
         self: SQLiteStore, principal_id: str, surface: str, profile_id: str, model: str
@@ -504,39 +485,35 @@ class ModelStore:
         A preference, not an authority: the turn this produces still carries an
         explicit profile and model, and the readiness gate judges that pair.
         """
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT OR REPLACE INTO principal_surface_models
-                (principal_id, surface, profile_id, model, updated_at)
-                VALUES (?, ?, ?, ?, ?)""",
-                (principal_id, surface, profile_id, model, utc_now()),
-            )
+        self._execute(
+            """INSERT OR REPLACE INTO principal_surface_models
+            (principal_id, surface, profile_id, model, updated_at)
+            VALUES (?, ?, ?, ?, ?)""",
+            (principal_id, surface, profile_id, model, utc_now()),
+        )
 
     def load_surface_model_default(self: SQLiteStore, principal_id: str, surface: str) -> tuple[str, str] | None:
         """The surface's default, or None when it has no opinion of its own."""
-        with self.connect() as connection:
-            row = connection.execute(
-                """SELECT profile_id, model FROM principal_surface_models
-                WHERE principal_id = ? AND surface = ?""",
-                (principal_id, surface),
-            ).fetchone()
+        row = self._row(
+            """SELECT profile_id, model FROM principal_surface_models
+            WHERE principal_id = ? AND surface = ?""",
+            (principal_id, surface),
+        )
         return None if row is None else (str(row["profile_id"]), str(row["model"]))
 
     def list_surface_model_defaults(self: SQLiteStore, principal_id: str) -> list[tuple[str, str, str]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT surface, profile_id, model FROM principal_surface_models
-                WHERE principal_id = ? ORDER BY surface""",
-                (principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT surface, profile_id, model FROM principal_surface_models
+            WHERE principal_id = ? ORDER BY surface""",
+            (principal_id,),
+        )
         return [(str(row["surface"]), str(row["profile_id"]), str(row["model"])) for row in rows]
 
     def clear_surface_model_default(self: SQLiteStore, principal_id: str, surface: str) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                "DELETE FROM principal_surface_models WHERE principal_id = ? AND surface = ?",
-                (principal_id, surface),
-            )
+        self._execute(
+            "DELETE FROM principal_surface_models WHERE principal_id = ? AND surface = ?",
+            (principal_id, surface),
+        )
 
     #
     # Whether a local model runtime exists on this machine is a fact about the
@@ -547,17 +524,16 @@ class ModelStore:
     def save_local_runtime_presence(
         self: SQLiteStore, runtime: str, *, present: bool, executable: str | None
     ) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO local_runtime_presence
-                (runtime, present, executable, detected_at)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(runtime) DO UPDATE SET
-                  present = excluded.present,
-                  executable = excluded.executable,
-                  detected_at = excluded.detected_at""",
-                (runtime, 1 if present else 0, executable, utc_now()),
-            )
+        self._execute(
+            """INSERT INTO local_runtime_presence
+            (runtime, present, executable, detected_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(runtime) DO UPDATE SET
+              present = excluded.present,
+              executable = excluded.executable,
+              detected_at = excluded.detected_at""",
+            (runtime, 1 if present else 0, executable, utc_now()),
+        )
 
     def load_local_runtime_presence(self: SQLiteStore) -> dict[str, dict[str, Any]]:
         """Every detection result on record, keyed by runtime name.
@@ -565,10 +541,9 @@ class ModelStore:
         A runtime absent from this mapping has never been detected, which is a
         third answer distinct from present and absent: nothing has looked yet.
         """
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT runtime, present, executable, detected_at FROM local_runtime_presence"
-            ).fetchall()
+        rows = self._rows(
+            "SELECT runtime, present, executable, detected_at FROM local_runtime_presence",
+        )
         return {
             str(row["runtime"]): {
                 "present": bool(row["present"]),
@@ -579,13 +554,12 @@ class ModelStore:
         }
 
     def list_configured_models(self: SQLiteStore, principal_id: str) -> list[tuple[str, str]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT profile_id, model FROM principal_configured_models
-                WHERE principal_id = ?
-                ORDER BY created_at, profile_id, model""",
-                (principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT profile_id, model FROM principal_configured_models
+            WHERE principal_id = ?
+            ORDER BY created_at, profile_id, model""",
+            (principal_id,),
+        )
         return [(str(row["profile_id"]), str(row["model"])) for row in rows]
 
     def set_configured_models(
@@ -664,13 +638,12 @@ class ModelStore:
 
     def list_provider_catalogue(self: SQLiteStore, principal_id: str, profile_id: str) -> list[str]:
         """The last catalogue this provider published, in its own order."""
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT model FROM principal_provider_catalogue
-                WHERE principal_id = ? AND profile_id = ?
-                ORDER BY position""",
-                (principal_id, profile_id),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT model FROM principal_provider_catalogue
+            WHERE principal_id = ? AND profile_id = ?
+            ORDER BY position""",
+            (principal_id, profile_id),
+        )
         return [str(row[0]) for row in rows]
 
     def provider_catalogue_listed_at(self: SQLiteStore, principal_id: str, profile_id: str) -> str | None:
@@ -679,12 +652,11 @@ class ModelStore:
         The age is the point: a picker may offer a remembered catalogue, but it
         must be able to say the answer is remembered rather than current.
         """
-        with self.connect() as connection:
-            row = connection.execute(
-                """SELECT listed_at FROM principal_provider_catalogue
-                WHERE principal_id = ? AND profile_id = ? LIMIT 1""",
-                (principal_id, profile_id),
-            ).fetchone()
+        row = self._row(
+            """SELECT listed_at FROM principal_provider_catalogue
+            WHERE principal_id = ? AND profile_id = ? LIMIT 1""",
+            (principal_id, profile_id),
+        )
         return str(row[0]) if row is not None else None
 
     def forget_provider_catalogue(self: SQLiteStore, principal_id: str, profile_id: str) -> int:
@@ -706,12 +678,11 @@ class ModelStore:
             return int(cursor.rowcount or 0)
 
     def is_configured_model(self: SQLiteStore, principal_id: str, profile_id: str, model: str) -> bool:
-        with self.connect() as connection:
-            row = connection.execute(
-                """SELECT 1 FROM principal_configured_models
-                WHERE principal_id = ? AND profile_id = ? AND model = ?""",
-                (principal_id, profile_id, model),
-            ).fetchone()
+        row = self._row(
+            """SELECT 1 FROM principal_configured_models
+            WHERE principal_id = ? AND profile_id = ? AND model = ?""",
+            (principal_id, profile_id, model),
+        )
         return row is not None
 
     def save_model_fallback_sequence(self: SQLiteStore, session_id: str, profile_ids: list[str]) -> None:
@@ -720,23 +691,21 @@ class ModelStore:
         The list is stored verbatim (deduplication/validation is the caller's job).
         An empty list clears the sequence.
         """
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO model_fallback_sequence
-                (session_id, profile_ids_json, updated_at)
-                VALUES (?, ?, ?)
-                """,
-                (session_id, json.dumps(list(profile_ids)), utc_now()),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO model_fallback_sequence
+            (session_id, profile_ids_json, updated_at)
+            VALUES (?, ?, ?)
+            """,
+            (session_id, json.dumps(list(profile_ids)), utc_now()),
+        )
 
     def load_model_fallback_sequence(self: SQLiteStore, session_id: str) -> list[str]:
         """Return the ordered fallback profile ids for ``session_id`` ([] if unset)."""
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT profile_ids_json FROM model_fallback_sequence WHERE session_id = ?",
-                (session_id,),
-            ).fetchone()
+        row = self._row(
+            "SELECT profile_ids_json FROM model_fallback_sequence WHERE session_id = ?",
+            (session_id,),
+        )
         if row is None:
             return []
         try:
@@ -748,19 +717,17 @@ class ModelStore:
     def save_principal_model_fallback_sequence(
         self: SQLiteStore, principal_id: str, profile_ids: list[str]
     ) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT OR REPLACE INTO principal_model_fallback_sequence
-                (principal_id, profile_ids_json, updated_at) VALUES (?, ?, ?)""",
-                (principal_id, json.dumps(list(profile_ids)), utc_now()),
-            )
+        self._execute(
+            """INSERT OR REPLACE INTO principal_model_fallback_sequence
+            (principal_id, profile_ids_json, updated_at) VALUES (?, ?, ?)""",
+            (principal_id, json.dumps(list(profile_ids)), utc_now()),
+        )
 
     def load_principal_model_fallback_sequence(self: SQLiteStore, principal_id: str) -> list[str]:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT profile_ids_json FROM principal_model_fallback_sequence WHERE principal_id = ?",
-                (principal_id,),
-            ).fetchone()
+        row = self._row(
+            "SELECT profile_ids_json FROM principal_model_fallback_sequence WHERE principal_id = ?",
+            (principal_id,),
+        )
         try:
             value = json.loads(row["profile_ids_json"]) if row else []
         except (TypeError, ValueError):
@@ -788,11 +755,7 @@ class ModelStore:
 
     def load_model_advisor(self: SQLiteStore, session_id: str) -> str | None:
         """Return the persisted advisor profile id for ``session_id`` (None if unset)."""
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT profile_id FROM model_advisor WHERE session_id = ?",
-                (session_id,),
-            ).fetchone()
+        row = self._row("SELECT profile_id FROM model_advisor WHERE session_id = ?", (session_id,))
         return str(row["profile_id"]) if row is not None else None
 
     def save_principal_model_advisor(self: SQLiteStore, principal_id: str, profile_id: str | None) -> None:
@@ -809,9 +772,8 @@ class ModelStore:
             )
 
     def load_principal_model_advisor(self: SQLiteStore, principal_id: str) -> str | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT profile_id FROM principal_model_advisor WHERE principal_id = ?",
-                (principal_id,),
-            ).fetchone()
+        row = self._row(
+            "SELECT profile_id FROM principal_model_advisor WHERE principal_id = ?",
+            (principal_id,),
+        )
         return str(row["profile_id"]) if row is not None else None

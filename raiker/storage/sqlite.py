@@ -721,6 +721,26 @@ class SQLiteStore(
                 stale.close()
         return connection
 
+    # OPT-06. One statement in its own transaction — commit on success,
+    # rollback on error — which is what 330 hand-written `with self.connect()`
+    # blocks around a single `execute` each were. A method that runs two
+    # statements, or reads its cursor in between, still opens the block itself,
+    # so a transaction boundary is never hidden behind a helper.
+
+    def _rows(self, sql: str, params: Any = ()) -> list[sqlite3.Row]:
+        with self.connect() as connection:
+            return connection.execute(sql, params).fetchall()
+
+    def _row(self, sql: str, params: Any = ()) -> sqlite3.Row | None:
+        with self.connect() as connection:
+            row: sqlite3.Row | None = connection.execute(sql, params).fetchone()
+            return row
+
+    def _execute(self, sql: str, params: Any = ()) -> int:
+        """Run one statement and return how many rows it changed."""
+        with self.connect() as connection:
+            return connection.execute(sql, params).rowcount
+
     def _reopen_after_memory_error(self, error: MemoryError) -> sqlite3.Connection:
         """Recover a keyed connection after a memory refusal, or fail named.
 

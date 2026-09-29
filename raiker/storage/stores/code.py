@@ -30,19 +30,17 @@ class CodeStore:
     # holds no credential and grants no capability.
 
     def list_code_repos(self: SQLiteStore, owner_principal_id: str) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM code_repos WHERE owner_principal_id = ? ORDER BY created_at, repo_id",
-                (owner_principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM code_repos WHERE owner_principal_id = ? ORDER BY created_at, repo_id",
+            (owner_principal_id,),
+        )
         return [dict(row) for row in rows]
 
     def load_code_repo(self: SQLiteStore, owner_principal_id: str, repo_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM code_repos WHERE owner_principal_id = ? AND repo_id = ?",
-                (owner_principal_id, repo_id),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM code_repos WHERE owner_principal_id = ? AND repo_id = ?",
+            (owner_principal_id, repo_id),
+        )
         return dict(row) if row is not None else None
 
     def insert_code_repo(
@@ -63,35 +61,33 @@ class CodeStore:
         duplicate is reported as a value rather than surfacing a driver exception
         to the service layer.
         """
-        with self.connect() as connection:
-            return bool(
-                connection.execute(
-                    """INSERT OR IGNORE INTO code_repos
-                       (repo_id, owner_principal_id, kind, label, local_subpath,
-                        github_owner, github_repo, branch, selected, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)""",
-                    (
-                        repo_id,
-                        owner_principal_id,
-                        kind,
-                        label,
-                        local_subpath,
-                        github_owner,
-                        github_repo,
-                        branch,
-                        utc_now(),
-                    ),
-                ).rowcount
+        return bool(
+            self._execute(
+                """INSERT OR IGNORE INTO code_repos
+                   (repo_id, owner_principal_id, kind, label, local_subpath,
+                    github_owner, github_repo, branch, selected, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)""",
+                (
+                    repo_id,
+                    owner_principal_id,
+                    kind,
+                    label,
+                    local_subpath,
+                    github_owner,
+                    github_repo,
+                    branch,
+                    utc_now(),
+                ),
             )
+        )
 
     def delete_code_repo(self: SQLiteStore, owner_principal_id: str, repo_id: str) -> bool:
-        with self.connect() as connection:
-            return bool(
-                connection.execute(
-                    "DELETE FROM code_repos WHERE owner_principal_id = ? AND repo_id = ?",
-                    (owner_principal_id, repo_id),
-                ).rowcount
+        return bool(
+            self._execute(
+                "DELETE FROM code_repos WHERE owner_principal_id = ? AND repo_id = ?",
+                (owner_principal_id, repo_id),
             )
+        )
 
     def select_code_repo(self: SQLiteStore, owner_principal_id: str, repo_id: str | None) -> None:
         """Point the account's Build workspace at one repository, or none."""
@@ -113,19 +109,17 @@ class CodeStore:
     # workspace containment check, and the policy engine.
 
     def load_code_map_index(self: SQLiteStore, owner_principal_id: str, repo_path: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM code_map_indexes WHERE owner_principal_id = ? AND repo_path = ?",
-                (owner_principal_id, repo_path),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM code_map_indexes WHERE owner_principal_id = ? AND repo_path = ?",
+            (owner_principal_id, repo_path),
+        )
         return dict(row) if row is not None else None
 
     def list_code_map_indexes(self: SQLiteStore, owner_principal_id: str) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM code_map_indexes WHERE owner_principal_id = ? ORDER BY repo_path",
-                (owner_principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM code_map_indexes WHERE owner_principal_id = ? ORDER BY repo_path",
+            (owner_principal_id,),
+        )
         return [dict(row) for row in rows]
 
     def record_code_map_index(
@@ -292,11 +286,10 @@ class CodeStore:
 
     def code_map_file_hashes(self: SQLiteStore, owner_principal_id: str, repo_path: str) -> dict[str, str]:
         """``path -> sha256`` for every indexed file, so a refresh can skip the unchanged."""
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT path, sha256 FROM code_map_files WHERE owner_principal_id = ? AND repo_path = ?",
-                (owner_principal_id, repo_path),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT path, sha256 FROM code_map_files WHERE owner_principal_id = ? AND repo_path = ?",
+            (owner_principal_id, repo_path),
+        )
         return {str(row["path"]): str(row["sha256"]) for row in rows}
 
     def match_code_map_symbols(
@@ -304,15 +297,14 @@ class CodeStore:
     ) -> list[dict[str, Any]]:
         """Candidate symbol rows for one search term. Ranking happens above this."""
         like = f"%{term.lower()}%"
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT * FROM code_map_symbols
-                   WHERE owner_principal_id = ? AND repo_path = ?
-                     AND (name_lower LIKE ? OR LOWER(qualified_name) LIKE ? OR LOWER(doc) LIKE ?)
-                   ORDER BY LENGTH(name), path, line_start
-                   LIMIT ?""",
-                (owner_principal_id, repo_path, like, like, like, limit),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT * FROM code_map_symbols
+               WHERE owner_principal_id = ? AND repo_path = ?
+                 AND (name_lower LIKE ? OR LOWER(qualified_name) LIKE ? OR LOWER(doc) LIKE ?)
+               ORDER BY LENGTH(name), path, line_start
+               LIMIT ?""",
+            (owner_principal_id, repo_path, like, like, like, limit),
+        )
         return [dict(row) for row in rows]
 
     def find_code_map_symbols(
@@ -327,30 +319,28 @@ class CodeStore:
         and lets the service above decide which of the real candidates is the
         one they meant.
         """
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT * FROM code_map_symbols
-                   WHERE owner_principal_id = ? AND repo_path = ?
-                     AND (name = ? OR qualified_name = ?)
-                   ORDER BY path, line_start
-                   LIMIT ?""",
-                (owner_principal_id, repo_path, name, name, limit),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT * FROM code_map_symbols
+               WHERE owner_principal_id = ? AND repo_path = ?
+                 AND (name = ? OR qualified_name = ?)
+               ORDER BY path, line_start
+               LIMIT ?""",
+            (owner_principal_id, repo_path, name, name, limit),
+        )
         return [dict(row) for row in rows]
 
     def match_code_map_files(
         self: SQLiteStore, owner_principal_id: str, repo_path: str, term: str, *, limit: int = 100
     ) -> list[dict[str, Any]]:
         like = f"%{term.lower()}%"
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT * FROM code_map_files
-                   WHERE owner_principal_id = ? AND repo_path = ?
-                     AND (LOWER(path) LIKE ? OR LOWER(title) LIKE ?)
-                   ORDER BY symbol_count DESC, path
-                   LIMIT ?""",
-                (owner_principal_id, repo_path, like, like, limit),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT * FROM code_map_files
+               WHERE owner_principal_id = ? AND repo_path = ?
+                 AND (LOWER(path) LIKE ? OR LOWER(title) LIKE ?)
+               ORDER BY symbol_count DESC, path
+               LIMIT ?""",
+            (owner_principal_id, repo_path, like, like, limit),
+        )
         return [dict(row) for row in rows]
 
     def list_code_map_files(
@@ -362,40 +352,37 @@ class CodeStore:
         indexing run already accepted, so a scan can never reach outside what the
         map itself covers.
         """
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT path, language, line_count, size_bytes FROM code_map_files
-                   WHERE owner_principal_id = ? AND repo_path = ?
-                   ORDER BY symbol_count DESC, path LIMIT ?""",
-                (owner_principal_id, repo_path, limit),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT path, language, line_count, size_bytes FROM code_map_files
+               WHERE owner_principal_id = ? AND repo_path = ?
+               ORDER BY symbol_count DESC, path LIMIT ?""",
+            (owner_principal_id, repo_path, limit),
+        )
         return [dict(row) for row in rows]
 
     def code_map_declarations(
         self: SQLiteStore, owner_principal_id: str, repo_path: str, name: str, *, limit: int = 200
     ) -> list[dict[str, Any]]:
         """Exact-name declarations, so a reference scan can exclude them."""
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT path, name, kind, qualified_name, line_start, line_end, signature
-                   FROM code_map_symbols
-                   WHERE owner_principal_id = ? AND repo_path = ? AND name_lower = ?
-                   ORDER BY path, line_start LIMIT ?""",
-                (owner_principal_id, repo_path, name.lower(), limit),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT path, name, kind, qualified_name, line_start, line_end, signature
+               FROM code_map_symbols
+               WHERE owner_principal_id = ? AND repo_path = ? AND name_lower = ?
+               ORDER BY path, line_start LIMIT ?""",
+            (owner_principal_id, repo_path, name.lower(), limit),
+        )
         return [dict(row) for row in rows]
 
     def top_code_map_files(
         self: SQLiteStore, owner_principal_id: str, repo_path: str, *, limit: int = 12
     ) -> list[dict[str, Any]]:
         """The files with the most declarations — the overview when nothing matched."""
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT * FROM code_map_files
-                   WHERE owner_principal_id = ? AND repo_path = ?
-                   ORDER BY symbol_count DESC, path LIMIT ?""",
-                (owner_principal_id, repo_path, limit),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT * FROM code_map_files
+               WHERE owner_principal_id = ? AND repo_path = ?
+               ORDER BY symbol_count DESC, path LIMIT ?""",
+            (owner_principal_id, repo_path, limit),
+        )
         return [dict(row) for row in rows]
 
     def code_map_totals(self: SQLiteStore, owner_principal_id: str, repo_path: str) -> dict[str, Any]:
@@ -426,13 +413,12 @@ class CodeStore:
     def code_map_file_symbols(
         self: SQLiteStore, owner_principal_id: str, repo_path: str, path: str, *, limit: int = 40
     ) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT * FROM code_map_symbols
-                   WHERE owner_principal_id = ? AND repo_path = ? AND path = ?
-                   ORDER BY line_start LIMIT ?""",
-                (owner_principal_id, repo_path, path, limit),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT * FROM code_map_symbols
+               WHERE owner_principal_id = ? AND repo_path = ? AND path = ?
+               ORDER BY line_start LIMIT ?""",
+            (owner_principal_id, repo_path, path, limit),
+        )
         return [dict(row) for row in rows]
 
     def code_map_dependents(
@@ -440,64 +426,60 @@ class CodeStore:
     ) -> list[dict[str, Any]]:
         """Files whose imports name *target* — the impact-analysis question."""
         like = f"%{target}%"
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT DISTINCT from_path, relationship, target FROM code_map_edges
-                   WHERE owner_principal_id = ? AND repo_path = ? AND target LIKE ?
-                   ORDER BY from_path LIMIT ?""",
-                (owner_principal_id, repo_path, like, limit),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT DISTINCT from_path, relationship, target FROM code_map_edges
+               WHERE owner_principal_id = ? AND repo_path = ? AND target LIKE ?
+               ORDER BY from_path LIMIT ?""",
+            (owner_principal_id, repo_path, like, limit),
+        )
         return [dict(row) for row in rows]
 
 
     def insert_graph_index_record(self: SQLiteStore, record: GraphIndexRecord) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO graph_index_records
-                (index_id, workspace_root, status, nodes_count, edges_count, started_at, completed_at, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record.index_id,
-                    record.workspace_root,
-                    record.status,
-                    record.nodes_count,
-                    record.edges_count,
-                    record.started_at,
-                    record.completed_at,
-                    record.created_by,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO graph_index_records
+            (index_id, workspace_root, status, nodes_count, edges_count, started_at, completed_at, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record.index_id,
+                record.workspace_root,
+                record.status,
+                record.nodes_count,
+                record.edges_count,
+                record.started_at,
+                record.completed_at,
+                record.created_by,
+            ),
+        )
 
     def list_graph_index_records(self: SQLiteStore, limit: int = 20) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM graph_index_records ORDER BY COALESCE(started_at, index_id) DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM graph_index_records ORDER BY COALESCE(started_at, index_id) DESC LIMIT ?",
+            (limit,),
+        )
         return [dict(row) for row in rows]
 
 
     def insert_symbol_node(self: SQLiteStore, node: SymbolNode) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO symbol_nodes
-                (symbol_id, name, kind, file_path, line_number, module, parent_symbol_id, doc_preview)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    node.symbol_id,
-                    node.name,
-                    node.kind,
-                    node.file_path,
-                    node.line_number,
-                    node.module,
-                    node.parent_symbol_id,
-                    node.doc_preview,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO symbol_nodes
+            (symbol_id, name, kind, file_path, line_number, module, parent_symbol_id, doc_preview)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                node.symbol_id,
+                node.name,
+                node.kind,
+                node.file_path,
+                node.line_number,
+                node.module,
+                node.parent_symbol_id,
+                node.doc_preview,
+            ),
+        )
 
     def list_symbol_nodes(self: SQLiteStore, kind: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
         query = "SELECT * FROM symbol_nodes"
@@ -507,50 +489,44 @@ class CodeStore:
             params.append(kind)
         query += " ORDER BY file_path, line_number LIMIT ?"
         params.append(limit)
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def insert_dependency_edge(self: SQLiteStore, edge: DependencyEdge) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO dependency_edges
-                (edge_id, source_symbol_id, target_symbol_id, dep_type, file_path, line_number, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    edge.edge_id,
-                    edge.source_symbol_id,
-                    edge.target_symbol_id,
-                    edge.dep_type,
-                    edge.file_path,
-                    edge.line_number,
-                    edge.created_at,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO dependency_edges
+            (edge_id, source_symbol_id, target_symbol_id, dep_type, file_path, line_number, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                edge.edge_id,
+                edge.source_symbol_id,
+                edge.target_symbol_id,
+                edge.dep_type,
+                edge.file_path,
+                edge.line_number,
+                edge.created_at,
+            ),
+        )
 
 
     def insert_project_graph(self: SQLiteStore, graph: ProjectGraph) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO project_graphs
-                (graph_id, workspace_root, module_count, dependency_count, built_at)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    graph.graph_id,
-                    graph.workspace_root,
-                    graph.module_count,
-                    graph.dependency_count,
-                    graph.built_at,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO project_graphs
+            (graph_id, workspace_root, module_count, dependency_count, built_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                graph.graph_id,
+                graph.workspace_root,
+                graph.module_count,
+                graph.dependency_count,
+                graph.built_at,
+            ),
+        )
 
     def list_project_graphs(self: SQLiteStore, limit: int = 10) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM project_graphs ORDER BY built_at DESC LIMIT ?", (limit,)
-            ).fetchall()
+        rows = self._rows("SELECT * FROM project_graphs ORDER BY built_at DESC LIMIT ?", (limit,))
         return [dict(row) for row in rows]

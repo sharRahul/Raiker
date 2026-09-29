@@ -29,49 +29,40 @@ if TYPE_CHECKING:
 class KnowledgeStore:
 
     def list_brain_sources(self: SQLiteStore, owner_principal_id: str) -> list[str]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT path FROM brain_sources WHERE owner_principal_id = ? ORDER BY created_at, path",
-                (owner_principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT path FROM brain_sources WHERE owner_principal_id = ? ORDER BY created_at, path",
+            (owner_principal_id,),
+        )
         return [str(row["path"]) for row in rows]
 
     def add_brain_source(self: SQLiteStore, owner_principal_id: str, path: str) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                "INSERT OR IGNORE INTO brain_sources (owner_principal_id, path, created_at) VALUES (?, ?, ?)",
-                (owner_principal_id, path, utc_now()),
-            )
+        self._execute(
+            "INSERT OR IGNORE INTO brain_sources (owner_principal_id, path, created_at) VALUES (?, ?, ?)",
+            (owner_principal_id, path, utc_now()),
+        )
 
     # A grant is the owner naming a folder on this machine that the Knowledge
     # Map may read *where it is*. It is stored so it can be shown back and
     # revoked; nothing is copied into the workspace by recording one.
 
     def list_brain_source_grants(self: SQLiteStore, owner_principal_id: str) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT root_id, path, label, created_at, write_enabled FROM brain_source_grants "
-                "WHERE owner_principal_id = ? ORDER BY created_at, path",
-                (owner_principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT root_id, path, label, created_at, write_enabled FROM brain_source_grants "
+            "WHERE owner_principal_id = ? ORDER BY created_at, path",
+            (owner_principal_id,),
+        )
         return [dict(row) for row in rows]
 
     def add_brain_source_grant(
         self: SQLiteStore, owner_principal_id: str, root_id: str, path: str, label: str
     ) -> None:
-        with self.connect() as connection:
-            # `INSERT OR REPLACE` would delete the existing row and write a
-            # fresh one, resetting `write_enabled` to its default. Re-granting a
-            # folder the owner already trusted must not quietly withdraw the
-            # write decision they made about it, so the conflict updates the
-            # describable fields and leaves that one alone.
-            connection.execute(
-                "INSERT INTO brain_source_grants "
-                "(owner_principal_id, root_id, path, label, created_at) VALUES (?, ?, ?, ?, ?) "
-                "ON CONFLICT(owner_principal_id, root_id) DO UPDATE SET path = excluded.path, "
-                "label = excluded.label",
-                (owner_principal_id, root_id, path, label, utc_now()),
-            )
+        self._execute(
+            "INSERT INTO brain_source_grants "
+            "(owner_principal_id, root_id, path, label, created_at) VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(owner_principal_id, root_id) DO UPDATE SET path = excluded.path, "
+            "label = excluded.label",
+            (owner_principal_id, root_id, path, label, utc_now()),
+        )
 
     def set_grant_write_enabled(self: SQLiteStore, owner_principal_id: str, root_id: str, enabled: bool) -> bool:
         """Record whether Raiker may write into one granted folder.
@@ -80,13 +71,12 @@ class KnowledgeStore:
         it are not the same permission, and the Knowledge Map's grants stay
         read-only however a project uses them.
         """
-        with self.connect() as connection:
-            updated = connection.execute(
-                "UPDATE brain_source_grants SET write_enabled = ? "
-                "WHERE owner_principal_id = ? AND root_id = ?",
-                (1 if enabled else 0, owner_principal_id, root_id),
-            )
-        return updated.rowcount == 1
+        updated = self._execute(
+            "UPDATE brain_source_grants SET write_enabled = ? "
+            "WHERE owner_principal_id = ? AND root_id = ?",
+            (1 if enabled else 0, owner_principal_id, root_id),
+        )
+        return updated == 1
 
     def remove_brain_source_grant(self: SQLiteStore, owner_principal_id: str, root_id: str) -> None:
         with self.connect() as connection:
@@ -104,11 +94,10 @@ class KnowledgeStore:
             )
 
     def load_brain_preferences(self: SQLiteStore, owner_principal_id: str) -> dict[str, Any]:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT settings_json FROM brain_preferences WHERE owner_principal_id = ?",
-                (owner_principal_id,),
-            ).fetchone()
+        row = self._row(
+            "SELECT settings_json FROM brain_preferences WHERE owner_principal_id = ?",
+            (owner_principal_id,),
+        )
         if row is None:
             return {}
         try:
@@ -119,21 +108,19 @@ class KnowledgeStore:
 
     def save_brain_preferences(self: SQLiteStore, owner_principal_id: str, settings: dict[str, Any]) -> str:
         updated_at = utc_now()
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO brain_preferences (owner_principal_id, settings_json, updated_at)
-                VALUES (?, ?, ?) ON CONFLICT(owner_principal_id) DO UPDATE SET
-                settings_json = excluded.settings_json, updated_at = excluded.updated_at""",
-                (owner_principal_id, json.dumps(settings, sort_keys=True), updated_at),
-            )
+        self._execute(
+            """INSERT INTO brain_preferences (owner_principal_id, settings_json, updated_at)
+            VALUES (?, ?, ?) ON CONFLICT(owner_principal_id) DO UPDATE SET
+            settings_json = excluded.settings_json, updated_at = excluded.updated_at""",
+            (owner_principal_id, json.dumps(settings, sort_keys=True), updated_at),
+        )
         return updated_at
 
     def remove_brain_source(self: SQLiteStore, owner_principal_id: str, path: str) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                "DELETE FROM brain_sources WHERE owner_principal_id = ? AND path = ?",
-                (owner_principal_id, path),
-            )
+        self._execute(
+            "DELETE FROM brain_sources WHERE owner_principal_id = ? AND path = ?",
+            (owner_principal_id, path),
+        )
 
 
     def insert_managed_file(
@@ -359,33 +346,31 @@ class KnowledgeStore:
         Returns the owner principal alongside, because every downstream call —
         grants, reconcile, retirement — is owner-scoped.
         """
-        with self.connect() as connection:
-            rows = connection.execute(
-                """
-                SELECT DISTINCT p.project_id AS project_id,
-                       g.owner_principal_id AS owner_principal_id,
-                       g.path AS path
-                FROM projects p
-                JOIN brain_source_grants g ON g.root_id = p.root_grant_id
-                JOIN managed_files m
-                  ON m.project_id = p.project_id
-                 AND m.owner_principal_id = g.owner_principal_id
-                 AND m.retired_at IS NULL
-                WHERE p.root_kind = 'attached' AND p.root_grant_id IS NOT NULL
-                """
-            ).fetchall()
+        rows = self._rows(
+            """
+            SELECT DISTINCT p.project_id AS project_id,
+                   g.owner_principal_id AS owner_principal_id,
+                   g.path AS path
+            FROM projects p
+            JOIN brain_source_grants g ON g.root_id = p.root_grant_id
+            JOIN managed_files m
+              ON m.project_id = p.project_id
+             AND m.owner_principal_id = g.owner_principal_id
+             AND m.retired_at IS NULL
+            WHERE p.root_kind = 'attached' AND p.root_grant_id IS NOT NULL
+            """,
+        )
         return [dict(row) for row in rows]
 
     def set_managed_file_source_mtime(
         self: SQLiteStore, file_id: str, owner_principal_id: str, mtime_ns: int
     ) -> bool:
-        with self.connect() as connection:
-            updated = connection.execute(
-                "UPDATE managed_files SET source_mtime_ns = ? "
-                "WHERE file_id = ? AND owner_principal_id = ?",
-                (int(mtime_ns), file_id, owner_principal_id),
-            )
-        return updated.rowcount == 1
+        updated = self._execute(
+            "UPDATE managed_files SET source_mtime_ns = ? "
+            "WHERE file_id = ? AND owner_principal_id = ?",
+            (int(mtime_ns), file_id, owner_principal_id),
+        )
+        return updated == 1
 
     def list_managed_files(
         self: SQLiteStore,
@@ -406,16 +391,14 @@ class KnowledgeStore:
         if not include_retired:
             query += " AND retired_at IS NULL"
         query += " ORDER BY created_at, file_id"
-        with self.connect() as connection:
-            rows = connection.execute(query, parameters).fetchall()
+        rows = self._rows(query, parameters)
         return [dict(row) for row in rows]
 
     def get_managed_file(self: SQLiteStore, file_id: str, owner_principal_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM managed_files WHERE file_id = ? AND owner_principal_id = ?",
-                (file_id, owner_principal_id),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM managed_files WHERE file_id = ? AND owner_principal_id = ?",
+            (file_id, owner_principal_id),
+        )
         return dict(row) if row else None
 
     def set_managed_file_index_state(
@@ -425,29 +408,27 @@ class KnowledgeStore:
         index_state: str,
         index_error: str | None = None,
     ) -> bool:
-        with self.connect() as connection:
-            updated = connection.execute(
-                """
-                UPDATE managed_files
-                SET index_state = ?, index_error = ?, updated_at = ?
-                WHERE file_id = ? AND owner_principal_id = ? AND retired_at IS NULL
-                """,
-                (index_state, index_error, utc_now(), file_id, owner_principal_id),
-            )
-        return updated.rowcount == 1
+        updated = self._execute(
+            """
+            UPDATE managed_files
+            SET index_state = ?, index_error = ?, updated_at = ?
+            WHERE file_id = ? AND owner_principal_id = ? AND retired_at IS NULL
+            """,
+            (index_state, index_error, utc_now(), file_id, owner_principal_id),
+        )
+        return updated == 1
 
     def retire_managed_file(self: SQLiteStore, file_id: str, owner_principal_id: str) -> bool:
         now = utc_now()
-        with self.connect() as connection:
-            retired = connection.execute(
-                """
-                UPDATE managed_files
-                SET index_state = 'retired', index_error = NULL, updated_at = ?, retired_at = ?
-                WHERE file_id = ? AND owner_principal_id = ? AND retired_at IS NULL
-                """,
-                (now, now, file_id, owner_principal_id),
-            )
-        return retired.rowcount == 1
+        retired = self._execute(
+            """
+            UPDATE managed_files
+            SET index_state = 'retired', index_error = NULL, updated_at = ?, retired_at = ?
+            WHERE file_id = ? AND owner_principal_id = ? AND retired_at IS NULL
+            """,
+            (now, now, file_id, owner_principal_id),
+        )
+        return retired == 1
 
 
     @staticmethod
@@ -543,16 +524,15 @@ class KnowledgeStore:
     def list_managed_file_chunks(
         self: SQLiteStore, file_id: str, owner_principal_id: str
     ) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                """
-                SELECT managed_file_chunks.*, managed_file_chunks.file_id AS source_file_id
-                FROM managed_file_chunks
-                WHERE file_id = ? AND owner_principal_id = ?
-                ORDER BY chunk_index
-                """,
-                (file_id, owner_principal_id),
-            ).fetchall()
+        rows = self._rows(
+            """
+            SELECT managed_file_chunks.*, managed_file_chunks.file_id AS source_file_id
+            FROM managed_file_chunks
+            WHERE file_id = ? AND owner_principal_id = ?
+            ORDER BY chunk_index
+            """,
+            (file_id, owner_principal_id),
+        )
         return [dict(row) for row in rows]
 
     def retire_managed_file_chunks(self: SQLiteStore, file_id: str, owner_principal_id: str) -> int:

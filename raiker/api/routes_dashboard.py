@@ -48,7 +48,9 @@ from raiker.api.schemas import (
 from raiker.api.session_cookie import issue as issue_session_cookie
 from raiker.api.sessions import ApiSession
 from raiker.auth.vault_key_file import ensure_vault_key
-from raiker.control.dashboard import TASK_RECURRENCES, AuthSessionView, DashboardService
+from raiker.control.dashboard import DashboardService
+from raiker.control.views.security import AuthSessionView
+from raiker.control.views.tasks import TASK_RECURRENCES
 from raiker.control.web_read_models import WebReadModels
 from raiker.models.codex_app_server import CodexSubscriptionSessions
 from raiker.models.connections import (

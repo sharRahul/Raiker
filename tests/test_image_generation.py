@@ -368,8 +368,8 @@ def test_the_models_view_actually_sends_the_declared_image_models() -> None:
     """
     import inspect
 
-    from raiker.control.dashboard import ModelProfileView
     from raiker.control.dashboard_parts import models as dashboard_models
+    from raiker.control.views.models import ModelProfileView
 
     field = ModelProfileView.__dataclass_fields__.get("image_models")
     assert field is not None, "the models view does not carry image models"

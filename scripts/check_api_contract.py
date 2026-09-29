@@ -46,7 +46,17 @@ API_TYPES = REPO_ROOT / "web" / "src" / "lib" / "apiTypes.ts"
 #: moment its first ``…View`` dataclass gets a TypeScript mirror.
 DTO_MODULES = (
     "raiker.control.dtos",
-    "raiker.control.dashboard",
+    "raiker.control.views.approvals",
+    "raiker.control.views.code",
+    "raiker.control.views.extensions",
+    "raiker.control.views.knowledge",
+    "raiker.control.views.memory",
+    "raiker.control.views.models",
+    "raiker.control.views.projects",
+    "raiker.control.views.security",
+    "raiker.control.views.sessions",
+    "raiker.control.views.tasks",
+    "raiker.control.views.threads",
     "raiker.control.service",
     "raiker.control.web_read_models",
 )

@@ -15,8 +15,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import new_id
-from raiker.control.dashboard import _GITHUB_NAME, _GITHUB_REF, CodeReposView, CodeRepoView
 from raiker.control.dtos import ControlResult
+from raiker.control.views.code import _GITHUB_NAME, _GITHUB_REF, CodeReposView, CodeRepoView
 from raiker.events.writer import EventLogWriter
 from raiker.tools.git import resolve_repository_root
 

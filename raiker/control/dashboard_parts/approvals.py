@@ -19,7 +19,8 @@ from typing import TYPE_CHECKING, Any
 from raiker.approval_previews import redact_secret_like_text
 from raiker.checkpoints.capture import MAX_PRE_IMAGE_BYTES
 from raiker.contracts.ids import utc_now
-from raiker.control.dashboard import ApprovalDetailView, ApprovalView, IdentityView
+from raiker.control.views.approvals import ApprovalDetailView, ApprovalView
+from raiker.control.views.security import IdentityView
 from raiker.execution.code_placement import (
     COMMAND_CAPABILITIES,
     HOST_NETWORK_CODE_CAPABILITY,

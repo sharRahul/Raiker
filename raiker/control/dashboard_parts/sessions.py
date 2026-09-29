@@ -16,33 +16,43 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import new_id, utc_now
-from raiker.control.dashboard import (
-    WORK_THREAD_MAX_PAGE_LIMIT,
-    WORK_THREAD_ORIGIN_NOUNS,
-    WORK_THREAD_PAGE_LIMIT,
-    WORK_THREAD_SCAN_LIMIT,
-    AuthError,
-    AuthSessionView,
+from raiker.control.dtos import ControlResult
+from raiker.control.views.security import AuthError, AuthSessionView
+from raiker.control.views.sessions import (
     CheckpointView,
     EventView,
     SessionDetailView,
     SessionView,
     TurnDetailView,
     TurnView,
+    _stored_content_parts,
+)
+from raiker.control.views.threads import (
+    WORK_THREAD_MAX_PAGE_LIMIT,
+    WORK_THREAD_PAGE_LIMIT,
+    WORK_THREAD_SCAN_LIMIT,
     WorkThreadFacet,
     WorkThreadPage,
     WorkThreadView,
-    _stored_content_parts,
     _work_thread_scope,
     decode_work_thread_cursor,
     encode_work_thread_cursor,
 )
-from raiker.control.dtos import ControlResult
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority.models import PrincipalType
 
 if TYPE_CHECKING:
     from raiker.control.dashboard import DashboardService
+
+
+#: REM-THREAD-03 — what an untitled thread of each kind is called on the work
+#: board. Separate from ``SESSION_LABELS`` because that table describes a node
+#: on the knowledge map, and a board row and a graph node are read differently.
+WORK_THREAD_ORIGIN_NOUNS: dict[str, str] = {
+    "chat": "chat",
+    "build": "build session",
+    "design": "design session",
+}
 
 
 class SessionService:
@@ -874,7 +884,7 @@ class SessionService:
 
     @staticmethod
     def _event_view(row: dict[str, Any]) -> EventView:
-        from raiker.control.dashboard import DashboardService  # defined after its parts
+        from raiker.control.dashboard import DashboardService
 
         machine_identity = (
             DashboardService._proposal_identity(row) if row.get("proposed_by") else None

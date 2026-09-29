@@ -8,10 +8,11 @@ from typing import Any
 
 import pytest
 
-import raiker.control.dashboard as dashboard
+import raiker.control.project_migration as migration
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.control.dashboard import DashboardService, migrate_project_roots
+from raiker.control.dashboard import DashboardService
 from raiker.control.knowledge_scope import build_roots
+from raiker.control.project_migration import migrate_project_roots
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -160,10 +161,10 @@ def test_replacement_after_cleanup_check_is_not_deleted(
     old.mkdir(parents=True)
     (old / "notes.txt").write_text("legacy", encoding="utf-8")
     store.create_project("proj_a", "Alpha", "projects/alpha")
-    original_is_unchanged = dashboard._source_is_unchanged
+    original_is_unchanged = migration._source_is_unchanged
     replaced = False
 
-    def replace_after_check(path: Path, identity: dashboard._SourceIdentity) -> bool:
+    def replace_after_check(path: Path, identity: migration._SourceIdentity) -> bool:
         nonlocal replaced
         unchanged = original_is_unchanged(path, identity)
         if unchanged and path == old and not replaced:
@@ -173,7 +174,7 @@ def test_replacement_after_cleanup_check_is_not_deleted(
             (old / "replacement.txt").write_text("do not delete", encoding="utf-8")
         return unchanged
 
-    monkeypatch.setattr(dashboard, "_source_is_unchanged", replace_after_check)
+    monkeypatch.setattr(migration, "_source_is_unchanged", replace_after_check)
 
     report = migrate_project_roots(tmp_path, store)
 
@@ -190,7 +191,7 @@ def test_parent_commit_with_retained_legacy_tree_migrates_nested_child(
     (child / "notes.txt").write_text("child", encoding="utf-8")
     store.create_project("proj_parent", "Alpha", "projects/alpha")
     store.create_project("proj_child", "Child", "projects/alpha/child", parent_id="proj_parent")
-    monkeypatch.setattr(dashboard, "_retain_migrated_source", lambda *_args: None)
+    monkeypatch.setattr(migration, "_retain_migrated_source", lambda *_args: None)
 
     report = migrate_project_roots(tmp_path, store)
 
@@ -239,7 +240,7 @@ def test_post_commit_invalid_migration_area_keeps_legacy_source(
     old.mkdir(parents=True)
     (old / "notes.txt").write_text("legacy", encoding="utf-8")
     store.create_project("proj_a", "Alpha", "projects/alpha")
-    original_area = dashboard._project_migration_area
+    original_area = migration._project_migration_area
     calls = 0
 
     def swapped_area(workspace: Path) -> Path:
@@ -249,7 +250,7 @@ def test_post_commit_invalid_migration_area_keeps_legacy_source(
             return tmp_path / "not-raiker-owned"
         return original_area(workspace)
 
-    monkeypatch.setattr(dashboard, "_project_migration_area", swapped_area)
+    monkeypatch.setattr(migration, "_project_migration_area", swapped_area)
 
     report = migrate_project_roots(tmp_path, store)
 
@@ -363,13 +364,13 @@ def test_incomplete_owned_publication_resumes_without_replacing_files(
     old.mkdir(parents=True)
     (old / "notes.txt").write_text("legacy", encoding="utf-8")
     store.create_project("proj_a", "Alpha", "projects/alpha")
-    original_copy = dashboard._copy_project_tree_resuming
+    original_copy = migration._copy_project_tree_resuming
 
     def fail_after_copy(source: Path, destination: Path) -> None:
         original_copy(source, destination)
         raise OSError("injected_after_final_copy")
 
-    monkeypatch.setattr(dashboard, "_copy_project_tree_resuming", fail_after_copy)
+    monkeypatch.setattr(migration, "_copy_project_tree_resuming", fail_after_copy)
 
     failed = migrate_project_roots(tmp_path, store)
 

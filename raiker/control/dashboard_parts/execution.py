@@ -18,8 +18,8 @@ from dataclasses import asdict
 from typing import TYPE_CHECKING, Any, cast
 
 from raiker.contracts.ids import new_id, utc_now
-from raiker.control.dashboard import _DISABLED_STATES
 from raiker.control.dtos import ControlResult
+from raiker.control.views.models import _DISABLED_STATES
 from raiker.execution.profiles import (
     CONTAINER_PROFILE_TOOLS,
     DEFAULT_EXECUTION_PROFILES,

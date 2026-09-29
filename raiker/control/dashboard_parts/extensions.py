@@ -13,13 +13,13 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any
 
-from raiker.control.dashboard import (
+from raiker.control.dtos import ControlResult
+from raiker.control.views.extensions import (
     McpServerView,
     _declaration_summaries,
     _env_requirements,
     _handler_target,
 )
-from raiker.control.dtos import ControlResult
 from raiker.hooks.handlers.http import egress_granted
 from raiker.runtime.executors.tier4_plugins import plugin_code_runtime
 from raiker.tools.mcp_schema import unsupported_feature_notes

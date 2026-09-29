@@ -18,7 +18,6 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority.grants import GrantValidationError, build_grant_record, grant_covers
@@ -26,6 +25,7 @@ from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelV
 from raiker.runtime.authority.router import GovernedAction, RuntimeAuthority
 from raiker.runtime.executors import build_default_executor_registry
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 
 def _ws(tmp_path: Path) -> Path:
@@ -74,11 +74,9 @@ def _write_action(principal_id: str, name: str = "notes.txt") -> GovernedAction:
     # `ask` decision mode on the file-write capability, which is how an
     # AI-proposed write is parked in production (setting requires_approval on an
     # AI's own action would instead trip the self-approval guard).
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        "write_file",
         principal_id=principal_id,
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": name, "text": "hello"},
         risk_level=RiskLevelValue.LOW,
     )
@@ -182,11 +180,9 @@ def test_grant_creation_is_classified_critical(
 ) -> None:
     # An AI proposing to create a grant hits the critical floor: F7 parks it for a
     # human decision (resting state deny) rather than executing it.
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "standing_grant_create",
         principal_id="ai_worker",
-        action_type="standing_grant_create",
-        tool_or_service_name="standing_grant_create",
         arguments={},
         risk_level=RiskLevelValue.LOW,
     )

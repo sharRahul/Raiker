@@ -27,7 +27,6 @@ from pathlib import Path
 
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
 from raiker.notify.approval_notifier import CRITICAL_APPROVAL_PENDING_KIND
@@ -44,6 +43,7 @@ from raiker.runtime.authority.router import (
 from raiker.runtime.executors import build_default_executor_registry
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 
 def _ws(tmp_path: Path) -> Path:
@@ -81,11 +81,9 @@ def _ai() -> Principal:
 def _critical_write(principal_id: str, *, session_id: str = "sess_c") -> GovernedAction:
     """A write_file action declared CRITICAL — has a real executor, so approving
     it proves end-to-end execution (a file appears on disk)."""
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        "write_file",
         principal_id=principal_id,
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "secret.txt", "text": "launched"},
         risk_level=RiskLevelValue.CRITICAL,
         session_id=session_id,
@@ -349,11 +347,9 @@ def test_relay_cannot_execute_critical_without_confirmation(tmp_path: Path) -> N
     # Drive the relay directly (as a human) with NO critical confirmation: the
     # re-governed target re-classifies as critical and is parked again, never run.
     relay = ApprovalExecutionRelay(ws, store)
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "approval_execution_relay",
         principal_id="principal_owner",
-        action_type="approval_execution_relay",
-        tool_or_service_name="approval_execution_relay",
         arguments={"approval_id": parked.approval_id},
         risk_level=RiskLevelValue.LOW,
     )
@@ -378,11 +374,9 @@ def test_ai_forged_confirmation_is_rejected(tmp_path: Path) -> None:
     forged = CriticalConfirmation(
         approval_id=parked.approval_id, confirmed_by="test_ai", step_up_verified=True
     )
-    forged_action = GovernedAction(
-        action_id=new_id("act_"),
+    forged_action = governed_action(
+        "write_file",
         principal_id="test_ai",
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "secret.txt", "text": "launched"},
         risk_level=RiskLevelValue.CRITICAL,
         critical_confirmation=forged,

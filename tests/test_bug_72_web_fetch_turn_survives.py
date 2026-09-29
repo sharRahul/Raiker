@@ -45,7 +45,6 @@ from raiker.contracts.models import (
     PromptEnvelope,
     PromptOptions,
     PromptPayload,
-    ToolAction,
     ToolResult,
     UserMetadata,
 )
@@ -63,6 +62,7 @@ from raiker.models.exceptions import (
     stream_failure,
 )
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
+from tests.factories import tool_action
 
 
 def _envelope() -> PromptEnvelope:
@@ -94,10 +94,10 @@ class TestToolExecutionNeverOccupiesTheEventLoop:
 
     def test_a_single_blocking_tool_call_does_not_stall_the_loop(self, tmp_path: Path) -> None:
         gw = _gateway(tmp_path)
-        action = ToolAction(
+        action = tool_action(
+            "web_fetch",
+            {"url": "https://example.test/"},
             action_id=new_id("act_"),
-            tool_name="web_fetch",
-            arguments={"url": "https://example.test/"},
             risk_level="medium",
             requires_approval=False,
             proposed_by="model",

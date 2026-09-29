@@ -23,9 +23,9 @@ from raiker.api.routes_prompts import _record_generated_file_attachments_for_tur
 from raiker.api.sessions import ApiSessionStore
 from raiker.checkpoints.capture import CheckpointCaptureService
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.models import ToolAction
 from raiker.runtime.attachment_preview import AttachmentPreviewService
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 
 
 @pytest.fixture
@@ -58,10 +58,10 @@ def _pending(
     """Insert a pending approval exactly as the broker parks one."""
     store = SQLiteStore(workspace)
     store.create_session("sess_a", str(workspace))
-    action = ToolAction(
+    action = tool_action(
+        tool_name,
+        arguments if arguments is not None else {"path": "notes.md", "text": "hello\n"},
         action_id=action_id,
-        tool_name=tool_name,
-        arguments=arguments if arguments is not None else {"path": "notes.md", "text": "hello\n"},
         risk_level="high",
         requires_approval=True,
     )

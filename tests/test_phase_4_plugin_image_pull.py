@@ -7,15 +7,16 @@ from typing import Any
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.ids import utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority import GovernedAction, RuntimeAuthority
-from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
+from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES, build_default_executor_registry
 from raiker.runtime.executors.sandbox import SandboxError
 from raiker.runtime.executors.tier4_plugins import PluginSandboxImagePullExecutor
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action, human
 
 _CAP = "plugin_sandbox_image_pull_cap"
 _DOC = "docs/threat-models/plugin-sandbox-image-pull.md"
@@ -55,11 +56,9 @@ def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
 
 
 def _action(principal_id: str, **args: object) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        _CAP,
         principal_id=principal_id,
-        action_type=_CAP,
-        tool_or_service_name=_CAP,
         arguments=dict(args),
         risk_level=RiskLevelValue.HIGH,
         session_id="sess_plugin_image_pull",
@@ -113,11 +112,7 @@ def _fake_action(image: object) -> Any:
 
 
 def _principal() -> Principal:
-    return Principal(
-        principal_id="principal_owner",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Owner",
-    )
+    return human("principal_owner", role_ids=())
 
 
 def test_image_pull_uses_only_docker_pull_and_redacts_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

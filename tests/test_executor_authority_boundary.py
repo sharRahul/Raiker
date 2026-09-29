@@ -18,14 +18,14 @@ from typing import Any
 
 import pytest
 
-from raiker.contracts.ids import new_id
-from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
+from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.authority.routed import routed_dispatch
 from raiker.runtime.authority.router import GovernedAction
 from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES, build_default_executor_registry
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.runtime.executors.registry import ExecutorRegistry, RoutedExecutor
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action, human
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -42,23 +42,16 @@ class _Spy:
 
 
 def _action(capability: str = "file_write_execution", **arguments: Any) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        capability,
         principal_id="principal_owner",
-        action_type=capability,
-        tool_or_service_name=capability,
         arguments=arguments,
         risk_level=RiskLevelValue.HIGH,
     )
 
 
 def _principal() -> Principal:
-    return Principal(
-        principal_id="principal_owner",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Owner",
-        role_ids=(),
-    )
+    return human("principal_owner", role_ids=())
 
 
 class TestTheRegistryHandsOutOnlyRoutedExecutors:

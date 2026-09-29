@@ -14,12 +14,12 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id
 from raiker.models.contracts import EmbeddingResponse
 from raiker.runtime.authority import GovernedAction
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors.models_runtime import ModelProviderExecutor, effective_sensitivity
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 # Built at runtime and deliberately not provider-shaped: a fixture must not look
 # like a real key to a secret scanner, and only needs to be credential-*shaped*.
@@ -47,11 +47,9 @@ def harness(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[ModelProvi
 
 
 def _embed(text: str, **extra: object) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        "model_embed",
         principal_id="principal_owner",
-        action_type="model_embed",
-        tool_or_service_name="model_embed",
         arguments={"operation": "embed", "text": text, "provider": "openai", "model": "m", **extra},
         risk_level=RiskLevelValue.MEDIUM,
     )

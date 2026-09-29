@@ -48,6 +48,7 @@ from raiker.runtime.executors import (
     ExecutorRegistry,
 )
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action, human
 
 CAPABILITIES = sorted(REAL_EXECUTOR_CAPABILITIES)
 
@@ -212,13 +213,7 @@ def _owner(store: SQLiteStore) -> Principal:
         role_ids=("rl_owner",),
         is_active=True,
     )
-    return Principal(
-        principal_id="p_owner",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Owner",
-        role_ids=("rl_owner",),
-        is_active=True,
-    )
+    return human("p_owner", role_ids=("rl_owner",))
 
 
 def _disable(store: SQLiteStore, capability: str) -> None:
@@ -276,11 +271,9 @@ def test_the_gate_refuses_before_the_executor_runs(
             executor_registry=registry,
         )
         result = authority.route_action(
-            GovernedAction(
-                action_id=new_id("act_"),
+            governed_action(
+                action_type,
                 principal_id=principal.principal_id,
-                action_type=action_type,
-                tool_or_service_name=action_type,
                 arguments={},
                 domain_scope="",
                 risk_level=RiskLevelValue.LOW,

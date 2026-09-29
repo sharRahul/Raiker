@@ -17,14 +17,14 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
 from raiker.runtime.authority.posture import capture_posture
-from raiker.runtime.authority.router import GovernedAction, RuntimeAuthority
+from raiker.runtime.authority.router import RuntimeAuthority
 from raiker.runtime.executors import build_default_executor_registry
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 
 def _ws(tmp_path: Path) -> Path:
@@ -71,11 +71,9 @@ def test_capture_posture_has_identity_and_auth_strength(store: SQLiteStore) -> N
 def test_executed_action_event_carries_posture(
     authority: RuntimeAuthority, store: SQLiteStore, ws: Path
 ) -> None:
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "write_file",
         principal_id="principal_owner",
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "p.txt", "text": "hi"},
         risk_level=RiskLevelValue.LOW,
     )

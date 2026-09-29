@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from raiker.api.app import create_app
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id, utc_now
-from raiker.contracts.models import ApprovalRelayRecord, ChannelPairing, ToolAction
+from raiker.contracts.models import ApprovalRelayRecord, ChannelPairing
 from raiker.control.service import RuntimeControlService
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
@@ -22,6 +22,7 @@ from raiker.runtime.executors import (
     build_default_executor_registry,
 )
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action, tool_action
 
 _CHANNEL_CAPS = ("external_channel_runtime", "channel_approval_relay")
 
@@ -69,11 +70,9 @@ def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
 
 
 def _action(cap: str, principal_id: str, **args: object) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        cap,
         principal_id=principal_id,
-        action_type=cap,
-        tool_or_service_name=cap,
         arguments=dict(args),
         risk_level=RiskLevelValue.MEDIUM,
     )
@@ -320,10 +319,10 @@ def test_channel_approval_response_is_exact_and_single_use(
     )
     assert configured.ok
     store.create_session("sess_channel_approval", str(ws))
-    action = ToolAction(
+    action = tool_action(
+        "write_file",
+        {"path": "never-written.txt", "text": "no"},
         action_id="act_channel_exact",
-        tool_name="write_file",
-        arguments={"path": "never-written.txt", "text": "no"},
         risk_level="high",
         requires_approval=True,
     )

@@ -19,11 +19,12 @@ from pathlib import Path
 import pytest
 
 from raiker.contracts.ids import new_id, utc_now
-from raiker.contracts.models import ToolAction, User
+from raiker.contracts.models import User
 from raiker.control.dashboard import DashboardService
 from raiker.memory.entity_extraction import propose_memory_relationships
 from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 
 OWNER = "prin_owner"
 USER = "usr_owner"
@@ -45,10 +46,10 @@ def _session(store: SQLiteStore, session_id: str, title: str, origin: str) -> No
 
 def _tool_action(store: SQLiteStore, session_id: str, tool: str, status: str = "completed") -> None:
     store.insert_tool_action(
-        ToolAction(
+        tool_action(
+            tool,
+            {},
             action_id=new_id("act_"),
-            tool_name=tool,
-            arguments={},
             risk_level="low",
             requires_approval=False,
             proposed_by="agent",

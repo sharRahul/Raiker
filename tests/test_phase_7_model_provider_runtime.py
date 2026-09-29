@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.ids import utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
@@ -31,6 +31,7 @@ from raiker.runtime.executors import (
 )
 from raiker.runtime.executors.models_runtime import Embedder
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 _CAP = "model_provider_runtime"
 _TOOL = "model_provider"
@@ -77,11 +78,9 @@ def _authority(ws: Path, *, embedder: Embedder | None = None) -> tuple[RuntimeAu
 
 
 def _action(principal_id: str, **args: object) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        _TOOL,
         principal_id=principal_id,
-        action_type=_TOOL,
-        tool_or_service_name=_TOOL,
         arguments=dict(args),
         risk_level=RiskLevelValue.MEDIUM,
         session_id="sess_model_provider",

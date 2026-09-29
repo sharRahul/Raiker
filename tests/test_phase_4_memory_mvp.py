@@ -21,6 +21,7 @@ from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.memory_tools import memory_forget, memory_search, memory_write
+from tests.factories import tool_action
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 
@@ -72,10 +73,10 @@ def _memory_write_action(text: str, **overrides: object) -> ToolAction:
         "created_by": "tests",
     }
     arguments.update(overrides)
-    return ToolAction(
+    return tool_action(
+        "memory_write",
+        arguments,
         action_id=new_id("act_"),
-        tool_name="memory_write",
-        arguments=arguments,
         risk_level="high",
         requires_approval=True,
         proposed_by="tests",
@@ -92,10 +93,10 @@ def _memory_forget_action(memory_id: str, **overrides: object) -> ToolAction:
         "deleted_by": "tests",
     }
     arguments.update(overrides)
-    return ToolAction(
+    return tool_action(
+        "memory_forget",
+        arguments,
         action_id=new_id("act_"),
-        tool_name="memory_forget",
-        arguments=arguments,
         risk_level="high",
         requires_approval=True,
         proposed_by="tests",

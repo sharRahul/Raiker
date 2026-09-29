@@ -12,6 +12,7 @@ from raiker.runtime.authority import GovernedAction, RuntimeAuthority
 from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
 from raiker.runtime.executors import ExecutionResult, ExecutorRegistry
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import human
 
 
 class TrackingExecutor:
@@ -59,13 +60,7 @@ def _make_human_principal(store: SQLiteStore) -> Principal:
         role_id="rl_user", name="user",
         description="", is_system_role=True, created_at=now,
     ))
-    principal = Principal(
-        principal_id="p_human",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Human",
-        role_ids=("rl_user",),
-        is_active=True,
-    )
+    principal = human("p_human", role_ids=("rl_user",), display_name="Human")
     store.insert_principal(
         principal_id="p_human",
         principal_type=PrincipalType.HUMAN.value,

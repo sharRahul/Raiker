@@ -25,7 +25,6 @@ import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import utc_now
-from raiker.contracts.models import ToolAction
 from raiker.models.contracts import ToolCallProposal
 from raiker.models.tool_call_validation import (
     ToolCallRejected,
@@ -46,6 +45,7 @@ from raiker.runtime.identity.lifecycle import TurnMachineIdentityLifecycle
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.broker import ToolBroker
 from raiker.tools.subagent_tools import SPAWNABLE_TOOLS
+from tests.factories import tool_action
 
 _OWNER = "principal_owner"
 _SESSION = "sess_plan"
@@ -105,10 +105,10 @@ def _broker(workspace: Path, store: SQLiteStore) -> ToolBroker:
 
 
 def _run(broker: ToolBroker, tool_name: str, arguments: dict[str, Any]) -> Any:
-    action = ToolAction(
+    action = tool_action(
+        tool_name,
+        arguments,
         action_id=f"act_{tool_name}",
-        tool_name=tool_name,
-        arguments=arguments,
         risk_level="medium",
         requires_approval=False,
         proposed_by="model",

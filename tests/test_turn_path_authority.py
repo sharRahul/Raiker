@@ -16,7 +16,6 @@ from typing import Any
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id
 from raiker.control.dashboard import DashboardService
 from raiker.control.project_roots import authority_for_project
 from raiker.runtime.authority.models import Principal, RiskLevelValue
@@ -24,6 +23,7 @@ from raiker.runtime.authority.routed import routed_dispatch
 from raiker.runtime.authority.router import GovernedAction
 from raiker.runtime.executors import build_default_executor_registry
 from raiker.runtime.executors.tier1_files import FileWriteExecutor
+from tests.factories import governed_action
 
 OWNER = "principal_owner"
 
@@ -74,11 +74,9 @@ def _principal(service: DashboardService) -> Principal:
 
 
 def _write(path: str, text: str = "x") -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        "write_file",
         principal_id=OWNER,
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": path, "text": text},
         risk_level=RiskLevelValue.LOW,
     )
@@ -119,11 +117,9 @@ class TestWritingIntoAnAttachedRoot:
         target = attached.root / "a.md"
         target.write_text("alpha\n", encoding="utf-8")
         executor = FileWriteExecutor(workspace, authority=attached.authority())
-        action = GovernedAction(
-            action_id=new_id("act_"),
+        action = governed_action(
+            "edit_file",
             principal_id=OWNER,
-            action_type="edit_file",
-            tool_or_service_name="edit_file",
             arguments={"path": str(target), "old_text": "alpha", "new_text": "beta"},
             risk_level=RiskLevelValue.LOW,
         )

@@ -27,13 +27,12 @@ from fastapi.testclient import TestClient
 from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id
-from raiker.contracts.models import ToolAction
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.authority.router import GovernedAction
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.patch_selection import hunk_ids, select_hunks, unknown_hunk_ids
+from tests.factories import governed_action, tool_action
 
 TWO_FILES = (
     "--- a/poem.txt\n"
@@ -100,10 +99,10 @@ def _human(store: SQLiteStore) -> Principal:
 def _pending_patch(store: SQLiteStore, patch: str) -> None:
     store.create_session("sess_a", "ws")
     store.insert_tool_action(
-        ToolAction(
+        tool_action(
+            "apply_patch",
+            {"path": "poem.txt", "patch": patch},
             action_id="act_1",
-            tool_name="apply_patch",
-            arguments={"path": "poem.txt", "patch": patch},
             risk_level="low",
             requires_approval=True,
             proposed_by="principal_owner",
@@ -116,11 +115,9 @@ def _pending_patch(store: SQLiteStore, patch: str) -> None:
 
 
 def _relay_action() -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        "approval_execution_relay",
         principal_id="principal_owner",
-        action_type="approval_execution_relay",
-        tool_or_service_name="approval_execution_relay",
         arguments={"approval_id": "appr_1"},
         risk_level=RiskLevelValue.LOW,
     )
@@ -278,10 +275,10 @@ class TestTheRoute:
         store = SQLiteStore(workspace)
         store.create_session("sess_a", "ws")
         store.insert_tool_action(
-            ToolAction(
+            tool_action(
+                "memory_write",
+                {"text": "note", "scope": "project"},
                 action_id="act_1",
-                tool_name="memory_write",
-                arguments={"text": "note", "scope": "project"},
                 risk_level="low",
                 requires_approval=True,
                 proposed_by="principal_owner",

@@ -34,6 +34,7 @@ from raiker.runtime.executors import (
 )
 from raiker.runtime.executors.connectors import SlackConnectorExecutor
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 from tests.routed_execution import execute_as_routed
 
@@ -281,10 +282,10 @@ class TestSlackReadTool:
         )
 
     def _action(self) -> ToolAction:
-        return ToolAction(
+        return tool_action(
+            "slack_read",
+            {"resource": "channel_info", "channel": "C123ABC"},
             action_id=new_id("act_"),
-            tool_name="slack_read",
-            arguments={"resource": "channel_info", "channel": "C123ABC"},
             risk_level="medium",
             requires_approval=False,
             proposed_by="model",

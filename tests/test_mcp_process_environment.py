@@ -25,7 +25,6 @@ from typing import Any
 
 import pytest
 
-from raiker.contracts.ids import new_id
 from raiker.runtime.authority import GovernedAction
 from raiker.runtime.authority.models import RiskLevelValue
 from raiker.runtime.executors.mcp import (
@@ -34,14 +33,13 @@ from raiker.runtime.executors.mcp import (
     mcp_stdio_env,
 )
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 
 def _action(action_type: str, arguments: dict[str, Any]) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        action_type,
         principal_id="principal_owner",
-        action_type=action_type,
-        tool_or_service_name=action_type,
         arguments=arguments,
         risk_level=RiskLevelValue.MEDIUM,
     )

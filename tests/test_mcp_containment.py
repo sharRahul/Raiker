@@ -31,6 +31,7 @@ from raiker.runtime.authority.models import RiskLevelValue
 from raiker.runtime.executors.mcp import McpBuilderExecutor, McpConnectorExecutor
 from raiker.security.mcp_monitor import McpContainment, McpSessionMonitor, McpSessionTelemetry
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 
 def _ws(tmp_path: Path) -> Path:
@@ -44,11 +45,9 @@ def _principal(pid: str = "principal_owner") -> Any:
 
 
 def _action(action_type: str, arguments: dict, *, principal_id: str = "principal_owner") -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        action_type,
         principal_id=principal_id,
-        action_type=action_type,
-        tool_or_service_name=action_type,
         arguments=arguments,
         risk_level=RiskLevelValue.MEDIUM,
     )

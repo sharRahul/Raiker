@@ -45,6 +45,7 @@ from raiker.runtime.executors import (
 )
 from raiker.runtime.executors.connectors import GmailConnectorExecutor
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 from tests.routed_execution import execute_as_routed
 
@@ -291,10 +292,10 @@ class TestGmailReadTool:
         )
 
     def _action(self) -> ToolAction:
-        return ToolAction(
+        return tool_action(
+            "gmail_read",
+            {"resource": "message", "message_id": "msg_abc123"},
             action_id=new_id("act_"),
-            tool_name="gmail_read",
-            arguments={"resource": "message", "message_id": "msg_abc123"},
             risk_level="medium",
             requires_approval=False,
             proposed_by="model",

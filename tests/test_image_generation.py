@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.ids import utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority import GovernedAction, GovernedActionResult, RuntimeAuthority
@@ -30,6 +30,7 @@ from raiker.runtime.executors import (
     tier2_image,
 )
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 CAP = "image_generation"
 
@@ -72,11 +73,9 @@ def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
 
 
 def _action(principal_id: str, **args: object) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        CAP,
         principal_id=principal_id,
-        action_type=CAP,
-        tool_or_service_name=CAP,
         arguments=dict(args),
         risk_level=RiskLevelValue.MEDIUM,
     )

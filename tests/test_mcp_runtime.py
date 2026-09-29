@@ -41,6 +41,7 @@ from raiker.runtime.executors.mcp import (
     available_mcp_templates,
 )
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action, tool_action
 
 
 def _ws(tmp_path: Path) -> Path:
@@ -56,11 +57,9 @@ def _principal(pid: str = "principal_owner") -> Any:
 
 
 def _action(action_type: str, arguments: dict, *, principal_id: str = "principal_owner") -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        action_type,
         principal_id=principal_id,
-        action_type=action_type,
-        tool_or_service_name=action_type,
         arguments=arguments,
         risk_level=RiskLevelValue.MEDIUM,
     )
@@ -346,17 +345,16 @@ def test_route_action_denies_when_gate_disabled(tmp_path: Path) -> None:
 
 
 def test_mcp_action_types_are_governed_by_policy(tmp_path: Path) -> None:
-    from raiker.contracts.models import ToolAction
     from raiker.policy.config import StaticPolicyConfig
     from raiker.policy.engine import PolicyEngine
 
     engine = PolicyEngine(StaticPolicyConfig(tmp_path))
     for tool in ("mcp_server_create", "mcp_connect", "mcp_list_tools", "mcp_call_tool"):
         decision = engine.review(
-            ToolAction(
+            tool_action(
+                tool,
+                {},
                 action_id=new_id("act_"),
-                tool_name=tool,
-                arguments={},
                 risk_level="medium",
                 requires_approval=True,
                 proposed_by="model",

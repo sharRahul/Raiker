@@ -6,11 +6,12 @@ from raiker.context.gatherer import CAPABILITY_GATE_TOOLS, ContextGatherer
 from raiker.context.models import SOURCE_TYPES, ContextBundle, ContextGathererConfig
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id, utc_now
-from raiker.contracts.models import Checkpoint, TaskRecord, ToolAction
+from raiker.contracts.models import Checkpoint, TaskRecord
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.memory.candidates import create_deferred_candidate
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 
 
 def _gather(tmp_path: Path, prompt: str = "do the thing", **kwargs: object) -> ContextBundle:
@@ -259,10 +260,10 @@ def test_tasks_checkpoints_approvals_summaries_are_bounded(tmp_path: Path) -> No
         ),
         manifest_path=str(tmp_path / "ckpt.json"),
     )
-    action = ToolAction(
+    action = tool_action(
+        "write_file",
+        {"path": "secret_location.txt", "text": "data"},
         action_id=new_id("act_"),
-        tool_name="write_file",
-        arguments={"path": "secret_location.txt", "text": "data"},
         risk_level="high",
         requires_approval=True,
     )

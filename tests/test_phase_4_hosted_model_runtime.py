@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.ids import utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
@@ -24,6 +24,7 @@ from raiker.runtime.executors.models_runtime import (
     PrivateNetworkModelRuntimeExecutor,
 )
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 _HOSTED = "hosted_model_runtime"
 _PRIVATE = "private_network_model_runtime"
@@ -61,11 +62,9 @@ def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
 
 
 def _action(principal_id: str, capability: str, **args: object) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        capability,
         principal_id=principal_id,
-        action_type=capability,
-        tool_or_service_name=capability,
         arguments=dict(args),
         risk_level=RiskLevelValue.MEDIUM,
     )

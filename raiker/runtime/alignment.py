@@ -55,6 +55,8 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
+from raiker.contracts.views import View
+
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 
@@ -109,7 +111,7 @@ REASON_RECORD_UNAVAILABLE = "auto_alignment_record_unavailable"
 
 
 @dataclass(frozen=True)
-class AlignmentVerdict:
+class AlignmentVerdict(View):
     """The check's answer, recorded as evidence rather than applied silently."""
 
     #: True when the action may run unprompted under Auto.
@@ -121,14 +123,6 @@ class AlignmentVerdict:
     #: One sentence naming what did not match, for the approval the owner sees.
     #: Never a mood — it says which path, and that the turn never established it.
     message: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "aligned": self.aligned,
-            "reason_code": self.reason_code,
-            "target": self.target,
-            "message": self.message,
-        }
 
 
 ALIGNED = AlignmentVerdict(aligned=True)

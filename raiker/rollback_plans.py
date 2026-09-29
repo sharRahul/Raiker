@@ -5,6 +5,7 @@ import json
 from dataclasses import dataclass
 
 from raiker.approval_previews import ApprovalPreview
+from raiker.contracts.views import View
 
 
 def _stable_id(prefix: str, payload: dict[str, object]) -> str:
@@ -15,7 +16,7 @@ def _stable_id(prefix: str, payload: dict[str, object]) -> str:
 
 
 @dataclass(frozen=True)
-class RollbackPlan:
+class RollbackPlan(View):
     rollback_plan_id: str
     target_capability: str
     source_preview_id: str
@@ -30,24 +31,6 @@ class RollbackPlan:
     rollback_execution_enabled: bool
     reasons: list[str]
     created_at: str
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "rollback_plan_id": self.rollback_plan_id,
-            "target_capability": self.target_capability,
-            "source_preview_id": self.source_preview_id,
-            "action_type": self.action_type,
-            "affected_paths": self.affected_paths,
-            "affected_records": self.affected_records,
-            "reversible": self.reversible,
-            "rollback_available": self.rollback_available,
-            "rollback_steps": self.rollback_steps,
-            "safety_notes": self.safety_notes,
-            "can_execute_rollback_now": self.can_execute_rollback_now,
-            "rollback_execution_enabled": self.rollback_execution_enabled,
-            "reasons": self.reasons,
-            "created_at": self.created_at,
-        }
 
 
 def create_graph_rollback_plan(preview: ApprovalPreview) -> RollbackPlan:

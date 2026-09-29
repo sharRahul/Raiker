@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import utc_now
+from raiker.contracts.views import View
 from raiker.runtime.identity.contracts import (
     MachineIdentityError,
     b64url_decode,
@@ -63,7 +64,7 @@ class DelegationError(ValueError):
 
 
 @dataclass(frozen=True)
-class DelegationClaims:
+class DelegationClaims(View):
     """What one delegation asserts. Metadata and a digest — never the findings."""
 
     version: int
@@ -81,9 +82,6 @@ class DelegationClaims:
 
     def canonical_bytes(self) -> bytes:
         return json.dumps(asdict(self), sort_keys=True, separators=(",", ":")).encode("utf-8")
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
     @classmethod
     def from_mapping(cls, raw: dict[str, Any]) -> DelegationClaims:

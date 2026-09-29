@@ -34,6 +34,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from raiker.contracts.ids import utc_now
+from raiker.contracts.views import View
 from raiker.models.price_registry import (
     PriceRegistry,
     rates_from_provider_metadata,
@@ -125,21 +126,12 @@ class SyncState:
 
 
 @dataclass(frozen=True)
-class SyncResult:
+class SyncResult(View):
     provider: str
     ok: bool
     models_recorded: int
     changes_written: int
     reason_code: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "provider": self.provider,
-            "ok": self.ok,
-            "models_recorded": self.models_recorded,
-            "changes_written": self.changes_written,
-            "reason_code": self.reason_code,
-        }
 
 
 class PriceSynchroniser:

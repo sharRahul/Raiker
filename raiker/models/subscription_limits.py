@@ -35,6 +35,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from raiker.contracts.ids import utc_now
+from raiker.contracts.views import View
 from raiker.storage.sqlite import SQLiteStore
 
 #: How a provider hands on what it volunteered: profile id, and the windows.
@@ -50,7 +51,7 @@ STALE_AFTER = timedelta(hours=24)
 
 
 @dataclass(frozen=True)
-class LimitWindow:
+class LimitWindow(View):
     """One limit the provider stated, exactly as stated."""
 
     #: The provider's own name for it where it gives one, else the duration.
@@ -61,14 +62,6 @@ class LimitWindow:
     window_minutes: int | None
     #: When it refreshes, as an ISO-8601 instant, when the provider says.
     resets_at: str | None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "label": self.label,
-            "used_percent": self.used_percent,
-            "window_minutes": self.window_minutes,
-            "resets_at": self.resets_at,
-        }
 
 
 @dataclass(frozen=True)

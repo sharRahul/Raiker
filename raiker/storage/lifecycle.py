@@ -9,6 +9,7 @@ from typing import Any
 from raiker.approval_audit import ApprovalAuditRecord
 from raiker.approval_previews import ApprovalPreview, redact_secret_like_text
 from raiker.contracts.ids import utc_now
+from raiker.contracts.views import View
 from raiker.rollback_plans import RollbackPlan
 
 REDACTED = "[REDACTED]"
@@ -79,7 +80,7 @@ def json_safe_metadata(value: Mapping[str, Any]) -> dict[str, Any]:
 
 
 @dataclass(frozen=True)
-class StorageLifecycleRecord:
+class StorageLifecycleRecord(View):
     lifecycle_id: str
     target_capability: str
     record_type: str
@@ -95,25 +96,6 @@ class StorageLifecycleRecord:
     runtime_writes_enabled: bool
     reasons: list[str]
     metadata: dict[str, Any]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "lifecycle_id": self.lifecycle_id,
-            "target_capability": self.target_capability,
-            "record_type": self.record_type,
-            "source_preview_id": self.source_preview_id,
-            "source_audit_id": self.source_audit_id,
-            "rollback_plan_id": self.rollback_plan_id,
-            "status": self.status,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-            "retention_policy": self.retention_policy,
-            "redaction_policy": self.redaction_policy,
-            "can_write_runtime_data": self.can_write_runtime_data,
-            "runtime_writes_enabled": self.runtime_writes_enabled,
-            "reasons": self.reasons,
-            "metadata": self.metadata,
-        }
 
 
 def create_storage_lifecycle_record(

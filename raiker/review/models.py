@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from raiker.contracts.views import View
+
 # Allowed enumerations for deterministic, contract-safe review models.
 REVIEW_MODES = frozenset({"unstaged", "staged", "path", "clean"})
 SEVERITIES = ("info", "low", "medium", "high")
@@ -69,7 +71,7 @@ class ReviewModelError(ValueError):
 
 
 @dataclass(frozen=True)
-class ReviewScope:
+class ReviewScope(View):
     mode: str
     workspace_root: str
     path_filter: str | None
@@ -80,16 +82,6 @@ class ReviewScope:
     def __post_init__(self) -> None:
         if self.mode not in REVIEW_MODES:
             raise ReviewModelError(f"invalid_review_mode:{self.mode}")
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "mode": self.mode,
-            "workspace_root": self.workspace_root,
-            "path_filter": self.path_filter,
-            "staged": self.staged,
-            "max_files": self.max_files,
-            "max_diff_chars": self.max_diff_chars,
-        }
 
 
 @dataclass(frozen=True)
@@ -111,7 +103,7 @@ class ReviewInput:
 
 
 @dataclass(frozen=True)
-class ReviewFinding:
+class ReviewFinding(View):
     finding_id: str
     severity: str
     category: str
@@ -131,23 +123,9 @@ class ReviewFinding:
         if self.confidence not in CONFIDENCES:
             raise ReviewModelError(f"invalid_confidence:{self.confidence}")
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "finding_id": self.finding_id,
-            "severity": self.severity,
-            "category": self.category,
-            "file_path": self.file_path,
-            "line": self.line,
-            "title": self.title,
-            "description": self.description,
-            "evidence": self.evidence,
-            "recommendation": self.recommendation,
-            "confidence": self.confidence,
-        }
-
 
 @dataclass(frozen=True)
-class ReviewActionProposal:
+class ReviewActionProposal(View):
     """A safe, in-memory proposed action derived from a review finding.
 
     Proposals are proposal-only. They never apply fixes, mutate files, run tests, or
@@ -177,24 +155,9 @@ class ReviewActionProposal:
         if not self.proposal_id.startswith("rap_"):
             raise ReviewModelError("proposal_id must use rap_ prefix")
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "proposal_id": self.proposal_id,
-            "finding_id": self.finding_id,
-            "title": self.title,
-            "action_type": self.action_type,
-            "risk_level": self.risk_level,
-            "requires_approval": self.requires_approval,
-            "would_modify_files": self.would_modify_files,
-            "files": list(self.files),
-            "summary": self.summary,
-            "rationale": self.rationale,
-            "safety_notes": list(self.safety_notes),
-        }
-
 
 @dataclass(frozen=True)
-class ProposalLifecycleRecord:
+class ProposalLifecycleRecord(View):
     """Metadata-only lifecycle record for a saved review action proposal.
 
     This is proposal-only and metadata-only. It never contains raw diff, raw file
@@ -230,27 +193,9 @@ class ProposalLifecycleRecord:
         if not self.proposal_id.startswith("rap_"):
             raise ReviewModelError("proposal_id must use rap_ prefix")
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "proposal_id": self.proposal_id,
-            "review_id": self.review_id,
-            "finding_id": self.finding_id,
-            "title": self.title,
-            "action_type": self.action_type,
-            "risk_level": self.risk_level,
-            "requires_approval": self.requires_approval,
-            "would_modify_files": self.would_modify_files,
-            "status": self.status,
-            "files": list(self.files),
-            "summary": self.summary,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-            "source": self.source,
-        }
-
 
 @dataclass(frozen=True)
-class ProposalApprovalPreview:
+class ProposalApprovalPreview(View):
     """Metadata-only approval planning preview derived from a saved proposal lifecycle record.
 
     This is a preview/planning record only. It never approves execution, executes
@@ -285,30 +230,9 @@ class ProposalApprovalPreview:
         if self.status not in APPROVAL_PREVIEW_STATUSES:
             raise ReviewModelError(f"invalid_approval_preview_status:{self.status}")
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "preview_id": self.preview_id,
-            "proposal_id": self.proposal_id,
-            "review_id": self.review_id,
-            "finding_id": self.finding_id,
-            "proposal_status": self.proposal_status,
-            "action_type": self.action_type,
-            "risk_level": self.risk_level,
-            "requires_approval": self.requires_approval,
-            "would_modify_files": self.would_modify_files,
-            "files": list(self.files),
-            "required_human_decision": self.required_human_decision,
-            "required_safety_checks": list(self.required_safety_checks),
-            "blocking_conditions": list(self.blocking_conditions),
-            "recommended_next_action": self.recommended_next_action,
-            "status": self.status,
-            "created_at": self.created_at,
-            "source": self.source,
-        }
-
 
 @dataclass(frozen=True)
-class ReviewSummary:
+class ReviewSummary(View):
     files_reviewed: int
     findings_count: int
     severity_counts: dict[str, int]
@@ -317,20 +241,9 @@ class ReviewSummary:
     redaction_applied: bool
     proposal_count: int = 0
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "files_reviewed": self.files_reviewed,
-            "findings_count": self.findings_count,
-            "severity_counts": dict(self.severity_counts),
-            "categories": dict(self.categories),
-            "truncated": self.truncated,
-            "redaction_applied": self.redaction_applied,
-            "proposal_count": self.proposal_count,
-        }
-
 
 @dataclass(frozen=True)
-class ReviewResult:
+class ReviewResult(View):
     review_id: str
     scope: ReviewScope
     summary: ReviewSummary
@@ -338,14 +251,3 @@ class ReviewResult:
     action_proposals: list[ReviewActionProposal] = field(default_factory=list)
     safety_notes: list[str] = field(default_factory=list)
     event_metadata: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "review_id": self.review_id,
-            "scope": self.scope.to_dict(),
-            "summary": self.summary.to_dict(),
-            "findings": [finding.to_dict() for finding in self.findings],
-            "action_proposals": [proposal.to_dict() for proposal in self.action_proposals],
-            "safety_notes": list(self.safety_notes),
-            "event_metadata": dict(self.event_metadata),
-        }

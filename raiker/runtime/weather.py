@@ -48,6 +48,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 from raiker.contracts.ids import utc_now
+from raiker.contracts.views import View
 from raiker.runtime.environment import owner_weather_location
 
 if TYPE_CHECKING:
@@ -100,19 +101,11 @@ def _condition(code: Any) -> str:
 
 
 @dataclass
-class WeatherLocation:
+class WeatherLocation(View):
     display_name: str
     latitude: float
     longitude: float
     timezone: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "display_name": self.display_name,
-            "latitude": self.latitude,
-            "longitude": self.longitude,
-            "timezone": self.timezone,
-        }
 
 
 @dataclass

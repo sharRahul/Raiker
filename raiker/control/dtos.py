@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from raiker.contracts.views import View
+
 # ── ReasonCode constants ──────────────────────────────────────────────
 # Values match the denial strings returned by RuntimeAuthority so callers
 # can branch on them without coupling to prose.
@@ -35,25 +37,16 @@ REASON_RISK_ACCEPTANCE_REQUIRED: str = "risk_acceptance_required"
 
 
 @dataclass(frozen=True)
-class ControlPrincipalRef:
+class ControlPrincipalRef(View):
     principal_id: str
     display_name: str
     principal_type: str
     role_ids: tuple[str, ...] = ()
     is_authorized_gate_manager: bool = False
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "principal_id": self.principal_id,
-            "display_name": self.display_name,
-            "principal_type": self.principal_type,
-            "role_ids": list(self.role_ids),
-            "is_authorized_gate_manager": self.is_authorized_gate_manager,
-        }
-
 
 @dataclass(frozen=True)
-class CapabilityGateView:
+class CapabilityGateView(View):
     capability: str
     phase: int
     state: str
@@ -108,35 +101,9 @@ class CapabilityGateView:
     #: never assumed; empty for every capability that runs no code.
     network_boundary: str = ""
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "capability": self.capability,
-            "phase": self.phase,
-            "state": self.state,
-            "default_state": self.default_state,
-            "source": self.source,
-            "runtime_enabled": self.runtime_enabled,
-            "allowed_transitions": list(self.allowed_transitions),
-            "can_current_principal_change": self.can_current_principal_change,
-            "blocked_reason_code": self.blocked_reason_code,
-            "readiness": dict(self.readiness),
-            "decision_mode": self.decision_mode,
-            "requires_threat_model_ack": self.requires_threat_model_ack,
-            "requires_human_confirmation": self.requires_human_confirmation,
-            "threat_model_ack_recorded": self.threat_model_ack_recorded,
-            "gate_reality": self.gate_reality,
-            "governance_note": self.governance_note,
-            "unset_resolution": self.unset_resolution,
-            "enforced_enabled": self.enforced_enabled,
-            "side_effect": self.side_effect,
-            "ungoverned_consequence": self.ungoverned_consequence,
-            "authority_requirement": self.authority_requirement,
-            "network_boundary": self.network_boundary,
-        }
-
 
 @dataclass(frozen=True)
-class RuntimeModeView:
+class RuntimeModeView(View):
     mode_name: str
     status: str
     activated_by: str = ""
@@ -144,42 +111,17 @@ class RuntimeModeView:
     reason: str = ""
     allowed_modes: tuple[str, ...] = ()
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "mode_name": self.mode_name,
-            "status": self.status,
-            "activated_by": self.activated_by,
-            "activated_at": self.activated_at,
-            "reason": self.reason,
-            "allowed_modes": list(self.allowed_modes),
-        }
-
 
 @dataclass(frozen=True)
-class ControlResult:
+class ControlResult(View):
     ok: bool
     reason_code: str | None = None
     message_key: str | None = None
     data: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "ok": self.ok,
-            "reason_code": self.reason_code,
-            "message_key": self.message_key,
-            "data": dict(self.data),
-        }
-
 
 @dataclass(frozen=True)
-class RuntimeReadinessView:
+class RuntimeReadinessView(View):
     mode: RuntimeModeView
     gates: tuple[CapabilityGateView, ...] = ()
     summary: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "mode": self.mode.to_dict(),
-            "gates": [g.to_dict() for g in self.gates],
-            "summary": dict(self.summary),
-        }

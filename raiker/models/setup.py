@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from typing import Any
+from dataclasses import dataclass
+
+from raiker.contracts.views import View
 
 
 @dataclass(frozen=True)
-class ModelSetupState:
+class ModelSetupState(View):
     owner_principal_id: str
     status: str = "required"
     step: str = "choose_path"
@@ -15,12 +16,9 @@ class ModelSetupState:
     created_at: str | None = None
     updated_at: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class SetupState:
+class SetupState(View):
     owner_principal_id: str
     status: str = "required"
     #: First launch opens on what the product is, not on a provider matrix
@@ -37,6 +35,3 @@ class SetupState:
     background_service_enabled: bool = False
     created_at: str | None = None
     updated_at: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)

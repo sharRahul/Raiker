@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
+
+from raiker.contracts.views import View
 
 _FULL_REVISION = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
 _SHARD = re.compile(r"^(?P<base>.+)-(?P<part>\d{5})-of-(?P<total>\d{5})\.gguf$", re.IGNORECASE)
@@ -70,18 +72,15 @@ class HuggingFaceAccessError(RuntimeError):
 
 
 @dataclass(frozen=True)
-class HfSearchResult:
+class HfSearchResult(View):
     repo_id: str
     downloads: int
     likes: int
     gated: bool
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class HfVariant:
+class HfVariant(View):
     repo_id: str
     revision: str
     files: tuple[str, ...]
@@ -93,21 +92,15 @@ class HfVariant:
     license_id: str | None
     complete: bool
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class HfDownloadPreview:
+class HfDownloadPreview(View):
     repo_id: str
     revision: str
     files: tuple[str, ...]
     total_bytes: int
     cached_bytes: int
     download_bytes: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 class HuggingFaceService:

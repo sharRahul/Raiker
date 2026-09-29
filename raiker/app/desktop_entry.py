@@ -38,6 +38,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from raiker.app.service import ServiceActionResult, detect_os, run_all
+from raiker.contracts.views import View
 
 APP_NAME = "Raiker"
 LINUX_ENTRY = "raiker.desktop"
@@ -80,7 +81,7 @@ class DesktopEntryPlan:
 
 
 @dataclass(frozen=True)
-class DesktopEntryStatus:
+class DesktopEntryStatus(View):
     """Whether a launcher is currently installed, and what kind."""
 
     supported: bool
@@ -89,16 +90,6 @@ class DesktopEntryStatus:
     label: str
     path: str | None
     note: str
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "supported": self.supported,
-            "installed": self.installed,
-            "mechanism": self.mechanism,
-            "label": self.label,
-            "path": self.path,
-            "note": self.note,
-        }
 
 
 def launch_command(workspace: Path | None = None) -> list[str]:

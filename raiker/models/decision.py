@@ -50,6 +50,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from raiker.contracts.views import View
 from raiker.models.readiness import ModelReadiness, ModelReadinessService
 
 #: The work surfaces that may hold their own default model.
@@ -74,7 +75,7 @@ SELECTION_SOURCES: tuple[str, ...] = ("surface_default", "global_default", "nati
 
 
 @dataclass(frozen=True)
-class ModelChoice:
+class ModelChoice(View):
     """A profile and a concrete model, with why it is the one being named."""
 
     profile_id: str
@@ -82,9 +83,6 @@ class ModelChoice:
     #: For ``selected``: one of ``SELECTION_SOURCES``.
     #: For ``effective``: ``selected``, ``fallback`` or ``no_ready_candidate``.
     source: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"profile_id": self.profile_id, "model": self.model, "source": self.source}
 
 
 @dataclass(frozen=True)

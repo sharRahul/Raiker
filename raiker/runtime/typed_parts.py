@@ -43,8 +43,10 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any
+
+from raiker.contracts.views import View
 
 # ── Part types ──────────────────────────────────────────────────────────────
 
@@ -84,7 +86,7 @@ _FENCE = re.compile(
 
 
 @dataclass(frozen=True)
-class ContentPart:
+class ContentPart(View):
     """One declared piece of a turn's answer."""
 
     type: str
@@ -98,9 +100,6 @@ class ContentPart:
     def __post_init__(self) -> None:
         if self.type not in PART_TYPES:
             raise ValueError(f"content_part_type_invalid:{self.type}")
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 def _text(run: str) -> ContentPart | None:

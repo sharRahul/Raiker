@@ -42,6 +42,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from raiker.contracts.views import View
 from raiker.storage.sqlite import SQLiteStore
 
 # How much text the inspector receives around a located passage. A source turn
@@ -61,7 +62,7 @@ STATUS_NOT_AUTHORIZED = "not_authorized"
 
 
 @dataclass(frozen=True)
-class SourceExcerpt:
+class SourceExcerpt(View):
     """One resolved source passage, or the stated reason there is not one."""
 
     status: str
@@ -78,21 +79,6 @@ class SourceExcerpt:
     attachment_id: str = ""
     truncated: bool = False
     resolution_method: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "status": self.status,
-            "kind": self.kind,
-            "title": self.title,
-            "excerpt": self.excerpt,
-            "highlight_start": self.highlight_start,
-            "highlight_length": self.highlight_length,
-            "session_id": self.session_id,
-            "turn_id": self.turn_id,
-            "attachment_id": self.attachment_id,
-            "truncated": self.truncated,
-            "resolution_method": self.resolution_method,
-        }
 
 
 def normalise_whitespace(text: str) -> str:

@@ -18,6 +18,7 @@ from typing import Any
 from uuid import uuid4
 
 from raiker.auth.app_key import ensure_app_key
+from raiker.contracts.views import View
 from raiker.control.knowledge_scope import (
     KNOWLEDGE_SOURCE_EXTENSIONS,
     REVIEW_ACCEPTED_FILE_BUDGET,
@@ -210,7 +211,7 @@ def _runs_on_this_platform(profile: Any) -> bool:
 
 
 @dataclass(frozen=True)
-class CodeRepoView:
+class CodeRepoView(View):
     """One repository a coding chat can be pointed at.
 
     A row is a *reference*, not an integration: it stores no credential, opens no
@@ -235,12 +236,9 @@ class CodeRepoView:
     github_repo: str | None = None
     branch: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class CodeReposView:
+class CodeReposView(View):
     """Every repository reference for one account, plus the honest read posture.
 
     ``github_gate_state``/``github_decision_mode`` report what the
@@ -261,19 +259,9 @@ class CodeReposView:
         "a disabled gate fails closed no matter what is connected here."
     )
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "repos": [repo.to_dict() for repo in self.repos],
-            "selected_repo_id": self.selected_repo_id,
-            "github_gate_state": self.github_gate_state,
-            "github_decision_mode": self.github_decision_mode,
-            "github_token_configured": self.github_token_configured,
-            "note": self.note,
-        }
-
 
 @dataclass(frozen=True)
-class SessionView:
+class SessionView(View):
     session_id: str
     title: str | None
     status: str
@@ -308,9 +296,6 @@ class SessionView:
     # only — it grants nothing and hides nothing; a task session stays fully
     # readable here and from Tasks.
     origin: str = "chat"
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 def _handler_target(handler: Any) -> str:
@@ -365,7 +350,7 @@ def _declaration_summaries(stored: Any) -> tuple[dict[str, Any], ...]:
 
 
 @dataclass(frozen=True)
-class McpServerView:
+class McpServerView(View):
     """Owner-scoped view of one local stdio MCP server profile (Control Deck
     task 4). ``command`` is the argv (interpreter + workspace-relative script);
     it is never a secret or a remote endpoint. Read-only — building or
@@ -412,12 +397,9 @@ class McpServerView:
     # made "why will this server not connect" unanswerable.
     protocol_version: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class SecurityFindingView:
+class SecurityFindingView(View):
     """Owner-scoped view of one redacted security finding (monitored MCP
     connections, Phase B/C). ``redacted_detail`` holds redacted metadata only
     (labels, counts, hostnames, added/removed tool names) — never a raw value."""
@@ -432,12 +414,9 @@ class SecurityFindingView:
     state: str
     created_at: str
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class NotificationView:
+class NotificationView(View):
     """Owner-scoped view of one notification (Phase C). Redacted human-readable
     copy only; ``finding_id`` / ``subject_id`` link back to what raised it."""
 
@@ -450,12 +429,9 @@ class NotificationView:
     read: bool
     created_at: str
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class McpSessionView:
+class McpSessionView(View):
     """Owner-scoped, redacted monitor row for one MCP connection session."""
 
     session_row_id: str
@@ -470,9 +446,6 @@ class McpSessionView:
     outcome: str
     started_at: str
     ended_at: str | None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 def _stored_content_parts(summary: Any) -> tuple[dict[str, Any], ...]:
@@ -499,7 +472,7 @@ def _stored_content_parts(summary: Any) -> tuple[dict[str, Any], ...]:
 
 
 @dataclass(frozen=True)
-class TurnView:
+class TurnView(View):
     turn_id: str
     session_id: str
     turn_type: str
@@ -528,21 +501,15 @@ class TurnView:
     # every answer that declared nothing, which is nearly all of them.
     content_parts: tuple[dict[str, Any], ...] = ()
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class SessionDetailView:
+class SessionDetailView(View):
     session: SessionView
     turns: tuple[TurnView, ...]
 
-    def to_dict(self) -> dict[str, Any]:
-        return {"session": self.session.to_dict(), "turns": [t.to_dict() for t in self.turns]}
-
 
 @dataclass(frozen=True)
-class EventView:
+class EventView(View):
     event_id: str
     session_id: str
     turn_id: str | None
@@ -553,12 +520,9 @@ class EventView:
     summary: str | None
     machine_identity: IdentityView | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class BrainNodeView:
+class BrainNodeView(View):
     node_id: str
     node_type: str
     label: str
@@ -567,12 +531,9 @@ class BrainNodeView:
     progress_percent: int | None = None
     is_real: bool = True
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class BrainEdgeView:
+class BrainEdgeView(View):
     source: str
     target: str
     relationship: str
@@ -580,9 +541,6 @@ class BrainEdgeView:
     relationship_id: str | None = None
     evidence_memory_id: str | None = None
     owner_can_reject: bool = False
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -603,7 +561,7 @@ class BrainView:
 
 
 @dataclass(frozen=True)
-class MemoryControlView:
+class MemoryControlView(View):
     """User-facing view of one approved memory entry.
 
     Carries the governance metadata the user needs to trust, scope, and
@@ -639,38 +597,9 @@ class MemoryControlView:
     updated_at: str | None = None
     last_used_at: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "memory_id": self.memory_id,
-            "text": self.text,
-            "scope": self.scope,
-            "sensitivity": self.sensitivity,
-            "memory_type": self.memory_type,
-            "created_at": self.created_at,
-            "tags": list(self.tags),
-            "source": self.source,
-            "provenance": dict(self.provenance),
-            "confidence": self.confidence,
-            "trust_score": self.trust_score,
-            "retention": self.retention,
-            "approval_state": self.approval_state,
-            "pinned": self.pinned,
-            "search_enabled": self.search_enabled,
-            "expires_at": self.expires_at,
-            "archived_at": self.archived_at,
-            "source_event_id": self.source_event_id,
-            "created_by": self.created_by,
-            "valid_from": self.valid_from,
-            "valid_until": self.valid_until,
-            "supersedes_memory_id": self.supersedes_memory_id,
-            "remembered_reason": self.remembered_reason,
-            "updated_at": self.updated_at,
-            "last_used_at": self.last_used_at,
-        }
-
 
 @dataclass(frozen=True)
-class ObservationView:
+class ObservationView(View):
     """MEM-04 — one eidetic observation, as the owner reads it.
 
     Everything here is metadata *about* material the runtime saw. There is no
@@ -700,33 +629,9 @@ class ObservationView:
     gist_summary: str = ""
     gist_id: str = ""
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "observation_id": self.observation_id,
-            "session_id": self.session_id,
-            "turn_id": self.turn_id,
-            "tool_name": self.tool_name,
-            "source_type": self.source_type,
-            "summary": self.summary,
-            "sensitivity": self.sensitivity,
-            "retention": self.retention,
-            "capture_status": self.capture_status,
-            "skip_reason": self.skip_reason,
-            "promotable_to_memory": self.promotable_to_memory,
-            "content_sha256": self.content_sha256,
-            "content_bytes": self.content_bytes,
-            "artifact_ref": self.artifact_ref,
-            "source_event_id": self.source_event_id,
-            "created_at": self.created_at,
-            "expires_at": self.expires_at,
-            "gist_status": self.gist_status,
-            "gist_summary": self.gist_summary,
-            "gist_id": self.gist_id,
-        }
-
 
 @dataclass(frozen=True)
-class MemorySettingsView:
+class MemorySettingsView(View):
     incognito: bool
     #: MEM-03 — which embedding space recall searches, and what is selectable.
     #: `retrieval` is what is in force *now*, including the reason a weaker
@@ -748,31 +653,15 @@ class MemorySettingsView:
     vector_search_strategy: str = "exact_then_approximate"
     vector_search_exact_limit: int = 512
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "incognito": self.incognito,
-            "embedding_backend": self.embedding_backend,
-            "retrieval": dict(self.retrieval),
-            "spaces": [dict(space) for space in self.spaces],
-            "embedding_providers": [dict(item) for item in self.embedding_providers],
-            "unindexed_memories": self.unindexed_memories,
-            "unindexed_file_chunks": self.unindexed_file_chunks,
-            "vector_search_strategy": self.vector_search_strategy,
-            "vector_search_exact_limit": self.vector_search_exact_limit,
-        }
-
 
 @dataclass(frozen=True)
-class TurnDetailView:
+class TurnDetailView(View):
     turn: TurnView
     events: tuple[EventView, ...]
 
-    def to_dict(self) -> dict[str, Any]:
-        return {"turn": self.turn.to_dict(), "events": [e.to_dict() for e in self.events]}
-
 
 @dataclass(frozen=True)
-class CheckpointView:
+class CheckpointView(View):
     checkpoint_id: str
     session_id: str
     turn_id: str | None
@@ -785,12 +674,9 @@ class CheckpointView:
     can_restore_state: bool
     can_restore_files: bool
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ProjectView:
+class ProjectView(View):
     # A project is an organizing scope, not an authority: it names a
     # workspace-contained subpath and groups sessions/checkpoints. Selecting or
     # creating one grants nothing.
@@ -810,9 +696,6 @@ class ProjectView:
     # say whether a folder survives *before* the owner opens anything.
     root_kind: str = "managed"
     root_label: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -1369,35 +1252,21 @@ def migrate_project_roots(workspace_root: Path, store: SQLiteStore) -> ProjectRo
 
 
 @dataclass(frozen=True)
-class ProjectsListView:
+class ProjectsListView(View):
     projects: tuple[ProjectView, ...]
     active_project_id: str | None
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "projects": [p.to_dict() for p in self.projects],
-            "active_project_id": self.active_project_id,
-        }
-
 
 @dataclass(frozen=True)
-class ProjectDetailView:
+class ProjectDetailView(View):
     project: ProjectView
     sessions: tuple[SessionView, ...]
     checkpoints: tuple[CheckpointView, ...]
     context: dict[str, Any]
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "project": self.project.to_dict(),
-            "sessions": [s.to_dict() for s in self.sessions],
-            "checkpoints": [c.to_dict() for c in self.checkpoints],
-            "context": dict(self.context),
-        }
-
 
 @dataclass(frozen=True)
-class WorkThreadView:
+class WorkThreadView(View):
     """One thread of the owner's work, whatever started it (GAP-CHAT C18).
 
     Chat search covered titles and message text, which answers *"where did I say
@@ -1453,9 +1322,6 @@ class WorkThreadView:
     archived: bool = False
     tags: tuple[str, ...] = ()
 
-    def to_dict(self) -> dict[str, Any]:
-        return {**asdict(self), "tags": list(self.tags)}
-
 
 # ── The work index (NEW-THREAD-01) ───────────────────────────────────────────
 #
@@ -1485,19 +1351,16 @@ WORK_THREAD_SCAN_LIMIT = 2000
 
 
 @dataclass(frozen=True)
-class WorkThreadFacet:
+class WorkThreadFacet(View):
     """One filter choice, with how many threads it would select."""
 
     value: str
     label: str
     count: int
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class WorkThreadPage:
+class WorkThreadPage(View):
     """One page of the work index, and the filters that produced it."""
 
     threads: list[WorkThreadView]
@@ -1525,18 +1388,6 @@ class WorkThreadPage:
     #: True when the scan bound was reached, so the counts above describe the
     #: most recent `WORK_THREAD_SCAN_LIMIT` threads rather than all of them.
     scan_truncated: bool
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "threads": [thread.to_dict() for thread in self.threads],
-            "next_cursor": self.next_cursor,
-            "total": self.total,
-            "projects": [facet.to_dict() for facet in self.projects],
-            "kinds": [facet.to_dict() for facet in self.kinds],
-            "archived_count": self.archived_count,
-            "active_count": self.active_count,
-            "scan_truncated": self.scan_truncated,
-        }
 
 
 def _work_thread_scope(
@@ -1583,7 +1434,7 @@ def decode_work_thread_cursor(cursor: str, scope: str) -> tuple[str, str] | None
 
 
 @dataclass(frozen=True)
-class TaskView:
+class TaskView(View):
     task_id: str
     session_id: str
     status: str
@@ -1620,12 +1471,9 @@ class TaskView:
     thread_turns: int = 0
     attachments: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class TaskDetailView:
+class TaskDetailView(View):
     """One task at its own address, with the attempts behind its status.
 
     BUG-299 / UX-TASK-04. The board says what a task *is* doing; this says what
@@ -1649,14 +1497,6 @@ class TaskDetailView:
     #: True when the attempt list was cut off by the read bound, so the page
     #: says "showing the most recent" rather than implying a complete history.
     truncated: bool = False
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "task": self.task.to_dict(),
-            "attempts": [attempt.to_dict() for attempt in self.attempts],
-            "approvals": [approval.to_dict() for approval in self.approvals],
-            "truncated": self.truncated,
-        }
 
 
 #: BUG-218 — how a tool is named on the Knowledge Map. The registry's own
@@ -1787,7 +1627,7 @@ def _names_an_available_model(
 
 
 @dataclass(frozen=True)
-class ModelProfileView:
+class ModelProfileView(View):
     profile_id: str
     provider: str
     model: str
@@ -1864,12 +1704,9 @@ class ModelProfileView:
     # no image provider either.
     image_models: tuple[str, ...] = ()
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ContextUsageView:
+class ContextUsageView(View):
     """What one conversation has used, and what it has cost.
 
     Every figure is optional and every one names its source. A missing price, a
@@ -1923,9 +1760,6 @@ class ContextUsageView:
     tools_projected: int = 0
     tools_deferred: int = 0
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
 class ModelPricingEntryView:
@@ -1958,23 +1792,16 @@ class ModelPricingEntryView:
 
 
 @dataclass(frozen=True)
-class ModelPricingView:
+class ModelPricingView(View):
     """Everything Models → Pricing has to state, in one governed read."""
 
     entries: tuple[ModelPricingEntryView, ...]
     sync: tuple[dict[str, Any], ...]
     can_override: bool
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "entries": [entry.to_dict() for entry in self.entries],
-            "sync": [dict(state) for state in self.sync],
-            "can_override": self.can_override,
-        }
-
 
 @dataclass(frozen=True)
-class ProviderModelListView:
+class ProviderModelListView(View):
     """On-demand, user-initiated listing of the models a provider serves.
 
     ``status`` is honest: "available" only when the provider actually answered;
@@ -1997,20 +1824,9 @@ class ProviderModelListView:
     remembered: bool = False
     listed_at: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "profile_id": self.profile_id,
-            "provider": self.provider,
-            "status": self.status,
-            "reason_code": self.reason_code,
-            "models": list(self.models),
-            "remembered": self.remembered,
-            "listed_at": self.listed_at,
-        }
-
 
 @dataclass(frozen=True)
-class ProviderCatalogueRefreshView:
+class ProviderCatalogueRefreshView(View):
     """Safe outcome for one provider in an explicit catalogue refresh."""
 
     profile_id: str
@@ -2018,9 +1834,6 @@ class ProviderCatalogueRefreshView:
     status: str
     reason_code: str | None
     model_count: int
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -2119,7 +1932,7 @@ class ModelsView:
 
 
 @dataclass(frozen=True)
-class ConnectorView:
+class ConnectorView(View):
     """Read-only status of one governed service connector (web-app task 4).
 
     Every field is derived from stored/config state — this view never reaches
@@ -2145,25 +1958,16 @@ class ConnectorView:
     actions: tuple[str, ...]
     kind: str = "read_only"
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ConnectionsView:
+class ConnectionsView(View):
     connectors: tuple[ConnectorView, ...]
     # True when the owner has set RAIKER_CONNECTOR_EGRESS_ALLOWLIST at all.
     connector_egress_allowlist_configured: bool
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "connectors": [c.to_dict() for c in self.connectors],
-            "connector_egress_allowlist_configured": self.connector_egress_allowlist_configured,
-        }
-
 
 @dataclass(frozen=True)
-class ProviderHealthView:
+class ProviderHealthView(View):
     profile_id: str
     provider: str
     model: str
@@ -2176,12 +1980,9 @@ class ProviderHealthView:
     status: str
     detail: str
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class DiagnosticsView:
+class DiagnosticsView(View):
     runtime_mode: str
     production_ready_local_single_user_runtime: bool
     summary: dict[str, Any]
@@ -2201,24 +2002,9 @@ class DiagnosticsView:
     model_profile_source: dict[str, str] = field(default_factory=dict)
     scope_note: str = "Status reflects the local single-user runtime only."
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "runtime_mode": self.runtime_mode,
-            "production_ready_local_single_user_runtime": self.production_ready_local_single_user_runtime,
-            "summary": dict(self.summary),
-            "disabled_capabilities": list(self.disabled_capabilities),
-            "counts": dict(self.counts),
-            "readiness": dict(self.readiness),
-            "missing_config": list(self.missing_config),
-            "provider_health": [p.to_dict() for p in self.provider_health],
-            "background_workers": [dict(worker) for worker in self.background_workers],
-            "model_profile_source": dict(self.model_profile_source),
-            "scope_note": self.scope_note,
-        }
-
 
 @dataclass(frozen=True)
-class IdentityView:
+class IdentityView(View):
     principal_id: str
     principal_type: str
     display_name: str
@@ -2229,12 +2015,9 @@ class IdentityView:
     expires_at: str | None = None
     state: str = "unknown"
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ApprovalView:
+class ApprovalView(View):
     approval_id: str
     action_id: str
     status: str
@@ -2264,12 +2047,9 @@ class ApprovalView:
     queue_position: int = 1
     queue_total: int = 1
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ApprovalDetailView:
+class ApprovalDetailView(View):
     approval: ApprovalView
     # Redacted, metadata-only preview of the proposed action's arguments.
     arguments: dict[str, Any]
@@ -2288,39 +2068,21 @@ class ApprovalDetailView:
     executes_on_approval: bool = False
     execution_evidence: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "approval": self.approval.to_dict(),
-            "arguments": dict(self.arguments),
-            "diff": self.diff,
-            "diff_path": self.diff_path,
-            "preview_kind": self.preview_kind,
-            "metadata_only_notice": self.metadata_only_notice,
-            "executes_on_approval": self.executes_on_approval,
-            "execution_evidence": dict(self.execution_evidence),
-        }
-
 
 @dataclass(frozen=True)
-class AuthSessionView:
+class AuthSessionView(View):
     # The only response that intentionally contains a token. Never logged; held in memory by the SPA.
     token: str
     session_id: str
     principal_id: str
     expires_at: str | None
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class AuthError:
+class AuthError(View):
     ok: bool = False
     reason_code: str = "auth_failed"
     message: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 def _env_requirements(raw: dict[str, Any]) -> list[dict[str, Any]]:

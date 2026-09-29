@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from typing import Any
+from dataclasses import dataclass
+
+from raiker.contracts.views import View
 
 
 @dataclass(frozen=True)
-class InstallPlan:
+class InstallPlan(View):
     runtime: str
     action: str
     source_url: str
@@ -13,9 +14,6 @@ class InstallPlan:
     requires_elevation: bool
     terms_url: str
     redistribution: bool = False
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 class RuntimeInstallerRegistry:

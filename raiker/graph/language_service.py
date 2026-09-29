@@ -45,6 +45,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from raiker.contracts.views import View
 from raiker.graph.codemap import CodeMapBuilder, CodeMapLimits, CodeMapScan, language_for
 from raiker.runtime.authority.admission import CapabilityAdmission, capability_admission
 from raiker.tools.git import repository_label, resolve_repository_root, selected_repository_subpath
@@ -96,7 +97,7 @@ def _failed(reason: str, message: str) -> dict[str, Any]:
 
 
 @dataclass(frozen=True)
-class Diagnostic:
+class Diagnostic(View):
     """One problem, at a coordinate the agent can open."""
 
     path: str
@@ -105,16 +106,6 @@ class Diagnostic:
     severity: str
     message: str
     source: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "path": self.path,
-            "line": self.line,
-            "column": self.column,
-            "severity": self.severity,
-            "message": self.message,
-            "source": self.source,
-        }
 
 
 class LanguageIntelligenceService:

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
+from raiker.contracts.views import View
 from raiker.models.tool_registry import CONTRACT_TOOL_NAMES
 
 SCHEMA_VERSION = "1.0"
@@ -736,7 +737,7 @@ class PromptOptions:
 
 
 @dataclass(frozen=True)
-class PromptEnvelope:
+class PromptEnvelope(View):
     request_id: str
     session_id: str
     turn_id: str
@@ -777,9 +778,6 @@ class PromptEnvelope:
             options=PromptOptions(**data["options"]),
         )
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
 class UIActionEnvelope:
@@ -816,7 +814,7 @@ class ChannelMessageEnvelope:
 
 
 @dataclass(frozen=True)
-class AgentEvent:
+class AgentEvent(View):
     event_id: str
     timestamp: str
     session_id: str
@@ -835,12 +833,9 @@ class AgentEvent:
         _one_of(self.event_type, EVENT_TYPES, "event_type")
         _require(self.actor, "actor")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ToolAction:
+class ToolAction(View):
     action_id: str
     tool_name: str
     arguments: dict[str, Any]
@@ -856,12 +851,9 @@ class ToolAction:
         _one_of(self.risk_level, RISK_LEVELS, "risk_level")
         _require(self.proposed_by, "proposed_by")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class PolicyDecision:
+class PolicyDecision(View):
     decision_id: str
     action_id: str
     decision: str
@@ -880,12 +872,9 @@ class PolicyDecision:
         if not self.reasons:
             raise ContractValidationError("missing_policy_reasons")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ToolResult:
+class ToolResult(View):
     action_id: str
     tool_name: str
     status: str
@@ -901,12 +890,9 @@ class ToolResult:
         _require(self.tool_name, "tool_name")
         _one_of(self.status, TOOL_STATUSES, "status")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class AgentResponse:
+class AgentResponse(View):
     request_id: str
     session_id: str
     turn_id: str
@@ -944,12 +930,9 @@ class AgentResponse:
                 [part.to_dict() for part in content_parts(self.message)],
             )
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class Checkpoint:
+class Checkpoint(View):
     checkpoint_id: str
     session_id: str
     turn_id: str
@@ -966,9 +949,6 @@ class Checkpoint:
         _require(self.session_id, "session_id")
         _require(self.turn_id, "turn_id")
         _require(self.created_at, "created_at")
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -1116,7 +1096,7 @@ INTERRUPT_ACTION_TYPES = {"pause", "cancel", "steer", "resume"}
 
 
 @dataclass(frozen=True)
-class SideQuestionTurn:
+class SideQuestionTurn(View):
     child_turn_id: str
     parent_turn_id: str
     session_id: str
@@ -1137,12 +1117,9 @@ class SideQuestionTurn:
         if not self.read_only:
             raise ContractValidationError("side_question_must_be_read_only")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class InterruptAction:
+class InterruptAction(View):
     action_id: str
     task_id: str
     session_id: str
@@ -1161,12 +1138,9 @@ class InterruptAction:
         if self.action_type == "steer" and not self.steer_text:
             raise ContractValidationError("missing_steer_text")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class User:
+class User(View):
     user_id: str
     display_name: str | None
     email: str | None
@@ -1179,12 +1153,9 @@ class User:
         _schema(self.schema_version)
         _require(self.user_id, "user_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class Role:
+class Role(View):
     role_id: str
     name: str
     description: str | None
@@ -1197,12 +1168,9 @@ class Role:
         _require(self.role_id, "role_id")
         _require(self.name, "role_name")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class UserRoleAssignment:
+class UserRoleAssignment(View):
     assignment_id: str
     user_id: str
     role_id: str
@@ -1216,12 +1184,9 @@ class UserRoleAssignment:
         _require(self.user_id, "user_id")
         _require(self.role_id, "role_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class HostedRoutine:
+class HostedRoutine(View):
     routine_id: str
     name: str
     routine_type: str
@@ -1238,12 +1203,9 @@ class HostedRoutine:
         _require(self.routine_id, "routine_id")
         _require(self.name, "name")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class BudgetRecord:
+class BudgetRecord(View):
     budget_id: str
     name: str
     max_cost: float
@@ -1261,12 +1223,9 @@ class BudgetRecord:
         _require(self.budget_id, "budget_id")
         _require(self.name, "name")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class RetentionPolicy:
+class RetentionPolicy(View):
     policy_id: str
     target_type: str
     retention_days: int
@@ -1282,12 +1241,9 @@ class RetentionPolicy:
         _require(self.policy_id, "policy_id")
         _require(self.target_type, "target_type")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class BackupManifest:
+class BackupManifest(View):
     manifest_id: str
     backup_type: str
     scope_json: str
@@ -1309,12 +1265,9 @@ class BackupManifest:
         _require(self.manifest_id, "manifest_id")
         _require(self.backup_type, "backup_type")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class PluginInstallRecord:
+class PluginInstallRecord(View):
     record_id: str
     plugin_id: str
     version: str
@@ -1334,12 +1287,9 @@ class PluginInstallRecord:
         _require(self.record_id, "record_id")
         _require(self.plugin_id, "plugin_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ExportManifest:
+class ExportManifest(View):
     export_id: str
     manifest_hash: str
     scope_json: str
@@ -1359,12 +1309,9 @@ class ExportManifest:
         _require(self.export_id, "export_id")
         _require(self.manifest_hash, "manifest_hash")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ManagedPolicyRule:
+class ManagedPolicyRule(View):
     rule_id: str
     effect: str
     tool_pattern: str
@@ -1385,12 +1332,9 @@ class ManagedPolicyRule:
         _require(self.reason, "reason")
         _require(self.created_by, "created_by")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class DesktopAppSession:
+class DesktopAppSession(View):
     session_id: str
     app_version: str
     window_state: str
@@ -1402,12 +1346,9 @@ class DesktopAppSession:
         _schema(self.schema_version)
         _require(self.session_id, "session_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class WebApiSession:
+class WebApiSession(View):
     token_id: str
     session_id: str
     client_type: str
@@ -1419,12 +1360,9 @@ class WebApiSession:
         _schema(self.schema_version)
         _require(self.token_id, "token_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class PluginExecutionRecord:
+class PluginExecutionRecord(View):
     execution_id: str
     plugin_id: str
     version: str
@@ -1442,12 +1380,9 @@ class PluginExecutionRecord:
         _require(self.execution_id, "execution_id")
         _require(self.plugin_id, "plugin_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class GraphIndexRecord:
+class GraphIndexRecord(View):
     index_id: str
     workspace_root: str
     status: str
@@ -1462,12 +1397,9 @@ class GraphIndexRecord:
         _schema(self.schema_version)
         _require(self.index_id, "index_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class SemanticMemoryWriteRecord:
+class SemanticMemoryWriteRecord(View):
     write_id: str
     content_summary: str
     embedding_model: str
@@ -1481,12 +1413,9 @@ class SemanticMemoryWriteRecord:
         _schema(self.schema_version)
         _require(self.write_id, "write_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class IdeExtensionSession:
+class IdeExtensionSession(View):
     session_id: str
     extension_version: str
     ide_type: str
@@ -1497,9 +1426,6 @@ class IdeExtensionSession:
         _schema(self.schema_version)
         _require(self.session_id, "session_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 CHANNEL_RELAY_STATUSES = {"pending", "approved", "denied", "expired"}
 SUBAGENT_STATUSES = {"created", "running", "completed", "failed", "cancelled"}
@@ -1507,7 +1433,7 @@ TEAM_STATUSES = {"created", "active", "completed", "cancelled"}
 
 
 @dataclass(frozen=True)
-class ChannelPairing:
+class ChannelPairing(View):
     pairing_id: str
     connector_id: str
     channel_type: str
@@ -1523,12 +1449,9 @@ class ChannelPairing:
         _require(self.pairing_id, "pairing_id")
         _require(self.connector_id, "connector_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ApprovalRelayRecord:
+class ApprovalRelayRecord(View):
     relay_id: str
     pairing_id: str
     action_id: str
@@ -1544,12 +1467,9 @@ class ApprovalRelayRecord:
         _require(self.pairing_id, "pairing_id")
         _one_of(self.status, CHANNEL_RELAY_STATUSES, "relay_status")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class SubagentContract:
+class SubagentContract(View):
     subagent_id: str
     parent_task_id: str
     name: str
@@ -1574,12 +1494,9 @@ class SubagentContract:
         _require(self.parent_task_id, "parent_task_id")
         _one_of(self.status, SUBAGENT_STATUSES, "subagent_status")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class TeamLedger:
+class TeamLedger(View):
     team_id: str
     name: str
     mode: str
@@ -1596,12 +1513,9 @@ class TeamLedger:
         _require(self.team_id, "team_id")
         _one_of(self.status, TEAM_STATUSES, "team_status")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class RemoteExecutionProfile:
+class RemoteExecutionProfile(View):
     profile_id: str
     profile_type: str
     name: str
@@ -1617,12 +1531,9 @@ class RemoteExecutionProfile:
         _require(self.profile_id, "profile_id")
         _one_of(self.profile_type, {"container", "ssh", "vps", "kubernetes", "cloud", "sandbox"}, "remote_execution_type")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ExecutionBudget:
+class ExecutionBudget(View):
     budget_id: str
     name: str
     max_cost: float
@@ -1639,12 +1550,9 @@ class ExecutionBudget:
         _schema(self.schema_version)
         _require(self.budget_id, "budget_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class VectorRecord:
+class VectorRecord(View):
     vector_id: str
     content_hash: str
     content_preview: str
@@ -1663,12 +1571,9 @@ class VectorRecord:
         _schema(self.schema_version)
         _require(self.vector_id, "vector_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class SymbolNode:
+class SymbolNode(View):
     symbol_id: str
     name: str
     kind: str
@@ -1684,12 +1589,9 @@ class SymbolNode:
         _schema(self.schema_version)
         _require(self.symbol_id, "symbol_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class DependencyEdge:
+class DependencyEdge(View):
     edge_id: str
     source_symbol_id: str
     target_symbol_id: str
@@ -1703,12 +1605,9 @@ class DependencyEdge:
         _schema(self.schema_version)
         _require(self.edge_id, "edge_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ProjectGraph:
+class ProjectGraph(View):
     graph_id: str
     workspace_root: str
     module_count: int
@@ -1720,12 +1619,9 @@ class ProjectGraph:
         _schema(self.schema_version)
         _require(self.graph_id, "graph_id")
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class SkillCandidate:
+class SkillCandidate(View):
     candidate_id: str
     name: str
     description: str
@@ -1740,6 +1636,3 @@ class SkillCandidate:
     def __post_init__(self) -> None:
         _schema(self.schema_version)
         _require(self.candidate_id, "candidate_id")
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)

@@ -5,6 +5,7 @@ import json
 import re
 from dataclasses import dataclass
 
+from raiker.contracts.views import View
 from raiker.graph.governance import GRAPH_RUNTIME_DISABLED_REASON
 from raiker.graph.planner import GraphCodemapIndexPlan
 from raiker.memory.policy import MemorySensitivity
@@ -40,7 +41,7 @@ def _stable_id(prefix: str, payload: dict[str, object]) -> str:
 
 
 @dataclass(frozen=True)
-class ApprovalPreview:
+class ApprovalPreview(View):
     preview_id: str
     action_type: str
     target_capability: str
@@ -59,28 +60,6 @@ class ApprovalPreview:
     affected_paths: list[str]
     affected_records: list[str]
     safety_notes: list[str]
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "preview_id": self.preview_id,
-            "action_type": self.action_type,
-            "target_capability": self.target_capability,
-            "title": self.title,
-            "summary": self.summary,
-            "risk_level": self.risk_level,
-            "requested_by": self.requested_by,
-            "created_at": self.created_at,
-            "requires_user_approval": self.requires_user_approval,
-            "can_execute_now": self.can_execute_now,
-            "execution_enabled": self.execution_enabled,
-            "reasons": self.reasons,
-            "policy_decision": self.policy_decision,
-            "expected_events": self.expected_events,
-            "reversible": self.reversible,
-            "affected_paths": self.affected_paths,
-            "affected_records": self.affected_records,
-            "safety_notes": self.safety_notes,
-        }
 
 
 def create_graph_indexing_approval_preview(

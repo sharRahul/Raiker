@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from raiker.contracts.views import View
 from raiker.plugins.contributions import contribution_summary
 from raiker.plugins.dependencies import (
     plugin_dependency_allowlist,
@@ -37,7 +38,7 @@ KNOWN_TRUST_LEVELS = {"untrusted", "local_dev", "project", "managed", "bundled"}
 
 
 @dataclass(frozen=True)
-class PluginRegistrationPlan:
+class PluginRegistrationPlan(View):
     plugin_id: str | None
     status: str
     reasons: list[str] = field(default_factory=list)
@@ -55,20 +56,6 @@ class PluginRegistrationPlan:
     # so the permission diff the owner reads states it alongside the permissions,
     # rather than leaving `verified` and `present only` looking identical.
     signature: SignatureVerification | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "plugin_id": self.plugin_id,
-            "status": self.status,
-            "reasons": list(self.reasons),
-            "permissions": list(self.permissions),
-            "trust_level": self.trust_level,
-            "execution_enabled": self.execution_enabled,
-            "entrypoints": self.entrypoints,
-            "events": self.events,
-            "contributions": dict(self.contributions),
-            "signature": self.signature.to_dict() if self.signature is not None else None,
-        }
 
 
 def plan_plugin_registration(manifest: dict[str, Any]) -> PluginRegistrationPlan:

@@ -44,6 +44,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+from raiker.contracts.views import View
+
 APP_LABEL = "com.raiker.host"
 UNIT_NAME = "raiker.service"
 WINDOWS_ENTRY = "Raiker.cmd"
@@ -73,7 +75,7 @@ class ServicePlan:
 
 
 @dataclass(frozen=True)
-class ServiceRegistration:
+class ServiceRegistration(View):
     """Whether the background host is registered, and what registered it."""
 
     supported: bool
@@ -82,16 +84,6 @@ class ServiceRegistration:
     label: str
     path: str | None
     note: str
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "supported": self.supported,
-            "registered": self.registered,
-            "mechanism": self.mechanism,
-            "label": self.label,
-            "path": self.path,
-            "note": self.note,
-        }
 
 
 def detect_os(system: str | None = None) -> str:

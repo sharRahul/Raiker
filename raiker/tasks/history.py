@@ -31,8 +31,10 @@ reported as ``in_progress``, which is the honest answer and is exactly the state
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any
+
+from raiker.contracts.views import View
 
 #: An attempt begins here, and what kind of attempt it is.
 #:
@@ -96,7 +98,7 @@ _FALLBACK_DETAIL: dict[str, str] = {
 
 
 @dataclass(frozen=True)
-class TaskEventView:
+class TaskEventView(View):
     """One recorded transition, as the timeline draws it."""
 
     event_id: str
@@ -110,12 +112,9 @@ class TaskEventView:
     turn_id: str | None = None
     session_id: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class TaskAttemptView:
+class TaskAttemptView(View):
     """One run of a task, from where it started to how it settled."""
 
     #: 1-based across runs and continuations; ``0`` for a segment that is not a
@@ -133,9 +132,6 @@ class TaskAttemptView:
     #: The decision this attempt waited on, when the runtime recorded which.
     approval_id: str | None
     events: list[TaskEventView] = field(default_factory=list)
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 def event_detail(event_type: str, payload: dict[str, Any]) -> str:

@@ -51,9 +51,11 @@ are deliberately not asked to pick again, because picking again would not fix a
 disk. Repair the workspace and the label clears on its own.
 
 **The first-run screen can do all of this on its own.** Setup's **Model** stage
-leads with the easiest working path — a runtime already running on this machine
-needs no account and no key — and keeps the full provider matrix behind **Other
-options**. That matrix shows one row per provider. The three local runtimes are *asked* what they are serving and
+leads with the easiest working path — a runtime installed on this machine that
+already names a model needs no account and no key (a llama.cpp slot does not
+name one until a GGUF is deployed into it) — and keeps the full provider matrix
+behind **Other options**. Choosing a model there checks it straight away, so the
+first message you send in Chat is not refused as unchecked. That matrix shows one row per provider. The three local runtimes are *asked* what they are serving and
 offer the answer in a dropdown; a runtime that is not running says so. Every
 API-key provider takes its key inline and then lists **that provider's own**
 catalogue, so a model can be connected and chosen without leaving the wizard.

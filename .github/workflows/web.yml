@@ -17,7 +17,7 @@ on:
       - "web/**"
       - "raiker/api/**"
       - "raiker/control/dtos.py"
-      - "raiker/control/dashboard.py"
+      - "raiker/control/views/**"
       - "raiker/control/service.py"
       - "raiker/control/web_read_models.py"
       - "scripts/check_api_contract.py"

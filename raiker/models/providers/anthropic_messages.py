@@ -88,21 +88,11 @@ THINKING_BUDGET_TOKENS = 2048
 # whole allowance is 1024 cannot carry a 1024-token minimum *and* an answer.
 MINIMUM_THINKING_BUDGET_TOKENS = 1024
 RESERVED_ANSWER_TOKENS = 512
-# What each model turned out to accept.
-#
-# GCR-32 — this used to be keyed by model id alone, which made it a claim about
-# a *name* rather than about an endpoint. Anthropic-compatible endpoints are not
-# all Anthropic: a proxy, a gateway, a self-hosted relay and the API itself can
-# all be asked for `claude-...`, and they do not have to accept the same
-# `thinking` spelling. A refusal learned from one of them silently changed the
-# requests Raiker sent to the others, including ones that had never refused
-# anything.
-#
-# The key is therefore what actually decides the answer: the profile that
-# configured the connection, the provider, the exact endpoint the request goes
-# to, the API revision it is sent under, and the model. It is bounded and
-# least-recently-used, so a long-lived host that talks to many endpoints cannot
-# grow it without limit.
+# What each endpoint turned out to accept, keyed by everything that decides the
+# answer — profile, provider, exact endpoint, API revision and model — because
+# Anthropic-compatible proxies and gateways need not accept what the API does,
+# and one endpoint's refusal must not change another's requests (GCR-32).
+# Bounded and least-recently-used.
 _NEGOTIATED_THINKING_LIMIT = 256
 _NEGOTIATED_THINKING: OrderedDict[tuple[str, ...], str] = OrderedDict()
 
@@ -307,14 +297,8 @@ class AsyncAnthropicMessagesProvider:
                 "model_available" if available else "model_missing",
             )
         except ModelProviderError as exc:
-            # GCR-30 — the base class, not a hand-kept list of six. The status
-            # mapper this probe runs through also raises quota exhaustion and
-            # the two workspace refusals, and none of them was named here, so a
-            # method whose whole contract is "return a ProviderHealth" raised
-            # instead and the readiness check died on a provider state it had
-            # already classified correctly. Every provider-domain failure is a
-            # health answer; anything that is not one is a bug and still
-            # escapes.
+            # Every provider-domain failure is a health answer (GCR-30);
+            # anything else is a bug and still escapes.
             return ProviderHealth(self.provider, False, False, type(exc).__name__)
 
     async def list_models(self) -> list[ProviderModelInfo]:

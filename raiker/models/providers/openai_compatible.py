@@ -280,14 +280,8 @@ class AsyncOpenAICompatibleProvider:
                 return ProviderHealth(self.provider, detail == "model_available", True, detail)
             return ProviderHealth(self.provider, True, True, detail)
         except ModelProviderError as exc:
-            # GCR-30 — the base class, not a hand-kept list of six. The status
-            # mapper this probe runs through also raises quota exhaustion and
-            # the two workspace refusals, and none of them was named here, so a
-            # method whose whole contract is "return a ProviderHealth" raised
-            # instead and the readiness check died on a provider state it had
-            # already classified correctly. Every provider-domain failure is a
-            # health answer; anything that is not one is a bug and still
-            # escapes.
+            # Every provider-domain failure is a health answer (GCR-30);
+            # anything else is a bug and still escapes.
             return ProviderHealth(self.provider, False, False, type(exc).__name__)
 
     async def list_models(self) -> list[ProviderModelInfo]:

@@ -667,6 +667,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-643](#fixed-643--tests-spelled-out-every-principal-and-action-field-by-field) | Low | Tests | Fixed 2026-09-30 — OPT-17 |
 | [FIXED-644](#fixed-644--setup-recommended-llamacpp-beside-no-complete-gguf-found) | Medium | Models / first run | Fixed 2026-09-30 — found by the live round |
 | [FIXED-645](#fixed-645--the-first-message-after-setup-was-refused-as-never-checked) | Medium | Chat / model readiness | Fixed 2026-09-30 — found by the live round |
+| [FIXED-646](#fixed-646--the-web-job-would-not-have-run-for-a-change-to-a-moved-read-model) | Low | CI | Fixed 2026-09-30 — the web job's trigger followed the moved views, and a same-day `brace-expansion` advisory |
 
 ---
 
@@ -27586,3 +27587,26 @@ The backend invariant is unchanged.
 connected*; `ModelSetupView.test.ts` — the choice posts a readiness check; live,
 on a reset workspace, setup → Chat → the first message answered with no manual
 check.
+
+---
+
+## FIXED-646 — The web job would not have run for a change to a moved read model
+
+**Severity: Low. Area: CI. Status: Fixed 2026-09-30 — found by this change's own
+full suite.**
+
+**Observed.** `web.yml` builds and tests the client when a file producing its
+contract changes, and listed `raiker/control/dashboard.py`. After FIXED-639 the
+read models live in `raiker/control/views/`, so a change to one would have
+skipped the web job; `test_every_dto_module_the_contract_check_reads_triggers_the_web_job`
+said so. The same run's audit then failed on three denial-of-service advisories
+published that day against `brace-expansion` 4.0.0–5.0.11
+(GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p).
+
+**Fixed.** The trigger names `raiker/control/views/**`, and the test accepts any
+enclosing package's glob. The lockfile takes `brace-expansion` 5.0.12, a
+transitive dev dependency, and changes nothing else.
+
+**Evidence.** `tests/test_web_workflow.py`; `npm audit --audit-level=moderate`
+reports no vulnerabilities, and the web job's lint, check, unit tests and build
+pass.

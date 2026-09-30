@@ -34,25 +34,24 @@ class AttachmentStore:
     ) -> None:
         """Persist validated attachment bytes. Validation is the caller's job
         (``raiker.runtime.attachments``) — this layer only stores what it is given."""
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO attachments
-                (attachment_id, kind, filename, media_type, byte_size, sha256, data, created_at, owner_principal_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    attachment_id,
-                    kind,
-                    filename,
-                    media_type,
-                    len(data),
-                    sha256,
-                    data,
-                    utc_now(),
-                    owner_principal_id,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO attachments
+            (attachment_id, kind, filename, media_type, byte_size, sha256, data, created_at, owner_principal_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                attachment_id,
+                kind,
+                filename,
+                media_type,
+                len(data),
+                sha256,
+                data,
+                utc_now(),
+                owner_principal_id,
+            ),
+        )
 
     def load_attachment(
         self: SQLiteStore, attachment_id: str, *, owner_principal_id: str | None = None
@@ -62,12 +61,11 @@ class AttachmentStore:
         # caller bug that must fail closed (match nothing), never drop the
         # predicate and expose every owner's bytes.
         scoped = owner_principal_id is not None
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM attachments WHERE attachment_id = ?"
-                + (" AND owner_principal_id = ?" if scoped else ""),
-                (attachment_id, *([owner_principal_id] if scoped else [])),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM attachments WHERE attachment_id = ?"
+            + (" AND owner_principal_id = ?" if scoped else ""),
+            (attachment_id, *([owner_principal_id] if scoped else [])),
+        )
         if row is None:
             return None
         record = dict(row)
@@ -81,15 +79,14 @@ class AttachmentStore:
         # ``None`` disables owner scoping; an empty string fails closed rather
         # than dropping the predicate (see ``load_attachment``).
         scoped = owner_principal_id is not None
-        with self.connect() as connection:
-            row = connection.execute(
-                """
-                SELECT attachment_id, kind, filename, media_type, byte_size, sha256, created_at
-                FROM attachments WHERE attachment_id = ?
-                """
-                + (" AND owner_principal_id = ?" if scoped else ""),
-                (attachment_id, *([owner_principal_id] if scoped else [])),
-            ).fetchone()
+        row = self._row(
+            """
+            SELECT attachment_id, kind, filename, media_type, byte_size, sha256, created_at
+            FROM attachments WHERE attachment_id = ?
+            """
+            + (" AND owner_principal_id = ?" if scoped else ""),
+            (attachment_id, *([owner_principal_id] if scoped else [])),
+        )
         return dict(row) if row is not None else None
 
 
@@ -125,34 +122,33 @@ class AttachmentStore:
         from the record would leave the refusal unattributable to the asset it
         was about.
         """
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO image_generations
-                (generation_id, owner_principal_id, profile_id, provider, model, prompt,
-                 size, status, reason_code, attachment_id, media_type, byte_size, created_at,
-                 source_generation_id, kind, project_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    generation_id,
-                    owner_principal_id,
-                    profile_id,
-                    provider,
-                    model,
-                    prompt,
-                    size,
-                    status,
-                    reason_code,
-                    attachment_id,
-                    media_type,
-                    byte_size,
-                    utc_now(),
-                    source_generation_id,
-                    kind,
-                    project_id,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO image_generations
+            (generation_id, owner_principal_id, profile_id, provider, model, prompt,
+             size, status, reason_code, attachment_id, media_type, byte_size, created_at,
+             source_generation_id, kind, project_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                generation_id,
+                owner_principal_id,
+                profile_id,
+                provider,
+                model,
+                prompt,
+                size,
+                status,
+                reason_code,
+                attachment_id,
+                media_type,
+                byte_size,
+                utc_now(),
+                source_generation_id,
+                kind,
+                project_id,
+            ),
+        )
 
     def list_image_generations(
         self: SQLiteStore, *, owner_principal_id: str | None = None, limit: int = 60
@@ -160,23 +156,21 @@ class AttachmentStore:
         """Newest first. ``None`` disables owner scoping; an empty string fails
         closed rather than dropping the predicate (see ``load_attachment``)."""
         scoped = owner_principal_id is not None
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM image_generations"
-                + (" WHERE owner_principal_id = ?" if scoped else "")
-                + " ORDER BY created_at DESC, generation_id DESC LIMIT ?",
-                (*([owner_principal_id] if scoped else []), int(limit)),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM image_generations"
+            + (" WHERE owner_principal_id = ?" if scoped else "")
+            + " ORDER BY created_at DESC, generation_id DESC LIMIT ?",
+            (*([owner_principal_id] if scoped else []), int(limit)),
+        )
         return [dict(row) for row in rows]
 
     def get_image_generation(
         self: SQLiteStore, generation_id: str, *, owner_principal_id: str | None = None
     ) -> dict[str, Any] | None:
         scoped = owner_principal_id is not None
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM image_generations WHERE generation_id = ?"
-                + (" AND owner_principal_id = ?" if scoped else ""),
-                (generation_id, *([owner_principal_id] if scoped else [])),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM image_generations WHERE generation_id = ?"
+            + (" AND owner_principal_id = ?" if scoped else ""),
+            (generation_id, *([owner_principal_id] if scoped else [])),
+        )
         return dict(row) if row is not None else None

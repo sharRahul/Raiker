@@ -16,8 +16,6 @@ from pathlib import Path
 
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id
-from raiker.contracts.models import ToolAction
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority.models import Principal, RiskLevelValue
@@ -25,6 +23,7 @@ from raiker.runtime.authority.router import GovernedAction, RuntimeAuthority
 from raiker.runtime.executors import build_default_executor_registry
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action, tool_action
 
 
 def _ws(tmp_path: Path) -> Path:
@@ -75,10 +74,10 @@ def _pending(
 ) -> None:
     store.create_session("sess_a", "ws")
     store.insert_tool_action(
-        ToolAction(
+        tool_action(
+            tool_name,
+            arguments,
             action_id=action_id,
-            tool_name=tool_name,
-            arguments=arguments,
             risk_level=risk_level,
             requires_approval=True,
             proposed_by="principal_owner",
@@ -91,11 +90,9 @@ def _pending(
 
 
 def _relay_action(approval_id: str) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        "approval_execution_relay",
         principal_id="principal_owner",
-        action_type="approval_execution_relay",
-        tool_or_service_name="approval_execution_relay",
         arguments={"approval_id": approval_id},
         risk_level=RiskLevelValue.LOW,
     )
@@ -236,11 +233,9 @@ def test_relay_dispatches_memory_write_end_to_end(tmp_path: Path) -> None:
         store, EventLogWriter(store),
         executor_registry=build_default_executor_registry(ws, store),
     )
-    relay_action = GovernedAction(
-        action_id=new_id("act_"),
+    relay_action = governed_action(
+        "approval_execution_relay",
         principal_id="principal_owner",
-        action_type="approval_execution_relay",
-        tool_or_service_name="approval_execution_relay",
         arguments={"approval_id": "appr_1"},
         risk_level=RiskLevelValue.LOW,
         session_id="sess_a",
@@ -422,11 +417,9 @@ def test_relay_denies_revoked_session(tmp_path: Path) -> None:
     api_sessions.revoke_session(session.session_id)
 
     relay = ApprovalExecutionRelay(ws, store)
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "approval_execution_relay",
         principal_id="principal_owner",
-        action_type="approval_execution_relay",
-        tool_or_service_name="approval_execution_relay",
         arguments={"approval_id": "appr_1"},
         risk_level=RiskLevelValue.LOW,
         session_id=session.session_id,

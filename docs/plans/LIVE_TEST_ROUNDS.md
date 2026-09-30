@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-30 | Targeted | `2026-09-30-optimisation-round/` | Ollama `gpt-oss:20b-cloud` on the local Ollama service, no key; the Anthropic, OpenAI and OpenRouter keys the owner supplied were not entered by the agent | Ten items from the optimisation review — OPT-05, -06 stage B, -08, -09, -10, -11, -17, -18, -20 and a first slice of OPT-15. Proved live: setup → Chat on a reset workspace, a real streamed answer and a readiness probe both through the shared provider transport, the palette naming **Memory engine**, and twenty-four destinations answering with **no 4xx, no 5xx and no traceback**, with no horizontal overflow at 390 wide. **Two defects found and fixed** — setup recommended llama.cpp beside "No complete GGUF found" (and My models offered Use on four empty slots), and the first message after setup was refused as never checked |
 | 2026-09-28 (third) | Targeted | `2026-09-28-docs-items-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that asked to run `python`, the key entered through the Connect dialog | Ten items from `docs/plans/`: BUG-309, Wave 0 and OPT-03, -04, -07, -12, -14 and -19, two stale index rows, and BUG-248's sign-ins. Proved live: readiness naming the provider from the registry; an approval notice docked on Home, opening Approvals, and absent there at 1440 and 390 wide with the bell agreeing; a misspelled field refused with 422; and every destination at both capture widths with **no 422, no 5xx and no console error**. **Four defects found and fixed** — the bell kept counting a notice the dock had just read, an approval card covered Settings' **Save changes**, a disclosure closed when its default was chosen, and (by CI) shutdown closed a connection a worker was using. The key's credit ran out part-way through BUG-248's four conversions |
 | 2026-09-28 (second) | Targeted | `2026-09-28-review-closure-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that asked to run `python`, the key entered through the Connect dialog | Nine items from `docs/plans/` that closed three review documents: BUG-308 (CR-05, CR-09) by the owner's decision, CR-01, GCR-10, GCR-11, GCR-13, GCR-41 and GCR-43. Proved live: Permissions naming *Code with this machine's network* and saying, measured on this host, where scripts run; a real model's `python hello.py` approved under that capability, run, and recorded as `code_placement_classified`; a plugin card saying where its code would run; no stored key in four redacted answers; and every destination at four widths through the split store and service with **no console error**. **Five defects found by the round and fixed in it** — a fresh capability that would have refused `python` to an owner who had turned shell on, an approval that named the tool rather than the capability the code would run under, the same approval promising a rewind a command cannot have, and an approval card covering the composer's **Send** and staying over Approvals |
 | 2026-09-28 | Targeted | `2026-09-28-docs-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering and streaming real turns, the key entered through the Connect dialog | Ten items from `docs/plans/`: the owner's GEP-02 decision, six security-review findings, BUG-307, GCR-12 and GEP-03. Proved live: the stop switch counting and stopping **an answer being streamed** with no task running, the stopped turn keeping its text, the next turn answering; and every destination at four widths under `style-src 'self'` with **no CSP refusal**. **Two defects found by the round and fixed in it** — the first stop-all reported one answer as "1 answer being written and 1 task", and Home called a readiness read still in flight a failed one |
@@ -77,6 +78,57 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-09-30 — Ten optimisation items, and a first run that sends
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py`, reset
+again after the round's fixes. Provider: Ollama `gpt-oss:20b-cloud` through the
+local Ollama service — no key. The owner supplied Anthropic, OpenAI and
+OpenRouter keys for the round; the agent did not enter them, because they are
+live keys the host would send on to those providers. Browser: Playwright's
+Chromium. Captures:
+[`docs/screenshots/2026-09-30-optimisation-round/`](../screenshots/2026-09-30-optimisation-round).**
+
+Ten items from the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md),
+FIXED-634 to FIXED-643. Most move code without changing what an owner sees, so
+what a round can prove is that nothing moved underneath a page.
+
+**What it proved.**
+
+1. **The shared provider transport carries a real turn.** A streamed answer from
+   `gpt-oss:20b-cloud`, and a readiness probe answering *Ollama can reach
+   gpt-oss:20b-cloud*, both through `ProviderHttpTransport` (FIXED-634).
+2. **Every page reads through the moved views and the one serializer.**
+   Twenty-four destinations — Home, Chat, Build, Design, Threads, Tasks,
+   Projects, Memory and Recall, Knowledge Map, Approvals, Permissions,
+   Extensions with MCP and Hooks, Observe with Activity and Checkpoints,
+   Messaging, Models, Settings with Memory engine and Privacy, and the Guide —
+   rendered, and the host logged no 4xx, no 5xx and no traceback (FIXED-638,
+   FIXED-639, FIXED-640).
+3. **The palette names Memory engine** by the rail's name and icon (FIXED-642).
+4. **No horizontal overflow at 390 wide** on My models.
+
+**What it found, and fixed in the round.**
+
+* Setup led with *Recommended — GGUF is already running here* above *No complete
+  GGUF found*, with nothing on port 8080, because `llama-server` on PATH made
+  every empty slot read as configured; My models then offered **Use** on all
+  four ([FIXED-644](FIXED_ITEMS.md#fixed-644--setup-recommended-llamacpp-beside-no-complete-gguf-found)).
+  After the fix setup recommends *Ollama is installed here* and the slots ask
+  **Fix**.
+* Choosing the Ollama model in setup and sending the first message returned *No
+  readiness check exists for this exact model* while the composer said *you can
+  still send* ([FIXED-645](FIXED_ITEMS.md#fixed-645--the-first-message-after-setup-was-refused-as-never-checked)).
+  After the fix, on a freshly reset workspace, the first message answered with no
+  manual check.
+
+**What it did not prove.** Anthropic, OpenAI and OpenRouter turns, for the
+reason above. Local deployment and MLX (no GGUF and no Apple silicon here), so
+the operation harness (FIXED-637) and the slot lifecycle (FIXED-635) are proved
+by their unit tests.
 
 ---
 

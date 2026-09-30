@@ -16,6 +16,7 @@ from raiker.phase_gates import ALL_CAPABILITIES, CapabilityState, default_capabi
 from raiker.runtime.authority.models import Principal, PrincipalType
 from raiker.runtime.authority.router import RuntimeAuthority
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import human
 
 
 def _insert_gov_acks(root: Path) -> None:
@@ -64,13 +65,7 @@ def owner_principal(store: SQLiteStore) -> Principal:
         role_id="rl_gm", name="runtime_gate_manager",
         description="", is_system_role=True, created_at=now,
     ))
-    principal = Principal(
-        principal_id="p_owner",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Owner",
-        role_ids=("rl_owner", "rl_gm"),
-        is_active=True,
-    )
+    principal = human("p_owner", role_ids=("rl_owner", "rl_gm"))
     store.insert_principal(
         principal_id="p_owner",
         principal_type=PrincipalType.HUMAN.value,

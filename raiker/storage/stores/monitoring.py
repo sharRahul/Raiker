@@ -74,25 +74,24 @@ class MonitoringStore:
         redacted metadata only (labels/counts/hostnames) — never a raw value.
         Owner-scoped by ``principal_id``; shared substrate across monitors."""
         finding_id = new_id("find_")
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO security_findings
-                   (finding_id, principal_id, source, severity, code, summary,
-                    redacted_detail_json, subject_id, state, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    finding_id,
-                    principal_id,
-                    source,
-                    severity,
-                    code,
-                    summary,
-                    json.dumps(dict(redacted_detail or {})),
-                    subject_id,
-                    state,
-                    utc_now(),
-                ),
-            )
+        self._execute(
+            """INSERT INTO security_findings
+               (finding_id, principal_id, source, severity, code, summary,
+                redacted_detail_json, subject_id, state, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                finding_id,
+                principal_id,
+                source,
+                severity,
+                code,
+                summary,
+                json.dumps(dict(redacted_detail or {})),
+                subject_id,
+                state,
+                utc_now(),
+            ),
+        )
         return finding_id
 
     def list_security_findings(
@@ -118,12 +117,11 @@ class MonitoringStore:
             conditions.append("state = ?")
             params.append(state)
         params.append(int(limit))
-        with self.connect() as connection:
-            rows = connection.execute(
-                f"SELECT * FROM security_findings WHERE {' AND '.join(conditions)} "
-                "ORDER BY created_at DESC, rowid DESC LIMIT ?",
-                params,
-            ).fetchall()
+        rows = self._rows(
+            f"SELECT * FROM security_findings WHERE {' AND '.join(conditions)} "
+            "ORDER BY created_at DESC, rowid DESC LIMIT ?",
+            params,
+        )
         return [self._security_finding_row(row) for row in rows]
 
 
@@ -141,23 +139,22 @@ class MonitoringStore:
         redacted human-readable copy (never a raw payload or token). Owner-scoped
         by ``principal_id``; shared across sources (findings + containment)."""
         notification_id = new_id("ntf_")
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO notifications
-                   (notification_id, principal_id, kind, title, body, finding_id,
-                    subject_id, read, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)""",
-                (
-                    notification_id,
-                    principal_id,
-                    kind,
-                    title,
-                    body,
-                    finding_id,
-                    subject_id,
-                    utc_now(),
-                ),
-            )
+        self._execute(
+            """INSERT INTO notifications
+               (notification_id, principal_id, kind, title, body, finding_id,
+                subject_id, read, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)""",
+            (
+                notification_id,
+                principal_id,
+                kind,
+                title,
+                body,
+                finding_id,
+                subject_id,
+                utc_now(),
+            ),
+        )
         return notification_id
 
     def list_notifications(
@@ -170,12 +167,11 @@ class MonitoringStore:
         if unread_only:
             conditions.append("read = 0")
         params.append(int(limit))
-        with self.connect() as connection:
-            rows = connection.execute(
-                f"SELECT * FROM notifications WHERE {' AND '.join(conditions)} "
-                "ORDER BY created_at DESC, rowid DESC LIMIT ?",
-                params,
-            ).fetchall()
+        rows = self._rows(
+            f"SELECT * FROM notifications WHERE {' AND '.join(conditions)} "
+            "ORDER BY created_at DESC, rowid DESC LIMIT ?",
+            params,
+        )
         return [dict(row) for row in rows]
 
     def mark_notification_read(self: SQLiteStore, notification_id: str, principal_id: str) -> bool:
@@ -200,45 +196,41 @@ class MonitoringStore:
         status: str,
     ) -> dict[str, Any]:
         credential_id = new_id("cred_")
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO credential_lifecycle
-                   (credential_id, principal_id, provider, rotated_at, verified_at, due_at, status)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(principal_id, provider) DO UPDATE SET
-                     rotated_at=excluded.rotated_at, verified_at=excluded.verified_at,
-                     due_at=excluded.due_at, status=excluded.status""",
-                (credential_id, principal_id, provider, verified_at, verified_at, due_at, status),
-            )
+        self._execute(
+            """INSERT INTO credential_lifecycle
+               (credential_id, principal_id, provider, rotated_at, verified_at, due_at, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(principal_id, provider) DO UPDATE SET
+                 rotated_at=excluded.rotated_at, verified_at=excluded.verified_at,
+                 due_at=excluded.due_at, status=excluded.status""",
+            (credential_id, principal_id, provider, verified_at, verified_at, due_at, status),
+        )
         row = self.get_credential_lifecycle(principal_id, provider)
         assert row is not None
         return row
 
     def get_credential_lifecycle(self: SQLiteStore, principal_id: str, provider: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM credential_lifecycle WHERE principal_id = ? AND provider = ?",
-                (principal_id, provider),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM credential_lifecycle WHERE principal_id = ? AND provider = ?",
+            (principal_id, provider),
+        )
         return dict(row) if row else None
 
     def list_credential_lifecycle(self: SQLiteStore, principal_id: str) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM credential_lifecycle WHERE principal_id = ? ORDER BY provider",
-                (principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM credential_lifecycle WHERE principal_id = ? ORDER BY provider",
+            (principal_id,),
+        )
         return [dict(row) for row in rows]
 
     def get_security_monitor_state(
         self: SQLiteStore, principal_id: str, source: str, subject_id: str, code: str
     ) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                """SELECT * FROM security_monitor_state
-                   WHERE principal_id = ? AND source = ? AND subject_id = ? AND code = ?""",
-                (principal_id, source, subject_id, code),
-            ).fetchone()
+        row = self._row(
+            """SELECT * FROM security_monitor_state
+               WHERE principal_id = ? AND source = ? AND subject_id = ? AND code = ?""",
+            (principal_id, source, subject_id, code),
+        )
         return dict(row) if row else None
 
     def set_security_monitor_state(
@@ -251,30 +243,27 @@ class MonitoringStore:
         state: str,
         finding_id: str | None,
     ) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO security_monitor_state
-                   (principal_id, source, subject_id, code, state, finding_id, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(principal_id, source, subject_id, code) DO UPDATE SET
-                     state=excluded.state, finding_id=excluded.finding_id, updated_at=excluded.updated_at""",
-                (principal_id, source, subject_id, code, state, finding_id, utc_now()),
-            )
+        self._execute(
+            """INSERT INTO security_monitor_state
+               (principal_id, source, subject_id, code, state, finding_id, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(principal_id, source, subject_id, code) DO UPDATE SET
+                 state=excluded.state, finding_id=excluded.finding_id, updated_at=excluded.updated_at""",
+            (principal_id, source, subject_id, code, state, finding_id, utc_now()),
+        )
 
     def set_security_finding_state(self: SQLiteStore, finding_id: str, principal_id: str, state: str) -> bool:
-        with self.connect() as connection:
-            cursor = connection.execute(
-                "UPDATE security_findings SET state = ? WHERE finding_id = ? AND principal_id = ?",
-                (state, finding_id, principal_id),
-            )
-        return cursor.rowcount > 0
+        changed = self._execute(
+            "UPDATE security_findings SET state = ? WHERE finding_id = ? AND principal_id = ?",
+            (state, finding_id, principal_id),
+        )
+        return changed > 0
 
     def list_security_monitor_state(self: SQLiteStore, principal_id: str) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM security_monitor_state WHERE principal_id = ? ORDER BY updated_at DESC",
-                (principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM security_monitor_state WHERE principal_id = ? ORDER BY updated_at DESC",
+            (principal_id,),
+        )
         return [dict(row) for row in rows]
 
     # The generic sibling of the MCP monitor's storage: one redacted activity row
@@ -302,45 +291,43 @@ class MonitoringStore:
         observed_at: str | None = None,
     ) -> str:
         activity_id = new_id("cact_")
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO capability_activity_log
-                   (activity_id, principal_id, capability, subject_id, operation, hosts_json,
-                    tools_json, calls, bytes_in, bytes_out, error_count, outcome, reason_code,
-                    arg_sensitivity, result_sensitivity, observed_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    activity_id,
-                    principal_id,
-                    capability,
-                    subject_id,
-                    operation,
-                    json.dumps(sorted(hosts or [])),
-                    json.dumps(sorted(tools or [])),
-                    int(calls),
-                    int(bytes_in),
-                    int(bytes_out),
-                    int(error_count),
-                    outcome,
-                    reason_code,
-                    arg_sensitivity,
-                    result_sensitivity,
-                    observed_at or utc_now(),
-                ),
-            )
+        self._execute(
+            """INSERT INTO capability_activity_log
+               (activity_id, principal_id, capability, subject_id, operation, hosts_json,
+                tools_json, calls, bytes_in, bytes_out, error_count, outcome, reason_code,
+                arg_sensitivity, result_sensitivity, observed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                activity_id,
+                principal_id,
+                capability,
+                subject_id,
+                operation,
+                json.dumps(sorted(hosts or [])),
+                json.dumps(sorted(tools or [])),
+                int(calls),
+                int(bytes_in),
+                int(bytes_out),
+                int(error_count),
+                outcome,
+                reason_code,
+                arg_sensitivity,
+                result_sensitivity,
+                observed_at or utc_now(),
+            ),
+        )
         return activity_id
 
     def list_capability_activity(
         self: SQLiteStore, principal_id: str, capability: str, subject_id: str, *, limit: int = 50
     ) -> list[dict[str, Any]]:
         """Most-recent-first activity rows forming one subject's rolling baseline."""
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT * FROM capability_activity_log
-                   WHERE principal_id = ? AND capability = ? AND subject_id = ?
-                   ORDER BY observed_at DESC, rowid DESC LIMIT ?""",
-                (principal_id, capability, subject_id, int(limit)),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT * FROM capability_activity_log
+               WHERE principal_id = ? AND capability = ? AND subject_id = ?
+               ORDER BY observed_at DESC, rowid DESC LIMIT ?""",
+            (principal_id, capability, subject_id, int(limit)),
+        )
         return [
             {
                 **dict(row),
@@ -353,12 +340,11 @@ class MonitoringStore:
     def get_capability_containment(
         self: SQLiteStore, principal_id: str, capability: str, subject_id: str
     ) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                """SELECT * FROM capability_containment
-                   WHERE principal_id = ? AND capability = ? AND subject_id = ?""",
-                (principal_id, capability, subject_id),
-            ).fetchone()
+        row = self._row(
+            """SELECT * FROM capability_containment
+               WHERE principal_id = ? AND capability = ? AND subject_id = ?""",
+            (principal_id, capability, subject_id),
+        )
         return dict(row) if row else None
 
     def list_capability_containment(
@@ -369,8 +355,7 @@ class MonitoringStore:
         if capability:
             query += " AND capability = ?"
             params.append(capability)
-        with self.connect() as connection:
-            rows = connection.execute(query + " ORDER BY updated_at DESC", tuple(params)).fetchall()
+        rows = self._rows(query + " ORDER BY updated_at DESC", tuple(params))
         return [dict(row) for row in rows]
 
     def set_capability_containment(
@@ -417,36 +402,35 @@ class MonitoringStore:
             "contained_at": contained_at,
             "probe_after": probe_after,
         }
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO capability_containment
-                   (principal_id, capability, subject_id, label, state, reason, source,
-                    finding_id, failure_streak, last_failure_code, contained_at, probe_after,
-                    updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(principal_id, capability, subject_id) DO UPDATE SET
-                     label=excluded.label, state=excluded.state, reason=excluded.reason,
-                     source=excluded.source, finding_id=excluded.finding_id,
-                     failure_streak=excluded.failure_streak,
-                     last_failure_code=excluded.last_failure_code,
-                     contained_at=excluded.contained_at, probe_after=excluded.probe_after,
-                     updated_at=excluded.updated_at""",
-                (
-                    principal_id,
-                    capability,
-                    subject_id,
-                    row["label"],
-                    row["state"],
-                    row["reason"],
-                    row["source"],
-                    row["finding_id"],
-                    row["failure_streak"],
-                    row["last_failure_code"],
-                    row["contained_at"],
-                    row["probe_after"],
-                    now,
-                ),
-            )
+        self._execute(
+            """INSERT INTO capability_containment
+               (principal_id, capability, subject_id, label, state, reason, source,
+                finding_id, failure_streak, last_failure_code, contained_at, probe_after,
+                updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(principal_id, capability, subject_id) DO UPDATE SET
+                 label=excluded.label, state=excluded.state, reason=excluded.reason,
+                 source=excluded.source, finding_id=excluded.finding_id,
+                 failure_streak=excluded.failure_streak,
+                 last_failure_code=excluded.last_failure_code,
+                 contained_at=excluded.contained_at, probe_after=excluded.probe_after,
+                 updated_at=excluded.updated_at""",
+            (
+                principal_id,
+                capability,
+                subject_id,
+                row["label"],
+                row["state"],
+                row["reason"],
+                row["source"],
+                row["finding_id"],
+                row["failure_streak"],
+                row["last_failure_code"],
+                row["contained_at"],
+                row["probe_after"],
+                now,
+            ),
+        )
         return {
             "principal_id": principal_id,
             "capability": capability,
@@ -496,11 +480,10 @@ class MonitoringStore:
 
     def list_background_worker_health(self: SQLiteStore) -> list[dict[str, Any]]:
         """Every recorded host-tick pass, worst first."""
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT * FROM background_worker_health
-                ORDER BY consecutive_failures DESC, pass_name""",
-            ).fetchall()
+        rows = self._rows(
+            """SELECT * FROM background_worker_health
+            ORDER BY consecutive_failures DESC, pass_name""",
+        )
         return [
             {
                 "pass_name": str(row["pass_name"]),

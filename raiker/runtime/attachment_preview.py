@@ -33,6 +33,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from raiker.contracts.views import View
 from raiker.runtime.attachments import (
     DOCX_MEDIA_TYPE,
     IMAGE_MEDIA_TYPES,
@@ -66,7 +67,7 @@ KIND_UNAVAILABLE = "unavailable"
 
 
 @dataclass(frozen=True)
-class AttachmentPreview:
+class AttachmentPreview(View):
     """One file's safe preview representation. Metadata plus inert content."""
 
     attachment_id: str
@@ -81,22 +82,6 @@ class AttachmentPreview:
     pdf_url: str | None = None
     image_url: str | None = None
     unavailable_reason: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "attachment_id": self.attachment_id,
-            "session_id": self.session_id,
-            "filename": self.filename,
-            "media_type": self.media_type,
-            "kind": self.kind,
-            "byte_size": self.byte_size,
-            "text": self.text,
-            "rows": [list(row) for row in self.rows],
-            "truncated": self.truncated,
-            "pdf_url": self.pdf_url,
-            "image_url": self.image_url,
-            "unavailable_reason": self.unavailable_reason,
-        }
 
 
 def _bytes_preview_url(session_id: str, attachment_id: str, suffix: str) -> str:

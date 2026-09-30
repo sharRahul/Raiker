@@ -10,10 +10,10 @@ from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
 from raiker.checkpoints.capture import STATUS_CAPTURED, CheckpointCaptureService
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.models import ToolAction
 from raiker.events.query import EventViewer
 from raiker.storage.internal_paths import display_path, internal_io_path
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 
 
 def test_internal_io_path_rejects_relative_input() -> None:
@@ -89,10 +89,10 @@ def test_deep_workspace_approved_overwrite_captures_a_pre_image(tmp_path: Path) 
     headers = {"Authorization": f"Bearer {raw}"}
     store = SQLiteStore(workspace)
     store.create_session("sess_deep", str(workspace))
-    action = ToolAction(
+    action = tool_action(
+        "write_file",
+        {"path": "notes.md", "text": "after\n"},
         action_id="act_deep",
-        tool_name="write_file",
-        arguments={"path": "notes.md", "text": "after\n"},
         risk_level="high",
         requires_approval=True,
     )

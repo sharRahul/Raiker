@@ -78,33 +78,32 @@ class ExtensionStore:
         """
         tool_list = list(tools) if tools is not None else None
         declarations = list(tool_schemas) if tool_schemas is not None else None
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT OR REPLACE INTO mcp_servers
-                   (server_id, principal_id, name, command, template, transport,
-                    status, created_at, last_connected_at, tools, tool_count,
-                    endpoint_url, auth_ref, protocol_version, tool_schemas,
-                    server_features)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    server_id,
-                    principal_id,
-                    name,
-                    json.dumps(list(command)),
-                    template,
-                    transport,
-                    status,
-                    utc_now(),
-                    last_connected_at,
-                    json.dumps(tool_list) if tool_list is not None else None,
-                    len(tool_list) if tool_list is not None else 0,
-                    endpoint_url,
-                    auth_ref,
-                    protocol_version,
-                    json.dumps(declarations) if declarations is not None else None,
-                    json.dumps(list(server_features)) if server_features is not None else None,
-                ),
-            )
+        self._execute(
+            """INSERT OR REPLACE INTO mcp_servers
+               (server_id, principal_id, name, command, template, transport,
+                status, created_at, last_connected_at, tools, tool_count,
+                endpoint_url, auth_ref, protocol_version, tool_schemas,
+                server_features)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                server_id,
+                principal_id,
+                name,
+                json.dumps(list(command)),
+                template,
+                transport,
+                status,
+                utc_now(),
+                last_connected_at,
+                json.dumps(tool_list) if tool_list is not None else None,
+                len(tool_list) if tool_list is not None else 0,
+                endpoint_url,
+                auth_ref,
+                protocol_version,
+                json.dumps(declarations) if declarations is not None else None,
+                json.dumps(list(server_features)) if server_features is not None else None,
+            ),
+        )
         return server_id
 
     def update_mcp_server_runtime(
@@ -186,27 +185,24 @@ class ExtensionStore:
             return cursor.rowcount > 0
 
     def list_mcp_servers(self: SQLiteStore, principal_id: str) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM mcp_servers WHERE principal_id = ? ORDER BY created_at DESC",
-                (principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM mcp_servers WHERE principal_id = ? ORDER BY created_at DESC",
+            (principal_id,),
+        )
         return [self._mcp_row(row) for row in rows]
 
     def get_mcp_server(self: SQLiteStore, server_id: str, principal_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM mcp_servers WHERE server_id = ? AND principal_id = ?",
-                (server_id, principal_id),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM mcp_servers WHERE server_id = ? AND principal_id = ?",
+            (server_id, principal_id),
+        )
         return self._mcp_row(row) if row else None
 
     def get_mcp_server_by_name(self: SQLiteStore, principal_id: str, name: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM mcp_servers WHERE principal_id = ? AND name = ?",
-                (principal_id, name),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM mcp_servers WHERE principal_id = ? AND name = ?",
+            (principal_id, name),
+        )
         return self._mcp_row(row) if row else None
 
     def set_mcp_server_status(
@@ -306,30 +302,27 @@ class ExtensionStore:
     def list_skills(self: SQLiteStore, principal_id: str) -> list[dict[str, Any]]:
         """Owner-scoped list, newest first. Bundles are excluded — the archive is
         only read on an explicit download."""
-        with self.connect() as connection:
-            rows = connection.execute(
-                """SELECT skill_id, principal_id, name, description, version, source,
-                          source_ref, checksum, active, skill_md, files_json, byte_size,
-                          created_at, updated_at, command_trigger
-                   FROM skills WHERE principal_id = ? ORDER BY created_at DESC""",
-                (principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            """SELECT skill_id, principal_id, name, description, version, source,
+                      source_ref, checksum, active, skill_md, files_json, byte_size,
+                      created_at, updated_at, command_trigger
+               FROM skills WHERE principal_id = ? ORDER BY created_at DESC""",
+            (principal_id,),
+        )
         return [row for row in (self._skill_row(r) for r in rows) if row is not None]
 
     def get_skill(self: SQLiteStore, skill_id: str, principal_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM skills WHERE skill_id = ? AND principal_id = ?",
-                (skill_id, principal_id),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM skills WHERE skill_id = ? AND principal_id = ?",
+            (skill_id, principal_id),
+        )
         return self._skill_row(row)
 
     def get_skill_by_name(self: SQLiteStore, principal_id: str, name: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM skills WHERE principal_id = ? AND name = ?",
-                (principal_id, name),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM skills WHERE principal_id = ? AND name = ?",
+            (principal_id, name),
+        )
         return self._skill_row(row)
 
     def rename_skill(self: SQLiteStore, skill_id: str, principal_id: str, name: str) -> bool:
@@ -361,18 +354,14 @@ class ExtensionStore:
 
     def seeded_skill_names(self: SQLiteStore, principal_id: str) -> set[str]:
         """Shipped skills this owner has already been offered, installed or not."""
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT name FROM skill_seeds WHERE principal_id = ?", (principal_id,)
-            ).fetchall()
+        rows = self._rows("SELECT name FROM skill_seeds WHERE principal_id = ?", (principal_id,))
         return {str(row["name"]) for row in rows}
 
     def record_skill_seed(self: SQLiteStore, principal_id: str, name: str) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                "INSERT OR IGNORE INTO skill_seeds (principal_id, name, seeded_at) VALUES (?, ?, ?)",
-                (principal_id, name, utc_now()),
-            )
+        self._execute(
+            "INSERT OR IGNORE INTO skill_seeds (principal_id, name, seeded_at) VALUES (?, ?, ?)",
+            (principal_id, name, utc_now()),
+        )
 
     def delete_skill(self: SQLiteStore, skill_id: str, principal_id: str) -> bool:
         """Owner-scoped delete. False when the row is missing or owned by another
@@ -385,11 +374,10 @@ class ExtensionStore:
             return cursor.rowcount > 0
 
     def has_connector_credential(self: SQLiteStore, principal_id: str, connector_id: str) -> bool:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT 1 FROM connector_credentials WHERE principal_id = ? AND connector_id = ?",
-                (principal_id, connector_id),
-            ).fetchone()
+        row = self._row(
+            "SELECT 1 FROM connector_credentials WHERE principal_id = ? AND connector_id = ?",
+            (principal_id, connector_id),
+        )
         return row is not None
 
     def upsert_connector_profiles(self: SQLiteStore, profiles: list[ConnectorProfile]) -> None:
@@ -430,22 +418,21 @@ class ExtensionStore:
         header_ref: str | None = None,
         include_content: bool = False,
     ) -> str:
-        with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO telemetry_destinations
-                   (destination_id, principal_id, name, endpoint_url, header_ref,
-                    include_content, enabled, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, 1, ?)""",
-                (
-                    destination_id,
-                    principal_id,
-                    name,
-                    endpoint_url,
-                    header_ref,
-                    1 if include_content else 0,
-                    utc_now(),
-                ),
-            )
+        self._execute(
+            """INSERT INTO telemetry_destinations
+               (destination_id, principal_id, name, endpoint_url, header_ref,
+                include_content, enabled, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 1, ?)""",
+            (
+                destination_id,
+                principal_id,
+                name,
+                endpoint_url,
+                header_ref,
+                1 if include_content else 0,
+                utc_now(),
+            ),
+        )
         return destination_id
 
     @staticmethod
@@ -459,23 +446,21 @@ class ExtensionStore:
         return data
 
     def list_telemetry_destinations(self: SQLiteStore, principal_id: str) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM telemetry_destinations WHERE principal_id = ?"
-                " ORDER BY created_at DESC",
-                (principal_id,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM telemetry_destinations WHERE principal_id = ?"
+            " ORDER BY created_at DESC",
+            (principal_id,),
+        )
         return [self._telemetry_row(row) for row in rows]
 
     def get_telemetry_destination(
         self: SQLiteStore, destination_id: str, principal_id: str
     ) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM telemetry_destinations"
-                " WHERE destination_id = ? AND principal_id = ?",
-                (destination_id, principal_id),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM telemetry_destinations"
+            " WHERE destination_id = ? AND principal_id = ?",
+            (destination_id, principal_id),
+        )
         return self._telemetry_row(row) if row else None
 
     def set_telemetry_destination_enabled(
@@ -600,28 +585,27 @@ class ExtensionStore:
             return cursor.rowcount > 0
 
     def insert_plugin_install_record(self: SQLiteStore, record: PluginInstallRecord) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO plugin_install_records
-                (record_id, plugin_id, version, trust_level, checksum, signature, source_url, commit_sha, permissions_json, status, installed_at, installed_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record.record_id,
-                    record.plugin_id,
-                    record.version,
-                    record.trust_level,
-                    record.checksum,
-                    record.signature,
-                    record.source_url,
-                    record.commit_sha,
-                    record.permissions_json,
-                    record.status,
-                    record.installed_at,
-                    record.installed_by,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO plugin_install_records
+            (record_id, plugin_id, version, trust_level, checksum, signature, source_url, commit_sha, permissions_json, status, installed_at, installed_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record.record_id,
+                record.plugin_id,
+                record.version,
+                record.trust_level,
+                record.checksum,
+                record.signature,
+                record.source_url,
+                record.commit_sha,
+                record.permissions_json,
+                record.status,
+                record.installed_at,
+                record.installed_by,
+            ),
+        )
 
     def list_plugin_install_records(self: SQLiteStore, status: str | None = None) -> list[dict[str, Any]]:
         query = "SELECT * FROM plugin_install_records"
@@ -630,15 +614,11 @@ class ExtensionStore:
             query += " WHERE status = ?"
             params.append(status)
         query += " ORDER BY installed_at DESC"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def load_plugin_install_record(self: SQLiteStore, record_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM plugin_install_records WHERE record_id = ?", (record_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM plugin_install_records WHERE record_id = ?", (record_id,))
         return dict(row) if row else None
 
     def revoke_plugin_install_record(self: SQLiteStore, record_id: str) -> bool:
@@ -648,34 +628,32 @@ class ExtensionStore:
         the fail-closed off-switch for the plugin install/execution slices; it
         never deletes the record or touches permissions.
         """
-        with self.connect() as connection:
-            cursor = connection.execute(
-                "UPDATE plugin_install_records SET status = 'revoked' "
-                "WHERE record_id = ? AND status = 'installed'",
-                (record_id,),
-            )
-        return cursor.rowcount > 0
+        changed = self._execute(
+            "UPDATE plugin_install_records SET status = 'revoked' "
+            "WHERE record_id = ? AND status = 'installed'",
+            (record_id,),
+        )
+        return changed > 0
 
 
     def insert_channel_pairing(self: SQLiteStore, pairing: ChannelPairing) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO channel_pairings
-                (pairing_id, connector_id, channel_type, display_name, paired_at, paired_by, enabled, sender_allowlist_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    pairing.pairing_id,
-                    pairing.connector_id,
-                    pairing.channel_type,
-                    pairing.display_name,
-                    pairing.paired_at,
-                    pairing.paired_by,
-                    int(pairing.enabled),
-                    pairing.sender_allowlist_json,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO channel_pairings
+            (pairing_id, connector_id, channel_type, display_name, paired_at, paired_by, enabled, sender_allowlist_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                pairing.pairing_id,
+                pairing.connector_id,
+                pairing.channel_type,
+                pairing.display_name,
+                pairing.paired_at,
+                pairing.paired_by,
+                int(pairing.enabled),
+                pairing.sender_allowlist_json,
+            ),
+        )
 
     def list_channel_pairings(self: SQLiteStore, enabled_only: bool = False) -> list[dict[str, Any]]:
         query = "SELECT * FROM channel_pairings"
@@ -683,15 +661,11 @@ class ExtensionStore:
         if enabled_only:
             query += " WHERE enabled = 1"
         query += " ORDER BY paired_at DESC"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def get_channel_pairing(self: SQLiteStore, pairing_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM channel_pairings WHERE pairing_id = ?", (pairing_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM channel_pairings WHERE pairing_id = ?", (pairing_id,))
         return dict(row) if row is not None else None
 
     def get_channel_pairing_by_connector(self: SQLiteStore, connector_id: str) -> dict[str, Any] | None:
@@ -701,11 +675,10 @@ class ExtensionStore:
         linked" a question with two answers, and every enforcement point that
         reads the pairing would have to pick one.
         """
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM channel_pairings WHERE connector_id = ? ORDER BY paired_at DESC LIMIT 1",
-                (connector_id,),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM channel_pairings WHERE connector_id = ? ORDER BY paired_at DESC LIMIT 1",
+            (connector_id,),
+        )
         return dict(row) if row is not None else None
 
     def set_channel_pairing_enabled(self: SQLiteStore, pairing_id: str, enabled: bool) -> bool:
@@ -777,66 +750,62 @@ class ExtensionStore:
     def get_active_skill_by_command(
         self: SQLiteStore, principal_id: str, trigger: str
     ) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                """SELECT * FROM skills
-                   WHERE principal_id = ? AND command_trigger = ? AND active = 1""",
-                (principal_id, trigger),
-            ).fetchone()
+        row = self._row(
+            """SELECT * FROM skills
+               WHERE principal_id = ? AND command_trigger = ? AND active = 1""",
+            (principal_id, trigger),
+        )
         return dict(row) if row is not None else None
 
 
     def insert_plugin_execution_record(self: SQLiteStore, record: PluginExecutionRecord) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO plugin_execution_records
-                (execution_id, plugin_id, version, trust_level, permissions_json, entrypoint, status, started_at, completed_at, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record.execution_id,
-                    record.plugin_id,
-                    record.version,
-                    record.trust_level,
-                    record.permissions_json,
-                    record.entrypoint,
-                    record.status,
-                    record.started_at,
-                    record.completed_at,
-                    record.created_by,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO plugin_execution_records
+            (execution_id, plugin_id, version, trust_level, permissions_json, entrypoint, status, started_at, completed_at, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record.execution_id,
+                record.plugin_id,
+                record.version,
+                record.trust_level,
+                record.permissions_json,
+                record.entrypoint,
+                record.status,
+                record.started_at,
+                record.completed_at,
+                record.created_by,
+            ),
+        )
 
     def list_plugin_execution_records(self: SQLiteStore, limit: int = 20) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM plugin_execution_records ORDER BY COALESCE(started_at, created_by) DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM plugin_execution_records ORDER BY COALESCE(started_at, created_by) DESC LIMIT ?",
+            (limit,),
+        )
         return [dict(row) for row in rows]
 
 
     def insert_skill_candidate(self: SQLiteStore, candidate: SkillCandidate) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO skill_candidates
-                (candidate_id, name, description, source_workflow_json, suggested_tools_json, provenance, status, created_by, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    candidate.candidate_id,
-                    candidate.name,
-                    candidate.description,
-                    candidate.source_workflow_json,
-                    candidate.suggested_tools_json,
-                    candidate.provenance,
-                    candidate.status,
-                    candidate.created_by,
-                    candidate.created_at,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO skill_candidates
+            (candidate_id, name, description, source_workflow_json, suggested_tools_json, provenance, status, created_by, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                candidate.candidate_id,
+                candidate.name,
+                candidate.description,
+                candidate.source_workflow_json,
+                candidate.suggested_tools_json,
+                candidate.provenance,
+                candidate.status,
+                candidate.created_by,
+                candidate.created_at,
+            ),
+        )
 
     def list_skill_candidates(
         self: SQLiteStore, status: str | None = None, limit: int = 50
@@ -848,6 +817,5 @@ class ExtensionStore:
             params.append(status)
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]

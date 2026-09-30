@@ -36,6 +36,7 @@ from raiker.runtime.authority.models import (
     normalize_runtime_mode,
 )
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import ai_agent, governed_action, human
 
 
 def _insert_ack(store: SQLiteStore, capability: str, now: str) -> None:
@@ -71,27 +72,23 @@ def router(authority: RuntimeAuthority) -> ActionRouter:
 
 @pytest.fixture
 def human_principal() -> Principal:
-    return Principal(
-        principal_id="test_human",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Test Human",
+    return human(
+        "test_human",
         role_ids=("rl_admin",),
+        display_name="Test Human",
         domain_scopes=("coding", "email"),
         max_runtime_mode=RuntimeMode.RAIKER_RUNTIME,
-        is_active=True,
     )
 
 
 @pytest.fixture
 def ai_principal() -> Principal:
-    return Principal(
-        principal_id="test_ai",
-        principal_type=PrincipalType.AI_AGENT,
-        display_name="Test AI Agent",
+    return ai_agent(
+        "test_ai",
         role_ids=("rl_assistant",),
         domain_scopes=("coding",),
+        display_name="Test AI Agent",
         max_runtime_mode=RuntimeMode.RAIKER_RUNTIME,
-        is_active=True,
     )
 
 
@@ -208,12 +205,7 @@ def test_expired_principal_cannot_act() -> None:
 
 
 def test_domain_scope_enforced(authority: RuntimeAuthority) -> None:
-    principal = Principal(
-        principal_id="test",
-        principal_type=PrincipalType.AI_AGENT,
-        display_name="Test",
-        domain_scopes=("coding",),
-    )
+    principal = ai_agent("test", role_ids=(), domain_scopes=("coding",), display_name="Test")
     result = authority.check_domain_scope(principal, "email")
     assert result is not None
     assert "domain_scope_denied" in result
@@ -354,19 +346,15 @@ def test_ai_cannot_approve_own_action(authority: RuntimeAuthority) -> None:
 
 
 def test_critical_risk_requires_human_confirmation(authority: RuntimeAuthority) -> None:
-    principal = Principal(
-        principal_id="ai_agent2",
-        principal_type=PrincipalType.AI_AGENT,
-        display_name="AI Agent",
+    principal = ai_agent(
+        "ai_agent2",
         role_ids=("rl_assistant",),
         domain_scopes=("coding",),
-        is_active=True,
+        display_name="AI Agent",
     )
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "write_file",
         principal_id="ai_agent2",
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "test.txt", "text": "content"},
         domain_scope="coding",
         risk_level=RiskLevelValue.CRITICAL,
@@ -458,11 +446,10 @@ def test_only_runtime_gate_manager_can_enable_gates(authority: RuntimeAuthority,
         role_id="rl_rgm", name="runtime_gate_manager",
         description="", is_system_role=True, created_at=utc_now(),
     ))
-    principal = Principal(
-        principal_id="human_no_rgm",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Human without RGM role",
+    principal = human(
+        "human_no_rgm",
         role_ids=("rl_admin",),
+        display_name="Human without RGM role",
     )
     result = authority.check_runtime_gate_enable(principal, "enable_runtime_gate")
     assert result is not None
@@ -473,12 +460,7 @@ def test_only_runtime_gate_manager_can_enable_gates(authority: RuntimeAuthority,
 
 
 def test_unknown_action_denied(authority: RuntimeAuthority) -> None:
-    principal = Principal(
-        principal_id="test",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Test",
-        is_active=True,
-    )
+    principal = human("test", role_ids=(), display_name="Test")
     action = GovernedAction(
         action_id=new_id("act_"),
         principal_id="test",
@@ -491,17 +473,10 @@ def test_unknown_action_denied(authority: RuntimeAuthority) -> None:
 
 
 def test_needs_risk_acceptance_returned(authority: RuntimeAuthority) -> None:
-    principal = Principal(
+    principal = human("test", role_ids=(), display_name="Test")
+    action = governed_action(
+        "write_file",
         principal_id="test",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Test",
-        is_active=True,
-    )
-    action = GovernedAction(
-        action_id=new_id("act_"),
-        principal_id="test",
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "test.txt", "text": "content"},
         risk_level=RiskLevelValue.HIGH,
         requires_risk_acceptance=True,
@@ -519,13 +494,11 @@ def test_user_create_governed(tmp_path: Path) -> None:
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
     router = ActionRouter(authority)
-    principal = Principal(
-        principal_id="cli_test",
-        principal_type=PrincipalType.HUMAN,
-        display_name="CLI Test",
+    principal = human(
+        "cli_test",
         role_ids=("rl_admin",),
+        display_name="CLI Test",
         domain_scopes=("admin",),
-        is_active=True,
     )
     result = router.route(
         action_type="admin_mutation",
@@ -545,13 +518,11 @@ def test_role_create_governed(tmp_path: Path) -> None:
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
     router = ActionRouter(authority)
-    principal = Principal(
-        principal_id="cli_test",
-        principal_type=PrincipalType.HUMAN,
-        display_name="CLI Test",
+    principal = human(
+        "cli_test",
         role_ids=("rl_admin",),
+        display_name="CLI Test",
         domain_scopes=("admin",),
-        is_active=True,
     )
     result = router.route(
         action_type="role_mutation",
@@ -569,13 +540,11 @@ def test_plugin_plan_governed(tmp_path: Path) -> None:
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
     router = ActionRouter(authority)
-    principal = Principal(
-        principal_id="cli_test",
-        principal_type=PrincipalType.HUMAN,
-        display_name="CLI Test",
+    principal = human(
+        "cli_test",
         role_ids=("rl_admin",),
+        display_name="CLI Test",
         domain_scopes=("admin",),
-        is_active=True,
     )
     result = router.route(
         action_type="plugin_install",
@@ -674,14 +643,12 @@ def test_principal_type_values() -> None:
 
 
 def test_effective_permissions_intersection(authority: RuntimeAuthority) -> None:
-    principal = Principal(
-        principal_id="test",
-        principal_type=PrincipalType.AI_AGENT,
-        display_name="Test",
+    principal = ai_agent(
+        "test",
         role_ids=("rl_assistant",),
         domain_scopes=("coding",),
+        display_name="Test",
         max_runtime_mode=RuntimeMode.RAIKER_RUNTIME,
-        is_active=True,
     )
     effective = authority.evaluate_effective_permissions(principal)
     assert effective["principal_id"] == "test"
@@ -758,14 +725,12 @@ def test_role_revoke_governance_allowed_with_proper_principal(tmp_path: Path) ->
     )
     store.insert_user_role_assignment(assignment)
     # Route through authority
-    principal = Principal(
-        principal_id="cli_local",
-        principal_type=PrincipalType.HUMAN,
-        display_name="CLI User",
+    principal = human(
+        "cli_local",
         role_ids=("rl_admin",),
+        display_name="CLI User",
         domain_scopes=("admin",),
         max_runtime_mode="local_single_user_safe",
-        is_active=True,
     )
     result = router.route(
         action_type="role_mutation",
@@ -789,13 +754,11 @@ def test_capability_gate_disabled_admin_mutation(authority: RuntimeAuthority) ->
 
 
 def test_disabled_capability_blocks_mutation(authority: RuntimeAuthority) -> None:
-    principal = Principal(
-        principal_id="test_human",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Test",
+    principal = human(
+        "test_human",
         role_ids=("rl_admin",),
+        display_name="Test",
         domain_scopes=("admin",),
-        is_active=True,
     )
     action = GovernedAction(
         action_id=new_id("act_"),
@@ -816,20 +779,16 @@ def test_unknown_capability_fails_closed(authority: RuntimeAuthority) -> None:
 
 
 def test_enabled_policy_gated_capability_path(authority: RuntimeAuthority) -> None:
-    principal = Principal(
-        principal_id="test_human",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Test",
+    principal = human(
+        "test_human",
         role_ids=("rl_admin",),
+        display_name="Test",
         domain_scopes=("admin", "coding"),
-        is_active=True,
     )
     # Read_file has no capability gate, should proceed to policy
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "read_file",
         principal_id="test_human",
-        action_type="read_file",
-        tool_or_service_name="read_file",
         arguments={"path": "test.txt"},
         domain_scope="coding",
         risk_level=RiskLevelValue.LOW,
@@ -843,19 +802,15 @@ def test_enabled_policy_gated_capability_path(authority: RuntimeAuthority) -> No
 
 
 def test_risk_acceptance_blocks_without_matching(authority: RuntimeAuthority) -> None:
-    principal = Principal(
-        principal_id="test_human",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Test",
+    principal = human(
+        "test_human",
         role_ids=("rl_admin",),
+        display_name="Test",
         domain_scopes=("admin",),
-        is_active=True,
     )
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "write_file",
         principal_id="test_human",
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "test.txt"},
         risk_level=RiskLevelValue.HIGH,
         requires_risk_acceptance=True,
@@ -979,13 +934,7 @@ def test_human_runtime_gate_manager_can_activate_runtime_mode(tmp_path: Path) ->
     ))
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    principal = Principal(
-        principal_id="human_gm",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Gate Manager",
-        role_ids=("rl_rgm",),
-        is_active=True,
-    )
+    principal = human("human_gm", role_ids=("rl_rgm",), display_name="Gate Manager")
     result = authority.activate_runtime_mode("local_single_user_runtime", principal, "Testing")
     assert result is None  # allowed
 
@@ -1010,13 +959,7 @@ def test_non_gate_manager_human_cannot_activate_runtime_mode(tmp_path: Path) -> 
     store = SQLiteStore(tmp_path)
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    principal = Principal(
-        principal_id="human_no_rgm",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Regular Human",
-        role_ids=("rl_admin",),
-        is_active=True,
-    )
+    principal = human("human_no_rgm", role_ids=("rl_admin",), display_name="Regular Human")
     result = authority.activate_runtime_mode("local_single_user_runtime", principal, "No RGM role")
     assert result is not None
     assert "only_runtime_gate_manager" in result
@@ -1032,13 +975,7 @@ def test_runtime_mode_activation_emits_event(tmp_path: Path) -> None:
     ))
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    principal = Principal(
-        principal_id="human_gm",
-        principal_type=PrincipalType.HUMAN,
-        display_name="GM",
-        role_ids=("rl_rgm",),
-        is_active=True,
-    )
+    principal = human("human_gm", role_ids=("rl_rgm",), display_name="GM")
     authority.activate_runtime_mode("local_single_user_runtime", principal, "Event test")
     events = store.list_event_index(session_id="authz", limit=10)
     event_types = [e["event_type"] for e in events]
@@ -1055,13 +992,7 @@ def test_runtime_mode_disable_emits_event(tmp_path: Path) -> None:
     ))
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    principal = Principal(
-        principal_id="human_gm",
-        principal_type=PrincipalType.HUMAN,
-        display_name="GM",
-        role_ids=("rl_rgm",),
-        is_active=True,
-    )
+    principal = human("human_gm", role_ids=("rl_rgm",), display_name="GM")
     authority.activate_runtime_mode("local_single_user_runtime", principal, "Enable")
     authority.disable_runtime_mode(principal, "Disable test")
     events = store.list_event_index(session_id="authz", limit=10)
@@ -1079,13 +1010,7 @@ def test_disabling_stops_the_runtime_and_activating_starts_it_again(tmp_path: Pa
     ))
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    principal = Principal(
-        principal_id="human_gm",
-        principal_type=PrincipalType.HUMAN,
-        display_name="GM",
-        role_ids=("rl_rgm",),
-        is_active=True,
-    )
+    principal = human("human_gm", role_ids=("rl_rgm",), display_name="GM")
     authority.activate_runtime_mode("local_single_user_runtime", principal, "First")
     started = authority.get_runtime_mode()
     assert started["mode_name"] == "raiker_runtime"
@@ -1121,13 +1046,7 @@ def test_admin_mutation_can_be_enabled_through_governed_transition(tmp_path: Pat
     _insert_ack(store, "admin_mutation", now)
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    principal = Principal(
-        principal_id="human_gm",
-        principal_type=PrincipalType.HUMAN,
-        display_name="GM",
-        role_ids=("rl_rgm",),
-        is_active=True,
-    )
+    principal = human("human_gm", role_ids=("rl_rgm",), display_name="GM")
     result = authority.request_capability_transition("admin_mutation", "enabled_policy_gated", principal, "Testing")
     assert result is None  # allowed
     gate = authority.get_effective_capability_gate("admin_mutation")
@@ -1146,13 +1065,7 @@ def test_role_mutation_can_be_enabled_through_governed_transition(tmp_path: Path
     _insert_ack(store, "role_mutation", now)
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    principal = Principal(
-        principal_id="human_gm",
-        principal_type=PrincipalType.HUMAN,
-        display_name="GM",
-        role_ids=("rl_rgm",),
-        is_active=True,
-    )
+    principal = human("human_gm", role_ids=("rl_rgm",), display_name="GM")
     result = authority.request_capability_transition("role_mutation", "enabled_policy_gated", principal, "Testing")
     assert result is None
     gate = authority.get_effective_capability_gate("role_mutation")
@@ -1170,13 +1083,7 @@ def test_disabled_capability_blocks_after_disable(tmp_path: Path) -> None:
     _insert_ack(store, "admin_mutation", now)
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    principal = Principal(
-        principal_id="human_gm",
-        principal_type=PrincipalType.HUMAN,
-        display_name="GM",
-        role_ids=("rl_rgm",),
-        is_active=True,
-    )
+    principal = human("human_gm", role_ids=("rl_rgm",), display_name="GM")
     authority.request_capability_transition("admin_mutation", "enabled_policy_gated", principal, "Enable")
     gate1 = authority.get_effective_capability_gate("admin_mutation")
     assert gate1["state"] == "enabled_policy_gated"
@@ -1214,13 +1121,7 @@ def test_dangerous_capability_transition_blocked(tmp_path: Path) -> None:
     ))
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    principal = Principal(
-        principal_id="human_gm",
-        principal_type=PrincipalType.HUMAN,
-        display_name="GM",
-        role_ids=("rl_rgm",),
-        is_active=True,
-    )
+    principal = human("human_gm", role_ids=("rl_rgm",), display_name="GM")
     result = authority.request_capability_transition("shell_execution", "enabled_policy_gated", principal, "Attempt")
     assert result is not None
     assert "activation_blocked" in result or "no_executor" in result
@@ -1236,13 +1137,7 @@ def test_unknown_capability_transition_blocked(tmp_path: Path) -> None:
     ))
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    principal = Principal(
-        principal_id="human_gm",
-        principal_type=PrincipalType.HUMAN,
-        display_name="GM",
-        role_ids=("rl_rgm",),
-        is_active=True,
-    )
+    principal = human("human_gm", role_ids=("rl_rgm",), display_name="GM")
     result = authority.request_capability_transition("nonexistent_cap", "disabled", principal, "Attempt")
     assert result is not None
     assert "unknown_capability" in result

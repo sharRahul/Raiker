@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from raiker.contracts.views import View
+
 # Phase 1/2-safe context source types. No graph runtime, semantic search, external channel,
 # remote/container/cloud, plugin execution, or scheduled automation sources are permitted.
 SOURCE_TYPES = (
@@ -53,7 +55,7 @@ SENSITIVITY_LEVELS = {"unknown", "low", "normal", "sensitive"}
 
 
 @dataclass(frozen=True)
-class ContextSource:
+class ContextSource(View):
     source_id: str
     source_type: str
     trust_level: str
@@ -61,19 +63,9 @@ class ContextSource:
     sensitivity: str
     redacted: bool = False
 
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "source_id": self.source_id,
-            "source_type": self.source_type,
-            "trust_level": self.trust_level,
-            "provenance": dict(self.provenance),
-            "sensitivity": self.sensitivity,
-            "redacted": self.redacted,
-        }
-
 
 @dataclass(frozen=True)
-class ContextItem:
+class ContextItem(View):
     item_id: str
     source: ContextSource
     title: str
@@ -83,21 +75,9 @@ class ContextItem:
     included: bool = True
     exclusion_reason: str | None = None
 
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "item_id": self.item_id,
-            "source": self.source.to_dict(),
-            "title": self.title,
-            "content": self.content,
-            "metadata": dict(self.metadata),
-            "token_estimate": self.token_estimate,
-            "included": self.included,
-            "exclusion_reason": self.exclusion_reason,
-        }
-
 
 @dataclass(frozen=True)
-class ContextBundle:
+class ContextBundle(View):
     bundle_id: str
     session_id: str
     turn_id: str
@@ -120,23 +100,6 @@ class ContextBundle:
             if item.source.source_type not in seen:
                 seen.append(item.source.source_type)
         return seen
-
-    def to_dict(self) -> dict[str, object]:
-        """Full bundle including item content. For model-prompt use, not event logs."""
-
-        return {
-            "bundle_id": self.bundle_id,
-            "session_id": self.session_id,
-            "turn_id": self.turn_id,
-            "items": [item.to_dict() for item in self.items],
-            "total_token_estimate": self.total_token_estimate,
-            "max_token_budget": self.max_token_budget,
-            "max_chars": self.max_chars,
-            "truncated": self.truncated,
-            "redaction_applied": self.redaction_applied,
-            "sources": list(self.sources),
-            "summary": self.summary,
-        }
 
     def recalled_memory_ids(self) -> list[str]:
         """C17 — which approved memories this turn was actually given.

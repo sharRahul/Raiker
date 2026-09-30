@@ -226,6 +226,12 @@ Dozens of local `_ws`, `_auth`, `_service`, `_operation_service`, `_library_serv
 
 ## OPT-05 — Replace repetitive DTO `to_dict()` implementations with one serialization strategy
 
+**Status: done 2026-09-30 — [FIXED-638](FIXED_ITEMS.md#fixed-638--a-hundred-and-thirty-four-to_dict-methods-said-all-my-fields).** `View` and
+`view_to_dict` in `raiker/contracts/views.py`; the 134 field-wise `to_dict`
+methods are gone and the 44 real projections keep theirs. Frozen dataclasses
+were chosen over Pydantic: FastAPI derives OpenAPI from a dataclass directly,
+so OPT-01 is not blocked by the choice. −874 lines.
+
 **Priority: P1 — Effort: Medium — LOC reduction: Medium/High — Risk: Medium**
 
 ### Evidence
@@ -256,8 +262,10 @@ Remove hundreds of repetitive projection lines and make frontend generation prac
 **Status: split done 2026-09-28 — [FIXED-616](FIXED_ITEMS.md#fixed-616--one-storage-file-held-every-domain-the-product-has).**
 `SQLiteStore` is assembled from sixteen domain parts in `raiker/storage/stores/`,
 the migration runner among them; `sqlite.py` keeps the connection core. The move
-was verbatim, so this entry's second half — deduplicating proven CRUD patterns —
-has not started, and OR-03 applies: the split did not reduce LOC.
+was verbatim, so OR-03 applied to it. **Stage B done 2026-09-30 —
+[FIXED-640](FIXED_ITEMS.md#fixed-640--three-hundred-and-seventy-six-transactions-around-one-statement-each).**
+`_rows`, `_row` and `_execute` replace 376 one-statement transaction blocks;
+anything with a loop, a `try` or a second statement keeps its own. −451 lines.
 
 **Priority: P1 — Effort: High — LOC reduction: High potential; module-length reduction: Critical — Risk: High if done in one step**
 
@@ -358,8 +366,11 @@ Historical migration behavior must remain immutable once released.
 
 **Status: decomposition done 2026-09-28 — [FIXED-617](FIXED_ITEMS.md#fixed-617--one-service-file-held-every-page-the-product-serves).**
 `DashboardService` is assembled from eleven domain parts in
-`raiker/control/dashboard_parts/`. The view dataclasses stayed in `dashboard.py`,
-and their `asdict()` duplication is untouched — that half remains.
+`raiker/control/dashboard_parts/`. **The rest done 2026-09-30 —
+[FIXED-639](FIXED_ITEMS.md#fixed-639--every-pages-read-models-lived-in-one-file-beside-the-service).**
+The views are `raiker/control/views/<domain>.py`, the project-folder migration
+its own module, and `dashboard.py` the composition root (2,424 → 68 lines); the
+`asdict()` duplication went with OPT-05.
 
 **Priority: P1 — Effort: High — LOC reduction: Medium/High; module-length reduction: Critical — Risk: Medium**
 
@@ -395,6 +406,10 @@ Replace `dashboard.py` with a single new `DashboardRepository` monolith. The poi
 ---
 
 ## OPT-09 — Introduce a shared async provider HTTP transport
+
+**Status: done 2026-09-30 — [FIXED-634](FIXED_ITEMS.md#fixed-634--two-provider-adapters-carried-the-same-http-client-twice).**
+`ProviderHttpTransport` and one status ladder in
+`raiker/models/providers/http.py`; each adapter keeps its protocol.
 
 **Priority: P1 — Effort: Medium — LOC reduction: Medium — Risk: Medium**
 
@@ -439,6 +454,11 @@ This can remove repeated infrastructure without forcing Anthropic and OpenAI pro
 
 ## OPT-10 — Share managed-local-runtime process/slot lifecycle
 
+**Status: done 2026-09-30 — [FIXED-635](FIXED_ITEMS.md#fixed-635--the-llamacpp-and-mlx-pools-were-the-same-lifecycle-written-twice).**
+`ManagedSlotRuntime` holds the lifecycle and the GCR-28 lock once; the slots are
+the profiles `model-profiles.json` marks `managed_slot`. Doing it found
+[FIXED-636](FIXED_ITEMS.md#fixed-636--models-said-a-local-model-the-owner-had-deployed-was-stopped).
+
 **Priority: P1/P2 — Effort: Medium — LOC reduction: Medium — Risk: Medium**
 
 ### Evidence
@@ -473,6 +493,10 @@ LOC reduction and correctness remediation reinforce each other rather than creat
 ---
 
 ## OPT-11 — Create a model-operation worker harness
+
+**Status: done 2026-09-30 — [FIXED-637](FIXED_ITEMS.md#fixed-637--five-model-operation-workers-each-wrote-their-own-claim-cancel-and-settle).**
+`run_operation` / `run_operation_async` own claim, cancellation and settlement
+for all five workers, on the GCR-20 expected-state transitions.
 
 **Priority: P1 — Effort: Medium — LOC reduction: Medium — Risk: Medium**
 
@@ -611,6 +635,12 @@ Apply the same rule to other purely descriptive repeated provider tables. Do not
 
 ## OPT-15 — Compress historical BUG/FIXED narratives inside executable files
 
+**Status: started 2026-09-30.** `CONTRIBUTING.md` carries the comment policy, and
+the examples this entry cites — the SQLCipher connection-cache history, the
+migration-lookup note, the GCR-30 note repeated in both adapters and the
+thinking-shape cache history — now state their invariant and cite the ID. The
+sweep across the rest of the codebase has not been done; this stays open.
+
 **Priority: P1/P2 — Effort: Medium — LOC reduction: Very High — Risk: Low if invariants are preserved**
 
 ### Evidence
@@ -672,6 +702,9 @@ Collapse semantically different safety tests into one opaque parameterized loop.
 
 ## OPT-17 — Use backend factories/builders in Python tests instead of repeated full object construction
 
+**Status: done 2026-09-30 — [FIXED-643](FIXED_ITEMS.md#fixed-643--tests-spelled-out-every-principal-and-action-field-by-field).**
+`tests/factories.py`; the authority-deciding fields are required arguments.
+
 **Priority: P2 — Effort: Medium — LOC reduction: Medium — Risk: Low**
 
 ### Change
@@ -691,6 +724,10 @@ Factories should expose meaningful defaults and require explicit values for auth
 ---
 
 ## OPT-18 — Extract shared reason-code/envelope types instead of repeating string dictionaries
+
+**Status: done 2026-09-30 — [FIXED-641](FIXED_ITEMS.md#fixed-641--the-routers-refusals-were-literals-a-constant-list-and-a-copy-table).**
+`AuthorityReason` is the router's catalogue; the web copy is held to it both
+ways by a test. Codes outside the router stay where their one owner raises them.
 
 **Priority: P2 — Effort: Medium — LOC reduction: Medium — Risk: Medium**
 
@@ -740,6 +777,11 @@ Move substantial release logic to tested Python only where it is real product/re
 ---
 
 ## OPT-20 — Keep generated/static registries as data when behavior is table-driven
+
+**Status: done 2026-09-30 — [FIXED-642](FIXED_ITEMS.md#fixed-642--the-command-palette-offered-memory-engine-as-memory-engine).**
+Provider names (FIXED-627), migrations (FIXED-625), the local-runtime slots
+(FIXED-635) and the settings sections the palette and All pages list are each
+one table read in one place.
 
 **Priority: P2 — Effort: Medium — LOC reduction: Medium — Risk: Medium**
 

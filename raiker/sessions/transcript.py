@@ -63,6 +63,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from raiker.approval_previews import redact_secret_like_text
+from raiker.contracts.views import View
 from raiker.runtime.typed_parts import (
     PART_CHART,
     PART_REFUSED,
@@ -99,25 +100,16 @@ _CITATION_MARKER = re.compile(r"(?P<space>[ \t]*)\[(?P<source_id>s[1-9][0-9]{0,5
 
 
 @dataclass(frozen=True)
-class TranscriptSource:
+class TranscriptSource(View):
     source_id: str
     title: str
     locator: str
     kind: str
     tool_name: str
 
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "source_id": self.source_id,
-            "title": self.title,
-            "locator": self.locator,
-            "kind": self.kind,
-            "tool_name": self.tool_name,
-        }
-
 
 @dataclass(frozen=True)
-class TranscriptMessage:
+class TranscriptMessage(View):
     role: str
     text: str
     timestamp: str | None
@@ -134,32 +126,13 @@ class TranscriptMessage:
         """Declared tables and charts. Refusals are not counted as content."""
         return sum(1 for part in self.parts if part.type in (PART_TABLE, PART_CHART))
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "role": self.role,
-            "text": self.text,
-            "timestamp": self.timestamp,
-            "status": self.status,
-            "sources": [source.to_dict() for source in self.sources],
-            "unresolved_citation_count": self.unresolved_citation_count,
-            "parts": [part.to_dict() for part in self.parts],
-        }
-
 
 @dataclass(frozen=True)
-class TranscriptFile:
+class TranscriptFile(View):
     filename: str
     media_type: str
     byte_size: int
     source: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "filename": self.filename,
-            "media_type": self.media_type,
-            "byte_size": self.byte_size,
-            "source": self.source,
-        }
 
 
 @dataclass(frozen=True)

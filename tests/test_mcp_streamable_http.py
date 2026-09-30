@@ -29,7 +29,6 @@ from typing import Any
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id
 from raiker.runtime.authority import GovernedAction
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors.mcp import McpConnectorExecutor
@@ -40,6 +39,7 @@ from raiker.tools.mcp_schema import (
     server_feature_keys,
     unsupported_feature_notes,
 )
+from tests.factories import governed_action
 
 _OWNER = "principal_owner"
 _URL = "https://mcp.example.com/rpc"
@@ -58,11 +58,9 @@ def _principal(store: SQLiteStore) -> Principal:
 
 
 def _connect_action(**arguments: Any) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        "mcp_connect",
         principal_id=_OWNER,
-        action_type="mcp_connect",
-        tool_or_service_name="mcp_connect",
         arguments={"transport": "http", "endpoint_url": _URL, "name": "remote", **arguments},
         risk_level=RiskLevelValue.MEDIUM,
     )

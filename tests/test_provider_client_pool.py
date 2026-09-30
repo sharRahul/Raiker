@@ -115,7 +115,7 @@ def test_the_factory_gives_a_provider_the_pooled_client(pool: ProviderClientPool
         profile = ModelProfileRegistry.load().resolve("anthropic", ANTHROPIC_MODEL)
         provider = _hosted_factory(client_pool=pool).create(profile)
         pooled = pool.client(endpoint=provider.endpoint, timeout=provider.timeout)
-        assert provider._client is pooled  # noqa: SLF001 — the point of the test
+        assert provider._http.client is pooled  # noqa: SLF001 — the point of the test
         # And the provider does not own it, so ending one call does not close
         # the connection the next call wants.
         await provider.aclose()
@@ -129,9 +129,9 @@ def test_a_factory_with_no_pool_behaves_as_before() -> None:
     async def body() -> None:
         profile = ModelProfileRegistry.load().resolve("anthropic", ANTHROPIC_MODEL)
         provider = _hosted_factory().create(profile)
-        assert provider._client is not None  # noqa: SLF001 — it opened its own
+        assert provider._http.client is not None  # noqa: SLF001 — it opened its own
         await provider.aclose()
-        assert provider._client.is_closed  # noqa: SLF001
+        assert provider._http.client.is_closed  # noqa: SLF001
 
     run(body())
 
@@ -148,7 +148,7 @@ def test_a_router_shares_one_connection_across_its_calls(pool: ProviderClientPoo
         clients = set()
         for _ in range(5):
             provider = router._factory(profile).create(profile)  # noqa: SLF001
-            clients.add(id(provider._client))  # noqa: SLF001
+            clients.add(id(provider._http.client))  # noqa: SLF001
             await provider.aclose()
         assert len(clients) == 1
         await pool.aclose()

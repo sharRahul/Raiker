@@ -44,6 +44,7 @@ from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
 from raiker.runtime.executors.sandbox import SandboxError
 from raiker.runtime.executors.tier2_telemetry import TelemetryExportExecutor
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 _OWNER = "principal_owner"
 
@@ -133,11 +134,9 @@ class _Collector:
 
 
 def _action(destination_id: str) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        "telemetry_export",
         principal_id=_OWNER,
-        action_type="telemetry_export",
-        tool_or_service_name="telemetry_export",
         arguments={"destination_id": destination_id},
         risk_level=RiskLevelValue.MEDIUM,
     )

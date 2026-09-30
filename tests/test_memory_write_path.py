@@ -48,6 +48,7 @@ from raiker.runtime.executors import (
     build_default_executor_registry,
 )
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action, human
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 _WRITE_CAP = "memory_write_execution"
@@ -327,18 +328,14 @@ class TestGovernedMemoryStatus:
 
 class TestApprovedWriteReallyHappens:
     def test_the_executor_writes_and_the_record_is_readable(self, workspace: Path) -> None:
-        from raiker.runtime.authority.models import Principal, PrincipalType
-        from raiker.runtime.authority.router import GovernedAction
 
         store = SQLiteStore(workspace)
         registry = build_default_executor_registry(workspace, store)
         executor = registry.get(_WRITE_CAP)
         assert executor is not None
-        action = GovernedAction(
-            action_id=new_id("act_"),
+        action = governed_action(
+            "memory_write",
             principal_id="principal_owner",
-            action_type="memory_write",
-            tool_or_service_name="memory_write",
             arguments={"text": "The owner prefers metric units.", "scope": "global"},
             risk_level="high",
         )
@@ -346,11 +343,7 @@ class TestApprovedWriteReallyHappens:
         with routed_dispatch(_WRITE_CAP, action.action_id):
             result = executor.execute(
                 action,
-                Principal(
-                    principal_id="principal_owner",
-                    principal_type=PrincipalType.HUMAN,
-                    display_name="Owner",
-                ),
+                human("principal_owner", role_ids=()),
             )
         assert result.ok is True
         memory_id = str(result.artifacts["memory_id"])

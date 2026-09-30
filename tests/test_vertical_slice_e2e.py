@@ -5,7 +5,7 @@ from typing import Any
 
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id, utc_now
-from raiker.contracts.models import PolicyDecision, ToolAction
+from raiker.contracts.models import PolicyDecision
 from raiker.control.service import RuntimeControlService
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
@@ -23,6 +23,7 @@ from raiker.runtime.executors import (
     WebFetchExecutor,
 )
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action, tool_action
 
 _TIER1_CAPS = ("approval_execution_relay", "file_write_execution", "patch_apply_execution",
                "memory_write_execution", "memory_forget_execution")
@@ -120,11 +121,9 @@ def test_file_write_executor_happy(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
 
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "write_file",
         principal_id="principal_owner",
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "hello.txt", "text": "Hello, World!"},
         risk_level=RiskLevelValue.LOW,
     )
@@ -155,10 +154,10 @@ def test_approval_relay_executor_happy(tmp_path: Path) -> None:
     # Create a pending tool action with its approval
     action_id = new_id("act_")
     store.insert_tool_action(
-        ToolAction(
+        tool_action(
+            "write_file",
+            {"path": "approved_hello.txt", "text": "Approved Content"},
             action_id=action_id,
-            tool_name="write_file",
-            arguments={"path": "approved_hello.txt", "text": "Approved Content"},
             risk_level="low",
             requires_approval=True,
             proposed_by="principal_owner",
@@ -170,11 +169,9 @@ def test_approval_relay_executor_happy(tmp_path: Path) -> None:
 
     # Route the relay action
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "approval_execution_relay",
         principal_id="principal_owner",
-        action_type="approval_execution_relay",
-        tool_or_service_name="approval_execution_relay",
         arguments={"approval_id": approval_id},
         risk_level=RiskLevelValue.LOW,
     )
@@ -211,11 +208,9 @@ def test_executor_not_called_on_deny(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer, policy_engine=DenyEngine(), executor_registry=registry)  # type: ignore[arg-type]
 
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "write_file",
         principal_id="principal_owner",
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "no_write.txt", "text": "should not appear"},
         risk_level=RiskLevelValue.LOW,
     )
@@ -243,11 +238,9 @@ def test_disabled_gate_blocks_execution(tmp_path: Path) -> None:
     svc.set_capability_state("file_write_execution", "disabled", None, "disable for test")
 
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "write_file",
         principal_id="principal_owner",
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "blocked.txt", "text": "should not appear"},
         risk_level=RiskLevelValue.LOW,
     )
@@ -267,11 +260,9 @@ def test_missing_executor_fails_closed(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer)  # No executor registry
 
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "write_file",
         principal_id="principal_owner",
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "unavailable.txt", "text": "should not appear"},
         risk_level=RiskLevelValue.LOW,
     )
@@ -294,11 +285,9 @@ def test_approval_relay_unknown_approval(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
 
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "approval_execution_relay",
         principal_id="principal_owner",
-        action_type="approval_execution_relay",
-        tool_or_service_name="approval_execution_relay",
         arguments={"approval_id": "nonexistent"},
         risk_level=RiskLevelValue.LOW,
     )
@@ -324,11 +313,9 @@ def test_action_executed_event_present(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
 
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "write_file",
         principal_id="principal_owner",
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "event_test.txt", "text": "event content"},
         risk_level=RiskLevelValue.LOW,
     )
@@ -373,11 +360,9 @@ def test_ai_principal_denied(tmp_path: Path) -> None:
     )
     store.insert_principal(principal_id="p_ai", principal_type="ai_agent", display_name="AI", role_ids=("rl_ai",), is_active=True)
 
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "write_file",
         principal_id="p_ai",
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "ai_write.txt", "text": "should not appear"},
         risk_level=RiskLevelValue.LOW,
     )
@@ -457,11 +442,9 @@ def test_memory_forget_executor(tmp_path: Path) -> None:
 
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "memory_forget",
         principal_id="principal_owner",
-        action_type="memory_forget",
-        tool_or_service_name="memory_forget",
         arguments={"memory_id": entry.memory_id},
         risk_level=RiskLevelValue.LOW,
     )
@@ -484,11 +467,9 @@ def test_memory_write_denied_no_text(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
 
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "memory_write",
         principal_id="principal_owner",
-        action_type="memory_write",
-        tool_or_service_name="memory_write",
         arguments={},
         risk_level=RiskLevelValue.LOW,
     )
@@ -509,11 +490,9 @@ def test_memory_write_disabled_gate(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
 
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "memory_write",
         principal_id="principal_owner",
-        action_type="memory_write",
-        tool_or_service_name="memory_write",
         arguments={"text": "should not be written"},
         risk_level=RiskLevelValue.LOW,
     )
@@ -533,10 +512,11 @@ def test_shell_executor_denied_no_command(tmp_path: Path) -> None:
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_owner",
-        action_type="shell", tool_or_service_name="shell",
-        arguments={}, risk_level=RiskLevelValue.LOW,
+    action = governed_action(
+        "shell",
+        principal_id="principal_owner",
+        arguments={},
+        risk_level=RiskLevelValue.LOW,
     )
     result = authority.route_action(action, principal)
     assert result.decision == "allow"
@@ -553,12 +533,15 @@ def test_shell_executor_blocked_not_allowed(tmp_path: Path) -> None:
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_owner",
-        action_type="shell", tool_or_service_name="shell",
-        arguments={"command": "rm -rf /"}, risk_level=RiskLevelValue.LOW,
-        authority_kind="approval", authority_id="approval_shell_denial",
-        session_id="sess_shell_denial", turn_id="turn_shell_denial",
+    action = governed_action(
+        "shell",
+        principal_id="principal_owner",
+        arguments={"command": "rm -rf /"},
+        risk_level=RiskLevelValue.LOW,
+        authority_kind="approval",
+        authority_id="approval_shell_denial",
+        session_id="sess_shell_denial",
+        turn_id="turn_shell_denial",
     )
     result = authority.route_action(action, principal)
     assert result.decision == "allow"
@@ -575,10 +558,11 @@ def test_process_executor_denied_no_executable(tmp_path: Path) -> None:
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_owner",
-        action_type="process", tool_or_service_name="process",
-        arguments={}, risk_level=RiskLevelValue.LOW,
+    action = governed_action(
+        "process",
+        principal_id="principal_owner",
+        arguments={},
+        risk_level=RiskLevelValue.LOW,
     )
     result = authority.route_action(action, principal)
     assert result.decision == "allow"
@@ -595,10 +579,11 @@ def test_web_fetch_denied_no_url(tmp_path: Path) -> None:
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_owner",
-        action_type="web_fetch", tool_or_service_name="web_fetch",
-        arguments={}, risk_level=RiskLevelValue.LOW,
+    action = governed_action(
+        "web_fetch",
+        principal_id="principal_owner",
+        arguments={},
+        risk_level=RiskLevelValue.LOW,
     )
     result = authority.route_action(action, principal)
     assert result.decision == "allow"
@@ -621,9 +606,9 @@ def test_web_fetch_refuses_plaintext_scheme(tmp_path: Path) -> None:
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_owner",
-        action_type="web_fetch", tool_or_service_name="web_fetch",
+    action = governed_action(
+        "web_fetch",
+        principal_id="principal_owner",
         arguments={"url": "http://malicious.example.com/data"},
         risk_level=RiskLevelValue.LOW,
     )
@@ -643,9 +628,9 @@ def test_web_fetch_refuses_private_address(tmp_path: Path) -> None:
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_owner",
-        action_type="web_fetch", tool_or_service_name="web_fetch",
+    action = governed_action(
+        "web_fetch",
+        principal_id="principal_owner",
         arguments={"url": "https://169.254.169.254/latest/meta-data/"},
         risk_level=RiskLevelValue.LOW,
     )
@@ -677,10 +662,11 @@ def test_tier2_disabled_gate_blocks_execution(tmp_path: Path) -> None:
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
-    action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_owner",
-        action_type="shell", tool_or_service_name="shell",
-        arguments={"command": "echo test"}, risk_level=RiskLevelValue.LOW,
+    action = governed_action(
+        "shell",
+        principal_id="principal_owner",
+        arguments={"command": "echo test"},
+        risk_level=RiskLevelValue.LOW,
     )
     result = authority.route_action(action, principal)
     assert result.decision == "disabled_by_capability_gate"

@@ -31,6 +31,7 @@ from raiker.models.tool_projection import (
     search_tools,
 )
 from raiker.models.tool_registry import MODEL_EXPOSED_TOOLS
+from tests.factories import tool_action
 
 
 def _tokens(specs: list[ToolSpec]) -> int:
@@ -180,12 +181,12 @@ class TestTheTurnKeepsWhatItFetched:
         )
 
     def _result(self, tool_names: list[str], status: str = "success"):  # type: ignore[no-untyped-def]
-        from raiker.contracts.models import ToolAction, ToolResult
+        from raiker.contracts.models import ToolResult
 
-        action = ToolAction(
+        action = tool_action(
+            TOOL_SEARCH,
+            {"query": "anything"},
             action_id="act_1",
-            tool_name=TOOL_SEARCH,
-            arguments={"query": "anything"},
             risk_level="low",
             requires_approval=False,
             proposed_by="principal_owner",
@@ -222,14 +223,14 @@ class TestTheTurnKeepsWhatItFetched:
         assert "rm_minus_rf" not in names
 
     def test_another_tool_result_reveals_nothing(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        from raiker.contracts.models import ToolAction, ToolResult
+        from raiker.contracts.models import ToolResult
 
         orchestrator = self._orchestrator(tmp_path)
         orchestrator._reveal_searched_tools(
-            ToolAction(
+            tool_action(
+                "read_file",
+                {"path": "x"},
                 action_id="act_2",
-                tool_name="read_file",
-                arguments={"path": "x"},
                 risk_level="low",
                 requires_approval=False,
                 proposed_by="principal_owner",

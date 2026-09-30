@@ -17,17 +17,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import new_id
-from raiker.control.dashboard import (
-    ProjectDetailView,
-    ProjectsListView,
-    ProjectView,
-    _default_root_label,
-)
 from raiker.control.dtos import ControlResult
+from raiker.control.project_migration import _default_root_label
 from raiker.control.project_paths import MANAGED_PROJECT_ROOT as _MANAGED_PROJECT_ROOT
 from raiker.control.project_paths import contained_project_root as _contained_project_root
 from raiker.control.project_paths import project_root_parts as _project_root_parts
 from raiker.control.project_roots import resolve_project_root
+from raiker.control.views.projects import ProjectDetailView, ProjectsListView, ProjectView
 from raiker.events.export import generate_export
 from raiker.runtime.authority.models import PrincipalType
 

@@ -13,6 +13,7 @@ from raiker.contracts.ids import new_id
 from raiker.contracts.models import ToolAction
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
+from tests.factories import tool_action
 
 
 def _engine(tmp_path: Path) -> PolicyEngine:
@@ -20,10 +21,10 @@ def _engine(tmp_path: Path) -> PolicyEngine:
 
 
 def _action(tool_name: str, args: dict[str, object], *, risk: str, approval: bool) -> ToolAction:
-    return ToolAction(
+    return tool_action(
+        tool_name,
+        args,
         action_id=new_id("act_"),
-        tool_name=tool_name,
-        arguments=args,
         risk_level=risk,
         requires_approval=approval,
         proposed_by="model",

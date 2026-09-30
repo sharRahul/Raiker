@@ -655,6 +655,19 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-631](#fixed-631--shutting-a-workspace-down-closed-a-connection-another-thread-was-still-using) | Medium | Storage / concurrency | Fixed 2026-09-29 — found by this change's CI run |
 | [FIXED-632](#fixed-632--an-approval-card-covered-settings-save-changes) | Medium | Web UI / approvals | Fixed 2026-09-29 — found converting a live spec for BUG-248 |
 | [FIXED-633](#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in) | Low | Web UI / Settings | Fixed 2026-09-29 — found converting a live spec for BUG-248 |
+| [FIXED-634](#fixed-634--two-provider-adapters-carried-the-same-http-client-twice) | Low | Models / providers | Fixed 2026-09-30 — OPT-09 |
+| [FIXED-635](#fixed-635--the-llamacpp-and-mlx-pools-were-the-same-lifecycle-written-twice) | Low | Models / local runtimes | Fixed 2026-09-30 — OPT-10, and OPT-20's slot declarations |
+| [FIXED-636](#fixed-636--models-said-a-local-model-the-owner-had-deployed-was-stopped) | Medium | Models / decision | Fixed 2026-09-30 — found while doing OPT-10 |
+| [FIXED-637](#fixed-637--five-model-operation-workers-each-wrote-their-own-claim-cancel-and-settle) | Low | Models / operations | Fixed 2026-09-30 — OPT-11 |
+| [FIXED-638](#fixed-638--a-hundred-and-thirty-four-to_dict-methods-said-all-my-fields) | Low | API / read models | Fixed 2026-09-30 — OPT-05 |
+| [FIXED-639](#fixed-639--every-pages-read-models-lived-in-one-file-beside-the-service) | Low | Control / read models | Fixed 2026-09-30 — OPT-08 |
+| [FIXED-640](#fixed-640--three-hundred-and-seventy-six-transactions-around-one-statement-each) | Low | Storage | Fixed 2026-09-30 — OPT-06 stage B |
+| [FIXED-641](#fixed-641--the-routers-refusals-were-literals-a-constant-list-and-a-copy-table) | Low | Authority / web copy | Fixed 2026-09-30 — OPT-18 |
+| [FIXED-642](#fixed-642--the-command-palette-offered-memory-engine-as-memory-engine) | Low | Web UI / navigation | Fixed 2026-09-30 — OPT-20 |
+| [FIXED-643](#fixed-643--tests-spelled-out-every-principal-and-action-field-by-field) | Low | Tests | Fixed 2026-09-30 — OPT-17 |
+| [FIXED-644](#fixed-644--setup-recommended-llamacpp-beside-no-complete-gguf-found) | Medium | Models / first run | Fixed 2026-09-30 — found by the live round |
+| [FIXED-645](#fixed-645--the-first-message-after-setup-was-refused-as-never-checked) | Medium | Chat / model readiness | Fixed 2026-09-30 — found by the live round |
+| [FIXED-646](#fixed-646--the-web-job-would-not-have-run-for-a-change-to-a-moved-read-model) | Low | CI | Fixed 2026-09-30 — the web job's trigger followed the moved views, and a same-day `brace-expansion` advisory |
 
 ---
 
@@ -27300,3 +27313,300 @@ opens or closes it; from then on their choice holds.
 case fails against the previous code; and the spec's density test, which now
 chooses Comfortable, then Compact, then Comfortable again, and measures a real
 row shorten.
+
+---
+
+## FIXED-634 — Two provider adapters carried the same HTTP client, twice
+
+**Severity: Low. Area: Models / providers. Status: Fixed 2026-09-30. Closes
+OPT-09 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-09--introduce-a-shared-async-provider-http-transport).**
+
+**Observed.** `anthropic_messages.py` and `openai_compatible.py` each owned an
+`httpx.AsyncClient`, merged their headers into each request, translated timeouts
+and transport errors, read a refused stream's body and mapped HTTP status to a
+provider error — and the status ladder was copied beside a comment asking the
+two be kept in step.
+
+**Fixed.** `ProviderHttpTransport` and `provider_status_error` in
+`raiker/models/providers/http.py`. The Anthropic adapter puts its one refusal of
+its own — the thinking-shape 400 — in front of the shared ladder; the
+OpenAI-compatible adapter uses the ladder as it is. Payload shape, tool calls,
+the stream parser, reasoning and model metadata stay in each adapter. The two
+adapters went from 1,383 to 1,263 lines, plus 142 in the shared module.
+
+**Evidence.** `tests/test_provider_http_transport.py`, and every provider test
+unchanged apart from where they reached into the old attributes. Live: a real
+turn streamed through Ollama's OpenAI-compatible endpoint, and the readiness
+probe answered *Ollama can reach gpt-oss:20b-cloud* through the same transport
+([the 2026-09-30 round](LIVE_TEST_ROUNDS.md#2026-09-30--ten-optimisation-items-and-a-first-run-that-sends)).
+
+---
+
+## FIXED-635 — The llama.cpp and MLX pools were the same lifecycle, written twice
+
+**Severity: Low. Area: Models / local runtimes. Status: Fixed 2026-09-30. Closes
+OPT-10 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-10--share-managed-local-runtime-processslot-lifecycle),
+and the slot half of OPT-20.**
+
+**Observed.** Each pool kept a slot table, a process map, a reservation set, a
+lock and the terminate → wait → kill sequence, and the GCR-28 race fix had been
+applied to each separately. The slots themselves were declared twice — in code,
+and as the eight profiles in `model-profiles.json` — with nothing holding the
+two in step.
+
+**Fixed.** `ManagedSlotRuntime` in `raiker/models/slot_runtime.py` owns select,
+reserve, launch, stop and status under one lock; the two pools keep only what
+differs (the command line and what counts as a model) and their own refusal
+codes. The slots are the profiles marked `"managed_slot": true`: the endpoint's
+port is the slot's port and the model is its served alias. An id that is not a
+slot now reads as not running rather than as the first slot's state.
+
+**Evidence.** `tests/test_slot_runtime.py`; the two pools' existing tests pass
+unchanged.
+
+---
+
+## FIXED-636 — Models said a local model the owner had deployed was stopped
+
+**Severity: Medium. Area: Models / decision. Status: Fixed 2026-09-30 — found
+while sharing the local-runtime lifecycle (FIXED-635).**
+
+**Observed.** `ModelDecisionService._running` built a fresh `ManagedLlamaRuntime`
+on every call and asked it whether a slot was running. A pool built there holds
+no process, so every managed slot always answered *not running*, and the Models
+overview sent the owner to Runtime to start a model that was serving.
+
+**Fixed.** The decision asks the host's own pools, which `/api/model-decision`
+and `/api/model-decisions` pass in; without them it answers *unknown* rather than
+*stopped*.
+
+**Evidence.** `tests/test_model_decision.py` — *a local slot reports what the
+host's pool is running*, which fails against the previous code.
+
+---
+
+## FIXED-637 — Five model-operation workers each wrote their own claim, cancel and settle
+
+**Severity: Low. Area: Models / operations. Status: Fixed 2026-09-30. Closes
+OPT-11 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-11--create-a-model-operation-worker-harness).**
+
+**Observed.** The Hugging Face download, the conversion, the Ollama pull and the
+llama.cpp and MLX deployments each claimed the row, checked for Cancel, did the
+work, checked again, and settled to complete, cancelled or a bounded failure code
+— five variations of one state machine, two of them signalling Cancel by
+comparing an exception's message.
+
+**Fixed.** `run_operation` and `run_operation_async` in
+`raiker/models/local_operations.py` own the mechanics; a worker names its phase
+and failure code and does its domain work. `OperationWorker.check_cancelled()` is
+a cancellation point and `on_abort()` registers what to undo — a deployment
+stops only its own slot. Every write is still the service's expected-state
+transition from GCR-20, so a worker that loses a race to Cancel reads the owner's
+decision instead of overwriting it.
+
+**Evidence.** `tests/test_operation_worker_harness.py` — including a check that
+none of the five workers calls `running`, `complete`, `fail` or `cancelled` by
+hand.
+
+---
+
+## FIXED-638 — A hundred and thirty-four `to_dict` methods said "all my fields"
+
+**Severity: Low. Area: API / read models. Status: Fixed 2026-09-30. Closes
+OPT-05 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-05--replace-repetitive-dto-to_dict-implementations-with-one-serialization-strategy).**
+
+**Observed.** 74 view dataclasses returned `asdict(self)` and 59 typed the same
+thing out field by field — `list(self.tags)`, `[row.to_dict() for row in
+self.rows]` — so the few projections that genuinely omit or derive a field were
+indistinguishable from the ones that did not.
+
+**Fixed.** `View` and `view_to_dict` in `raiker/contracts/views.py`. A view opts
+in by inheriting `View`; only declared dataclass fields are serialised, and a
+nested object with its own projection is asked for it, so a parent never widens
+what a child chose to expose. The migration was generated from the syntax tree
+and replaced only `to_dict` bodies that were exactly field-wise; the 44 that omit,
+rename or derive keep theirs. Frozen dataclasses were kept rather than Pydantic
+models: FastAPI derives an OpenAPI schema from a dataclass directly, which is
+what OPT-01 needs. −874 lines.
+
+**Evidence.** The full Python suite and the API contract check; the live round's
+walk of twenty-four destinations answered with no 4xx or 5xx.
+
+---
+
+## FIXED-639 — Every page's read models lived in one file beside the service
+
+**Severity: Low. Area: Control / read models. Status: Fixed 2026-09-30. Closes
+OPT-08 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-08--decompose-dashboardpy-by-read-model-domain-and-remove-embedded-api-dto-duplication)
+([FIXED-617](#fixed-617--one-service-file-held-every-page-the-product-serves)
+did the service half).**
+
+**Fixed.** The view dataclasses are in `raiker/control/views/<domain>.py` —
+approvals, code, extensions, knowledge, memory, models, projects, security,
+sessions, tasks and threads — the legacy project-folder migration is
+`raiker/control/project_migration.py`, and the Knowledge, Sessions and Models
+helpers live in the parts that use them. `dashboard.py` is the composition root:
+2,424 → 68 lines. The move was verbatim (OR-03: a split is not a reduction; the
+reduction is FIXED-638). Importers were rewritten to the new modules rather than
+re-exported, and `scripts/check_api_contract.py` reads the views modules.
+
+**Evidence.** The full Python suite, the contract check, and the live walk.
+
+---
+
+## FIXED-640 — Three hundred and seventy-six transactions around one statement each
+
+**Severity: Low. Area: Storage. Status: Fixed 2026-09-30. Closes stage B of
+OPT-06 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-06--break-sqlitepy-into-domain-stores-then-deduplicate-only-proven-crud-patterns)
+([FIXED-616](#fixed-616--one-storage-file-held-every-domain-the-product-has) was
+stage A).**
+
+**Fixed.** `SQLiteStore._rows`, `_row` and `_execute` each run one statement in
+its own transaction — commit on success, rollback on error — which is exactly
+what the hand-written `with self.connect()` blocks around a single `execute`
+were. Only that shape was rewritten, from the syntax tree; a block with a loop, a
+`try` or a second statement keeps its own transaction, so no boundary is hidden.
+A count that used to be read off a cursor is `_execute`'s return value. −451
+lines.
+
+**Evidence.** `tests/test_store_query_helpers.py` — the helpers' commit and
+rollback, and a check that no store hand-writes the shape again.
+
+---
+
+## FIXED-641 — The router's refusals were literals, a constant list, and a copy table
+
+**Severity: Low. Area: Authority / web copy. Status: Fixed 2026-09-30. Closes
+OPT-18 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-18--extract-shared-reason-codeenvelope-types-instead-of-repeating-string-dictionaries).**
+
+**Observed.** The authority router returned string literals; `control/dtos.py`
+kept `REASON_*` constants of the same strings, three of which
+(`not_runtime_gate_manager`, `runtime_mode_not_activated`,
+`capability_requires_activation_task`) nothing had ever sent; and the web
+client's `reasonCodes.ts` had no owner-facing words for seven refusals the router
+does send, which therefore reached the owner as raw codes.
+
+**Fixed.** `AuthorityReason`, a `StrEnum` in
+`raiker/runtime/authority/reason_codes.py`, is what the router returns, and
+`scoped()` spells a reason about one subject. A member is its wire string, so
+comparisons, JSON and storage read the same value. The constants are gone, and
+the web client has copy for the seven.
+
+**Evidence.** `tests/test_reason_code_catalogue.py` fails when a catalogue code
+has no copy, when the copy names a code the backend never sends, or when the
+router spells a catalogue reason as a literal.
+
+---
+
+## FIXED-642 — The command palette offered Memory engine as "memory-engine"
+
+**Severity: Low. Area: Web UI / navigation. Status: Fixed 2026-09-30 — found
+under OPT-20 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-20--keep-generatedstatic-registries-as-data-when-behavior-is-table-driven),
+which it closes.**
+
+**Observed.** The command palette and All pages each kept a table of settings
+section labels beside the rail's own `SETTINGS_SECTIONS`. Neither had a row for
+Memory engine, so both offered it by its id, and both named Git credential and
+Runtime configuration differently from the rail.
+
+**Fixed.** Both read `settingsSection()` from `settingsSections.ts`, and draw
+each section with the rail's icon rather than a generic gear. With the slot
+declarations (FIXED-635), provider names (FIXED-627) and migrations (FIXED-625),
+OPT-20's candidate tables are data read in one place.
+
+**Evidence.** `CommandPalette.test.ts` — *names every settings section as the
+rail does*, which fails against the previous code; live, the palette answering
+"engine" with **Memory engine**.
+
+---
+
+## FIXED-643 — Tests spelled out every principal and action field by field
+
+**Severity: Low. Area: Tests. Status: Fixed 2026-09-30. Closes OPT-17 of the
+[optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-17--use-backend-factoriesbuilders-in-python-tests-instead-of-repeated-full-object-construction).**
+
+**Fixed.** `tests/factories.py` — `human`, `ai_agent`, `governed_action` and
+`tool_action`. They fill what no decision depends on and *require* what does: a
+principal's roles, an action's principal and risk, a tool call's approval flag,
+so the posture under test is still stated at the call. 163 constructions in 78
+test files use them; a construction with a multi-line value or an unusual shape
+was left as it was.
+
+**Evidence.** The full Python suite, and mypy over `tests/`.
+
+---
+
+## FIXED-644 — Setup recommended llama.cpp beside "No complete GGUF found"
+
+**Severity: Medium. Area: Models / first run. Status: Fixed 2026-09-30 — found
+by the live round.**
+
+**Observed.** On a host with `llama-server` installed and no GGUF, setup's model
+step led with **Recommended — GGUF is already running here**, directly above a
+Local GGUF row saying *No complete GGUF found*; nothing was listening on 8080.
+My models then offered **Use** on all four empty slots.
+
+**Root cause.** Two claims that were each about something else. Runtime
+detection is a PATH lookup, and `_names_an_available_model` took the binary's
+presence as evidence that a managed slot named a model — but a slot's
+`local-gguf` alias exists only once a model is deployed into it. And
+`isChoosableModel` let any local profile be offered, although its own comment
+calls listing an empty llama.cpp slot the mistake it exists to prevent.
+
+**Fixed.** A profile marked `managed_slot` names a model only once deployed;
+`configured: false` is not choosable; and the recommendation says a runtime is
+*installed*, not *running*, and requires it to name a model.
+
+**Evidence.** `tests/test_local_runtime_presence.py` — *an installed llama-server
+is not a deployed model*, failing against the previous code; `firstRun.test.ts`
+and `modelReadinessGating.test.ts`; live, setup recommending **Ollama is
+installed here** and My models asking **Fix** of the empty slots.
+
+---
+
+## FIXED-645 — The first message after setup was refused as never checked
+
+**Severity: Medium. Area: Chat / model readiness. Status: Fixed 2026-09-30 —
+found by the live round.**
+
+**Observed.** Setup, choosing `gpt-oss:20b-cloud` on the local Ollama, then the
+first message in Chat: the composer said *Checking this model — you can still
+send*, and the turn came back *No readiness check exists for this exact model*.
+
+**Root cause.** The server takes a first readiness check by itself only for a
+provider with a saved connection — a recorded invariant, held by
+`test_a_never_checked_model_is_not_rechecked_behind_the_owners_back`. The
+composer counted every local runtime as connected, so it promised a check the
+server would not take.
+
+**Fixed.** The composer counts only a saved connection, and choosing a model in
+setup — the owner's own act — takes its first check there, as **Test** would.
+The backend invariant is unchanged.
+
+**Evidence.** `modelReadinessGating.test.ts` — *does not count a local runtime as
+connected*; `ModelSetupView.test.ts` — the choice posts a readiness check; live,
+on a reset workspace, setup → Chat → the first message answered with no manual
+check.
+
+---
+
+## FIXED-646 — The web job would not have run for a change to a moved read model
+
+**Severity: Low. Area: CI. Status: Fixed 2026-09-30 — found by this change's own
+full suite.**
+
+**Observed.** `web.yml` builds and tests the client when a file producing its
+contract changes, and listed `raiker/control/dashboard.py`. After FIXED-639 the
+read models live in `raiker/control/views/`, so a change to one would have
+skipped the web job; `test_every_dto_module_the_contract_check_reads_triggers_the_web_job`
+said so. The same run's audit then failed on three denial-of-service advisories
+published that day against `brace-expansion` 4.0.0–5.0.11
+(GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p).
+
+**Fixed.** The trigger names `raiker/control/views/**`, and the test accepts any
+enclosing package's glob. The lockfile takes `brace-expansion` 5.0.12, a
+transitive dev dependency, and changes nothing else.
+
+**Evidence.** `tests/test_web_workflow.py`; `npm audit --audit-level=moderate`
+reports no vulnerabilities, and the web job's lint, check, unit tests and build
+pass.

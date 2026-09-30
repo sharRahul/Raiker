@@ -33,6 +33,7 @@ from raiker.runtime.authority.models import (
     RiskLevelValue,
     normalize_runtime_mode,
 )
+from raiker.runtime.authority.reason_codes import AuthorityReason, scoped
 from raiker.runtime.authority.routed import routed_dispatch
 from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.storage.internal_paths import display_path
@@ -504,56 +505,56 @@ class RuntimeAuthority:
         for role_id in principal.role_ids:
             role_name = self.store.get_role_name(role_id)
             if role_name and role_name in HUMAN_ONLY_ROLES:
-                return f"cannot_assign_human_role_to_ai:{role_name}"
+                return scoped(AuthorityReason.CANNOT_ASSIGN_HUMAN_ROLE_TO_AI, role_name)
         return None
 
     def check_principal_active(self, principal: Principal) -> str | None:
         if not principal.is_active:
-            return "principal_not_active"
+            return AuthorityReason.PRINCIPAL_NOT_ACTIVE
         if principal.expires_at and utc_now() > principal.expires_at:
-            return "principal_expired"
+            return AuthorityReason.PRINCIPAL_EXPIRED
         return None
 
     def check_domain_scope(
         self, principal: Principal, required_scope: str
     ) -> str | None:
         if required_scope and required_scope not in principal.domain_scopes:
-            return f"domain_scope_denied:{required_scope}"
+            return scoped(AuthorityReason.DOMAIN_SCOPE_DENIED, required_scope)
         return None
 
     def check_self_approval(
         self, principal: Principal, action: GovernedAction
     ) -> str | None:
         if action.principal_id == principal.principal_id and action.requires_approval and principal.principal_type != PrincipalType.HUMAN:
-            return "ai_cannot_approve_own_action"
+            return AuthorityReason.AI_CANNOT_APPROVE_OWN_ACTION
         return None
 
     def check_self_grant(self, principal: Principal, action_type: str) -> str | None:
         if action_type in ("role_grant", "role_assign") and principal.principal_type != PrincipalType.HUMAN:
-            return "ai_cannot_grant_roles"
+            return AuthorityReason.AI_CANNOT_GRANT_ROLES
         return None
 
     def _check_human_runtime_gate_manager(self, principal: Principal) -> str | None:
         if principal.principal_type != PrincipalType.HUMAN:
-            return "ai_cannot_manage_runtime_gates"
+            return AuthorityReason.AI_CANNOT_MANAGE_RUNTIME_GATES
         is_gate_manager = any(
             self.store.get_role_name(rid) == "runtime_gate_manager"
             for rid in principal.role_ids
         )
         if not is_gate_manager:
-            return "only_runtime_gate_manager_can_manage_gates"
+            return AuthorityReason.ONLY_RUNTIME_GATE_MANAGER_CAN_MANAGE_GATES
         return None
 
     def check_runtime_gate_enable(self, principal: Principal, action_type: str) -> str | None:
         if action_type == "enable_runtime_gate":
             if principal.principal_type != PrincipalType.HUMAN:
-                return "ai_cannot_enable_runtime_gate"
+                return AuthorityReason.AI_CANNOT_ENABLE_RUNTIME_GATE
             is_runtime_manager = any(
                 self.store.get_role_name(rid) == "runtime_gate_manager"
                 for rid in principal.role_ids
             )
             if not is_runtime_manager:
-                return "only_runtime_gate_manager_can_enable_gates"
+                return AuthorityReason.ONLY_RUNTIME_GATE_MANAGER_CAN_ENABLE_GATES
         return None
 
     def check_capability_gate(
@@ -572,20 +573,20 @@ class RuntimeAuthority:
         if persisted is not None:
             state = persisted["state"]
             if state in (CapabilityState.DISABLED, CapabilityState.PLANNED):
-                return "disabled_by_capability_gate"
+                return AuthorityReason.DISABLED_BY_CAPABILITY_GATE
             return None
         if self._uses_principal_controls(principal_id):
-            return "disabled_by_capability_gate"
+            return AuthorityReason.DISABLED_BY_CAPABILITY_GATE
         try:
             gates = default_capability_gates()
             gate = gates.get(cap_name)
             if gate is None:
-                return "unknown_capability_gate"
+                return AuthorityReason.UNKNOWN_CAPABILITY_GATE
             if gate.state in (CapabilityState.DISABLED, CapabilityState.PLANNED):
-                return "disabled_by_capability_gate"
+                return AuthorityReason.DISABLED_BY_CAPABILITY_GATE
             return None
         except Exception:
-            return "unknown_capability_gate"
+            return AuthorityReason.UNKNOWN_CAPABILITY_GATE
 
     def get_persisted_capability_state(
         self, cap_name: str, principal_id: str | None = None
@@ -650,16 +651,16 @@ class RuntimeAuthority:
             })
             return gate_check
         if capability not in ALL_CAPABILITIES:
-            return f"unknown_capability:{capability}"
+            return scoped(AuthorityReason.UNKNOWN_CAPABILITY, capability)
         parsed = parse_decision_mode(mode)
         if parsed is None:
-            return f"invalid_decision_mode:{mode}"
+            return scoped(AuthorityReason.INVALID_DECISION_MODE, mode)
         if parsed in PERMISSIVE_MODES and capability not in REAL_EXECUTOR_CAPABILITIES:
             self._event("capability_decision_mode_set", principal.principal_id, {
                 "capability": capability, "requested_mode": parsed.value,
                 "status": "denied", "reason": "decision_mode_requires_executor",
             })
-            return f"decision_mode_requires_executor:{capability}"
+            return scoped(AuthorityReason.DECISION_MODE_REQUIRES_EXECUTOR, capability)
         now = utc_now()
         record = {
             "capability": capability,
@@ -721,7 +722,7 @@ class RuntimeAuthority:
         # runtime. Anything else is still refused rather than assumed.
         resolved = normalize_runtime_mode(mode_name)
         if resolved is None:
-            return f"unknown_runtime_mode:{mode_name}"
+            return scoped(AuthorityReason.UNKNOWN_RUNTIME_MODE, mode_name)
         now = utc_now()
         record = {
             "runtime_mode_id": new_id("rm_"),
@@ -787,10 +788,10 @@ class RuntimeAuthority:
             })
             return gate_check
         if capability not in ALL_CAPABILITIES:
-            return f"unknown_capability:{capability}"
+            return scoped(AuthorityReason.UNKNOWN_CAPABILITY, capability)
         allowed_targets = {s.value for s in CapabilityState}
         if target_state not in allowed_targets:
-            return f"invalid_target_state:{target_state}"
+            return scoped(AuthorityReason.INVALID_TARGET_STATE, target_state)
         activation_reason = evaluate_activation_requirement(
             capability, target_state, principal, self.store,
             registry=self.executor_registry, confirmation_token=confirmation_token,
@@ -936,7 +937,7 @@ class RuntimeAuthority:
                 "action_type": action_type, "reason": "grant_target_is_critical",
                 "criterion": critical_match.code,
             })
-            return "grant_target_is_critical"
+            return AuthorityReason.GRANT_TARGET_IS_CRITICAL
         try:
             record = grants.build_grant_record(
                 principal_id=principal_id,
@@ -978,12 +979,12 @@ class RuntimeAuthority:
     ) -> str | None:
         """Human-only revoke. Returns None on success or a reason code."""
         if revoker.principal_type != PrincipalType.HUMAN:
-            return "only_human_may_revoke_grant"
+            return AuthorityReason.ONLY_HUMAN_MAY_REVOKE_GRANT
         ok = self.store.revoke_standing_grant(
             grant_id, revoked_by=revoker.principal_id, granted_by=granted_by
         )
         if not ok:
-            return "grant_not_found_or_already_revoked"
+            return AuthorityReason.GRANT_NOT_FOUND_OR_ALREADY_REVOKED
         self._event("standing_grant_revoked", revoker.principal_id, {"grant_id": grant_id})
         return None
 

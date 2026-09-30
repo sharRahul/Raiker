@@ -49,7 +49,7 @@ def test_a_key_a_view_computes_counts_as_a_field_it_sends() -> None:
     Comparing against `dataclasses.fields` alone reported `BrainView`'s constant
     motion notice as a field the browser read and the backend did not send.
     """
-    from raiker.control.dashboard import BrainView
+    from raiker.control.views.knowledge import BrainView
 
     keys = serialised_keys(BrainView)
     assert "illustrative_motion_notice" in keys

@@ -25,8 +25,8 @@ from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
 from raiker.approvals.execution import executable_capability
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.models import ToolAction
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 
 
 @pytest.fixture
@@ -60,10 +60,10 @@ def _pending(
     """Insert a pending approval exactly as the broker parks one."""
     store = SQLiteStore(workspace)
     store.create_session(session_id, str(workspace), user_id="owner")
-    action = ToolAction(
+    action = tool_action(
+        tool_name,
+        arguments,
         action_id=action_id,
-        tool_name=tool_name,
-        arguments=arguments,
         risk_level="high",
         requires_approval=True,
     )
@@ -303,10 +303,10 @@ class TestWiringInvariants:
             store=store,
             principal_id="principal_owner",
         )
-        action = ToolAction(
+        action = tool_action(
+            "create_task",
+            {"title": "Weekly summary"},
             action_id="act_e",
-            tool_name="create_task",
-            arguments={"title": "Weekly summary"},
             risk_level="high",
             requires_approval=True,
         )

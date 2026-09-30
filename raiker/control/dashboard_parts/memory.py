@@ -16,8 +16,8 @@ from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import new_id, utc_now
-from raiker.control.dashboard import MemoryControlView, MemorySettingsView, ObservationView
 from raiker.control.dtos import ControlResult
+from raiker.control.views.memory import MemoryControlView, MemorySettingsView, ObservationView
 from raiker.memory.store import get_memory, list_memory
 from raiker.runtime.authority.models import PrincipalType
 from raiker.storage.internal_paths import display_path, internal_io_path

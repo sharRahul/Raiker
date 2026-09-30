@@ -5,8 +5,9 @@ from pathlib import Path
 
 from raiker.context.gatherer import CAPABILITY_GATE_TOOLS, ContextGatherer
 from raiker.contracts.ids import new_id, utc_now
-from raiker.contracts.models import PolicyDecision, ToolAction, ToolResult
+from raiker.contracts.models import PolicyDecision, ToolResult
 from raiker.verification.verifier import Verifier
+from tests.factories import tool_action
 
 # The capabilities whose gates the context bundle is required to report. BUG-57
 # replaced a fixed list of `*_enabled: false` lines with a live per-principal
@@ -92,10 +93,10 @@ def test_context_gathered_event_payload_is_metadata_only_and_redacted(tmp_path: 
 
 
 def test_verification_completed_event_payload_is_metadata_only() -> None:
-    action = ToolAction(
+    action = tool_action(
+        "read_file",
+        {"path": "secret.txt"},
         action_id=new_id("act_"),
-        tool_name="read_file",
-        arguments={"path": "secret.txt"},
         risk_level="medium",
         requires_approval=False,
     )

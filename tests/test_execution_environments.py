@@ -116,7 +116,7 @@ def test_execution_environment_api_configures_container_profile(
 ) -> None:
     workspace = _workspace(tmp_path)
     monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "raiker-tools:approved")
-    monkeypatch.setattr("raiker.control.dashboard.shutil.which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr("shutil.which", lambda name: f"/bin/{name}")
     client = TestClient(create_app(workspace))
     token = client.post("/api/auth/session", json={"as_principal": None}).json()["token"]
     headers = {"Authorization": f"Bearer {token}"}

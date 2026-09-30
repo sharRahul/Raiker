@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.views import View
 from raiker.graph.governance import GRAPH_RUNTIME_DISABLED_REASON
 
 DEFAULT_EXCLUDED_DIRS = {
@@ -24,17 +25,14 @@ DEFAULT_MAX_FILE_SIZE_BYTES = 256 * 1024
 
 
 @dataclass(frozen=True)
-class PathDecision:
+class PathDecision(View):
     path: str
     included: bool
     reason: str
 
-    def to_dict(self) -> dict[str, object]:
-        return {"path": self.path, "included": self.included, "reason": self.reason}
-
 
 @dataclass(frozen=True)
-class GraphCodemapIndexPlan:
+class GraphCodemapIndexPlan(View):
     plan_id: str
     workspace_root: str
     included_paths: list[str]
@@ -49,24 +47,6 @@ class GraphCodemapIndexPlan:
     edge_count_estimate: int
     policy_decision: str
     created_at: str
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "plan_id": self.plan_id,
-            "workspace_root": self.workspace_root,
-            "included_paths": self.included_paths,
-            "excluded_paths": self.excluded_paths,
-            "max_files": self.max_files,
-            "max_file_size_bytes": self.max_file_size_bytes,
-            "can_index": self.can_index,
-            "requires_approval": self.requires_approval,
-            "runtime_indexing_enabled": self.runtime_indexing_enabled,
-            "reasons": self.reasons,
-            "node_count_estimate": self.node_count_estimate,
-            "edge_count_estimate": self.edge_count_estimate,
-            "policy_decision": self.policy_decision,
-            "created_at": self.created_at,
-        }
 
 
 @dataclass(frozen=True)

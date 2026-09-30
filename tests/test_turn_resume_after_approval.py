@@ -43,6 +43,7 @@ from raiker.runtime.turn_suspension import (
 )
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.broker import ToolBroker
+from tests.factories import tool_action
 
 
 class ScriptedRouter:
@@ -508,14 +509,13 @@ class TestResumeBoundaries:
         self, workspace: Path, headers: dict[str, str], scripted_model: ScriptedRouter
     ) -> None:
         # A CLI-proposed or connector-store approval has no chat turn behind it.
-        from raiker.contracts.models import ToolAction
 
         store = SQLiteStore(workspace)
         store.create_session("sess_x", str(workspace))
-        action = ToolAction(
+        action = tool_action(
+            "write_file",
+            {"path": "x.md", "text": "x"},
             action_id="act_x",
-            tool_name="write_file",
-            arguments={"path": "x.md", "text": "x"},
             risk_level="high",
             requires_approval=True,
         )

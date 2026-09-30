@@ -272,7 +272,7 @@ Setup runs once and asks two questions.
 | Stage | What it is |
 |---|---|
 | **Welcome** | What Raiker is: Chat, Build and Design. Nothing to configure. |
-| **Model** | Connect a provider or a runtime. It leads with the easiest working path — a runtime already running on this machine needs no account and no key — and keeps the full provider matrix behind **Other options**. **Advanced setup** opens [Models](connecting-a-model.md) for deeper configuration; you do not need it to finish. |
+| **Model** | Connect a provider or a runtime. It leads with the easiest working path — a runtime installed on this machine that already names a model needs no account and no key — checks the model you choose, and keeps the full provider matrix behind **Other options**. **Advanced setup** opens [Models](connecting-a-model.md) for deeper configuration; you do not need it to finish. |
 | **Privacy** | *Where may Raiker send model requests?* **Local only**, or **Local, and the providers I connect**. This is about where your words travel. [Permissions](permissions-and-runtime-modes.md) governs the actions Raiker may take. |
 | **Ready** | Finish into **Chat**, **Build** or **Design**, or **Start using Raiker** for the dashboard. The screen says what it actually set up: *Your Raiker is ready* when a model is chosen, and *Setup saved* when you deferred that choice — with each mode naming what it still needs and the page that supplies it. Every mode opens either way; exploring one before connecting a model is how you find out what it is. |
 

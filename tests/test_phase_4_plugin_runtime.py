@@ -8,19 +8,20 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.ids import utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
 from raiker.plugins.registry import record_plugin_install
 from raiker.runtime.authority import GovernedAction, RuntimeAuthority
-from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
+from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import (
     REAL_EXECUTOR_CAPABILITIES,
     PluginRuntimeExecutor,
     build_default_executor_registry,
 )
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action, human
 
 _CAP = "plugin_runtime_cap"
 _DOC = "docs/threat-models/plugin-runtime.md"
@@ -87,11 +88,9 @@ def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
 
 
 def _run_action(principal_id: str, *, action_type: str = _CAP, **args: object) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        action_type,
         principal_id=principal_id,
-        action_type=action_type,
-        tool_or_service_name=action_type,
         arguments=dict(args),
         risk_level=RiskLevelValue.MEDIUM,
         session_id="sess_plugin_runtime",
@@ -127,9 +126,7 @@ def test_an_unpinned_entrypoint_does_not_run(
     _install(store)
     (ws / "entry.py").write_text("print('hi')\n", encoding="utf-8")
     monkeypatch.setenv(_ALLOWLIST_ENV, _PLUGIN)
-    principal = Principal(
-        principal_id="principal_owner", principal_type=PrincipalType.HUMAN, display_name="Owner"
-    )
+    principal = human("principal_owner", role_ids=())
 
     result = PluginRuntimeExecutor(ws, store, runner=fake_runner).execute(
         _run_action(principal.principal_id, plugin_id=_PLUGIN, entrypoint="entry.py"), principal

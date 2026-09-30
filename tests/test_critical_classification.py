@@ -31,6 +31,7 @@ from raiker.runtime.authority.critical import (
 from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
 from raiker.runtime.authority.router import GovernedAction, RuntimeAuthority
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action, human
 
 
 @pytest.fixture
@@ -54,13 +55,7 @@ def _ai() -> Principal:
 
 
 def _human() -> Principal:
-    return Principal(
-        principal_id="test_human",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Human",
-        role_ids=("rl_owner",),
-        is_active=True,
-    )
+    return human("test_human", role_ids=("rl_owner",), display_name="Human")
 
 
 def _action(action_type: str, *, tool: str = "", args: dict | None = None) -> GovernedAction:
@@ -185,11 +180,9 @@ def test_human_critical_action_needs_confirmation(
     authority: RuntimeAuthority, action_type: str, args: dict
 ) -> None:
     human = _human()
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        action_type,
         principal_id=human.principal_id,
-        action_type=action_type,
-        tool_or_service_name=action_type,
         arguments=args,
         risk_level=RiskLevelValue.LOW,
     )

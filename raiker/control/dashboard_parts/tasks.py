@@ -14,7 +14,7 @@ from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import new_id, utc_now
-from raiker.control.dashboard import TASK_RECURRENCES, TaskDetailView, TaskView
+from raiker.control.views.tasks import TASK_RECURRENCES, TaskDetailView, TaskView
 from raiker.events.writer import EventLogWriter
 from raiker.models.registry import ModelProfileRegistry
 from raiker.tasks.history import derive_attempts

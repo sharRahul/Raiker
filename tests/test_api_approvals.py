@@ -8,9 +8,9 @@ from fastapi.testclient import TestClient
 from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.models import ToolAction
 from raiker.runtime.identity.lifecycle import TurnMachineIdentityLifecycle
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 
 
 @pytest.fixture
@@ -47,10 +47,10 @@ def _pending_approval(
     """Insert a pending approval-required write_file action, mirroring the broker's bookkeeping."""
     store = SQLiteStore(workspace)
     store.create_session("sess_a", str(workspace))
-    action = ToolAction(
+    action = tool_action(
+        tool_name,
+        arguments if arguments is not None else {"path": "notes.txt", "text": "hello\n"},
         action_id=action_id,
-        tool_name=tool_name,
-        arguments=arguments if arguments is not None else {"path": "notes.txt", "text": "hello\n"},
         risk_level="high",
         requires_approval=True,
     )
@@ -67,10 +67,10 @@ def _pending_machine_approval(workspace: Path) -> str:
         turn_id="turn_machine",
         role_ids=("assistant",),
     )
-    action = ToolAction(
+    action = tool_action(
+        "write_file",
+        {"path": "agent.txt", "text": "hello"},
         action_id="act_machine",
-        tool_name="write_file",
-        arguments={"path": "agent.txt", "text": "hello"},
         risk_level="high",
         requires_approval=True,
         proposed_by=identity.claims.principal_id,

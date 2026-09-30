@@ -1,5 +1,7 @@
-// Plain-English copy for backend machine reason_codes (transcribed from the runtime
-// authority sources, e.g. raiker/runtime/authority/router.py and routes_prompts.py).
+// Plain-English copy for backend machine reason_codes. The authority router's are
+// the `AuthorityReason` catalogue (raiker/runtime/authority/reason_codes.py), and
+// tests/test_reason_code_catalogue.py fails when a catalogue code has no copy here
+// or a key here names a code the backend never sends.
 // Never hide an unknown code — fall back to the raw code plus a generic explanation.
 
 interface ReasonCopy {
@@ -48,6 +50,27 @@ const REASON_CODES: Record<string, ReasonCopy> = {
   ai_cannot_enable_runtime_gate: {
     plain: "An AI can't enable a runtime gate.",
     remediation: "A human runtime_gate_manager must do this.",
+  },
+  only_runtime_gate_manager_can_manage_gates: {
+    plain: "Only a runtime gate manager can change runtime modes and gates.",
+    remediation: "Sign in as the owner, who holds that role.",
+  },
+  only_runtime_gate_manager_can_enable_gates: {
+    plain: "Only a runtime gate manager can turn a capability on.",
+    remediation: "Sign in as the owner, who holds that role.",
+  },
+  // Standing grants (router.py).
+  grant_target_is_critical: {
+    plain: "A critical action can't be allowed ahead of time.",
+    remediation: "It is approved one action at a time, every time.",
+  },
+  only_human_may_revoke_grant: {
+    plain: "Only a person can withdraw a standing permission.",
+    remediation: "Sign in as the owner to revoke it.",
+  },
+  grant_not_found_or_already_revoked: {
+    plain: "That permission is already gone.",
+    remediation: "Nothing to revoke; refresh to see the current list.",
   },
   // Capability-gate / mode / transition denials (router.py).
   disabled_by_capability_gate: {
@@ -117,6 +140,14 @@ const PREFIX_CODES: Record<string, ReasonCopy> = {
   invalid_target_state: {
     plain: "That target state isn't allowed.",
     remediation: "Choose an allowed transition.",
+  },
+  invalid_decision_mode: {
+    plain: "That decision mode isn't one Raiker has.",
+    remediation: "Choose one of the modes the capability offers.",
+  },
+  decision_mode_requires_executor: {
+    plain: "This capability has nothing that can run it yet, so it can't be allowed without asking.",
+    remediation: "Keep it on Ask until it can run.",
   },
   execution_failed: {
     plain: "The executor failed.",

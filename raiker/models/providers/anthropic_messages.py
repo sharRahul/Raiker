@@ -23,22 +23,18 @@ from raiker.models.contracts import (
 )
 from raiker.models.exceptions import (
     ModelProviderError,
-    ProviderAuthenticationError,
     ProviderConnectionError,
-    ProviderModelNotFoundError,
-    ProviderQuotaExhaustedError,
-    ProviderRateLimitError,
     ProviderResponseValidationError,
     ProviderStreamError,
-    ProviderTimeoutError,
     ProviderUnsupportedCapabilityError,
-    ProviderWorkspaceRequiredError,
-    is_quota_exhausted,
-    needs_workspace_id,
     stream_failure,
-    workspace_id_rejected,
 )
 from raiker.models.health import ProviderHealth
+from raiker.models.providers.http import (
+    ProviderHttpTransport,
+    json_object,
+    provider_status_error,
+)
 
 _STOP_REASON_TO_FINISH = {
     "end_turn": "stop",
@@ -92,21 +88,11 @@ THINKING_BUDGET_TOKENS = 2048
 # whole allowance is 1024 cannot carry a 1024-token minimum *and* an answer.
 MINIMUM_THINKING_BUDGET_TOKENS = 1024
 RESERVED_ANSWER_TOKENS = 512
-# What each model turned out to accept.
-#
-# GCR-32 — this used to be keyed by model id alone, which made it a claim about
-# a *name* rather than about an endpoint. Anthropic-compatible endpoints are not
-# all Anthropic: a proxy, a gateway, a self-hosted relay and the API itself can
-# all be asked for `claude-...`, and they do not have to accept the same
-# `thinking` spelling. A refusal learned from one of them silently changed the
-# requests Raiker sent to the others, including ones that had never refused
-# anything.
-#
-# The key is therefore what actually decides the answer: the profile that
-# configured the connection, the provider, the exact endpoint the request goes
-# to, the API revision it is sent under, and the model. It is bounded and
-# least-recently-used, so a long-lived host that talks to many endpoints cannot
-# grow it without limit.
+# What each endpoint turned out to accept, keyed by everything that decides the
+# answer — profile, provider, exact endpoint, API revision and model — because
+# Anthropic-compatible proxies and gateways need not accept what the API does,
+# and one endpoint's refusal must not change another's requests (GCR-32).
+# Bounded and least-recently-used.
 _NEGOTIATED_THINKING_LIMIT = 256
 _NEGOTIATED_THINKING: OrderedDict[tuple[str, ...], str] = OrderedDict()
 
@@ -190,42 +176,7 @@ def _map_status(status: int, *, model: str, body: str = "") -> Exception:
         alternate = _rejected_thinking_shape(body)
         if alternate is not None:
             return _ThinkingShapeRejected(alternate)
-    # Checked before auth and rate limiting: Anthropic answers an empty balance
-    # with HTTP 400 on a perfectly valid key, so status alone would send the
-    # owner to rotate a credential that is not the problem.
-    # BUG-272 — a valid, identity-linked key with no workspace named. Checked
-    # beside quota and for the same reason: the status is an ordinary 400 and
-    # only the body says which 400 it is. There is no credential to rotate here.
-    if workspace_id_rejected(status, body):
-        # BUG-274 — the owner named a workspace and the provider would not have
-        # it. Its own code so the card says "fix this id" rather than repeating
-        # the ask for something already supplied.
-        return ProviderWorkspaceRequiredError(f"provider_workspace_invalid:http_{status}")
-    if needs_workspace_id(status, body):
-        return ProviderWorkspaceRequiredError(f"provider_workspace_required:http_{status}")
-    if is_quota_exhausted(status, body):
-        return ProviderQuotaExhaustedError(f"provider_quota_exhausted:http_{status}")
-    if status in {401, 403}:
-        return ProviderAuthenticationError(f"provider_auth_failed:http_{status}")
-    if status == 404:
-        return ProviderModelNotFoundError(f"model_not_found:{model}")
-    if status == 408:
-        return ProviderTimeoutError("provider_timeout")
-    if status == 429:
-        return ProviderRateLimitError("provider_rate_limited")
-    if status >= 500:
-        return ProviderConnectionError(f"provider_unavailable:http_{status}")
-    return ProviderConnectionError(f"provider_http_error:http_{status}")
-
-
-def _json(response: httpx.Response) -> dict[str, Any]:
-    try:
-        data = response.json()
-    except json.JSONDecodeError as exc:
-        raise ProviderResponseValidationError("invalid_json_response") from exc
-    if not isinstance(data, dict):
-        raise ProviderResponseValidationError("response_not_object")
-    return data
+    return provider_status_error(status, model=model, body=body)
 
 
 def _to_anthropic_messages(
@@ -318,36 +269,26 @@ class AsyncAnthropicMessagesProvider:
     client: httpx.AsyncClient | None = None
 
     def __post_init__(self) -> None:
-        headers = {"anthropic-version": ANTHROPIC_VERSION, **dict(self.extra_headers)}
-        self._client = self.client or httpx.AsyncClient(timeout=self.timeout, headers=headers)
-        self._headers = headers
-        self._owns_client = self.client is None
+        self._http = ProviderHttpTransport(
+            self.client,
+            timeout=self.timeout,
+            headers={"anthropic-version": ANTHROPIC_VERSION, **dict(self.extra_headers)},
+            map_status=lambda status, body: _map_status(status, model=self.model, body=body),
+        )
 
     async def aclose(self) -> None:
-        if self._owns_client:
-            await self._client.aclose()
+        await self._http.aclose()
 
     def _url(self, path: str) -> str:
         return self.endpoint.rstrip("/") + "/" + path.lstrip("/")
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
-        headers = {**self._headers, **kwargs.pop("headers", {})}
-        try:
-            response = await self._client.request(
-                method, self._url(path), headers=headers, **kwargs
-            )
-        except httpx.TimeoutException as exc:
-            raise ProviderTimeoutError("provider_timeout") from exc
-        except httpx.HTTPError as exc:
-            raise ProviderConnectionError("provider_connection_failed") from exc
-        if response.status_code >= 400:
-            raise _map_status(response.status_code, model=self.model, body=response.text)
-        return response
+        return await self._http.request(method, self._url(path), **kwargs)
 
     async def health(self, *, timeout: float = 1.0) -> ProviderHealth:
         try:
             response = await self._request("GET", self.models_path, timeout=timeout)
-            models = self._parse_models(_json(response))
+            models = self._parse_models(json_object(response))
             available = any(item.id == self.model for item in models)
             return ProviderHealth(
                 self.provider,
@@ -356,19 +297,13 @@ class AsyncAnthropicMessagesProvider:
                 "model_available" if available else "model_missing",
             )
         except ModelProviderError as exc:
-            # GCR-30 — the base class, not a hand-kept list of six. The status
-            # mapper this probe runs through also raises quota exhaustion and
-            # the two workspace refusals, and none of them was named here, so a
-            # method whose whole contract is "return a ProviderHealth" raised
-            # instead and the readiness check died on a provider state it had
-            # already classified correctly. Every provider-domain failure is a
-            # health answer; anything that is not one is a bug and still
-            # escapes.
+            # Every provider-domain failure is a health answer (GCR-30);
+            # anything else is a bug and still escapes.
             return ProviderHealth(self.provider, False, False, type(exc).__name__)
 
     async def list_models(self) -> list[ProviderModelInfo]:
         response = await self._request("GET", self.models_path)
-        return self._parse_models(_json(response))
+        return self._parse_models(json_object(response))
 
     def _parse_models(self, data: dict[str, Any]) -> list[ProviderModelInfo]:
         raw = data.get("data")
@@ -505,7 +440,7 @@ class AsyncAnthropicMessagesProvider:
                     raise ProviderUnsupportedCapabilityError("reasoning_unsupported") from rejected
                 self._record_thinking_shape(request.model or self.model, rejected.shape)
                 continue
-            return self._parse_chat(_json(response))
+            return self._parse_chat(json_object(response))
         raise ProviderUnsupportedCapabilityError("reasoning_unsupported")
 
     def _parse_chat(self, data: dict[str, Any]) -> ModelResponse:
@@ -574,21 +509,13 @@ class AsyncAnthropicMessagesProvider:
         tool_blocks: dict[int, dict[str, str]] = {}
         finish_emitted = False
         try:
-            async with self._client.stream(
+            async with self._http.stream(
                 "POST",
                 self._url(self.chat_path),
-                headers={**self._headers, **self._cache_headers(request)},
+                headers=self._cache_headers(request),
                 json=self._payload(request, stream=True),
                 timeout=self.timeout,
             ) as response:
-                if response.status_code >= 400:
-                    # The error body has not been read yet on a streamed
-                    # response; classification needs it and it is bounded.
-                    raise _map_status(
-                        response.status_code,
-                        model=self.model,
-                        body=(await response.aread()).decode("utf-8", "replace"),
-                    )
                 async for line in response.aiter_lines():
                     if not line or not line.startswith("data:"):
                         continue

@@ -113,6 +113,7 @@ names.
 | [BUG-307](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true) | Low | Web UI / security headers | **Closed 2026-09-28 ([FIXED-609](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true))** — `style-src 'self'`; Svelte 5 styles through the CSSOM, and a live sweep of every destination at four widths found nothing refused |
 | [BUG-308](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so) | Medium | Plugins / commands / sandbox | **Closed 2026-09-28 ([FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so))** — by the owner's decision: code runs in the sandbox where there is one, and otherwise under *Code with this machine's network*, its own switch, starting at *Ask me* |
 | [BUG-309](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing) | Low | Web UI / notifications | **Closed 2026-09-28 ([FIXED-622](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing))** — a notice whose subject is the page on screen is not docked there and is read; running it live found the bell disagreeing for a poll, fixed with it |
+| [BUG-310](#bug-310--seven-python-tests-fail-on-windows-and-nowhere-else) | Low | Tests / Windows | Open — four plugin-runtime tests and a source-review test read fixtures written with Windows line endings as other bytes; two instance tests meet [BUG-266](#bug-266--a-live-workspace-directory-cannot-be-deleted-while-the-host-holds-it)'s held directory. Each also fails on untouched `main` on the same host |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2135,3 +2136,34 @@ not docked there, and marked read on arrival — and the *unread* count sits on
 the card's own surface.
 
 ---
+
+---
+
+## BUG-310 — Seven Python tests fail on Windows and nowhere else
+
+**Severity: Low. Area: Tests / Windows. Status: Open — raised 2026-09-30 by the
+full local suite. Each also fails on an untouched `origin/main` checkout on the
+same host, and CI's Linux job does not run them into failure.**
+
+**Observed.** On the Windows development host:
+
+* `test_phase_4_plugin_runtime.py` — four tests (`executes_installed_allowlisted_plugin`,
+  `defaults_to_direct_python_on_windows`, `reports_nonzero_exit`,
+  `allows_entrypoint_within_plugin_scope`) end `execution_failed:plugin_entrypoint_digest_mismatch`.
+* `test_knowledge_source_review_budget.py::…::test_a_single_file_is_reviewed_as_itself`
+  counts 7 bytes for `"hello\n"`.
+* `test_instance_runtime_lifecycle.py` — `test_a_failed_first_account_leaves_nothing_behind_and_the_retry_works`
+  and `test_the_registry_is_published_atomically` find the instance directory
+  still present after the failed create.
+
+**Likely causes, not yet confirmed.** The first two are line endings: the test
+writes with `write_text`, which on Windows writes `\r\n`, so the file on disk is
+not the bytes the test recorded — its digest, its size. The third is the
+[BUG-266](#bug-266--a-live-workspace-directory-cannot-be-deleted-while-the-host-holds-it)
+family: Windows will not remove a directory a handle is still open in.
+
+**Proposed fix.** Write fixtures with `newline=""` or as bytes; for the instance
+case, release the store's handles before removal, as BUG-266 proposes.
+
+**Required user-interface outcome.** None for the first two, which are
+test-only. The third, if the product behaves the same way, is BUG-266's.

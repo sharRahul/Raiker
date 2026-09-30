@@ -24,38 +24,37 @@ if TYPE_CHECKING:
 class TaskStore:
 
     def insert_task(self: SQLiteStore, task: TaskRecord) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR IGNORE INTO tasks
-                (task_id, session_id, thread_session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model, surface, attachments_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    task.task_id,
-                    task.session_id,
-                    task.thread_session_id,
-                    task.parent_turn_id,
-                    task.parent_task_id,
-                    task.title,
-                    task.objective,
-                    task.status,
-                    task.current_step,
-                    task.progress_percent,
-                    task.created_at,
-                    task.updated_at,
-                    task.completed_at,
-                    task.priority,
-                    task.scheduled_at,
-                    task.recurrence,
-                    task.reminder_at,
-                    task.project_id,
-                    task.model_profile,
-                    task.model,
-                    task.surface,
-                    json.dumps(task.attachments, sort_keys=True),
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR IGNORE INTO tasks
+            (task_id, session_id, thread_session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model, surface, attachments_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                task.task_id,
+                task.session_id,
+                task.thread_session_id,
+                task.parent_turn_id,
+                task.parent_task_id,
+                task.title,
+                task.objective,
+                task.status,
+                task.current_step,
+                task.progress_percent,
+                task.created_at,
+                task.updated_at,
+                task.completed_at,
+                task.priority,
+                task.scheduled_at,
+                task.recurrence,
+                task.reminder_at,
+                task.project_id,
+                task.model_profile,
+                task.model,
+                task.surface,
+                json.dumps(task.attachments, sort_keys=True),
+            ),
+        )
 
     @staticmethod
     def _task_from_row(row: Any) -> TaskRecord:
@@ -77,15 +76,11 @@ class TaskStore:
         `parent_task_id` from the model instead would let one turn attach work to
         somebody else's tree.
         """
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM tasks WHERE thread_session_id = ? LIMIT 1", (session_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM tasks WHERE thread_session_id = ? LIMIT 1", (session_id,))
         return self._task_from_row(row) if row is not None else None
 
     def load_task(self: SQLiteStore, task_id: str) -> TaskRecord | None:
-        with self.connect() as connection:
-            row = connection.execute("SELECT * FROM tasks WHERE task_id = ?", (task_id,)).fetchone()
+        row = self._row("SELECT * FROM tasks WHERE task_id = ?", (task_id,))
         if row is None:
             return None
         return self._task_from_row(row)
@@ -101,12 +96,11 @@ class TaskStore:
         """
         if user_id is None:
             return self.load_task(task_id)
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM tasks WHERE task_id = ? AND session_id IN "
-                "(SELECT session_id FROM sessions WHERE user_id = ? OR user_id IS NULL)",
-                (task_id, user_id),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM tasks WHERE task_id = ? AND session_id IN "
+            "(SELECT session_id FROM sessions WHERE user_id = ? OR user_id IS NULL)",
+            (task_id, user_id),
+        )
         return self._task_from_row(row) if row is not None else None
 
     def list_tasks(
@@ -141,8 +135,7 @@ class TaskStore:
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY created_at DESC"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [self._task_from_row(row) for row in rows]
 
     def claim_due_tasks(self: SQLiteStore, now: str, limit: int = 10) -> list[TaskRecord]:
@@ -213,8 +206,7 @@ class TaskStore:
         updates["updated_at"] = now
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [task_id]
-        with self.connect() as connection:
-            connection.execute(f"UPDATE tasks SET {set_clause} WHERE task_id = ?", values)
+        self._execute(f"UPDATE tasks SET {set_clause} WHERE task_id = ?", values)
 
     def update_task_progress(self: SQLiteStore, task_id: str, current_step: str, progress_percent: int) -> None:
         self._update_task(task_id, current_step=current_step, progress_percent=progress_percent)
@@ -237,12 +229,11 @@ class TaskStore:
         Guarded on ``waiting_for_approval`` so a task the owner cancelled, or one
         another continuation already picked up, is never dragged back to running.
         """
-        with self.connect() as connection:
-            connection.execute(
-                "UPDATE tasks SET status = 'continuing', current_step = ?, summary = NULL, "
-                "updated_at = ? WHERE task_id = ? AND status = 'waiting_for_approval'",
-                (current_step, utc_now(), task_id),
-            )
+        self._execute(
+            "UPDATE tasks SET status = 'continuing', current_step = ?, summary = NULL, "
+            "updated_at = ? WHERE task_id = ? AND status = 'waiting_for_approval'",
+            (current_step, utc_now(), task_id),
+        )
 
     def block_task_on_approval(self: SQLiteStore, task_id: str, reason: str) -> None:
         """A run reached an approval boundary: blocked, not finished.
@@ -271,10 +262,7 @@ class TaskStore:
         child failed did not succeed, and a parent told only "three children,
         none unfinished" could not tell the difference.
         """
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT status FROM tasks WHERE parent_task_id = ?", (parent_task_id,)
-            ).fetchall()
+        rows = self._rows("SELECT status FROM tasks WHERE parent_task_id = ?", (parent_task_id,))
         return [str(row["status"]) for row in rows]
 
     def hold_task_for_children(self: SQLiteStore, task_id: str, summary: str | None) -> None:
@@ -297,33 +285,31 @@ class TaskStore:
         if session_id is not None:
             query += " WHERE session_id = ?"
             params.append(session_id)
-        with self.connect() as connection:
-            row = connection.execute(query, params).fetchone()
+        row = self._row(query, params)
         return int(row["cnt"]) if row else 0
 
     def update_task_status(self: SQLiteStore, task_id: str, status: str) -> None:
         self._update_task(task_id, status=status)
 
     def insert_hosted_routine(self: SQLiteStore, routine: HostedRoutine) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO hosted_routines
-                (routine_id, name, routine_type, schedule, endpoint, enabled, created_by, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    routine.routine_id,
-                    routine.name,
-                    routine.routine_type,
-                    routine.schedule,
-                    routine.endpoint,
-                    int(routine.enabled),
-                    routine.created_by,
-                    routine.created_at,
-                    routine.updated_at,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO hosted_routines
+            (routine_id, name, routine_type, schedule, endpoint, enabled, created_by, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                routine.routine_id,
+                routine.name,
+                routine.routine_type,
+                routine.schedule,
+                routine.endpoint,
+                int(routine.enabled),
+                routine.created_by,
+                routine.created_at,
+                routine.updated_at,
+            ),
+        )
 
     def list_hosted_routines(self: SQLiteStore, enabled_only: bool = False) -> list[dict[str, Any]]:
         query = "SELECT * FROM hosted_routines"
@@ -331,45 +317,37 @@ class TaskStore:
         if enabled_only:
             query += " WHERE enabled = 1"
         query += " ORDER BY created_at DESC"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def delete_hosted_routine(self: SQLiteStore, routine_id: str) -> bool:
-        with self.connect() as connection:
-            cursor = connection.execute(
-                "DELETE FROM hosted_routines WHERE routine_id = ?", (routine_id,)
-            )
-        return cursor.rowcount > 0
+        changed = self._execute("DELETE FROM hosted_routines WHERE routine_id = ?", (routine_id,))
+        return changed > 0
 
 
     def insert_scheduled_routine(self: SQLiteStore, routine: dict[str, Any]) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO scheduled_routines
-                (routine_id, name, interval_seconds, payload_json, enabled, next_run, last_run, created_by, created_at, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    routine["routine_id"],
-                    routine["name"],
-                    int(routine["interval_seconds"]),
-                    routine["payload_json"],
-                    int(routine.get("enabled", 0)),
-                    routine["next_run"],
-                    routine.get("last_run"),
-                    routine["created_by"],
-                    routine["created_at"],
-                    routine.get("status", "scheduled"),
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO scheduled_routines
+            (routine_id, name, interval_seconds, payload_json, enabled, next_run, last_run, created_by, created_at, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                routine["routine_id"],
+                routine["name"],
+                int(routine["interval_seconds"]),
+                routine["payload_json"],
+                int(routine.get("enabled", 0)),
+                routine["next_run"],
+                routine.get("last_run"),
+                routine["created_by"],
+                routine["created_at"],
+                routine.get("status", "scheduled"),
+            ),
+        )
 
     def get_scheduled_routine(self: SQLiteStore, routine_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM scheduled_routines WHERE routine_id = ?", (routine_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM scheduled_routines WHERE routine_id = ?", (routine_id,))
         return dict(row) if row else None
 
     def list_scheduled_routines(
@@ -386,103 +364,92 @@ class TaskStore:
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY next_run ASC"
-        with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+        rows = self._rows(query, params)
         return [dict(row) for row in rows]
 
     def update_scheduled_routine_run(
         self: SQLiteStore, routine_id: str, *, last_run: str, next_run: str
     ) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                "UPDATE scheduled_routines SET last_run = ?, next_run = ? WHERE routine_id = ?",
-                (last_run, next_run, routine_id),
-            )
+        self._execute(
+            "UPDATE scheduled_routines SET last_run = ?, next_run = ? WHERE routine_id = ?",
+            (last_run, next_run, routine_id),
+        )
 
 
     def insert_subagent_contract(self: SQLiteStore, contract: SubagentContract) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO subagent_contracts
-                (subagent_id, parent_task_id, name, mode, allowed_tools_json, max_depth, max_runtime_seconds, max_cost, created_by, created_at, status, max_steps, max_tool_calls, max_tokens)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    contract.subagent_id,
-                    contract.parent_task_id,
-                    contract.name,
-                    contract.mode,
-                    contract.allowed_tools_json,
-                    contract.max_depth,
-                    contract.max_runtime_seconds,
-                    contract.max_cost,
-                    contract.created_by,
-                    contract.created_at,
-                    contract.status,
-                    contract.max_steps,
-                    contract.max_tool_calls,
-                    contract.max_tokens,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO subagent_contracts
+            (subagent_id, parent_task_id, name, mode, allowed_tools_json, max_depth, max_runtime_seconds, max_cost, created_by, created_at, status, max_steps, max_tool_calls, max_tokens)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                contract.subagent_id,
+                contract.parent_task_id,
+                contract.name,
+                contract.mode,
+                contract.allowed_tools_json,
+                contract.max_depth,
+                contract.max_runtime_seconds,
+                contract.max_cost,
+                contract.created_by,
+                contract.created_at,
+                contract.status,
+                contract.max_steps,
+                contract.max_tool_calls,
+                contract.max_tokens,
+            ),
+        )
 
     def list_subagent_contracts(self: SQLiteStore) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM subagent_contracts ORDER BY created_at DESC"
-            ).fetchall()
+        rows = self._rows("SELECT * FROM subagent_contracts ORDER BY created_at DESC")
         return [dict(row) for row in rows]
 
 
     def insert_team_ledger(self: SQLiteStore, team: TeamLedger) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT OR REPLACE INTO team_ledgers
-                (team_id, name, mode, members_json, max_depth, max_cost, created_by, created_at, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    team.team_id,
-                    team.name,
-                    team.mode,
-                    team.members_json,
-                    team.max_depth,
-                    team.max_cost,
-                    team.created_by,
-                    team.created_at,
-                    team.status,
-                ),
-            )
+        self._execute(
+            """
+            INSERT OR REPLACE INTO team_ledgers
+            (team_id, name, mode, members_json, max_depth, max_cost, created_by, created_at, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                team.team_id,
+                team.name,
+                team.mode,
+                team.members_json,
+                team.max_depth,
+                team.max_cost,
+                team.created_by,
+                team.created_at,
+                team.status,
+            ),
+        )
 
     def list_team_ledgers(self: SQLiteStore) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM team_ledgers ORDER BY created_at DESC"
-            ).fetchall()
+        rows = self._rows("SELECT * FROM team_ledgers ORDER BY created_at DESC")
         return [dict(row) for row in rows]
 
 
     def insert_reminder(self: SQLiteStore, record: dict[str, Any]) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO reminders
-                  (reminder_id, title, due_at, notes, status, created_by,
-                   created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record["reminder_id"],
-                    record["title"],
-                    record.get("due_at"),
-                    record.get("notes"),
-                    record["status"],
-                    record["created_by"],
-                    record["created_at"],
-                    record["updated_at"],
-                ),
-            )
+        self._execute(
+            """
+            INSERT INTO reminders
+              (reminder_id, title, due_at, notes, status, created_by,
+               created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record["reminder_id"],
+                record["title"],
+                record.get("due_at"),
+                record.get("notes"),
+                record["status"],
+                record["created_by"],
+                record["created_at"],
+                record["updated_at"],
+            ),
+        )
 
     def list_reminders(self: SQLiteStore, *, status: str | None = None) -> list[dict[str, Any]]:
         with self.connect() as connection:
@@ -498,11 +465,10 @@ class TaskStore:
     def list_due_reminders(
         self: SQLiteStore, due_before: str, *, delivery_status: str = "active"
     ) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM reminders WHERE delivery_status = ? AND due_at IS NOT NULL AND due_at <= ? ORDER BY due_at ASC",
-                (delivery_status, due_before),
-            ).fetchall()
+        rows = self._rows(
+            "SELECT * FROM reminders WHERE delivery_status = ? AND due_at IS NOT NULL AND due_at <= ? ORDER BY due_at ASC",
+            (delivery_status, due_before),
+        )
         return [dict(row) for row in rows]
 
     def update_reminder_status(
@@ -527,36 +493,31 @@ class TaskStore:
             sets.append("retry_count = ?")
             params.append(retry_count)
         params.append(reminder_id)
-        with self.connect() as connection:
-            cur = connection.execute(
-                f"UPDATE reminders SET {', '.join(sets)} WHERE reminder_id = ?",
-                params,
-            )
-        return cur.rowcount > 0
+        changed = self._execute(f"UPDATE reminders SET {', '.join(sets)} WHERE reminder_id = ?", params)
+        return changed > 0
 
 
     def insert_calendar_event(self: SQLiteStore, record: dict[str, Any]) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO calendar_events
-                  (event_id, title, starts_at, ends_at, location, notes, status,
-                   created_by, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record["event_id"],
-                    record["title"],
-                    record.get("starts_at"),
-                    record.get("ends_at"),
-                    record.get("location"),
-                    record.get("notes"),
-                    record["status"],
-                    record["created_by"],
-                    record["created_at"],
-                    record["updated_at"],
-                ),
-            )
+        self._execute(
+            """
+            INSERT INTO calendar_events
+              (event_id, title, starts_at, ends_at, location, notes, status,
+               created_by, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record["event_id"],
+                record["title"],
+                record.get("starts_at"),
+                record.get("ends_at"),
+                record.get("location"),
+                record.get("notes"),
+                record["status"],
+                record["created_by"],
+                record["created_at"],
+                record["updated_at"],
+            ),
+        )
 
     def list_calendar_events(self: SQLiteStore, *, status: str | None = None) -> list[dict[str, Any]]:
         with self.connect() as connection:
@@ -573,25 +534,24 @@ class TaskStore:
 
 
     def insert_email_draft(self: SQLiteStore, record: dict[str, Any]) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO email_drafts
-                  (draft_id, subject, recipients, body, status, created_by,
-                   created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record["draft_id"],
-                    record["subject"],
-                    record.get("recipients"),
-                    record.get("body"),
-                    record["status"],
-                    record["created_by"],
-                    record["created_at"],
-                    record["updated_at"],
-                ),
-            )
+        self._execute(
+            """
+            INSERT INTO email_drafts
+              (draft_id, subject, recipients, body, status, created_by,
+               created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record["draft_id"],
+                record["subject"],
+                record.get("recipients"),
+                record.get("body"),
+                record["status"],
+                record["created_by"],
+                record["created_at"],
+                record["updated_at"],
+            ),
+        )
 
     def list_email_drafts(self: SQLiteStore, *, status: str | None = None) -> list[dict[str, Any]]:
         with self.connect() as connection:
@@ -607,16 +567,12 @@ class TaskStore:
         return [dict(row) for row in rows]
 
     def get_email_draft(self: SQLiteStore, draft_id: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM email_drafts WHERE draft_id = ?", (draft_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM email_drafts WHERE draft_id = ?", (draft_id,))
         return dict(row) if row else None
 
     def update_email_draft_status(self: SQLiteStore, draft_id: str, status: str, *, updated_at: str) -> bool:
-        with self.connect() as connection:
-            cur = connection.execute(
-                "UPDATE email_drafts SET status = ?, updated_at = ? WHERE draft_id = ?",
-                (status, updated_at, draft_id),
-            )
-        return cur.rowcount > 0
+        changed = self._execute(
+            "UPDATE email_drafts SET status = ?, updated_at = ? WHERE draft_id = ?",
+            (status, updated_at, draft_id),
+        )
+        return changed > 0

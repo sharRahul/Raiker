@@ -36,6 +36,8 @@ from typing import Any
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from raiker.contracts.views import View
+
 
 class UpdateError(RuntimeError):
     """A stable refusal from the signed-update boundary."""
@@ -50,7 +52,7 @@ class UpdateResult:
 
 
 @dataclass(frozen=True)
-class ChannelUpdate:
+class ChannelUpdate(View):
     """One target's entry in a verified channel index."""
 
     channel: str
@@ -62,19 +64,6 @@ class ChannelUpdate:
     signature: str
     signed: bool
     released_at: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "channel": self.channel,
-            "version": self.version,
-            "target": self.target,
-            "artifact": self.artifact,
-            "sha256": self.sha256,
-            "manifest": self.manifest,
-            "signature": self.signature,
-            "signed": self.signed,
-            "released_at": self.released_at,
-        }
 
 
 def version_key(version: str) -> tuple[int, int, int]:

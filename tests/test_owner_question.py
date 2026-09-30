@@ -31,13 +31,14 @@ from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
 from raiker.contracts.ids import new_id
-from raiker.contracts.models import OWNER_QUESTION_TOOL, ToolAction
+from raiker.contracts.models import OWNER_QUESTION_TOOL
 from raiker.models.contracts import ToolCallProposal
 from raiker.models.tool_call_validation import ToolCallRejected, validate_tool_call
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.turn_suspension import approval_outcome, owner_answer_outcome
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 
 QUESTIONS: list[dict[str, Any]] = [
     {
@@ -167,10 +168,10 @@ def _parked(store: SQLiteStore, tool_name: str, arguments: dict[str, Any]) -> st
         user_id=store.principal_user_id(store.original_account_principal_id() or ""),
     )
     store.insert_turn(session_id, f"turn_{tool_name}", "do the thing")
-    action = ToolAction(
+    action = tool_action(
+        tool_name,
+        arguments,
         action_id=new_id("act_"),
-        tool_name=tool_name,
-        arguments=arguments,
         risk_level="low" if tool_name == OWNER_QUESTION_TOOL else "medium",
         requires_approval=True,
     )

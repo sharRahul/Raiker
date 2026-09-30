@@ -45,6 +45,7 @@ from raiker.runtime.executors import (
 )
 from raiker.runtime.executors.connectors import GithubConnectorExecutor
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 from tests.routed_execution import execute_as_routed
 
@@ -288,10 +289,10 @@ class TestGithubReadTool:
         )
 
     def _action(self) -> ToolAction:
-        return ToolAction(
+        return tool_action(
+            "github_read",
+            {"resource": "issue", "repo": "octo/repo", "number": "5"},
             action_id=new_id("act_"),
-            tool_name="github_read",
-            arguments={"resource": "issue", "repo": "octo/repo", "number": "5"},
             risk_level="medium",
             requires_approval=False,
             proposed_by="model",

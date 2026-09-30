@@ -18,9 +18,9 @@ from pathlib import Path
 import pytest
 
 from raiker.contracts.ids import new_id
-from raiker.contracts.models import ToolAction
 from raiker.control.dashboard import DashboardService
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 
 
 @pytest.fixture
@@ -54,10 +54,10 @@ def _record(
     arguments: dict[str, object],
     status: str,
 ) -> str:
-    action = ToolAction(
+    action = tool_action(
+        tool_name,
+        arguments,
         action_id=new_id("act_"),
-        tool_name=tool_name,
-        arguments=arguments,
         risk_level="low",
         requires_approval=False,
     )

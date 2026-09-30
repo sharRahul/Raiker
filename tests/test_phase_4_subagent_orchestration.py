@@ -7,12 +7,13 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority import GovernedAction, RuntimeAuthority
-from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
+from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import (
     REAL_EXECUTOR_CAPABILITIES,
     build_default_executor_registry,
 )
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import ai_agent, governed_action
 
 _ORCH_CAPS = ("subagents", "multi_agent_teams")
 
@@ -56,11 +57,9 @@ def _subagent_action(principal_id: str, **arg_overrides: object) -> GovernedActi
         "steps": [{"tool_name": "read_file", "arguments": {"path": "hello.txt"}}],
     }
     arguments.update(arg_overrides)
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        "subagents",
         principal_id=principal_id,
-        action_type="subagents",
-        tool_or_service_name="subagents",
         arguments=arguments,
         risk_level=RiskLevelValue.MEDIUM,
     )
@@ -148,12 +147,11 @@ def test_ai_principal_blocked_from_subagents(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     _enable(ws, "subagents")
     authority, owner = _authority(ws)
-    ai = Principal(
-        principal_id="ai_1",
-        principal_type=PrincipalType.AI_AGENT,
-        display_name="assistant",
+    ai = ai_agent(
+        "ai_1",
+        role_ids=(),
         domain_scopes=owner.domain_scopes,
-        is_active=True,
+        display_name="assistant",
     )
     result = authority.route_action(_subagent_action(ai.principal_id), ai)
     assert result.decision == "needs_approval"
@@ -196,11 +194,9 @@ def test_team_member_budget_enforced(tmp_path: Path) -> None:
         {"name": f"m{i}", "steps": [{"tool_name": "read_file", "arguments": {"path": "hello.txt"}}]}
         for i in range(6)
     ]
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "multi_agent_teams",
         principal_id=principal.principal_id,
-        action_type="multi_agent_teams",
-        tool_or_service_name="multi_agent_teams",
         arguments={"name": "toobig", "members": members},
         risk_level=RiskLevelValue.MEDIUM,
     )

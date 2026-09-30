@@ -21,24 +21,21 @@ from typing import TYPE_CHECKING, Any
 from raiker.approval_previews import redact_secret_like_text
 from raiker.build_identity import version as raiker_version
 from raiker.contracts.ids import new_id, utc_now
-from raiker.control.dashboard import (
+from raiker.control.dtos import ControlResult
+from raiker.control.views.extensions import ConnectionsView, ConnectorView
+from raiker.control.views.models import (
     _DISABLED_STATES,
-    LOCAL_RUNTIME_PROVIDERS,
-    ConnectionsView,
-    ConnectorView,
     ContextUsageView,
-    DiagnosticsView,
     ModelPricingEntryView,
     ModelPricingView,
     ModelProfileView,
     ModelsView,
     ProviderCatalogueRefreshView,
-    ProviderHealthView,
     ProviderModelListView,
     _names_an_available_model,
     _runs_on_this_platform,
 )
-from raiker.control.dtos import ControlResult
+from raiker.control.views.security import DiagnosticsView, ProviderHealthView
 from raiker.events.writer import EventLogWriter
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
 from raiker.models.exceptions import (
@@ -62,6 +59,11 @@ from raiker.runtime.model_facts_store import ModelFactsStore
 
 if TYPE_CHECKING:
     from raiker.control.dashboard import DashboardService
+
+
+#: Providers whose availability is a fact about *this machine* — the runtime has
+#: to be installed here before any surface may name a model it would serve.
+LOCAL_RUNTIME_PROVIDERS: frozenset[str] = frozenset({"ollama", "llama.cpp", "mlx", "vllm"})
 
 
 class ModelService:

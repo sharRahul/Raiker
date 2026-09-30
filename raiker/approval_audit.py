@@ -5,6 +5,7 @@ import json
 from dataclasses import dataclass
 
 from raiker.approval_previews import ApprovalPreview, redact_secret_like_text
+from raiker.contracts.views import View
 from raiker.rollback_plans import RollbackPlan
 
 DECISION_STATES = {
@@ -19,7 +20,7 @@ DECISION_STATES = {
 
 
 @dataclass(frozen=True)
-class ApprovalAuditRecord:
+class ApprovalAuditRecord(View):
     audit_id: str
     preview_id: str
     action_type: str
@@ -40,30 +41,6 @@ class ApprovalAuditRecord:
     reversible: bool
     rollback_plan_id: str | None
     redacted_summary: str
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "audit_id": self.audit_id,
-            "preview_id": self.preview_id,
-            "action_type": self.action_type,
-            "target_capability": self.target_capability,
-            "decision": self.decision,
-            "decision_status": self.decision_status,
-            "requested_by": self.requested_by,
-            "reviewer": self.reviewer,
-            "created_at": self.created_at,
-            "decided_at": self.decided_at,
-            "risk_level": self.risk_level,
-            "policy_decision": self.policy_decision,
-            "reasons": self.reasons,
-            "safety_notes": self.safety_notes,
-            "expected_events": self.expected_events,
-            "can_execute_now": self.can_execute_now,
-            "execution_enabled": self.execution_enabled,
-            "reversible": self.reversible,
-            "rollback_plan_id": self.rollback_plan_id,
-            "redacted_summary": self.redacted_summary,
-        }
 
 
 def _stable_id(prefix: str, payload: dict[str, object]) -> str:

@@ -65,9 +65,10 @@ class TestBothProvidersRaiseIt:
         assert provider_error_code(exc) == "provider_workspace_required:http_400"
 
     def test_openai_compatible(self) -> None:
-        from raiker.models.providers.openai_compatible import _map_status
+        # The OpenAI-compatible adapter maps through the shared ladder directly.
+        from raiker.models.providers.http import provider_status_error
 
-        exc = _map_status(400, model="gpt-x", body=ANTHROPIC_BODY)
+        exc = provider_status_error(400, model="gpt-x", body=ANTHROPIC_BODY)
         assert isinstance(exc, ProviderWorkspaceRequiredError)
 
     def test_an_ordinary_400_is_still_a_connection_error(self) -> None:

@@ -42,6 +42,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from raiker.app.build_tools import tools_for
+from raiker.contracts.views import View
 
 RELEASE_SCHEMA = 1
 #: A fixed timestamp for every archive member. Reproducibility is the point: two
@@ -64,7 +65,7 @@ class ReleaseError(RuntimeError):
 
 
 @dataclass(frozen=True)
-class SigningIdentity:
+class SigningIdentity(View):
     """What signing one target's installers actually requires.
 
     Held as data so the workflow, the documentation and the product all read the
@@ -75,9 +76,6 @@ class SigningIdentity:
     tool: str
     secrets: tuple[str, ...]
     note: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"tool": self.tool, "secrets": list(self.secrets), "note": self.note}
 
 
 @dataclass(frozen=True)

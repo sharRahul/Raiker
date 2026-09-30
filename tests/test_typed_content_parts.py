@@ -248,7 +248,7 @@ class TestAStoredTurnIsReopenedAsThePartsItDeclared:
     """
 
     def test_a_stored_answer_that_declared_a_table_carries_its_parts(self) -> None:
-        from raiker.control.dashboard import _stored_content_parts
+        from raiker.control.views.sessions import _stored_content_parts
 
         parts = _stored_content_parts(f"Spending so far.\n\n{_fence('table', TABLE)}")
         assert [part["type"] for part in parts] == [PART_TEXT, PART_TABLE]
@@ -256,14 +256,14 @@ class TestAStoredTurnIsReopenedAsThePartsItDeclared:
 
     def test_a_stored_answer_that_declared_nothing_carries_nothing(self) -> None:
         """An ordinary turn's payload is what it always was, byte for byte."""
-        from raiker.control.dashboard import _stored_content_parts
+        from raiker.control.views.sessions import _stored_content_parts
 
         assert _stored_content_parts("A plain answer.") == ()
         assert _stored_content_parts(None) == ()
         assert _stored_content_parts("") == ()
 
     def test_a_stored_refusal_is_carried_rather_than_printed_as_a_fence(self) -> None:
-        from raiker.control.dashboard import _stored_content_parts
+        from raiker.control.views.sessions import _stored_content_parts
 
         parts = _stored_content_parts(_fence("chart", {"kind": "pie", "labels": ["a"]}))
         assert [part["type"] for part in parts] == [PART_REFUSED]

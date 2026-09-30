@@ -19,9 +19,9 @@ from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.models import ToolAction
 from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 
 # Key sets transcribed from web/src/lib/apiTypes.ts (required, client-read fields).
 AUTH_SESSION = {"token", "session_id", "principal_id", "expires_at"}
@@ -284,10 +284,10 @@ def _assert_contract(expected: set[str], actual: dict[str, object], name: str) -
 def _seed_approval(workspace: Path) -> None:
     store = SQLiteStore(workspace)
     store.create_session("sess_c", str(workspace))
-    action = ToolAction(
+    action = tool_action(
+        "write_file",
+        {"path": "c.txt", "text": "hi"},
         action_id="act_c",
-        tool_name="write_file",
-        arguments={"path": "c.txt", "text": "hi"},
         risk_level="high",
         requires_approval=True,
     )

@@ -16,6 +16,8 @@ owner has already supplied is the one answer that helps nobody.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from raiker.contracts.models import ModelProfile
@@ -32,6 +34,12 @@ from raiker.models.exceptions import (
     workspace_id_rejected,
 )
 from raiker.models.factory import ModelProviderFactory, ProviderRuntimePolicy
+from raiker.models.providers.anthropic_messages import _map_status as _anthropic_map_status
+from raiker.models.providers.http import provider_status_error
+
+#: The Anthropic adapter's mapper, and the shared one the OpenAI-compatible
+#: adapter uses as-is.
+_MAPPERS = (_anthropic_map_status, provider_status_error)
 
 INVALID_BODY = (
     '{"type":"error","error":{"type":"invalid_request_error","message":'
@@ -121,13 +129,13 @@ class TestTheHeaderIsSentOnlyWhenNamed:
         provider = _factory({"api_key": "sk-test", "workspace_id": "wrkspc_01"}).create(
             _anthropic_profile()
         )
-        assert provider._headers["anthropic-workspace-id"] == "wrkspc_01"
-        assert provider._headers["x-api-key"] == "sk-test"
+        assert provider._http.headers["anthropic-workspace-id"] == "wrkspc_01"
+        assert provider._http.headers["x-api-key"] == "sk-test"
 
     def test_a_standard_key_is_not_sent_an_empty_workspace(self) -> None:
         """An empty header is not the same as no header, and would be refused."""
         provider = _factory({"api_key": "sk-test"}).create(_anthropic_profile())
-        assert "anthropic-workspace-id" not in provider._headers
+        assert "anthropic-workspace-id" not in provider._http.headers
 
     def test_a_stored_value_that_no_longer_passes_fails_closed(self) -> None:
         """It is never sent unchecked; a misconfiguration is repaired, not risked."""
@@ -153,11 +161,8 @@ class TestARejectedIdIsNotAMissingOne:
     def test_only_a_400_is_considered(self, status: int) -> None:
         assert workspace_id_rejected(status, INVALID_BODY) is False
 
-    @pytest.mark.parametrize("module", ["anthropic_messages", "openai_compatible"])
-    def test_both_providers_raise_the_invalid_code(self, module: str) -> None:
-        mapper = __import__(
-            f"raiker.models.providers.{module}", fromlist=["_map_status"]
-        )._map_status
+    @pytest.mark.parametrize("mapper", _MAPPERS, ids=["anthropic_messages", "shared"])
+    def test_both_providers_raise_the_invalid_code(self, mapper: Any) -> None:
         exc = mapper(400, model="m", body=INVALID_BODY)
         assert isinstance(exc, ProviderWorkspaceRequiredError)
         assert provider_error_code(exc) == "provider_workspace_invalid:http_400"
@@ -241,11 +246,8 @@ class TestTheRefusalIsClassifiedByWhatItMeansNotHowItIsWorded:
         assert isinstance(exc, ProviderWorkspaceRequiredError)
         assert provider_error_code(exc) == "provider_workspace_required:http_400"
 
-    @pytest.mark.parametrize("module", ["anthropic_messages", "openai_compatible"])
-    def test_both_providers_classify_it(self, module: str) -> None:
-        mapper = __import__(
-            f"raiker.models.providers.{module}", fromlist=["_map_status"]
-        )._map_status
+    @pytest.mark.parametrize("mapper", _MAPPERS, ids=["anthropic_messages", "shared"])
+    def test_both_providers_classify_it(self, mapper: Any) -> None:
         assert isinstance(
             mapper(400, model="m", body=LIVE_MISSING_BODY), ProviderWorkspaceRequiredError
         )

@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from raiker.control import dashboard as dashboard_module
 from raiker.control.dashboard import DashboardService
+from raiker.control.dashboard_parts import knowledge as knowledge_part
 from raiker.control.knowledge_scope import (
     REVIEW_ACCEPTED_FILE_BUDGET,
     REVIEW_DEPTH_BUDGET,
@@ -100,7 +100,7 @@ class TestTheBudgetsBind:
         """The budget the old cap was mistaken for. Lowered here rather than
         building fifty thousand files: what is under test is that the walk
         stops when it binds and says which budget stopped it."""
-        monkeypatch.setattr(dashboard_module, "REVIEW_VISITED_ENTRY_BUDGET", 40)
+        monkeypatch.setattr(knowledge_part, "REVIEW_VISITED_ENTRY_BUDGET", 40)
         folder = tmp_path / "wide"
         folder.mkdir()
         for index in range(200):
@@ -121,7 +121,7 @@ class TestTheBudgetsBind:
     ) -> None:
         """A pathological tree is deep rather than wide, and no counter of
         entries notices depth on its own."""
-        monkeypatch.setattr(dashboard_module, "REVIEW_DEPTH_BUDGET", 3)
+        monkeypatch.setattr(knowledge_part, "REVIEW_DEPTH_BUDGET", 3)
         folder = tmp_path / "deep"
         here = folder
         for level in range(8):
@@ -141,7 +141,7 @@ class TestTheBudgetsBind:
     ) -> None:
         """The budget that was already there keeps meaning what the card says
         it means — how many files the review will describe."""
-        monkeypatch.setattr(dashboard_module, "REVIEW_ACCEPTED_FILE_BUDGET", 10)
+        monkeypatch.setattr(knowledge_part, "REVIEW_ACCEPTED_FILE_BUDGET", 10)
         folder = tmp_path / "many"
         folder.mkdir()
         for index in range(40):
@@ -164,7 +164,7 @@ class TestTheBudgetsBind:
             (folder / f"note{index}.md").write_text("x", encoding="utf-8")
 
         ticks = iter([0.0] + [float(step) for step in range(1, 400)])
-        monkeypatch.setattr(dashboard_module.time, "monotonic", lambda: next(ticks))
+        monkeypatch.setattr(knowledge_part.time, "monotonic", lambda: next(ticks))
 
         service = _service(tmp_path)
         review = service.review_brain_source(_granted(service, folder), owner_principal_id=OWNER)

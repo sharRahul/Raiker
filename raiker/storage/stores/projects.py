@@ -52,12 +52,11 @@ class ProjectStore:
             )
 
     def load_project(self: SQLiteStore, project_id: str, user_id: str | None = None) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM projects WHERE project_id = ?"
-                + (" AND owner_user_id = ?" if user_id else ""),
-                (project_id, user_id) if user_id else (project_id,),
-            ).fetchone()
+        row = self._row(
+            "SELECT * FROM projects WHERE project_id = ?"
+            + (" AND owner_user_id = ?" if user_id else ""),
+            (project_id, user_id) if user_id else (project_id,),
+        )
         return dict(row) if row else None
 
     def attach_project_root(
@@ -71,13 +70,12 @@ class ProjectStore:
         """
         if self.load_project(project_id, user_id) is None:
             return False
-        with self.connect() as connection:
-            updated = connection.execute(
-                "UPDATE projects SET root_kind = 'attached', root_grant_id = ?, root_subpath = '' "
-                "WHERE project_id = ?",
-                (root_grant_id, project_id),
-            )
-        return updated.rowcount == 1
+        updated = self._execute(
+            "UPDATE projects SET root_kind = 'attached', root_grant_id = ?, root_subpath = '' "
+            "WHERE project_id = ?",
+            (root_grant_id, project_id),
+        )
+        return updated == 1
 
     def detach_project_root(self: SQLiteStore, project_id: str, *, user_id: str | None = None) -> bool:
         """Release the grant a project was attached to, leaving it rootless.
@@ -88,21 +86,18 @@ class ProjectStore:
         """
         if self.load_project(project_id, user_id) is None:
             return False
-        with self.connect() as connection:
-            updated = connection.execute(
-                "UPDATE projects SET root_grant_id = NULL WHERE project_id = ?", (project_id,)
-            )
-        return updated.rowcount == 1
+        updated = self._execute(
+            "UPDATE projects SET root_grant_id = NULL WHERE project_id = ?",
+            (project_id,),
+        )
+        return updated == 1
 
     def project_for_grant(
         self: SQLiteStore, owner_principal_id: str, root_grant_id: str
     ) -> dict[str, Any] | None:
         """The project attached to one grant, if the caller owns it."""
         user_id = self.principal_user_id(owner_principal_id)
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM projects WHERE root_grant_id = ?", (root_grant_id,)
-            ).fetchone()
+        row = self._row("SELECT * FROM projects WHERE root_grant_id = ?", (root_grant_id,))
         if row is None:
             return None
         owner = row["owner_user_id"]
@@ -111,8 +106,7 @@ class ProjectStore:
         return dict(row)
 
     def load_project_by_name(self: SQLiteStore, name: str) -> dict[str, Any] | None:
-        with self.connect() as connection:
-            row = connection.execute("SELECT * FROM projects WHERE name = ?", (name,)).fetchone()
+        row = self._row("SELECT * FROM projects WHERE name = ?", (name,))
         return dict(row) if row else None
 
     def update_project_root(
@@ -132,9 +126,8 @@ class ProjectStore:
         if expected_root_subpath is not None:
             query += " AND root_subpath = ?"
             params.append(expected_root_subpath)
-        with self.connect() as connection:
-            updated = connection.execute(query, params)
-        return updated.rowcount == 1
+        updated = self._execute(query, params)
+        return updated == 1
 
     def publish_project_root_atomic(
         self: SQLiteStore,
@@ -176,11 +169,10 @@ class ProjectStore:
                 "memory_enabled": False,
                 "memory_mode": "inherit",
             }
-        with self.connect() as connection:
-            row = connection.execute(
-                "SELECT instructions, attachment_ids_json, memory_enabled, memory_mode FROM project_contexts WHERE project_id = ?",
-                (project_id,),
-            ).fetchone()
+        row = self._row(
+            "SELECT instructions, attachment_ids_json, memory_enabled, memory_mode FROM project_contexts WHERE project_id = ?",
+            (project_id,),
+        )
         if row is None:
             return {
                 "instructions": "",
@@ -218,48 +210,46 @@ class ProjectStore:
             for attachment_id in attachment_ids
         ):
             raise ValueError("unknown_project_attachment")
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO project_contexts (project_id, instructions, attachment_ids_json, memory_enabled, memory_mode, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(project_id) DO UPDATE SET
-                  instructions = excluded.instructions,
-                  attachment_ids_json = excluded.attachment_ids_json,
-                  memory_enabled = excluded.memory_enabled,
-                  memory_mode = excluded.memory_mode,
-                  updated_at = excluded.updated_at
-                """,
-                (
-                    project_id,
-                    instructions,
-                    json.dumps(attachment_ids),
-                    int(mode == "enabled"),
-                    mode,
-                    utc_now(),
-                ),
-            )
+        self._execute(
+            """
+            INSERT INTO project_contexts (project_id, instructions, attachment_ids_json, memory_enabled, memory_mode, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(project_id) DO UPDATE SET
+              instructions = excluded.instructions,
+              attachment_ids_json = excluded.attachment_ids_json,
+              memory_enabled = excluded.memory_enabled,
+              memory_mode = excluded.memory_mode,
+              updated_at = excluded.updated_at
+            """,
+            (
+                project_id,
+                instructions,
+                json.dumps(attachment_ids),
+                int(mode == "enabled"),
+                mode,
+                utc_now(),
+            ),
+        )
 
     def list_projects(self: SQLiteStore, user_id: str | None = None) -> list[dict[str, Any]]:
-        with self.connect() as connection:
-            rows = connection.execute(
-                """
-                SELECT projects.*, COUNT(sessions.session_id) AS session_count,
-                       grants.path AS root_grant_path
-                FROM projects
-                LEFT JOIN sessions ON sessions.project_id = projects.project_id
-                -- An attached project's folder lives on its grant, so the list
-                -- can name it without one extra query per row.
-                LEFT JOIN brain_source_grants AS grants
-                       ON grants.root_id = projects.root_grant_id
-                """
-                + (" WHERE projects.owner_user_id = ? " if user_id else "")
-                + """
-                GROUP BY projects.project_id
-                ORDER BY projects.created_at DESC
-                """,
-                (user_id,) if user_id else (),
-            ).fetchall()
+        rows = self._rows(
+            """
+            SELECT projects.*, COUNT(sessions.session_id) AS session_count,
+                   grants.path AS root_grant_path
+            FROM projects
+            LEFT JOIN sessions ON sessions.project_id = projects.project_id
+            -- An attached project's folder lives on its grant, so the list
+            -- can name it without one extra query per row.
+            LEFT JOIN brain_source_grants AS grants
+                   ON grants.root_id = projects.root_grant_id
+            """
+            + (" WHERE projects.owner_user_id = ? " if user_id else "")
+            + """
+            GROUP BY projects.project_id
+            ORDER BY projects.created_at DESC
+            """,
+            (user_id,) if user_id else (),
+        )
         return [dict(row) for row in rows]
 
     def get_active_project(self: SQLiteStore, user_id: str | None = None) -> str | None:
@@ -295,15 +285,14 @@ class ProjectStore:
         return project_id
 
     def save_active_project(self: SQLiteStore, project_id: str | None, user_id: str | None = None) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO active_project (scope_id, project_id, updated_at)
-                VALUES (?, ?, ?)
-                ON CONFLICT(scope_id) DO UPDATE SET project_id = excluded.project_id, updated_at = excluded.updated_at
-                """,
-                (f"{self.ACTIVE_PROJECT_SCOPE}{user_id or 'legacy'}", project_id, utc_now()),
-            )
+        self._execute(
+            """
+            INSERT INTO active_project (scope_id, project_id, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(scope_id) DO UPDATE SET project_id = excluded.project_id, updated_at = excluded.updated_at
+            """,
+            (f"{self.ACTIVE_PROJECT_SCOPE}{user_id or 'legacy'}", project_id, utc_now()),
+        )
 
     def delete_project(self: SQLiteStore, project_id: str) -> bool:
         with self.connect() as connection:

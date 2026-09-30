@@ -31,6 +31,7 @@ from raiker.security.containment import (
     CapabilityBreaker,
     CapabilityContainment,
 )
+from tests.factories import tool_action
 
 
 def _envelope() -> PromptEnvelope:
@@ -80,10 +81,10 @@ def _allow_delegation(store: Any, owner_principal_id: str) -> None:
 
 
 def _action(tool_name: str = "web_fetch", **arguments: Any) -> ToolAction:
-    return ToolAction(
+    return tool_action(
+        tool_name,
+        arguments or {"url": "https://example.test/"},
         action_id=new_id("act_"),
-        tool_name=tool_name,
-        arguments=arguments or {"url": "https://example.test/"},
         risk_level="medium",
         requires_approval=False,
         proposed_by="model",

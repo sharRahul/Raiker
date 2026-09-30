@@ -31,7 +31,6 @@ from typing import Any, cast
 
 import pytest
 
-from raiker.contracts.ids import new_id
 from raiker.models.contracts import ToolSpec
 from raiker.models.tool_projection import (
     MCP_SCHEMA_BUDGET_CHARS,
@@ -52,6 +51,7 @@ from raiker.tools.mcp_schema import (
     sanitize_declaration,
 )
 from raiker.tools.mcp_tools import McpToolService, mcp_tool_name
+from tests.factories import governed_action
 
 _OWNER = "principal_owner"
 
@@ -70,11 +70,9 @@ def store(workspace: Path) -> SQLiteStore:
 
 
 def _action(action_type: str, arguments: dict[str, Any]) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        action_type,
         principal_id=_OWNER,
-        action_type=action_type,
-        tool_or_service_name=action_type,
         arguments=arguments,
         risk_level=RiskLevelValue.MEDIUM,
     )

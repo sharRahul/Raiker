@@ -13,8 +13,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from raiker.control.dashboard import McpSessionView, NotificationView, SecurityFindingView
 from raiker.control.dtos import ControlResult
+from raiker.control.views.extensions import McpSessionView
+from raiker.control.views.security import NotificationView, SecurityFindingView
 from raiker.security.credentials import CredentialLifecycle, CredentialLifecycleView
 from raiker.security.monitoring import SecurityMonitor
 

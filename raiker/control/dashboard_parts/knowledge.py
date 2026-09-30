@@ -11,23 +11,16 @@ turns off.
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
+import os
+import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from raiker.contracts.ids import utc_now
-from raiker.control.dashboard import (
-    CONTEXT_NODE_TYPES,
-    SESSION_LABELS,
-    SESSION_NODE_TYPES,
-    TOOL_LABELS,
-    BrainEdgeView,
-    BrainNodeView,
-    BrainView,
-    _task_detail,
-    _walk_source_for_review,
-)
 from raiker.control.knowledge_scope import (
     ARTIFACTS_ROOT_ID,
     KNOWLEDGE_SOURCE_EXTENSIONS,
@@ -35,7 +28,10 @@ from raiker.control.knowledge_scope import (
     MAX_KNOWLEDGE_UPLOAD_BYTES,
     MAX_SOURCE_PATH_CHARS,
     REVIEW_ACCEPTED_FILE_BUDGET,
+    REVIEW_DEPTH_BUDGET,
+    REVIEW_TIME_BUDGET_SECONDS,
     REVIEW_TRUNCATION_REASONS,
+    REVIEW_VISITED_ENTRY_BUDGET,
     RUNTIME_DIR_NAME,
     SKIPPED_DIRECTORY_NAMES,
     ScopeError,
@@ -46,6 +42,8 @@ from raiker.control.knowledge_scope import (
     resolve,
     scope_path,
 )
+from raiker.control.views.knowledge import BrainEdgeView, BrainNodeView, BrainView
+from raiker.control.views.tasks import _task_detail
 from raiker.events.writer import EventLogWriter
 from raiker.memory.store import list_memory
 from raiker.storage.internal_paths import internal_io_path
@@ -53,6 +51,202 @@ from raiker.tools.graph_tools import reference_resolution
 
 if TYPE_CHECKING:
     from raiker.control.dashboard import DashboardService
+
+
+@dataclass(frozen=True)
+class _SourceReviewWalk:
+    """What one bounded review walk found, and what it cost to find it."""
+
+    supported: int
+    unsupported: int
+    total_bytes: int
+    examples: tuple[str, ...]
+    #: Every entry looked at, accepted or skipped. The number the old cap was
+    #: mistaken for.
+    visited: int
+    truncated_reason: str | None
+
+
+def _walk_source_for_review(path: Path, base: Path) -> _SourceReviewWalk:
+    """Walk *path* for an indexing plan, under four budgets that actually bind.
+
+    NEW-MAP-03. The previous walk was ``path.rglob("*")`` with a counter that
+    only advanced on entries it accepted, so everything it skipped was free:
+    every directory, every hidden path, every name under ``node_modules``, every
+    file it could not ``stat``. A cap of 5,000 therefore bounded the *answer*
+    and not the *work*, and a folder with a large dependency tree beside it was
+    walked in full to report the six files an owner cared about.
+
+    Three things change:
+
+    * **Excluded directories are pruned before descent** rather than after
+      every entry inside them has been produced. ``os.walk`` lets the walker
+      edit the directory list in place, which is the difference between not
+      entering ``node_modules`` and enumerating it and discarding the result.
+    * **Every entry visited is counted**, whatever happens to it, so the visit
+      budget is a bound on the work and the file budget stays a bound on the
+      answer.
+    * **Depth and elapsed time are their own budgets.** A pathological tree is
+      deep rather than wide, and a slow drive is neither — no counter of entries
+      notices either one.
+
+    Symlinked directories are not followed (``os.walk`` does not by default),
+    which is what stops a cycle; the containment check below is unchanged and
+    still judges every accepted file against the selected root.
+    """
+    started = time.monotonic()
+    supported = 0
+    unsupported = 0
+    total_bytes = 0
+    visited = 0
+    examples: list[str] = []
+    truncated: str | None = None
+
+    def _example(resolved: Path) -> None:
+        if len(examples) < 8:
+            with contextlib.suppress(ValueError):
+                examples.append(resolved.relative_to(base).as_posix())
+
+    def _consider(candidate: Path) -> None:
+        """Count one file, if it is one Raiker could read."""
+        nonlocal supported, unsupported, total_bytes
+        try:
+            resolved = candidate.resolve()
+            if resolved != base and base not in resolved.parents:
+                return
+            size = candidate.stat().st_size
+        except (OSError, ValueError):
+            return
+        if candidate.suffix.casefold() in KNOWLEDGE_SOURCE_EXTENSIONS and size <= 5 * 1024 * 1024:
+            supported += 1
+            total_bytes += size
+            _example(resolved)
+        else:
+            unsupported += 1
+
+    if path.is_file():
+        visited = 1
+        _consider(path)
+        return _SourceReviewWalk(
+            supported, unsupported, total_bytes, tuple(examples), visited, None
+        )
+
+    base_depth = len(path.parts)
+    for dirpath, dirnames, filenames in os.walk(path, onerror=None):
+        here = Path(dirpath)
+        depth = len(here.parts) - base_depth
+        # Pruned in place, before anything inside them is produced. This is the
+        # whole finding: the previous walk enumerated these and threw the
+        # entries away one at a time.
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if name not in SKIPPED_DIRECTORY_NAMES and not name.startswith(".")
+        ]
+        visited += len(dirnames)
+        if depth >= REVIEW_DEPTH_BUDGET:
+            dirnames.clear()
+            truncated = truncated or "depth_cap"
+
+        for name in filenames:
+            visited += 1
+            if visited >= REVIEW_VISITED_ENTRY_BUDGET:
+                truncated = "visited_entry_cap"
+                break
+            if time.monotonic() - started >= REVIEW_TIME_BUDGET_SECONDS:
+                truncated = "time_cap"
+                break
+            if name.startswith("."):
+                continue
+            _consider(here / name)
+            # The accepted-file budget is checked after the file is counted, so
+            # the number the owner reads is the number that was reached.
+            if supported + unsupported >= REVIEW_ACCEPTED_FILE_BUDGET:
+                truncated = "accepted_file_cap"
+                break
+
+        if truncated in {"visited_entry_cap", "time_cap", "accepted_file_cap"}:
+            break
+        if visited >= REVIEW_VISITED_ENTRY_BUDGET:
+            truncated = "visited_entry_cap"
+            break
+        if time.monotonic() - started >= REVIEW_TIME_BUDGET_SECONDS:
+            truncated = "time_cap"
+            break
+
+    return _SourceReviewWalk(
+        supported, unsupported, total_bytes, tuple(examples), visited, truncated
+    )
+
+
+#: BUG-218 — how a tool is named on the Knowledge Map. The registry's own
+#: labels are written for a transcript line ("Run command"); a graph node has
+#: room for a noun. Anything unlisted falls back to its underscored name made
+#: readable, so a new tool appears sensibly without being registered twice.
+TOOL_LABELS: dict[str, str] = {
+    "read_file": "Read file",
+    "write_file": "Write file",
+    "edit_file": "Edit file",
+    "apply_patch": "Apply patch",
+    "list_directory": "List folder",
+    "grep": "Search text",
+    "glob": "Find files",
+    "shell": "Run command",
+    "run_command": "Run command",
+    "background_run": "Background run",
+    "web_fetch": "Fetch page",
+    "web_search": "Web search",
+    "web_extract": "Read part of a page",
+    "weather_lookup": "Weather",
+    "memory_search": "Search memory",
+    "memory_write": "Remember",
+    "knowledge_graph": "Explore graph",
+    "conversation_search": "Search chats",
+    "code_map_search": "Search code map",
+    "code_map_references": "Find references",
+    "document_symbols": "Outline file",
+    "find_definition": "Find definition",
+    "diagnostics": "Check for problems",
+    "create_document": "Create document",
+    "spawn_subagent": "Delegate",
+    "update_plan": "Update plan",
+}
+
+
+#: What a cited source is drawn *as*. A file the answer quoted should look like
+#: a file on the map, not like a generic citation — the whole complaint BUG-218
+#: answers is that the map showed runtime bookkeeping where the owner expected
+#: their own material.
+CONTEXT_NODE_TYPES: dict[str, str] = {
+    "file": "file",
+    "repository": "file",
+    "attachment": "file",
+    "document": "file",
+    "folder": "folder",
+    "memory": "memory",
+    "conversation": "conversation",
+    "web": "source",
+    "url": "source",
+    "connector": "source",
+}
+
+
+#: BUG-218 — a Chat and a Build session are different work. `sessions.origin`
+#: already distinguished them and the map drew both as one green dot.
+SESSION_NODE_TYPES: dict[str, str] = {
+    "chat": "conversation",
+    "build": "build",
+    "task": "task_run",
+    "workbench": "conversation",
+}
+
+
+SESSION_LABELS: dict[str, str] = {
+    "chat": "chat",
+    "build": "build session",
+    "task": "task run",
+    "workbench": "chat",
+}
 
 
 class KnowledgeService:

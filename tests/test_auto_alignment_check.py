@@ -21,7 +21,6 @@ from typing import Any
 import pytest
 
 from raiker.contracts.ids import new_id
-from raiker.contracts.models import ToolAction
 from raiker.runtime.alignment import (
     ALIGNMENT_CHECKED_TOOLS,
     REASON_RECORD_UNAVAILABLE,
@@ -30,6 +29,7 @@ from raiker.runtime.alignment import (
     check_alignment,
 )
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 
 SESSION = "sess_align"
 
@@ -52,10 +52,10 @@ def _record(
 ) -> None:
     """Record one completed tool call in the turn, as the broker does."""
     store.insert_tool_action(
-        ToolAction(
+        tool_action(
+            tool_name,
+            arguments,
             action_id=new_id("act_"),
-            tool_name=tool_name,
-            arguments=arguments,
             risk_level="medium",
             proposed_by="prin_agent",
             requires_approval=False,
@@ -336,10 +336,10 @@ def test_a_proposed_but_unrun_action_establishes_nothing(
     (tmp_path / "deploy.sh").write_text("real", encoding="utf-8")
     turn_id = _turn(store, "write the report")
     store.insert_tool_action(
-        ToolAction(
+        tool_action(
+            "write_file",
+            {"path": "deploy.sh", "text": "x"},
             action_id="act_self",
-            tool_name="write_file",
-            arguments={"path": "deploy.sh", "text": "x"},
             risk_level="high",
             proposed_by="prin_agent",
             requires_approval=True,

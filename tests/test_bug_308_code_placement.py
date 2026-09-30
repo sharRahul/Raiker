@@ -27,10 +27,11 @@ from raiker.execution.code_placement import (
     place_code,
 )
 from raiker.execution.commands.service import CommandService, CommandServiceError
-from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
+from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.authority.router import GovernedAction, RuntimeAuthority
 from raiker.runtime.executors import build_default_executor_registry
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action, human, tool_action
 
 OWNER = "principal_owner"
 
@@ -50,21 +51,13 @@ def with_sandbox() -> Iterator[None]:
 
 
 def _human() -> Principal:
-    return Principal(
-        principal_id=OWNER,
-        principal_type=PrincipalType.HUMAN,
-        display_name="Owner",
-        role_ids=(),
-        is_active=True,
-    )
+    return human(OWNER, role_ids=())
 
 
 def _shell(command: str) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        "shell",
         principal_id=OWNER,
-        action_type="shell",
-        tool_or_service_name="shell",
         arguments={"command": command},
         risk_level=RiskLevelValue.MEDIUM,
     )
@@ -486,12 +479,11 @@ class TestTheApprovalSaysWhatItWillRunAs:
     """Found by the live round: the approval for a `python` run said *Shell commands*."""
 
     def _approval(self, store: SQLiteStore, command: str) -> str:
-        from raiker.contracts.models import ToolAction
 
-        action = ToolAction(
+        action = tool_action(
+            "shell",
+            {"command": command},
             action_id=new_id("act_"),
-            tool_name="shell",
-            arguments={"command": command},
             risk_level="high",
             requires_approval=True,
         )

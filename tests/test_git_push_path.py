@@ -39,7 +39,7 @@ from raiker.phase_gates import default_capability_gates
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.authority.activation import get_activation_requirement
-from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
+from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.authority.router import CAPABILITY_GATE_MAP, GovernedAction
 from raiker.runtime.executors import (
     REAL_EXECUTOR_CAPABILITIES,
@@ -55,6 +55,7 @@ from raiker.tools.git import (
     resolve_repository_root,
     selected_repository_subpath,
 )
+from tests.factories import governed_action, human
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 _CAP = "git_push_execution"
@@ -99,19 +100,13 @@ def allowed(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _principal() -> Principal:
-    return Principal(
-        principal_id="principal_owner",
-        principal_type=PrincipalType.HUMAN,
-        display_name="Owner",
-    )
+    return human("principal_owner", role_ids=())
 
 
 def _action(tool: str, args: dict[str, object]) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        tool,
         principal_id="principal_owner",
-        action_type=tool,
-        tool_or_service_name=tool,
         arguments=args,
         risk_level=RiskLevelValue.HIGH,
     )

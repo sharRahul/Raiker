@@ -33,6 +33,7 @@ from raiker.runtime.executors import (
 )
 from raiker.runtime.executors.connectors import GcalConnectorExecutor
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import tool_action
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 from tests.routed_execution import execute_as_routed
 
@@ -265,10 +266,10 @@ class TestGcalReadTool:
         )
 
     def _action(self) -> ToolAction:
-        return ToolAction(
+        return tool_action(
+            "gcal_read",
+            {"resource": "event", "calendar_id": "primary", "event_id": "evt1"},
             action_id=new_id("act_"),
-            tool_name="gcal_read",
-            arguments={"resource": "event", "calendar_id": "primary", "event_id": "evt1"},
             risk_level="medium",
             requires_approval=False,
             proposed_by="model",

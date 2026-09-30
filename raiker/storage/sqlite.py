@@ -28,38 +28,22 @@ from raiker.storage.migrations import (
 )
 from raiker.storage.sqlcipher_probe import MemorySecurityProbeResult, probe_memory_security
 
-# SQLCipher performs its key derivation when a connection is opened. API routes
-# construct short-lived SQLiteStore objects, so opening in ``connect`` made a
-# burst of cheap reads pay that KDF once per request. Keep one keyed connection
-# per workspace and worker thread for the host lifetime instead. The connection
-# is never shared for query work across threads; ``check_same_thread=False`` only
-# allows shutdown/invalidation to close every worker's handle from one place.
+# ── The keyed-connection cache ───────────────────────────────────────────────
 #
-# BUG-50 — the cache is bounded and evicted least-recently-used. Without a bound
-# it grew with the number of *distinct* workspaces a process ever touches: a test
-# session opening temporary workspaces, or a long-lived host serving many
-# instances, kept every handle until exit and eventually ran out of file
-# descriptors.
+# SQLCipher derives its key when a connection opens, and routes build stores
+# freely, so each workspace keeps one keyed connection per worker thread for the
+# host's lifetime instead of paying the KDF per request. Invariants:
 #
-# A thread only ever closes a handle it owns itself, or one whose owning thread
-# has exited. ``connect`` has no release point, so a cached connection may be
-# mid-query in the thread that owns it, and closing another live worker's handle
-# would be a use-after-close. Reaping an exited thread's handles is what keeps the
-# bound from drifting upwards with thread churn.
-#
-# Self-eviction alone would bound the cache only *per thread*, so a request
-# threadpool would multiply the bound by its worker count. The allowance a thread
-# gives itself is therefore the per-thread limit **or** the process ceiling shared
-# between the threads currently holding connections, whichever is smaller — a real
-# process-wide bound that still never touches another thread's handle.
-#
-# BUG-86 — the ceiling used to be expressed as *worker-threads-worth* of the
-# per-thread limit (eight of them), so the real bound was the per-thread limit
-# multiplied by a thread count the store does not control. Every keyed connection
-# holds SQLCipher key material, and on a platform that locks those pages the
-# population is spent against a locked-memory allowance measured in a few
-# megabytes. The ceiling is therefore an absolute number of key-bearing
-# connections: what the process may hold, whatever the server's threadpool does.
+# * A connection runs queries only in the thread that owns it.
+#   ``check_same_thread=False`` exists so shutdown can close handles centrally.
+# * A thread closes only its own handles, or those of threads that have exited.
+#   ``connect`` has no release point, so another live worker's handle may be
+#   mid-query, and closing it would be a use-after-close.
+# * The cache is bounded twice, least-recently-used: a per-thread limit, and an
+#   absolute process ceiling on key-bearing connections, because each holds key
+#   material that may be spent against a locked-memory allowance of a few
+#   megabytes (BUG-50, BUG-86). A thread's allowance is whichever is smaller.
+
 # BUG-243 — words a full-text AND must not be allowed to require.
 #
 # Deliberately short and deliberately closed-class: articles, pronouns,
@@ -94,18 +78,10 @@ _CONNECTIONS_LOCK = threading.RLock()
 
 # ── Who owns a cached connection (GCR-37) ────────────────────────────────────
 #
-# The cache used to be keyed by ``(workspace_root, threading.get_ident())``. A
-# thread identifier is a numeric identity the platform is free to hand out
-# again once the thread it belonged to has exited, and these connections are
-# opened with ``check_same_thread=False``. So a new worker that happened to
-# receive a retired worker's identifier could look up the cache, find that
-# worker's connection, and adopt its handle and its session state — the one
-# thing the per-thread key exists to prevent.
-#
-# Ownership is therefore a token this module mints, never a number the platform
-# recycles. It lives in thread-local storage, so a thread cannot inherit
-# another's, and a weak reference to the owning ``Thread`` is what answers "is
-# that owner still alive?" for eviction and for memory-pressure release.
+# A token this module mints, held in thread-local storage — never the thread's
+# identifier, which the platform recycles once a thread exits, so a new worker
+# could otherwise adopt a retired worker's handle and session state. A weak
+# reference to the owning ``Thread`` answers whether that owner is still alive.
 _OWNER_TOKENS = threading.local()
 _OWNER_SEQUENCE = itertools.count(1)
 _OWNER_THREADS: dict[int, weakref.ReferenceType[threading.Thread]] = {}
@@ -618,27 +594,13 @@ class SQLiteStore(
     TaskStore,
 ):
     #: The migration ids this database already records, read once at the top of
-    #: a :meth:`bootstrap` pass and ``None`` outside one. Only
-    #: :meth:`_apply_migration` reads it, and only :meth:`bootstrap` calls that.
+    #: a :meth:`bootstrap` pass and ``None`` outside one, so a pass asks the
+    #: ``migrations`` table once rather than once per migration (GCR-10).
     #:
-    #: GCR-10 — ``bootstrap()`` runs on every ``SQLiteStore`` construction, and
-    #: the architecture builds stores freely: handling one prompt constructs
-    #: them for session ownership, project resolution, readiness, attachment
-    #: references, generated files and the gateway, and every read route does
-    #: the same. Each construction asked the ``migrations`` table **once per
-    #: migration** — a hundred and sixty-odd round trips to answer one question,
-    #: while holding the process-global bootstrap lock the others were waiting
-    #: on.
-    #:
-    #: **What this deliberately does not do is skip the pass.** ``bootstrap()``
-    #: is not only schema setup, it is the store's self-repair: a marker
-    #: somebody deleted gets its migration re-applied, an index an older release
-    #: left on FTS4 is converted in place, a legacy project path is rebuilt from
-    #: its parent links. Caching "this workspace is fine" across constructions
-    #: removes that, and the suite says so in six places —
-    #: ``test_repeated_store_facade_rechecks_deleted_migration_marker`` is named
-    #: for the contract. So the pass still runs, every time. What changed is how
-    #: many queries it takes to find out there is nothing to do.
+    #: The pass itself still runs on every construction: it is the store's
+    #: self-repair — a deleted marker's migration is re-applied, a legacy FTS4
+    #: index converted, a legacy project path rebuilt — and
+    #: ``test_repeated_store_facade_rechecks_deleted_migration_marker`` holds it.
     _applied: set[str] | None = None
 
     def __init__(self, workspace_root: str | Path) -> None:
@@ -720,6 +682,26 @@ class SQLiteStore(
             with contextlib.suppress(Exception):
                 stale.close()
         return connection
+
+    # OPT-06. One statement in its own transaction — commit on success,
+    # rollback on error — which is what 330 hand-written `with self.connect()`
+    # blocks around a single `execute` each were. A method that runs two
+    # statements, or reads its cursor in between, still opens the block itself,
+    # so a transaction boundary is never hidden behind a helper.
+
+    def _rows(self, sql: str, params: Any = ()) -> list[sqlite3.Row]:
+        with self.connect() as connection:
+            return connection.execute(sql, params).fetchall()
+
+    def _row(self, sql: str, params: Any = ()) -> sqlite3.Row | None:
+        with self.connect() as connection:
+            row: sqlite3.Row | None = connection.execute(sql, params).fetchone()
+            return row
+
+    def _execute(self, sql: str, params: Any = ()) -> int:
+        """Run one statement and return how many rows it changed."""
+        with self.connect() as connection:
+            return connection.execute(sql, params).rowcount
 
     def _reopen_after_memory_error(self, error: MemoryError) -> sqlite3.Connection:
         """Recover a keyed connection after a memory refusal, or fail named.

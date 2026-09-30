@@ -34,10 +34,11 @@ import shutil
 import subprocess
 import time
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raiker.contracts.views import View
 from raiker.models.gguf import read_gguf_metadata
 
 TOOLCHAIN_IMAGE = (
@@ -96,7 +97,7 @@ class ConversionIsolation:
 
 
 @dataclass(frozen=True)
-class ConversionPreview:
+class ConversionPreview(View):
     source: str
     output: str
     revision: str
@@ -109,12 +110,9 @@ class ConversionPreview:
     quantize_argv: tuple[str, ...]
     isolation: ConversionIsolation
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ConversionProvenance:
+class ConversionProvenance(View):
     source_revision: str
     source_fingerprint: str
     output_fingerprint: str
@@ -122,9 +120,6 @@ class ConversionProvenance:
     architecture: str
     quantization: str
     output_path: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 class DockerConversionRunner:

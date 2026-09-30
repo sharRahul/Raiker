@@ -102,6 +102,16 @@
       selected_model: model,
       model_deferred: false,
     });
+    // Choosing a model here is the owner's own act, so its first reachability
+    // check is taken now, as **Test** would take it. The server takes a first
+    // check by itself only for a provider with a saved connection, and a local
+    // runtime has none: without this, the first turn after setup was refused
+    // with "No readiness check exists for this exact model".
+    try {
+      await api.checkModelReadiness(profileId, model);
+    } catch {
+      // The outcome is on the model's own row; setup carries on either way.
+    }
     await loadProfiles();
   }
 

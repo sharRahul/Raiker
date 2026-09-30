@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.ids import utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
@@ -12,6 +12,7 @@ from raiker.runtime.authority import GovernedAction, RuntimeAuthority
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES, build_default_executor_registry
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 _CAP = "reminder_runtime"
 _DOC = "docs/threat-models/reminders.md"
@@ -48,11 +49,9 @@ def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
 
 
 def _action(principal_id: str, **args: object) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        _CAP,
         principal_id=principal_id,
-        action_type=_CAP,
-        tool_or_service_name=_CAP,
         arguments=dict(args),
         risk_level=RiskLevelValue.MEDIUM,
         session_id="sess_reminders",

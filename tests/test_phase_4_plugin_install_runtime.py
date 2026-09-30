@@ -6,14 +6,15 @@ from pathlib import Path
 from typing import Any
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.ids import utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority import GovernedAction, RuntimeAuthority
-from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
+from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES, build_default_executor_registry
 from raiker.runtime.executors.tier4_plugins import PluginInstallExecutor
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action, human
 
 _CAP = "plugin_install"
 _EXEC_CAP = "plugin_execution_cap"
@@ -75,11 +76,9 @@ def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
 
 
 def _action(principal_id: str, **args: object) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        _CAP,
         principal_id=principal_id,
-        action_type=_CAP,
-        tool_or_service_name=_CAP,
         arguments=dict(args),
         risk_level=RiskLevelValue.MEDIUM,
     )
@@ -176,7 +175,7 @@ def test_plugin_install_rejects_paths_outside_workspace(tmp_path: Path) -> None:
     executor = PluginInstallExecutor(ws, SQLiteStore(ws))
     result = executor.execute(
         _action("principal_owner", manifest_path=str(outside)),
-        Principal(principal_id="principal_owner", principal_type=PrincipalType.HUMAN, display_name="Owner"),
+        human("principal_owner", role_ids=()),
     )
     assert result.ok is False
     assert result.reason_code == "outside_workspace:manifest_path"

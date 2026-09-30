@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.views import View
 from raiker.memory.candidates import MemoryCandidate
 from raiker.memory.policy import (
     MemorySensitivity,
@@ -17,7 +18,7 @@ VALID_DECISIONS = {"approved_for_later", "denied", "needs_user_review"}
 
 
 @dataclass(frozen=True)
-class MemoryReviewItem:
+class MemoryReviewItem(View):
     candidate_id: str
     source_event_id: str
     proposed_text: str
@@ -30,22 +31,6 @@ class MemoryReviewItem:
     reviewer: str | None
     can_write_semantic_memory: bool
     semantic_write_enabled: bool
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "candidate_id": self.candidate_id,
-            "source_event_id": self.source_event_id,
-            "proposed_text": self.proposed_text,
-            "scope": self.scope,
-            "sensitivity": self.sensitivity,
-            "decision": self.decision,
-            "reasons": self.reasons,
-            "created_at": self.created_at,
-            "reviewed_at": self.reviewed_at,
-            "reviewer": self.reviewer,
-            "can_write_semantic_memory": self.can_write_semantic_memory,
-            "semantic_write_enabled": self.semantic_write_enabled,
-        }
 
 
 def review_item_from_candidate(candidate: dict[str, Any]) -> MemoryReviewItem:

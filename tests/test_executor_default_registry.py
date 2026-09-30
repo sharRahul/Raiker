@@ -4,7 +4,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
 from raiker.execution.commands.service import CommandService
@@ -17,6 +16,7 @@ from raiker.runtime.executors import (
 from raiker.runtime.executors.tier2_shell import ProcessExecutor, ShellExecutor
 from raiker.runtime.executors.tier6_domains import FinanceRuntimeExecutor, MedicalRuntimeExecutor
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 _SENSITIVE = (
     "medical_runtime", "finance_runtime", "investment_runtime", "cctv_runtime",
@@ -103,11 +103,9 @@ def test_real_capability_enables_and_executes(tmp_path: Path) -> None:
     raw = store.get_principal("principal_owner")
     assert raw is not None
     principal = Principal(**raw)
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "write_file",
         principal_id="principal_owner",
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "out.txt", "text": "real work"},
         risk_level=RiskLevelValue.LOW,
     )

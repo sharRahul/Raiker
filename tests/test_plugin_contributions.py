@@ -48,6 +48,7 @@ from raiker.plugins.contributions import (
     remove_contributions,
 )
 from raiker.plugins.policy import plan_plugin_registration
+from tests.factories import human
 
 HOOKS_BLOCK = {
     "PreToolUse": [
@@ -229,7 +230,6 @@ def test_the_revocation_executor_removes_them(workspace: Path) -> None:
     revocation deletes the file, a revoked plugin keeps enforcing.
     """
     from raiker.plugins.registry import record_plugin_install
-    from raiker.runtime.authority.models import Principal, PrincipalType
     from raiker.runtime.authority.router import GovernedAction
     from raiker.runtime.executors.tier4_plugins import PluginRevocationExecutor
     from raiker.storage.sqlite import SQLiteStore
@@ -252,11 +252,7 @@ def test_the_revocation_executor_removes_them(workspace: Path) -> None:
             tool_or_service_name="plugin_revocation_cap",
             arguments={"plugin_id": "acme-guard", "reason": "no longer needed"},
         ),
-        Principal(
-            principal_id="principal_owner",
-            principal_type=PrincipalType.HUMAN,
-            display_name="Owner",
-        ),
+        human("principal_owner", role_ids=()),
     )
 
     assert result.ok is True

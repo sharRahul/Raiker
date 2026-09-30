@@ -10,7 +10,7 @@ the audit record too.
 from __future__ import annotations
 
 from raiker.api.redaction import assert_no_secrets_in_body, redact_response_body
-from raiker.control.dashboard import ContextUsageView
+from raiker.control.views.models import ContextUsageView
 from raiker.events.export import redact_event_payload
 
 

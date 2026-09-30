@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.ids import utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
 from raiker.plugins.dependencies import (
@@ -20,6 +20,7 @@ from raiker.runtime.authority import GovernedAction, RuntimeAuthority
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import build_default_executor_registry
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 _ALLOW = frozenset({"dep.one", "dep.two"})
 
@@ -150,11 +151,9 @@ def _enable_install(ws: Path) -> None:
 
 
 def _install_action(principal_id: str, manifest_path: str) -> GovernedAction:
-    return GovernedAction(
-        action_id=new_id("act_"),
+    return governed_action(
+        "plugin_install",
         principal_id=principal_id,
-        action_type="plugin_install",
-        tool_or_service_name="plugin_install",
         arguments={"manifest_path": manifest_path},
         risk_level=RiskLevelValue.MEDIUM,
         session_id="sess_plugin_install",

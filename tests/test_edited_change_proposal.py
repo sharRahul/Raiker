@@ -30,9 +30,9 @@ from fastapi.testclient import TestClient
 from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.models import ToolAction
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.patch_selection import patch_target_paths
+from tests.factories import tool_action
 
 PROPOSED = (
     "--- a/poem.txt\n"
@@ -81,10 +81,10 @@ def _pending_patch(
 ) -> None:
     store.create_session("sess_a", "ws")
     store.insert_tool_action(
-        ToolAction(
+        tool_action(
+            tool_name,
+            {"path": "poem.txt", "patch": patch},
             action_id="act_1",
-            tool_name=tool_name,
-            arguments={"path": "poem.txt", "patch": patch},
             risk_level="medium",
             requires_approval=True,
             proposed_by="principal_owner",
@@ -279,10 +279,10 @@ class TestWhatItRefuses:
         store = SQLiteStore(workspace)
         store.create_session("sess_a", "ws")
         store.insert_tool_action(
-            ToolAction(
+            tool_action(
+                "write_file",
+                {"path": "poem.txt", "content": "roses"},
                 action_id="act_1",
-                tool_name="write_file",
-                arguments={"path": "poem.txt", "content": "roses"},
                 risk_level="medium",
                 requires_approval=True,
                 proposed_by="principal_owner",

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raiker.contracts.views import View
 from raiker.hooks.contracts import HookConfigError, HookHandler, HookRule
 
 # (relative path under the workspace, scope). Managed config has the highest authority.
@@ -74,7 +75,7 @@ def _parse_config(data: dict[str, Any], scope: str, source: str | None = None) -
 
 
 @dataclass(frozen=True)
-class HookSourceStatus:
+class HookSourceStatus(View):
     """What one configuration file contributed, and why it contributed nothing.
 
     A hooks file is owner-authored text on disk. A typo in it used to raise out of
@@ -94,16 +95,6 @@ class HookSourceStatus:
     loaded: bool
     rule_count: int
     error: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "path": self.path,
-            "scope": self.scope,
-            "exists": self.exists,
-            "loaded": self.loaded,
-            "rule_count": self.rule_count,
-            "error": self.error,
-        }
 
 
 def _plugin_sources(root: Path) -> list[tuple[str, str]]:

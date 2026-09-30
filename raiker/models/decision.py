@@ -50,6 +50,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from raiker.contracts.views import View
 from raiker.models.readiness import ModelReadiness, ModelReadinessService
 
 #: The work surfaces that may hold their own default model.
@@ -74,7 +75,7 @@ SELECTION_SOURCES: tuple[str, ...] = ("surface_default", "global_default", "nati
 
 
 @dataclass(frozen=True)
-class ModelChoice:
+class ModelChoice(View):
     """A profile and a concrete model, with why it is the one being named."""
 
     profile_id: str
@@ -82,9 +83,6 @@ class ModelChoice:
     #: For ``selected``: one of ``SELECTION_SOURCES``.
     #: For ``effective``: ``selected``, ``fallback`` or ``no_ready_candidate``.
     source: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"profile_id": self.profile_id, "model": self.model, "source": self.source}
 
 
 @dataclass(frozen=True)
@@ -127,8 +125,18 @@ class ModelDecisionService:
     readiness — an unreadable configuration reports itself as a problem.
     """
 
-    def __init__(self, store: Any, readiness: ModelReadinessService | None = None) -> None:
+    def __init__(
+        self,
+        store: Any,
+        readiness: ModelReadinessService | None = None,
+        *,
+        runtimes: tuple[Any, ...] = (),
+    ) -> None:
         self.store = store
+        # The host's own managed pools. A pool built here would hold no
+        # processes and report every local slot stopped, which is what `_running`
+        # did while it constructed one per call.
+        self.runtimes = runtimes
         if readiness is None:
             # The catalogue probe is the same one the readiness routes build, so
             # a caller that does not already hold a service gets the identical
@@ -267,28 +275,17 @@ class ModelDecisionService:
     def _running(self, profile_id: str) -> bool | None:
         """Whether a managed local process is serving this profile.
 
-        ``None`` for anything without a local slot. "Not running" is not a true
-        statement about a hosted endpoint, and rendering it as `false` puts a
-        stopped-looking state next to a model that is working perfectly.
+        ``None`` for anything without a local slot, and when no pool was given
+        to ask. "Not running" is not a true statement about a hosted endpoint,
+        and rendering it as `false` puts a stopped-looking state next to a model
+        that is working perfectly.
         """
-        if not profile_id:
-            return None
-        try:
-            from raiker.models.local_runtime import ManagedLlamaRuntime, slot_for_profile
-            from raiker.models.mlx_runtime import MLX_SLOTS, ManagedMlxRuntime
-        except Exception:  # noqa: BLE001 — no local runtime support on this host
-            return None
-
-        if slot_for_profile(profile_id) is not None:
-            try:
-                return bool(ManagedLlamaRuntime().status(profile_id).running)
-            except Exception:  # noqa: BLE001 — a runtime that cannot be asked is unknown
-                return None
-        if any(slot.profile_id == profile_id for slot in MLX_SLOTS):
-            try:
-                return bool(ManagedMlxRuntime().status(profile_id).running)
-            except Exception:  # noqa: BLE001
-                return None
+        for runtime in self.runtimes:
+            if any(slot.profile_id == profile_id for slot in runtime.slots):
+                try:
+                    return bool(runtime.status(profile_id).running)
+                except Exception:  # noqa: BLE001 — a runtime that cannot be asked is unknown
+                    return None
         return None
 
     # ── revision ─────────────────────────────────────────────────────────────

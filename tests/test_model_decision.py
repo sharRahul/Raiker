@@ -329,6 +329,38 @@ class TestRunningIsOnlyClaimedWhereItMeansSomething:
 
         assert decision.running is None
 
+    def test_a_local_slot_reports_what_the_hosts_pool_is_running(
+        self, workspace: Path, tmp_path: Path
+    ) -> None:
+        # The decision used to build a pool of its own, which held no process,
+        # so a model the owner had just deployed read as stopped on Models.
+        from raiker.models.local_runtime import LOCAL_SLOTS, ManagedLlamaRuntime
+
+        class _Alive:
+            pid = 4242
+
+            def poll(self) -> None:
+                return None
+
+        library = tmp_path / "library"
+        library.mkdir()
+        model = library / "m.gguf"
+        model.write_bytes(b"GGUF")
+        slot = LOCAL_SLOTS[1]
+        pool = ManagedLlamaRuntime(lambda _argv: _Alive(), approved_roots=(library,))
+        pool.start(model, executable=Path("llama-server"), profile_id=slot.profile_id)
+        store = SQLiteStore(workspace)
+        store.save_surface_model_default(OWNER, "chat", slot.profile_id, slot.alias)
+        chain = [(slot.profile_id, slot.alias)]
+
+        running = ModelDecisionService(
+            store, readiness=_StubReadiness(store, set(chain), chain), runtimes=(pool,)
+        ).decide(OWNER, "chat")
+        unknown = _service(store, ready=set(chain), chain=chain).decide(OWNER, "chat")
+
+        assert running.running is True
+        assert unknown.running is None
+
 
 class TestTheRevisionChangesWhenTheDecisionDoes:
     def test_the_same_decision_gives_the_same_token(self, workspace: Path) -> None:

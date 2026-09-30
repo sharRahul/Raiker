@@ -56,7 +56,7 @@ describe("the stages first launch shows", () => {
 });
 
 describe("what the model stage recommends", () => {
-  it("prefers a runtime already running on this machine", () => {
+  it("prefers a runtime installed on this machine", () => {
     const recommended = recommendedPath([
       profile({
         profile_id: "anthropic-hosted",
@@ -64,11 +64,26 @@ describe("what the model stage recommends", () => {
         local_only: false,
         connection_configured: true,
       }),
-      profile({ profile_id: "ollama-local", provider_detected: true }),
+      profile({ profile_id: "ollama-local", provider_detected: true, configured: true }),
     ]);
 
     expect(recommended?.profileId).toBe("ollama-local");
-    expect(recommended?.label).toContain("already running here");
+    // Detection is a PATH lookup, so the claim is "installed", not "running".
+    expect(recommended?.label).toContain("installed here");
+  });
+
+  it("does not recommend an installed runtime that names no model", () => {
+    // A managed llama.cpp slot before anything is deployed into it.
+    const bare = profile({
+      profile_id: "raiker-local-llama-cpp",
+      provider: "llama.cpp",
+      provider_detected: true,
+      configured: false,
+    });
+    expect(recommendedPath([bare])).toBeNull();
+
+    const ollama = profile({ profile_id: "ollama-local", provider_detected: true, configured: true });
+    expect(recommendedPath([bare, ollama])?.profileId).toBe("ollama-local");
   });
 
   /**

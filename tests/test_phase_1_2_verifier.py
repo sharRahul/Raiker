@@ -5,14 +5,15 @@ import json
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import PolicyDecision, ToolAction, ToolResult
 from raiker.verification.verifier import Verifier
+from tests.factories import tool_action
 
 
 def _action(tool_name: str, arguments: dict[str, object], *, requires_approval: bool = False) -> ToolAction:
     risk = "high" if requires_approval else "medium"
-    return ToolAction(
+    return tool_action(
+        tool_name,
+        arguments,
         action_id=new_id("act_"),
-        tool_name=tool_name,
-        arguments=arguments,
         risk_level=risk,
         requires_approval=requires_approval,
     )

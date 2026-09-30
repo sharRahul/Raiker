@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from raiker.contracts.ids import utc_now
+from raiker.contracts.views import View
 from raiker.storage.sqlite import SQLiteStore
 
 WARNING_DAYS = 75
@@ -13,21 +14,12 @@ OVERDUE_DAYS = 90
 
 
 @dataclass(frozen=True)
-class CredentialLifecycleView:
+class CredentialLifecycleView(View):
     credential_id: str
     provider: str
     verified_at: str | None
     due_at: str
     status: str
-
-    def to_dict(self) -> dict[str, str | None]:
-        return {
-            "credential_id": self.credential_id,
-            "provider": self.provider,
-            "verified_at": self.verified_at,
-            "due_at": self.due_at,
-            "status": self.status,
-        }
 
 
 def _parse(value: str) -> datetime:

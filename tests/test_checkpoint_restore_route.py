@@ -19,6 +19,7 @@ from pathlib import Path
 from raiker.cli.commands import bootstrap_owner, handle_checkpoints
 from raiker.control.service import RuntimeControlService
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action, tool_action
 
 
 def _workspace(tmp_path: Path) -> Path:
@@ -102,14 +103,13 @@ def test_the_route_raises_an_approval_and_restores_nothing(tmp_path: Path) -> No
     assert plan is not None
 
     from raiker.contracts.ids import new_id
-    from raiker.contracts.models import ToolAction
 
     # The route's own body, exercised without the HTTP stack: recompute, record,
     # return an approval id. What matters is that the workspace is untouched.
-    action = ToolAction(
+    action = tool_action(
+        "checkpoint_restore",
+        {"checkpoint_id": checkpoint_id},
         action_id=new_id("act_"),
-        tool_name="checkpoint_restore",
-        arguments={"checkpoint_id": checkpoint_id},
         risk_level="high",
         requires_approval=True,
         proposed_by="principal_owner",
@@ -183,10 +183,9 @@ def test_a_relayed_write_is_captured_under_the_proposing_conversation(tmp_path: 
     session was invisible to every restore plan. The pre-image existed and
     nothing could reach it, which is the same defect BUG-230 closed one layer up.
     """
-    from raiker.contracts.ids import new_id
     from raiker.events.writer import EventLogWriter
     from raiker.runtime.authority.models import Principal, RiskLevelValue
-    from raiker.runtime.authority.router import GovernedAction, RuntimeAuthority
+    from raiker.runtime.authority.router import RuntimeAuthority
     from raiker.runtime.executors import build_default_executor_registry
 
     ws = _workspace(tmp_path)
@@ -205,15 +204,11 @@ def test_a_relayed_write_is_captured_under_the_proposing_conversation(tmp_path: 
         executor_registry=build_default_executor_registry(ws, store),
     )
     _force_enable(store, "file_write_execution")
-    action = GovernedAction(
-        action_id=new_id("act_"),
+    action = governed_action(
+        "write_file",
         principal_id=principal.principal_id,
-        action_type="write_file",
-        tool_or_service_name="write_file",
         arguments={"path": "relayed.txt", "text": "after"},
         risk_level=RiskLevelValue.LOW,
-        # What the relay does: execute under the inbox's API session, while
-        # naming the conversation the proposal came from.
         session_id="api_ses_inbox",
         origin_session_id="sess_chat",
     )

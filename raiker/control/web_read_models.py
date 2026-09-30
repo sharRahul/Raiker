@@ -19,7 +19,7 @@ are served read-only.
 from __future__ import annotations
 
 import os
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import UTC
 from pathlib import Path
 from typing import Any
@@ -27,6 +27,7 @@ from typing import Any
 from raiker.api.redaction import redact_response_body
 from raiker.checkpoints.service import CheckpointService
 from raiker.contracts.ids import utc_now
+from raiker.contracts.views import View
 from raiker.control.dashboard import DashboardService
 from raiker.runtime.connector_ecosystem import (
     ConnectorCatalog,
@@ -71,7 +72,7 @@ _DEFERRED_EXTENSION_KINDS: tuple[dict[str, str], ...] = (
 
 
 @dataclass(frozen=True)
-class ExtensionView:
+class ExtensionView(View):
     """One extension's lifecycle as four independent, server-derived facts.
 
     ``installed``, ``connected``, ``enabled``, and ``usable`` are deliberately
@@ -106,30 +107,18 @@ class ExtensionView:
     tool_count: int = 0
     last_activity_at: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class ExtensionsOverviewView:
+class ExtensionsOverviewView(View):
     extensions: tuple[ExtensionView, ...]
     counts: dict[str, int]
     vault_configured: bool
     connector_egress_allowlist_configured: bool
     deferred: tuple[dict[str, str], ...] = _DEFERRED_EXTENSION_KINDS
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "extensions": [e.to_dict() for e in self.extensions],
-            "counts": dict(self.counts),
-            "vault_configured": self.vault_configured,
-            "connector_egress_allowlist_configured": self.connector_egress_allowlist_configured,
-            "deferred": [dict(d) for d in self.deferred],
-        }
-
 
 @dataclass(frozen=True)
-class ProjectFileView:
+class ProjectFileView(View):
     """Metadata for one project file. Never carries file content."""
 
     workspace_path: str
@@ -139,12 +128,9 @@ class ProjectFileView:
     modified_at: str
     depth: int
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
 
 @dataclass(frozen=True)
-class FileProvenanceEntryView:
+class FileProvenanceEntryView(View):
     """One governed write that touched a file, as recorded by checkpoint capture.
 
     Content addresses and sizes only — the pre-image bytes are never returned.
@@ -161,9 +147,6 @@ class FileProvenanceEntryView:
     existed_before: bool
     pre_image_size: int
     created_at: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 @dataclass(frozen=True)

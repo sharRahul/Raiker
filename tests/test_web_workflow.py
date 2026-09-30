@@ -54,8 +54,11 @@ def test_every_dto_module_the_contract_check_reads_triggers_the_web_job() -> Non
     paths = set(_triggers()["pull_request"])
     for module in DTO_MODULES:
         as_file = f"{module.replace('.', '/')}.py"
-        package_glob = f"{module.split('.')[0]}/{module.split('.')[1]}/**"
-        covered = as_file in paths or package_glob in paths
+        parts = module.split(".")
+        # Any enclosing package's glob covers the module, `raiker/control/views/**`
+        # as much as `raiker/control/**`.
+        globs = {"/".join(parts[:depth]) + "/**" for depth in range(2, len(parts))}
+        covered = as_file in paths or bool(globs & paths)
         assert covered, f"{module} can change without the web client being built ({as_file})"
 
 

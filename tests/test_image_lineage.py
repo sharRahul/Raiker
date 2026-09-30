@@ -26,13 +26,14 @@ from typing import Any
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.ids import utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
-from raiker.runtime.authority import GovernedAction, GovernedActionResult, RuntimeAuthority
+from raiker.runtime.authority import GovernedActionResult, RuntimeAuthority
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import build_default_executor_registry, tier2_image
 from raiker.storage.sqlite import SQLiteStore
+from tests.factories import governed_action
 
 CAP = "image_generation"
 
@@ -75,11 +76,9 @@ def _generate(ws: Path, **args: object) -> GovernedActionResult:
     assert raw is not None
     principal = Principal(**raw)
     return authority.route_action(
-        GovernedAction(
-            action_id=new_id("act_"),
+        governed_action(
+            CAP,
             principal_id=principal.principal_id,
-            action_type=CAP,
-            tool_or_service_name=CAP,
             arguments=dict(args),
             risk_level=RiskLevelValue.MEDIUM,
         ),

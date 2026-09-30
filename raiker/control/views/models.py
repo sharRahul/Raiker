@@ -65,6 +65,10 @@ def _names_an_available_model(
         return True
     if profile.profile_id in deployed_profile_ids:
         return True
+    # A managed slot's alias exists only once a model is deployed into it; the
+    # runtime binary being installed is no evidence of that.
+    if profile.raw.get("managed_slot"):
+        return False
     return presence.get(profile.provider) is True
 
 

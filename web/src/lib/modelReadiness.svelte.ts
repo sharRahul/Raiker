@@ -23,11 +23,13 @@ export function readinessForProfile(profile: ModelProfile): ModelReadinessView {
     remediation: profile.readiness_remediation ?? "Set up or check this model before sending.",
     // The composer needs to know whether the owner has connected this provider,
     // because that is exactly what decides whether the server will take the
-    // first readiness check itself. `evidence` is the view's free-form half and
-    // is where a fact like this belongs rather than in a new contract field.
+    // first readiness check itself — a saved connection, and nothing else. A
+    // local runtime has none, and counting it as connected told the owner "you
+    // can still send" before a turn the server then refused. `evidence` is the
+    // view's free-form half, where a fact like this belongs.
     evidence: {
       provider: profile.provider,
-      connection_configured: profile.connection_configured === true || !profile.off_machine,
+      connection_configured: profile.connection_configured === true,
     },
     ready: profile.ready === true,
   };
@@ -109,12 +111,16 @@ const MEASURED_UNAVAILABLE = new Set([
 export function isChoosableModel(profile: {
   readiness_state?: string | null;
   connection_configured?: boolean;
+  configured?: boolean;
   off_machine?: boolean;
 }): boolean {
   // `ready === false` is not the test: it is also false for a model nobody has
   // checked, and excluding those emptied every picker on a fresh instance. What
   // disqualifies a model is a check that *answered badly*.
   if (profile.readiness_state && MEASURED_UNAVAILABLE.has(profile.readiness_state)) return false;
+  // The server's own answer that the profile names no model this owner has —
+  // a managed llama.cpp slot before anything is deployed into it.
+  if (profile.configured === false) return false;
   // A provider the owner holds an account with is only reachable once they have
   // connected it. Listing "Anthropic — Sonnet 5" on an instance with no
   // Anthropic credential offered a model that cannot answer, which is the same

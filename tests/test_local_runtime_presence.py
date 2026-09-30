@@ -182,6 +182,25 @@ class TestTheCountThatWasWrong:
         assert slots, "the shipped llama.cpp slots should still be listed for setup"
         assert all(profile["configured"] is False for profile in slots)
 
+    def test_an_installed_llama_server_is_not_a_deployed_model(
+        self, client: TestClient, owner_token: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`llama-server` on PATH proves the runtime, not a model in any slot.
+
+        Found live: with the binary installed and nothing deployed, every slot
+        read as configured and setup recommended "GGUF" beside "No complete
+        GGUF found".
+        """
+        monkeypatch.setattr(
+            local_presence.shutil,
+            "which",
+            lambda name: "/usr/bin/llama-server" if name == "llama-server" else None,
+        )
+        body = client.get("/api/models", headers=_auth(owner_token)).json()
+        slots = [p for p in body["profiles"] if p["profile_id"].startswith("raiker-local-llama-cpp")]
+        assert slots and all(p["provider_detected"] is True for p in slots)
+        assert all(p["configured"] is False for p in slots)
+
     def test_a_deployed_slot_counts(
         self, client: TestClient, owner_token: str, workspace: Path, bare_host: None
     ) -> None:

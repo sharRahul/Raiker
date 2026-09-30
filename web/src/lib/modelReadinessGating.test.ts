@@ -13,6 +13,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelReadinessView } from "./apiTypes";
 import {
   blocksSending,
+  isChoosableModel,
+  readinessForProfile,
   isReachableProfile,
   isRevalidating,
   readinessForSelection,
@@ -91,6 +93,29 @@ describe("model readiness gating", () => {
       evidence: { connection_configured: false },
     });
     expect(blocksSending(unconnected)).toBe(true);
+  });
+
+  it("does not count a local runtime as connected", () => {
+    // Found live: a local Ollama model chosen in setup read "you can still
+    // send", and the server — which takes a first check only for a saved
+    // connection — refused the turn as never checked.
+    const local = readinessForProfile({
+      profile_id: "ollama-local-openai-compatible",
+      provider: "ollama",
+      model: "gpt-oss:20b-cloud",
+      off_machine: false,
+      connection_configured: false,
+      readiness_state: "not_configured",
+      ready: false,
+    } as never);
+    expect(blocksSending(local)).toBe(true);
+  });
+
+  it("does not offer a managed slot nothing has been deployed into", () => {
+    // `llama-server` installed and no GGUF served: My models offered **Use** on
+    // four slots that could not answer.
+    expect(isChoosableModel({ off_machine: false, configured: false })).toBe(false);
+    expect(isChoosableModel({ off_machine: false, configured: true })).toBe(true);
   });
 
   it("blocks a send when no model is named at all", () => {

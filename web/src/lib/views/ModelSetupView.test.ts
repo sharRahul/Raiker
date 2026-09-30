@@ -105,11 +105,11 @@ describe("first-run setup", () => {
   });
 
   it("leads with the easiest working path and keeps the matrix on request", async () => {
-    // FIRST-05 — a runtime already running here needs no account and no key.
+    // FIRST-05 — a runtime installed here needs no account and no key.
     stubFetch({
       "GET /api/setup": required,
       "GET /api/models": {
-        profiles: [profile({ profile_id: "ollama-local", provider: "ollama", provider_detected: true })],
+        profiles: [profile({ profile_id: "ollama-local", provider: "ollama", provider_detected: true, configured: true })],
         chat_profiles: [],
       },
       "GET /api/model-library": { roots: [], models: [] },
@@ -120,7 +120,7 @@ describe("first-run setup", () => {
     render(ModelSetupView);
 
     expect(await screen.findByText("Recommended")).toBeInTheDocument();
-    expect(screen.getByText(/Ollama is already running here/)).toBeInTheDocument();
+    expect(screen.getByText(/Ollama is installed here/)).toBeInTheDocument();
     // The full matrix is one press away rather than the opening move.
     expect(screen.getByRole("button", { name: "Other options" })).toBeInTheDocument();
   });
@@ -209,6 +209,7 @@ describe("first-run setup", () => {
         models: ["claude-opus-4-5", "claude-haiku-4-5-20251001"],
       },
       "PUT /api/model-selection": { ok: true, profile_id: "anthropic-hosted", model: "claude-opus-4-5" },
+      "POST /api/model-readiness/check": { profile_id: "anthropic-hosted", model: "claude-opus-4-5", state: "ready", ready: true },
     });
     render(ModelSetupView);
 
@@ -240,6 +241,15 @@ describe("first-run setup", () => {
       ).toBe(true),
     );
     expect(await screen.findByText(/Opus 4.5 is selected/)).toBeInTheDocument();
+    // The choice is the owner's own act, so its first check is taken with it.
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) =>
+            String(url).endsWith("/api/model-readiness/check") && init?.method === "POST",
+        ),
+      ).toBe(true),
+    );
   });
 
   // BUG-274 — an identity-linked key authenticates and then acts inside one

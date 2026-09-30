@@ -96,15 +96,23 @@ export function recommendedPath(profiles: ModelProfile[]): RecommendedPath | nul
   // answer, so a runtime this machine is running but whose last check found no
   // model, or a connected account whose key was rejected, is not offered as the
   // cheapest path to a working model.
+  //
+  // Detection is a PATH lookup: it proves the runtime is installed, not that it
+  // serves anything. So the runtime must also name a model it has — a managed
+  // llama.cpp slot does not until one is deployed into it, and the first screen
+  // used to recommend it beside "No complete GGUF found".
   const detected = profiles.find(
     (profile) =>
-      profile.local_only && profile.provider_detected === true && isReachableProfile(profile),
+      profile.local_only &&
+      profile.provider_detected === true &&
+      profile.configured === true &&
+      isReachableProfile(profile),
   );
   if (detected) {
     return {
       profileId: detected.profile_id,
       provider: detected.provider,
-      label: `${providerName(detected.provider)} is already running here`,
+      label: `${providerName(detected.provider)} is installed here`,
       detail:
         "It needs no account and no API key, and its models never leave this device.",
     };

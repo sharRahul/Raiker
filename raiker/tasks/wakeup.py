@@ -1,18 +1,12 @@
 """The nudge that turns an approved scheduled run from *waiting* into *running*.
 
-BUG-39. A scheduled run that parks on an approval is continued by the host's own
-scheduler pass, and that pass used to happen only on the 15-second tick. A
-decision granted one moment after a tick therefore sat for the rest of the
-interval showing *waiting for approval*, while the identical decision made in
-Chat continued within a second — because a Chat tab is watching and resolving an
-approval there nudges that watcher directly.
-
-This is the scheduler's equivalent of that watcher. Resolving an approval sets
-the event; the host's continuation worker is waiting on it and starts the
-continuation immediately. The periodic tick still runs, unchanged, which is
-exactly the arrangement the fix asks for: the signal is the fast path and the
-tick is the recovery path, so a decision that arrives while the worker is busy —
-or through a route that never reaches this process at all — is still picked up.
+BUG-39. A scheduled run that parks on an approval continues as promptly as one
+in Chat, where a watching tab is nudged directly. This is the scheduler's
+equivalent of that watcher: resolving an approval sets the event, and the host's
+continuation worker waiting on it starts the continuation immediately. The
+periodic tick still runs: the signal is the fast path and the tick is the
+recovery path, so a decision that arrives while the worker is busy — or through
+a route that never reaches this process at all — is still picked up.
 
 Two things this deliberately is *not*:
 

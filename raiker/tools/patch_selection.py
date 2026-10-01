@@ -1,8 +1,6 @@
 """Accepting part of a proposed change (GAP-BUILD B14).
 
-An approval used to govern a whole change set: the owner read a diff and pressed
-Accept or Reject on all of it. Reviewing code is not that. The reviewer who wants
-two of five hunks had to reject everything and ask again, which is the one
+A reviewer who wants two of five hunks accepts those two: that is the one
 interaction a coding agent's review surface exists to support.
 
 **A selection narrows; it never edits.** That distinction is the whole security

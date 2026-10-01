@@ -283,9 +283,8 @@
     if (!task.scheduled_at) return "Ready when you run it";
     const when = new Date(task.scheduled_at).toLocaleString();
     if (task.recurrence === "background") return task.status === "running" ? "Background agent working" : "Background agent ready to start";
-    // Backlog #10 — a routine used to read as "Scheduled for …" unless it was
-    // daily, so an hourly or weekly one looked like a one-shot and its next slot
-    // looked like its only one.
+    // Backlog #10 — every repeating cadence reads as a routine, so an hourly or
+    // weekly one never looks like a one-shot whose next slot is its only one.
     if (task.recurrence) return `${cadenceLabel(task.recurrence)}, next ${when}`;
     return `Scheduled for ${when}`;
   }
@@ -475,9 +474,8 @@
 
   // REM-TASK-02 — all three lifecycle controls below go through the shared
   // controller, so one run has one Stop, one Resume and one Run-now meaning
-  // wherever the owner presses it. This page's Stop used to discard the
-  // runtime's reason entirely, and reported a refusal and a lost response with
-  // the same five words.
+  // wherever the owner presses it, and a refusal is reported apart from a lost
+  // response, with the runtime's reason.
   //
   // BUG-25/BUG-39 — the owner's retry. Granting the approval now signals the
   // host directly, so a parked scheduled run starts continuing immediately and
@@ -522,13 +520,8 @@
   $effect(() => { void projectId; void sessionId; void load(); });
 
   // Tasks run outside this page: a queued run is claimed, works, and finishes
-  // while the list sits still. Without this the page kept showing "queued" long
-  // after the run had ended (BUG-09), and only a manual Refresh disagreed.
-  // The `raiker:task-compose` handoff this used to listen for came from the
-  // Workbench composer, which no longer exists: the Workbench is a board over the
-  // work that is already running, and planning a task happens in the form on this
-  // page. A listener for an event nothing dispatches is a handoff the product
-  // claims and never performs, so it is gone with its sender.
+  // while the list sits still, so the page polls rather than show "queued"
+  // after the run has ended (BUG-09).
   onMount(() => {
     // Chat's `/schedule` asks this surface to open on **Schedule once**. It
     // arranges the form and stops: nothing is created and nothing is scheduled.
@@ -589,10 +582,9 @@
   {/if}
 
   <!-- COMPOSER-10 — the same shell Chat, Build and Design use. What differs is
-       the primary action and the one control that is specific to planning work:
-       when it should run. Everything else the form used to hold at all times —
-       title, parent, priority, repeat, start time, model — is either derived or
-       behind Details. -->
+       the primary action and the one control specific to planning work: when
+       it should run. Title, parent, priority, repeat, start time and model are
+       derived or behind Details. -->
   <Composer
     ariaLabel="Plan work"
     cardClass="composer-task"
@@ -945,12 +937,10 @@
                 activityAt={task.updated_at}
               />
               <span class="task-actions">
-                <!-- C11 — background work used to finish into a status line.
-                     Each task now runs its cycles in a conversation of its own,
-                     so "what did the overnight run find?" is a thread the owner
-                     opens and replies in — and because the next cycle runs in
-                     the same conversation, the reply is context that cycle
-                     reads rather than a note nobody acts on.
+                <!-- C11 — each task runs its cycles in a conversation of its
+                     own, so "what did the overnight run find?" is a thread the
+                     owner opens and replies in, and the reply is context the
+                     next cycle reads.
 
                      Only offered once there is something to read: a link to an
                      empty transcript is a dead end, and a routine that has not

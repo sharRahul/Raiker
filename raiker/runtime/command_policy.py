@@ -419,10 +419,9 @@ _PASSTHROUGH = (
     # Windows again, and for a structural reason rather than a convenience one:
     # an AppContainer process is created with a redirected local profile, and
     # `CreateProcessW` resolves that from the environment it is given. Without
-    # `LOCALAPPDATA` the launch fails with ERROR_ENVVAR_NOT_FOUND — a error code
-    # that names nothing about what is actually missing. Found live: every
-    # sandboxed command refused to start while the same command run with the
-    # host's own environment worked.
+    # `LOCALAPPDATA` the launch fails with ERROR_ENVVAR_NOT_FOUND, an error code
+    # that names nothing about what is actually missing, and every sandboxed
+    # command refuses to start.
     "LOCALAPPDATA",
 )
 

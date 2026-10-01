@@ -134,11 +134,8 @@
 </script>
 
 <div class="head-row">
-  <!-- BUG-87 — the scope is stated, because the page used to claim "every
-       governed step" while showing only conversation events, so connecting a
-       credential or pinning a model appeared nowhere. It is stated in one line
-       now: what it *includes* is read once and belongs in the guide, and four
-       sentences above the filters filled a phone screen before the first row. -->
+  <!-- BUG-87 — the scope is stated in one line, and only what is true of it;
+       what it *includes* belongs in the guide. -->
   <p class="page-lead">
     Every governed step in this account, append-only. <GuideLink route="activity" />
   </p>

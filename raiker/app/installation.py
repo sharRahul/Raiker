@@ -311,13 +311,11 @@ class UpdateStatus:
 #: ``available``        a newer, signed release exists for this target.
 #: ``unreachable``      the channel could not be read; nothing was changed.
 #:
-#: REM-SET-UPDATES — ``not_checked`` is its own state because it used to be
-#: ``up_to_date`` carrying the message "Not checked yet on this host."  Every
-#: consumer that reads the state rather than the sentence — the host control's
-#: tone map among them — therefore rendered a host that had never contacted its
-#: channel as *current*, in the same green as one that had asked and been told
-#: it was.  "Nobody has looked" and "there is nothing newer" are different
-#: facts, and only one of them is an assurance.
+#: REM-SET-UPDATES — ``not_checked`` is its own state, not ``up_to_date`` with a
+#: "Not checked yet" message, because every consumer that reads the state rather
+#: than the sentence — the host control's tone map among them — would render a
+#: host that never contacted its channel as *current*.  "Nobody has looked" and
+#: "there is nothing newer" are different facts, and only one is an assurance.
 STATE_MESSAGES = {
     "source_checkout": _SOURCE_NOTE,
     "no_channel": (

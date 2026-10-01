@@ -119,15 +119,10 @@
   let archiveError = $state<string | null>(null);
 
   /*
-   * UX-PROJ-09 — "current" is one thing, and it is the Work project.
-   *
-   * The card used to badge a project "active" from the account-level selection
-   * the server still keeps, which nothing on this page sets any more; the
-   * project new work actually starts in is the Work project every composer
-   * reads. Two answers to "which project am I in" is the confusion, so the
-   * page shows the one the composers use, calls it what it is, and keeps
-   * "recently active" (when work last happened) and "archived" (whether the
-   * project takes new work at all) as separate facts.
+   * UX-PROJ-09 — "current" is one thing: the Work project every composer reads,
+   * never the account-level selection the server also keeps. "Recently active"
+   * (when work last happened) and "archived" (whether the project takes new
+   * work) are separate facts.
    */
   const currentProjectId = $derived(workProject());
   const WORK_MODE_NAMES = { "new-chat": "Chat", build: "Build", design: "Design" } as const;
@@ -189,17 +184,10 @@
   /*
    * "New chat in this project" opens Chat in that project.
    *
-   * RR-PROJECT-01 — this used to navigate and nothing else, on the reasoning
-   * that Chat's retrieval is owner-wide by design and starting a conversation
-   * from a project must not quietly scope it. The first half of that is right
-   * and is unchanged. The second half conflated two different things: *what a
-   * turn may retrieve* and *where the resulting conversation is filed*. Only the
-   * first is a boundary. The second is the ordinary meaning of pressing "New
-   * chat" on a project card, and the Build button beside it had always done it.
-   *
-   * So the shared Work project is set — which is filing, is visible in the
-   * composer's own picker before the owner presses Send, and re-files nothing
-   * that already exists — and retrieval stays owner-wide exactly as before.
+   * RR-PROJECT-01 — *what a turn may retrieve* and *where the conversation is
+   * filed* are different things, and only the first is a boundary. This sets
+   * the shared Work project — filing, visible in the composer's picker before
+   * Send, re-filing nothing that exists — and retrieval stays owner-wide.
    */
   function newChatInProject(projectId: string) {
     setWorkProject(projectId);
@@ -344,16 +332,11 @@
    * NEW-PROJ-01 — which selection a response belongs to.
    *
    * A project home is four independent reads — the detail, the files, the tasks
-   * and the images — sharing one set of view variables, and every one of them
-   * used to be assigned the moment it resolved. Open project A on a slow
-   * workspace, open B while A's file read is still out, and B's header stood
-   * over A's files: a header is an implicit promise that everything under it
-   * belongs to that workspace, and this broke the promise silently, which is
-   * the worst way to break it. An older *failed* detail read could also clear a
-   * newer successful selection, so a project that loaded fine disappeared
-   * behind an error about a different one.
+   * and the images — sharing one set of view variables. Invariant: everything
+   * under a project's header belongs to that project, and a stale response —
+   * success or failure — never lands on a newer selection.
    *
-   * The counter is the whole fix. Each open takes the next number, every
+   * Each open takes the next number, every
    * response carries the number of the open that asked for it, and a response
    * is committed only if that number is still the current one. It holds for
    * failures as well as successes, and for a close during a load, because
@@ -519,14 +502,10 @@
   /**
    * UX-BUILD-05 — open the project a `#/projects?project=<id>` link names.
    *
-   * Build, Chat, Design and Tasks all name the Project a turn runs inside and
-   * all linked here, to the list. Coming back meant finding that project among
-   * the others and pressing it again. They now link to it, and this is the half
-   * that makes the link land.
-   *
-   * An id that names no owned project is not an error: the list opens, which is
-   * what the link used to do, and is the right answer for a project that has
-   * since been deleted or archived.
+   * Build, Chat, Design and Tasks name the Project a turn runs inside and link
+   * to it; this is the half that makes the link land. An id that names no owned
+   * project is not an error: the list opens, which is the right answer for a
+   * project that has since been deleted or archived.
    */
   async function openRequestedProject() {
     const requested = projectFromHash(window.location.hash);

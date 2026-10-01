@@ -1,8 +1,7 @@
 """Session-authorized, view-only previews of stored attachments (BUG-07).
 
-A chat attachment used to be a dead chip: the bytes were in the governed store
-and there was no way to look at them again. This module is the read side of the
-file inspector, and it is deliberately the narrowest one that works:
+The read side of the file inspector, so an attachment can be looked at again,
+and deliberately the narrowest one that works:
 
 * **Authorization is a stored fact, not an inference.** ``get`` returns
   something only when ``session_attachment_refs`` holds a row joining this

@@ -69,7 +69,7 @@ class ManagedSlotRuntime:
     """Starts, stops and reports loopback servers across a fixed slot table.
 
     Selecting a slot, reserving it and launching into it are one step under one
-    lock (GCR-28): two deploys arriving together used to both see a slot free,
+    lock (GCR-28), so two deploys arriving together cannot both see a slot free,
     both launch, and orphan one process contending for one port.
     """
 

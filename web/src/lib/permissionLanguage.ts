@@ -76,11 +76,8 @@ export const BEHAVIOUR_COPY: Record<DecisionMode, BehaviourCopy> = {
 /**
  * What to read when the stored mode is not one Raiker knows.
  *
- * NEW-PERM-03 — the page used to answer a missing or unrecognised mode by
- * quietly dropping the behaviour half of the row, and the authority table
- * answered it by calling the capability `Direct`. Both are the page inventing
- * an enforcement decision it has not been told. Unknown is not evidence of
- * permission, so it is said as itself.
+ * NEW-PERM-03 — the page never invents an enforcement decision it has not been
+ * told. Unknown is not evidence of permission, so it is said as itself.
  */
 export const UNKNOWN_BEHAVIOUR: BehaviourCopy = {
   label: "Unknown",
@@ -109,9 +106,8 @@ export function rowSummary(
 /**
  * The first question's answer, in a sentence rather than in a word.
  *
- * REM-PERM-03 — the detail used to print the question as a heading and then
- * offer only the buttons underneath it, so the card asked "Can Raiker use
- * this?" and never said. `On by default` is kept apart from `On` because they
+ * REM-PERM-03 — the card answers "Can Raiker use this?" in words, not only
+ * with buttons. `On by default` is kept apart from `On` because they
  * are different facts about the same capability: one is a choice the owner
  * made, the other is what an empty table resolves to.
  */

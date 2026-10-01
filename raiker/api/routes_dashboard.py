@@ -1883,15 +1883,12 @@ def _record_codex_connection(request: Request, principal_id: str, *, signed_in: 
     ``provider_runtime_policy_from_gates`` reads, so an owner who has connected
     is not then sent to Permissions to flip a second switch.
 
-    **BUG-259 — it must not be called from a read.** It used to be, from
-    ``GET .../status``, and the consequence was that a brand-new Raiker on a
-    machine where somebody had once signed Codex in adopted that ChatGPT
-    account by itself: merely opening the setup page connected an identity
-    nobody had chosen, listed its models, and reported it as connected. A read
-    that performs a connection is exactly what "nothing is contacted until you
-    ask" exists to forbid, and adopting an account is worse than contacting a
-    host. Only the two explicit routes below reach this — the owner pressing
-    connect, or disconnect.
+    **BUG-259 — it must not be called from a read.** A read that adopts an
+    account connects an identity nobody chose — on a machine where somebody
+    once signed Codex in, merely opening the setup page would do it — which is
+    exactly what "nothing is contacted until you ask" forbids. Only the two
+    explicit routes below reach this — the owner pressing connect, or
+    disconnect.
 
     The marker is the fact of the connection and nothing else. Access tokens,
     refresh tokens, verifiers, device codes and authorization URLs stay inside
@@ -1974,8 +1971,8 @@ async def connect_chatgpt_codex(
 ) -> dict[str, Any]:
     """Adopt the ChatGPT subscription the local Codex client is signed in to.
 
-    BUG-259 — the explicit act that ``GET .../status`` used to perform by
-    itself. It refuses when Codex has no session, because recording a connection
+    BUG-259 — the explicit act, never performed by a read. It refuses when
+    Codex has no session, because recording a connection
     to an account that does not exist would put a provider in the pickers that
     cannot answer anything.
     """

@@ -93,21 +93,18 @@ class EventLogWriter:
                 )
             except Exception:
                 # GCR-40 - the file append and the index write are two
-                # different stores, and this is the gap between them. An
-                # index write that failed used to leave the line behind: a
-                # JSONL line the database has never heard of, which the
-                # integrity verifier could not see (it starts from the
-                # index) and which the *next* append would chain straight
-                # past, because `prev_hash` also comes from the database.
-                # The physical log and the indexed hash chain then
-                # disagreed permanently.
+                # different stores, and this is the gap between them. A line
+                # left behind by a failed index write is one the *next*
+                # append would chain straight past, because `prev_hash` comes
+                # from the database, and the physical log and the indexed
+                # hash chain would disagree permanently.
                 #
-                # The append is undone instead. That is safe precisely
+                # So the append is undone. That is safe precisely
                 # here: the session lock is still held, so nothing else has
                 # appended, and `offset` is where this line starts, so
                 # truncating to it restores the file to what the index
                 # still describes. A truncation that itself fails leaves an
-                # orphan, which is why `verify_session_events` now scans
+                # orphan, which is why `verify_session_events` scans
                 # for lines the index does not know about rather than
                 # trusting the index to be complete.
                 self._undo_append(path, offset)

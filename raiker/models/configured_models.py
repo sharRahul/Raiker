@@ -6,13 +6,11 @@ and is read on the way into every turn: by the gateway resolving the turn's
 profile, by readiness resolving the target it reports on, and by the advisor
 resolving the model a consult would call.
 
-All three used to read it the same wrong way — ``except Exception: return
-None`` — and ``None`` already means something else here. It means *the owner
-pinned nothing*, which for a placeholder profile makes the profile unrunnable
-and drops it from the fallback chain and from readiness. So a storage failure
-did not surface as a storage failure; it silently changed which model Raiker
-would run, or removed a model the owner had configured, and every surface then
-reported that altered reality as the truth (GCR-46).
+``None`` already means *the owner pinned nothing*, which for a placeholder
+profile makes it unrunnable and drops it from the fallback chain and from
+readiness, so a storage failure must never read as ``None``: it would silently
+change which model Raiker runs, and every surface would report that altered
+reality as the truth (GCR-46).
 
 The distinction this module exists to keep:
 

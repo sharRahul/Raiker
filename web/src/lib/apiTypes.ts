@@ -495,9 +495,8 @@ export interface PartialFiles {
 }
 
 /**
- * GCR-38 — one host-tick background pass and how it has been going. Failures
- * used to be suppressed in silence, so a pass could throw every fifteen seconds
- * while the host reported itself healthy.
+ * GCR-38 — one host-tick background pass and how it has been going, so a pass
+ * that keeps failing is never reported as a healthy host.
  */
 export interface BackgroundWorkerHealth {
   pass_name: string;
@@ -1063,10 +1062,8 @@ export interface ModelsView {
   current_model: string | null;
   advisor_profile_id: string | null;
   advisor_model_gate_state: string;
-  // BUG-82 — readiness for the exact model a consult would call. The advisor is
-  // a second model this runtime runs, and it used to have no probe, no state and
-  // no chip: an owner could pin one with no credential, no credit or no running
-  // runtime and learn about it only when a consult failed mid-turn.
+  // BUG-82 — readiness for the exact model a consult would call: the advisor is
+  // a second model, and a broken one is reported before a consult fails mid-turn.
   advisor_model?: string | null;
   advisor_readiness_state?: ModelReadinessState;
   advisor_readiness_summary?: string | null;
@@ -1088,8 +1085,7 @@ export interface ModelsView {
   ready_provider_count?: number;
   /**
    * BUG-270 — models the owner actually has set up, counted on the server where
-   * the deployment and detection facts live. The browser used to derive this
-   * itself from the model string and counted four empty local slots.
+   * the deployment and detection facts live, so an empty local slot is never one.
    */
   usable_provider_count?: number;
 }
@@ -1690,12 +1686,9 @@ export interface DiagnosticsExport {
 /**
  * NEW-THREAD-01 — one filtered, faceted, bounded page of the work index.
  *
- * Threads used to derive its Project choices from whatever arrived in one
- * unpaginated read of a hundred rows, so a project whose newest thread fell
- * outside that page was not offered as a filter at all — on screen,
- * indistinguishable from a project with nothing in it. The facets below are
- * computed on the server over everything that matched, with each facet's own
- * filter lifted, so every choice stays reachable from every page.
+ * The facets are computed on the server over everything that matched, with
+ * each facet's own filter lifted, so every choice stays reachable from every
+ * page rather than only those in the rows a browser happened to receive.
  */
 export interface WorkThreadFacet {
   value: string;
@@ -1745,8 +1738,8 @@ export interface WorkThread {
   /** A blocker the runtime is actually holding, or null. Never a guess. */
   waiting_on?: string | null;
   /**
-   * BUG-303 — the library state Sessions used to be the only reader of. A pin
-   * puts the thread first; archiving takes it out of the default scope without
+   * BUG-303 — the conversation library's state, on the thread. A pin puts the
+   * thread first; archiving takes it out of the default scope without
    * deleting anything; tags are organizing labels that grant nothing. All three
    * are false/empty on a routine thread, which belongs to its task rather than
    * to the owner's library.

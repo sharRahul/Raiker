@@ -99,8 +99,7 @@ export function recommendedPath(profiles: ModelProfile[]): RecommendedPath | nul
   //
   // Detection is a PATH lookup: it proves the runtime is installed, not that it
   // serves anything. So the runtime must also name a model it has — a managed
-  // llama.cpp slot does not until one is deployed into it, and the first screen
-  // used to recommend it beside "No complete GGUF found".
+  // llama.cpp slot does not until one is deployed into it.
   const detected = profiles.find(
     (profile) =>
       profile.local_only &&

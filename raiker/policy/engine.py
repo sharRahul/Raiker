@@ -190,12 +190,10 @@ class PolicyEngine:
         if action.tool_name in self.config.approval_required_actions:
             # The decision records the action's *own* band, not "high".
             #
-            # This branch used to assert `high` for everything that parks, which
-            # made the word mean "this needs approval" rather than "this is
-            # dangerous". Two different facts wearing one name is how an approval
-            # queue stops being read: an owner who learns that "high risk" is
-            # what a routine workspace write looks like has been taught to click
-            # through the ones that are not routine. Parking is decided here;
+            # "Needs approval" and "dangerous" are two facts; one name for both
+            # teaches an owner that "high risk" is what a routine write looks
+            # like, and to click through the ones that are not. Parking is
+            # decided here;
             # how dangerous the action is was decided by its declared signals in
             # `raiker.policy.risk`, and this carries that through unchanged.
             # The reasons list is matched *exactly* by
@@ -203,8 +201,8 @@ class PolicyEngine:
             # composer mode tells an ordinary action-bound pause from a hook
             # request, a managed-policy refusal, or anything it does not
             # recognise. Appending the assessment's reasons here is therefore not
-            # free: it silently stopped `auto` from recognising an ordinary file
-            # write, which is the narrowness working as designed. The band is
+            # free: `auto` would stop recognising an ordinary file write, which is
+            # the narrowness working as designed. The band is
             # carried and the reasons are left alone; the signals behind the band
             # are in the tool's own declaration, so the assessment is still
             # recomputable from the record without widening this list.

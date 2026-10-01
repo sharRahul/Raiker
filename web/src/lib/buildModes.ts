@@ -2,17 +2,13 @@
  * Build-workspace composer modes: Plan, Edit, Auto.
  *
  * The three modes are not a mood the interface sets on itself — each one is a
- * concrete, server-enforced posture. What changed in BUG-70 is *whose* posture
- * it is.
+ * concrete, server-enforced posture of *this turn* (BUG-70). Invariant: a chip
+ * never edits the owner's **standing** permissions, which change only through
+ * the Permissions page's step-up (a recorded reason, and a threat-model
+ * acknowledgement where the capability demands one). Pressing **Auto** in a
+ * composer is not consent to change what every future session may do.
  *
- * These chips used to POST four `/api/capability-modes/<cap>/<mode>` changes,
- * which rewrote the owner's **standing** permissions: globally, permanently, and
- * without the step-up — a recorded reason, and a threat-model acknowledgement
- * where the capability demands one — that the Permissions page requires for the
- * identical transition. Pressing **Auto** in a composer is not consent to change
- * what every future Chat, Task and Build session may do.
- *
- * So a mode is now built from two per-turn controls only:
+ * So a mode is built from two per-turn controls only:
  *
  *  1. the `planning_mode` sent with the prompt, and
  *  2. a `capability_modes` map sent with the same prompt, which the runtime

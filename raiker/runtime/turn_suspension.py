@@ -1,21 +1,18 @@
 """Suspending and resuming a turn across an approval (B2).
 
-Before this, the agent loop `break`ed on `needs_approval` and the turn returned.
-Even once an approved write really executed (BUG-06 / FIXED-08), the agent
-stopped dead at its first write: the owner had to re-prompt, which discarded the
-model's working state and re-paid for the whole context. That is the difference
-between a proposal generator and an agent.
+A turn parked on an approval resumes with the model's working state, rather
+than stopping dead and making the owner re-prompt and re-pay for the context.
+That is the difference between a proposal generator and an agent.
 
-This module holds the two halves of the fix that are pure data:
+This module holds the parts that are pure data:
 
 * **serialisation** — turning the in-flight `ModelMessage` list into something
   the encrypted store can hold, and back again, without losing tool-call
   identity (a `tool` message is only valid against the `assistant` message whose
   `tool_calls` carry the same `call_id`);
-* **the pending-call queue** (ADD-02) — the rest of the model's batch. A batch of
-  three mutations used to stop at the first one and drop the other two; the
-  queue parks them with the turn so the owner walks the whole batch one decision
-  at a time and a refusal skips its own call instead of ending the turn;
+* **the pending-call queue** (ADD-02) — the rest of the model's batch, parked
+  with the turn so the owner walks the whole batch one decision at a time and a
+  refusal skips its own call instead of ending the turn;
 * **the resolution outcome** — the tool result the model is handed when the turn
   resumes. Approved-and-executed replays the real executor result; approved but
   not executed, and rejected, are stated honestly so the model reacts to what

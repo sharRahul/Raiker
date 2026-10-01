@@ -164,9 +164,8 @@
   @media (prefers-reduced-motion: reduce) {
     .composer-card { transition: none; }
   }
-  /* Upper area: the prompt, and nothing else. Per-turn controls used to sit in
-     a column to its right, which cost the prompt a third of the card's width
-     and put the model chip somewhere no other composer keeps it. */
+  /* Upper area: the prompt, and nothing else — the per-turn controls sit below,
+     where every composer keeps the model chip. */
   .composer-upper {
     display: flex;
     align-items: flex-start;

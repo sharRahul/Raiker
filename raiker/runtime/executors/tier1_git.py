@@ -51,7 +51,7 @@ class GitWriteExecutor:
         self._workspace_root = Path(workspace_root).resolve()
         self._store = store
 
-    # BUG-66 — the same resolution the broker used to compute the proposal. An
+    # BUG-66 — the same resolution the broker computed the proposal with. An
     # execution that fell back to the workspace root would record the change in a
     # repository the owner never saw named in the approval.
     def _repo_root(self, principal: Principal) -> Path:

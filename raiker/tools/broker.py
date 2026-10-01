@@ -1227,11 +1227,9 @@ class ToolBroker:
     def _expected_effect(self, action: ToolAction, connector_write: bool) -> str:
         """What approving this proposal will actually do, stated at proposal time.
 
-        BUG-06: this sentence used to say "metadata-only … does not execute the
-        action" for every non-connector tool, which stopped being true for file
-        mutations once approval resolution was wired to the execution relay. It
-        is now derived from the same check the resolve endpoint makes, so the
-        model and the transcript are told the truth in both configurations.
+        BUG-06: derived from the same check the resolve endpoint makes, so the
+        model and the transcript are told the truth whether approving executes
+        the action or only records a decision.
         """
         if connector_write:
             return "Approving executes this exact connector mutation once."

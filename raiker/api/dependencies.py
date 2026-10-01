@@ -1,9 +1,8 @@
-"""The request-scoped values every route module used to rebuild for itself (OPT-04).
+"""The request-scoped values every route module shares (OPT-04).
 
-Twenty route modules each defined a ``_ws`` that read the workspace off the
-application and an ``_auth`` that authenticated against it, with the same body
-and four spellings of the same ``type: ignore``. They are these functions now.
-A module imports the one it needs, so the route's own signature still says what
+The workspace off the application and the authenticated caller are read here
+once, not redefined per route module. A module imports the one it needs, so
+the route's own signature still says what
 authority it requires — ``Depends(authenticate)`` — rather than a decorator
 deciding it somewhere out of sight.
 

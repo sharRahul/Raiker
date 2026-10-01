@@ -1,9 +1,8 @@
 """What the Knowledge Map is allowed to see.
 
-The graph's source picker used to browse the workspace root, so opening it
-listed everything under the Raiker installation — its own source tree included —
-and invited an owner to index any of it. That is not a boundary; it is the
-absence of one.
+Browsing the workspace root would list everything under the Raiker
+installation — its own source tree included — and invite an owner to index any
+of it. That is not a boundary; it is the absence of one.
 
 The boundary this module defines has three parts, and nothing else is
 browsable:

@@ -1,13 +1,7 @@
 """One declarative definition per tool, and every table derived from it.
 
-Registering a tool used to mean writing its name into seven files at twelve
-sites — the risk band here, the source kind there, the capability somewhere
-else — and nothing failed when one was missed. A tool registered in six of the
-seven behaved as an unknown tool, or as one with no description, or as one a
-subagent was not allowed to use. Completeness was not represented anywhere, so
-it could not be checked.
-
-It is represented here. :class:`ToolDefinition` has **no defaulted fields**, so
+Completeness is represented here, so it can be checked: :class:`ToolDefinition`
+has **no defaulted fields**, so
 a half-registered tool is a construction error rather than a runtime surprise,
 and every consumer table below is a comprehension over :data:`TOOL_DEFINITIONS`.
 
@@ -25,10 +19,10 @@ Two conventions worth stating, because both look like omissions and are not:
   authority's capability map likewise keeps its non-tool aliases: capability
   names are a different vocabulary from tool names.
 
-OPT-13 added the last three things a tool was declared in elsewhere: its
-transcript ``label``, its glyph ``family`` and its ``audit`` treatment — whether
-the event log may hold its result content and its argument values. The broker's
-two audit sets and the transcript's two tables are derived below.
+A tool's transcript ``label``, glyph ``family`` and ``audit`` treatment —
+whether the event log may hold its result content and its argument values — are
+part of its definition (OPT-13); the broker's two audit sets and the
+transcript's two tables are derived below.
 
 A definition carries no authority. ``requires_approval`` and ``capability``
 say which gate a proposal is routed to; whether it passes is decided by the
@@ -1546,9 +1540,7 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # Not in the model's catalogue, and deliberately so: `vector_get` is reachable
     # by a subagent step and by the policy engine's read-shaped set, but it is not
     # a tool a turn proposes. `model_exposed=False` is what keeps it out of the
-    # advertised schema while still being a first-class registry entry — the
-    # distinction that used to be invisible because there was no one place to
-    # state it.
+    # advertised schema while still being a first-class registry entry.
     ToolDefinition(
         name="vector_get",
         label="Open vector",
@@ -1741,12 +1733,8 @@ def all_definitions() -> tuple[ToolDefinition, ...]:
 def tool_risk_band(name: str) -> str:
     """The band a registered tool carries, for the modules that need it by name.
 
-    Four modules used to hold their own `_READ_RISK = "medium"` / `_CALL_RISK`
-    literal, each with a comment explaining that the action was "not low-risk"
-    because it left the machine. The reasoning was right and the band was a
-    guess: by the definitions in `raiker.policy.risk` every one of them is
-    `high`. They read it from here now, so the reasoning lives in the tool's own
-    declared signals and cannot be restated differently four times.
+    The band comes from the tool's own declared signals under
+    `raiker.policy.risk`, so a module never restates it as a local literal.
     """
     try:
         return TOOL_RISK_BANDS[name]

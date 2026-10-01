@@ -287,20 +287,14 @@
   .read-only { color: var(--text-3); font-size: var(--text-xs); font-weight: 400;
     text-transform: uppercase; letter-spacing: 0.04em; }
   .remedy { color: var(--text-2); font-size: var(--text-sm); margin: 0.2rem 0 0; }
-  /* Found by the width sweep once it started covering Settings (FIXED-416).
-     This was `grid-template-columns: 1fr 1fr auto`, and a `1fr` track will not
-     shrink below its content's own minimum: an `<input>` defaults to about
-     twenty characters wide, so the two fields held the row at 478px inside a
-     422px card and pushed the whole Settings layout 31px past the viewport at
-     768px. The overflow was not visible on the page itself, which is why it
-     survived — it was absorbed by the shell.
-
-     A wrapping flex row is the honest shape for this. The fields share the
+  /* FIXED-416 — a wrapping flex row, not a `1fr 1fr auto` grid: a `1fr` track
+     will not shrink below its content's minimum, and an `<input>` defaults to
+     about twenty characters, which pushes Settings past a 768px viewport — an
+     overflow the shell absorbs, so it is invisible on the page itself. The fields share the
      space while there is space and drop to their own lines when there is not,
-     the button never stretches to fill a column it was only borrowing (the
-     probe form below has two children in a three-column grid, so **Check** was
-     doing exactly that), and `min-width: 0` is what lets a field actually
-     shrink rather than merely being asked to. */
+     the button never stretches to fill a column it was only borrowing, and
+     `min-width: 0` is what lets a field actually shrink rather than merely
+     being asked to. */
   .add-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: end; }
   .add-row .field-label { flex: 1 0 100%; margin: 0; }
   .add-row .input { flex: 1 1 12rem; min-width: 0; }

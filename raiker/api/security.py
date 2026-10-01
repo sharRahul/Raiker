@@ -139,14 +139,13 @@ class MaxBodySizeMiddleware:
     paths — used so the attachment-upload endpoint can accept a base64 image
     without loosening the tight default for every other route.
 
-    CR-06 — this used to read the declared ``Content-Length`` and nothing else.
-    A declaration is a claim by the sender, and the two ways of getting past it
-    are the two ordinary ways of sending a body: omit the header, or send
-    ``Transfer-Encoding: chunked``, which has no ``Content-Length`` at all. Either
-    way the cap this middleware exists to enforce was never consulted, and an
-    unbounded body reached the route and whatever buffered it.
+    CR-06 — a declared ``Content-Length`` is a claim by the sender, and the two
+    ways of getting past it are the two ordinary ways of sending a body: omit the
+    header, or send ``Transfer-Encoding: chunked``, which has no
+    ``Content-Length`` at all. Checking the declaration alone would let an
+    unbounded body reach the route and whatever buffered it.
 
-    Both halves now hold. The declared length is still checked first, because
+    So both halves hold. The declared length is checked first, because
     refusing before a single byte is read is the cheap answer and the one an
     honest oversized client should get. What actually enforces the cap is the
     count of bytes received: the body stream is wrapped, and the request is

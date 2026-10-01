@@ -20,13 +20,9 @@
   // the most-downloaded GGUF repositories.
   let showingTrending = $state(false);
   let loadingTrending = $state(true);
-  // Found live 2026-09-05, on a host with no route to huggingface.co. The
-  // trending read failed, was swallowed, and the panel rendered its
-  // "Search the Hub catalogue" empty state — which is what it says when nothing
-  // has been asked for yet. So the owner saw a panel that looked ready, typed a
-  // search, and learned the Hub was unreachable from a request that timed out.
-  // Naming it here is not an interruption: it is the one fact that decides
-  // whether the box below is worth typing into.
+  // A failed trending read is said, never shown as the "nothing asked yet"
+  // empty state: whether the Hub is reachable is the one fact that decides
+  // whether the search box below is worth typing into.
   let hubUnreachable = $state(false);
   let selectedRepo = $state<string | null>(null);
   let variants = $state<HuggingFaceVariant[]>([]);
@@ -126,11 +122,9 @@
           : "Could not estimate download";
     }
   }
-  // GCR-22 — the download no longer happens inside the request. A multi-gigabyte
-  // snapshot used to hold one open for its whole duration, and the completion it
-  // wrote at the end could not see a Cancel pressed in between. It is a durable
-  // background operation now, so this panel follows it: the same job Activity
-  // shows, watched here until it can offer the conversion step.
+  // GCR-22 — the download is a durable background operation, never held inside
+  // the request, so this panel follows it: the same job Activity shows, watched
+  // here until it can offer the conversion step.
   let downloadingOperationId = $state<string | null>(null);
   let downloadState = $state<string | null>(null);
   let downloadPercent = $state<number | null>(null);

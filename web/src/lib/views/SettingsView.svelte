@@ -43,11 +43,9 @@
   /*
    * NEW-SET-01 — which section each unsaved key was edited in.
    *
-   * The dirty marks used to be a list of sections appended to as the owner
-   * typed and emptied wholesale on save, which is right only while a save
-   * acknowledges everything. Once a save acknowledges *the revision it
-   * submitted*, the marks have to be recomputed from the keys that are still
-   * outstanding, and that needs to know where each key lives.
+   * A save acknowledges *the revision it submitted*, so the marks are
+   * recomputed from the keys still outstanding, which needs to know where each
+   * key lives.
    */
   let keySection: Record<string, string> = {};
 

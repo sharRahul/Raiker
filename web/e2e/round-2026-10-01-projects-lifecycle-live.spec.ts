@@ -13,7 +13,7 @@ import {
   OWNER_CREDENTIALS,
   chooseModelForTurn,
   signInAsOwner,
-  } from "./hosted-provider";
+} from "./hosted-provider";
 import { roundName } from "./naming";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY, sendTurn, useAnthropic } from "./live";
 
@@ -257,5 +257,17 @@ test("a pending approval is shown once, by its card, and nothing covers Chat's h
     return !(top === el || el.contains(top));
   });
   expect(covered).toBe(false);
+  // And the card is never over the composer's Send, from the first frame the
+  // composer exists rather than from the card's next measurement.
+  const send = page
+    .getByRole("group", { name: "Message composer" })
+    .getByRole("button", { name: /^Send/ });
+  await expect(send).toBeVisible({ timeout: 30_000 });
+  const sendCovered = await send.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return !(top === el || el.contains(top));
+  });
+  expect(sendCovered).toBe(false);
   await capture(page, `${SHOTS}/09-approval-shown-once-on-chat.png`);
 });

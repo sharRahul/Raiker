@@ -20,11 +20,11 @@ Permissions description       ``tests/test_capability_permissions_copy.py``
 **Negative bypass test**      **this table's** :attr:`CapabilityAuthority.bypass_test`
 ============================  ====================================================
 
-The bypass property used to be established *structurally*: ``route_action``'s
-callers are enumerated and asserted, and the agent gateway is constructed only by
-named surfaces. That is a genuine boundary and it is a different claim. It says
-*no current path bypasses the chokepoint*; it does not say *each of the forty-eight
-capabilities has a test proving its own gate refuses before its executor runs.*
+The structural property — ``route_action``'s callers are enumerated and
+asserted, and the agent gateway is constructed only by named surfaces — is a
+genuine boundary and a different claim. It says *no current path bypasses the
+chokepoint*; it does not say *each capability has a test proving its own gate
+refuses before its executor runs.*
 
 So every row here names a test, ``tests/test_capability_authority.py`` asserts
 that the named test exists and is the one that covers this capability, and the
@@ -32,13 +32,10 @@ generic proof is parameterised over the capability rather than over a set
 intersection — a test id carrying the capability's own name is per-capability in
 the way a shared assertion is not.
 
-**What writing it out found.** ``image_generation`` had a real executor, an
-owner-facing switch on Permissions, a docstring in
-``RuntimeControlService.run_image_generation`` saying "the ``image_generation``
-gate … appl[ies]", and **no entry in** :data:`~raiker.runtime.authority.router.CAPABILITY_GATE_MAP`
-— so ``check_capability_gate`` found no gate for the action, returned ``None``,
-and the owner's off switch decided nothing. It was approval-required by policy,
-which is why nothing looked wrong. Recorded as FIXED-542.
+Invariant: a capability with an owner-facing switch has an entry in
+:data:`~raiker.runtime.authority.router.CAPABILITY_GATE_MAP`, or
+``check_capability_gate`` finds no gate and the off switch decides nothing —
+silently, when policy also requires approval (FIXED-542).
 
 The API serves this beside the gate, so Permissions can answer *what would this
 cost if it ran without me* rather than only *is it on*.

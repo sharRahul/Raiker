@@ -752,9 +752,8 @@ class RuntimeAuthority:
             })
             return gate_check
         now = utc_now()
-        # Disabling is now what it says: the one runtime stops accepting new
-        # executions. It used to mean "fall back to development_preview", which
-        # left a runtime running under a name that implied it was not.
+        # Disabling is what it says: the one runtime stops accepting new
+        # executions, never a fallback that keeps running under another name.
         record = {
             "runtime_mode_id": new_id("rm_"),
             "mode_name": RAIKER_RUNTIME,

@@ -589,19 +589,17 @@ class RuntimeControlService:
     ) -> ControlResult:
         """Governed install of a validated local plugin manifest (GEP-04).
 
-        The terminal used to call ``record_plugin_install`` directly. That wrote
-        the install record, the trust level and the permission set without ever
-        reading the ``plugin_install`` gate — so an owner who had deliberately
-        held that capability off could install a plugin anyway, and the switch
-        the Capabilities page showed them governed nothing.
+        Never a direct ``record_plugin_install``, which writes the install
+        record, the trust level and the permission set without reading the
+        ``plugin_install`` gate — so an owner holding that capability off could
+        install a plugin anyway.
 
         This takes the long way round for the same reason the channel test and
         the audit export do: it builds a governed action and routes it through
         :class:`RuntimeAuthority`, so the capability gate, the decision mode, the
         policy review, the critical floor and the audit event all apply. The
-        executor behind it also validates strictly more than the old path did —
-        manifest size, JSON shape, plan status and supply-chain fields — so
-        routing is an upgrade rather than a toll.
+        executor behind it also validates manifest size, JSON shape, plan status
+        and supply-chain fields.
 
         Human-only: installing a plugin is an owner's act, never an agent's.
         """

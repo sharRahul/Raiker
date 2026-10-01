@@ -27,14 +27,9 @@ if TYPE_CHECKING:
 # Capability gates the bundle reports, keyed by the capability the owner actually
 # switches and valued by the model-exposed tools that capability governs.
 #
-# BUG-57: this used to be a fixed tuple of eighteen `*_enabled` names reported as
-# `False` on every turn. Two things were wrong with that at once. It never
-# reflected a gate the owner had turned on, so a live turn declined to call
-# `web_fetch` with the gate enabled and its decision mode at Allow; and it named
-# capabilities in a vocabulary that no longer lined up one-to-one with the tools
-# in the schema, so the model reasoned from `network_execution` — a different
-# capability, since deleted by BUG-232 — to a neighbouring one. Naming the governed tools beside each gate
-# is what removes the second half: there is nothing left to infer across.
+# BUG-57: each gate is reported with the tools it governs, so the model never
+# has to infer from a capability name which tool it covers, and a gate the owner
+# turned on is never reported as off.
 #
 # Every capability here is read per principal from the same store the Permissions
 # page writes, so an owner's decision is what the model is told.
@@ -380,12 +375,9 @@ class ContextGatherer:
         metadata only, keeping raw prompts out of ambient context. The model can
         use the exposed memory tools when it needs the full governed record.
 
-        RAIKER-2020: the prior-chat half used to be *the eight most recently
-        updated conversations*, whatever the turn was about. A conversation from
-        three years ago could therefore never be recalled, however exactly it
-        answered the question. Conversations whose text matches this prompt now
-        come first, from anywhere in the owner's history; recency only fills the
-        remaining slots, so a turn with no lexical match behaves as it did.
+        RAIKER-2020: conversations whose text matches this prompt come first,
+        from anywhere in the owner's history; recency only fills the remaining
+        slots, so age alone never puts a matching conversation out of reach.
         """
         if owner_principal_id is None or store.is_memory_incognito(owner_principal_id):
             return None
@@ -598,12 +590,9 @@ class ContextGatherer:
     ) -> ContextItem | None:
         """B9 — where the code is, ranked against this turn's prompt.
 
-        Every turn used to start cold: the agent knew the workspace root and
-        nothing about what was in it, so on a repository of any size its first
-        several tool calls were spent finding out. This item is the orientation
-        that removes those calls — the files that best answer the prompt and the
-        declarations inside them, with line numbers, so ``read_file`` can go
-        straight to the right place.
+        The files that best answer the prompt and the declarations inside them,
+        with line numbers, so ``read_file`` can go straight to the right place
+        instead of spending the first tool calls finding out.
 
         It is bounded, it is coordinates rather than code, and it is **untrusted
         data**: a symbol name and a docstring come out of repository files, which
@@ -750,12 +739,10 @@ class ContextGatherer:
     ) -> ContextItem:
         capped = content[: self.config.max_item_chars]
         if source_type == "attachment" and trust_level == "untrusted_external":
-            # CR-13 — an attached file's class comes from what it says. Every
-            # attachment path used to write ``unknown`` here, so the one
-            # property the security review asked each extracted chunk to carry
-            # beside its provenance and injection scan was the one it lacked.
-            # Classified before redaction: a credential that redaction is about
-            # to remove is exactly the fact the label must keep.
+            # CR-13 — an attached file's class comes from what it says, carried
+            # beside its provenance and injection scan. Classified before
+            # redaction: a credential that redaction is about to remove is
+            # exactly the fact the label must keep.
             sensitivity, content_class = _attachment_sensitivity(capped, sensitivity)
             metadata = {**(metadata or {}), "content_class": content_class}
         redacted, changed = redact_text(capped)
@@ -1082,12 +1069,9 @@ class ContextGatherer:
         checkpoint_count = store.count_checkpoints(session_id)
         task_count = store.count_tasks(session_id)
         pending_approvals = store.count_pending_approvals(session_id)
-        # BUG-57: this used to assert `runtime_mode: local_read_only_planning`
-        # and `disabled_runtime: all unsafe runtime flags remain false` on every
-        # turn. Both were fixed strings. The first named one of the five modes
-        # FIXED-63 replaced with a single runtime; the second told the model that
-        # everything the owner had switched on was off. A model reading them had
-        # been argued out of the whole tool set before it saw its own schema.
+        # BUG-57: nothing here is a fixed string about posture. A constant that
+        # says everything is off argues the model out of tools the owner enabled
+        # before it reads its own schema.
         runtime_status = self._runtime_status(store, owner_principal_id)
         lines = [
             f"workspace_root: {root}",
@@ -1144,11 +1128,8 @@ class ContextGatherer:
     ) -> ContextItem:
         """Report the owner's live capability gates, named beside the tools they govern.
 
-        BUG-57: a fixed list of ``*_enabled: false`` lines used to be reported on
-        every turn whatever the owner had enabled, and a live turn talked itself
-        out of a tool it had. Each line below is read from the same store the
-        Permissions page writes, so what the model is told is what the owner
-        decided.
+        BUG-57: each line is read from the same store the Permissions page
+        writes, so what the model is told is what the owner decided.
         """
         lines = [
             "The owner's capability gates for this account, as they are right now. "

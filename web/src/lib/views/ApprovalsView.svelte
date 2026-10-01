@@ -534,9 +534,9 @@
             </td>
             <td><IdentityChip identity={a.proposed_by} /></td>
             <td>{capabilityLabel(a.capability)}</td>
-            <!-- Every row of this queue used to be toned, so the one
-                 dangerous decision looked like the twenty routine ones above
-                 it. Routine risk is metadata; `elevatedRisk` decides. -->
+            <!-- Only elevated risk is toned, so the one dangerous decision
+                 stands out from the routine ones. Routine risk is metadata;
+                 `elevatedRisk` decides. -->
             <td>
               {#if elevatedRisk(a.risk_level)}
                 <Badge variant="blocked" label={a.risk_level} />
@@ -579,13 +579,6 @@
     <!-- An approval should answer, in this order: what is Raiker
          trying to do, why, what changes or leaves the machine, how far does it
          reach, and then decide.
-
-         It used to answer them in almost the reverse. Under the title came
-         eight rows of provenance — session, requested, proposed by, batch,
-         expiry, authorized by — and the execution evidence, and only then the
-         diff. The single thing the decision actually turns on was below all of
-         it, and the owner scrolled past the record-keeping to reach the change
-         they were being asked about.
 
          Two facts stay above the change, because they decide whether the
          decision can be made at all rather than describing it: what capability
@@ -662,12 +655,10 @@
         <pre class="diff">{selected.diff ?? "{}"}</pre>
       </details>
     {:else if !isQuestion}
-      <!-- REM-APPROVAL — this branch used to be the whole answer: a `<pre>` of
-           the request body, with nothing above it saying what approving would
-           cause. A payload is evidence, and evidence reads after the decision
-           it supports, not instead of it. Nothing here is inferred — every row
-           is a value the proposal itself names, and all of them are still in the
-           payload below. -->
+      <!-- REM-APPROVAL — what approving would cause, before the payload: a
+           payload is evidence, and evidence reads after the decision it
+           supports. Nothing here is inferred — every row is a value the
+           proposal itself names, and all of them are still in the payload. -->
       <h3>What approving would do</h3>
       {#if consequence.length > 0}
         <dl class="consequence">

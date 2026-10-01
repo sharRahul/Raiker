@@ -607,11 +607,9 @@ def handle_plugin_plan(command: str, *, workspace_root: str | Path = ".") -> str
     if contributions.get("refused"):
         lines.append(f"contributions_refused: {','.join(contributions['refused'])}")
     if install_flag and plan["status"] != "denied":
-        # GEP-04 — the install is a governed action. This used to call
-        # `record_plugin_install` directly, which wrote the install record
-        # without ever reading the `plugin_install` gate: the switch on the
-        # Capabilities page governed nothing, and an owner who had held that
-        # capability off could install a plugin from the terminal anyway.
+        # GEP-04 — the install is a governed action, never a direct
+        # `record_plugin_install`, which would skip the `plugin_install` gate and
+        # let the terminal install what the owner holds off on Capabilities.
         from raiker.control.service import RuntimeControlService
 
         result = RuntimeControlService(workspace_root).install_plugin(None, str(path))
@@ -2928,8 +2926,7 @@ def handle_export_command(command: str, *, workspace_root: str | Path = ".") -> 
                 lines.append(f"  FAIL: event={d['event_id']} error={d.get('error', 'chain_gap')}")
         # GCR-40 - lines the log holds that the index has never heard of.
         # They are not "failed events", because the index cannot count
-        # them at all; they are the divergence that used to be invisible
-        # to this very check.
+        # them at all; they are the divergence this check must surface.
         for orphan in result["unindexed_lines"]:
             lines.append(
                 f"  ORPHAN: {orphan['jsonl_path']} "

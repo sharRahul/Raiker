@@ -2,12 +2,6 @@
   /**
    * UX-PROJ-06 — move a project by choosing where it goes, in the tree it goes into.
    *
-   * The move used to be a select of every project's name with only the project
-   * itself left out, so a descendant — a destination the server refuses because
-   * it would make the project its own ancestor — was offered like any other,
-   * and an archived folder too. The owner learnt which ones were wrong from a
-   * status code.
-   *
    * The destinations are drawn as the hierarchy, indented, so "inside what" is
    * visible. The project and everything under it stay in the list, disabled,
    * with the reason beside them, because a destination that silently vanishes

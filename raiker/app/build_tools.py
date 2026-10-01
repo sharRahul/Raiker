@@ -1,14 +1,12 @@
 """The external build tools a release is allowed to fetch, pinned by digest.
 
-GCR-41. The Linux job used to fetch `appimagetool` from the AppImage project's
-`continuous` release — a tag that is moved, by design, whenever that project
-publishes. Two builds of the same Raiker commit, a week apart, therefore
-contained different build-tool bytes while every other part of the release
-process was careful to be deterministic: sorted zip members, one fixed
-timestamp, normalised modes, `SOURCE_DATE_EPOCH`.
+GCR-41. A moving tag such as the AppImage project's `continuous` release is
+never fetched: two builds of the same Raiker commit a week apart would contain
+different build-tool bytes while every other part of the release process is
+deterministic (sorted zip members, one fixed timestamp, normalised modes,
+`SOURCE_DATE_EPOCH`), and the build would only *look* reproducible.
 
-That is the difference between a build that is reproducible and one that merely
-*looks* reproducible. So the tool is named by an immutable version tag and by
+So the tool is named by an immutable version tag and by
 the SHA-256 of the exact file, the release job refuses anything else, and what
 it used travels in the artifact's own provenance where an owner — or an auditor
 asking what produced this binary — can read it back.

@@ -57,13 +57,11 @@ export function answeredByPage(notification: RaikerNotification, hash: string): 
 /**
  * Kinds the approval card already presents on every page it stands on.
  *
- * Found live on 2026-10-01: on Chat the dock held *Approval needed … run
- * 'write_file'* over the conversation header's **New chat**, while the approval
- * card above the composer showed the same approval with Approve and Deny. The
- * card is everywhere but Approvals, and on Approvals the page answers the
- * notice (BUG-309), so a docked approval notice repeats something on screen on
- * every page. It stays unread — the bell counts it and the record lists it —
- * because seeing the card is not the same as having read the notice.
+ * The card is on every page but Approvals, and Approvals answers the notice
+ * itself (BUG-309), so docking an approval notice would repeat what is on
+ * screen — and covered page controls where it did. It stays unread: the bell
+ * counts it and the record lists it, because seeing the card is not reading
+ * the notice.
  */
 const SHOWN_BY_APPROVAL_CARD = new Set(["approval_pending", "critical_approval_pending"]);
 

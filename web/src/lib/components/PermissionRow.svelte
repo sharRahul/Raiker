@@ -69,15 +69,9 @@
   /**
    * The one contextual explanation the detail carries.
    *
-   * REM-PERM-03 — the card used to stack up to three separate paragraphs of
-   * prose about the same capability. They are answers to one question, so they
-   * are one answer: what this switch really decides, said once.
-   *
-   * The `Governed elsewhere` / `No route yet` half of that explanation is not
-   * read here any more, and not because it stopped mattering: a gate that does
-   * not decide its own capability is no longer rendered as a row at all. It is
-   * in the page's read-only **Not decided here** list, where the note is the
-   * whole content rather than a caveat under a control that should not exist.
+   * REM-PERM-03 — one answer to one question: what this switch really decides,
+   * said once. A gate that does not decide its own capability is not a row at
+   * all; it is in the page's read-only **Not decided here** list (GEP-04).
    */
   const why = $derived(unsetResolutionNote(gate));
   /**
@@ -336,9 +330,7 @@
     margin: 0 0 var(--space-3);
     max-width: var(--prose-measure);
   }
-  /* One shape for every explanation the card has: question, answer. The card
-     used to stack four paragraphs that each looked like a different kind of
-     thing. */
+  /* One shape for every explanation the card has: question, answer. */
   .cap-facts {
     display: grid;
     gap: var(--space-2) var(--space-4);

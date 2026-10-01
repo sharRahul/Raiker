@@ -2,13 +2,9 @@
   /**
    * One page's way into the guide (BUG-208 slice B).
    *
-   * Every surface used to teach on the page, because `docs/guide/` was
-   * unreachable from the product and the page was the only place an explanation
-   * could live. Slice A gave it a destination; this is how a page points at it.
-   *
-   * Deliberately quiet. It sits where the page header's paragraph used to be and
-   * takes one line instead of five, so the page opens with its own state rather
-   * than with an explanation of itself. What it must never become is a second
+   * The guide is the destination for explanation; this is how a page points at
+   * it. Deliberately quiet — one line — so the page opens with its own state
+   * rather than with an explanation of itself. What it must never become is a second
    * place to write prose: the label names the section, and the section carries
    * the words.
    */

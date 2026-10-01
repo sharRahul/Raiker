@@ -136,6 +136,23 @@ describe("ChatView streaming transcript", () => {
     });
   });
 
+  it("greets without a name until the account says what to call the owner", async () => {
+    stubFetch({
+      ...MODELS_ROUTE,
+      "GET /api/settings": { status: { display_name: "Asha", username: "asha" }, settings: {} },
+    });
+    render(ChatView);
+    // Never a placeholder name in the moment before the account read lands.
+    expect(screen.queryByText(/work on, there\?/)).not.toBeInTheDocument();
+    expect(await screen.findByText("What would you like to work on, Asha?")).toBeInTheDocument();
+  });
+
+  it("asks without a name when the account read fails", async () => {
+    stubFetch(MODELS_ROUTE);
+    render(ChatView);
+    expect(await screen.findByText("What would you like to work on?")).toBeInTheDocument();
+  });
+
   it("copies a response without offering transcript exports", async () => {
     stubFetch(MODELS_ROUTE);
     const writeText = vi.fn().mockResolvedValue(undefined);

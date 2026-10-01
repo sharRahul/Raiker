@@ -1,13 +1,8 @@
 /**
  * BUG-71 — what the Memory page is allowed to promise.
  *
- * The page used to tell every owner "When Raiker identifies a useful preference
- * or durable fact, it will propose it for review" regardless of whether any turn
- * could actually propose one. That sentence is true only when the
- * `memory_write_execution` gate is on and its decision mode is not `deny`; with
- * the gate off it described a capability the owner had not turned on, and with
- * the mode at Deny it described one they had explicitly refused.
- *
+ * "Raiker will propose useful facts for review" is true only when the
+ * `memory_write_execution` gate is on and its decision mode is not `deny`.
  * This derives the honest sentence from the same two facts the runtime reads,
  * so the page cannot drift from the gate again. It is pure so it can be tested
  * without a browser.

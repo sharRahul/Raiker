@@ -2,12 +2,10 @@
   /**
    * The Build composer's posture control, as one chip and one menu.
    *
-   * It used to be three buttons sitting side by side in the control bar. Three
-   * always-visible buttons make a mode look like a filter — something you toggle
-   * to change a view — when what it actually decides is how much of the machine
-   * the next turn may touch. A single chip that names the current posture, and a
-   * menu that explains each one before you choose it, states that correctly and
-   * matches where every reference coding agent keeps the same control.
+   * A mode decides how much of the machine the next turn may touch, not a view,
+   * so it is a chip that names the current posture and a menu that explains
+   * each one before you choose it — never three always-visible buttons that
+   * read as a filter.
    *
    * Nothing about what a mode *does* changes here: `BUILD_MODES` still owns the
    * per-turn `capability_modes` map and the planning option, both of which may

@@ -1,14 +1,12 @@
 """Which roots a scope may touch, and what a path inside one is called.
 
-Confinement used to be a single question — "is this inside the workspace?" —
-asked in three places that each spelled it out. A project can now have a root
-that is a folder the owner already had, so the question becomes "is this inside
-exactly one of the roots this scope was granted, and may that root be written?"
+A project can have a root that is a folder the owner already had, so
+confinement asks "is this inside exactly one of the roots this scope was
+granted, and may that root be written?" — in one place.
 
-Constructed with no extra roots this is workspace-only and answers exactly as
-the bare check it replaces. That is deliberate and load-bearing: every existing
-call site adopts it without changing meaning, and attached roots are additive
-rather than a rewrite of the boundary.
+Constructed with no extra roots this is workspace-only, which is deliberate and
+load-bearing: attached roots are additive rather than a rewrite of the
+boundary.
 """
 
 from __future__ import annotations

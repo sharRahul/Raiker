@@ -1,27 +1,19 @@
 """One capability admission check, shared by every path that needs one.
 
-**Why this exists (GEP-01).** Eight modules used to carry their own copy of the
-capability-gate lookup — a local ``_ENABLED_GATE_STATES`` constant, a local
-"is this principal account-scoped" test, and a local decision-mode read. None of
-them was wrong. Eight independent copies of a governance check is simply the
-precondition for drift, and this repository has already produced one instance of
-exactly that pattern in its two egress implementations.
+**Why this exists (GEP-01).** Independent copies of a governance check are the
+precondition for drift, so the capability-gate lookup, the account-scope test
+and the decision-mode read exist once. Two properties are held by construction:
 
-Two drifts were live in the eight copies when this module replaced them:
-
-* **Scope.** ``RuntimeAuthority`` resolves the control scope with
-  ``store.account_scope``, which maps a delegated AI-agent principal onto the
-  owner account that delegated it. The eight used ``store.get_account(pid) is
-  not None``, which does not — so the same capability could read the owner's
-  gate at chokepoint B and the workspace-wide gate inside the tool. No shipped
-  path passed an AI-agent principal to any of the eight, so the drift was latent
-  rather than live; it is closed here by construction.
-* **Failure.** Some copies caught a broken store read and reported "off";
-  others let it raise. Every admission here fails closed with a named reason.
+* **Scope.** The control scope is resolved with ``store.account_scope``, which
+  maps a delegated AI-agent principal onto the owner account that delegated it,
+  exactly as ``RuntimeAuthority`` does — so a capability never reads the
+  owner's gate at the chokepoint and the workspace-wide gate inside the tool.
+* **Failure.** Every admission fails closed with a named reason; a broken store
+  read is never reported as "off" in one place and raised in another.
 
 **What this module is not.** It is not a second chokepoint. It answers exactly
-the question the eight already asked — *may this capability run for this
-principal at all, and under what decision mode* — and it answers it once. The
+one question — *may this capability run for this principal at all, and under
+what decision mode* — and it answers it once. The
 checks that belong to :meth:`RuntimeAuthority.route_action` (self-approval,
 domain scope, the critical floor, the audit event) stay there; a caller that
 needs those routes an action instead of calling this.

@@ -219,8 +219,7 @@
 
   /* The command output pane renders a real program's output, so it is dark in
      both themes: inverting it in light mode would misrepresent what the program
-     drew. Six literals used to live in the component; they live here now, which
-     is also what lets a future terminal theme be one edit. */
+     drew. Declared here so a terminal theme is one edit. */
   --term-bg: #171a1c;
   --term-fg: #e8e8e2;
   --term-dim: #a9aaa4;
@@ -303,10 +302,9 @@
   --chart-5: #a3324f;
   --chart-6: #4f6470;
 
-  /* Aliases for the names a handful of views reached for before the token set
-     was settled. They resolve to the palette rather than to a hard-coded
-     fallback, so a colour that used to escape the theme now follows it. Both
-     themes define them; nothing may read one of these without the other. */
+  /* Aliases some views use. They resolve to the palette rather than to a
+     hard-coded fallback, so they follow the theme. Both themes define them;
+     nothing may read one of these without the other. */
   --success: var(--ok);
   --warning: var(--warn);
   --ok-text: var(--ok);
@@ -363,11 +361,9 @@
      is allowed above `--z-alert`, because the control that stops a running turn
      must remain reachable from every state the product can be in.
 
-     A popover sits above a docked tray. It was below until 2026-10-01, when a
-     live round could not choose a model: the approval card rises to sit just
-     above a composer (FIXED-621), which is exactly where the composer's model
-     menu opens, and the card took every click meant for the menu. A menu is
-     the thing the owner opened this moment; a tray is waiting for them. */
+     A popover sits above a docked tray: a menu is the thing the owner opened
+     this moment, a tray is waiting for them. The approval card rises to sit
+     just above a composer (FIXED-621), exactly where a composer's menus open. */
   --z-raised: 10;
   --z-docked: 50;
   --z-popover: 54;
@@ -1129,13 +1125,9 @@ code,
   }
 }
 
-/* One control appearance, applied to the element rather than to a class.
-   Eight views used to re-declare this — at 40px, 42px and 44px tall, with
-   --border or --border-strong, --surface or --sunken, --r-sm or --r-md — so
-   Memory's filters, Settings' dropdowns and Models' pickers were four
-   different-looking controls on the same page. Adding `class="select"` to
-   thirty-seven call sites would have fixed today's markup and none of
-   tomorrow's; styling the element fixes both.
+/* One control appearance, applied to the element rather than to a class, so
+   every select, textarea and text input looks the same without each call site
+   opting in — including the ones written tomorrow.
 
    `:where()` keeps the specificity at zero, so any component that genuinely
    needs to differ (the composer's inline chips, a borderless search field)

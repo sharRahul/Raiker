@@ -99,12 +99,9 @@ class ContainerBackendHandle:
 class ContainerCommandHandle:
     """One command inside a container, without owning the container's life.
 
-    BUG-194 — a handle used to remove the container the moment its command
-    ended, which is what made the boundary per-run: nothing an installer, a
-    build, or a `cd` did could survive into the next command, because there was
-    nothing left for it to survive into. `persistent=True` keeps the container
-    standing, so a session has one environment rather than a sequence of
-    identical fresh ones. The container is still removed — by
+    BUG-194 — `persistent=True` keeps the container standing, so what an
+    installer, a build or a `cd` did survives into the next command: a session
+    has one environment rather than a sequence of identical fresh ones. The container is still removed — by
     :meth:`PersistentContainerBackend.reset`, by the session ending, and by the
     owner asking — but never as a side effect of one command finishing.
     """

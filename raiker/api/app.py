@@ -148,17 +148,11 @@ def _is_session_export_request(scope: Scope, path: str) -> bool:
 def _carries_json(start_message: Message) -> bool:
     """Whether this response is something the JSON redactor can act on.
 
-    GCR-44 — the middleware used to decide what to buffer from the *path*
-    alone, so a PDF preview and an image or attachment download were each
-    copied into a `bytearray`, joined into `bytes`, offered to `json.loads`,
-    and then sent out again unchanged. Binary bytes cannot be JSON-redacted, so
-    every one of those copies was work that could not change the answer, on the
-    largest bodies the product serves.
-
-    A content type Raiker can see is not JSON is therefore streamed straight
-    through. A response that declares no content type at all is still buffered:
-    the old behaviour is the safe one where the answer is unknown, and it costs
-    nothing, because the bodies this is about all declare what they are.
+    GCR-44 — binary bytes cannot be JSON-redacted, so a content type Raiker
+    can see is not JSON is streamed straight through rather than buffered — on
+    the largest bodies the product serves. A response that declares no content
+    type is still buffered: buffering is the safe answer where the type is
+    unknown, and the binary bodies all declare what they are.
     """
     for key, value in start_message.get("headers", []):
         if key.lower() != b"content-type":
@@ -388,14 +382,11 @@ async def create_and_mount_instance(
 ) -> Path:
     """Create one isolated workspace and mount its independent ASGI app.
 
-    GCR-08 — this used to create the directory, publish the registry entry and
-    mount the route, and only then let the route try to register the first
-    account. A registration that failed returned an error and left all three
-    behind, so the retry the owner was invited to make answered
-    ``instance_already_exists`` about an instance that had never worked. The
-    account is now created in the staged workspace *before* anything is
-    published, and a failure at any point removes the staged directory and
-    re-raises: an instance either exists completely or does not exist at all.
+    GCR-08 — an instance either exists completely or does not exist at all.
+    The first account is created in the staged workspace *before* the registry
+    entry or the route is published, and a failure at any point removes the
+    staged directory and re-raises, so the retry the error invites can succeed
+    rather than answer ``instance_already_exists``.
     """
     internal_workspace = internal_io_path(root / ".raiker" / "instances" / name)
     workspace = Path(display_path(internal_workspace))

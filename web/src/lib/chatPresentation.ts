@@ -150,9 +150,8 @@ export function hasRunningTool(rows: ToolCallRow[]): boolean {
  * The model's own reasoning for this turn, in arrival order (BUG-207 slice C).
  *
  * Empty means the turn produced none — reasoning was off, the model did not
- * think, or the provider does not return it. It never means reasoning was
- * replaced with something else: the three canned sentences this used to show
- * are gone, and nothing stands in for absent reasoning.
+ * think, or the provider does not return it. Nothing stands in for absent
+ * reasoning.
  */
 export function collectReasoning(events: StreamEvent[]): string {
   let text = "";

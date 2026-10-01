@@ -250,13 +250,10 @@ def collect_payload(
     workflow resolves them on the target's own runner rather than trusting a
     development machine's copy.
 
-    ``apps`` used to be walked alongside ``raiker``. Only ``node_modules`` was
-    excluded, so an artifact carried 553 files and 13 MB from that tree — every
-    TypeScript source, all 92 Playwright specs, the public assets, and a second
-    copy of the built SPA already added below as ``web/`` — of which three files
-    were the Python service. The two Python modules live under ``raiker`` now
-    and the web project is not walked at all, so the bundle is right by
-    construction rather than by an exclusion list that has to keep up.
+    Only ``raiker`` is walked; the web project is not walked at all, because a
+    walk with an exclusion list has to keep up with every source, spec and
+    asset the tree grows, and the built SPA is already added below as ``web/``.
+    The bundle is right by construction rather than by exclusion.
     """
     root = Path(source_root)
     entries: list[BundleEntry] = []

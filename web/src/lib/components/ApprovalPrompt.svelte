@@ -28,15 +28,16 @@
   import { capabilityLabel } from "../capabilityModel";
   import { raikerIsHidden, raiseDesktopNotice } from "../desktopNotice";
   import { humanize } from "../format";
+  import { watchLayout } from "../layoutWatch";
   import Icon from "./Icon.svelte";
 
   /** How often pending approvals are re-read while the tab is visible. */
   const POLL_MS = 5000;
   /**
-   * And while it is not (BUG-255). A hidden tab used to skip the read entirely,
-   * which is exactly when a background task raises the decision nobody is
-   * watching for. Slower rather than off: browsers throttle a hidden tab's
-   * timers anyway, and the answer only has to arrive before the owner does.
+   * And while it is not (BUG-255): a hidden tab is exactly when a background
+   * task raises the decision nobody is watching for. Slower rather than off:
+   * browsers throttle a hidden tab's timers anyway, and the answer only has to
+   * arrive before the owner does.
    */
   const HIDDEN_POLL_MS = 30000;
 
@@ -159,17 +160,12 @@
   }
 
   /**
-   * How far the card rises so it never covers a composer.
+   * How far the card rises so it never covers a composer (FIXED-621).
    *
-   * Found by the 2026-09-28 live round: the card is docked bottom-right, and so
-   * is every composer's model picker and **Send**. With an approval pending from
-   * another conversation, a new chat could not choose a model or send until the
-   * owner dismissed a card about something else. The card now sits above any
-   * composer it would overlap, and back in its corner when there is none.
-   *
-   * And above any other bottom action bar that says so with `data-dock-clear`:
-   * the third 2026-09-28 round found the card over Settings' **Save changes**,
-   * so a change could not be saved while an approval was waiting elsewhere.
+   * Invariant: a waiting card never takes a click meant for a composer's model
+   * picker or **Send**, nor for any bottom action bar marked `data-dock-clear`
+   * (Settings' **Save changes**). It sits above any it would overlap, and back
+   * in its corner when there is none.
    */
   const KEEP_CLEAR = ".composer-card, [data-dock-clear]";
   const DOCK_BOTTOM = 18;
@@ -193,13 +189,7 @@
 
   $effect(() => {
     if (current === null) return;
-    measure();
-    const tick = setInterval(measure, 1000);
-    window.addEventListener("resize", measure);
-    return () => {
-      clearInterval(tick);
-      window.removeEventListener("resize", measure);
-    };
+    return watchLayout(measure);
   });
 
   $effect(() => {

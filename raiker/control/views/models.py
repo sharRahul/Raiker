@@ -96,13 +96,10 @@ class ModelProfileView(View):
     # unset for placeholder or provider-discovered models rather than guessed.
     context_window_tokens: int | None = None
     context_window_source: str | None = None
-    # BUG-270 — "does this profile name a model that exists here". It used to be
-    # `effective_model != "<model>"`, which is only "does this profile name a
-    # model string at all", and that is what let a fresh install print
-    # `gemma4:31b-cloud` on a host with no Ollama. A profile that declares
-    # `disabled_until_provider_detected` now has to earn this: the runtime is
-    # detected on this machine, or the owner has connected it or deployed into
-    # it. Everything else is unchanged.
+    # BUG-270 — "does this profile name a model that exists here", which is more
+    # than "does it name a model string". A profile that declares
+    # `disabled_until_provider_detected` has to earn it: the runtime is detected
+    # on this machine, or the owner has connected it or deployed into it.
     configured: bool = False
     # Why `configured` came out the way it did, for the profiles whose answer
     # depends on this host. `True`/`False` are detection results; `None` means
@@ -304,10 +301,8 @@ class ModelsView:
     remote_profile_count: int
     ready_provider_count: int = 0
     # BUG-270 — how many models the owner actually has set up, counted where the
-    # facts are. The browser used to derive this from `model != "<model>"`, which
-    # counted the four empty llama.cpp slots (their `local-gguf…` aliases are
-    # model strings) and the undetected Ollama default, and printed
-    # "5 models set up" on a machine with none.
+    # facts are: an empty llama.cpp slot's `local-gguf…` alias and an undetected
+    # Ollama default are model strings, not models.
     usable_provider_count: int = 0
     # User-owned ordered model fallback sequence (profile ids). When the selected
     # provider is unavailable, the runtime walks this list in order; each candidate

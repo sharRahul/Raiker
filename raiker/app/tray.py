@@ -31,9 +31,8 @@ TRAY_ICON_SIZE = (64, 64)
 def tray_image(image_module: Any, draw_module: Any) -> Any:
     """The system-tray icon: the shipped icon, or a drawn stand-in.
 
-    The tray used to draw its own rounded rectangle, so the mark in the menu bar
-    was not the mark the product ships — a different Raiker in the one place the
-    app is visible while it is doing nothing. It now loads
+    The mark in the menu bar is the mark the product ships, because it is the one
+    place the app is visible while it is doing nothing. It loads
     ``raiker/assets/raiker-icon.png`` through :func:`raiker.assets.icon_path`,
     downsampled to tray size with alpha preserved so it stays legible on a dark
     menu bar. The drawn shape survives only as the fallback for a build whose

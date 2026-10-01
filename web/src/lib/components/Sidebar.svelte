@@ -58,9 +58,8 @@
 
 {#if compact && drawerOpen}<button type="button" class="drawer-scrim" aria-label="Close navigation" onclick={() => closeNavigation()}></button>{/if}
 
-<!-- `inert`/`aria-hidden` used to include the collapsed desktop case, because
-     collapsed meant the sidebar was translated off screen. A rail is on screen
-     and clickable, so only the closed mobile drawer is hidden from anyone. -->
+<!-- A collapsed rail is on screen and clickable, so only the closed mobile
+     drawer is `inert`/`aria-hidden`. -->
 <nav id="all-navigation" class="sidebar" class:open={drawerOpen} class:desktop-hidden={!compact && !desktopOpen}
   aria-label="All navigation" aria-hidden={compact && !drawerOpen ? "true" : undefined}
   inert={compact && !drawerOpen} bind:this={navigationElement}>
@@ -96,11 +95,9 @@
 <style>
   .sidebar { width:var(--sidebar-w); flex-shrink:0; display:flex; flex-direction:column; min-height:0; overflow-y: auto; overflow-x:hidden; padding:var(--space-4) var(--space-3); border-right:1px solid var(--border); background:var(--surface); position: relative; transition:width var(--motion-shell) var(--ease-shell),padding var(--motion-shell) var(--ease-shell),transform var(--motion-shell) var(--ease-shell); }
 
-  /* Collapsed used to mean *gone* — width 0 and translated off screen — so the
-     only way to see where you were was to bring the whole 256px back. It is a
-     rail now: the icons stay, the active row stays marked, and the labels are
-     what the width buys you. Same control, same toggle; what changes is that
-     collapsing costs you the words rather than the navigation. */
+  /* Collapsed is a rail, not gone: the icons stay, the active row stays marked,
+     and the labels are what the width buys you. Collapsing costs the words,
+     never the navigation. */
   .sidebar.desktop-hidden { width:var(--sidebar-rail-w); padding-inline:var(--space-2); }
   .sidebar.desktop-hidden .brand-text,
   .sidebar.desktop-hidden .group-label,

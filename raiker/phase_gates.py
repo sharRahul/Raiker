@@ -61,12 +61,10 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     "project_assignment_runtime",
     "approval_execution_relay",
     "admin_mutation",
-    # BUG-298 — `policy_mutation` used to sit here. Nothing ever proposed one:
-    # policy is process configuration the runtime *reads*, on the same footing as
-    # the model egress allowlist, and deliberately not editable from a browser
-    # session. A capability nothing can construct is a switch that decides
-    # nothing, so the capability is gone and the boundary is stated outright —
-    # in the Guide, and in `docs/architecture/SECURITY_AND_POLICY.md`.
+    # BUG-298 — no `policy_mutation`: policy is process configuration the
+    # runtime *reads*, on the same footing as the model egress allowlist, and
+    # deliberately not editable from a browser session. The boundary is stated
+    # in the Guide and in `docs/architecture/SECURITY_AND_POLICY.md`.
     "role_mutation",
     "model_provider_runtime",
     "hosted_model_runtime",

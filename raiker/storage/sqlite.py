@@ -355,9 +355,9 @@ def text_search_posture(store: SQLiteStore) -> dict[str, Any]:
 def store_health(workspace_root: str | Path) -> dict[str, Any]:
     """Whether the encrypted store can actually be opened and read, right now.
 
-    BUG-86 — the health probe used to answer "ok" without touching the store,
-    so the lock screen could report the runtime operational in the same breath
-    as refusing every sign-in. This is the one probe both statements read.
+    BUG-86 — the health answer touches the store, so the lock screen cannot
+    report the runtime operational while refusing every sign-in. This is the
+    one probe both statements read.
     """
     posture = memory_security_posture(workspace_root)
     try:

@@ -13,11 +13,9 @@
   let deleteError = $state<string | null>(null);
   const terminal = (state: string) =>
     ["complete", "failed", "cancelled"].includes(state);
-  // GCR-21 — the states a retry may really start from. It used to be offered on
-  // `failed` alone while the API accepted it from any state at all, so a job the
-  // owner had cancelled could not be started again from here and a *running*
-  // one could be started twice from anywhere else. Both halves now say the same
-  // thing: a terminal, retryable job, and nothing else.
+  // GCR-21 — the states a retry may really start from: a terminal, retryable
+  // job, and nothing else. The API enforces the same set, so a running job is
+  // never started twice and a cancelled one can be started again.
   const retryableNow = (item: ModelOperation) =>
     item.retryable && ["failed", "cancelled"].includes(item.state);
   /**
@@ -36,11 +34,9 @@
   async function load() {
     try {
       // The list, or an empty one. A 200 whose body has no `items` — a
-      // truncated response, a proxy's error page served as JSON, a host older
-      // than this build — used to assign `undefined` here, and the adaptive
-      // poll below then called `.some` on it every two seconds. An unhandled
-      // rejection in a status loop is the worst place for one: it repeats, and
-      // the panel it is about looks fine.
+      // truncated response, a proxy's error page served as JSON, an older host
+      // — must not reach the adaptive poll below, where an exception would
+      // repeat every two seconds while the panel looks fine.
       const body = await api.modelOperations();
       items = Array.isArray(body?.items) ? body.items : [];
       error = null;

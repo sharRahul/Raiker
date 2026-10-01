@@ -12,11 +12,10 @@ if TYPE_CHECKING:
 class RoutedExecutor:
     """An executor as the registry hands it out: runnable only while routed.
 
-    CR-01 — the registry used to store an executor and return that same object,
-    so anything holding a registry — a future route handler, a scheduled job, a
-    helper — could fetch a real side-effecting executor and call it with no
-    gate, no decision mode, no approval and no audit. The review asked for
-    runtime-issued authority on every call, and the runtime already issues one:
+    CR-01 — anything holding a registry — a future route handler, a scheduled
+    job, a helper — must not be able to fetch a real side-effecting executor and
+    call it with no gate, no decision mode, no approval and no audit. Every call
+    needs runtime-issued authority, and the runtime already issues one:
     ``RuntimeAuthority.route_action`` opens a :func:`routed_dispatch` for exactly
     one capability and one action around ``executor.execute`` (CR-03).
 

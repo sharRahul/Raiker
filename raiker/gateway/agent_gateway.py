@@ -464,21 +464,14 @@ class AgentGateway:
     def _persisted_summary(response: AgentResponse) -> str:
         """The reply this turn stores in its transcript row (BUG-73).
 
-        A turn parked on an approval has no answer yet — it has a *state*. The
-        pre-approval notice ("Approval required for local action. No command was
-        executed.") used to be stored as though it were the answer, and the
-        resume was the only thing that ever replaced it. One live round ended
-        with that sentence sitting, durably, beneath the chip for the file the
-        approval had just written: the write happened, was checkpointed, and
-        changed the filesystem, and reopening the conversation showed the denial
-        again.
-
-        Nothing about a race can produce that now, because the false claim is
-        never written. An interrupted resume leaves the turn with no stored
-        answer and its parked approval still showing — which is what actually
-        happened — and the resume writes the real one over an empty row. The old
-        wording is refused alongside the new one so a workspace written before
-        this change cannot re-persist it on a resume either.
+        A turn parked on an approval has no answer yet — it has a *state*, and
+        the pre-approval notice is never stored as though it were the answer: a
+        race could otherwise leave a durable denial beneath a write that
+        happened. An interrupted resume leaves the turn with no stored answer
+        and its parked approval still showing — which is what actually
+        happened — and the resume writes the real one over an empty row. Both
+        wordings are refused so a workspace written by an older build cannot
+        re-persist one on a resume either.
         """
         if response.message in {
             PARKED_FOR_APPROVAL_NOTICE,

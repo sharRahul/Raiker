@@ -24,6 +24,7 @@
   import type { Notification as RaikerNotification } from "../apiTypes";
   import { api, hasToken } from "../api";
   import { canRaiseDesktopNotice, raiseDesktopNotice } from "../desktopNotice";
+  import { watchLayout } from "../layoutWatch";
   import { uiPrefs } from "../prefs.svelte";
   import {
     NOTICES_CHANGED,
@@ -127,11 +128,9 @@
   /**
    * Read it here, without going anywhere.
    *
-   * Opening was the only way to clear the dock, so a notice the owner had
-   * already understood sat over the top of whatever page they were on — on
-   * Chat, over the conversation's own **New chat** — until they left that page
-   * to read it. Dismissing marks it read through the same route; the record
-   * keeps it.
+   * A notice the owner has understood must be clearable without leaving the
+   * page. Dismissing marks it read through the same route opening uses; the
+   * record keeps it.
    */
   async function dismiss(notification: RaikerNotification) {
     notifications = notifications.map((item) =>
@@ -148,13 +147,10 @@
   /**
    * How far the dock drops so it never covers a page's own top actions.
    *
-   * Found live on 2026-10-01: docked under the top bar, the notice sat over the
-   * conversation header's **New chat** on Chat and Build and over **Refresh**
-   * on the list pages, and a click meant for either opened the notice instead.
-   * The approval card learned the same thing about composers at the bottom
-   * (FIXED-621); this is the top half. A page's top action row is measured and
-   * the dock sits just below any row it would cover, and back under the top bar
-   * when there is none.
+   * Invariant: a docked notice never takes a click meant for a page control.
+   * A page's top action row (New chat, Refresh) is measured and the dock sits
+   * just below any row it would cover — the top-edge counterpart of the
+   * approval card rising above a composer (FIXED-621).
    */
   const KEEP_CLEAR_TOP = ".head-row, .header-actions, [data-dock-clear-top]";
   const DOCK_RIGHT = 20;
@@ -183,13 +179,7 @@
 
   $effect(() => {
     if (shown.length === 0 || dock === null) return;
-    measure();
-    const tick = setInterval(measure, 1000);
-    window.addEventListener("resize", measure);
-    return () => {
-      clearInterval(tick);
-      window.removeEventListener("resize", measure);
-    };
+    return watchLayout(measure);
   });
 
   // Mirror new unread notifications to the desktop through the one path every

@@ -90,9 +90,8 @@ class ModelLibraryService:
     def _index_root(owner: str, root: Path, files: list[Path]) -> list[LocalModel]:
         # GCR-27 — a shard group is a *directory* and a base name, not a base
         # name. `model-00001-of-00002.gguf` is the commonest filename a split
-        # GGUF has, so two unrelated models one folder apart used to be indexed
-        # as one: one model's metadata over the other's files, with a shard
-        # count and a size that belonged to neither.
+        # GGUF has, so keying on the name alone indexes two unrelated models one
+        # folder apart as one.
         groups: dict[tuple[str, str, int], list[tuple[Path, int, int]]] = {}
         for path in files:
             match = _SHARD.match(path.name)

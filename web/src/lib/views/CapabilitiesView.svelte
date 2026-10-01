@@ -114,11 +114,9 @@
    * the server has confirmed is kept here so the control updates without a full
    * reload.
    *
-   * NEW-PERM-02 — this used to be *only* the control's private knowledge. Every
-   * summary above the registry read the raw gate list instead, so a capability
-   * set to Never showed Never on its control and Automatic in the two sections
-   * above it. There is one list now: `effective` is the read with every
-   * confirmation merged in, and nothing on this page derives from anything else.
+   * NEW-PERM-02 — `effective` is the read with every confirmation merged in,
+   * and every summary on this page derives from it, so a control and the
+   * sections above it can never disagree about a capability.
    */
   let confirmedModes = $state<ConfirmedModes>({});
   /** Counts confirmed mutations, so a slow refresh cannot undo a fast change. */
@@ -656,15 +654,10 @@
       {/each}
     </div>
     {#if integratedButOff > 0}
-      <!-- Why a fresh account shows most things off. One sentence, at note
-           weight: it was a full-width accent banner competing with the controls
-           under it.
-
-           BUG-239 — and it used to say *every* capability with a real executor
-           starts off, which stopped being true the moment a new account was
-           given a baseline. A page that says "off" about five capabilities that
-           are on is the exact defect this page exists to prevent, so the
-           sentence says "most" and names the exception. -->
+      <!-- Why a fresh account shows most things off, at note weight. BUG-239 —
+           "most", with the exception named, because a new account's baseline
+           turns some on; saying "off" about a capability that is on is the
+           defect this page exists to prevent. -->
       <p class="posture-note">
         <Icon name="info" size="sm" />
         <span>
@@ -889,10 +882,8 @@
     <!--
       GEP-04, second answer. These gates exist, and flipping them decides
       nothing: either nothing in the product reaches the executor, or the work
-      runs under a different named control. They used to sit in the registry
-      with a grey chip and a full set of mode buttons, so a quarter of a page of
-      decisions was not decisions — and an owner could set one, select it for a
-      bulk change, and come away believing they had closed something.
+      runs under a different named control. They carry no mode buttons, so no
+      owner can set one and believe they closed something.
 
       They are not hidden. Hiding a capability an owner can ask about is its own
       dishonesty, and the note is the answer they actually need: what really
@@ -923,9 +914,8 @@
   {/if}
 
   {#if authorityGates.length > 0}
-    <!-- REM-PERM-01 — evidence, not the owner's first task. The read-only
-         table used to sit above every control on the page; it is reference for
-         a question an owner asks second, so it reads second, and closed. -->
+    <!-- REM-PERM-01 — evidence, not the owner's first task: reference for a
+         question an owner asks second, so it reads second, and closed. -->
     <details class="panel authority-disclosure">
       <summary>How your permissions apply</summary>
       <AuthorityMatrix gates={authorityGates} total={governedGates.length} />

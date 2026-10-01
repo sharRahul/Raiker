@@ -218,10 +218,8 @@
   /**
    * COMPOSER-09 — the same composer grammar as Chat and Build.
    *
-   * Design's bar carried a model select and a size select permanently: two of
-   * the parameters an image request takes, with no route to the rest. The shell
-   * is shared now, and what stays at rest is the one visual parameter changed
-   * often enough to earn the room.
+   * The shell is shared, and what stays at rest is the one visual parameter
+   * changed often enough to earn the room.
    *
    * The menus are deliberately short, and short *honestly*. COMPOSER-09
    * describes edit, variations, outpaint, reference images and version compare;
@@ -231,11 +229,6 @@
    * reference images have no governed path and are therefore absent rather than
    * present and inert, which is the review's own acceptance test: "every exposed
    * composer action reaches an actual backend/runtime path or is omitted".
-   *
-   * REM-DESIGN-01 — this paragraph used to say the endpoint "takes a prompt, a
-   * size and a model and returns one picture", which had been untrue since the
-   * lineage work landed. A comment that describes a retired endpoint is read as
-   * a statement about the product by the next person to change this file.
    */
   const HANDLED = new Set([
     "set-project",
@@ -254,13 +247,9 @@
   /**
    * The Work project, named here as it is in Chat and Build.
    *
-   * Named, and honestly bounded. Design's research turns run inside this
-   * project like any other governed turn; the *image* endpoint takes a prompt,
-   * a size and a model and had no project field, so a generated picture did not
-   * belong to the project it was made in. BUG-277's lineage work carried
-   * `project_id` with it (BUG-282), so a picture generated here is filed
-   * against the project the composer names, and the fact below says so without
-   * the qualification it used to need.
+   * Design's research turns run inside this project like any other governed
+   * turn, and a generated picture carries `project_id` (BUG-282), so it is
+   * filed against the project the composer names.
    */
   const project = $derived(
     (projects?.projects ?? []).find((entry) => entry.project_id === workProject()) ?? null,
@@ -284,11 +273,9 @@
           },
         ]
       : []),
-    // Size is deliberately *not* a fact here. It has a control of its own two
-    // elements to the left, and a line that repeats the value of the control
-    // beside it printed "1024x1024" twice in one bar — the duplication
-    // COMPOSER-18 exists to prevent. The context line answers for what the turn
-    // will use that the bar does not already show. Found live 2026-09-07.
+    // Size is deliberately *not* a fact here: it has its own control two
+    // elements to the left, and repeating it is the duplication COMPOSER-18
+    // prevents. The context line answers only what the bar does not show.
     ...(choice !== null
       ? [
           {

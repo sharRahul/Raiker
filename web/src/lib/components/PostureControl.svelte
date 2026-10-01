@@ -2,40 +2,21 @@
   /**
    * Governance, summarized to one control, expanded on request.
    *
-   * Governance is Raiker's strongest differentiator and the composer was the
-   * place it cost the most. Chat and Build each carried the approval-mode
-   * control and the execution-environment badge side by side, permanently, so
-   * the room under every message the owner ever typed was spent on two
-   * configuration surfaces that do not change from one turn to the next. Asking
-   * a question looked like operating a control plane.
-   *
-   * The posture is one chip now:
+   * The posture is one chip, so asking a question does not look like operating
+   * a control plane:
    *
    *     Local · Asks first
    *
-   * and that chip opens the exact same controls, unchanged — the approval-mode
-   * control and the environment badge are composed here rather than replaced,
-   * so the behaviour, the API calls and their own tests are untouched. Nothing
-   * is removed and nothing is one click further away than it was: the chip is a
-   * click, and so was opening the approval menu.
+   * and that chip opens the approval-mode control and the environment badge,
+   * composed here rather than replaced, so their behaviour, API calls and tests
+   * are their own.
    *
-   * the chip used to open with the constant word "Protected", so a
-   * workspace set to approve everything automatically read
-   *
-   *     Protected · Local · Auto-approve
-   *
-   * in amber. The colour said "this is a relaxed posture" and the first word
-   * said "you are covered", about the same setting, at the same moment. A
-   * standing reassurance is not a state: it is true in every state, so it
-   * cannot be read as a description of this one, and next to a warning tone it
-   * actively misleads.
-   *
-   * The chip now states only what changed and what it does — where work runs,
-   * and what happens when a decision is needed — in the mode's own words. What
-   * *does* still hold in every posture has not been deleted; it moved into the
-   * popover, where it is a sentence naming the specific protections rather than
-   * one adjective standing in for all of them. Everything below that — the full
-   * gate matrix — stays on Permissions, which is where a matrix belongs.
+   * The chip states only where work runs and what happens when a decision is
+   * needed, in the mode's own words — never a standing reassurance such as
+   * "Protected", which is true in every state, describes none of them, and
+   * beside a warning tone actively misleads. What holds in every posture is a
+   * sentence in the popover naming the specific protections; the full gate
+   * matrix stays on Permissions.
    */
   import { onMount } from "svelte";
   import { api } from "../api";

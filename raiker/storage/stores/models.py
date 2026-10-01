@@ -160,10 +160,9 @@ class ModelStore:
     ) -> ModelOperation | None:
         """Move one operation, and only from a state the caller expected (GCR-20).
 
-        Every lifecycle write used to be load, replace, save, so a worker that
-        had already computed its progress row could store `running` over a
-        cancellation the owner had asked for in between and the request was
-        lost. This is the one write the lifecycle uses: an
+        Invariant: no lifecycle write is load-replace-save, which lets a worker
+        store `running` over a cancellation the owner asked for in between.
+        This is the one write the lifecycle uses: an
         ``UPDATE ... WHERE state IN (...)`` that either moves the row or reports
         that somebody else moved it first. Returns the row as it now stands, or
         ``None`` when the expected state no longer held.
@@ -203,16 +202,13 @@ class ModelStore:
         """Fail every non-terminal model operation. **Startup only.**
 
         GCR-25 — a pull, conversion or deploy is a durable row executed by an
-        in-process worker. The row outlives the process; the worker does not. A
-        host that stopped mid-download therefore came back reporting work that
-        was still `queued` or `running` and had nobody advancing it, and the
-        owner's only signal was a progress bar that never moved again.
+        in-process worker. The row outlives the process; the worker does not,
+        so without this a stopped host comes back reporting `queued` or
+        `running` work nobody is advancing.
 
-        `queued` is included deliberately. It used to be left alone, which was
-        right while a process was live — a queued row is one a dispatcher is
-        about to pick up. At startup nothing has been dispatched yet, so a
-        queued row is abandoned by definition and would otherwise sit there for
-        the life of the install. The state named here is terminal and
+        `queued` is included deliberately: while a process is live a queued row
+        is one a dispatcher is about to pick up, but at startup nothing has been
+        dispatched, so a queued row is abandoned by definition. The state named here is terminal and
         retryable, so the owner's next move is one press.
         """
         changed = self._execute(

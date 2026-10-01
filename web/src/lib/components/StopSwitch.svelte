@@ -2,41 +2,20 @@
   // STOP switch (top bar). Wired to the governed stop path: it requests that all
   // work in progress stop at the next safe boundary — NOT an instant force-kill.
   //
-  // Found live 2026-09-05, walking every destination at four widths.
-  //
-  // The control was **full-strength red on every page, at every width, forever**,
-  // and it could not say whether pressing it would do anything. The owner
-  // pressed it, confirmed a dialog about cancelling everything at a safe
-  // boundary, waited on two API calls, and was told "No active tasks to stop."
-  // On a 360px header the pill took about a third of the width to do it. A
-  // permanent alarm is an alarm nobody reads, which is the opposite of what an
-  // emergency control is for.
-  //
-  // **What did not change, and must not.** The stop stays reachable from every
-  // page at every moment — that is the Security Philosophy's "instant stop", and
-  // taking it away when Raiker *believes* nothing is running would make a stale
-  // belief into a removed control. It is still one press away when the count is
-  // zero; it is simply quiet about it.
-  //
-  // **What changed.** The switch reads the same task list the workbench reads
-  // and counts it with the same `isActiveTask`, so the two can never disagree.
-  // Nothing running: a ghost icon, no word, no colour. Something running: the
-  // red pill it always was, with the number on it, announced politely. And the
-  // dialog opens on a count refreshed at that moment, so an owner pressing it
-  // with nothing running is told so immediately rather than after an interrupt
-  // nobody needed.
-  //
-  // Beyond the reference set: Claude Code, Cowork and Codex all surface a stop
-  // while a turn runs. None of them tells you *how much* it would reach before
-  // you commit to it, because none of them has a governed queue to count.
+  // **Invariant, and it must not change.** The stop is reachable from every
+  // page at every moment — the Security Philosophy's "instant stop" — even when
+  // Raiker *believes* nothing is running: a stale belief must never become a
+  // removed control. With nothing running it is a quiet ghost icon, still one
+  // press away; with something running it is the red pill with the count, so a
+  // permanent alarm does not become an alarm nobody reads. The dialog opens on a
+  // count refreshed at that moment.
   //
   // **GEP-02 (owner decision, 2026-09-27).** "Stop" means stop *everything*
   // currently being performed — the answer being written in Chat, a Build turn,
   // a routine, a task, a running command — whether or not it leaves the
-  // machine. The switch used to read the task list alone, so the one thing an
-  // owner most often wants to stop, the turn they are watching, was invisible to
-  // it: a chat turn is not a task. It now counts tasks the way every surface
-  // does (`isActiveTask` over `GET /api/tasks`) and adds what
+  // machine, including the turn the owner is watching, which is not a task. It
+  // counts tasks the way every surface does (`isActiveTask` over
+  // `GET /api/tasks`) and adds what
   // `GET /api/work-in-flight` reports — live turns and running commands — and
   // one press sends one `POST /api/stop-all`, which applies each kind of work's
   // own existing stop at its safe boundary.

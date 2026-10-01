@@ -238,12 +238,11 @@ class TaskService:
             origin="task",
         )
         self.store.set_session_origin(inbox_session_id, "task")
-        # C11 — this task's own conversation. Background work used to run as an
-        # isolated turn whose output landed in a task record: "what did the
-        # overnight run find?" had no thread to be asked in, and every routine's
-        # cycles interleaved in one Inbox transcript Chat deliberately hides.
+        # C11 — this task's own conversation, so "what did the overnight run
+        # find?" has a thread to be asked in and routines' cycles never
+        # interleave in one transcript.
         #
-        # Each task now gets a durable session of its own, titled after the task,
+        # Each task gets a durable session of its own, titled after the task,
         # which every cycle runs in. The owner opens it from the task card and
         # replies there, and because the next cycle runs in the same session, the
         # reply is context the next cycle reads — which is what makes a reply

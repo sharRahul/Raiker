@@ -785,14 +785,9 @@ class KnowledgeService:
                     str(agent["status"]) == "running",
                 )
             )
-        # BUG-218 — one node per *tool*, not one per event.
-        #
-        # This used to emit a node per row of `list_event_index(limit=250)`,
-        # typed `tool`. Measured on a workspace after one live round: 20 of 22
-        # nodes were that type, and not one was a tool — they were "turn
-        # started", "model request completed" and their kin. The map read as a
-        # map of the runtime's own bookkeeping, which is why chats, context and
-        # files were invisible underneath it.
+        # BUG-218 — one node per *tool*, not one per event: most event-index
+        # rows typed `tool` are lifecycle bookkeeping, and a map of them hides
+        # the chats, context and files underneath.
         #
         # `tool_actions` is where tools actually are, aggregated per session, so
         # a session that ran `read_file` forty times is one node saying forty
@@ -895,9 +890,8 @@ class KnowledgeService:
                 )
             )
             # BUG-218 — a memory whose source event fell outside the event
-            # window used to be drawn with no edge at all: a fact floating free
-            # of the work that produced it. The session is the durable anchor,
-            # so it is the fallback rather than leaving the node orphaned.
+            # window still anchors to the work that produced it: the session is
+            # the durable fallback, never an orphaned node.
             if memory.source_event_id in event_ids:
                 edges.append(
                     BrainEdgeView(f"event:{memory.source_event_id}", node_id, "remembered")

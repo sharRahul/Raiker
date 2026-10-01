@@ -56,8 +56,7 @@
   let findings = $state<McpFinding[]>([]);
   let health = $state<SecurityHealth[]>([]);
   let storageHealth = $state<HealthView | null>(null);
-  // BUG-77 — containment used to exist for monitored MCP connections and nothing
-  // else. This is the same three facts for every capability family: what is
+  // BUG-77 — the same three facts for every capability family: what is
   // contained, why, and the one control that clears it.
   let containment = $state<CapabilityContainmentView | null>(null);
   let containmentBusy = $state("");
@@ -297,17 +296,10 @@
 <!--
   REM-SET-SECURITY — four sections, because these are four lifecycles.
 
-  Everything below used to be one card: eight fields in a flat stack, from
-  database encryption through a breach check to standing approval grants. They
-  do not change together, they are not read together, and they are not even
-  answered by the same question — "how do I sign in" and "what may run without
-  asking me" had the same heading, the same weight and the same neighbours.
-
-  Nothing is removed and nothing is weakened: the same controls, in the same
-  order within each group, under the heading that says which lifecycle they
-  belong to. The emergency pause is not here and never was — it is the STOP
-  switch in the context bar, which is on every screen rather than behind a
-  settings tab.
+  "How do I sign in" and "what may run without asking me" do not change
+  together and are not read together, so each lifecycle has its own heading.
+  The emergency pause is not here: it is the STOP switch in the context bar,
+  on every screen rather than behind a settings tab.
 -->
 <section class="card" aria-labelledby="security-signin-h">
   <h2 id="security-signin-h">Signing in and devices</h2>

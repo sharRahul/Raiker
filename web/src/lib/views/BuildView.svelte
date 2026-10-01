@@ -163,11 +163,8 @@
   const surface = workSurface("build");
 
   let {
-    // BUG-242 — the conversation this surface was opened on, from the URL. Build
-    // used to learn its session only from the stream, so a reload — the thing an
-    // owner does exactly when a change looked wrong — mounted an empty
-    // conversation over a session that was still stored, still findable, and
-    // still holding the approvals for that change.
+    // BUG-242 — the conversation this surface was opened on, from the URL, so a
+    // reload comes back to the stored session and the approvals it holds.
     sessionId: continuedSessionId = null,
     // MEM-08 — the exchange this link is pointing at inside that conversation.
     anchoredTurnId = null,
@@ -598,9 +595,8 @@
   /**
    * The terminal control opens the workbench on the terminal.
    *
-   * It used to toggle a pane of its own. Now it names a view: pressing it opens
-   * the workbench there, and pressing it again closes the terminal rather than
-   * the workbench, because the owner asked about the terminal and not about the
+   * It names a view: pressing it again closes the terminal rather than the
+   * workbench, because the owner asked about the terminal and not about the
    * column it happens to live in.
    */
   function toggleTerminal(event: MouseEvent) {
@@ -666,9 +662,8 @@
   // Build owns its project, and a project is required before work can start.
   // That is not a UI preference: the selection *is* the execution boundary —
   // the files, memories and conversations the turn may retrieve — so a Build
-  // session with no project has no boundary to run inside. It used to fall back
-  // to an account-level "active project" set from the top bar, which meant the
-  // boundary could change from another page without anything here saying so.
+  // session with no project has no boundary to run inside, and nothing set on
+  // another page may change the boundary without this page saying so.
   //
   // The choice is remembered locally so returning to Build resumes where the
   // owner left off, and it cannot change mid-turn.
@@ -2409,9 +2404,7 @@
               </p>
               {#if approvalDiffs[approval.approval_id] !== undefined}
                 <!-- B14 — the change, read *and decided* where it was
-                     proposed. Accepting part of it is the act a coding review
-                     is made of, and it used to mean rejecting everything and
-                     asking again. -->
+                     proposed, including accepting part of it. -->
                 <DiffView
                   diff={approvalDiffs[approval.approval_id].diff}
                   path={approvalDiffs[approval.approval_id].path}
@@ -3337,15 +3330,9 @@
     :global(.command-pane:not(.expanded)) { display: none; }
     /* Build carries six controls on the left where Chat has four, so its left
        group wraps to a second row rather than compressing off the screen. The
-       bar used to hide the project picker below this width while still printing
-       "Select a project to start." underneath and keeping Send disabled — an
-       instruction pointing at a control that was not on the screen, with no
-       other route to it in Build.
-
-       COMPOSER-02/03 removed the problem rather than the symptom: the project
-       select is not on the bar at any width now, it is an entry in `+`, and the
-       "Select a project to start." line carries its own way to open it. What a
-       narrow window may still lose is information; what gates sending stays. */
+       project select is an entry in `+` at every width (COMPOSER-02/03), and
+       "Select a project to start." carries its own way to open it: a narrow
+       window may lose information, never what gates sending. */
     :global(.composer-build .bar-left) { flex-wrap: wrap; }
     .project-choice { max-width: 100%; }
     :global(.composer-build .environment-badge) { display: none; }

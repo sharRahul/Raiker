@@ -404,13 +404,9 @@ def conversion_artifacts(preview: ConversionPreview) -> tuple[Path, ...]:
 def _source_fingerprint(source: Path, revision: str) -> str:
     """What this conversion was made from, as a content-integrity claim (GCR-26).
 
-    It used to hash the declared revision, each relative filename and each
-    file's *byte size*, and never the bytes. A path and a length are not an
-    identity: edit a weights file in place, keep its length, and the fingerprint
-    is unchanged — so the provenance record recorded a different model under the
-    same value, which is the one thing a fingerprint exists not to do.
-
-    Now every included file's content is hashed. Three details that matter:
+    Every included file's *content* is hashed: a path and a length are not an
+    identity, and a weights file edited in place at the same length must change
+    the fingerprint. Three details that matter:
 
     * **Each file's own digest goes in**, rather than the bytes being streamed
       into one running hash, so two files whose contents could be re-split

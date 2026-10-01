@@ -1,16 +1,10 @@
 """Lending the git credential for one command, and taking it back afterwards.
 
-``RAIKER_GITHUB_TOKEN`` used to be read straight from the host's environment. Two
-things follow from that, and both are worse than they look:
+The token is never read from the host's environment, where two things follow:
+every child process inherits it, including the ones that have nothing to do
+with git, and the owner cannot take it back short of restarting the host.
 
-* **Every child process inherited it.** A push needed the token, so the host held
-  it, so every command the runtime ever launched had it in its environment —
-  including the ones that had nothing to do with git.
-* **The owner could not take it back.** A credential that lives in the process
-  environment is withdrawn by restarting the host, which is not a control anyone
-  reaches for.
-
-So the token is held in the workspace vault instead, and reaches a child process
+So the token is held in the workspace vault, and reaches a child process
 only when three things are true at once: the owner stored it, the owner granted
 its use (for one command, or for this session), and the command about to run is
 the one the grant was for. It is passed in a constructed environment rather than

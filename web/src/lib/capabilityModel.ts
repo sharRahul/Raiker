@@ -115,21 +115,12 @@ export function gateBadge(gate: CapabilityGate): BadgeVariant {
 }
 
 // ── What the switch actually decides (GEP-04) ────────────────────────────────
-// Forty-five capabilities have a real executor and therefore a gate, and the
-// Permissions page used to render every one of them as a switch. For fourteen,
-// flipping it changed nothing: either nothing in the product reaches the
+// Some gates decide nothing: either nothing in the product reaches the
 // executor, or the work happens under a different control the gate never
 // consults. An owner holding a switch that governs nothing is the one failure
-// mode a governance product cannot have.
-//
-// The first answer was to label them — a grey `No route yet` or `Governed
-// elsewhere` chip on the row. That is honest and it is not enough: fourteen of
-// fifty-one rows on a page of decisions were not decisions, and a chip does not
-// stop an owner setting a mode, selecting the row for a bulk change, or
-// believing afterwards that they have closed something. They are off the
-// decision surface now and read as what they are — a short read-only list that
-// names what really governs each one. Nothing is hidden; nothing pretends to be
-// a lever.
+// mode a governance product cannot have, so these are off the decision surface
+// and read as a short read-only list naming what really governs each one.
+// Nothing is hidden; nothing pretends to be a lever.
 
 /** True when this gate's own state decides whether the capability runs. */
 export function governsItsOwnCapability(gate: CapabilityGate): boolean {
@@ -275,15 +266,10 @@ export function sideEffectChip(
 }
 
 // ── The delegated-authority summary ──────────────────────────────────────────
-// The matrix at the top of Permissions shows eight rows out of sixty-seven, and
-// it used to show the *alphabetically first* eight — `admin_mutation` through
-// `cloud_execution_cap`, none of which an owner has ever thought about. On a
-// fresh account that is eight rows of "Off / Unavailable": a summary that says
-// nothing, above a list that says everything.
-//
-// The summary is worth having, so it shows the eight rows that carry the most
-// authority instead. Ranked, never filtered: a table with nothing in it is
-// still the truth about an account where nothing is on.
+// The matrix at the top of Permissions shows the eight capabilities that carry
+// the most authority, not the alphabetically first eight. Ranked, never
+// filtered: a table with nothing in it is still the truth about an account
+// where nothing is on.
 
 /** How many rows the delegated-authority summary shows. */
 export const AUTHORITY_MATRIX_ROWS = 8;
@@ -399,8 +385,7 @@ const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   // back, not in "Other tools", which is where an unmapped capability lands.
   checkpoint_restore_execution: "Workspace",
   // One subject, one group. A branch, a commit, a push and the account the push
-  // authenticates to are four halves of the same decision, and they used to be
-  // three groups apart.
+  // authenticates to are four halves of the same decision.
   git_write_execution: "Git",
   git_push_execution: "Git",
   connector_github_runtime: "Git",

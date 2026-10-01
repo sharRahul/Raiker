@@ -1343,11 +1343,10 @@ class ModelService:
         def _remembered(status: str, reason_code: str | None) -> ProviderModelListView:
             """The failure, plus whatever this provider last published.
 
-            A provider that is briefly unreachable used to make
-            its whole catalogue vanish from every picker, because the only copy
-            was the one in flight. The failure is still reported exactly as it
-            happened; the models beside it are the remembered ones, flagged as
-            remembered so nothing presents them as current.
+            A provider that is briefly unreachable keeps its catalogue in every
+            picker. The failure is reported exactly as it happened; the models
+            beside it are the remembered ones, flagged as remembered so nothing
+            presents them as current.
 
             A policy denial carries no models at all: the owner has not been
             granted this provider *now*, and offering a remembered catalogue for
@@ -1385,14 +1384,10 @@ class ModelService:
         except ProviderPolicyError as exc:
             return _remembered("policy_denied", safe_error(str(exc)))
         except ModelProviderError as exc:
-            # BUG-257 — every provider failure used to come back as
-            # `provider_unreachable`, which the Models page states as "could not
-            # be reached. Check the credential and this device's network
-            # access." A provider that answered 401 was reached perfectly well,
-            # and sending the owner to check their network for a key the
-            # provider rejected is the wrong instruction, not merely a vague
-            # one. The error classes already distinguish these; only this branch
-            # was flattening them.
+            # BUG-257 — each error class keeps its own reason. A provider that
+            # answered 401 was reached perfectly well; flattening it to
+            # `provider_unreachable` sends the owner to check their network for
+            # a key the provider rejected.
             if "unsupported" in str(exc):
                 return _remembered("unsupported", "model_listing_unsupported")
             return _remembered("unavailable", provider_error_code(exc))
@@ -1480,10 +1475,9 @@ class ModelService:
     ) -> ControlResult:
         """Choose which of a provider's models stay offered in every picker.
 
-        Selecting a default used to be the only way a model entered the pickers,
-        so a provider serving six could offer one. This is the owner saying
-        which of them they actually work with; the default is a separate,
-        unchanged decision, and the model it names is always kept.
+        This is the owner saying which of a provider's models they actually work
+        with; the default is a separate decision, and the model it names is
+        always kept.
         """
         registry = ModelProfileRegistry.load()
         try:
@@ -1547,9 +1541,8 @@ class ModelService:
             from raiker.models.connections import get_model_connection
 
             # GCR-02 — the question is whether `effective` would run, so ask it
-            # without building anything. The provider this used to construct was
-            # closed by hand below, through a `getattr(..., "aclose")` that had to
-            # exist because the call returned a live client nobody wanted.
+            # without building anything: a built provider is a live client to
+            # close.
             ModelProviderFactory(
                 policy=provider_runtime_policy_from_gates(self.store, principal.principal_id),
                 connection=get_model_connection(

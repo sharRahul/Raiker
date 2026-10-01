@@ -424,10 +424,9 @@
     <ul class="threads">
       {#each threads as thread (thread.session_id)}
         <li class:blocked={thread.waiting_on}>
-          <!-- REM-THREAD-03 — a thread is resumed where it was done. Every row
-               used to point at Chat, so a Build conversation opened on a screen
-               that cannot show its repository, its pending diffs or the
-               approvals over them. -->
+          <!-- REM-THREAD-03 — a thread is resumed where it was done: Chat
+               cannot show a Build conversation's repository, pending diffs or
+               the approvals over them. -->
           <a href={conversationLink(workModeRoute(thread.origin), thread.session_id)}>
             <span class="title">
               {#if thread.kind === "routine"}<Icon name="tasks" size="sm" />{/if}

@@ -636,9 +636,9 @@ def _completed_turns(
         rows = store.list_turns(session_id, limit=500)
     except Exception as exc:  # noqa: BLE001 — every read failure is one condition
         # GCR-36 — an unreadable transcript is not an empty one. Returning `[]`
-        # here told the planner the conversation was short enough to replay
-        # whole and told replay there was nothing to replay, which is how a
-        # storage failure used to reach the model as a first turn.
+        # here would tell the planner the conversation is short enough to replay
+        # whole and replay that there is nothing to replay — a storage failure
+        # reaching the model as a first turn.
         raise ConversationHistoryUnavailable(
             f"conversation_history_unreadable:{type(exc).__name__}"
         ) from exc

@@ -74,9 +74,9 @@ def _set_capability_decision_mode(
 async def health(request: Request) -> dict[str, Any]:
     """Liveness *and* whether the encrypted store can be opened (BUG-86).
 
-    The probe used to answer ``{"status": "ok"}`` without reading anything, so
-    the lock screen's status strip could call the runtime operational while
-    every sign-in on the same screen failed on a store that would not open.
+    A probe that answered ``{"status": "ok"}`` without reading anything would let
+    the lock screen's status strip call the runtime operational while every
+    sign-in on the same screen failed on a store that would not open.
     ``status`` stays ``ok`` only while both are true; the response is a 200
     either way, because the *server* is answering — it is the store that is
     degraded, and the caller needs to be told which.

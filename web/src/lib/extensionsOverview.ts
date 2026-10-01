@@ -90,12 +90,9 @@ export function extensionExceptions(
 /**
  * What is working, as counts.
  *
- * **Counted over the same five kinds the inventory is.** It used to read
- * `/api/extensions` alone, which covers connectors and MCP servers and not
- * skills, hooks or plugins — so a workspace with seven installed skills was
- * told *"Nothing is installed yet."* Building the inventory beside it is what
- * made that visible, and leaving the two to disagree on one screen would have
- * been worse than either of them being wrong on its own.
+ * **Counted over the same five kinds the inventory is**, so the counts and the
+ * inventory on one screen never disagree — `/api/extensions` alone covers
+ * connectors and MCP servers, not skills, hooks or plugins.
  *
  * `tools` stays over the extension views, because a tool count is something
  * only a connector or an MCP server has. A skill offers no tool; it is

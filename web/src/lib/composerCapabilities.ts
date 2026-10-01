@@ -326,11 +326,9 @@ export function composerMenu(
   handled: ReadonlySet<string>,
   readiness: readonly ToolReadiness[] = [],
 ): ComposerMenuItem[] {
-  // A gate list that is not a list is no evidence about anything. This is not
-  // defensive habit: `/api/capability-gates` answering with an object rather
-  // than an array — a truncated body, a proxy's error page served as JSON, a
-  // host older than the build — used to reach `.find` here and take the whole
-  // composer down, which is a far worse outcome than a menu that offers a
+  // A gate list that is not a list is no evidence about anything. A truncated
+  // body, a proxy's error page served as JSON or an older host would take the
+  // whole composer down at `.find` — far worse than a menu offering a
   // capability the runtime will judge properly when it is invoked.
   const known: readonly CapabilityGate[] = Array.isArray(gates) ? gates : [];
   return COMPOSER_CAPABILITIES.filter(

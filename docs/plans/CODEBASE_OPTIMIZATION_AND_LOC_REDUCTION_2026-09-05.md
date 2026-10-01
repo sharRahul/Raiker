@@ -66,7 +66,11 @@ Move or delete historical narrative already preserved in Git history/issues/PRs.
 
 ## OPT-01 — Generate frontend API types from FastAPI/OpenAPI
 
-**Priority: P0/P1 — Effort: Medium — LOC reduction: Very High — Risk: Low/Medium with contract tests**
+**Status: scope decided 2026-10-01; implementation remains open.** This run takes
+the bounded first stage below. Full response-contract coverage is a separate
+follow-up, not an implicit prerequisite hidden inside a code-generation task.
+
+**Priority: P0/P1 — Effort: Medium for generation infrastructure; High for full response modelling — LOC reduction: staged — Risk: Medium with contract tests**
 
 ### Evidence
 
@@ -74,9 +78,67 @@ Move or delete historical narrative already preserved in Git history/issues/PRs.
 
 This is a multi-source contract: backend fields can change while TypeScript is still hand-edited separately.
 
+### Scope decision — OPT-01 and OPT-02 (2026-10-01)
+
+**Decision: establish generation and migrate verified existing contracts in this
+run; defer the broad response-model backfill.** Do not attempt to invent the
+remaining response contracts merely to close the optimization review.
+
+The scope review reports **348 routes with no explicit response-model
+declarations, 47 relevant backend View dataclasses, and 232 handwritten
+TypeScript types**. The roughly **185-type gap** is a planning estimate, not a
+one-to-one route/model count: types can be nested, shared or frontend-only.
+Recount and map the actual routes and types before implementation. FastAPI can
+also infer schemas from return annotations, but a generic `dict[str, Any]`
+does not describe a response's fields. Existing dataclasses do not automatically
+appear as route response contracts just because they exist or implement
+`to_dict()`; each route must reference the correct wire representation.
+
+**Stage A — this optimization run:**
+
+1. Inventory ordinary JSON operations by method/path, request schema, actual
+   success/error response shapes, corresponding backend model and frontend
+   type. Record which are eligible, deferred for missing contracts, or special
+   transports; use this inventory as the migration boundary.
+2. Add deterministic OpenAPI export, pinned TypeScript generation and CI
+   drift checking. Generate the request contracts already represented in
+   OpenAPI.
+3. Attach existing dedicated response/view models only where contract tests
+   establish that they describe the actual serialized response, including
+   envelopes, nested projections, optional versus null fields and status codes.
+   Small envelope models needed for these existing views are in scope; modelling
+   unrelated ad-hoc response dictionaries is Stage B.
+4. Migrate frontend types and ordinary REST wrappers only for the verified
+   operations. Keep the existing public client facade and handwritten types/
+   wrappers for uncovered operations, with the inventory explaining each
+   remainder. Never replace a precise handwritten response type with generated
+   `any`, `unknown`, an empty schema or an unchecked cast and count it as done.
+
+**Stage B — explicit follow-up under OPT-01/OPT-02:**
+
+Create dedicated backend wire-response models for the remaining ordinary JSON
+operations, domain by domain, based on actual behavior and contract tests.
+Then migrate each operation's types and wrappers and remove its handwritten
+duplicates. Frontend-only types and special transports remain separately owned.
+This backfill is API-contract work with its own estimate and validation, not
+an assumed LOC saving in Stage A.
+
+**Compatibility boundary.** Adding a FastAPI response model can validate,
+coerce or filter runtime output. Preserve existing fields, omissions, aliases,
+nullability, status codes and refusal bodies. A custom `to_dict()` projection
+may intentionally omit private fields or derive public ones; do not substitute
+its dataclass fields without verifying the wire shape. Use dedicated projection
+models, never storage/domain objects, and preserve authorization and redaction.
+
+**Completion rule.** Stage A may be recorded as complete with measured coverage
+and an explicit remaining inventory. OPT-01/OPT-02 as a whole stay **partial**
+until Stage B covers the ordinary JSON operations; tooling alone does not close
+either finding. The long-term targets below apply to the completed migration.
+
 ### Change
 
-Make the FastAPI/OpenAPI schema the contract source and generate TypeScript types during development/CI.
+Make the FastAPI/OpenAPI schema the contract source for verified operations and
+generate TypeScript types during development/CI, following Stage A then Stage B.
 
 Recommended shape:
 
@@ -92,13 +154,14 @@ apps/web/src/lib/generated/api-schema.ts
 
 ### Remove
 
-- most manually mirrored interfaces from `apiTypes.ts`;
+- manually mirrored interfaces from `apiTypes.ts` only as their verified generated replacements land;
 - local duplicate response interfaces in `api.ts` where the same backend schema exists;
 - schema drift tests that only compensate for manual mirroring, replacing them with generation-diff tests.
 
 ### Acceptance
 
-- no handwritten frontend interface for an ordinary JSON API response that OpenAPI can express;
+- Stage A: deterministic generation, verified response-model wiring, migrated consumers and a route/type coverage inventory with explicit deferred entries;
+- final closure after Stage B: no handwritten frontend interface for an ordinary JSON API response that OpenAPI can express;
 - special streaming/event contracts remain explicit if OpenAPI cannot accurately represent them;
 - frontend build fails if generated contract is stale.
 
@@ -106,7 +169,12 @@ apps/web/src/lib/generated/api-schema.ts
 
 ## OPT-02 — Generate ordinary REST endpoint wrappers; keep only special transports handwritten
 
-**Priority: P1 — Effort: Medium/High — LOC reduction: Very High — Risk: Medium**
+**Status: scope decided 2026-10-01; implementation remains open.** Follows the
+[shared OPT-01/OPT-02 scope decision](#scope-decision--opt-01-and-opt-02-2026-10-01):
+Stage A generates wrappers only for verified operations; Stage B completes
+coverage after response-model backfill.
+
+**Priority: P1 — Effort: Medium/High plus OPT-01 response-model dependency — LOC reduction: staged — Risk: Medium**
 
 ### Evidence
 
@@ -124,7 +192,24 @@ api/streaming.ts            # SSE/stream-specific behavior
 api/files.ts                # Blob/download special cases
 ```
 
-Generate ordinary REST operations from OpenAPI. Preserve custom code only where Raiker has real semantics beyond a normal request: session adoption, CSRF, SSE, streamed prompt handling, binary downloads, retry/resume semantics.
+Generate ordinary REST operations from OpenAPI only after their request and
+response contracts meet OPT-01's migration gate. Retain handwritten wrappers
+for operations lacking verified response schemas until Stage B. Generated
+operations must use the existing request core so authentication, instance paths,
+cookies/CSRF, error mapping and cancellation retain their semantics. Preserve
+custom code for session adoption, SSE, streamed prompt handling, binary
+downloads and retry/resume semantics.
+
+### Acceptance
+
+- Stage A wrappers cover exactly the eligible operation inventory; uncovered
+  operations retain their existing typed implementation.
+- Contract/client tests verify method, path/query/body encoding, success and
+  refusal handling, and use of the shared transport core.
+- Generated artifacts are deterministic and checked for drift; frontend
+  typecheck/build and affected client tests pass.
+- Full closure requires Stage B's ordinary JSON coverage; special transports
+  remain handwritten and explicitly listed.
 
 ### Expected result
 
@@ -229,8 +314,10 @@ Dozens of local `_ws`, `_auth`, `_service`, `_operation_service`, `_library_serv
 **Status: done 2026-09-30 — [FIXED-638](FIXED_ITEMS.md#fixed-638--a-hundred-and-thirty-four-to_dict-methods-said-all-my-fields).** `View` and
 `view_to_dict` in `raiker/contracts/views.py`; the 134 field-wise `to_dict`
 methods are gone and the 44 real projections keep theirs. Frozen dataclasses
-were chosen over Pydantic: FastAPI derives OpenAPI from a dataclass directly,
-so OPT-01 is not blocked by the choice. −874 lines.
+were chosen over Pydantic: FastAPI can derive OpenAPI from a dataclass when it
+is wired into a route contract. This choice is compatible with OPT-01, but does
+not supply the missing route response declarations or the remaining response
+models; see the OPT-01/OPT-02 scope decision. −874 lines.
 
 **Priority: P1 — Effort: Medium — LOC reduction: Medium/High — Risk: Medium**
 
@@ -898,9 +985,10 @@ These can produce immediate net line deletion without redesigning core runtime b
 
 ## Wave 2 — contract generation
 
-1. OPT-01 generated TypeScript API types.
-2. OPT-02 generated ordinary REST client wrappers.
+1. OPT-01 Stage A: inventory, generation infrastructure, request types and verified existing response contracts.
+2. OPT-02 Stage A: generated wrappers for those verified operations through the existing transport core.
 3. OPT-18 generated/shared reason-code contracts.
+4. Separate follow-up: OPT-01/OPT-02 Stage B response-model backfill and remaining ordinary JSON migration; do not mark full contract generation complete before it lands.
 
 This is the highest-value source-of-truth reduction because future API additions stop creating parallel Python + TypeScript maintenance work.
 
@@ -951,6 +1039,9 @@ A refactor that moves 1,000 lines into another handwritten file scores **0 LOC r
 These are directional targets to validate after the baseline rather than promises made without `cloc` evidence.
 
 ### Target A — frontend contract surface
+
+These are final Stage B targets. Stage A reports actual coverage and retains
+uncovered handwritten contracts under the scope decision above.
 
 - ordinary REST response/request types: generated;
 - ordinary REST wrappers: generated;

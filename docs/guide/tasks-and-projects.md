@@ -119,10 +119,38 @@ not an authority — selecting a project grants nothing, and its folder can neve
 leave the workspace.
 
 **Projects → Create project.** Each card shows its path
-(`projects/<slug>`) and session count. **New chat** and **Start in Build** are on
-the card; **Archive**, **Move** and **Delete** are in its `⋯` menu, because
-deleting a managed project deletes its folder and that is not a neighbour for a
-button you press all day. A folder tree shows nesting.
+(`projects/<slug>`), how many chats it holds and when it was last worked in.
+**New chat** and **Start in Build** are on the card; **Archive**, **Move** and
+**Delete** are in its `⋯` menu, because deleting a managed project deletes its
+folder and that is not a neighbour for a button you press all day. A folder tree
+shows nesting.
+
+**Current project** is the one project new work starts in — the same one every
+composer names. Projects says which it is, with **Stop working in it** beside it.
+That is a different fact from the two lists, **Active** and **Archived**: a
+project can be active without being the current one.
+
+**Archive and restore.** Archiving a project archives what is inside it too, and
+it leaves the Active list and every project picker. Nothing expires: an archived
+project keeps its chats, files and tasks until you restore or delete it. Open it
+from **Archived** to read it, and **Restore** to bring it back — with the
+projects that were archived *with* it. A project inside it that you had archived
+on its own, earlier, stays archived. A project whose parent is still archived is
+restored by restoring the parent.
+
+**Move** opens the folder tree, indented, with **Top level** first. The project
+and everything inside it stay in the list but cannot be chosen — a project
+cannot go inside itself — and archived folders are not offered. Its chats, files
+and the projects inside it move with it; no folder on disk changes.
+
+**Delete** first counts what will go: the chats and their exchanges, tasks,
+checkpoints and files, and — for a managed project — the folder and how much is
+in it. Projects inside it are kept, archived and moved to the top level. Nothing
+deleted goes to a bin, so the dialog offers **Export project** first. You confirm
+by typing the project's name, and removing a managed project's folder also asks
+for your password (or authenticator code), as deleting your account does. An
+attached folder is never touched: deleting its project removes Raiker's record of
+it, not your files.
 
 **Start in Build** and **New chat** both open that Work mode *in the project*:
 the composer names it before you press Send, and the conversation or Build turn
@@ -146,8 +174,8 @@ long column:
 | Section | What is in it |
 |---|---|
 | **Overview** | The project's instructions and memory setting, and how many of each kind of thing is under it |
-| **Files** | The project's folder, and any file's provenance |
-| **Work** | The sessions started in it, and the tasks scoped to it |
+| **Files** | The project's folder, any file's provenance, and the files its chats shared, by name, type and size |
+| **Work** | The chats started in it — each with its title, last activity, mode and status, and a click away from where it left off — and the tasks scoped to it |
 | **Assets** | The **images** generated in [Design](design.md) while it was the working project |
 | **Evidence** | The checkpoints taken in its sessions |
 

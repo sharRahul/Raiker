@@ -91,6 +91,20 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-01.** §3.12 Projects is closed. UX-PROJ-04
+> to UX-PROJ-09 closed as [FIXED-647](FIXED_ITEMS.md#fixed-647--a-projects-shared-files-were-listed-by-attachment-id)
+> to [FIXED-653](FIXED_ITEMS.md#fixed-653--projects-called-the-selected-project-and-the-unarchived-ones-both-active)
+> under DEC-04: shared files by name, Active and Archived with a Restore that
+> undoes one archive, a move dialog that disables the project's own subtree
+> while the server names each refusal, a delete that shows the server's count of
+> what it removes and needs a step-up for a managed folder, chat rows that resume
+> the conversation, and one *Current project*. UX-PROJ-01 and UX-PROJ-03 had
+> already closed — as [FIXED-496](FIXED_ITEMS.md#fixed-496--new-chat-on-a-project-card-opened-a-chat-that-belonged-to-no-project)
+> (RR-PROJECT-01) and [FIXED-585](FIXED_ITEMS.md#fixed-585--a-project-was-six-things-stacked-in-one-column)
+> (REM-PROJ-02) — and this document had gone on listing them as open. Doing it
+> found subtree matching reading the `_` in project ids as a wildcard,
+> [FIXED-650](FIXED_ITEMS.md#fixed-650--subtree-matching-read-the-underscore-in-every-project-id-as-a-wildcard).
+>
 > **Implementation status, 2026-09-21.** UX-BUILD-05 closed as
 > [FIXED-600](FIXED_ITEMS.md#fixed-600--build-named-the-project-and-sent-you-to-the-list-of-them):
 > Build, Chat, Design and Tasks all named the Project a turn runs inside and all
@@ -751,15 +765,15 @@ Show counts and trends without exposing content to telemetry:
 
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
-| UX-PROJ-01 | P1 | “New chat” from a Project does not set the selected work project before routing. | Pass an explicit project handoff or call the same selection contract used by Build. Keep Chat retrieval owner-wide while filing the new session to the project. |
+| ~~UX-PROJ-01~~ **closed** — [FIXED-496](FIXED_ITEMS.md#fixed-496--new-chat-on-a-project-card-opened-a-chat-that-belonged-to-no-project) | P1 | “New chat” from a Project does not set the selected work project before routing. | Pass an explicit project handoff or call the same selection contract used by Build. Keep Chat retrieval owner-wide while filing the new session to the project. |
 | ~~UX-PROJ-02~~ **closed** — [FIXED-529](FIXED_ITEMS.md#fixed-529--delete-was-the-same-size-and-one-click-away-as-new-chat) | P1 | Five card actions compete: Start Build, New chat, Archive, Move and Delete. | Use Open/Continue as primary, New work as secondary and move lifecycle actions into an overflow menu. |
-| UX-PROJ-03 | P1 | Project detail is an information stack rather than a workspace overview. | Lead with Continue work, recent activity and needs attention; place files/tasks/sessions/checkpoints in tabs or grouped sections. |
-| UX-PROJ-04 | P1 | Shared attachment IDs can appear as raw identifiers. | Resolve user-facing filenames/type/size; retain IDs only in provenance details. |
-| UX-PROJ-05 | P1 | Archive is visible but a clear archive browser/restore journey is not. | Add Active/Archived filter with restore and retention behavior. |
-| UX-PROJ-06 | P1 | Moving in a hierarchy needs cycle prevention and a clearer destination picker. | Use a real modal/tree, disable self/descendants and prove backend cycle rejection. |
-| UX-PROJ-07 | P1 | Managed-project deletion is materially destructive. | Require step-up, typed project name, exact filesystem impact preview and recoverability statement. |
-| UX-PROJ-08 | P2 | Session rows favor short IDs and are not an obvious continuation action. | Show title, last activity, mode and status; make the row open the conversation. |
-| UX-PROJ-09 | P2 | “Active” can be confused with selected-for-current-work state. | Distinguish Current project, recently active and archived; use one authoritative work-project store. |
+| ~~UX-PROJ-03~~ **closed** — [FIXED-585](FIXED_ITEMS.md#fixed-585--a-project-was-six-things-stacked-in-one-column) | P1 | Project detail is an information stack rather than a workspace overview. | Lead with Continue work, recent activity and needs attention; place files/tasks/sessions/checkpoints in tabs or grouped sections. |
+| ~~UX-PROJ-04~~ **closed** — [FIXED-647](FIXED_ITEMS.md#fixed-647--a-projects-shared-files-were-listed-by-attachment-id) | P1 | Shared attachment IDs can appear as raw identifiers. | Resolve user-facing filenames/type/size; retain IDs only in provenance details. |
+| ~~UX-PROJ-05~~ **closed** — [FIXED-648](FIXED_ITEMS.md#fixed-648--an-archived-project-had-no-way-back) | P1 | Archive is visible but a clear archive browser/restore journey is not. | Add Active/Archived filter with restore and retention behavior. |
+| ~~UX-PROJ-06~~ **closed** — [FIXED-649](FIXED_ITEMS.md#fixed-649--move-offered-a-flat-list-that-included-the-projects-own-subtree) | P1 | Moving in a hierarchy needs cycle prevention and a clearer destination picker. | Use a real modal/tree, disable self/descendants and prove backend cycle rejection. |
+| ~~UX-PROJ-07~~ **closed** — [FIXED-651](FIXED_ITEMS.md#fixed-651--deleting-a-managed-projects-folder-took-one-confirmation-and-no-count) | P1 | Managed-project deletion is materially destructive. | Require step-up, typed project name, exact filesystem impact preview and recoverability statement. |
+| ~~UX-PROJ-08~~ **closed** — [FIXED-652](FIXED_ITEMS.md#fixed-652--a-projects-chats-were-short-ids-that-did-not-open-anything) | P2 | Session rows favor short IDs and are not an obvious continuation action. | Show title, last activity, mode and status; make the row open the conversation. |
+| ~~UX-PROJ-09~~ **closed** — [FIXED-653](FIXED_ITEMS.md#fixed-653--projects-called-the-selected-project-and-the-unarchived-ones-both-active) | P2 | “Active” can be confused with selected-for-current-work state. | Distinguish Current project, recently active and archived; use one authoritative work-project store. |
 
 ### Project continuity contract
 
@@ -2393,15 +2407,15 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 
 | Finding | Decision | Explanation |
 | --- | --- | --- |
-| UX-PROJ-01 | Pass an explicit project handoff or call the same selection contract used by Build. Keep Chat retrieval owner-wide while filing the new session to the project. | Use a typed handoff shared with Build; do not change owner-wide Chat retrieval as a side effect. |
+| ~~UX-PROJ-01~~ **closed** — [FIXED-496](FIXED_ITEMS.md#fixed-496--new-chat-on-a-project-card-opened-a-chat-that-belonged-to-no-project) | Pass an explicit project handoff or call the same selection contract used by Build. Keep Chat retrieval owner-wide while filing the new session to the project. | Use a typed handoff shared with Build; do not change owner-wide Chat retrieval as a side effect. |
 | ~~UX-PROJ-02~~ **closed** — [FIXED-529](FIXED_ITEMS.md#fixed-529--delete-was-the-same-size-and-one-click-away-as-new-chat) | Use Open/Continue as primary, New work as secondary and move lifecycle actions into an overflow menu. | Prioritize continuation; lifecycle actions need deliberate discovery and confirmation. |
-| UX-PROJ-03 | Lead with Continue work, recent activity and needs attention; place files/tasks/sessions/checkpoints in tabs or grouped sections. | Summaries answer what to do next before presenting specialist inventories. |
-| UX-PROJ-04 | Resolve user-facing filenames/type/size; retain IDs only in provenance details. | Resolve labels through authorized metadata queries; raw identifiers remain available for diagnostics. |
-| UX-PROJ-05 | Add Active/Archived filter with restore and retention behavior. | Archive must have a find-and-restore path and a documented retention contract. |
-| UX-PROJ-06 | Use a real modal/tree, disable self/descendants and prove backend cycle rejection. | Client prevention aids usability; transactional server cycle rejection remains authoritative. |
-| UX-PROJ-07 | Require step-up, typed project name, exact filesystem impact preview and recoverability statement. | Destruction needs accurate impact and fresh authority; typed text is confirmation, not authentication. |
-| UX-PROJ-08 | Show title, last activity, mode and status; make the row open the conversation. | Make sessions recognizable and directly resumable. |
-| UX-PROJ-09 | Distinguish Current project, recently active and archived; use one authoritative work-project store. | Selection, activity and archival state are distinct facts and need distinct labels. |
+| ~~UX-PROJ-03~~ **closed** — [FIXED-585](FIXED_ITEMS.md#fixed-585--a-project-was-six-things-stacked-in-one-column) | Lead with Continue work, recent activity and needs attention; place files/tasks/sessions/checkpoints in tabs or grouped sections. | Summaries answer what to do next before presenting specialist inventories. |
+| ~~UX-PROJ-04~~ **closed** — [FIXED-647](FIXED_ITEMS.md#fixed-647--a-projects-shared-files-were-listed-by-attachment-id) | Resolve user-facing filenames/type/size; retain IDs only in provenance details. | Resolve labels through authorized metadata queries; raw identifiers remain available for diagnostics. |
+| ~~UX-PROJ-05~~ **closed** — [FIXED-648](FIXED_ITEMS.md#fixed-648--an-archived-project-had-no-way-back) | Add Active/Archived filter with restore and retention behavior. | Archive must have a find-and-restore path and a documented retention contract. |
+| ~~UX-PROJ-06~~ **closed** — [FIXED-649](FIXED_ITEMS.md#fixed-649--move-offered-a-flat-list-that-included-the-projects-own-subtree) | Use a real modal/tree, disable self/descendants and prove backend cycle rejection. | Client prevention aids usability; transactional server cycle rejection remains authoritative. |
+| ~~UX-PROJ-07~~ **closed** — [FIXED-651](FIXED_ITEMS.md#fixed-651--deleting-a-managed-projects-folder-took-one-confirmation-and-no-count) | Require step-up, typed project name, exact filesystem impact preview and recoverability statement. | Destruction needs accurate impact and fresh authority; typed text is confirmation, not authentication. |
+| ~~UX-PROJ-08~~ **closed** — [FIXED-652](FIXED_ITEMS.md#fixed-652--a-projects-chats-were-short-ids-that-did-not-open-anything) | Show title, last activity, mode and status; make the row open the conversation. | Make sessions recognizable and directly resumable. |
+| ~~UX-PROJ-09~~ **closed** — [FIXED-653](FIXED_ITEMS.md#fixed-653--projects-called-the-selected-project-and-the-unarchived-ones-both-active) | Distinguish Current project, recently active and archived; use one authoritative work-project store. | Selection, activity and archival state are distinct facts and need distinct labels. |
 
 ## 14.13 Identity, enforcement, installers and release decisions
 

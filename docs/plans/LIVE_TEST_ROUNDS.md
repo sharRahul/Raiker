@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-01 | Targeted | `2026-10-01-projects-lifecycle/` | Anthropic (`claude-haiku-4-5-20251001`) answering real turns and proposing a shell command, the key entered through the Connect dialog | Ten items from `docs/plans/`: UX-PROJ-04 to UX-PROJ-09, BUG-310, OPT-13, OPT-15 and OPT-16. Proved live: a chat filed under a project resuming from its row, shared files by name, a move that will not go inside itself, archive and a restore that leaves a separately archived child archived, a managed delete counting what goes and asking for the password, all of it at 390 wide; the converted live specs connecting through `live.ts`; and every destination at both capture widths with **no 422, no 5xx and no console error**. **Six defects found and fixed** — subtree matching read `_` as a wildcard, an approval notice docked a second time over Chat's header, the approval card took a model menu's clicks, composers said no model was set up for the first second, the approval card covered **Send** until its next measurement, and a finished command run held its supervisor key for a moment |
 | 2026-09-30 | Targeted | `2026-09-30-optimisation-round/` | Ollama `gpt-oss:20b-cloud` on the local Ollama service, no key; the Anthropic, OpenAI and OpenRouter keys the owner supplied were not entered by the agent | Ten items from the optimisation review — OPT-05, -06 stage B, -08, -09, -10, -11, -17, -18, -20 and a first slice of OPT-15. Proved live: setup → Chat on a reset workspace, a real streamed answer and a readiness probe both through the shared provider transport, the palette naming **Memory engine**, and twenty-four destinations answering with **no 4xx, no 5xx and no traceback**, with no horizontal overflow at 390 wide. **Two defects found and fixed** — setup recommended llama.cpp beside "No complete GGUF found" (and My models offered Use on four empty slots), and the first message after setup was refused as never checked |
 | 2026-09-28 (third) | Targeted | `2026-09-28-docs-items-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that asked to run `python`, the key entered through the Connect dialog | Ten items from `docs/plans/`: BUG-309, Wave 0 and OPT-03, -04, -07, -12, -14 and -19, two stale index rows, and BUG-248's sign-ins. Proved live: readiness naming the provider from the registry; an approval notice docked on Home, opening Approvals, and absent there at 1440 and 390 wide with the bell agreeing; a misspelled field refused with 422; and every destination at both capture widths with **no 422, no 5xx and no console error**. **Four defects found and fixed** — the bell kept counting a notice the dock had just read, an approval card covered Settings' **Save changes**, a disclosure closed when its default was chosen, and (by CI) shutdown closed a connection a worker was using. The key's credit ran out part-way through BUG-248's four conversions |
 | 2026-09-28 (second) | Targeted | `2026-09-28-review-closure-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that asked to run `python`, the key entered through the Connect dialog | Nine items from `docs/plans/` that closed three review documents: BUG-308 (CR-05, CR-09) by the owner's decision, CR-01, GCR-10, GCR-11, GCR-13, GCR-41 and GCR-43. Proved live: Permissions naming *Code with this machine's network* and saying, measured on this host, where scripts run; a real model's `python hello.py` approved under that capability, run, and recorded as `code_placement_classified`; a plugin card saying where its code would run; no stored key in four redacted answers; and every destination at four widths through the split store and service with **no console error**. **Five defects found by the round and fixed in it** — a fresh capability that would have refused `python` to an owner who had turned shell on, an approval that named the tool rather than the capability the code would run under, the same approval promising a rewind a command cannot have, and an approval card covering the composer's **Send** and staying over Approvals |
@@ -78,6 +79,79 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-10-01 — A project's whole lifecycle, and nothing docked over what the owner is using
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py` and
+holding a one-line `hello.py`, with `RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com`.
+Provider: Anthropic `claude-haiku-4-5-20251001`, the key entered through the
+Connect dialog. Browser: Playwright's Chromium. Captures:
+[`docs/screenshots/2026-10-01-projects-lifecycle/`](../screenshots/2026-10-01-projects-lifecycle).
+Specs: `round-2026-10-01-projects-lifecycle-live.spec.ts` (9 of 9) and, re-run on
+this build, `docs-items-round-2026-09-28-live.spec.ts` (4 of 4) and
+`bug-206-207-tool-rows-and-reasoning-live.spec.ts` (6 of 6). The 2026-09-28 round's own
+captures were restored after the re-run, so its record is unchanged.**
+
+Ten items from `docs/plans/`: §3.12 Projects of the
+[release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects)
+(UX-PROJ-04 to -09, FIXED-647 to FIXED-653), BUG-310 (FIXED-654), and OPT-13,
+-15 and -16 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md)
+(FIXED-655 to FIXED-657).
+
+**What it proved.**
+
+1. **A project's chats resume from the project.** A real turn filed under a
+   project is a row with its title, last activity, mode and status that opens
+   the conversation; the project reads as the *Current project*
+   ([01](../screenshots/2026-10-01-projects-lifecycle/01-current-project-and-last-activity.png),
+   [02](../screenshots/2026-10-01-projects-lifecycle/02-chat-rows-resume.png)).
+2. **Shared files read by name**, the attachment ids one disclosure away
+   ([03](../screenshots/2026-10-01-projects-lifecycle/03-shared-files-by-name.png)).
+3. **A move never offers the project's own subtree**, and a real move lands
+   ([04](../screenshots/2026-10-01-projects-lifecycle/04-move-refuses-own-subtree.png)).
+4. **Archive has a way back.** The Archived list, Restore, and a child archived
+   on its own staying archived when its parent comes back
+   ([05](../screenshots/2026-10-01-projects-lifecycle/05-archived-list.png),
+   [07](../screenshots/2026-10-01-projects-lifecycle/07-child-kept-archived.png)).
+5. **A managed delete counts what goes and asks who is asking**: one chat, one
+   task, one checkpoint, an empty folder, a child kept and moved to the top
+   level, the typed name, then the password
+   ([06](../screenshots/2026-10-01-projects-lifecycle/06-delete-counts-and-step-up.png)).
+6. **All of it at 390 wide**
+   ([08](../screenshots/2026-10-01-projects-lifecycle/08-mobile-archived.png)).
+7. **A pending approval is shown once**, by its card, clear of Chat's header and
+   of the composer's **Send**
+   ([09](../screenshots/2026-10-01-projects-lifecycle/09-approval-shown-once-on-chat.png)).
+8. **The specs converted for OPT-16 drive a real host** through `live.ts`, and
+   the destination walk at both capture widths logged no 422, no 5xx and no
+   console error.
+
+**What it found, and fixed in the round.**
+
+* Subtree matching used `LIKE`, which reads the `_` in every project id as a
+  wildcard ([FIXED-650](FIXED_ITEMS.md#fixed-650--subtree-matching-read-the-underscore-in-every-project-id-as-a-wildcard)).
+* Running the converted specs: an approval notice docked over Chat's **New chat**
+  while the card showed the same approval, and the dock sat over pages' top
+  actions ([FIXED-658](FIXED_ITEMS.md#fixed-658--an-approval-notice-docked-over-chat-while-the-approval-card-showed-it-too));
+  the card took clicks meant for an open model menu
+  ([FIXED-659](FIXED_ITEMS.md#fixed-659--the-approval-card-took-clicks-meant-for-an-open-model-menu));
+  composers said *No model is set up* for the first second
+  ([FIXED-660](FIXED_ITEMS.md#fixed-660--every-composer-said-no-model-is-set-up-for-the-first-second-after-a-load)).
+* The first capture of 09 showed the approval card over the composer's **Send**:
+  it had been drawn before the composer mounted and rose only at its next
+  one-second measurement
+  ([FIXED-661](FIXED_ITEMS.md#fixed-661--an-approval-card-covered-send-until-its-next-measurement)).
+* The full suite, run while the round loaded the host, caught a finished command
+  run still holding its supervisor key
+  ([FIXED-662](FIXED_ITEMS.md#fixed-662--a-finished-command-run-still-held-its-supervisor-key-for-a-moment)).
+
+**What it did not prove.** BUG-310 on Windows — this host is Linux, so the next
+Windows full suite is its confirmation. OPT-13 and OPT-15 change no page; the
+tool-row round and the full suites are their evidence. OpenAI and OpenRouter,
+which this round was not given keys for.
 
 ---
 

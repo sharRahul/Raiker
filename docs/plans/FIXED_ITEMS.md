@@ -668,6 +668,22 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-644](#fixed-644--setup-recommended-llamacpp-beside-no-complete-gguf-found) | Medium | Models / first run | Fixed 2026-09-30 — found by the live round |
 | [FIXED-645](#fixed-645--the-first-message-after-setup-was-refused-as-never-checked) | Medium | Chat / model readiness | Fixed 2026-09-30 — found by the live round |
 | [FIXED-646](#fixed-646--the-web-job-would-not-have-run-for-a-change-to-a-moved-read-model) | Low | CI | Fixed 2026-09-30 — the web job's trigger followed the moved views, and a same-day `brace-expansion` advisory |
+| [FIXED-647](#fixed-647--a-projects-shared-files-were-listed-by-attachment-id) | Medium | Projects / web UI | Fixed 2026-10-01 — UX-PROJ-04 |
+| [FIXED-648](#fixed-648--an-archived-project-had-no-way-back) | Medium | Projects | Fixed 2026-10-01 — UX-PROJ-05 |
+| [FIXED-649](#fixed-649--move-offered-a-flat-list-that-included-the-projects-own-subtree) | Medium | Projects | Fixed 2026-10-01 — UX-PROJ-06 |
+| [FIXED-650](#fixed-650--subtree-matching-read-the-underscore-in-every-project-id-as-a-wildcard) | Medium | Projects / storage | Fixed 2026-10-01 — found while doing UX-PROJ-06 |
+| [FIXED-651](#fixed-651--deleting-a-managed-projects-folder-took-one-confirmation-and-no-count) | High | Projects / destructive actions | Fixed 2026-10-01 — UX-PROJ-07 |
+| [FIXED-652](#fixed-652--a-projects-chats-were-short-ids-that-did-not-open-anything) | Low | Projects / web UI | Fixed 2026-10-01 — UX-PROJ-08 |
+| [FIXED-653](#fixed-653--projects-called-the-selected-project-and-the-unarchived-ones-both-active) | Low | Projects / web UI | Fixed 2026-10-01 — UX-PROJ-09 |
+| [FIXED-654](#fixed-654--seven-python-tests-failed-on-windows-and-nowhere-else) | Low | Tests / Windows | Fixed 2026-10-01 — BUG-310 |
+| [FIXED-655](#fixed-655--a-tools-label-glyph-and-audit-treatment-lived-in-four-tables-beside-it) | Low | Runtime / tools | Fixed 2026-10-01 — OPT-13 |
+| [FIXED-656](#fixed-656--executable-files-retold-how-their-bugs-were-found) | Low | Code comments | Fixed 2026-10-01 — OPT-15 |
+| [FIXED-657](#fixed-657--a-hundred-and-twelve-live-specs-each-declared-the-host-key-and-model) | Low | Tests / Playwright | Fixed 2026-10-01 — OPT-16 |
+| [FIXED-658](#fixed-658--an-approval-notice-docked-over-chat-while-the-approval-card-showed-it-too) | Medium | Web UI / notifications | Fixed 2026-10-01 — found running the live specs for OPT-16 |
+| [FIXED-659](#fixed-659--the-approval-card-took-clicks-meant-for-an-open-model-menu) | Low | Web UI / layering | Fixed 2026-10-01 — found running the live specs for OPT-16 |
+| [FIXED-660](#fixed-660--every-composer-said-no-model-is-set-up-for-the-first-second-after-a-load) | Low | Web UI / models | Fixed 2026-10-01 — found running the live specs for OPT-16 |
+| [FIXED-661](#fixed-661--an-approval-card-covered-send-until-its-next-measurement) | Medium | Web UI / approvals | Fixed 2026-10-01 — found by this run's live round |
+| [FIXED-662](#fixed-662--a-finished-command-run-still-held-its-supervisor-key-for-a-moment) | Low | Execution / commands | Fixed 2026-10-01 — found by this run's full suite |
 
 ---
 
@@ -27610,3 +27626,335 @@ transitive dev dependency, and changes nothing else.
 **Evidence.** `tests/test_web_workflow.py`; `npm audit --audit-level=moderate`
 reports no vulnerabilities, and the web job's lint, check, unit tests and build
 pass.
+
+---
+
+## FIXED-647 — A project's shared files were listed by attachment id
+
+**Severity: Medium. Area: Projects / web UI. Status: Fixed 2026-10-01. Closes
+UX-PROJ-04 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects).**
+
+**Observed.** A project's shared files were the ids of the attachments its chats
+had carried — `att_…` strings an owner had never seen anywhere else.
+
+**Fixed.** The project detail resolves each one server-side, through the
+owner's own attachment rows, to its file name, type and size, and says when the
+file is no longer available rather than dropping the row. The ids stay in a
+closed **Record identifiers** disclosure for diagnostics.
+
+**Evidence.** `tests/test_project_lifecycle.py` —
+*attachments resolve to files and say when they do not*; `ProjectsView.test.ts`;
+live, [shared files by name](../screenshots/2026-10-01-projects-lifecycle/03-shared-files-by-name.png).
+
+---
+
+## FIXED-648 — An archived project had no way back
+
+**Severity: Medium. Area: Projects. Status: Fixed 2026-10-01. Closes UX-PROJ-05
+of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects).**
+
+**Observed.** **Archive** removed a project from the list and nothing on the page
+could bring it back. Every project picker — Build, Chat, Design, Tasks — went on
+offering it as somewhere to file new work.
+
+**Fixed.** Projects has **Active** and **Archived** lists. An archived project
+opens read-only under a banner with **Restore**, and restore is the inverse of
+one archive: it brings back the descendants archived *with* it (same
+`archived_at`) and leaves a child the owner archived on its own, earlier, where it
+was. Archiving now leaves already-archived descendants' timestamps alone so that
+distinction survives, and clears the account's current project when it is in the
+archived subtree. Restoring a project whose parent is still archived is refused
+as `project_parent_archived`; restore is human-only. Pickers offer only active
+projects, keeping an archived one visible only while it is the current choice.
+Retention is unchanged: an archived project is kept until it is deleted.
+
+**Evidence.** `tests/test_project_lifecycle.py` — *restore brings back what the
+archive took*, *restore leaves a child archived on its own*, *restore under an
+archived parent is refused by name*, *restore is human-only*, *archiving the
+account selection clears it*, *restore route*; `projectLifecycle.test.ts`; live,
+[the archived list](../screenshots/2026-10-01-projects-lifecycle/05-archived-list.png),
+[the child kept archived](../screenshots/2026-10-01-projects-lifecycle/07-child-kept-archived.png) and
+[at 390 px](../screenshots/2026-10-01-projects-lifecycle/08-mobile-archived.png).
+
+---
+
+## FIXED-649 — Move offered a flat list that included the project's own subtree
+
+**Severity: Medium. Area: Projects. Status: Fixed 2026-10-01. Closes UX-PROJ-06
+of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects).**
+
+**Observed.** **Move** was a flat select of every project. Choosing the project
+itself or one of its descendants failed with a generic refusal, and archived
+folders were offered as destinations.
+
+**Fixed.** A modal draws the hierarchy indented, with **Top level** first. The
+project and everything inside it stay in the list, disabled, with the reason
+beside them, so a destination never silently vanishes; archived folders are not
+offered. The server remains authoritative and names each refusal —
+`project_move_into_itself`, `project_move_into_descendant`,
+`project_move_into_archived` (409), `unknown_parent:` (404) — and the store still
+refuses a cycle when a caller skips the service.
+
+**Evidence.** `tests/test_project_lifecycle.py` — the five move tests and *route
+answers a cycle with 409*; `projectLifecycle.test.ts` — *blocks the project
+itself and everything inside it, and nothing else*; live,
+[the move dialog](../screenshots/2026-10-01-projects-lifecycle/04-move-refuses-own-subtree.png).
+
+---
+
+## FIXED-650 — Subtree matching read the underscore in every project id as a wildcard
+
+**Severity: Medium. Area: Projects / storage. Status: Fixed 2026-10-01 — found
+while doing UX-PROJ-06.**
+
+**Observed.** Move, archive and delete found a project's subtree with
+`path LIKE '<path>%'`. Project ids carry `_`, which `LIKE` reads as "any one
+character", so a sibling whose path differed from the moving project's only at an
+underscore's position counted as inside it and was moved, archived or orphaned
+with it.
+
+**Fixed.** One prefix comparison, `substr(path, 1, len) = path`, used by every
+subtree query in the store.
+
+**Evidence.** `tests/test_project_lifecycle.py` — *an underscore in an id is not
+a wildcard*, failing against the previous query; `projectLifecycle.test.ts` —
+*does not mistake a sibling whose id starts the same for a descendant*.
+
+---
+
+## FIXED-651 — Deleting a managed project's folder took one confirmation and no count
+
+**Severity: High. Area: Projects / destructive actions. Status: Fixed 2026-10-01.
+Closes UX-PROJ-07 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects).**
+
+**Observed.** Deleting a managed project removes its folder from disk, its chats,
+tasks and checkpoints. The confirmation said so in general terms and asked
+nothing more of the owner than for an archive.
+
+**Fixed.** `GET /api/projects/{id}/deletion-preview` counts, server-side, what
+the delete will remove: the same session set the delete uses, their turns, tasks
+and checkpoints, managed files, descendant projects, and the folder's files and
+bytes (walked without following links, stopping at 20,000 entries and saying "at
+least"). The dialog shows that count and the recoverability statement — nothing
+here is in a bin — and takes the typed project name. For a managed folder the
+server also requires a step-up: the request must come from an elevated session,
+the same one account deletion uses, or it is refused as
+`project_delete_requires_step_up`; the dialog asks for the password (or
+authenticator code), deletes with that session, and puts the ordinary one back.
+An attached folder is never counted or touched, and its delete needs no step-up.
+
+**Evidence.** `tests/test_project_lifecycle.py` — *preview counts what the delete
+removes*, *preview never counts an attached folder*, *managed delete requires a
+step-up*, *attached delete keeps the ordinary session*;
+`projectLifecycle.test.ts`; live,
+[the counted delete with step-up](../screenshots/2026-10-01-projects-lifecycle/06-delete-counts-and-step-up.png).
+
+---
+
+## FIXED-652 — A project's chats were short ids that did not open anything
+
+**Severity: Low. Area: Projects / web UI. Status: Fixed 2026-10-01. Closes
+UX-PROJ-08 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects).**
+
+**Fixed.** Each row shows the chat's title, last activity, mode and status, and
+is a link that resumes it on the surface that owns it — Chat, Build or Design —
+through the same conversation link the session list uses. A project card shows
+its own last activity.
+
+**Evidence.** `tests/test_project_lifecycle.py` — *last activity is the newest
+session update*; `ProjectsView.test.ts`; live,
+[chat rows](../screenshots/2026-10-01-projects-lifecycle/02-chat-rows-resume.png).
+
+---
+
+## FIXED-653 — Projects called the selected project and the unarchived ones both active
+
+**Severity: Low. Area: Projects / web UI. Status: Fixed 2026-10-01. Closes
+UX-PROJ-09 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects).**
+
+**Fixed.** *Current project* is the one Work project the composers read — one
+store, one label — shown with **Stop working in it**. *Active* and *Archived*
+name the two lists, and last activity is its own fact on each card.
+
+**Evidence.** `ProjectsView.test.ts`; live,
+[current project and last activity](../screenshots/2026-10-01-projects-lifecycle/01-current-project-and-last-activity.png).
+
+---
+
+## FIXED-654 — Seven Python tests failed on Windows and nowhere else
+
+**Severity: Low. Area: Tests / Windows. Status: Fixed 2026-10-01. Closes
+[BUG-310](TO_BE_FIXED.md#bug-310--seven-python-tests-fail-on-windows-and-nowhere-else).**
+
+**Fixed.** The plugin-runtime and source-review fixtures are written as bytes, so
+Windows' newline translation cannot change a digest or a size. A failed instance
+create releases the staged workspace's cached SQLCipher handles before removing
+it and retries the removal through a held handle, logging what it could not
+remove; publishing the instance registry retries `os.replace` through a reader's
+sharing violation (up to a second) and raises if it never succeeds.
+
+**Evidence.** `tests/test_instance_runtime_lifecycle.py` — *a registry replace
+waits out a reader*, *a registry replace that never succeeds is an error*, *a
+rollback releases the staged database's handles before removing it*, simulating
+the Windows errors. The original seven were run on Linux; this run had no Windows
+host, so the Windows confirmation is the next Windows full suite.
+
+---
+
+## FIXED-655 — A tool's label, glyph and audit treatment lived in four tables beside it
+
+**Severity: Low. Area: Runtime / tools. Status: Fixed 2026-10-01. Closes OPT-13
+of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-13--create-one-typed-tool-definition-registry).**
+
+**Fixed.** `ToolDefinition` in `raiker/models/tool_registry.py` gains `label`,
+`family` and `audit`, none defaulted, so a tool cannot reach a transcript or the
+event log without saying how it is named and how much of it the audit trail may
+keep. The broker's content- and argument-withheld sets and the transcript's label
+and family tables are derived from it; the Knowledge Map falls back to the
+registry's label. The broker keeps its executor map — deriving it would import
+`raiker.tools` into `raiker.models` — and a test holds the two key sets equal.
+Authority stays outside the definition.
+
+**Evidence.** `tests/test_tool_registry.py`, `tests/test_bug_206_207_tool_rows_and_reasoning.py`,
+the broker audit tests, and the live tool-row round.
+
+---
+
+## FIXED-656 — Executable files retold how their bugs were found
+
+**Severity: Low. Area: Code comments. Status: Fixed 2026-10-01. Closes OPT-15 of
+the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-15--compress-historical-bugfixed-narratives-inside-executable-files).**
+
+**Fixed.** The sweep the 2026-09-30 start left open: the production files
+whose comments said what the code *used to* do, or that it was *found live* on a
+date, now state the invariant, the reason and what fails without it, and cite the
+ID — as `CONTRIBUTING.md` asks. Security-boundary rationale was kept whole (the
+request-body cap, approval and authority comments say why, not just what). 158
+files, net about 800 comment lines fewer. Passive uses ("is used to") and external-protocol facts
+were left.
+
+**Evidence.** `tests/test_comment_policy.py` fails on a "Found live" or "Found by
+the" story in any file the LOC classifier counts as production; tests are exempt,
+because a regression test is where that belongs. Ruff, mypy, svelte-check and the
+full suites.
+
+---
+
+## FIXED-657 — A hundred and twelve live specs each declared the host, key and model
+
+**Severity: Low. Area: Tests / Playwright. Status: Fixed 2026-10-01. Closes OPT-16
+of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-16--consolidate-repeated-playwright-setup-into-fixturespage-objects).**
+
+**Fixed.** `web/e2e/live.ts` owns the live host address (`RAIKER_LIVE_BASE`), the
+round's Anthropic key and model, connecting Anthropic through Models
+(`useAnthropic`) and sending a turn (`sendTurn`). 112 live specs import them
+instead of declaring their own — 110 host constants, 58 key reads, 42 model pins
+and 28 connect calls. A spec about a different host keeps its own address,
+because that difference is what it tests. Net −253 lines. Two drifted specs were
+brought up to the product: Build needs a project and a chosen model, and a tool
+row may name an absolute path.
+
+**Evidence.** `npm run check` type-checks every spec; the live rounds run on
+this change.
+
+---
+
+## FIXED-658 — An approval notice docked over Chat while the approval card showed it too
+
+**Severity: Medium. Area: Web UI / notifications. Status: Fixed 2026-10-01 —
+found running the live specs for OPT-16.**
+
+**Observed.** On Chat with an approval pending, the approval card showed the
+decision and the notice dock showed the same approval again, drawn over the
+header's **New chat**. On other pages the dock sat over the page's own top
+actions.
+
+**Fixed.** An approval notice is the approval card's to show: it is not docked,
+and it stays unread until the queue answers it. Any docked notice has a
+**Dismiss** that marks it read in place. The dock measures the page's top action
+row (`.head-row`, `.header-actions`, or anything marked `data-dock-clear-top`) and
+drops below it rather than covering it.
+
+**Evidence.** `noticeDestination.test.ts`, `SessionMenu.test.ts`; live,
+[the approval shown once on Chat](../screenshots/2026-10-01-projects-lifecycle/09-approval-shown-once-on-chat.png) and
+the 2026-09-28 round's BUG-309 test.
+
+---
+
+## FIXED-659 — The approval card took clicks meant for an open model menu
+
+**Severity: Low. Area: Web UI / layering. Status: Fixed 2026-10-01 — found
+running the live specs for OPT-16.**
+
+**Fixed.** Popovers sit above docked trays on the overlay ladder (`--z-docked`
+50, `--z-popover` 54, `--z-popover-panel` 55), so a menu the owner opened is
+never under a card that docked afterwards.
+
+**Evidence.** `visualRubric.test.ts` asserts the ordering.
+
+---
+
+## FIXED-660 — Every composer said "No model is set up" for the first second after a load
+
+**Severity: Low. Area: Web UI / models. Status: Fixed 2026-10-01 — found running
+the live specs for OPT-16.**
+
+**Observed.** Until the first models read landed, Chat, Build and Tasks said no
+model was set up, on a host that had one, and the Chat greeting asked *What
+would you like to work on, there?* until the account read landed.
+
+**Fixed.** The readiness strip says nothing until the models read has landed
+(`modelsKnown()`), and then says what is true, including "none". The greeting
+without a name is *What would you like to work on?*
+
+**Evidence.** `src/lib/models.test.ts` — *is false until the first read lands,
+and true after, even when it is empty*; `ChatView.test.ts` — *greets without a
+name until the account says what to call the owner*.
+
+---
+
+## FIXED-661 — An approval card covered Send until its next measurement
+
+**Severity: Medium. Area: Web UI / approvals. Status: Fixed 2026-10-01 — found by
+this run's live round.**
+
+**Observed.** Opening Chat with an approval waiting, the approval card was drawn
+before the composer mounted, in its bottom-right corner — over the composer's
+model picker and **Send** — and rose above it only at its next one-second
+measurement. FIXED-621's invariant held only between ticks.
+
+**Root cause.** The card and the notice dock measured what to keep clear of on a
+timer and on resize. A route mounting its composer is neither.
+
+**Fixed.** `web/src/lib/layoutWatch.ts` — both docked surfaces re-measure when
+elements are added or removed (coalesced to one measurement per frame), on
+resize, and on the one-second backstop for what no observer reports. A surface
+restyling its own offset does not wake itself.
+
+**Evidence.** `ApprovalPrompt.test.ts` — *rises above a composer that mounts
+after it, without waiting for a tick*, failing against the previous code; live,
+the round's approval check now also asserts nothing is drawn over **Send**,
+[captured](../screenshots/2026-10-01-projects-lifecycle/09-approval-shown-once-on-chat.png).
+
+---
+
+## FIXED-662 — A finished command run still held its supervisor key for a moment
+
+**Severity: Low. Area: Execution / commands. Status: Fixed 2026-10-01 — found by
+this run's full suite.**
+
+**Observed.** `test_a_run_survives_the_restart_of_the_runtime_that_started_it`
+failed once under load: the run read as succeeded with a receipt while its
+encrypted supervisor handle was still stored.
+
+**Root cause.** `_finalize` wrote the terminal state and receipt first and
+cleared the handle after, so a reader between the two writes saw a finished run
+holding a key to a channel that no longer exists — and a crash between them
+would have kept that key indefinitely.
+
+**Fixed.** The handle is cleared before the terminal state is written. A crash
+between the two now leaves a run without a handle, which recovery already
+answers with an honest `lost` receipt.
+
+**Evidence.** The test, run twelve times concurrently, passes every time; the
+command and supervisor suites.

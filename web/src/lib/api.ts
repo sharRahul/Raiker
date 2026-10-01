@@ -2,7 +2,6 @@ import type {
   AgentPlan,
   AgentResponse,
   ApprovalDetailView,
-  ApprovalView,
   AttachmentPreview,
   AuditExportResult,
   AuditExportView,
@@ -22,13 +21,11 @@ import type {
   CodeRepoChangesView,
   CodeRepoDiagnosticsView,
   CodeRepoFileView,
-  CodeReposView,
   CodexSubscriptionStatus,
   CommandChunkView,
   CommandReceiptView,
   CommandRunView,
   ComposerApprovalModeSettings,
-  ConnectionsView,
   ConnectorStoreView,
   ContainedSubject,
   ContextUsage,
@@ -44,7 +41,6 @@ import type {
   EventEntry,
   ExecutionEnvironment,
   ExecutionEnvironmentsView,
-  ExtensionsOverview,
   GitCredentialStatus,
   GuideIndex,
   GuideSection,
@@ -99,7 +95,6 @@ import type {
   ProjectFilesView,
   ProjectRootIndexResult,
   ProjectRootStatus,
-  ProjectsList,
   ProjectTreeNode,
   PromptAttachment,
   PromptRequestBody,
@@ -113,8 +108,6 @@ import type {
   RestoreRequestResult,
   ResumableTurnsView,
   RuntimeInstallPlan,
-  RuntimeMode,
-  RuntimeReadiness,
   SecurityHealth,
   SessionAttachmentsView,
   SessionDetail,
@@ -144,12 +137,13 @@ import type {
   WebBlocklist,
   WebBlocklistProbe,
   WorkInFlight,
-  WorkThread,
-  WorkThreadPage,
 } from "./apiTypes";
 import type { ApprovalMode } from "./approvalMode";
 import { restoreSession } from "./api/auth";
 import { postJson, request, requestBlob, withQuery } from "./api/core";
+// OPT-02 Stage A — operations whose response a contract test verified are
+// generated (scripts/api_contract.py); the rest stay written here.
+import { contract } from "./generated/apiContract";
 
 // The endpoint catalogue. Transport, sign-in and streaming live under ./api/;
 // what they export is re-exported here, so a caller imports from one place.
@@ -254,7 +248,7 @@ export const api = {
   // second tab picks the checklist back up instead of starting blank.
   sessionPlan: (sessionId: string) =>
     request<AgentPlan>(`/api/sessions/${encodeURIComponent(sessionId)}/plan`),
-  capabilityGates: () => request<CapabilityGate[]>("/api/capability-gates"),
+  capabilityGates: () => contract.listCapabilityGates(),
   // One read for the whole contract: the catalogue, its
   // per-surface parity, and typed readiness. Every composer answers from this
   // rather than deriving a list of its own, which is the drift the contract
@@ -267,7 +261,7 @@ export const api = {
     request<CapabilityGate>(
       `/api/capability-gates/${encodeURIComponent(capability)}`,
     ),
-  runtimeMode: () => request<RuntimeMode>("/api/runtime-mode"),
+  runtimeMode: () => contract.getRuntimeMode(),
   // ── Host lifecycle (BUG-40) ──
   // The menu-bar control's contract: what state the host is in, what background
   // work is in flight, and the four actions the distribution design requires.
@@ -296,7 +290,7 @@ export const api = {
     postJson<UpdateCheckResult>("/api/host/update/check", {}),
   applyHostUpdate: (confirm = false) =>
     postJson<UpdateApplyResult>("/api/host/update/apply", { confirm }),
-  runtimeReadiness: () => request<RuntimeReadiness>("/api/runtime-readiness"),
+  runtimeReadiness: () => contract.getRuntimeReadiness(),
   diagnostics: () => request<Diagnostics>("/api/diagnostics"),
   // MEM-09 — the memory integrity report, and its one stated repair. The scan
   // is read-only and starts when the owner asks for it; the rebuild is a
@@ -563,7 +557,7 @@ export const api = {
   // Read-only status of governed service connectors (never reaches the network;
   // never exposes a credential value). Enabling one is done via the capability
   // gate + decision-mode control plane, not here.
-  connections: () => request<ConnectionsView>("/api/connections"),
+  connections: () => contract.getConnections(),
   // ── Local MCP servers (Control Deck task 4b) ────────────────────────────
   // Owner-scoped. Create and test-connect run through the governed capability
   // (a disabled gate returns 403 disabled_by_capability_gate); rename and
@@ -1211,12 +1205,7 @@ export const api = {
       { decision_id: decisionId },
     ),
   checkpoints: (sessionId?: string, projectId?: string) =>
-    request<Checkpoint[]>(
-      withQuery("/api/checkpoints", {
-        session_id: sessionId,
-        project_id: projectId,
-      }),
-    ),
+    contract.listCheckpoints({ session_id: sessionId, project_id: projectId }),
   checkpoint: (id: string) =>
     request<Checkpoint>(`/api/checkpoints/${encodeURIComponent(id)}`),
   // Preflight only. Reading a plan performs no restore; executing one still
@@ -1338,7 +1327,7 @@ export const api = {
       },
     ),
 
-  extensions: () => request<ExtensionsOverview>("/api/extensions"),
+  extensions: () => contract.getExtensions(),
   projectFiles: (id: string) =>
     request<ProjectFilesView>(`/api/projects/${encodeURIComponent(id)}/files`),
   diagnosticsExport: () =>
@@ -1356,8 +1345,7 @@ export const api = {
     ),
   // C18 — what the owner is working on, across chats, projects and routines.
   // Chat search answers "where did I say that"; this answers the other question.
-  workThreads: (limit = 100) =>
-    request<WorkThread[]>(`/api/work-threads?limit=${limit}`),
+  workThreads: (limit = 100) => contract.listWorkThreads({ limit }),
   // NEW-THREAD-01 — the index behind Threads. Filters and paging happen on the
   // server, because facets computed over one page can only ever offer what is
   // already on screen.
@@ -1371,16 +1359,14 @@ export const api = {
     // other filter applies within whichever one is read.
     archived?: boolean;
   } = {}) =>
-    request<WorkThreadPage>(
-      withQuery("/api/work-threads/page", {
-        project_id: options.projectId ?? undefined,
-        kind: options.kind ?? undefined,
-        query: options.query || undefined,
-        cursor: options.cursor ?? undefined,
-        limit: options.limit ?? undefined,
-        archived: options.archived ? "true" : undefined,
-      }),
-    ),
+    contract.workThreadPage({
+      project_id: options.projectId ?? undefined,
+      kind: options.kind ?? undefined,
+      query: options.query || undefined,
+      cursor: options.cursor ?? undefined,
+      limit: options.limit ?? undefined,
+      archived: options.archived ? true : undefined,
+    }),
   searchChats: (q: string) =>
     request<SessionSummary[]>(withQuery("/api/chat-search", { q })),
 
@@ -1435,8 +1421,7 @@ export const api = {
   // provenance/scope/sensitivity/confidence/retention + pin; forget reuses
   // the governed forget path (human-only); incognito withholds approved
   // project memory from the turn context.
-  memories: (scope?: string) =>
-    request<MemoryControlView[]>(withQuery("/api/memory", { scope })),
+  memories: (scope?: string) => contract.listMemories({ scope }),
   memoryProposals: () => request<MemoryProposal[]>("/api/memory/proposals"),
   memoryRelationshipProposals: () =>
     request<MemoryRelationshipProposal[]>("/api/memory/relationship-proposals"),
@@ -1639,7 +1624,7 @@ export const api = {
   // closed server-side); a GitHub repository records an `owner/repo` coordinate
   // and performs no network call — its content still reaches a turn through the
   // brokered `github_read` tool under the connector_github_runtime gate.
-  codeRepos: () => request<CodeReposView>("/api/code/repos"),
+  codeRepos: () => contract.listCodeRepos(),
   // B13 — the connected repository, one directory at a time and one bounded
   // file at a time. Both are reads through the same path authority a turn
   // writes through, so the explorer can never reach further than the agent can.
@@ -1718,7 +1703,7 @@ export const api = {
     }>("/api/code/map/rebuild", {}),
 
   // ── Projects (organizing scopes; creating/selecting one grants nothing) ──
-  projects: () => request<ProjectsList>("/api/projects"),
+  projects: () => contract.listProjects(),
   project: (id: string) =>
     request<ProjectDetail>(`/api/projects/${encodeURIComponent(id)}`),
   exportProject: async (id: string): Promise<void> => {
@@ -1996,9 +1981,7 @@ export const api = {
 
   // ── Approvals (resolution is metadata-only: records a decision, never executes) ──
   approvals: (statusFilter = "pending") =>
-    request<ApprovalView[]>(
-      withQuery("/api/approvals", { status_filter: statusFilter }),
-    ),
+    contract.listApprovals({ status_filter: statusFilter }),
   // Which of a provider's models stay offered in every picker. The default
   // model is a different decision, made by `setModelSelection`.
   setAvailableModels: (profileId: string, models: string[]) =>

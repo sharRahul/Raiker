@@ -139,7 +139,7 @@ export function instancePath(path: string): string {
 
 export function withQuery(
   path: string,
-  params: Record<string, string | number | undefined>,
+  params: Record<string, string | number | boolean | undefined>,
 ): string {
   const q = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {

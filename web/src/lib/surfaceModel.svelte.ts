@@ -98,12 +98,9 @@ export async function modelDecision(
 /**
  * Whether a body really is a decision, before any surface renders from it.
  *
- * Found by the mocked end-to-end fixture, which answers an unrouted path with
- * `{}` and HTTP 200 — and the composer's model picker then read
- * `decision.selected.profile_id` off it and took the page down. The fixture is
- * artificial; the failure it produced is not. A truncated body, a proxy's error
- * page served as JSON, a version skew between a running host and a newer build
- * all arrive the same way: a 200 whose shape is wrong.
+ * A truncated body, a proxy's error page served as JSON, or a version skew
+ * between a running host and a newer build all arrive the same way: a 200
+ * whose shape is wrong, which takes a page down at the first field read.
  *
  * A read model exists so that every surface can trust one answer. That is only
  * true if the answer is checked once, here, rather than by each caller

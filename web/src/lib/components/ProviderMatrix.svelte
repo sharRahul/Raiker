@@ -3,14 +3,9 @@
    * One row per model provider — the whole model-connection question on a single
    * screen.
    *
-   * The first-run wizard used to show a flat list of *profiles* and ask the owner
-   * to pick one. That list is only ever populated by profiles that already have a
-   * concrete model, so on a fresh install it read "No model connection yet" and
-   * sent the owner to a different page to do the actual work. The question the
-   * screen is asking — "where should Raiker think?" — was never answerable from
-   * the screen asking it.
-   *
-   * A row is therefore the provider, not the profile, and it carries the two
+   * "Where should Raiker think?" must be answerable on the screen asking it, and
+   * a list of profiles is empty until a profile has a concrete model. A row is
+   * therefore the provider, not the profile, and it carries the two
    * things a provider needs:
    *
    *  - **On this machine** (llama.cpp, Ollama, LM Studio): nothing to

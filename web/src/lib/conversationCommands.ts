@@ -2,11 +2,9 @@
  * BUG-306 / REM-CHAT-02 — one command set behind every conversation menu.
  *
  * Rename, archive, pin, move and retry are reachable from more than one place —
- * Chat's own header, Threads' Organise control, the session detail — and each
- * place used to own its own copy: its own API call, its own decision about
- * whether to confirm, and its own sentence when it failed. Nothing made them
- * disagree today, which is exactly the condition under which the next change
- * makes one of them disagree quietly.
+ * Chat's own header, Threads' Organise control, the session detail — and none
+ * of them owns a copy of the API call, the confirmation decision or the failure
+ * sentence, so the next change cannot make one disagree quietly.
  *
  * Two things live here rather than in a view.
  *

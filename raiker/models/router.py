@@ -274,18 +274,15 @@ class ModelRouter:
     def generate(self, provider: str, model: str, prompt: str) -> str:
         """One prompt, one answer, no conversation.
 
-        GCR-04 — this used to accept a `context` mapping and drop it on the
-        floor, so a caller could hand it the context it wanted honoured and get
-        a turn that had never seen it. A parameter that changes nothing is worse
-        than no parameter: build the messages you want and call :meth:`chat`.
+        GCR-04 — no `context` parameter: one that changes nothing is worse than
+        none. Build the messages you want and call :meth:`chat`.
         """
         return self.chat(provider, model, [ModelMessage(role="user", content=prompt)]).text
 
     def default_provider(self) -> tuple[str, str]:
         """The registry's native default backend as ``(provider, model)``.
 
-        GCR-18 — the `health_timeout` this used to accept was never read; no
-        health check happens here, and no caller ever passed one.
+        GCR-18 — no health check happens here, so it takes no timeout.
         """
         profile = self.default_profile()
         return profile.provider, profile.model
@@ -309,10 +306,9 @@ class ModelRouter:
         """Make *profile_id* the active profile, refusing one that could not run.
 
         GCR-02: the check is :meth:`~ModelProviderFactory.validate`, not a
-        provider that gets built and dropped. Selecting a model is a thing an
-        owner does repeatedly while looking for the right one, and every one of
-        those presses used to leave an `httpx.AsyncClient` and its connection
-        pool open for the life of the process.
+        provider that gets built and dropped — each built provider holds an
+        `httpx.AsyncClient` and its connection pool, and an owner selects
+        repeatedly while looking for the right model.
         """
         profile = self.registry.resolve_profile_id(profile_id)
         self.validate_profile(profile)
@@ -326,13 +322,10 @@ class ModelRouter:
         native default — the profile :meth:`default_provider` returns and the one
         a turn with no selection actually runs on.
 
-        GCR-03: this used to be `list_profiles()[0]`, a position in a shipped
-        file rather than a choice anyone made. `active_profile_id` is only set
-        when something calls :meth:`select_profile`, which the web and gateway
-        paths never did, so an owner running a hosted reasoning model had their
-        reasoning setting judged against the first registry entry — a local
-        llama.cpp profile that declares no reasoning support at all, and so
-        refuses every value with `reasoning_not_supported`.
+        GCR-03: never a position in the shipped registry. `active_profile_id`
+        is set only by :meth:`select_profile`, which the web and gateway paths do
+        not call, and judging a setting against the first registry entry refuses
+        every reasoning value for a hosted model.
         """
         if self.active_profile_id:
             return self.registry.resolve_profile_id(self.active_profile_id)

@@ -19,11 +19,10 @@ import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { writeFileSync } from "node:fs";
 import { signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = "../../docs/plans/screenshots/working";
 
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "/tmp/raiker-live";
 
 test.describe.configure({ mode: "serial" });

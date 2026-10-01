@@ -45,9 +45,9 @@
    * REM-SKILL-01 — where a skill comes from, chosen before a form appears.
    *
    * `null` is "the add entry is closed"; `"choose"` is "open, and the mode is
-   * not decided yet". Keeping those distinct is the point of the row: the page
-   * used to show all three forms at once, which is the same as deciding for the
-   * owner that they wanted to compare them.
+   * not decided yet". Keeping those distinct is the point of the row: showing
+   * all three forms at once decides for the owner that they want to compare
+   * them.
    */
   type AddMode = "choose" | "upload" | "link" | "build";
   const ADD_MODES: ReadonlyArray<{ id: AddMode; label: string; summary: string }> = [

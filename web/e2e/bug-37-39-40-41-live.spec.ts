@@ -48,14 +48,12 @@ import { execFileSync } from "node:child_process";
 import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { signInAsOwner, useHostedModel } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const REPO = join(import.meta.dirname, "..", "..");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
-const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 
 // Every route the app has. Walked at four widths in two themes, which is the
 // audit BUG-37 asks for and the part no amount of token discipline replaces.
@@ -100,12 +98,7 @@ test("a real Anthropic turn answers, so the rest of this file is evidence", asyn
   test.setTimeout(240_000);
   expect(ANTHROPIC_KEY, "set RAIKER_LIVE_ANTHROPIC_KEY").not.toBe("");
 
-  const card = await useHostedModel(page, BASE, {
-    provider: "Anthropic",
-    keyLabel: "Anthropic API key",
-    key: ANTHROPIC_KEY,
-    model: MODEL,
-  });
+  const card = await useAnthropic(page);
   // The card's own model line, not the option still sitting in the open picker.
   await expect(card.locator("code").filter({ hasText: /Haiku 4\.5/i })).toBeVisible({
     timeout: 30_000,

@@ -198,9 +198,8 @@ def build_appimage(payload: Path, record: dict[str, object], out_dir: Path) -> P
         "Icon=raiker\nCategories=Utility;\n",
         encoding="utf-8",
     )
-    # One resolver for the shipped icon. This used to name
-    # `assets/icons/raiker.png`, which has never existed here, so every AppImage
-    # was built with a zero-byte icon and showed a blank square in the launcher.
+    # One resolver for the shipped icon, which must exist: a missing path builds
+    # every AppImage with a zero-byte icon, a blank square in the launcher.
     from raiker.assets import icon_path
 
     icon = icon_path()

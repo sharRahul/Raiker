@@ -123,8 +123,7 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   approvals: ["M9 11.5 11.3 14 15.5 9.5", "M12 3l7 3v5.5c0 4.4-3 7.6-7 9.5-4-1.9-7-5.1-7-9.5V6l7-3Z"],
   tasks: ["M4 6h10", "M4 12h10", "M4 18h6", "M17 15l2 2 3.5-3.5"],
   sessions: ["M5 4h14a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H8l-4 3.5V5a1 1 0 0 1 1-1Z", "M9 9h6"],
-  // A key: what Raiker may do. The ringed circle it used to be was the sun icon
-  // with four rays instead of eight — indistinguishable at 16px.
+  // A key: what Raiker may do. Distinct from the sun icon at 16px.
   capabilities: [
     "M15.5 4a4.5 4.5 0 1 1-4.2 6.1L4 17.4V20h2.6l.9-.9v-1.9h1.9l1.3-1.3",
     "M16.5 8.2h.01",
@@ -137,9 +136,8 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   models: ["M12 3 4 7.5v9L12 21l8-4.5v-9L12 3Z", "M4 7.5 12 12l8-4.5", "M12 12v9"],
   checkpoints: ["M12 8v4l2.5 2.5", "M12 3a9 9 0 1 1-9 9", "M3 5v4h4"],
   activity: ["M3 12h4l2.5-6 4 12 2.5-6H21"],
-  // A gauge: how healthy is this, right now. It used to be the same
-  // clock-with-a-rewind-arrow as `checkpoints`, which is genuinely that glyph's
-  // meaning — rewinding — and is not this one's.
+  // A gauge: how healthy is this, right now. Not the rewind clock, which means
+  // `checkpoints`.
   diagnostics: ["M3.5 17.5a9 9 0 1 1 17 0", "M12 17.5 16 11", "M12 20.2h.01"],
   settings: [
     "M12 9.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z",
@@ -175,9 +173,9 @@ export const ICON_PATHS: Record<IconName, string[]> = {
     "M18.5 6.5a8 8 0 0 1 0 11",
   ],
   file: ["M7 3h7l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 0-1Z", "M14 3v4h4"],
-  // Stacked boards: a project groups conversations, files and instructions. It
-  // used to be the same folder outline as `folder`, which means a directory on
-  // disk — a different thing that appears on the same screens.
+  // Stacked boards: a project groups conversations, files and instructions.
+  // Not the `folder` outline, which means a directory on disk and appears on
+  // the same screens.
   projects: [
     "M4 8.5a1.5 1.5 0 0 1 1.5-1.5h13A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-9Z",
     "M6.5 4.5h11",

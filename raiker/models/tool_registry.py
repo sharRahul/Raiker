@@ -1,13 +1,7 @@
 """One declarative definition per tool, and every table derived from it.
 
-Registering a tool used to mean writing its name into seven files at twelve
-sites — the risk band here, the source kind there, the capability somewhere
-else — and nothing failed when one was missed. A tool registered in six of the
-seven behaved as an unknown tool, or as one with no description, or as one a
-subagent was not allowed to use. Completeness was not represented anywhere, so
-it could not be checked.
-
-It is represented here. :class:`ToolDefinition` has **no defaulted fields**, so
+Completeness is represented here, so it can be checked: :class:`ToolDefinition`
+has **no defaulted fields**, so
 a half-registered tool is a construction error rather than a runtime surprise,
 and every consumer table below is a comprehension over :data:`TOOL_DEFINITIONS`.
 
@@ -24,6 +18,15 @@ Two conventions worth stating, because both look like omissions and are not:
   are equal instead, which is the same guarantee without the cycle. The runtime
   authority's capability map likewise keeps its non-tool aliases: capability
   names are a different vocabulary from tool names.
+
+A tool's transcript ``label``, glyph ``family`` and ``audit`` treatment —
+whether the event log may hold its result content and its argument values — are
+part of its definition (OPT-13); the broker's two audit sets and the
+transcript's two tables are derived below.
+
+A definition carries no authority. ``requires_approval`` and ``capability``
+say which gate a proposal is routed to; whether it passes is decided by the
+runtime authority and the policy engine, which no declaration here can satisfy.
 """
 
 from __future__ import annotations
@@ -49,6 +52,52 @@ _EXTRACT_MODES: tuple[str, ...] = (
 )
 
 
+# The icon families the client draws one glyph for. `tool` is the neutral
+# fallback: an unrecognised tool — a projected MCP one — renders as a tool rather
+# than as nothing. Declared here, with the tools, so a new tool's family is part
+# of its definition rather than a second table it has to be remembered in.
+FAMILY_FILE_READ = "file-read"
+FAMILY_FILE_WRITE = "file-write"
+FAMILY_SHELL = "shell"
+FAMILY_WEB = "web"
+FAMILY_REPOSITORY = "repository"
+FAMILY_CONNECTOR = "connector"
+FAMILY_MEMORY = "memory"
+FAMILY_SUBAGENT = "subagent"
+FAMILY_PLAN = "plan"
+FAMILY_TOOL = "tool"
+
+TOOL_FAMILIES: tuple[str, ...] = (
+    FAMILY_FILE_READ,
+    FAMILY_FILE_WRITE,
+    FAMILY_SHELL,
+    FAMILY_WEB,
+    FAMILY_REPOSITORY,
+    FAMILY_CONNECTOR,
+    FAMILY_MEMORY,
+    FAMILY_SUBAGENT,
+    FAMILY_PLAN,
+    FAMILY_TOOL,
+)
+
+# What the audit trail keeps of a call (OPT-13). The event log is the durable
+# record; these say how much of a call's text it may hold.
+#
+# * ``full`` — arguments (redacted) and result metadata and content.
+# * ``content_withheld`` — the result's content is untrusted outside material
+#   that flows to the calling model only; the trail keeps sizes and ids. The
+#   arguments are governance-relevant identifiers and are kept.
+# * ``metadata_only`` — the arguments are themselves sensitive prompt text (the
+#   advisor's question), so they are reduced to lengths as well.
+#
+# Projected MCP tools are not in the registry and are treated as
+# ``metadata_only`` by the broker, which knows their names by shape.
+AUDIT_FULL = "full"
+AUDIT_CONTENT_WITHHELD = "content_withheld"
+AUDIT_METADATA_ONLY = "metadata_only"
+AUDIT_LEVELS: tuple[str, ...] = (AUDIT_FULL, AUDIT_CONTENT_WITHHELD, AUDIT_METADATA_ONLY)
+
+
 def _derived_risk(name: str, signals: tuple[str, ...]) -> str:
     """The band these signals produce, or a named failure for an unknown one."""
     from raiker.policy.risk import RiskModelError, assess
@@ -69,6 +118,12 @@ class ToolDefinition:
 
     #: The exact name a model proposes and the broker executes.
     name: str
+    #: How a transcript row names the call, in the owner's language.
+    label: str
+    #: Which glyph the transcript draws for it; one of :data:`TOOL_FAMILIES`.
+    family: str
+    #: How much of a call the audit trail keeps; one of :data:`AUDIT_LEVELS`.
+    audit: str
     #: Risk band the proposal carries into the policy engine.
     #:
     #: **Derived, and checked.** The band is whatever `risk_signals` below
@@ -122,6 +177,12 @@ class ToolDefinition:
             raise ValueError(f"tool_definition_description_required:{self.name}")
         if self.risk not in {"low", "medium", "high", "critical"}:
             raise ValueError(f"tool_definition_risk_invalid:{self.name}")
+        if not self.label.strip():
+            raise ValueError(f"tool_definition_label_required:{self.name}")
+        if self.family not in TOOL_FAMILIES:
+            raise ValueError(f"tool_definition_family_invalid:{self.name}")
+        if self.audit not in AUDIT_LEVELS:
+            raise ValueError(f"tool_definition_audit_invalid:{self.name}")
         # The band and the reasons for it cannot drift, because a definition
         # whose halves disagree does not construct. This is the check that makes
         # the band mean something: it is no longer a word somebody chose, it is
@@ -142,6 +203,9 @@ class ToolDefinition:
 TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="apply_patch",
+        label="Apply patch",
+        family=FAMILY_FILE_WRITE,
+        audit=AUDIT_FULL,
         risk="medium",
         risk_signals=("changes_state",),
         requires_approval=True,
@@ -160,6 +224,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # The active session is trusted broker context, never a model argument.
     ToolDefinition(
         name="assign_session_project",
+        label="Assign to project",
+        family=FAMILY_PLAN,
+        audit=AUDIT_FULL,
         risk="medium",
         risk_signals=("changes_state",),
         requires_approval=True,
@@ -177,6 +244,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="cloud_execute",
+        label="Run command in the cloud",
+        family=FAMILY_SHELL,
+        audit=AUDIT_FULL,
         risk="high",
         risk_signals=(
             "changes_state",
@@ -200,6 +270,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="code_map_references",
+        label="Find references",
+        family=FAMILY_REPOSITORY,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -230,6 +303,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # a gate that only covers half of it.
     ToolDefinition(
         name="code_map_search",
+        label="Search the code map",
+        family=FAMILY_REPOSITORY,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -260,6 +336,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # `code_map_references` and is deliberately not duplicated here.
     ToolDefinition(
         name="document_symbols",
+        label="Outline a file",
+        family=FAMILY_REPOSITORY,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -277,6 +356,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="find_definition",
+        label="Find where this is defined",
+        family=FAMILY_REPOSITORY,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -302,6 +384,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="diagnostics",
+        label="Check files for problems",
+        family=FAMILY_REPOSITORY,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -328,6 +413,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="connector_read",
+        label="Read connector",
+        family=FAMILY_CONNECTOR,
+        audit=AUDIT_CONTENT_WITHHELD,
         risk="high",
         risk_signals=("leaves_this_machine", "spends_owner_credential"),
         requires_approval=False,
@@ -345,6 +433,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="connector_write",
+        label="Write through connector",
+        family=FAMILY_CONNECTOR,
+        audit=AUDIT_FULL,
         risk="high",
         risk_signals=(
             "changes_state",
@@ -370,6 +461,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # (default `ask` withholds) + provider policy at call time.
     ToolDefinition(
         name="consult_advisor",
+        label="Consult the advisor model",
+        family=FAMILY_SUBAGENT,
+        audit=AUDIT_METADATA_ONLY,
         risk="high",
         risk_signals=("leaves_this_machine", "spends_owner_credential"),
         requires_approval=False,
@@ -393,6 +487,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # year has to be able to say so.
     ToolDefinition(
         name="conversation_search",
+        label="Search past conversations",
+        family=FAMILY_MEMORY,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -418,6 +515,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="create_document",
+        label="Create document",
+        family=FAMILY_FILE_WRITE,
+        audit=AUDIT_FULL,
         risk="medium",
         risk_signals=("changes_state",),
         requires_approval=False,
@@ -437,6 +537,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # they retain the normal approval path.
     ToolDefinition(
         name="create_task",
+        label="Create task",
+        family=FAMILY_PLAN,
+        audit=AUDIT_FULL,
         risk="medium",
         risk_signals=("changes_state",),
         requires_approval=True,
@@ -475,6 +578,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="diff_files",
+        label="Compare files",
+        family=FAMILY_FILE_READ,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -492,6 +598,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="edit_file",
+        label="Edit file",
+        family=FAMILY_FILE_WRITE,
+        audit=AUDIT_FULL,
         risk="medium",
         risk_signals=("changes_state",),
         requires_approval=True,
@@ -513,6 +622,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # in the tool.
     ToolDefinition(
         name="gcal_read",
+        label="Read Calendar",
+        family=FAMILY_CONNECTOR,
+        audit=AUDIT_CONTENT_WITHHELD,
         risk="high",
         risk_signals=("leaves_this_machine", "spends_owner_credential"),
         requires_approval=False,
@@ -533,6 +645,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # approval path and neither is ever proposed as read-shaped.
     ToolDefinition(
         name="git_branch",
+        label="Create branch",
+        family=FAMILY_REPOSITORY,
+        audit=AUDIT_FULL,
         risk="medium",
         risk_signals=("changes_state",),
         requires_approval=True,
@@ -550,6 +665,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="git_commit",
+        label="Commit",
+        family=FAMILY_REPOSITORY,
+        audit=AUDIT_FULL,
         risk="medium",
         risk_signals=("changes_state",),
         requires_approval=True,
@@ -576,6 +694,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="git_diff",
+        label="Read repository changes",
+        family=FAMILY_REPOSITORY,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -593,6 +714,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="git_log",
+        label="Read repository history",
+        family=FAMILY_REPOSITORY,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -615,6 +739,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # tracks are the answer when the model names neither.
     ToolDefinition(
         name="git_push",
+        label="Push",
+        family=FAMILY_REPOSITORY,
+        audit=AUDIT_FULL,
         risk="high",
         risk_signals=(
             "changes_state",
@@ -638,6 +765,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="git_status",
+        label="Check repository status",
+        family=FAMILY_REPOSITORY,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -657,6 +787,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # (default `ask` withholds) + owner credential + egress allowlist.
     ToolDefinition(
         name="github_read",
+        label="Read from GitHub",
+        family=FAMILY_REPOSITORY,
+        audit=AUDIT_CONTENT_WITHHELD,
         risk="high",
         risk_signals=("leaves_this_machine", "spends_owner_credential"),
         requires_approval=False,
@@ -679,6 +812,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # correctable reason can name the operation.
     ToolDefinition(
         name="github_write",
+        label="Write to GitHub",
+        family=FAMILY_REPOSITORY,
+        audit=AUDIT_FULL,
         risk="high",
         risk_signals=(
             "changes_state",
@@ -702,6 +838,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="glob",
+        label="Find files",
+        family=FAMILY_FILE_READ,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -721,6 +860,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # (default `ask` withholds) + owner credential + egress allowlist.
     ToolDefinition(
         name="gmail_read",
+        label="Read Gmail",
+        family=FAMILY_CONNECTOR,
+        audit=AUDIT_CONTENT_WITHHELD,
         risk="high",
         risk_signals=("leaves_this_machine", "spends_owner_credential"),
         requires_approval=False,
@@ -738,6 +880,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="grep",
+        label="Search files",
+        family=FAMILY_FILE_READ,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -755,6 +900,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="list_directory",
+        label="List folder",
+        family=FAMILY_FILE_READ,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -772,6 +920,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="memory_forget",
+        label="Forget memory",
+        family=FAMILY_MEMORY,
+        audit=AUDIT_FULL,
         risk="high",
         risk_signals=("changes_state", "not_covered_by_checkpoint"),
         requires_approval=True,
@@ -789,6 +940,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="memory_get",
+        label="Open memory",
+        family=FAMILY_MEMORY,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -806,6 +960,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="memory_list",
+        label="List memory",
+        family=FAMILY_MEMORY,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -829,6 +986,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # writing rather than leaving reads ungoverned.
     ToolDefinition(
         name="knowledge_graph",
+        label="Explore related memories",
+        family=FAMILY_MEMORY,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -875,6 +1035,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="memory_search",
+        label="Search memory",
+        family=FAMILY_MEMORY,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -909,6 +1072,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # may say; the sensitivity classifier still refuses credential-like text.
     ToolDefinition(
         name="memory_write",
+        label="Save memory",
+        family=FAMILY_MEMORY,
+        audit=AUDIT_FULL,
         risk="medium",
         risk_signals=("changes_state",),
         requires_approval=True,
@@ -926,6 +1092,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="read_file",
+        label="Read file",
+        family=FAMILY_FILE_READ,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -943,6 +1112,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="remote_execute",
+        label="Run command on the remote host",
+        family=FAMILY_SHELL,
+        audit=AUDIT_FULL,
         risk="high",
         risk_signals=(
             "changes_state",
@@ -965,6 +1137,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="run_command",
+        label="Run command",
+        family=FAMILY_SHELL,
+        audit=AUDIT_CONTENT_WITHHELD,
         risk="high",
         risk_signals=("changes_state", "crosses_sandbox_boundary"),
         requires_approval=False,
@@ -1007,6 +1182,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # happened first — attached a read verdict to host process control.
     ToolDefinition(
         name="background_run",
+        label="Check a background command",
+        family=FAMILY_SHELL,
+        audit=AUDIT_CONTENT_WITHHELD,
         risk="high",
         risk_signals=("changes_state", "crosses_sandbox_boundary"),
         requires_approval=False,
@@ -1047,6 +1225,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="shell",
+        label="Run command",
+        family=FAMILY_SHELL,
+        audit=AUDIT_FULL,
         risk="high",
         risk_signals=("changes_state", "crosses_sandbox_boundary"),
         requires_approval=True,
@@ -1068,6 +1249,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # `files` list the no-argument call returns.
     ToolDefinition(
         name="skill_load",
+        label="Load skill",
+        family=FAMILY_FILE_READ,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -1085,6 +1269,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="slack_read",
+        label="Read Slack",
+        family=FAMILY_CONNECTOR,
+        audit=AUDIT_CONTENT_WITHHELD,
         risk="high",
         risk_signals=("leaves_this_machine", "spends_owner_credential"),
         requires_approval=False,
@@ -1105,6 +1292,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # so spawning is no more authority than the parent already held.
     ToolDefinition(
         name="spawn_subagent",
+        label="Delegate to a subagent",
+        family=FAMILY_SUBAGENT,
+        audit=AUDIT_CONTENT_WITHHELD,
         risk="medium",
         risk_signals=("changes_state",),
         requires_approval=False,
@@ -1159,6 +1349,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # capability of its own, on the same reasoning `stat_path` does.
     ToolDefinition(
         name="tool_search",
+        label="Look up a tool",
+        family=FAMILY_PLAN,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -1180,6 +1373,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="stat_path",
+        label="Inspect path",
+        family=FAMILY_FILE_READ,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -1210,6 +1406,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # the reference refuses it for the same reason.
     ToolDefinition(
         name="ask_owner_question",
+        label="Ask you a question",
+        family=FAMILY_PLAN,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=True,
@@ -1293,6 +1492,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # stays exactly as strict as it was.
     ToolDefinition(
         name="update_plan",
+        label="Update the plan",
+        family=FAMILY_PLAN,
+        audit=AUDIT_FULL,
         risk="medium",
         risk_signals=("changes_state",),
         requires_approval=False,
@@ -1338,11 +1540,12 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # Not in the model's catalogue, and deliberately so: `vector_get` is reachable
     # by a subagent step and by the policy engine's read-shaped set, but it is not
     # a tool a turn proposes. `model_exposed=False` is what keeps it out of the
-    # advertised schema while still being a first-class registry entry — the
-    # distinction that used to be invisible because there was no one place to
-    # state it.
+    # advertised schema while still being a first-class registry entry.
     ToolDefinition(
         name="vector_get",
+        label="Open vector",
+        family=FAMILY_FILE_READ,
+        audit=AUDIT_FULL,
         risk="low",
         risk_signals=(),
         requires_approval=False,
@@ -1364,6 +1567,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # redirects. What comes back is untrusted data, never instructions.
     ToolDefinition(
         name="web_fetch",
+        label="Fetch page",
+        family=FAMILY_WEB,
+        audit=AUDIT_CONTENT_WITHHELD,
         risk="high",
         risk_signals=("leaves_this_machine",),
         requires_approval=False,
@@ -1381,6 +1587,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="web_search",
+        label="Search the web",
+        family=FAMILY_WEB,
+        audit=AUDIT_CONTENT_WITHHELD,
         risk="high",
         risk_signals=("leaves_this_machine",),
         requires_approval=False,
@@ -1407,6 +1616,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # because it is the same request leaving the same machine.
     ToolDefinition(
         name="web_extract",
+        label="Read part of a page",
+        family=FAMILY_WEB,
+        audit=AUDIT_CONTENT_WITHHELD,
         risk="high",
         risk_signals=("leaves_this_machine",),
         requires_approval=False,
@@ -1442,6 +1654,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # request to a third party.
     ToolDefinition(
         name="weather_lookup",
+        label="Check the weather",
+        family=FAMILY_WEB,
+        audit=AUDIT_CONTENT_WITHHELD,
         risk="high",
         risk_signals=("leaves_this_machine",),
         requires_approval=False,
@@ -1474,6 +1689,9 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="write_file",
+        label="Write file",
+        family=FAMILY_FILE_WRITE,
+        audit=AUDIT_FULL,
         risk="medium",
         risk_signals=("changes_state",),
         requires_approval=True,
@@ -1515,12 +1733,8 @@ def all_definitions() -> tuple[ToolDefinition, ...]:
 def tool_risk_band(name: str) -> str:
     """The band a registered tool carries, for the modules that need it by name.
 
-    Four modules used to hold their own `_READ_RISK = "medium"` / `_CALL_RISK`
-    literal, each with a comment explaining that the action was "not low-risk"
-    because it left the machine. The reasoning was right and the band was a
-    guess: by the definitions in `raiker.policy.risk` every one of them is
-    `high`. They read it from here now, so the reasoning lives in the tool's own
-    declared signals and cannot be restated differently four times.
+    The band comes from the tool's own declared signals under
+    `raiker.policy.risk`, so a module never restates it as a local literal.
     """
     try:
         return TOOL_RISK_BANDS[name]
@@ -1608,4 +1822,20 @@ READ_SHAPED_TOOL_NAMES: frozenset[str] = frozenset(
 #: Tools whose proposal parks for an owner decision.
 APPROVAL_TOOL_NAMES: frozenset[str] = frozenset(
     item.name for item in TOOL_DEFINITIONS if item.requires_approval
+)
+
+#: Tool -> how a transcript row names it.
+TOOL_LABEL_BY_TOOL: dict[str, str] = {item.name: item.label for item in TOOL_DEFINITIONS}
+
+#: Tool -> the glyph family a transcript row draws.
+TOOL_FAMILY_BY_TOOL: dict[str, str] = {item.name: item.family for item in TOOL_DEFINITIONS}
+
+#: Tools whose result *content* never enters an event payload.
+CONTENT_WITHHELD_TOOL_NAMES: frozenset[str] = frozenset(
+    item.name for item in TOOL_DEFINITIONS if item.audit != AUDIT_FULL
+)
+
+#: Tools whose argument *values* never enter an event payload either.
+ARGUMENTS_WITHHELD_TOOL_NAMES: frozenset[str] = frozenset(
+    item.name for item in TOOL_DEFINITIONS if item.audit == AUDIT_METADATA_ONLY
 )

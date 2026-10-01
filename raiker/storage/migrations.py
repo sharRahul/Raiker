@@ -2902,9 +2902,8 @@ CREATE TABLE IF NOT EXISTS principal_surface_models (
 
 # B9 — the repository code map.
 #
-# Every turn used to start cold: no symbol index, no map of the tree, so on a
-# large repository the agent grepped blind. These four tables are the projection
-# that ends that, and each column exists for a stated reason.
+# A symbol index and a map of the tree, so the agent does not grep a large
+# repository blind. Each column exists for a stated reason.
 #
 # `code_map_indexes` is one row per indexed repository *path* rather than per
 # `code_repos` row, because the repository a turn works in is the selected folder
@@ -3081,12 +3080,8 @@ ALTER TABLE model_operations ADD COLUMN payload_json TEXT NOT NULL DEFAULT '{}';
 
 # ── Conversation recall (RAIKER-2020) ────────────────────────────────────────
 #
-# Chat search used to be `LIKE '%term%'` over `sessions.title`, `turns.prompt_text`
-# and `turns.summary`: an unindexed scan of every turn the owner had ever taken,
-# returning whole conversations with no indication of *which* exchange matched.
-# It answered "which chats mention this" slowly and could not answer "what
-# exactly did we decide, and when", which is the question a conversation from
-# years ago is actually asked.
+# Answers "what exactly did we decide, and when" — which exchange matched, not
+# only which conversation — without scanning every turn.
 #
 # `conversation_fts` is a rebuildable projection of the `turns` table — never a
 # second source of truth. One row per side of an exchange (`prompt` for what the
@@ -3119,14 +3114,10 @@ TEXT_SEARCH_FTS5_MIGRATION_ID = "RAIKER-2025-text-search-fts5"
 
 # ── Owner-managed web egress blocklist (RAIKER-2021) ─────────────────────────
 #
-# Web egress used to be an allowlist that only existed in the process
-# environment, on the stated grounds that the last boundary before bytes leave
-# the machine should not be editable from a browser session. That reasoning held
-# while the list was the *only* thing standing between a model-chosen URL and the
-# network. It no longer is: the address guard refuses every private, loopback and
-# link-local destination and is not owner-editable at all, so what the owner edits
-# here is their own policy about public destinations — which is exactly the kind
-# of thing a person should be able to change without editing a service file.
+# The owner edits their own policy about *public* destinations here. It is
+# safe to edit from a browser because it is not the last boundary: the address
+# guard refuses every private, loopback and link-local destination and is not
+# owner-editable at all.
 #
 # `RAIKER_WEB_EGRESS_BLACKLIST` still applies and is unioned with these rows, so
 # a deployment that wants rules the app cannot remove still has them.

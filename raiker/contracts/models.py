@@ -393,10 +393,9 @@ EVENT_TYPES = {
     "task_resume_blocked",
     # BUG-299 — one cycle of a routine settled while the task itself stays
     # armed. Distinct from `task_completed` and `task_failed`, which are the
-    # *task's* terminal states: a daily routine never reaches either, so the
-    # only record of what its Tuesday run did used to be a summary string
-    # overwritten by its Wednesday run. The payload states the cycle's outcome
-    # and the slot it was rescheduled into.
+    # *task's* terminal states: a daily routine never reaches either, so each
+    # cycle is recorded rather than overwritten by the next. The payload states
+    # the cycle's outcome and the slot it was rescheduled into.
     "task_cycle_landed",
     "side_question_received",
     "side_question_answered",
@@ -577,19 +576,12 @@ def _one_of(value: str, allowed: set[str], field_name: str) -> None:
 
 # BUG-73 — the sentence a turn shows *while* it is parked on an approval.
 #
-# It used to be persisted as that turn's assistant response, which is how one
-# conversation ended, durably, reading "Approval required for local action. No
-# command was executed." beneath the chip for the file the approval had just
-# written. The write had happened, was checkpointed, and had changed the
-# filesystem; the transcript said otherwise, and a reload did not correct it.
-#
-# Two things changed. It now *reads* as a state rather than as a verdict on
-# execution, and it is no longer stored as an answer at all: `close_turn` refuses
-# to persist it (see `AgentGateway._persisted_summary`), so a resume replaces it
-# by construction and an interrupted resume leaves the parked state showing
-# rather than a false claim. Naming both here is what lets the persistence layer
-# recognise the notice wherever it was produced — including the old wording,
-# which a workspace written before this change can still be carrying.
+# Invariant: it reads as a state, never as a verdict on execution, and it is
+# never stored as an answer: `close_turn` refuses to persist it (see
+# `AgentGateway._persisted_summary`), so a resume replaces it by construction
+# and an interrupted resume leaves the parked state showing rather than a false
+# claim. Both wordings are named so the persistence layer recognises the notice
+# wherever it was produced, including in a workspace written by an older build.
 PARKED_FOR_APPROVAL_NOTICE = "Waiting for your decision. Nothing has run yet."
 LEGACY_PARKED_FOR_APPROVAL_NOTICE = (
     "Approval required for local action. No command was executed."
@@ -709,12 +701,9 @@ class PromptOptions:
     reasoning_effort: str | None = None
     max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS
     # BUG-70 — a **turn-scoped** capability posture, and deliberately a
-    # one-directional one. Build's Plan / Edit / Auto chips used to POST four
-    # `/api/capability-modes/<cap>/<mode>` changes, which rewrote the owner's
-    # *standing* permissions — globally, permanently, and without the step-up
-    # (recorded reason, threat-model acknowledgement) the Permissions page
-    # demands for the identical transition. A control presented as a per-turn
-    # posture must not be a silent edit of four high-risk permissions.
+    # one-directional one. A control presented as a per-turn posture must never
+    # edit the owner's *standing* permissions, which change only through the
+    # Permissions page's step-up (recorded reason, threat-model acknowledgement).
     #
     # So a turn may only ever *tighten* itself: `ask` and `deny` are the only
     # accepted values, and the standing mode still governs everything this map

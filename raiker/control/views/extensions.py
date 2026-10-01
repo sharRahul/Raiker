@@ -27,10 +27,9 @@ def _handler_target(handler: Any) -> str:
 def _declaration_summaries(stored: Any) -> tuple[dict[str, Any], ...]:
     """The owner-facing summary of what a server declared for each of its tools.
 
-    Backlog #16 (MCP half). The card used to show a row of tool-name chips and
-    nothing else, so a server whose tools had no declared arguments looked
-    identical to one whose tools were fully described — and the owner could not
-    tell whether the model was calling them with real arguments or guesses.
+    Backlog #16 (MCP half). A server whose tools declare no arguments must not
+    look identical to one whose tools are fully described, so the owner can
+    tell whether the model calls them with real arguments or guesses.
 
     Re-bounded on the way out (`decode_declarations`), so an older row written
     before those bounds existed is still safe to render, and the *argument

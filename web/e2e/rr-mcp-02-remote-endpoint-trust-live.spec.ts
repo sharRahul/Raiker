@@ -20,8 +20,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = "../../docs/screenshots/2026-09-13-mcp-endpoint-trust";
 
 /** Open Extensions → MCP servers, signed in. */

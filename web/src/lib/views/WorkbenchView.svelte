@@ -1,17 +1,9 @@
 <script lang="ts">
   /**
-   * Workbench — the default screen, and now a board rather than a box.
+   * Workbench — the default screen: a board, not a composer.
    *
-   * It used to open with a large composer that could not send anything. The
-   * prompt was written here, handed to Chat, Build or Tasks, and *re-shown* there
-   * in that surface's own composer, which meant the first thing the product asked
-   * you to do was type into a control that was a copy of the real one. It also
-   * pushed the only genuinely live information on the screen — what is running,
-   * what is waiting, what fires next — into a narrow rail beside it.
-   *
-   * The box is gone. What is left is the answer to "what is Raiker doing right
-   * now", in three groups that are three different facts, not three names for the
-   * same one:
+   * It answers "what is Raiker doing right now" in three groups that are three
+   * different facts, not three names for the same one:
    *
    *  - **Running now** — a governed cycle in flight this second, with the safe
    *    boundary you can stop it at.
@@ -58,19 +50,15 @@
     valueOf,
   } from "../freshness";
 
-  // C18 — "continue working" used to mean only the conversations the owner
-  // typed, so a routine advancing a thread on its own was invisible here and
-  // reachable only through Tasks. One read now answers both.
+  // C18 — "continue working" includes the threads a routine is advancing on
+  // its own, not only the conversations the owner typed. One read answers both.
   let sessions = $state<WorkThread[] | null>(null);
   let tasks = $state<TaskView[] | null>(null);
   let approvals = $state<ApprovalView[] | null>(null);
   let projects = $state<ProjectsList | null>(null);
-  // NEW-HOME-01 — readiness used to be `Diagnostics | null`, and `null` meant
-  // three different things: not read yet, read and failed, and nothing to
-  // report. `runtimeIssues` resolved all three to **0**, so a diagnostics
-  // endpoint that was down produced a board that said nothing needed the owner.
-  // A readiness claim nobody checked is worse than no claim, because it is
-  // acted on.
+  // NEW-HOME-01 — not read yet, read and failed, and nothing to report are
+  // three states, never one `null`. A readiness claim nobody checked is worse
+  // than no claim, because it is acted on.
   let health = $state<Freshness<Diagnostics>>(freshnessLoading());
   let unavailable = $state(false);
   let updatedAt = $state<Date | null>(null);
@@ -103,18 +91,10 @@
     active.filter((task) => IN_FLIGHT.includes(task.status) || !armed(task)),
   );
   /**
-   * REM-HOME-01 — a standing agent whose cycle is in flight is one row, not two.
+   * REM-HOME-01 — a standing agent whose cycle is in flight is one row, not two:
+   * one piece of work is never counted twice or given two Stop buttons.
    *
-   * This used to be every repeating task that was still alive, on the reasoning
-   * that "a cycle is running" and "an agent is standing" are two different
-   * facts and the board should answer both. They are two different facts, and
-   * the board still answers both — but it was answering them with the *same
-   * row, twice*, under two headings, with two Stop buttons that do the same
-   * thing to the same run. An owner scanning Home counted one nightly routine
-   * as two pieces of work, and there was nothing on either row to tell them it
-   * was not.
-   *
-   * So the cycle wins the row while it is in flight, and it carries the
+   * The cycle wins the row while it is in flight, and it carries the
    * schedule with it: the running row states the cadence and the next slot, so
    * nothing that was in the standing row is lost. `Standing agents` lists the
    * repeating work that is *waiting* for its next cycle, which is what the
@@ -495,10 +475,9 @@
              of the three things were looked at and both are clear; the third
              is named rather than counted as zero, which is what turned a
              failed read into "Nothing needs you right now." -->
-        <!-- Found live 2026-09-28: a read still in flight was reported as a
-             read that failed. "Could not read" is a claim about an answer;
-             while the answer is on its way the honest sentence is that it is
-             still being read. Neither is an all-clear. -->
+        <!-- "Could not read" is a claim about an answer; while the answer is
+             on its way the honest sentence is that it is still being read.
+             Neither is an all-clear. -->
         <p class="all-clear">
           No approvals are waiting and no work is blocked.
           {#if health.kind === "loading"}

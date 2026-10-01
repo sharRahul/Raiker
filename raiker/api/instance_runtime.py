@@ -68,13 +68,11 @@ class InstanceRuntime:
     async def _contained(self, pass_name: str, work: Awaitable[Any]) -> None:
         """Run one host-tick pass, isolated from the others and *recorded*.
 
-        GCR-38 — every pass used to be `with suppress(Exception)`. The
-        isolation is right: a telemetry collector that is down must not stop
-        due work from starting. Suppressing in silence was not: a pass could
-        throw every fifteen seconds for days while the product reported a
-        healthy host, because nothing counted it, nothing logged it, and no
-        surface could show it. The exception is still swallowed — the tick
-        must not die — and now it leaves a row and a log line behind.
+        GCR-38 — the isolation is deliberate: a telemetry collector that is
+        down must not stop due work from starting. Silence is not: a pass
+        that throws every fifteen seconds for days while nothing counts it
+        reads as a healthy host. So the exception is swallowed — the tick
+        must not die — and it leaves a row and a log line behind.
         """
         store = SQLiteStore(self.workspace_root)
         try:

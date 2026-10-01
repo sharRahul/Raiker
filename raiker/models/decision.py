@@ -183,15 +183,9 @@ class ModelDecisionService:
         # BUG-286 — the owner has stored nothing, so there is nothing to report.
         #
         # `resolve_request_target` ends at the *shipped* native default when no
-        # selection exists, and this used to return that pair as `selected` with
-        # the source set to `native_default`. Every consumer then had to know
-        # that one of the three sources means "this is not actually a choice",
-        # and the composer's menu did not: on a fresh workspace with Anthropic
-        # connected it opened with `Gemma 4:31B Cloud — Selected · unavailable`,
-        # naming the shipped Ollama profile's model on a host with no Ollama,
-        # directly above its own trigger correctly reading `Not selected`.
-        #
-        # A selection nobody made is not a selection. The empty pair is the
+        # selection exists, and a selection nobody made is not a selection —
+        # reporting it as `selected` would make every consumer tell two kinds of
+        # `selected` apart. The empty pair is the
         # honest answer, `decide` turns it into the `no_model_selected` problem
         # below, and the interface stops having to tell two kinds of `selected`
         # apart. What a turn sent *without* a model would run is a different

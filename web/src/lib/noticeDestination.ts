@@ -54,6 +54,22 @@ export function answeredByPage(notification: RaikerNotification, hash: string): 
   return destination !== undefined && routeOf(hash) === destination;
 }
 
+/**
+ * Kinds the approval card already presents on every page it stands on.
+ *
+ * The card is on every page but Approvals, and Approvals answers the notice
+ * itself (BUG-309), so docking an approval notice would repeat what is on
+ * screen — and covered page controls where it did. It stays unread: the bell
+ * counts it and the record lists it, because seeing the card is not reading
+ * the notice.
+ */
+const SHOWN_BY_APPROVAL_CARD = new Set(["approval_pending", "critical_approval_pending"]);
+
+/** True when the approval card is the place this notice is already shown. */
+export function shownByApprovalCard(notification: RaikerNotification): boolean {
+  return SHOWN_BY_APPROVAL_CARD.has(notification.kind);
+}
+
 /** True on the record itself, where a docked notice would repeat a row. */
 export function onNoticeRecord(hash: string): boolean {
   return routeOf(hash) === "#/observe" && hash.includes("tab=notifications");

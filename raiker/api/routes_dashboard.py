@@ -1435,7 +1435,11 @@ async def get_project(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    view = _service(request).get_project(project_id, auth_data[1].delegated_by_user_id)
+    view = _service(request).get_project(
+        project_id,
+        auth_data[1].delegated_by_user_id,
+        owner_principal_id=auth_data[0].principal_id,
+    )
     if view is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown project: {project_id}"
@@ -1491,6 +1495,19 @@ async def save_project_context(
     return {"ok": True, **result.data}
 
 
+@router.get("/api/projects/{project_id}/deletion-preview")
+async def project_deletion_preview(
+    project_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """UX-PROJ-07 — what a delete would remove, counted, before it is asked for."""
+    result = _service(request).project_deletion_preview(project_id, auth_data[0].principal_id)
+    if not result.ok:
+        raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
+    return serialize_dto(result.data["preview"])
+
+
 @router.delete("/api/projects/{project_id}")
 async def delete_project(
     project_id: str,
@@ -1500,10 +1517,41 @@ async def delete_project(
 ) -> dict[str, Any]:
     if x_project_delete_confirm != project_id:
         raise refusal(status.HTTP_409_CONFLICT, "project_delete_confirmation_required")
-    result = _service(request).delete_project(project_id, auth_data[0].principal_id, confirm=True)
+    service = _service(request)
+    # UX-PROJ-07 / DEC-04 step 9 — removing a managed project removes a folder
+    # Raiker owns from disk, so it takes a recent step-up, the same elevated
+    # session account deletion takes. An attached folder is never touched, and
+    # its delete keeps the ordinary session.
+    preview = service.project_deletion_preview(project_id, auth_data[0].principal_id)
+    if not preview.ok:
+        raise refusal(_project_refusal_status(preview.reason_code), preview.reason_code)
+    if preview.data["preview"].requires_step_up and auth_data[0].scope != "elevated":
+        raise refusal(status.HTTP_403_FORBIDDEN, "project_delete_requires_step_up")
+    result = service.delete_project(project_id, auth_data[0].principal_id, confirm=True)
     if not result.ok:
-        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+        raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
     return {"ok": True, **result.data}
+
+
+#: Refusals that describe the request's target rather than the caller's right.
+_PROJECT_CONFLICTS = frozenset(
+    {
+        "project_move_into_itself",
+        "project_move_into_descendant",
+        "project_move_into_archived",
+        "project_parent_archived",
+    }
+)
+
+
+def _project_refusal_status(reason_code: str | None) -> int:
+    """404 for a project that is not there, 409 for a destination that cannot be, else 403."""
+    code = reason_code or ""
+    if code.startswith(("unknown_project:", "unknown_parent:")):
+        return status.HTTP_404_NOT_FOUND
+    if code in _PROJECT_CONFLICTS:
+        return status.HTTP_409_CONFLICT
+    return status.HTTP_403_FORBIDDEN
 
 
 @router.put("/api/projects/{project_id}/move")
@@ -1514,13 +1562,14 @@ async def move_project(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Move a project to a new parent folder (human-only).
-    
-    ``body.parent_id`` may be null to reparent to root. A cycle check is
-    performed server-side — a descendant cannot become its own ancestor.
+
+    ``body.parent_id`` may be null to reparent to root. The server refuses the
+    project itself, any of its descendants (a cycle) and an archived folder as
+    a destination, each by name.
     """
     result = _service(request).move_project(project_id, body.parent_id, auth_data[0].principal_id)
     if not result.ok:
-        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+        raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1533,7 +1582,20 @@ async def archive_project(
     """Soft-delete a project subtree (human-only)."""
     result = _service(request).archive_project(project_id, auth_data[0].principal_id)
     if not result.ok:
-        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+        raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/projects/{project_id}/restore")
+async def restore_project(
+    project_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """UX-PROJ-05 — undo an archive: the project and what was archived with it."""
+    result = _service(request).restore_project(project_id, auth_data[0].principal_id)
+    if not result.ok:
+        raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1821,15 +1883,12 @@ def _record_codex_connection(request: Request, principal_id: str, *, signed_in: 
     ``provider_runtime_policy_from_gates`` reads, so an owner who has connected
     is not then sent to Permissions to flip a second switch.
 
-    **BUG-259 — it must not be called from a read.** It used to be, from
-    ``GET .../status``, and the consequence was that a brand-new Raiker on a
-    machine where somebody had once signed Codex in adopted that ChatGPT
-    account by itself: merely opening the setup page connected an identity
-    nobody had chosen, listed its models, and reported it as connected. A read
-    that performs a connection is exactly what "nothing is contacted until you
-    ask" exists to forbid, and adopting an account is worse than contacting a
-    host. Only the two explicit routes below reach this — the owner pressing
-    connect, or disconnect.
+    **BUG-259 — it must not be called from a read.** A read that adopts an
+    account connects an identity nobody chose — on a machine where somebody
+    once signed Codex in, merely opening the setup page would do it — which is
+    exactly what "nothing is contacted until you ask" forbids. Only the two
+    explicit routes below reach this — the owner pressing connect, or
+    disconnect.
 
     The marker is the fact of the connection and nothing else. Access tokens,
     refresh tokens, verifiers, device codes and authorization URLs stay inside
@@ -1912,8 +1971,8 @@ async def connect_chatgpt_codex(
 ) -> dict[str, Any]:
     """Adopt the ChatGPT subscription the local Codex client is signed in to.
 
-    BUG-259 — the explicit act that ``GET .../status`` used to perform by
-    itself. It refuses when Codex has no session, because recording a connection
+    BUG-259 — the explicit act, never performed by a read. It refuses when
+    Codex has no session, because recording a connection
     to an account that does not exist would put a provider in the pickers that
     cannot answer anything.
     """

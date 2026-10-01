@@ -385,12 +385,10 @@ class AsyncAnthropicMessagesProvider:
             # The budget has to leave room for the answer, and `max_tokens`
             # counts both. A budget that met or exceeded it would be refused.
             #
-            # GCR-31 — the clamp used to end at `max(1024, …)`, which clamps
-            # *upward*: with `max_tokens` at 1024 it returned a 1024-token
-            # thinking budget and left the answer nothing, so the request the
-            # comment above describes was exactly the request being built. A
-            # budget that will not fit is now said out loud, with the field to
-            # change, rather than sent to the provider to be refused as a 400.
+            # GCR-31 — never clamp *upward* (`max(1024, …)` with `max_tokens` at
+            # 1024 leaves the answer nothing). A budget that will not fit is said
+            # out loud, with the field to change, rather than sent to the
+            # provider to be refused as a 400.
             limit = request.max_tokens or self.max_tokens
             available = limit - RESERVED_ANSWER_TOKENS
             if available < MINIMUM_THINKING_BUDGET_TOKENS:

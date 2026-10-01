@@ -21,9 +21,8 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { hostedProviderCard, signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
-const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const SHOTS = "../../docs/plans/screenshots/working";
 
 test.describe.configure({ mode: "serial" });

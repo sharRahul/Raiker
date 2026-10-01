@@ -14,15 +14,10 @@ This is that wire, and it is deliberately the *narrow* one:
   takes the threat-model acknowledgement and the human confirmation that tier
   requires, and the owner's decision mode still governs each run.
 
-  **BUG-281 — this used to say the gate "ships enabled".** The *shipped table*
-  does set every real-executor capability to `enabled_runtime`, which is where
-  that sentence came from; what an account actually meets is
-  `unset_resolution_for("telemetry_export")`, and `telemetry_export` is not in
-  `CAPABILITY_UNSET_RESOLUTION`, so an account with nothing persisted resolves
-  **off**. A live round confirmed it: Observability said *"Telemetry export is
-  turned off. Turn it on in Permissions."* on a fresh install. The behaviour is
-  right — a capability that reaches the network should be the owner's explicit
-  yes — and the sentence describing it was not.
+  An account with nothing persisted resolves it **off**: what an account meets
+  is `unset_resolution_for("telemetry_export")`, and `telemetry_export` is not in
+  `CAPABILITY_UNSET_RESOLUTION`, whatever the shipped table says (BUG-281). A
+  capability that reaches the network is the owner's explicit yes.
 
   Two things are therefore true and are worth keeping apart, because the second
   is the one that would still matter if the first ever changed: the owner turns

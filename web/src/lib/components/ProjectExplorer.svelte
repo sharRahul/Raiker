@@ -2,10 +2,8 @@
   /**
    * One file tree for both kinds of project root.
    *
-   * A project's files used to appear twice on this page: once as the managed
-   * document library and once as a walk of the project folder. They were the
-   * same files described differently, which meant the owner had to work out
-   * which list to believe. This is the one list.
+   * The one list of a project's files, so the owner never has to work out which
+   * of two descriptions of the same files to believe.
    *
    * Two properties shape everything below:
    *

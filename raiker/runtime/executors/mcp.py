@@ -1058,15 +1058,13 @@ class McpConnectorExecutor:
 
         BUG-234. The streamable HTTP transport carries both directions over the
         same endpoint: a client answers a server-initiated request by POSTing the
-        JSON-RPC response to the URL it is already talking to. Raiker never
-        answered at all, so a server that asked anything sat waiting for a reply
-        that was never coming and spent its own timeout on it.
+        JSON-RPC response to the URL it is already talking to, so a server that
+        asks is never left spending its timeout waiting.
 
         **Best-effort, and deliberately so.** These answers are all refusals bar
         `ping`, so the governed read Raiker came here to do is unaffected by one
-        failing to land: a server that does not accept them is no worse off than
-        under the silence it used to get. Failing the owner's read because a
-        courtesy reply did not post would be the wrong trade. Returns the bytes
+        failing to land. Failing the owner's read because a courtesy reply did
+        not post would be the wrong trade. Returns the bytes
         sent, for the monitor's wire totals.
         """
         sent = 0
@@ -1450,11 +1448,10 @@ def _call_result_text(responses: dict[Any, dict[str, Any]]) -> str:
     it called returned (BUG-12). It is never stored: artifacts, the audit event,
     and the session log keep carrying counts and labels only.
 
-    BUG-234 — this used to concatenate the ``text`` field of every block, which
-    is one of the five content shapes the current revision defines. A result made
-    of `resource_link`s, an embedded resource, an image, or nothing but
-    ``structuredContent`` reached the model as an empty string, and nothing said
-    so. `render_call_result` handles every shape and names the ones that are
+    BUG-234 — ``text`` is one of the five content shapes the current revision
+    defines; reading only it turns a result of `resource_link`s, an embedded
+    resource, an image or ``structuredContent`` into a silent empty string.
+    `render_call_result` handles every shape and names the ones that are
     references rather than text — including a link, which it never follows.
     """
     from raiker.tools.mcp_schema import render_call_result

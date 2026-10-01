@@ -17,9 +17,7 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { enableCapability, hostedProviderCard, signInAsOwner } from "./hosted-provider";
-
-const BASE = "http://127.0.0.1:8765";
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY } from "./live";
 
 // Deliberately not serial. The three blocks share a host but touch different
 // surfaces, and a failure in one is not a reason to leave the other two unrun —

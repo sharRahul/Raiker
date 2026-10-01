@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
 import { OWNER_CREDENTIALS, keepOffered, offeredModelIds, openModelDialog } from "./hosted-provider";
+import { LIVE_BASE as BASE } from "./live";
 
 /**
  * BUG-69's live evidence, runnable with **one** provider key (BUG-84).
@@ -25,7 +26,6 @@ import { OWNER_CREDENTIALS, keepOffered, offeredModelIds, openModelDialog } from
  * `default-ollama-live.spec.ts`); this spec is the readiness gate.
  */
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(
   import.meta.dirname,
   "..",

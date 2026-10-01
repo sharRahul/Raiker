@@ -2,17 +2,10 @@
   /**
    * Runtime configuration.
    *
-   * Raiker used to ship five runtime modes — development preview, two
-   * single-user modes, a multi-user mode and a hosted mode — and this panel
-   * was where you picked one. Picking never told anyone anything: what the
-   * agent may do is decided by each capability's own gate, its threat-model
-   * acknowledgement, its human confirmation and whether a real executor is
-   * registered. The mode was a fifth answer that could only say "not yet" to
-   * work the other four had already authorised, and choosing wrong left a
-   * correctly-configured install refusing to run.
-   *
-   * There is one runtime now and it does all of it, so this panel states what
-   * is running instead of asking. The one runtime-level decision that remains
+   * There is one runtime (FIXED-63): what the agent may do is decided by each
+   * capability's gate, threat-model acknowledgement, human confirmation and
+   * registered executor, so this panel states what is running instead of
+   * asking. The one runtime-level decision that remains
    * is binary and stays here in the danger zone: whether the runtime accepts
    * new executions at all.
    */
@@ -35,11 +28,9 @@
     save?: (patch: Record<string, unknown>) => void;
   } = $props();
 
-  // BUG-83 — the readiness observation window used to be a hard-coded five
-  // minutes with no way to move it, so a long session traded a stale-ready
-  // window for a spurious-stale interruption and offered no control over
-  // either. The bounds are the server's: under a minute is a check on every
-  // keystroke, over two hours is not a check.
+  // BUG-83 — the readiness observation window is the owner's to move. The
+  // bounds are the server's: under a minute is a check on every keystroke, over
+  // two hours is not a check.
   const readinessTtl = $derived(
     Number(settings["models.readiness_ttl_minutes"] ?? 5),
   );
@@ -481,7 +472,7 @@
   .egress-status small { color:var(--text-2); text-transform:none; }
   .reset-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:.45rem; }
   .reset-actions .danger { color:var(--danger); }
-  details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; min-width:0; color:var(--text-2); font-size:var(--text-sm); } /* `minmax(0,1fr)` on the track is only half of it: a grid item's automatic minimum is its content, and a <select> is at least as wide as its longest option ('Daytona cloud workspace'), so the label held a 183px minimum inside a 152px track and bled at 390px. Found by the width sweep once it started covering Settings — FIXED-416. */ .environment-form input,.environment-form select { min-width:0; max-width:100%; background:var(--sunken); } .environment-form small,.environment-form button,.environment-form fieldset,.boundary-preview { grid-column:1/-1; } .environment-form fieldset { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:0; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-form fieldset legend { padding:0 .35rem; color:var(--text-2); font-size:var(--text-sm); } .environment-form .tool-choice { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:.35rem; color:var(--text-1); font-family:var(--font-mono); } .environment-form .tool-choice input { min-height:0; } .boundary-preview { display:grid; grid-template-columns:auto auto 1fr auto auto; align-items:center; gap:.55rem; padding:.7rem .8rem; border-left:3px solid var(--accent); background:var(--sunken); color:var(--text-3); font-size:var(--text-xs); } .boundary-preview strong { color:var(--text-1); } .boundary-preview i { text-align:center; color:var(--accent); font-style:normal; }
+  details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; min-width:0; color:var(--text-2); font-size:var(--text-sm); } /* `minmax(0,1fr)` is only half of it: a grid item's automatic minimum is its content, and a <select> is as wide as its longest option, which overflows a narrow track at 390px (FIXED-416). */ .environment-form input,.environment-form select { min-width:0; max-width:100%; background:var(--sunken); } .environment-form small,.environment-form button,.environment-form fieldset,.boundary-preview { grid-column:1/-1; } .environment-form fieldset { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:0; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-form fieldset legend { padding:0 .35rem; color:var(--text-2); font-size:var(--text-sm); } .environment-form .tool-choice { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:.35rem; color:var(--text-1); font-family:var(--font-mono); } .environment-form .tool-choice input { min-height:0; } .boundary-preview { display:grid; grid-template-columns:auto auto 1fr auto auto; align-items:center; gap:.55rem; padding:.7rem .8rem; border-left:3px solid var(--accent); background:var(--sunken); color:var(--text-3); font-size:var(--text-xs); } .boundary-preview strong { color:var(--text-1); } .boundary-preview i { text-align:center; color:var(--accent); font-style:normal; }
   .advanced { margin-top: var(--space-5); }
   .advanced summary { color: var(--text-2); }
   .advanced label { margin-top: var(--space-3); }

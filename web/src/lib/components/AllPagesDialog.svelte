@@ -2,32 +2,18 @@
   /**
    * Everything that is not the daily work, behind one control.
    *
-   * The sidebar used to carry eight rows — Approvals, Permissions, Models,
-   * Extensions, Observability, Guide, Settings — for work that happens on a
-   * handful of days: you connect a provider once, set a gate once, and come
-   * back when something needs changing. They were permanent furniture beside
-   * the six destinations an owner opens many times an hour.
-   *
-   * They live here now, reached from the gear in the top right. The routes
-   * themselves are untouched — `#/models` still renders Models, deep links
-   * still resolve, and `nav.ts` still holds every destination in `NAV_GROUPS`
-   * because `routeFromHash` resolves against it. What changed is only where a
-   * link to them is drawn.
+   * Work that happens on a handful of days — connecting a provider, setting a
+   * gate — is reached from here, not from permanent sidebar rows beside the
+   * destinations an owner opens many times an hour. Only where a link is drawn
+   * differs: deep links resolve, and `nav.ts` holds every destination in
+   * `NAV_GROUPS` because `routeFromHash` resolves against it.
    *
    * Settings' own sections are listed too, so this answers "where is that
    * setting" without making the owner open Settings and then hunt its rail.
    *
-   * **REM-POPUP-01 — it is `More`, and it says so.** The trigger was a gear and
-   * the heading was "Settings & pages", which is one control making two
-   * promises: a gear means "the settings screen" everywhere else an owner has
-   * used a computer, and this opens a route launcher whose largest group is
-   * pages that are not settings at all. Worse, the one thing the icon named was
-   * the one row deliberately missing — Settings itself was omitted because its
-   * sections are listed below, so pressing a gear could not open Settings.
-   *
-   * The control is an overflow control, so it is named after what it is, and a
-   * direct link to Settings leads the window. Nothing about the routes, the
-   * groups or the deep links changed.
+   * **REM-POPUP-01 — it is `More`, and it says so.** A gear means "the settings
+   * screen"; this is an overflow control and a route launcher, so it is named
+   * after what it is, and a direct link to Settings leads the window.
    */
   import Icon from "./Icon.svelte";
   import { HUB_GROUPS, HUB_TABS } from "../nav";

@@ -195,11 +195,9 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-# BUG-83 — the observation window used to be a hard-coded five minutes with no
-# way to move it and nothing to re-check in the background, so a long editing
-# session traded a stale-ready window for a spurious-stale interruption. The TTL
-# is now the owner's, bounded so neither end can be set to something dishonest:
-# under a minute is a check on every keystroke, over two hours is not a check.
+# BUG-83 — the observation window is the owner's, bounded so neither end can be
+# set to something dishonest: under a minute is a check on every keystroke, over
+# two hours is not a check.
 DEFAULT_READINESS_TTL_MINUTES = 5
 MIN_READINESS_TTL_MINUTES = 1
 MAX_READINESS_TTL_MINUTES = 120
@@ -311,7 +309,7 @@ class _FailureRule:
 
 _S = ModelReadinessState
 
-#: OPT-12 — the two exception ladders ``check`` used to carry, as one table per
+#: OPT-12 — how ``check`` classifies a provider failure, as one table per
 #: stage. Workspace and quota refusals are not rows: each has its own explicit
 #: answer below because its repair is neither a network fix nor a new key.
 _FAILURE_RULES: dict[ProbeStage, tuple[_FailureRule, ...]] = {

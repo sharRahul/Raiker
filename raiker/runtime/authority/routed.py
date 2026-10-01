@@ -5,12 +5,11 @@ and the advisor — enforce their own gate and decision mode, because a chat too
 reaches them directly. The executor that runs *after* ``route_action`` must not
 enforce them a second time: the router already applied the gate, the mode and
 the approval, and a second ``ask`` would withhold an action the owner just
-approved. That skip used to be ``enforce_modes: bool``, and a boolean is
-something any caller can pass. One ``False`` in a future scheduler, plugin
-bridge or route handler would have skipped the owner's switch without anything
-noticing.
+approved. The skip is never a boolean, which any caller can pass: one ``False``
+in a future scheduler, plugin bridge or route handler would skip the owner's
+switch without anything noticing.
 
-The skip now needs a :class:`RoutedAuthority`, and only
+The skip needs a :class:`RoutedAuthority`, and only
 :func:`routed_dispatch` — entered by ``RuntimeAuthority.route_action``
 immediately around ``executor.execute`` — issues one. A token is honoured only
 while that dispatch is still running, only in the context it was issued in,

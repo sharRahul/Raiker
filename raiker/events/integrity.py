@@ -40,12 +40,10 @@ def _line_offsets(path: Path) -> list[int] | None:
 def _unindexed_lines(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Lines present in a session's JSONL that the index has never heard of.
 
-    GCR-40 — verification used to start from the database and read each indexed
-    line by its stored offset, so it could only ever check lines the index
-    already knew about. A line the index was missing was invisible to the very
-    check whose job is to say whether the log and the index agree, and the next
-    append chained past it because `prev_hash` also comes from the index. An
-    orphan was therefore both undetectable and permanent.
+    GCR-40 — verification that starts from the index can only check lines the
+    index already knows, so a line it is missing would be invisible to the very
+    check whose job is to say whether the log and the index agree — and
+    permanent, because the next append chains past it.
     """
     indexed: dict[str, set[int]] = {}
     for row in rows:

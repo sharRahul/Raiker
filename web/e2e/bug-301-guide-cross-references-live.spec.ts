@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { join } from "node:path";
 import { signInAsOwner } from "./hosted-provider";
 import { capture } from "./capture";
+import { LIVE_BASE as BASE } from "./live";
 
 /**
  * BUG-301 — a reference from one guide chapter to another is a link that opens
@@ -17,7 +18,6 @@ import { capture } from "./capture";
  * address is one this app's router really serves: a unit test can assert the
  * href, and only a real navigation proves the chapter opens.
  */
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-09-18-round");
 
 test("a guide chapter's cross-reference opens the chapter it names", async ({ page }) => {

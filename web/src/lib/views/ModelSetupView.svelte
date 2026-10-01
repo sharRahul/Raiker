@@ -7,13 +7,9 @@
    * unlock, and bootstrap verification all still happen before the workspace
    * mounts, and none of them is collapsed into a generic failure.
    *
-   * What changed is everything after it. This used to be
-   * `Account → Model → Privacy → Backup → Finish`, which asked an owner to
-   * understand infrastructure before they had used the product once: an Account
-   * stage after the account was already created, a full provider matrix as the
-   * opening move, a backup path requested before first use, and a final button
-   * to "Open Workbench" — a place the rest of the product does not call by that
-   * name. `firstRun.ts` holds the ordering and the wording; this file draws it.
+   * After it, nothing asks an owner to understand infrastructure before they
+   * have used the product once. `firstRun.ts` holds the ordering and the
+   * wording; this file draws it.
    */
   import { onMount } from "svelte";
   import { api } from "../api";
@@ -156,9 +152,9 @@
     if (state === null) return false;
     return !state.model_deferred && (state.selected_model ?? "") !== "";
   });
-  // REM-MODEL-01 — "could Raiker reach this" is answered in one place. This
-  // screen used to answer it here, out of `configured` and `provider_detected`,
-  // and so called a provider whose key the last check rejected usable.
+  // REM-MODEL-01 — "could Raiker reach this" is answered in one place, never
+  // here from `configured` and `provider_detected`, which call a provider whose
+  // key the last check rejected usable.
   const imageReady = $derived(
     profiles.some(
       (profile) =>
@@ -419,9 +415,8 @@
 
 <style>
   .setup-shell { width: min(68rem, 100%); margin: 0 auto; display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: clamp(1.5rem, 5vw, 4rem); padding: clamp(1rem, 4vw, 3rem); }
-  /* Which of the five stages you are on is the one thing worth keeping in
-     view while the model list under it is scrolled; the rail used to leave
-     with it. */
+  /* Which of the five stages you are on stays in view while the model list
+     under it is scrolled. */
   .stage-rail { border-right: 1px solid var(--border); padding-right: var(--space-4); position: sticky; top: var(--space-4); align-self: start; }
   .rail-title { margin: 0 0 var(--space-4); color: var(--text-1); font-family: var(--font-serif); font-size: var(--text-xl); }
   ol { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }

@@ -10,13 +10,12 @@ import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
 
 import { roundName } from "./naming";
+import { LIVE_BASE as BASE } from "./live";
 
 // BUG-250 — named per run, so a round that has already worked in this
 // workspace cannot find its own leftovers and assert on them. The suite shares
 // one workspace by design; this is what keeps a shared workspace honest.
 const PROJECT = roundName("Repo work");
-
-const BASE = "http://127.0.0.1:8765";
 
 test.describe.configure({ mode: "serial" });
 

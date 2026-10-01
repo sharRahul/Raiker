@@ -29,24 +29,20 @@ def check_command_allowlist(
 ) -> None:
     """The full command policy, raised as a :class:`SandboxError`.
 
-    RAIKER-2023: this used to be a one-line check on the binary's basename, which
-    said nothing about the *arguments*. `git -c core.sshCommand=… push` and
-    `find . -exec sh {} ;` both pass a basename allowlist and both run a program
-    of the caller's choosing. :mod:`raiker.runtime.command_policy` parses the
+    RAIKER-2023: a basename check says nothing about the *arguments* —
+    `git -c core.sshCommand=… push` and `find . -exec sh {} ;` both pass a
+    basename allowlist and both run a program of the caller's choosing.
+    :mod:`raiker.runtime.command_policy` parses the
     whole argv — including any string that will itself be read as shell source —
     and refuses chaining, pipes, redirection, substitution, expansion, globbing,
     interpreters, per-binary escape flags, and any path outside the workspace.
 
     *workspace_root* is the directory this command may touch, and it is the
-    caller's to state. GCR-06: it used to be a module global that
-    :func:`run_command` assigned immediately before calling this, and that the
-    tool broker never assigned at all. Two commands running at once — two
-    mounted instances, or one instance with a background run in flight —
-    validated against whichever root was written last, so a path could be
-    accepted for being inside a workspace that was not the one it would run in.
-    ``None`` still means the process working directory, which is what a caller
-    with no workspace of its own has always been held to; it is now a stated
-    choice rather than a leftover.
+    caller's to state (GCR-06). Never shared state: two commands running at
+    once — two mounted instances, or a background run in flight — would
+    validate against whichever root was written last, accepting a path for
+    being inside a workspace it will not run in. ``None`` means the process
+    working directory, the stated choice for a caller with no workspace.
     """
     from raiker.runtime.command_policy import CommandRejected, validate_command
 

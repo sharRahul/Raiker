@@ -574,17 +574,13 @@ class SessionService:
         }
         threads: list[WorkThreadView] = []
         # REM-THREAD-03 — every conversation the owner started, on whichever
-        # surface they started it. This read used to name `chat`, which was the
-        # whole list while every session was stored as one; now that a session
-        # records the surface that opened it, naming `chat` would quietly drop
-        # Build and Design from the one board that claims to show all the work.
-        # The complement is what was always meant: not the server-owned sessions
-        # a task run executes in, which arrive below as routine threads.
-        # BUG-303 — an archived thread used to be unreachable from here at all,
-        # which is why Archive could not move off Sessions: a control whose
-        # effect the owner cannot see or undo from the same surface is worse
-        # than one that has not moved. The index can list them now; which of the
-        # two scopes is shown is `work_thread_page`'s decision.
+        # surface they started it: naming `chat` would drop Build and Design from
+        # the one board that claims to show all the work. The complement of the
+        # server-owned sessions a task run executes in, which arrive below as
+        # routine threads.
+        # BUG-303 — archived threads are listable here, because a control whose
+        # effect the owner cannot see or undo from the same surface is worse than
+        # none; which of the two scopes is shown is `work_thread_page`'s decision.
         owner_sessions = self.store.list_sessions(
             limit=WORK_THREAD_SCAN_LIMIT,
             user_id=user_id,

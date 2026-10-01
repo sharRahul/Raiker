@@ -27,7 +27,7 @@ class WorkThreadView(View):
     title: str
     #: ``chat`` for a conversation the owner started, ``routine`` for a thread a
     #: task is advancing. The distinction is what makes "resume the thread a
-    #: routine is advancing" possible at all — it used to be unreachable.
+    #: routine is advancing" possible at all.
     kind: str
     updated_at: str
     turn_count: int

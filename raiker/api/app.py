@@ -7,6 +7,7 @@ import logging
 import os
 import shutil
 import threading
+import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -147,17 +148,11 @@ def _is_session_export_request(scope: Scope, path: str) -> bool:
 def _carries_json(start_message: Message) -> bool:
     """Whether this response is something the JSON redactor can act on.
 
-    GCR-44 — the middleware used to decide what to buffer from the *path*
-    alone, so a PDF preview and an image or attachment download were each
-    copied into a `bytearray`, joined into `bytes`, offered to `json.loads`,
-    and then sent out again unchanged. Binary bytes cannot be JSON-redacted, so
-    every one of those copies was work that could not change the answer, on the
-    largest bodies the product serves.
-
-    A content type Raiker can see is not JSON is therefore streamed straight
-    through. A response that declares no content type at all is still buffered:
-    the old behaviour is the safe one where the answer is unknown, and it costs
-    nothing, because the bodies this is about all declare what they are.
+    GCR-44 — binary bytes cannot be JSON-redacted, so a content type Raiker
+    can see is not JSON is streamed straight through rather than buffered — on
+    the largest bodies the product serves. A response that declares no content
+    type is still buffered: buffering is the safe answer where the type is
+    unknown, and the binary bodies all declare what they are.
     """
     for key, value in start_message.get("headers", []):
         if key.lower() != b"content-type":
@@ -295,10 +290,55 @@ def _write_instance_names(root: Path, names: list[str]) -> None:
     staging = registry.with_name(f"{registry.name}.{os.getpid()}.tmp")
     try:
         staging.write_text(json.dumps(names), encoding="utf-8")
-        os.replace(staging, registry)
+        _replace_with_retry(staging, registry)
     finally:
         with suppress(OSError):
             staging.unlink()
+
+
+#: How long a registry replace or a staged-workspace removal keeps trying
+#: while another handle holds the file (BUG-310).
+_SHARING_RETRY_ATTEMPTS = 50
+_SHARING_RETRY_SECONDS = 0.02
+
+
+def _replace_with_retry(source: Path, target: Path) -> None:
+    """``os.replace``, waiting out a reader that has ``target`` open.
+
+    BUG-310 — Windows refuses to replace a file another handle has open, and a
+    reader of the registry holds it for the moment its read takes. That is a
+    sharing violation, not a failure: the reader lets go. Elsewhere the first
+    attempt succeeds, so this costs nothing there.
+    """
+    for attempt in range(_SHARING_RETRY_ATTEMPTS):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if attempt == _SHARING_RETRY_ATTEMPTS - 1:
+                raise
+            time.sleep(_SHARING_RETRY_SECONDS)
+
+
+def _remove_staged_workspace(internal_workspace: Path, workspace: Path) -> None:
+    """Remove a staged instance directory completely, or say that it could not.
+
+    BUG-310 — a registration that opened the workspace's database leaves its
+    cached SQLCipher handles open, and Windows will not remove a directory a
+    handle is still open in. ``rmtree(ignore_errors=True)`` then left the
+    directory behind in silence, and the retry this rollback exists to allow
+    answered ``instance_already_exists``. The handles are released first, and
+    the removal is retried while anything else lets go.
+    """
+    from raiker.storage.sqlite import invalidate_workspace_connections
+
+    invalidate_workspace_connections(workspace)
+    for _attempt in range(_SHARING_RETRY_ATTEMPTS):
+        shutil.rmtree(internal_workspace, ignore_errors=True)
+        if not internal_workspace.exists():
+            return
+        time.sleep(_SHARING_RETRY_SECONDS)
+    _LOG.warning("Could not remove the staged instance directory %s", internal_workspace)
 
 
 def _mount_instance(app: FastAPI, name: str, workspace: Path) -> FastAPI | None:
@@ -342,14 +382,11 @@ async def create_and_mount_instance(
 ) -> Path:
     """Create one isolated workspace and mount its independent ASGI app.
 
-    GCR-08 — this used to create the directory, publish the registry entry and
-    mount the route, and only then let the route try to register the first
-    account. A registration that failed returned an error and left all three
-    behind, so the retry the owner was invited to make answered
-    ``instance_already_exists`` about an instance that had never worked. The
-    account is now created in the staged workspace *before* anything is
-    published, and a failure at any point removes the staged directory and
-    re-raises: an instance either exists completely or does not exist at all.
+    GCR-08 — an instance either exists completely or does not exist at all.
+    The first account is created in the staged workspace *before* the registry
+    entry or the route is published, and a failure at any point removes the
+    staged directory and re-raises, so the retry the error invites can succeed
+    rather than answer ``instance_already_exists``.
     """
     internal_workspace = internal_io_path(root / ".raiker" / "instances" / name)
     workspace = Path(display_path(internal_workspace))
@@ -368,7 +405,7 @@ async def create_and_mount_instance(
             except BaseException:
                 # Nothing has been published yet, so the rollback is the staged
                 # directory and nothing else.
-                shutil.rmtree(internal_workspace, ignore_errors=True)
+                _remove_staged_workspace(internal_workspace, workspace)
                 raise
             _write_instance_names(root, [*_stored_instance_names(root), name])
         return workspace

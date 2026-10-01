@@ -278,11 +278,10 @@ class ApprovalService:
                 "skipped are left exactly as they are."
             )
         elif relays and view.tool_name in {"shell", "process"}:
-            # Found live on 2026-09-28: a `python hello.py` approval fell through
-            # to the file-write wording below and promised a checkpointed rewind.
-            # A command is not a file write — nothing it changes has a pre-image —
-            # and when its code runs with this machine's network, that is the
-            # one fact the owner is deciding on.
+            # A command is not a file write — nothing it changes has a pre-image,
+            # so it never promises a checkpointed rewind — and when its code runs
+            # with this machine's network, that is the one fact the owner is
+            # deciding on (FIXED-620).
             where = (
                 "It runs on this machine, with this machine's network: anything "
                 "it sends has left and cannot be taken back."

@@ -23,21 +23,11 @@ _METHODS = frozenset({"get", "post", "put", "patch", "delete"})
 # ── The connector response-size contract (GCR-34) ────────────────────────────
 #
 # A connector answer is read into memory and handed to a model, so it needs a
-# bound. The bound used to be applied as a slice of the bytes *before* parsing:
-#
-#     raw = response.content[:200_000]
-#     try: result = json.loads(raw)
-#     except ...: result = raw.decode(...)[:20_000]
-#
-# which meant a perfectly valid JSON answer one byte over the cap was cut in the
-# middle of a token, failed to parse, and came back as a 20 000-character
-# string. Nothing told the caller the body had been truncated, and nothing told
-# it that a structured result had become an unstructured one — a model reading
-# that string cannot tell it apart from a connector that answers in plain text.
-#
-# The bound is now a stated contract rather than a silent slice. A body over the
-# cap is its own outcome, named, with the size that caused it; the stream is
-# stopped at the cap rather than buffered whole and then discarded.
+# bound, and the bound is a stated contract rather than a silent slice: slicing
+# bytes before parsing cuts valid JSON mid-token into a string a model cannot
+# tell from a plain-text answer. A body over the cap is its own outcome, named,
+# with the size that caused it; the stream is stopped at the cap rather than
+# buffered whole and then discarded.
 
 #: The most of one connector answer Raiker will hold and hand on.
 CONNECTOR_RESPONSE_MAX_BYTES = 200_000
@@ -330,13 +320,11 @@ def credential_status(expires_at: str | None) -> str:
 
 # GCR-33 — one refresh at a time per (owner, connector).
 #
-# A credential that has expired is noticed by every invocation that reaches it,
-# and each one used to call the refresh independently. All of them read the same
-# stored refresh token R0. For a provider that rotates refresh tokens, the first
-# exchange invalidates R0 and stores R1; the second then presents a token the
-# provider has already retired, and depending on what that provider does with a
-# retired token the owner is either handed a spurious failure or left with a
-# credential row that no longer matches anything upstream.
+# An expired credential is noticed by every invocation that reaches it, and all
+# of them read the same stored refresh token R0. For a provider that rotates
+# refresh tokens, a second concurrent exchange presents a token the first has
+# already retired — a spurious failure, or a credential row that no longer
+# matches anything upstream.
 #
 # `ConnectorInvoker` is built per request, so the lease cannot live on the
 # instance. It is keyed by the running loop as well as the credential: an

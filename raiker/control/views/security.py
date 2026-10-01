@@ -68,11 +68,10 @@ class DiagnosticsView(View):
     provider_health: tuple[ProviderHealthView, ...] = ()
     # GCR-38 — one row per host-tick background pass: when it last succeeded,
     # when it last threw, the exception *class* it threw, and how many times in
-    # a row. A pass that fails every fifteen seconds used to be invisible.
+    # a row, so a pass that fails every fifteen seconds is visible.
     background_workers: tuple[dict[str, Any], ...] = ()
-    # GCR-45 — which file the built-in model registry was actually read from.
-    # It used to depend on the working directory the host was launched from, so
-    # the same install could answer differently and nothing said which one won.
+    # GCR-45 — which file the built-in model registry was actually read from,
+    # independent of the working directory the host was launched from.
     model_profile_source: dict[str, str] = field(default_factory=dict)
     scope_note: str = "Status reflects the local single-user runtime only."
 

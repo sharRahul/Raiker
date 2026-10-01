@@ -567,6 +567,13 @@ Shorter readiness code and one place to fix edge-case gaps such as GCR-30.
 
 ## OPT-13 — Create one typed tool-definition registry
 
+**Status: done 2026-10-01 — [FIXED-655](FIXED_ITEMS.md#fixed-655--a-tools-label-glyph-and-audit-treatment-lived-in-four-tables-beside-it).**
+`ToolDefinition` declares a tool's spec, capability, approval routing, label,
+glyph family and audit treatment, none defaulted; the broker's audit sets and the
+transcript's tables are derived from it. The broker's executor map stays where it
+is — deriving it would import `raiker.tools` into `raiker.models` — and a test
+holds its keys equal to the registry's. Authority stays outside the definition.
+
 **Priority: P1 — Effort: High — LOC reduction: High — Risk: High; requires strong invariant tests**
 
 ### Evidence
@@ -635,11 +642,12 @@ Apply the same rule to other purely descriptive repeated provider tables. Do not
 
 ## OPT-15 — Compress historical BUG/FIXED narratives inside executable files
 
-**Status: started 2026-09-30.** `CONTRIBUTING.md` carries the comment policy, and
-the examples this entry cites — the SQLCipher connection-cache history, the
-migration-lookup note, the GCR-30 note repeated in both adapters and the
-thinking-shape cache history — now state their invariant and cite the ID. The
-sweep across the rest of the codebase has not been done; this stays open.
+**Status: done 2026-10-01 — [FIXED-656](FIXED_ITEMS.md#fixed-656--executable-files-retold-how-their-bugs-were-found).**
+`CONTRIBUTING.md` carries the comment policy (2026-09-30, with this entry's own
+examples); the sweep across the rest of the production code followed, keeping
+security-boundary rationale whole. `tests/test_comment_policy.py` keeps "found
+live" stories out of production files; tests may still say which failure they
+pin.
 
 **Priority: P1/P2 — Effort: Medium — LOC reduction: Very High — Risk: Low if invariants are preserved**
 
@@ -672,6 +680,11 @@ Do **not** strip comments around security boundaries simply to hit a LOC target.
 ---
 
 ## OPT-16 — Consolidate repeated Playwright setup into fixtures/page objects
+
+**Status: done 2026-10-01 — [FIXED-657](FIXED_ITEMS.md#fixed-657--a-hundred-and-twelve-live-specs-each-declared-the-host-key-and-model).**
+`web/e2e/live.ts` owns the live host, the round's key and model, connecting
+Anthropic and sending a turn; 112 live specs import them. The Models steps stay
+in `hosted-provider.ts`, which already owned them.
 
 **Priority: P2 — Effort: Medium — LOC reduction: Medium/High — Risk: Low**
 

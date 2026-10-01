@@ -1,25 +1,17 @@
 """The capability-level web read, routed through the one web implementation.
 
-BUG-232: this module used to hold two executors — ``WebFetchExecutor`` and
-``NetworkExecutor`` — that both called ``raiker.runtime.executors.sandbox.
-fetch_url``. That helper enforced exactly one control, a hard-coded four-host
-``fnmatch`` on the netloc: no HTTPS requirement, no public-address check, no
-pinning, and ``urllib``'s free redirect following, so a redirect out of an
-allowlisted host went anywhere unchecked. Meanwhile the model-facing path
-(``web_fetch`` / ``web_search`` through the broker) enforced all of it in
-:class:`~raiker.runtime.web_access.WebAccessService`.
-
-Two implementations of "reach the network" that do not enforce the same controls
-is one call site away from making Raiker's central claim false, so there is now
-one: this executor delegates to the same service the broker uses. The decision
+BUG-232: one implementation of "reach the network". Two that do not enforce
+the same controls — HTTPS, the public-address check, pinning, checked
+redirects — are one call site away from making Raiker's central claim false, so
+this executor delegates to the same
+:class:`~raiker.runtime.web_access.WebAccessService` the broker uses. The decision
 modes are not re-run here because :class:`~raiker.runtime.authority.router.
 RuntimeAuthority` already made that decision before an executor is reached; the
 blocklist and the non-editable address guard are inside ``fetch()`` itself and
 run on every call regardless.
 
-``network_execution`` is gone entirely — capability, executor and gate. It was a
-second name for this same read with a weaker guard, it had no caller, and a gate
-that changes nothing when an owner opens it is worse than no gate.
+There is no second capability for this read: a second name with a weaker
+guard and no caller is a gate that changes nothing, which is worse than none.
 """
 
 from __future__ import annotations

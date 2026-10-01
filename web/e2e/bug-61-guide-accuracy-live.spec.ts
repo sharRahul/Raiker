@@ -23,19 +23,17 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { signInAsOwner, useHostedModel } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
 
 import { roundName } from "./naming";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
 
 // BUG-250 — named per run, so a round that has already worked in this
 // workspace cannot find its own leftovers and assert on them. The suite shares
 // one workspace by design; this is what keeps a shared workspace honest.
 const TASK = roundName("Guide accuracy task");
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const MODEL = "claude-haiku-4-5-20251001";
 
 // Serial because every test shares one signed-in page. That is what this file
 // needs and also what hid the defect above: a failure in one test stops the file,
@@ -105,12 +103,7 @@ test("a provider key is added through the UI and a real turn answers", async () 
   requiresModel();
   test.setTimeout(240_000);
 
-  const card = await useHostedModel(page, BASE, {
-    provider: "Anthropic",
-    keyLabel: "Anthropic API key",
-    key: ANTHROPIC_KEY,
-    model: MODEL,
-  });
+  const card = await useAnthropic(page);
   await expect(card.locator("code").filter({ hasText: /Haiku 4\.5/i })).toBeVisible({
     timeout: 30_000,
   });

@@ -51,14 +51,13 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { signInAsOwner, useHostedModel } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
+import { ANTHROPIC_KEY, ANTHROPIC_MODEL as MODEL, useAnthropic } from "./live";
 
 const SOURCE = "http://127.0.0.1:8765";
 const PACKAGED = "http://127.0.0.1:8766";
 const REPO = join(import.meta.dirname, "..", "..");
 const SHOTS = join(REPO, "docs", "plans", "screenshots", "working");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 const RELEASE_DIR = process.env.RAIKER_LIVE_RELEASE_DIR ?? "";
 const WHEEL_DIR = process.env.RAIKER_LIVE_WHEEL_DIR ?? "";
 
@@ -84,12 +83,7 @@ test("a real Anthropic turn answers, so the rest of this file is evidence", asyn
   test.setTimeout(240_000);
   expect(ANTHROPIC_KEY, "set RAIKER_LIVE_ANTHROPIC_KEY").not.toBe("");
 
-  const card = await useHostedModel(page, SOURCE, {
-    provider: "Anthropic",
-    keyLabel: "Anthropic API key",
-    key: ANTHROPIC_KEY,
-    model: MODEL,
-  });
+  const card = await useAnthropic(page, SOURCE, MODEL);
   await expect(card.locator("code").filter({ hasText: /Haiku 4\.5/i })).toBeVisible({ timeout: 30_000 });
 
   await page.goto(`${SOURCE}/#/new-chat`);

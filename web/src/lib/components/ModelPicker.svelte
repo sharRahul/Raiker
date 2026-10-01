@@ -161,11 +161,8 @@
    * The first published-but-unready profile, or null when every provider is
    * usable.
    *
-   * This menu used to list each unready profile by name, so a fresh install
-   * offered “Local GGUF”, “Local GGUF 2”, “Local GGUF 3” and “Local GGUF 4”:
-   * four rows for one runtime that is not running, none of which could be
-   * chosen. A picker should offer what can be picked, and setting a provider
-   * up is one action rather than one action per slot.
+   * A picker offers what can be picked, and setting a provider up is one
+   * action rather than one per slot, so unready profiles are not rows.
    */
   const firstUnconfigured = $derived(
     choices.find((profile) => !isChoosableModel(profile)) ?? null,

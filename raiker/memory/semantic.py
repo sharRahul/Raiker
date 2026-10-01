@@ -13,13 +13,10 @@ def semantic_memory_status(
 ) -> dict[str, object]:
     """What semantic memory is doing right now — for writes *and* for reads.
 
-    MEM-03 — this used to hard-code ``embedding_backend: "disabled"``. That was
-    truthful about **writes**: semantic memory writes really are off until the
-    owner configures a policy and a backend. It was misleading about **reads**,
-    because the vector leg of hybrid retrieval ran on every search regardless,
-    on the hashing embedding, and nothing said so. A surface that reads
-    "disabled" while a lexical vector leg is scoring results is the kind of
-    statement this codebase exists not to make.
+    MEM-03 — writes and reads are answered separately: semantic writes are off
+    until the owner configures a policy and a backend, while the vector leg of
+    hybrid retrieval scores every search, on the hashing embedding if nothing
+    else. "Disabled" about both would be false about reads.
 
     Passing *store* resolves the read backend for real. Without one the answer
     is the always-available floor, which is what a caller with no workspace in

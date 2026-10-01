@@ -100,11 +100,9 @@ class ModelProviderFactory:
     require_api_key_for_hosted: bool = True
     client: httpx.AsyncClient | None = None
     # GCR-14 — where a provider's HTTP connection comes from when the caller did
-    # not hand one in. Every call used to build its own client and close it in a
-    # `finally`, so a turn, the readiness probe behind it and the catalogue
-    # refresh beside it each paid for a fresh TCP connection and TLS handshake
-    # to a host Raiker had been talking to seconds earlier. A factory built
-    # without a pool behaves exactly as before.
+    # not hand one in, so a turn, its readiness probe and the catalogue refresh
+    # share a connection instead of each paying a TCP connection and TLS
+    # handshake. A factory built without a pool builds and closes its own.
     client_pool: ProviderClientPool | None = None
     connection: dict[str, str] | None = None
     # BUG-254 — where a provider hands on the limit windows it volunteers with a

@@ -20,21 +20,19 @@
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
+import { roundName } from "./naming";
 import { join } from "node:path";
 import {
   chooseModelForTurn,
   setThinkingEffort,
   signInAsOwner,
-  useHostedModel,
-} from "./hosted-provider";
+  } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
 
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 // Haiku 4.5 refuses `thinking.type.adaptive` and names the budgeted spelling in
 // the refusal, so this model is also what proves the negotiation in BUG-207
 // slice B: the turn thinks rather than failing with a 400.
-const MODEL = "claude-haiku-4-5-20251001";
 
 test.describe.configure({ mode: "serial" });
 
@@ -68,12 +66,7 @@ test("the provider key is added through the UI and a real turn answers", async (
   test.setTimeout(300_000);
   expect(ANTHROPIC_KEY, "set RAIKER_LIVE_ANTHROPIC_KEY").not.toBe("");
 
-  const card = await useHostedModel(page, BASE, {
-    provider: "Anthropic",
-    keyLabel: "Anthropic API key",
-    key: ANTHROPIC_KEY,
-    model: MODEL,
-  });
+  const card = await useAnthropic(page);
   await expect(card.locator("code").filter({ hasText: /Haiku 4\.5/i })).toBeVisible({
     timeout: 60_000,
   });
@@ -258,9 +251,21 @@ test("BUG-207 — the turn shows the model's own reasoning, not three canned sen
 
 test("BUG-206 and BUG-207 — Build shows the same rows and the same reasoning", async () => {
   test.setTimeout(420_000);
-  await page.goto(`${BASE}/#/build`);
+  // Build works inside a project (backlog #23), so the turn starts from one —
+  // the way an owner reaches Build from a project card.
+  const project = roundName("Tool rows");
+  await page.goto(`${BASE}/#/projects`);
+  await page.getByLabel("New project name").fill(project);
+  await page.getByRole("button", { name: "Create project" }).click();
+  await page
+    .locator("article.project")
+    .filter({ has: page.getByRole("button", { name: `Open project ${project}` }) })
+    .getByRole("button", { name: "Start in Build" })
+    .click();
   const prompt = page.locator("textarea#build-prompt");
   await expect(prompt).toBeVisible({ timeout: 60_000 });
+  // A turn answers with the model chosen for it (BUG-292), in Build as in Chat.
+  await chooseModelForTurn(page, /Haiku 4\.5/i, "Build composer");
   // Chat stays mounted behind Build, so its composer is still in the DOM and
   // every unscoped selector below would match both. `article.turn` is Build's
   // own transcript element; Chat's is a `div`.
@@ -277,7 +282,9 @@ test("BUG-206 and BUG-207 — Build shows the same rows and the same reasoning",
   const row = turn.locator(".tool-activity .tool-row").last();
   await expect(row).toBeVisible({ timeout: 240_000 });
   await expect(row.locator(".tool-label")).toHaveText("Read file");
-  await expect(row.locator(".tool-action")).toHaveText("README.md");
+  // The row names the path the model passed, and a model may pass it relative
+  // or absolute; either way the object it names is README.md.
+  await expect(row.locator(".tool-action")).toHaveText(/(^|\/)README\.md$/);
   await expect(turn.locator("section.reasoning")).toBeVisible({ timeout: 240_000 });
   await expect(turn.locator(".answer").last()).toBeVisible({ timeout: 240_000 });
   await page.waitForTimeout(2500);

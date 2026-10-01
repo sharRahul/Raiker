@@ -1,12 +1,9 @@
 """The scheduler: it starts due work, and it finishes work you approved.
 
-Both halves matter, and only the first one used to exist. A scheduled run that
-reached an approval boundary parked correctly — the turn suspended, the approval
-appeared in the inbox, the task card said *waiting for approval* — and then, when
-the owner granted it, nothing continued it. Chat can resume a parked turn because
-a Chat tab is watching; a scheduler-launched turn has no client at all, so its
-continuation had no owner and the task sat in ``waiting_for_approval`` forever
-(BUG-25). ``resume_approved`` is that owner.
+Both halves matter. Chat can resume a parked turn because a Chat tab is
+watching; a scheduler-launched turn has no client at all, so its continuation
+needs an owner or the task sits in ``waiting_for_approval`` forever (BUG-25).
+``resume_approved`` is that owner.
 
 It is deliberately the same machinery a Chat tab uses rather than a second one:
 ``list_resumable_suspended_turns`` names what is resolved-but-unclaimed, and

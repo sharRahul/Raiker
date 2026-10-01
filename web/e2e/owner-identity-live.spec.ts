@@ -22,14 +22,12 @@ import {
   checkModelReady,
   connectHostedProvider,
   signInAsOwner,
-  useHostedModel,
-} from "./hosted-provider";
+  } from "./hosted-provider";
+import { ANTHROPIC_KEY as KEY, ANTHROPIC_MODEL as MODEL, useAnthropic } from "./live";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8768";
 const SHOTS = "../../docs/screenshots/2026-09-13-release-readiness";
-const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const OWNER_NAME = "Rahul S";
-const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 
 test.describe.configure({ mode: "serial" });
 
@@ -62,12 +60,7 @@ test("a real turn answers with the owner's name and not with their key", async (
 
   // Connect, pin an exact model and leave it ready — the card offers **Test**
   // only once it has a model to test, so connecting alone is not enough.
-  const card = await useHostedModel(page, BASE, {
-    provider: "Anthropic",
-    keyLabel: "Anthropic API key",
-    key: KEY,
-    model: MODEL,
-  });
+  const card = await useAnthropic(page, BASE, MODEL);
   await capture(page, `${SHOTS}/anthropic-connected.png`, card);
 
   await page.goto(`${BASE}/#/new-chat`);

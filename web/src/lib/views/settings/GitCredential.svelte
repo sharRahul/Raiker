@@ -2,12 +2,10 @@
   /**
    * REM-SET-GIT — scope before secret.
    *
-   * This page used to open on a password field. An owner's first act was to
-   * paste a credential, and only afterwards could they find out what it would
-   * be used for, which host it would be offered to, or how to take it back. The
-   * order is now the other way round: the boundary the runtime issues the
-   * credential inside is stated first — read from the runtime, not written down
-   * again here — then how a credential may be supplied, and the field last.
+   * An owner learns what a credential is for, which host it is offered to and
+   * how to take it back before pasting one: the boundary the runtime issues it
+   * inside comes first — read from the runtime, not written down again here —
+   * then how a credential may be supplied, and the field last.
    */
   import { onMount } from "svelte";
   import { api, ApiError } from "../../api";

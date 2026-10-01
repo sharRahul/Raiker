@@ -1,10 +1,10 @@
 """What actually reaches each capability, and what actually governs it.
 
 **Why this exists (GEP-04).** Every capability with a real executor has a gate,
-and the Capabilities page renders that gate as a switch. For fifteen of the
-forty-five, flipping the switch changed nothing: either nothing in the product
-constructed a governed action for the capability at all, or the work it names
-happens through a *different* control that the gate never consults.
+and the Capabilities page renders that gate as a switch. A gate may decide
+nothing: nothing in the product may construct a governed action for the
+capability, or the work it names may happen through a *different* control the
+gate never consults.
 
 A switch in the "off" position beside a feature that is running is worse than no
 switch. It is the one failure mode a governance product cannot have, because the
@@ -25,17 +25,12 @@ every capability the action router can route a gate decision onto**:
 ``REAL_EXECUTOR_CAPABILITIES``, ``CAPABILITY_GATE_MAP``, ``TOOL_DEFINITIONS`` and
 ``EXECUTABLE_ON_APPROVAL``, so a new executor, a new tool, a new relay or a new
 routed gate cannot land without classifying itself. That test is invariant **I3**
-in ``docs/plans/GOVERNANCE_ENTRY_PATHS.md`` §5 — the invariant whose absence
-produced the finding this module answers.
+in ``docs/plans/GOVERNANCE_ENTRY_PATHS.md`` §5.
 
-**BUG-297 widened the second of those**, as **I3c**. The table used to be
-asserted against ``REAL_EXECUTOR_CAPABILITIES`` alone, and ``admin_mutation``,
-``policy_mutation`` and ``role_mutation`` are governance gates with no executor
-of their own — so the invariant never reached them, and
-:func:`gate_is_effective` answered ``own_gate`` for all three *by default rather
-than by classification*. Two of them deserved that answer and one did not.
-Anything the router can route onto is classified here now, which is the set the
-Permissions page can offer a control for.
+**I3c (BUG-297)** covers governance gates with no executor of their own:
+anything the router can route onto is classified here, never answered
+``own_gate`` by default, because that is the set the Permissions page can offer
+a control for.
 
 The API serves this to the web app, which renders it beside the gate rather than
 letting the switch speak for itself.
@@ -265,13 +260,11 @@ _ENTRIES: tuple[CapabilityEntry, ...] = (
     # earning it.
     _own("admin_mutation", ENTRY_CONTROL_PLANE),
     _own("role_mutation", ENTRY_CONTROL_PLANE),
-    # BUG-298 — there used to be a third, `policy_mutation`, classified
-    # `no_path` because nothing proposed one. A routed gate nothing proposes is
-    # not a trace; it is a switch over nothing, and the honest answer was the
-    # boundary rather than the row. Policy is process configuration the runtime
-    # reads — the same footing as the model egress allowlist, and deliberately
-    # not editable from a browser session — so the capability is gone and
-    # `docs/guide/` and `SECURITY_AND_POLICY.md` say so where an owner looks.
+    # BUG-298 — no `policy_mutation` row: a routed gate nothing proposes is a
+    # switch over nothing. Policy is process configuration the runtime reads —
+    # the same footing as the model egress allowlist, deliberately not editable
+    # from a browser session — and `docs/guide/` and `SECURITY_AND_POLICY.md`
+    # say so where an owner looks.
     # ── The sensitive domains: registered, fail-closed, and reached by nothing ─
     #
     # Each has an executor class that returns `not_implemented`, and none of them

@@ -1,8 +1,7 @@
 """The repository code map (GAP-BUILD B9).
 
-Every turn used to start cold. The agent could `grep`, but it could not answer
-"where is this defined" without guessing a pattern first, so on a repository of
-any size it searched blind. This module is the scan that ends that: a bounded,
+The agent can `grep`, but not answer "where is this defined" without guessing a
+pattern first. This module is the scan that answers it: a bounded,
 deterministic, local walk of one repository that records **what each file is and
 what it defines**, so the runtime can rank a prompt against real symbols instead
 of hoping a substring matches.

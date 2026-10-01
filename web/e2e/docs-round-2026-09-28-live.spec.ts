@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { capture } from "./capture";
 import { DESTINATIONS, WIDTHS, settled } from "./destinations";
 import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY, ANTHROPIC_MODEL as MODEL } from "./live";
 
 /**
  * The 2026-09-28 round, live: the items from `docs/plans/` this run closed that
@@ -23,10 +24,7 @@ import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-prov
  *   1. `raiker-web` on 127.0.0.1:8765, on a workspace reset for the round
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment — entered through the UI
  */
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-09-28-docs-round");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const MODEL = "claude-haiku-4-5-20251001";
 const MODEL_LABEL = /Haiku 4\.5/;
 
 test.describe.configure({ mode: "serial" });

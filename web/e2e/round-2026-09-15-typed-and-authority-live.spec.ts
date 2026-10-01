@@ -23,11 +23,9 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
-import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { chooseModelForTurn, signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY, useAnthropic } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
-const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 const SHOTS = "../../docs/screenshots";
 
 test.describe.configure({ mode: "serial" });
@@ -265,12 +263,7 @@ test("a real turn answers with a table Raiker knows is a table", async ({ page }
   test.skip(KEY === "", "needs RAIKER_LIVE_ANTHROPIC_KEY");
   const errors = watchConsole(page);
   await signInAsOwner(page, BASE);
-  await useHostedModel(page, BASE, {
-    provider: "Anthropic",
-    keyLabel: "Anthropic API key",
-    key: KEY,
-    model: MODEL,
-  });
+  await useAnthropic(page);
 
   await page.goto(`${BASE}/#/new-chat`);
   // Where an owner chooses the model: the picker beside Send. A workspace that

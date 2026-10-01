@@ -16,26 +16,19 @@
    * NEW-PERM-03 — what the agent may do with this capability, said only as far
    * as the page has actually been told.
    *
-   * This returned `Direct` for every mode that was not `deny` or `ask`, which
-   * quietly included a mode that is missing, misspelt, or newer than this
-   * build: an unrecognised value was rendered as the *most permissive* verdict
-   * the table can print. Unknown is not evidence of permission. It is now its
-   * own answer, and `allow` and `auto` are told apart in the page's own words
-   * rather than collapsed into one invented one.
+   * Invariant: a mode that is missing, misspelt or newer than this build is
+   * never rendered as a permissive verdict. Unknown is not evidence of
+   * permission; it is its own answer, and `allow` and `auto` are told apart.
    *
    * Availability and readiness come from the shared helpers, so this table
-   * resolves "is it on" the same way the registry row below it does — including
-   * a capability that is on because nothing is stored against it, which this
-   * copy of the rule used to read as Off.
+   * resolves "is it on" the same way the registry row below it does —
+   * including a capability that is on because nothing is stored against it.
    */
   /**
    * What this table says the agent carries.
    *
-   * REM-PERM-02 — the mode words come from the one owner vocabulary now. This
-   * table used to say **Ask** and **Denied** while the control three rows below
-   * it said **Ask me** and **Never** about the same stored value, so one policy
-   * had two names on one screen (and `DECISION_MODE_COPY` was a third, unused,
-   * waiting to be picked up).
+   * REM-PERM-02 — the mode words come from the one owner vocabulary, so one
+   * policy has one name on every screen.
    *
    * The three verdicts that are *not* modes stay as they are: unavailable, not
    * ready and unrecognised are different facts about whether the capability can

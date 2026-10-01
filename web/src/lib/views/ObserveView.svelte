@@ -214,11 +214,9 @@
     {:else if diagnostics === null}
       <PageState state="loading" title="Reading runtime status…" />
     {:else}
-      <!-- REM-OBSERVE — exceptions first. This page used to open with seven
-           tiles that read Ready, 0, 0, 0 and "Nothing required is unset" on any
-           working install, which made the one tile that mattered exactly as
-           easy to miss as the six that did not. The resting state moved below;
-           what is wrong, and what changed, came up. -->
+      <!-- REM-OBSERVE — exceptions first: what is wrong and what changed lead,
+           and the resting state reads below, so the one tile that matters is
+           not as easy to miss as six that read "0". -->
       <section aria-labelledby="attention-h" class="attention">
         <h2 id="attention-h" class="section-h">Needs your attention</h2>
         {#if attention.length === 0}

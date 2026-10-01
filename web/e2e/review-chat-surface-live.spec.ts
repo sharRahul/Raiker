@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE } from "./live";
 
 /**
  * What one ordinary turn actually puts on screen.
@@ -12,7 +13,6 @@ import { signInAsOwner } from "./hosted-provider";
  * recollection of it.
  */
 
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
 
 test("a single turn's transcript, mid-stream and settled", async ({ page }) => {

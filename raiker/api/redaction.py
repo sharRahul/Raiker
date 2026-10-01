@@ -19,20 +19,16 @@ REDACTED_VALUE = "***REDACTED***"
 # replies, chat titles, and document excerpts talk about secrets, tokens, and
 # passwords constantly without containing one.
 #
-# This layer used to replace the entire string whenever it merely contained the
-# substring "secret", "token", "password", "bearer", or "authorization". That
-# destroyed ordinary prose — a reply about an attached file came back as
-# "(sample.md***REDACTED***comes directly from" because each streamed chunk
-# holding the word was nuked, and a conversation titled from its first message
-# appeared in Recent chats as literally "***REDACTED***".
+# Replacing a whole string because it contains "secret", "token", "password",
+# "bearer" or "authorization" destroys ordinary prose and chat titles.
 #
-# Free-form text is now handed to ``redact_text``, which matches real credential
+# Free-form text is handed to ``redact_text``, which matches real credential
 # *shapes* (``sk-…``, ``ghp_…``, ``AKIA…``, ``Bearer …``, ``token=…``, PEM
 # blocks, high-entropy runs) and substitutes only the matched span. Secrets are
 # still caught, sentences survive, and nothing is silently lost: a redaction is
 # always visible as a ``[REDACTED_*]`` marker in place.
 #
-# Deliberately unchanged: the keyword sweep in ``raiker/events/export.py`` still
+# Deliberately different: the keyword sweep in ``raiker/events/export.py``
 # guards audit exports, which leave the machine in bulk and are read by
 # machines, not people. There the cost of over-redaction is low and the value of
 # belt-and-braces is high.
@@ -42,9 +38,9 @@ REDACTED_VALUE = "***REDACTED***"
 # The high-entropy fallback matches any 40+ character run of URL/base64
 # characters — and ``/`` is one of them. A server-issued locator therefore trips
 # it purely because its segments were joined: ``pdf_url``, ``events_path``,
-# ``checkpoint_path`` and ``root_subpath`` all came back as
+# ``checkpoint_path`` and ``root_subpath`` would come back as
 # ``[REDACTED_SECRET]``, leaving the client with nothing to fetch, open, or
-# link to. (The file inspector's PDF pane is where this was first noticed.)
+# link to.
 #
 # The key is the signal, exactly as it is for token *counts* above: a field
 # named ``*_url`` or ``*_path`` holds a locator, and only this layer knows that
@@ -56,14 +52,11 @@ REDACTED_VALUE = "***REDACTED***"
 # the fallback and applies here unchanged. Free-form text is untouched by this
 # and keeps the strict scan.
 #
-# The suffix list alone was not enough: a field can name a locator without a
-# prefix. ``/api/model-library`` reports each approved root as ``{"path": …}``,
-# and an unprefixed ``path`` ends with none of the suffixes below, so the roots
-# the owner had just approved came back as ``/[REDACTED_SECRET]`` — unusable in
-# the library pane and unremovable, since removal is by path. The same holds for
-# the ``path`` of an approval's artifact and of a prompt attachment. The bare
-# names carry exactly the same signal as the suffixed ones and are listed
-# alongside them.
+# A field can name a locator without a prefix — ``/api/model-library`` reports
+# each approved root as ``{"path": …}``, as do an approval's artifact and a
+# prompt attachment — so the bare names are listed alongside the suffixes; an
+# approved root redacted to ``/[REDACTED_SECRET]`` cannot even be removed,
+# since removal is by path.
 
 # Field-name suffixes whose values are locators. Deliberately a short, literal
 # list of families the API actually emits (``pdf_url``, ``events_path``,
@@ -267,17 +260,15 @@ def response_json_body(response_body: bytes) -> Any:
 
 # GCR-13 — redaction at serialization, so a JSON body is not buffered twice
 # ------------------------------------------------------------------------
-# `RedactionMiddleware` used to hold every JSON body the API sent: each chunk
-# appended to a `bytearray`, joined, parsed, redacted, and serialized again. For
-# the overwhelming majority of responses — a route returning a DTO that FastAPI
-# renders — the structured value was in hand one step earlier, before it became
-# bytes at all. Redacting it *there* is the same rule applied to the same value,
-# and it leaves the middleware nothing to do but forward the bytes.
+# For a route returning a DTO that FastAPI renders, the structured value is in
+# hand before it becomes bytes. Redacting it *there* is the same rule applied to
+# the same value, and leaves the middleware nothing to buffer, parse and
+# re-serialize — it forwards the bytes.
 #
 # The middleware still decides *whether* a request is redacted: it opens a
 # `RenderedRedactionScope` only for the paths it would have buffered, so an
 # exempt route (the owner's own session token, a folder listing) is rendered
-# untouched exactly as before. A body is trusted as already redacted only when
+# untouched. A body is trusted as already redacted only when
 # it is the very `bytes` object this class rendered inside that request's scope —
 # identity, not a header a route could set — so a route that builds its own
 # `JSONResponse`, an exception handler, or anything else unknown still falls back

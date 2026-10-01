@@ -1,5 +1,6 @@
 <script lang="ts">
   import { LARGE_PASTE_CHARS } from "../composerAttachments.svelte";
+  import { pickableProjects } from "../projectLifecycle";
   import { workDraft } from "../workDraft.svelte";
   import { onMount, tick, untrack } from "svelte";
   import Icon from "../components/Icon.svelte";
@@ -94,7 +95,7 @@
     sentenceAround,
     sourcesForTurn,
   } from "../citations";
-  import { chatProfiles, refreshModels, modelCatalogues } from "../models.svelte";
+  import { chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
   import { catalogueChoices } from "../modelCatalogue";
   import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
   import {
@@ -177,7 +178,9 @@
   let voiceProvenanceSnapshot = { dictated: false, typedBefore: false, editedAfter: false };
   let promptSelectionStart = $state(0);
   let promptSelectionEnd = $state(0);
-  let userName = $state("there");
+  // Empty until the account is read, so the greeting never names a placeholder
+  // in the first second of a load; with no name it asks without one.
+  let userName = $state("");
   let turns = $state<ChatTurn[]>([]);
   // What the last copy action did. Shown, not only announced: a copy that
   // reports nothing leaves the owner guessing whether it worked.
@@ -885,7 +888,7 @@
       // name, because `username` is the fixed handle and the two were conflated.
       // The server resolves which one applies, so the greeting and the model's
       // own identity block cannot disagree about what to call the same person.
-      userName = view.status.display_name || view.status.username || "there";
+      userName = view.status.display_name || view.status.username || "";
       speechLanguage = speechLanguagePreference(view.settings["general.speech_language"]);
     }).catch(() => {});
     // The Workbench composer hands its text to this mounted chat rather than
@@ -1661,11 +1664,9 @@
 
   // ── BUG-24: continue a turn whose approval was resolved anywhere ──────────
   //
-  // A parked turn used to be a dead end in Chat: Build could stream a parked
-  // continuation and Approvals could offer a manual one, but a Chat tab that
-  // did not itself record the decision never learned it had been made. The
-  // watcher below closes that, and the server keeps the guarantee — its atomic
-  // claim means a turn resumes exactly once even when two tabs both react.
+  // A Chat tab learns of a decision made anywhere — another tab, Approvals —
+  // and continues the parked turn. The server's atomic claim keeps the
+  // guarantee: a turn resumes exactly once even when two tabs both react.
   let liveChannelDown = $state(false);
   let resumeWatcher: ResumeWatcher | null = null;
 
@@ -1947,7 +1948,7 @@
     {:else if turns.length === 0}
       <EmptyState
         icon="chat"
-        title={`What would you like to work on, ${userName}?`}
+        title={userName ? `What would you like to work on, ${userName}?` : "What would you like to work on?"}
         compactTitle="What can I help with?"
         body="Start with a question, a task, or a file."
         serif={true}
@@ -1994,14 +1995,9 @@
               rewinding={rewindingTurn === turn.response?.turn_id}
             />
           {/if}
-          <!-- BUG-208 slice F. An emoji used to be appended here, to the
-               *owner's own message*, labelled "Raiker reacted with …". It was
-               computed from `turn.prompt` by regex — before the model had
-               answered — so it could not be a reaction to anything: saying
-               "thanks" produced a heart whatever Raiker went on to do, or fail
-               to do. A label that names an actor and an act, for an act that did
-               not happen, is the same claim FIXED-204 removed from the provider
-               cards and BUG-207 removed from the streaming turn. -->
+          <!-- BUG-208 slice F — nothing is appended to the owner's message. A
+               label that names an actor and an act may only describe an act
+               that happened. -->
           {#if uploadedAttachments.length > 0}
             <div class="turn-attachments">
               {#each uploadedAttachments as a, i (a.attachmentId ?? a.path ?? i)}
@@ -2023,18 +2019,11 @@
         </div>
 
         <div class="message-group message-group-raiker">
-          <!-- BUG-207 slices C and D. What used to be here was a disclosure
-               labelled "See what Raiker is thinking" holding three fixed
-               sentences chosen by lifecycle event type — the same words for a
-               one-word question and a twenty-tool build, and not the model's
-               reasoning at all. Slice A removed it. This is the real thing:
-               shown only when the turn produced reasoning, collapsed the moment
-               the answer starts, and absent entirely when there is none.
-
-               The one indicator below still ends at the first token, and now
-               ends at the first *tool row* too — once the transcript is saying
-               what Raiker is doing, "Working…" is the less specific of the two
-               and has nothing left to add. -->
+          <!-- BUG-207 slices C and D — the model's own reasoning, and nothing
+               standing in for it: shown only when the turn produced some,
+               collapsed when the answer starts, absent when there is none.
+               The indicator below ends at the first token or the first tool
+               row, whichever says more about what Raiker is doing. -->
           <ReasoningBlock
             text={reasoning}
             streaming={turn.streaming}
@@ -2099,16 +2088,10 @@
               </div>
             {/if}
           {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval"}
-            <!-- BUG-73 — a turn with no answer has a state, not an answer. It
-                 used to store "No command was executed." as though that were
-                 the answer, which is how one conversation ended up denying,
-                 durably, a write that had happened.
-
-                 BUG-206 — the parked case no longer renders here. It used to
-                 read "Waiting for your decision — nothing has run yet.", which
-                 the approval card immediately below already says, and which the
-                 call's own row now says of the call it is actually about. Three
-                 statements of one fact, and only one of them named the call. -->
+            <!-- BUG-73 — a turn with no answer has a state, not an answer; a
+                 placeholder stored as the answer becomes a durable false claim.
+                 BUG-206 — a parked turn says so on the waiting call's own row and
+                 in the approval card, not a third time here. -->
             <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer muted">(No answer text was returned.)</p></div>
           {/if}
 
@@ -2190,15 +2173,9 @@
             <p class="error-line" role="alert">{turn.error}</p>
           {/if}
 
-          <!-- BUG-206 slice E. A refusal card used to sit here, listing the
-               calls policy would not run (BUG-52). It existed because a refused
-               call was the *only* call the transcript could speak about, which
-               made refusal the single visible tool outcome while every success
-               was silent. Now that each call has a row, a refused one is that
-               same row in a refused state, in the place it was refused — with
-               its reasons and its remediation link on the row rather than in a
-               block after the answer. This removes a surface instead of adding
-               one; nothing it said has been lost. -->
+          <!-- BUG-206 slice E — a refused call is its own row in a refused
+               state, with its reasons and remediation link, where it was refused;
+               there is no separate refusal block after the answer. -->
 
           <!-- REM-CHAT-01 — the turn's own evidence, under the turn rather than
                on another route. Collapsed, so the answer and the decisions it
@@ -2295,7 +2272,7 @@
   >
     {#snippet above()}
       <ComposerChips store={attachStore} disabled={streaming} oninline={(text) => { draft.text += text; }} />
-      <ModelReadinessStrip readiness={modelReadiness} draftPreserved={draft.text.trim() !== ""} />
+      <ModelReadinessStrip readiness={modelsKnown() ? modelReadiness : null} draftPreserved={draft.text.trim() !== ""} />
       <SkillLinkNotice text={draft.text} />
 
       {#if shortcutsOpen}
@@ -2334,7 +2311,7 @@
             }}
           >
             <option value="">No project — this chat stands alone</option>
-            {#each projects?.projects ?? [] as project (project.project_id)}
+            {#each pickableProjects(projects, projectId) as project (project.project_id)}
               <option value={project.project_id}>{project.name}</option>
             {/each}
           </select>
@@ -2352,9 +2329,8 @@
     {/snippet}
 
     {#snippet left()}
-          <!-- COMPOSER-02 — two controls at rest. Everything the four permanent
-               ones used to offer is inside them, and the row under the prompt
-               is quiet enough that the prompt is the thing on the screen. -->
+          <!-- COMPOSER-02 — two controls at rest, holding every composer
+               action, so the prompt is the thing on the screen. -->
           <ComposerActionMenu
             kind="add"
             items={addItems}
@@ -2385,8 +2361,8 @@
             onrestored={restoreVoiceProvenance}
             onactivechange={onVoiceActive}
           />
-          <!-- COMPOSER-06 — one inspectable line where a project select, an
-               attachment count and a context ring used to sit apart. -->
+          <!-- COMPOSER-06 — project, attachments and context in one
+               inspectable line. -->
           <ComposerContext
             facts={contextFacts}
             usedPercent={contextPercent}

@@ -3,8 +3,8 @@ import { capture } from "./capture";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
 const SHOT = join(
   import.meta.dirname,
   "..",
@@ -23,7 +23,6 @@ const DOWNLOAD_ROOT = join(
   "playwright",
   "bug69-huggingface-download",
 );
-
 
 /**
  * Search the Hub, and say plainly when the Hub is not reachable from here.

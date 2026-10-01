@@ -43,13 +43,13 @@ from raiker.models.providers.anthropic_messages import (
     AsyncAnthropicMessagesProvider,
     reset_thinking_negotiation,
 )
+from raiker.models.tool_registry import TOOL_FAMILIES
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.presentation import (
     _FAMILY_BY_TOOL,
     _LABEL_BY_TOOL,
-    TOOL_FAMILIES,
     tool_row,
 )
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker

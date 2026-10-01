@@ -32,10 +32,9 @@ _BUILTIN_CONFIG_RESOURCES = {
 class BuiltinConfigSource:
     """Where a built-in registry was actually read from, and why.
 
-    GCR-45 — the answer used to depend on the current working directory, so the
-    same install answered differently depending on where the owner happened to
-    launch it from. It is reported now because a resolution nobody can see is a
-    resolution nobody can check.
+    GCR-45 — independent of the working directory the owner launched from, and
+    reported, because a resolution nobody can see is a resolution nobody can
+    check.
     """
 
     __slots__ = ("kind", "location")

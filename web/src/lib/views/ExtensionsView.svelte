@@ -42,9 +42,8 @@
   let { tab = "connectors" }: { tab?: string } = $props();
 
   let overview = $state<ExtensionsOverview | null>(null);
-  // BUG-79 — a manifest signature used to be a presence marker with nothing on
-  // screen to say so. This reads the installed records and this workspace's own
-  // signing posture, so `verified` and `present only` never look identical.
+  // BUG-79 — reads the installed records and this workspace's own signing
+  // posture, so `verified` and `present only` never look identical.
   let plugins = $state<PluginsView | null>(null);
   let pluginsError = $state<string | null>(null);
   // Hooks had a real enforcing backend and no surface at all: they were written
@@ -1004,9 +1003,8 @@
   .hook-errors > li {
     display: grid;
     /* A grid item's default `min-width: auto` refuses to shrink below its
-       content, so one unbreakable string — an `http` handler's URL — pushed the
-       whole card four pixels past a 390px window. Found by the width sweep on
-       the very rule this round added. */
+       content, so one unbreakable string — an `http` handler's URL — would
+       push the card past a 390px window. */
     min-width: 0;
     gap: 0.3rem;
     padding: var(--space-3);

@@ -20,18 +20,12 @@ class RiskLevelValue(StrEnum):
 
 
 class RuntimeMode(StrEnum):
-    """Raiker has exactly one runtime.
+    """Raiker has exactly one runtime (FIXED-63).
 
-    It used to have five — ``development_preview``, two single-user modes, a
-    multi-user mode and a hosted mode — and a person installing Raiker had to
-    pick one in Settings before a capability could reach ``enabled_runtime``.
-    That was a second switch in front of the switches that actually decide
-    anything. What a capability may do is already decided by its own gate state,
-    its threat-model acknowledgement, its human confirmation, and whether a real
-    executor is registered for it; the mode added a fifth answer that could only
-    ever say "not yet" to work the other four had already authorised.
-
-    One runtime does all of it. The only remaining runtime-level question is
+    What a capability may do is decided by its own gate state, its threat-model
+    acknowledgement, its human confirmation, and whether a real executor is
+    registered for it; a runtime mode in front of those could only ever say
+    "not yet" to work the other four had already authorised. The only remaining runtime-level question is
     binary and stays in Settings' danger zone: is the agent runtime accepting
     new executions at all (``status``: ``active`` or ``disabled``).
     """

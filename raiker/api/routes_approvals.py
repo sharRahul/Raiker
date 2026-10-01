@@ -132,8 +132,8 @@ def _nudge_scheduler(request: Request, session_id: str) -> None:
 
     BUG-39. Chat continues within a second because the tab that resolved the
     approval goes straight on to resume the turn; a scheduler-launched run has no
-    tab, so it used to wait for the next 15-second sweep with its card still
-    reading *waiting for approval*. This is that missing signal.
+    tab, so without this signal it would wait for the next 15-second sweep with
+    its card still reading *waiting for approval*.
 
     Scoped to the Inbox sessions scheduled work actually runs in: a Chat or Build
     approval is continued by the client that made it and has nothing for the

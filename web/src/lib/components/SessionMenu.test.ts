@@ -145,7 +145,7 @@ describe("shared page feedback", () => {
       "href",
       "#/observe?tab=notifications",
     );
-    await fireEvent.click(await screen.findByRole("button", { name: /Nightly digest/ }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^Nightly digest/ }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -206,19 +206,78 @@ describe("shared page feedback", () => {
     window.location.hash = "";
   });
 
-  it("opens an approval notice on Approvals rather than on the record", async () => {
+  // Found live 2026-10-01 — on Chat the approval notice sat over the header's
+  // New chat while the approval card above the composer showed the same
+  // approval. The card is where an approval is shown; the notice stays unread.
+  it("leaves an approval notice to the approval card, and keeps it unread", async () => {
     setToken("control-token");
     window.location.hash = "#/chat";
-    stubFetch({
+    const fetchMock = stubFetch({
       "GET /api/notifications": [
         { notification_id: "ntf_a", kind: "approval_pending", title: "Approval needed", body: "Review it.", finding_id: null, subject_id: "apr_1", read: false, created_at: "2026-09-28T00:00:00Z" },
+        { notification_id: "ntf_s", kind: "security_alert", title: "Security finding", body: "Look.", finding_id: null, subject_id: null, read: false, created_at: "2026-09-28T00:00:00Z" },
       ],
-      "POST /api/notifications/ntf_a/read": { ok: true },
     });
     render(NotificationCenter);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /Approval needed/ }));
-    expect(window.location.hash).toBe("#/approvals");
+    const strip = await screen.findByRole("region", { name: "Notifications" });
+    expect(strip).toHaveTextContent("Security finding");
+    expect(strip).not.toHaveTextContent("Approval needed");
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/notifications/ntf_a/read"),
+      expect.anything(),
+    );
+    window.location.hash = "";
+  });
+
+  // Found live 2026-10-01: docked under the top bar, the notice covered Chat's
+  // New chat and the list pages' Refresh.
+  it("drops below a page's top action row it would cover, and returns when it goes", async () => {
+    setToken("control-token");
+    Object.defineProperty(window, "innerWidth", { value: 1440, configurable: true });
+    stubFetch({
+      "GET /api/notifications": [
+        { notification_id: "ntf_s", kind: "security_alert", title: "Security finding", body: "Look.", finding_id: null, subject_id: null, read: false, created_at: "2026-09-28T00:00:00Z" },
+      ],
+    });
+    render(NotificationCenter);
+    const strip = await screen.findByRole("region", { name: "Notifications" });
+    expect(strip.style.transform).toBe("");
+
+    const actions = document.createElement("div");
+    actions.className = "header-actions";
+    actions.getBoundingClientRect = () =>
+      ({ top: 60, bottom: 100, left: 1200, right: 1410, width: 210, height: 40 }) as DOMRect;
+    document.body.appendChild(actions);
+    window.dispatchEvent(new Event("resize"));
+    // The row ends at 100; the dock starts 8px below it.
+    await waitFor(() => expect(strip.style.transform).toBe("translateY(108px)"));
+
+    actions.remove();
+    window.dispatchEvent(new Event("resize"));
+    await waitFor(() => expect(strip.style.transform).toBe(""));
+  });
+
+  it("dismisses a notice in place: read, gone, and nowhere navigated", async () => {
+    setToken("control-token");
+    window.location.hash = "#/chat";
+    const fetchMock = stubFetch({
+      "GET /api/notifications": [
+        { notification_id: "ntf_s", kind: "security_alert", title: "Security finding", body: "Look.", finding_id: null, subject_id: null, read: false, created_at: "2026-09-28T00:00:00Z" },
+      ],
+      "POST /api/notifications/ntf_s/read": { ok: true },
+    });
+    render(NotificationCenter);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Dismiss: Security finding" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "Notifications" })).not.toBeInTheDocument(),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/notifications/ntf_s/read"),
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(window.location.hash).toBe("#/chat");
     window.location.hash = "";
   });
 });

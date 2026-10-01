@@ -37,6 +37,17 @@ export function modelCatalogues(): Record<string, string[]> {
   return store.data?.catalogues ?? {};
 }
 
+/**
+ * Whether the first `/api/models` read has landed.
+ *
+ * Until it has, "no model" is not an answer but the absence of one, and a
+ * composer that said *No model is set up* then was wrong on every instance
+ * that had one. A surface asks this before it says anything about what exists.
+ */
+export function modelsKnown(): boolean {
+  return store.data !== null;
+}
+
 // Workbench's model summary covers every profile, configured or not.
 export function allProfiles(): ModelProfile[] {
   return store.data ? store.data.profiles : [];

@@ -122,13 +122,9 @@ async def check_model_readiness(
     return readiness.to_dict()
 
 
-# The work surfaces that may hold their own default model.
-#
-# this list used to be declared here and nowhere else, which
-# is how `design` came to be missing from it while the product model was Chat |
-# Build | Design. It lives beside the decision contract now, so the routes, the
-# read model and the tests cannot hold three different opinions about what a
-# work surface is.
+# The work surfaces that may hold their own default model. Declared beside the
+# decision contract, so the routes, the read model and the tests cannot hold
+# three different opinions about what a work surface is.
 SURFACES = DECISION_SURFACES
 
 
@@ -567,8 +563,7 @@ def retry_model_operation(
 ) -> dict[str, Any]:
     """Re-queue a failed operation **and dispatch its worker again** (BUG-75).
 
-    Retry used to reset the durable row to `queued` and stop there, so an
-    operation that had failed sat honestly recorded and permanently idle. The
+    A retry that only re-queued the row would leave it recorded and idle. The
     typed payload persisted at start is what makes the real dispatch possible:
     the same job, reconstructed by kind, with the credential re-read from the
     vault rather than remembered.
@@ -1116,12 +1111,10 @@ def download_hugging_face_model(
 ) -> dict[str, Any]:
     """Queue one immutable snapshot download and return its durable operation.
 
-    The download used to run inside this request: a multi-gigabyte snapshot held
-    a request worker for its whole duration, and the completion it wrote at the
-    end could not see a Cancel the owner had pressed in the meantime, so the row
-    ended `complete` against the owner's decision (GCR-22, GCR-23). Retry
-    already had a background worker that checked cancellation; there is one
-    worker now, and the first attempt is the same job as the second.
+    The download never runs inside the request: a multi-gigabyte snapshot would
+    hold a worker for its whole duration, and its completion must see a Cancel
+    pressed meanwhile (GCR-22, GCR-23). One background worker runs the first
+    attempt and every retry.
     """
     session, principal = auth_data
     _require_human(principal)
@@ -1162,10 +1155,9 @@ def download_hugging_face_model(
     try:
         conversion_output.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        # It used to be made after a successful download, so a library folder
-        # the owner cannot write to surfaced at the end of a multi-gigabyte
-        # pull. Made up front now, and refused in the owner's terms rather than
-        # as an unhandled 500.
+        # Made before the download, so a library folder the owner cannot write
+        # to is refused up front in the owner's terms, not at the end of a
+        # multi-gigabyte pull as an unhandled 500.
         raise HTTPException(
             status_code=422, detail={"reason_code": "model_library_not_writable"}
         ) from exc
@@ -1279,13 +1271,10 @@ def start_model_conversion(
         session.principal_id,
         ModelOperationRequest(
             kind="convert",
-            # The short revision, as the download row beside it already uses.
-            # Found live 2026-09-05: `snapshot@<40 hex>` is 49 URL-safe
-            # characters in one run, so the API redactor's high-entropy fallback
-            # replaced the whole label with `[REDACTED_SECRET]` and every
-            # conversion of the same snapshot became indistinguishable in
-            # Activity. An immutable Hub revision is public, not a credential —
-            # and twelve characters is the convention the product already had.
+            # The short revision, as the download row beside it uses. A full
+            # `snapshot@<40 hex>` is one 49-character URL-safe run, which the API
+            # redactor's high-entropy fallback replaces with `[REDACTED_SECRET]`.
+            # An immutable Hub revision is public, not a credential.
             target=f"{source.name}@{body.revision[:12]}",
             confirmed=True,
             destination=str(output),

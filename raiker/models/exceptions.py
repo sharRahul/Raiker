@@ -287,11 +287,10 @@ def provider_error_code(exc: BaseException) -> str:
 def stream_failure(exc: Exception) -> Exception:
     """The exception a streaming adapter should raise for *exc* (BUG-72).
 
-    A stream adapter used to answer every failure with one code. Anything the
-    transport or the HTTP status had already classified — an expired key, an
-    exhausted balance, a rate limit, a closed connection — arrived at the owner
-    as ``provider_stream_failed``, which says only that a stream ended and sends
-    them to debug the wrong thing. So:
+    A failure the transport or the HTTP status already classified — an expired
+    key, an exhausted balance, a rate limit, a closed connection — keeps its
+    code; ``provider_stream_failed`` alone says only that a stream ended and
+    sends the owner to debug the wrong thing. So:
 
     * an already-classified provider error is returned **unchanged**, keeping
       the code its own layer chose;

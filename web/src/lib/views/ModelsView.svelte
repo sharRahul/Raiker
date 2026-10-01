@@ -55,16 +55,10 @@
 
   /**
    * The page is split by *what you came to do*, not by which table the data
-   * lives in. Everything on this page used to be one long scroll, which meant
-   * an owner looking for a rate scrolled past provider cards, and an owner
-   * connecting a provider scrolled past the fallback list.
-   *
-   * "Providers" then became its own long scroll for the same reason: it held
-   * local runtimes, hosted accounts, advanced routers, vendor installers, and
-   * the GGUF library at once. Obtaining a model that runs on this machine and
-   * signing in to somebody else's are different jobs with different vocabulary,
-   * different risks, and almost no shared controls, so they are separate tabs.
-   * Local is first because Raiker prefers local backends.
+   * lives in. Obtaining a model that runs on this machine and signing in to
+   * somebody else's are different jobs with different vocabulary, risks and
+   * controls, so they are separate tabs. Local is first because Raiker prefers
+   * local backends.
    */
   const TABS = [
     { id: "overview", label: "Overview" },
@@ -503,11 +497,8 @@
         // back to reachability.
         const guidance = providerErrorGuidance(list.reason_code);
         if (guidance !== null) return `${name}: ${guidance.message} ${guidance.fix}`;
-        // BUG-289 — one fallback sentence used to carry the *local* remedy to
-        // both kinds of destination, so an owner whose host refuses
-        // `CONNECT openrouter.ai` was told to check that OpenRouter was
-        // running. The diagnosis was right and the advice was for a machine
-        // they do not own.
+        // BUG-289 — the remedy depends on the kind of destination: a hosted
+        // provider this host cannot reach is not a runtime to start.
         return unreachableProviderNote(name, profile.off_machine);
       }
     }
@@ -975,11 +966,9 @@
   // user who connects the one provider they intend to use is finished, not 10%
   // finished. The honest headline is how many providers are actually ready.
   //
-  // BUG-69 — and "ready" has to mean ready. Counting saved connections put
-  // "1 of 10 providers set up" on this page in the same session where Chat
-  // said "No readiness check exists for this exact model" and refused to send.
-  // The server already counts proven observations; this reads that number and
-  // only falls back to counting `ready` profiles if the field is absent.
+  // BUG-69 — and "ready" has to mean ready: a saved connection is not a
+  // proven model. This reads the server's count of proven observations and
+  // falls back to counting `ready` profiles only if the field is absent.
   const readyCount = $derived(
     models?.ready_provider_count ??
       (models?.profiles ?? []).filter((p) => p.ready === true).length,
@@ -1197,17 +1186,8 @@
 
 
   /**
-   * Escape closes whichever of this page's three modals is open.
-   *
-   * Found live, 2026-09-07: the model picker could be dismissed by clicking its
-   * backdrop or its Done button and by nothing else, so an owner who opened a
-   * provider's catalogue and reached for the key every other dialog in the
-   * product answers to was left holding a modal that would not go. The sign-in
-   * dialog and the details panel had the same gap.
-   *
-   * the overlay vocabulary asks for one overlay vocabulary; this is the part of that vocabulary
-   * a keyboard user actually depends on, and `ApprovalPrompt`, `StepUpDialog`
-   * and the command palette all already had it. Innermost first, so Escape
+   * Escape closes whichever of this page's three modals is open, as it does
+   * every other dialog in the product. Innermost first, so Escape
    * unwinds one layer at a time rather than clearing the stack: the picker can
    * be opened from the details panel, and closing both at once would lose the
    * owner's place.
@@ -1475,11 +1455,7 @@
                           <h3>{providerName(p.provider)}</h3>
                         </div>
                         <!-- The model line states a fact when there is one and
-                             says nothing when there is not. It used to print
-                             "model chosen at selection" on every row that had
-                             not named one — a placeholder that told an owner
-                             about Raiker's pinning vocabulary rather than about
-                             their provider, on a page where "Select models…"
+                             says nothing when there is not; "Select models…"
                              already offers the choice. -->
                         {#if namesAModel(p)}
                           <p class="row-model"><code>{modelName(p.model)}</code></p>
@@ -1964,9 +1940,8 @@
            above answer "what is running". They were interleaved. -->
       <LocalLibraryPanel />
 
-      <!-- The four words the page used to spell "active", told
-           apart: what each surface starts on, and what would really answer
-           right now. The fallback sequence that produces the second is edited
+      <!-- Two facts told apart: what each surface starts on, and what would
+           really answer right now. The fallback sequence that produces the second is edited
            directly beneath, so cause and effect are on one screen. -->
       <WorkDefaults {models} />
 

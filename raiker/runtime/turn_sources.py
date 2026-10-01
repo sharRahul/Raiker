@@ -830,7 +830,7 @@ def resolve_source_excerpt(
     is re-checked against this caller now rather than trusted from capture time;
     a workspace file is re-read and the stored passage located inside it, so a
     file that has since changed reports ``source_changed`` instead of
-    highlighting something near where the passage used to be; and a source whose
+    highlighting something near where the passage was; and a source whose
     material lives outside Raiker (a web page, an email, a connector response) is
     shown as the bounded text that actually reached the model, which is the only
     copy of it Raiker is entitled to claim.
@@ -943,7 +943,7 @@ def _text_answer(
     2. **Where is the passage the tool returned?** For a narrower result — a
        match, an excerpt — the stored passage is located directly, and a
        document that no longer contains it reports ``source_changed`` rather
-       than marking something near where it used to be.
+       than marking something near where it was.
     """
     if quote:
         start, length = locate_answer_quote(document, quote)

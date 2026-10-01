@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { capture } from "./capture";
 import { DESTINATIONS, WIDTHS, settled } from "./destinations";
 import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY, ANTHROPIC_MODEL as MODEL } from "./live";
 
 /**
  * The third 2026-09-28 round, live: the items this run took from `docs/plans/`
@@ -24,7 +25,6 @@ import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-prov
  *      holding a one-line `hello.py`
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment — entered through the UI
  */
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(
   import.meta.dirname,
   "..",
@@ -33,9 +33,7 @@ const SHOTS = join(
   "screenshots",
   "2026-09-28-docs-items-round",
 );
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const PYTHON = process.env.RAIKER_LIVE_PYTHON ?? "python";
-const MODEL = "claude-haiku-4-5-20251001";
 const MODEL_LABEL = /Haiku 4\.5/;
 
 test.describe.configure({ mode: "serial" });
@@ -122,15 +120,20 @@ test("BUG-309: an approval notice is shown elsewhere, and answered by Approvals"
     })
     .toBe(true);
 
-  // Somewhere that is not Approvals, the notice is exactly what it is for.
+  // Somewhere that is not Approvals, the approval card shows the decision —
+  // and since 2026-10-01 the dock does not show it a second time over the
+  // page's own controls. The notice stays unread until the queue answers it.
   await page.goto(`${BASE}/#/workbench`);
   await page.reload();
+  await expect(page.getByRole("region", { name: "Approval needed" })).toBeVisible({
+    timeout: 60_000,
+  });
   const dock = page.getByRole("region", { name: "Notifications" });
-  await expect(dock).toContainText("Approval needed", { timeout: 60_000 });
+  await expect(dock.filter({ hasText: "Approval needed" })).toHaveCount(0);
   await capture(page, join(SHOTS, "02-approval-notice-on-home.png"));
 
-  // Opening it lands on the queue that answers it, not on the record.
-  await dock.getByRole("button", { name: /Approval needed/ }).click();
+  // Arriving at the queue that answers it reads it.
+  await page.goto(`${BASE}/#/approvals`);
   await expect(page).toHaveURL(/#\/approvals/);
   const header = page.getByRole("columnheader", { name: "Status" });
   await expect(header).toBeVisible({ timeout: 60_000 });

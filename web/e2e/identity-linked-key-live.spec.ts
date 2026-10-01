@@ -16,9 +16,7 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { hostedProviderCard, signInAsOwner } from "./hosted-provider";
-
-const BASE = "http://127.0.0.1:8765";
-const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY } from "./live";
 
 test.skip(KEY === "", "Set RAIKER_LIVE_ANTHROPIC_KEY to an identity-linked key.");
 

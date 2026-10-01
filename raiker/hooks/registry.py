@@ -78,10 +78,10 @@ def _parse_config(data: dict[str, Any], scope: str, source: str | None = None) -
 class HookSourceStatus(View):
     """What one configuration file contributed, and why it contributed nothing.
 
-    A hooks file is owner-authored text on disk. A typo in it used to raise out of
-    ``HooksRegistry.load``, which runs inside the ``AgentGateway`` constructor —
-    so one misplaced brace made **every prompt in the product fail**, with a raw
-    ``JSONDecodeError`` and nothing anywhere that said which file was wrong.
+    A hooks file is owner-authored text on disk, and ``HooksRegistry.load`` runs
+    inside the ``AgentGateway`` constructor — so a typo raised from it would fail
+    **every prompt in the product** with a raw ``JSONDecodeError`` naming no
+    file.
 
     Failing closed is right for the *hook*: a file Raiker cannot read must not be
     guessed at, and none of its rules load. Failing closed for the whole runtime

@@ -2,11 +2,8 @@
   /**
    * Which of a provider's models stay offered everywhere.
    *
-   * Choosing a default used to be the only way a model reached a picker, so a
-   * provider serving six could offer exactly one of them and swapping meant
-   * coming back to this page. These switches are the owner saying which models
-   * they actually work with; the default is still a separate decision, made by
-   * the button beside them.
+   * These switches are the owner saying which models they actually work with;
+   * the default is a separate decision, made by the button beside them.
    */
   import { api } from "../../api";
   import { chatCandidates, modelName } from "../../modelPresentation";

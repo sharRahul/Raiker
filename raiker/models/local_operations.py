@@ -213,8 +213,8 @@ class ModelOperationService:
         completed = max(0, completed_bytes)
         total = max(completed, total_bytes) if total_bytes is not None else None
         percent = min(99, int(completed * 100 / total)) if total else None
-        # `running` only: a progress row that arrived after the owner pressed
-        # Cancel used to reinstate `running` and lose the request.
+        # `running` only: a progress row that arrives after the owner pressed
+        # Cancel must not reinstate `running` and lose the request.
         return self._transition(
             owner_principal_id,
             operation_id,
@@ -309,11 +309,9 @@ class ModelOperationService:
     def retry(self, owner_principal_id: str, operation_id: str) -> ModelOperation:
         """Re-queue a **terminal** operation. The caller dispatches its worker.
 
-        Retry used to check only that the kind was retryable and a payload
-        existed, so pressing it against a running or already-completed job
-        re-queued the row and started a second expensive worker over the same
-        destination (GCR-21). The claim is the transition itself: two
-        simultaneous presses cannot both take it.
+        Only a terminal job may be retried, or a second expensive worker runs
+        over the same destination (GCR-21). The claim is the transition itself:
+        two simultaneous presses cannot both take it.
         """
         operation = self.store.require_model_operation(owner_principal_id, operation_id)
         if operation.kind not in RETRYABLE_KINDS or not operation.payload():

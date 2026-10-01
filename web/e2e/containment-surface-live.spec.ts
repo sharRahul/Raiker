@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE } from "./live";
 
 /**
  * The containment surface, against a workspace that really has a contained
@@ -24,7 +25,6 @@ import { signInAsOwner } from "./hosted-provider";
  * the owner, names its reason and its failure count, and clears in one press.
  */
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
 const REPO = join(import.meta.dirname, "..", "..");
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";

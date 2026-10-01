@@ -215,11 +215,9 @@
     </section>
 
     <!--
-      GCR-45 — which file the built-in model registry came from. This used to be
-      resolved against the working directory the host happened to be launched
-      from, so a stale `config/` beside the terminal silently replaced the model
-      registry and no surface could say so. Two answers now, and the page states
-      which one this host got.
+      GCR-45 — which file the built-in model registry came from, independent of
+      the working directory the host was launched from; the page states which
+      of the two answers this host got.
     -->
     <section class="card" aria-labelledby="diag-profile-source-h">
       <h2 id="diag-profile-source-h">Built-in model profiles</h2>

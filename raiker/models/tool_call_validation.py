@@ -18,11 +18,8 @@ from raiker.models.tool_registry import (
 )
 from raiker.tools.mcp_tools import is_mcp_tool, parse_mcp_tool_name
 
-# Every table this module used to own now lives in one declaration per tool.
-# Registering `conversation_search` and `code_map_references` cost twelve edits
-# across seven files, none of which failed loudly when one was missed — so the
-# requirement moved somewhere it cannot be forgotten. See
-# `raiker.models.tool_registry`.
+# The per-tool tables are derived from one declaration per tool, where a
+# missing field fails construction. See `raiker.models.tool_registry`.
 _TOOL_RISK = TOOL_RISK
 _MODEL_EXPOSED_TOOLS = MODEL_EXPOSED_TOOLS
 _REQUIRED_ARGS = REQUIRED_ARGS

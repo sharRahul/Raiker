@@ -42,10 +42,9 @@ _BRANCH_REJECT_PREFIXES = ("-", "refs/")
 # ── BUG-66: which repository the git tools operate in ────────────────────────
 #
 # Build lets an owner connect a repository that is a *folder inside* the
-# workspace, and every git tool used to run against the workspace root anyway —
-# so the surface promised the agent was working in the repository the owner
-# picked and it was not. Resolution happens at call time rather than when the
-# broker is built, because the owner can change the selection between turns.
+# workspace, and every git tool runs in the repository the owner picked, never
+# the workspace root by default. Resolution happens at call time rather than when
+# the broker is built, because the owner can change the selection between turns.
 
 
 def selected_repository_subpath(store: Any, owner_principal_id: str | None) -> str | None:

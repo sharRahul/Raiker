@@ -21,13 +21,11 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
-import { refreshHostedReadiness, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { refreshHostedReadiness, signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = "../../docs/plans/screenshots/working";
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
-const MODEL = "claude-haiku-4-5-20251001";
 
 /** The file nobody asks about. Planted with content worth not losing. */
 const UNRELATED = "ops/deploy.sh";
@@ -132,12 +130,7 @@ test("a provider key is added through the UI and a model selected", async () => 
   expect(ANTHROPIC_KEY, "set RAIKER_LIVE_ANTHROPIC_KEY").not.toBe("");
   expect(WORKSPACE, "set RAIKER_LIVE_WORKSPACE").not.toBe("");
 
-  const card = await useHostedModel(page, BASE, {
-    provider: "Anthropic",
-    keyLabel: "Anthropic API key",
-    key: ANTHROPIC_KEY,
-    model: MODEL,
-  });
+  const card = await useAnthropic(page);
   await expect(card.locator("code")).toBeVisible({ timeout: 30_000 });
 
   await setCapability("File writes", "live-testing Auto's alignment check");

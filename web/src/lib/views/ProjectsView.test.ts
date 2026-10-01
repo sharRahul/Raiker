@@ -8,7 +8,7 @@ import { setToken } from "../api";
 import type { ProjectView } from "../apiTypes";
 import { stubFetch, stubFetchPending } from "../test-helpers";
 import ProjectsView from "./ProjectsView.svelte";
-import { resetWorkProject, workProject } from "../workProject.svelte";
+import { resetWorkProject, setWorkProject, workProject } from "../workProject.svelte";
 
 afterEach(() => {
   // UX-BUILD-05 — the deep-link tests write the address bar, and a hash left
@@ -54,7 +54,10 @@ describe("ProjectsView", () => {
     expect(alert).toHaveTextContent(/unavailable \(404\)/i);
   });
 
-  it("lists projects with their scope and marks the active one", async () => {
+  it("lists projects with their scope and marks the current one from the Work project", async () => {
+    // UX-PROJ-09 — the account-level selection (`selected`) is not what new
+    // work starts in, so it no longer badges a card. The Work project does.
+    setWorkProject("proj_2");
     stubFetch({
       "GET /api/projects": {
         projects: [
@@ -66,10 +69,17 @@ describe("ProjectsView", () => {
       "GET /api/projects/tree": [],
     });
     render(ProjectsView);
-    await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
-    expect(screen.getByText("Beta")).toBeInTheDocument();
-    expect(screen.getByText("active")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText("Alpha").length).toBeGreaterThan(0));
+    expect(screen.getAllByText("current project")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /open project beta/i })).toHaveTextContent(
+      /current project/,
+    );
+    expect(screen.getByRole("button", { name: /open project alpha/i })).not.toHaveTextContent(
+      /current/,
+    );
+    expect(screen.getByText(/new chats, build work and images start here/i)).toBeInTheDocument();
     expect(screen.getByText("projects/alpha")).toBeInTheDocument();
+    resetWorkProject();
   });
 
   it("shows the empty state when no projects exist", async () => {
@@ -532,11 +542,89 @@ describe("ProjectsView context home", () => {
     await openSection("Assets");
 
     expect(
-      await screen.findByText(/pictures generated in design while this project is active/i),
+      await screen.findByText(/pictures generated in design while this is the current project/i),
     ).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "elsewhere" })).not.toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "unfiled" })).not.toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "refused" })).not.toBeInTheDocument();
+  });
+
+  it("lists chats as rows that resume on the surface that owns them", async () => {
+    await openDetail(
+      routes({
+        "GET /api/projects/proj_1": {
+          ...DETAIL,
+          sessions: [
+            {
+              session_id: "sess_build",
+              title: "Fix the parser",
+              status: "open",
+              created_at: "2026-07-20T00:00:00Z",
+              updated_at: "2026-07-21T00:00:00Z",
+              turn_count: 4,
+              pinned: false,
+              tags: [],
+              project_id: "proj_1",
+              archived: false,
+              archived_at: null,
+              origin: "build",
+            },
+            {
+              session_id: "sess_chat",
+              title: null,
+              status: "open",
+              created_at: "2026-07-20T00:00:00Z",
+              updated_at: "2026-07-20T00:00:00Z",
+              turn_count: 1,
+              pinned: false,
+              tags: [],
+              project_id: "proj_1",
+              archived: false,
+              archived_at: null,
+              origin: "chat",
+            },
+          ],
+        },
+      }),
+    );
+    await openSection("Work");
+    const build = await screen.findByRole("link", { name: /fix the parser/i });
+    expect(build).toHaveAttribute("href", "#/build?session=sess_build");
+    expect(build).toHaveTextContent(/Build · 4 exchanges/);
+    const chat = screen.getByRole("link", { name: /untitled conversation/i });
+    expect(chat).toHaveAttribute("href", "#/new-chat?session=sess_chat");
+    expect(screen.queryByText("sess_build")).toBeNull();
+  });
+
+  it("names shared files and keeps their ids behind a disclosure", async () => {
+    await openDetail(
+      routes({
+        "GET /api/projects/proj_1": {
+          ...DETAIL,
+          context: { ...DETAIL.context, attachment_ids: ["att_1", "att_gone"] },
+          attachments: [
+            {
+              attachment_id: "att_1",
+              filename: "brief.pdf",
+              media_type: "application/pdf",
+              byte_size: 2048,
+              available: true,
+            },
+            {
+              attachment_id: "att_gone",
+              filename: "",
+              media_type: "",
+              byte_size: 0,
+              available: false,
+            },
+          ],
+        },
+      }),
+    );
+    expect(await screen.findByText("brief.pdf")).toBeInTheDocument();
+    expect(screen.getByText(/PDF · 2\.0 KB/)).toBeInTheDocument();
+    expect(screen.getByText("A file that is no longer available")).toBeInTheDocument();
+    expect(screen.getByText("Record identifiers").closest("details")).not.toHaveAttribute("open");
   });
 
   it("renders exactly one file list", async () => {
@@ -782,35 +870,109 @@ async function openLifecycleMenu(projectName = "Alpha"): Promise<void> {
 }
 
 describe("ProjectsView deletion", () => {
-  it("states that deleting an attached project keeps the folder", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+  const PREVIEW = {
+    project_id: "proj_1",
+    name: "Alpha",
+    root_kind: "managed",
+    root_label: "alpha",
+    sessions: 3,
+    turns: 12,
+    tasks: 1,
+    checkpoints: 2,
+    managed_files: 0,
+    descendants: 1,
+    folder_files: 4,
+    folder_bytes: 4096,
+    folder_truncated: false,
+    requires_step_up: true,
+  };
+
+  it("states that deleting an attached project keeps the folder, and asks for no password", async () => {
     stubFetch({
       "GET /api/projects": {
         projects: [project({ root_kind: "attached", root_label: "repo" })],
         active_project_id: null,
       },
       "GET /api/projects/tree": [],
+      "GET /api/projects/proj_1/deletion-preview": {
+        ...PREVIEW,
+        root_kind: "attached",
+        root_label: "repo",
+        folder_files: 0,
+        folder_bytes: 0,
+        requires_step_up: false,
+      },
     });
     render(ProjectsView);
 
     await openLifecycleMenu();
-    await fireEvent.click(await screen.findByRole("menuitem", { name: /^Delete$/ }));
+    await fireEvent.click(await screen.findByRole("menuitem", { name: /^Delete…$/ }));
 
-    expect(confirmSpy.mock.calls[0][0]).toMatch(/folder repo will not be deleted/i);
+    expect(await screen.findByText(/The folder repo\. It is yours/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Password")).toBeNull();
   });
 
-  it("keeps today's wording for a managed project", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+  it("counts what a managed delete removes and needs the typed name and a step-up", async () => {
+    const mock = stubFetch({
+      "GET /api/projects": { projects: [project({})], active_project_id: null },
+      "GET /api/projects/tree": [],
+      "GET /api/projects/proj_1/deletion-preview": PREVIEW,
+      "POST /api/auth/elevate": { token: "elevated-token" },
+      "DELETE /api/projects/proj_1": { ok: true, project_id: "proj_1", root_kind: "managed" },
+    });
+    setToken("control-token");
+    render(ProjectsView);
+
+    await openLifecycleMenu();
+    await fireEvent.click(await screen.findByRole("menuitem", { name: /^Delete…$/ }));
+
+    expect(await screen.findByText("3 chats (12 exchanges)")).toBeInTheDocument();
+    expect(screen.getByText(/The folder alpha from this computer — 4 files, 4\.0 KB/)).toBeInTheDocument();
+    expect(screen.getByText(/1 project inside it — archived and moved to the top level/)).toBeInTheDocument();
+    expect(screen.getByText(/This cannot be undone/)).toBeInTheDocument();
+
+    const confirm = screen.getByRole("button", { name: "Delete project" });
+    expect(confirm).toBeDisabled();
+    await fireEvent.input(screen.getByLabelText("Project name to confirm deletion"), {
+      target: { value: "Alph" },
+    });
+    expect(confirm).toBeDisabled();
+    await fireEvent.input(screen.getByLabelText("Project name to confirm deletion"), {
+      target: { value: "Alpha" },
+    });
+    // Still held: a managed folder goes with it, so the step-up is required.
+    expect(confirm).toBeDisabled();
+    await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "hunter2" } });
+    expect(confirm).toBeEnabled();
+    await fireEvent.click(confirm);
+
+    await waitFor(() => {
+      const del = mock.mock.calls.find(([, init]) => (init?.method ?? "") === "DELETE");
+      expect(del).toBeTruthy();
+      const headers = new Headers(del![1]!.headers as HeadersInit);
+      expect(headers.get("X-Project-Delete-Confirm")).toBe("proj_1");
+      expect(headers.get("Authorization")).toBe("Bearer elevated-token");
+    });
+    const elevate = mock.mock.calls.find(([url]) => String(url).includes("/api/auth/elevate"));
+    expect(JSON.parse(String(elevate![1]!.body))).toMatchObject({ password: "hunter2" });
+  });
+
+  it("says a rejected password deleted nothing", async () => {
     stubFetch({
       "GET /api/projects": { projects: [project({})], active_project_id: null },
       "GET /api/projects/tree": [],
+      "GET /api/projects/proj_1/deletion-preview": PREVIEW,
+      "POST /api/auth/elevate": { __status: 401 },
     });
     render(ProjectsView);
-
     await openLifecycleMenu();
-    await fireEvent.click(await screen.findByRole("menuitem", { name: /^Delete$/ }));
-
-    expect(confirmSpy.mock.calls[0][0]).toMatch(/permanently delete all project chats and files/i);
+    await fireEvent.click(await screen.findByRole("menuitem", { name: /^Delete…$/ }));
+    await fireEvent.input(await screen.findByLabelText("Project name to confirm deletion"), {
+      target: { value: "Alpha" },
+    });
+    await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "wrong" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Delete project" }));
+    expect(await screen.findByText(/was not accepted\. Nothing was deleted/)).toBeInTheDocument();
   });
 
   it("keeps the three lifecycle actions off the card's own row", async () => {
@@ -826,14 +988,130 @@ describe("ProjectsView deletion", () => {
 
     expect(await screen.findByRole("button", { name: /^New chat$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Start in Build$/ })).toBeInTheDocument();
-    for (const action of [/^Archive$/, /^Move$/, /^Delete$/]) {
+    for (const action of [/^Archive$/, /^Move…$/, /^Delete…$/]) {
       expect(screen.queryByRole("button", { name: action })).toBeNull();
     }
 
     await openLifecycleMenu();
-    for (const action of [/^Archive$/, /^Move$/, /^Delete$/]) {
+    for (const action of [/^Archive$/, /^Move…$/, /^Delete…$/]) {
       expect(screen.getByRole("menuitem", { name: action })).toBeInTheDocument();
     }
+  });
+});
+
+describe("ProjectsView archive and move", () => {
+  afterEach(() => resetWorkProject());
+
+  it("lists archived projects apart, and restores one", async () => {
+    const mock = stubFetch({
+      "GET /api/projects": {
+        projects: [
+          project({ project_id: "proj_1", name: "Alpha" }),
+          project({
+            project_id: "proj_2",
+            name: "Old",
+            path: "/proj_2/",
+            is_archived: true,
+            archived_at: "2026-07-20T00:00:00Z",
+          }),
+        ],
+        active_project_id: null,
+      },
+      "GET /api/projects/tree": [],
+      "PUT /api/projects/proj_2/restore": { ok: true, project_id: "proj_2", archived: false },
+    });
+    render(ProjectsView);
+
+    await screen.findByRole("button", { name: /open project alpha/i });
+    expect(screen.queryByRole("button", { name: /open project old/i })).toBeNull();
+    await fireEvent.click(screen.getByRole("tab", { name: "Archived (1)" }));
+    expect(await screen.findByRole("button", { name: /open project old/i })).toHaveTextContent(
+      /archived/,
+    );
+    expect(screen.getByText(/Nothing expires/)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    await waitFor(() =>
+      expect(
+        mock.mock.calls.some(
+          ([url, init]) =>
+            String(url).endsWith("/api/projects/proj_2/restore") && init?.method === "PUT",
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it("stops a current project being current when it is archived", async () => {
+    setWorkProject("proj_1");
+    stubFetch({
+      "GET /api/projects": { projects: [project({ path: "/proj_1/" })], active_project_id: null },
+      "GET /api/projects/tree": [],
+      "PUT /api/projects/proj_1/archive": { ok: true, project_id: "proj_1" },
+    });
+    render(ProjectsView);
+    await openLifecycleMenu();
+    await fireEvent.click(await screen.findByRole("menuitem", { name: /^Archive$/ }));
+    await waitFor(() => expect(workProject()).toBe(""));
+  });
+
+  it("offers the tree as destinations and disables the project and its descendants", async () => {
+    stubFetch({
+      "GET /api/projects": {
+        projects: [
+          project({ project_id: "proj_1", name: "Alpha", path: "/proj_1/" }),
+          project({ project_id: "proj_2", name: "Child", path: "/proj_1/proj_2/", parent_id: "proj_1" }),
+          project({ project_id: "proj_3", name: "Beta", path: "/proj_3/" }),
+          project({ project_id: "proj_4", name: "Gone", path: "/proj_4/", is_archived: true }),
+        ],
+        active_project_id: null,
+      },
+      "GET /api/projects/tree": [],
+      "PUT /api/projects/proj_1/move": { ok: true, project_id: "proj_1", new_parent_id: "proj_3" },
+    });
+    render(ProjectsView);
+    await openLifecycleMenu();
+    await fireEvent.click(await screen.findByRole("menuitem", { name: /^Move…$/ }));
+
+    const dialog = await screen.findByRole("dialog", { name: /move “alpha”/i });
+    const radio = (name: RegExp) =>
+      Array.from(dialog.querySelectorAll<HTMLInputElement>("input[type=radio]")).find((input) =>
+        name.test(input.closest("label")?.textContent ?? ""),
+      )!;
+    expect(radio(/^\s*Alpha/)).toBeDisabled();
+    expect(radio(/Child/)).toBeDisabled();
+    expect(dialog).toHaveTextContent(/inside this project/);
+    expect(radio(/Beta/)).toBeEnabled();
+    expect(dialog).not.toHaveTextContent(/Gone/);
+    expect(screen.getByRole("button", { name: "Move here" })).toBeDisabled();
+    await fireEvent.click(radio(/Beta/));
+    await fireEvent.click(screen.getByRole("button", { name: "Move here" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("names a refused destination in words", async () => {
+    stubFetch({
+      "GET /api/projects": {
+        projects: [
+          project({ project_id: "proj_1", name: "Alpha", path: "/proj_1/" }),
+          project({ project_id: "proj_3", name: "Beta", path: "/proj_3/" }),
+        ],
+        active_project_id: null,
+      },
+      "GET /api/projects/tree": [],
+      "PUT /api/projects/proj_1/move": {
+        __status: 409,
+        detail: { reason_code: "project_move_into_archived" },
+      },
+    });
+    render(ProjectsView);
+    await openLifecycleMenu();
+    await fireEvent.click(await screen.findByRole("menuitem", { name: /^Move…$/ }));
+    const dialog = await screen.findByRole("dialog", { name: /move “alpha”/i });
+    const beta = Array.from(dialog.querySelectorAll<HTMLInputElement>("input[type=radio]")).find(
+      (input) => /Beta/.test(input.closest("label")?.textContent ?? ""),
+    )!;
+    await fireEvent.click(beta);
+    await fireEvent.click(screen.getByRole("button", { name: "Move here" }));
+    expect(await screen.findByText(/That folder is archived\./)).toBeInTheDocument();
   });
 });
 

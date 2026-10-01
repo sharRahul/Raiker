@@ -50,12 +50,10 @@ class ExecutionProfile:
             # literal here would be a claim made before anything ran.
             return CommandFeatures(shell=False, process_tree_stop=False, concurrent_runs=False)
         if self.kind == "local":
-            # BUG-194 — read from the backend rather than restated here. These
-            # two answers used to be written down twice and had already drifted:
-            # the backend offered background execution and a POSIX terminal
-            # while this said neither, so the card the owner reads described a
-            # different product from the one that ran their command. The import
-            # is local because `backends.container` imports this module.
+            # BUG-194 — read from the backend rather than restated here, so the
+            # card the owner reads describes the product that runs their
+            # command. The import is local because `backends.container` imports
+            # this module.
             from raiker.execution.commands.backends.local import LocalStrictBackend
 
             return replace(LocalStrictBackend.features, concurrent_runs=False)

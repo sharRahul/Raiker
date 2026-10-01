@@ -321,10 +321,9 @@ class MemoryStore:
     ) -> dict[tuple[str, str], str]:
         """``(content_checksum, scope)`` → ``memory_id`` for what this owner holds.
 
-        BUG-244 — an import used to be the one way to create a
-        contradiction-free duplicate: every other correction path records a
-        correction or a supersession link, and import simply wrote again. This
-        is the read that lets it ask first.
+        BUG-244 — the read that lets an import ask before it writes, so import
+        cannot create a duplicate where every other path records a correction
+        or a supersession link.
 
         Two deliberate choices:
 
@@ -1293,27 +1292,18 @@ class MemoryStore:
             return []
         # MEM-05 — relevance first, recency only to break ties.
         #
-        # This used to order by `created_at DESC` and truncate, on the recorded
-        # grounds that the shipped SQLCipher build had no FTS5 and therefore no
-        # BM25. Measured, that was untrue (see `text_search_engine`), and the
-        # consequence was real: on a four-year workspace the exact answer from
-        # 2023 sat behind hundreds of newer partial matches and was dropped
-        # before it was ranked. `bm25()` returns a *negative* score that is more
-        # negative the better the match, so ascending order is best-first.
+        # Ordering by recency and truncating drops an old exact answer behind
+        # newer partial matches before it is ranked. `bm25()` returns a
+        # *negative* score that is more negative the better the match, so
+        # ascending order is best-first.
         #
-        # **The index is evaluated exactly once**, and that constraint is older
-        # than the ranking. The pre-FTS5 comment here recorded why: written so
-        # that the planner picks `approved_memory` as the outer loop, the
-        # full-text match re-runs once per candidate row, and at 800 memories the
-        # same match costs 16 ms alone and 13 s that way.
-        #
-        # The first FTS5 attempt broke that rule and paid for it. Scoring with a
-        # *correlated scalar subquery* — `(SELECT bm25(…) WHERE memory_id = m.…
-        # AND … MATCH ?)` — put the rank on the row but re-scanned the index per
-        # row, measured at **5.2 s** for the same 800 memories. Selecting the
-        # rank alongside `memory_id` in a single subquery and joining on it
-        # keeps one `SCAN approved_memory_fts` in the plan and a primary-key
-        # probe per hit: **23 ms**, and the ranking is free.
+        # **The index is evaluated exactly once.** With `approved_memory` as the
+        # outer loop, the full-text match re-runs once per candidate row (16 ms
+        # alone, 13 s that way at 800 memories); a correlated scalar subquery
+        # for the rank re-scans it per row too (5.2 s). Selecting the rank
+        # alongside `memory_id` in a single subquery and joining on it keeps one
+        # `SCAN approved_memory_fts` in the plan and a primary-key probe per hit:
+        # 23 ms, and the ranking is free.
         #
         # Written as a derived table rather than a `WITH … AS MATERIALIZED` CTE
         # on purpose: both plan identically here, and the hint needs SQLite 3.35

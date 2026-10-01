@@ -71,13 +71,10 @@ def governed_memory_status(
 ) -> dict[str, Any]:
     """What the memory capability *actually* allows right now (BUG-71).
 
-    This used to return ``durable_writes_enabled: False`` and
-    ``mode: read_only_review`` as literals. The runtime has real, broker-governed
-    ``memory_write`` / ``memory_forget`` executors behind the
-    ``memory_write_execution`` and ``memory_forget_execution`` gates, so the
-    literal was a claim about the product rather than a reading of it: an owner
-    could enable the capability, set it to Allow, and be told by the agent that
-    memory is read-only.
+    A reading, never a literal: real, broker-governed ``memory_write`` /
+    ``memory_forget`` executors sit behind the ``memory_write_execution`` and
+    ``memory_forget_execution`` gates, so an owner who enabled the capability
+    must not be told by the agent that memory is read-only.
 
     Called without a store it still answers conservatively — nothing to read
     means nothing can be asserted as enabled — but every in-runtime caller now

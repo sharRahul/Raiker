@@ -2,25 +2,18 @@
   /**
    * What the evidence inspector may do to a conversation.
    *
-   * BUG-303 — this used to be the whole conversation library: rename, move to a
-   * project, pin, archive. Those are how somebody organises the chats they work
-   * in, and they were on the page whose job is *audit*, while Threads — the page
-   * work is resumed from — could not express any of them. They live on Threads
-   * now.
+   * BUG-303 — organising conversations (rename, move, pin, archive) is on
+   * Threads, where work is resumed; this inspector's job is audit.
    *
-   * **Delete** stayed, deliberately. It removes the audit record — the turns and
+   * **Delete** is here, deliberately. It removes the audit record — the turns and
    * the governed events — and it belongs beside the evidence it removes rather
    * than in a library where "tidy this away" is what Archive means. Copying the
-   * link stayed too: it is a way of citing this record, not a way of filing it.
+   * link is here too: it is a way of citing this record, not a way of filing it.
    *
-   * **Found live on 2026-09-20, while capturing BUG-303's evidence.** The menu
-   * was absolutely positioned inside the session table, and the table's card
-   * scrolls horizontally on a narrow window — `overflow-x: auto`, which the
-   * browser resolves to `overflow-y: auto` as well. On a workspace with one
-   * conversation the menu opened 131 pixels below the bottom of that card and
-   * was simply cut off, so **Delete**, the only destructive control on the
-   * page, was unreachable. It is positioned against the viewport now, measured
-   * from the trigger, which no ancestor can clip.
+   * The menu is positioned against the viewport, measured from the trigger, so
+   * no ancestor can clip it: the session table's card scrolls horizontally on a
+   * narrow window, which the browser resolves to vertical clipping too, and a
+   * clipped menu makes **Delete** unreachable.
    */
   import { isLoopbackHost } from "../loopback";
   import { conversationLink, workModeRoute } from "../turnAnchor";
@@ -30,8 +23,7 @@
   }: {
     sessionId: string; title: string;
     /** REM-THREAD-03 — which surface owns this conversation, so the copied
-     *  link opens where the work was done. It used to be Chat for every
-     *  session, including a Build one. */
+     *  link opens where the work was done. */
     origin?: string;
     onDelete: () => void;
   } = $props();

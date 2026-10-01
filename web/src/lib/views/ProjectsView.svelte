@@ -11,7 +11,9 @@
   import SidePanel from "../components/SidePanel.svelte";
   import RowOverflow from "../components/RowOverflow.svelte";
   import GuideLink from "../components/GuideLink.svelte";
-  import { setWorkProject, startInBuild } from "../workProject.svelte";
+  import ProjectDeleteDialog from "../components/ProjectDeleteDialog.svelte";
+  import ProjectMoveDialog from "../components/ProjectMoveDialog.svelte";
+  import { setWorkProject, startInBuild, workProject } from "../workProject.svelte";
   import ProjectExplorer from "../components/ProjectExplorer.svelte";
   import { api, ApiError } from "../api";
   import type {
@@ -21,11 +23,14 @@
     ProjectFilesView,
     ProjectsList,
     ProjectTreeNode as TreeNode,
+    ProjectView,
     TaskView,
   } from "../apiTypes";
   import { humanize, isRedacted, relativeTime, shortId } from "../format";
   import { projectFromHash } from "../nav";
   import { explainReasonCode } from "../reasonCodes";
+  import { fileKind, formatBytes } from "../projectLifecycle";
+  import { conversationLink, workModeRoute } from "../turnAnchor";
 
   let { onchanged }: { onchanged?: () => void } = $props();
 
@@ -102,17 +107,41 @@
   let projectImages = $state<ImageGeneration[]>([]);
   let exporting = $state(false);
   let exportError = $state<string | null>(null);
-  let deleteError = $state<string | null>(null);
   let savingContext = $state(false);
   let contextError = $state<string | null>(null);
 
-  let moveTarget = $state<string | null>(null);
-  let moveParentId = $state<string | null>(null);
-  let moving = $state(false);
-  let moveError = $state<string | null>(null);
+  // UX-PROJ-06 / UX-PROJ-07 — the project a lifecycle dialog is open for.
+  let moveTarget = $state<ProjectView | null>(null);
+  let deleteTarget = $state<ProjectView | null>(null);
 
   let archiving = $state<string | null>(null);
+  let restoring = $state<string | null>(null);
   let archiveError = $state<string | null>(null);
+
+  /*
+   * UX-PROJ-09 — "current" is one thing: the Work project every composer reads,
+   * never the account-level selection the server also keeps. "Recently active"
+   * (when work last happened) and "archived" (whether the project takes new
+   * work) are separate facts.
+   */
+  const currentProjectId = $derived(workProject());
+  const WORK_MODE_NAMES = { "new-chat": "Chat", build: "Build", design: "Design" } as const;
+
+  /*
+   * UX-PROJ-05 — archived projects have their own list.
+   *
+   * Archive kept every card exactly where it was, so archiving looked like it
+   * had done nothing and there was no way back. Active and Archived are two
+   * views of one list now; an archived card offers Restore first.
+   */
+  type ListView = "active" | "archived";
+  let listView = $state<ListView>("active");
+  const activeProjects = $derived((list?.projects ?? []).filter((p) => !p.is_archived));
+  const archivedProjects = $derived((list?.projects ?? []).filter((p) => p.is_archived));
+  const shownProjects = $derived(listView === "active" ? activeProjects : archivedProjects);
+  const currentProject = $derived(
+    activeProjects.find((p) => p.project_id === currentProjectId) ?? null,
+  );
   // BUG-251 — the folder can be browsed to. Typing an absolute path is still
   // allowed; it is no longer the only way.
   let browsing = $state(false);
@@ -155,17 +184,10 @@
   /*
    * "New chat in this project" opens Chat in that project.
    *
-   * RR-PROJECT-01 — this used to navigate and nothing else, on the reasoning
-   * that Chat's retrieval is owner-wide by design and starting a conversation
-   * from a project must not quietly scope it. The first half of that is right
-   * and is unchanged. The second half conflated two different things: *what a
-   * turn may retrieve* and *where the resulting conversation is filed*. Only the
-   * first is a boundary. The second is the ordinary meaning of pressing "New
-   * chat" on a project card, and the Build button beside it had always done it.
-   *
-   * So the shared Work project is set — which is filing, is visible in the
-   * composer's own picker before the owner presses Send, and re-files nothing
-   * that already exists — and retrieval stays owner-wide exactly as before.
+   * RR-PROJECT-01 — *what a turn may retrieve* and *where the conversation is
+   * filed* are different things, and only the first is a boundary. This sets
+   * the shared Work project — filing, visible in the composer's picker before
+   * Send, re-filing nothing that exists — and retrieval stays owner-wide.
    */
   function newChatInProject(projectId: string) {
     setWorkProject(projectId);
@@ -187,18 +209,13 @@
     }
   }
 
-  async function remove(projectId: string, rootKind: "managed" | "attached", rootLabel: string) {
-    // The two roots deserve different sentences, because they have different
-    // consequences. Telling an owner their attached folder will be deleted
-    // would be false; telling a managed project's owner it survives would be
-    // worse.
-    const message =
-      rootKind === "attached"
-        ? `This will remove the project and its chats from Raiker. The folder ${rootLabel} will not be deleted.`
-        : "This will permanently delete all project chats and files in this project folder. To save chats, move them to your chat list or another project before deleting.";
-    if (!window.confirm(message)) return;
-    try { deleteError = null; await api.deleteProject(projectId, true); closeDetail(); await load(); onchanged?.(); }
-    catch (e) { deleteError = e instanceof ApiError ? `Could not delete (${e.status}).` : "Could not delete"; }
+  /** A delete landed: nothing about the project should stand on the page. */
+  async function onDeleted(project: ProjectView) {
+    deleteTarget = null;
+    if (currentProjectId === project.project_id) setWorkProject("");
+    if (detail?.project.project_id === project.project_id) closeDetail();
+    await load();
+    onchanged?.();
   }
 
   async function load() {
@@ -311,26 +328,15 @@
     );
   });
 
-  function formatBytes(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
   /*
    * NEW-PROJ-01 — which selection a response belongs to.
    *
    * A project home is four independent reads — the detail, the files, the tasks
-   * and the images — sharing one set of view variables, and every one of them
-   * used to be assigned the moment it resolved. Open project A on a slow
-   * workspace, open B while A's file read is still out, and B's header stood
-   * over A's files: a header is an implicit promise that everything under it
-   * belongs to that workspace, and this broke the promise silently, which is
-   * the worst way to break it. An older *failed* detail read could also clear a
-   * newer successful selection, so a project that loaded fine disappeared
-   * behind an error about a different one.
+   * and the images — sharing one set of view variables. Invariant: everything
+   * under a project's header belongs to that project, and a stale response —
+   * success or failure — never lands on a newer selection.
    *
-   * The counter is the whole fix. Each open takes the next number, every
+   * Each open takes the next number, every
    * response carries the number of the open that asked for it, and a response
    * is committed only if that number is still the current one. It holds for
    * failures as well as successes, and for a close during a load, because
@@ -450,12 +456,18 @@
     }
   }
 
-  async function archiveProject(projectId: string) {
-    archiving = projectId;
+  async function archiveProject(project: ProjectView) {
+    archiving = project.project_id;
     archiveError = null;
     try {
-      await api.archiveProject(projectId);
+      await api.archiveProject(project.project_id);
+      // Archiving takes the subtree out of new work, so a current project
+      // inside it stops being where new work starts.
+      const current = list?.projects.find((p) => p.project_id === currentProjectId);
+      if (current && current.path.startsWith(project.path)) setWorkProject("");
       await load();
+      if (detail?.project.project_id === project.project_id) await open(project.project_id);
+      onchanged?.();
     } catch (e) {
       archiveError = e instanceof ApiError ? `Could not archive (${e.status}).` : "Could not archive.";
     } finally {
@@ -463,43 +475,37 @@
     }
   }
 
-  async function startMove(projectId: string) {
-    moveTarget = projectId;
-    moveParentId = null;
-    moveError = null;
-  }
-
-  async function confirmMove() {
-    if (moveTarget === null || moving) return;
-    moving = true;
-    moveError = null;
+  async function restoreProject(project: ProjectView) {
+    restoring = project.project_id;
+    archiveError = null;
     try {
-      await api.moveProject(moveTarget, moveParentId);
-      moveTarget = null;
+      await api.restoreProject(project.project_id);
       await load();
+      if (detail?.project.project_id === project.project_id) await open(project.project_id);
+      onchanged?.();
     } catch (e) {
-      moveError = e instanceof ApiError ? `Could not move (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""}).` : "Could not move.";
+      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
+      archiveError = explained
+        ? `${explained.plain} ${explained.remediation ?? ""}`.trim()
+        : "Could not restore.";
     } finally {
-      moving = false;
+      restoring = null;
     }
   }
 
-  function flatProjects(): { project_id: string; name: string }[] {
-    if (!list) return [];
-    return list.projects.map((p) => ({ project_id: p.project_id, name: p.name }));
+  async function onMoved() {
+    moveTarget = null;
+    await load();
+    onchanged?.();
   }
 
   /**
    * UX-BUILD-05 — open the project a `#/projects?project=<id>` link names.
    *
-   * Build, Chat, Design and Tasks all name the Project a turn runs inside and
-   * all linked here, to the list. Coming back meant finding that project among
-   * the others and pressing it again. They now link to it, and this is the half
-   * that makes the link land.
-   *
-   * An id that names no owned project is not an error: the list opens, which is
-   * what the link used to do, and is the right answer for a project that has
-   * since been deleted or archived.
+   * Build, Chat, Design and Tasks name the Project a turn runs inside and link
+   * to it; this is the half that makes the link land. An id that names no owned
+   * project is not an error: the list opens, which is the right answer for a
+   * project that has since been deleted or archived.
    */
   async function openRequestedProject() {
     const requested = projectFromHash(window.location.hash);
@@ -635,11 +641,52 @@
   </div>
 {:else}
   <div class="layout">
+    <div class="list-head">
+      <TabStrip
+        tabs={[
+          { id: "active", label: `Active (${activeProjects.length})` },
+          { id: "archived", label: `Archived (${archivedProjects.length})` },
+        ]}
+        selected={listView}
+        onselect={(id: string) => (listView = id as ListView)}
+        label="Which projects to show"
+      />
+      <!-- UX-PROJ-09 — the one "current", said once, with what it means. -->
+      <p class="current-line" role="status">
+        {#if currentProject !== null}
+          <strong>Current project:</strong> {currentProject.name} — new chats, Build work and
+          images start here.
+          <button type="button" class="btn btn-ghost btn-sm" onclick={() => setWorkProject("")}
+            >Stop working in it</button
+          >
+        {:else}
+          No current project — new work stands alone until you start it in one.
+        {/if}
+      </p>
+    </div>
+    {#if listView === "archived"}
+      <p class="sub">
+        Archived projects keep their chats, files and tasks, take no new work, and stay until you
+        restore or delete them. Nothing expires.
+      </p>
+    {/if}
+    {#if shownProjects.length === 0}
+      <div class="card">
+        <EmptyState
+          icon="projects"
+          title={listView === "archived" ? "Nothing archived" : "No active projects"}
+          body={listView === "archived"
+            ? "Projects you archive wait here until you restore them."
+            : "Every project is archived. Restore one, or create a new one above."}
+        />
+      </div>
+    {/if}
     <div class="card-grid project-grid">
-      {#each list.projects as p (p.project_id)}
+      {#each shownProjects as p (p.project_id)}
         <article
           class="card card-interactive project"
-          class:active={p.selected}
+          class:current={p.project_id === currentProjectId && !p.is_archived}
+          class:archived={p.is_archived}
           class:drag-over={dragOverId === p.project_id}
           ondragover={(e) => onDragOver(e, p.project_id)}
           ondragleave={() => onDragLeave(p.project_id)}
@@ -656,8 +703,10 @@
           >
             <span class="project-head">
               <span class="project-name">{p.name}</span>
-              {#if p.selected}
-                <Badge variant="active" label="active" />
+              {#if p.is_archived}
+                <Badge variant="metadata-only" label="archived" />
+              {:else if p.project_id === currentProjectId}
+                <Badge variant="active" label="current project" />
               {/if}
               {#if p.root_kind === "attached"}
                 <Badge variant="read-only" label="attached folder" />
@@ -670,9 +719,15 @@
                  the order a thread and a task use. -->
             <code class="project-root mono">{p.root_kind === "attached" ? p.root_label : p.root_subpath}</code>
             <WorkMeta
-              detail={`${p.session_count} session${p.session_count === 1 ? "" : "s"}`}
-              activityAt={p.created_at}
-              activityVerb="created"
+              detail={`${p.session_count} chat${p.session_count === 1 ? "" : "s"}`}
+              activityAt={p.is_archived
+                ? p.archived_at
+                : (p.last_activity_at ?? p.created_at)}
+              activityVerb={p.is_archived
+                ? "archived"
+                : p.last_activity_at
+                  ? "last active"
+                  : "created"}
             />
           </button>
           <!-- REM-PROJ-01 / UX-PROJ-02 — five actions at equal weight is not a
@@ -686,36 +741,47 @@
                removed: every action keeps its handler, its disabled state and
                its confirmation. -->
           <div class="project-actions">
-            <button
-              type="button"
-              class="btn btn-primary btn-sm"
-              onclick={() => newChatInProject(p.project_id)}
-            >
-              New chat
-            </button>
-            <button
-              type="button"
-              class="btn btn-sm"
-              onclick={() => startInBuild(p.project_id)}
-            >
-              Start in Build
-            </button>
-            <RowOverflow
-              label={p.name}
-              items={[
-                {
-                  label: archiving === p.project_id ? "Archiving…" : "Archive",
-                  disabled: archiving === p.project_id,
-                  run: () => void archiveProject(p.project_id),
-                },
-                { label: "Move", run: () => void startMove(p.project_id) },
-                {
-                  label: "Delete",
-                  run: () =>
-                    void remove(p.project_id, p.root_kind, p.root_label),
-                },
-              ]}
-            />
+            {#if p.is_archived}
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                disabled={restoring === p.project_id}
+                onclick={() => void restoreProject(p)}
+              >
+                {restoring === p.project_id ? "Restoring…" : "Restore"}
+              </button>
+              <RowOverflow
+                label={p.name}
+                items={[{ label: "Delete…", run: () => (deleteTarget = p) }]}
+              />
+            {:else}
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                onclick={() => newChatInProject(p.project_id)}
+              >
+                New chat
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm"
+                onclick={() => startInBuild(p.project_id)}
+              >
+                Start in Build
+              </button>
+              <RowOverflow
+                label={p.name}
+                items={[
+                  {
+                    label: archiving === p.project_id ? "Archiving…" : "Archive",
+                    disabled: archiving === p.project_id,
+                    run: () => void archiveProject(p),
+                  },
+                  { label: "Move…", run: () => (moveTarget = p) },
+                  { label: "Delete…", run: () => (deleteTarget = p) },
+                ]}
+              />
+            {/if}
           </div>
           {#if dragOverId === p.project_id}
             <p class="drop-hint" role="status">Drop to move chat into “{p.name}”.</p>
@@ -733,31 +799,21 @@
     {/if}
 
     {#if moveTarget !== null}
-      <div class="card move-dialog">
-        <h3 class="kicker">Move project</h3>
-        <label class="move-row">
-          <span>New parent:</span>
-          <select bind:value={moveParentId} class="input">
-            <option value={null}>Root (no parent)</option>
-            {#each flatProjects() as fp}
-              {#if fp.project_id !== moveTarget}
-                <option value={fp.project_id}>{fp.name}</option>
-              {/if}
-            {/each}
-          </select>
-        </label>
-        <div class="move-actions">
-          <button type="button" class="btn btn-sm" onclick={() => void confirmMove()} disabled={moving}>
-            {moving ? "Moving…" : "Confirm move"}
-          </button>
-          <button type="button" class="btn btn-ghost btn-sm" onclick={() => (moveTarget = null)}>
-            Cancel
-          </button>
-        </div>
-        {#if moveError}<p class="error" role="alert">{moveError}</p>{/if}
-      </div>
+      <ProjectMoveDialog
+        project={moveTarget}
+        projects={list.projects}
+        onclose={() => (moveTarget = null)}
+        onmoved={() => void onMoved()}
+      />
     {/if}
-    {#if deleteError}<p class="error" role="alert">{deleteError}</p>{/if}
+    {#if deleteTarget !== null}
+      {@const target = deleteTarget}
+      <ProjectDeleteDialog
+        project={target}
+        onclose={() => (deleteTarget = null)}
+        ondeleted={() => void onDeleted(target)}
+      />
+    {/if}
 
     {#if detailError}
       <p class="error" role="alert">{detailError}</p>
@@ -776,6 +832,21 @@
           </div>
         </div>
         {#if exportError}<p class="error" role="alert">{exportError}</p>{/if}
+        {#if detail.project.is_archived}
+          {@const archivedProject = detail.project}
+          <p class="archived-banner" role="status">
+            Archived {relativeTime(archivedProject.archived_at)} — it keeps everything and takes
+            no new work.
+            <button
+              type="button"
+              class="btn btn-sm"
+              disabled={restoring === archivedProject.project_id}
+              onclick={() => void restoreProject(archivedProject)}
+            >
+              {restoring === archivedProject.project_id ? "Restoring…" : "Restore"}
+            </button>
+          </p>
+        {/if}
 
         <TabStrip
           tabs={DETAIL_SECTIONS.map((section) => ({ id: section.id, label: section.label }))}
@@ -810,7 +881,32 @@
           </select>
         </label>
         </div>
-        <p class="sub">Shared attachment IDs: {detail.context.attachment_ids.length ? detail.context.attachment_ids.join(", ") : "none"}</p>
+        <!-- UX-PROJ-04 — the files every chat here can read, by name. The
+             ids are provenance, kept one disclosure away for anyone tracing
+             a record, never the label. -->
+        <h4 class="mini-h">Shared files</h4>
+        {#if (detail.attachments ?? []).length === 0}
+          <p class="sub">No files are shared with every chat in this project.</p>
+        {:else}
+          <ul class="attachments">
+            {#each detail.attachments ?? [] as file (file.attachment_id)}
+              <li class:unavailable={!file.available}>
+                <Icon name="file" size="sm" />
+                {#if file.available}
+                  <span class="file-name">{file.filename}</span>
+                  <span class="sub">{fileKind(file.filename, file.media_type)} · {formatBytes(file.byte_size)}</span>
+                {:else}
+                  <span class="file-name">A file that is no longer available</span>
+                  <span class="sub">It was removed; saving the context drops it.</span>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+          <details class="provenance-ids">
+            <summary>Record identifiers</summary>
+            <p class="sub mono">{(detail.attachments ?? []).map((a) => a.attachment_id).join(", ")}</p>
+          </details>
+        {/if}
         <button type="button" class="btn btn-sm" onclick={() => void saveContext()} disabled={savingContext}>{savingContext ? "Saving…" : "Save context"}</button>
         {#if contextError}<p class="error" role="alert">{contextError}</p>{/if}
         {#if detailRootKind === "managed"}
@@ -831,7 +927,7 @@
              than to find out whether it holds anything. -->
         <dl class="section-counts">
           <div><dt>Files</dt><dd>{files?.files.length ?? 0}{files?.truncated ? "+" : ""}</dd></div>
-          <div><dt>Sessions</dt><dd>{detail.sessions.length}</dd></div>
+          <div><dt>Chats</dt><dd>{detail.sessions.length}</dd></div>
           <div><dt>Tasks</dt><dd>{projectTasks.length}</dd></div>
           <div><dt>Images</dt><dd>{projectImages.length}</dd></div>
           <div><dt>Checkpoints</dt><dd>{detail.checkpoints.length}</dd></div>
@@ -849,16 +945,24 @@
           <p class="sub" role="status">{filesError}</p>
         {/if}
         {:else if detailSection === "work"}
-        <h3 class="kicker">Sessions</h3>
+        <h3 class="kicker">Chats</h3>
         {#if detail.sessions.length === 0}
-          <p class="sub">No sessions yet — chats started while this project is active land here.</p>
+          <p class="sub">No chats yet — start one with New chat and it is filed here.</p>
         {:else}
-          <ul class="plain-list">
+          <!-- UX-PROJ-08 — a row is the conversation: its title, where it was
+               done, how long it is and when it last moved, and pressing it
+               resumes it on the surface that owns it. -->
+          <ul class="session-rows">
             {#each detail.sessions as s (s.session_id)}
               <li>
-                <span class="mono">{shortId(s.session_id)}</span>
-                <span>{s.title ?? "—"}</span>
-                <span class="sub" title={s.updated_at}>{relativeTime(s.updated_at)}</span>
+                <a href={conversationLink(workModeRoute(s.origin), s.session_id)}>
+                  <span class="session-title">{s.title?.trim() || "Untitled conversation"}</span>
+                  <WorkMeta
+                    state={s.archived ? "archived" : s.status !== "open" && s.status !== "" ? humanize(s.status) : null}
+                    detail={`${WORK_MODE_NAMES[workModeRoute(s.origin)]} · ${s.turn_count} exchange${s.turn_count === 1 ? "" : "s"}`}
+                    activityAt={s.updated_at}
+                  />
+                </a>
               </li>
             {/each}
           </ul>
@@ -866,7 +970,7 @@
         <h3 class="kicker">Work under this project</h3>
         {#if projectTasks.length === 0}
           <p class="sub">
-            No tasks are scoped to this project. Tasks created while it is active land here.
+            No tasks are scoped to this project. Tasks created while it is the current project land here.
           </p>
         {:else}
           <ul class="plain-list">
@@ -889,7 +993,7 @@
         <h3 class="kicker">Images</h3>
         {#if projectImages.length === 0}
           <p class="sub">
-            No images yet — pictures generated in Design while this project is active land here.
+            No images yet — pictures generated in Design while this is the current project land here.
           </p>
         {:else}
           <!-- NEW-PROJ-02 — the strip showed eight pictures and offered no way
@@ -1059,9 +1163,100 @@
   .project-grid {
     --card-min: 18rem;
   }
-  .project.active {
+  .project.current {
     border-color: var(--accent-border);
     box-shadow: 0 0 0 1px var(--accent-border), var(--shadow-1);
+  }
+  .project.archived .project-name {
+    color: var(--text-2);
+  }
+  .list-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
+  }
+  .current-line {
+    margin: 0;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .archived-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 0;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--sunken);
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+  .mini-h {
+    margin: var(--space-3) 0 0.3rem;
+    font-size: var(--text-sm);
+  }
+  .attachments {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.3rem;
+  }
+  .attachments li {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: var(--text-sm);
+  }
+  .attachments li .sub {
+    margin: 0;
+  }
+  .attachments li.unavailable .file-name {
+    color: var(--text-3);
+    font-style: italic;
+  }
+  .file-name {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .provenance-ids {
+    margin-top: 0.3rem;
+    font-size: var(--text-xs);
+    color: var(--text-3);
+  }
+  .session-rows {
+    list-style: none;
+    margin: 0 0 var(--space-3);
+    padding: 0;
+    display: grid;
+    gap: 0.35rem;
+  }
+  .session-rows a {
+    display: grid;
+    gap: 0.2rem;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    color: var(--text-1);
+    text-decoration: none;
+  }
+  .session-rows a:hover,
+  .session-rows a:focus-visible {
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
+  }
+  .session-title {
+    font-weight: 600;
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
   }
   .project.drag-over {
     border-color: var(--accent);
@@ -1112,22 +1307,6 @@
     justify-content: space-between;
   }
   .detail-actions {
-    display: flex;
-    gap: 0.4rem;
-  }
-  .move-dialog {
-    padding: var(--space-3);
-  }
-  .move-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-  .move-row select {
-    max-width: 16rem;
-  }
-  .move-actions {
     display: flex;
     gap: 0.4rem;
   }

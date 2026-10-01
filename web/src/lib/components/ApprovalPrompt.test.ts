@@ -181,6 +181,28 @@ it("rises above a composer it would cover, and stays in its corner otherwise", a
   await waitFor(() => expect(card.style.bottom).toBe("18px"));
 });
 
+// Found live on 2026-10-01: arriving on Chat with an approval waiting, the card
+// was drawn before the composer mounted and covered its Send until the next
+// one-second measurement.
+it("rises above a composer that mounts after it, without waiting for a tick", async () => {
+  vi.spyOn(api, "approvals").mockResolvedValue([approval()]);
+  Object.defineProperty(window, "innerWidth", { value: 1440, configurable: true });
+  Object.defineProperty(window, "innerHeight", { value: 1000, configurable: true });
+  render(ApprovalPrompt);
+  const card = (await screen.findByText("Approval needed")).closest("section") as HTMLElement;
+  expect(card.style.bottom).toBe("18px");
+
+  const composer = document.createElement("div");
+  composer.className = "composer-card";
+  composer.getBoundingClientRect = () =>
+    ({ top: 800, bottom: 980, left: 286, right: 1410, width: 1124, height: 180 }) as DOMRect;
+  // No resize: the page simply grows a composer, as a route does when it mounts.
+  document.body.appendChild(composer);
+
+  await waitFor(() => expect(card.style.bottom).toBe("212px"), { timeout: 300 });
+  composer.remove();
+});
+
 // Found by the third 2026-09-28 round: the card covered Settings' Save changes,
 // so a settings change could not be saved while an approval waited elsewhere.
 it("rises above any bottom action bar that asks to be kept clear", async () => {

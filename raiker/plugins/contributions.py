@@ -1,9 +1,6 @@
 """What an installed plugin is allowed to actually contribute (BUG-221).
 
-Installing a plugin used to validate its manifest, check its supply chain,
-resolve its signature and write a record — and then nothing happened. The
-blocking question was never packaging; it was *what a plugin's code is allowed to
-be*. Every other extension surface answers it: a skill is instructions and runs
+The question is not packaging; it is *what a plugin's code is allowed to be*. Every other extension surface answers it: a skill is instructions and runs
 nothing, a connector is a brokered tool behind a capability gate, a hook is argv
 resolved inside the workspace under a bounded timeout.
 

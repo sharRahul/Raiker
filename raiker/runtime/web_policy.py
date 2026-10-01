@@ -1,12 +1,10 @@
 """Where the agent's own web reads may go, and where they may never.
 
-Raiker used to gate web egress on ``RAIKER_WEB_EGRESS_ALLOWLIST``: empty by
-default, so ``web_fetch`` reached nothing until the owner named every host in
-advance. That is the safest possible default and it made the feature unusable —
-an agent that cannot read a documentation page answers from training instead,
-which is its own kind of unsafe. This module replaces it with the posture the
-rest of Raiker already takes: **allow, monitor, and give the owner a precise
-instrument for the things they want stopped.**
+The posture is the one the rest of Raiker takes: **allow, monitor, and give
+the owner a precise instrument for the things they want stopped** (RAIKER-2021).
+An agent that cannot read a documentation page answers from training instead,
+which is its own kind of unsafe, so an empty owner blocklist means "anywhere
+public" — never "anywhere".
 
 Two boundaries, and they are not the same kind of thing:
 

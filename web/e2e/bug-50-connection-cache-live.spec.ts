@@ -48,11 +48,9 @@ import { join } from "node:path";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { hostedProviderCard, keepOffered, offeredModelIds, openModelDialog, signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY, ANTHROPIC_MODEL as MODEL } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 const HOST_PID = process.env.RAIKER_LIVE_HOST_PID ?? "";
 
 /** How many extra instance workspaces this host is made to serve. */

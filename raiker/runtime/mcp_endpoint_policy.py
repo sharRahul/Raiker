@@ -164,10 +164,8 @@ def stated_network_class(endpoint_url: str) -> str | None:
 def network_class_label(network_class: str | None, *, encrypted: bool) -> str:
     """The phrase the owner reads on a server card.
 
-    The page used to print "Remote (HTTPS)" for every ``http`` transport,
-    including a plain-``http`` endpoint and including the owner's own laptop.
-    Three different destinations under one reassuring label is the kind of
-    quietly wrong sentence this surface exists to avoid.
+    Plain ``http``, the owner's own machine and a public HTTPS endpoint are
+    different destinations and never share one reassuring label.
     """
     suffix = "HTTPS" if encrypted else "unencrypted HTTP"
     if network_class == LOOPBACK:

@@ -20,12 +20,10 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { signInAsOwner, useHostedModel } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const MODEL = "claude-haiku-4-5-20251001";
 
 test.describe.configure({ mode: "serial" });
 
@@ -59,12 +57,7 @@ test("the provider key is added through the UI and a real turn answers", async (
   test.setTimeout(240_000);
   expect(ANTHROPIC_KEY, "set RAIKER_LIVE_ANTHROPIC_KEY").not.toBe("");
 
-  const card = await useHostedModel(page, BASE, {
-    provider: "Anthropic",
-    keyLabel: "Anthropic API key",
-    key: ANTHROPIC_KEY,
-    model: MODEL,
-  });
+  const card = await useAnthropic(page);
   await expect(card.locator("code").filter({ hasText: /Haiku 4\.5/i })).toBeVisible({
     timeout: 30_000,
   });

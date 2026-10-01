@@ -46,6 +46,7 @@ from raiker.control.views.knowledge import BrainEdgeView, BrainNodeView, BrainVi
 from raiker.control.views.tasks import _task_detail
 from raiker.events.writer import EventLogWriter
 from raiker.memory.store import list_memory
+from raiker.models.tool_registry import TOOL_LABEL_BY_TOOL
 from raiker.storage.internal_paths import internal_io_path
 from raiker.tools.graph_tools import reference_resolution
 
@@ -179,10 +180,10 @@ def _walk_source_for_review(path: Path, base: Path) -> _SourceReviewWalk:
     )
 
 
-#: BUG-218 — how a tool is named on the Knowledge Map. The registry's own
-#: labels are written for a transcript line ("Run command"); a graph node has
-#: room for a noun. Anything unlisted falls back to its underscored name made
-#: readable, so a new tool appears sensibly without being registered twice.
+#: BUG-218 — how a tool is named on the Knowledge Map, where it differs from the
+#: transcript. The registry's labels are written for a transcript line ("Check
+#: the weather"); a graph node has room for a noun ("Weather"). Anything unlisted
+#: uses the registry's own label (OPT-13), so a new tool is named once.
 TOOL_LABELS: dict[str, str] = {
     "read_file": "Read file",
     "write_file": "Write file",
@@ -784,14 +785,9 @@ class KnowledgeService:
                     str(agent["status"]) == "running",
                 )
             )
-        # BUG-218 — one node per *tool*, not one per event.
-        #
-        # This used to emit a node per row of `list_event_index(limit=250)`,
-        # typed `tool`. Measured on a workspace after one live round: 20 of 22
-        # nodes were that type, and not one was a tool — they were "turn
-        # started", "model request completed" and their kin. The map read as a
-        # map of the runtime's own bookkeeping, which is why chats, context and
-        # files were invisible underneath it.
+        # BUG-218 — one node per *tool*, not one per event: most event-index
+        # rows typed `tool` are lifecycle bookkeeping, and a map of them hides
+        # the chats, context and files underneath.
         #
         # `tool_actions` is where tools actually are, aggregated per session, so
         # a session that ran `read_file` forty times is one node saying forty
@@ -808,7 +804,9 @@ class KnowledgeService:
                 BrainNodeView(
                     node_id,
                     "tool",
-                    TOOL_LABELS.get(tool_name, tool_name.replace("_", " ")),
+                    TOOL_LABELS.get(
+                        tool_name, TOOL_LABEL_BY_TOOL.get(tool_name, tool_name.replace("_", " "))
+                    ),
                     "failed" if failures and failures == uses else "used",
                     f"{uses} use{'' if uses == 1 else 's'}"
                     + (f", {failures} failed" if failures else ""),
@@ -892,9 +890,8 @@ class KnowledgeService:
                 )
             )
             # BUG-218 — a memory whose source event fell outside the event
-            # window used to be drawn with no edge at all: a fact floating free
-            # of the work that produced it. The session is the durable anchor,
-            # so it is the fallback rather than leaving the node orphaned.
+            # window still anchors to the work that produced it: the session is
+            # the durable fallback, never an orphaned node.
             if memory.source_event_id in event_ids:
                 edges.append(
                     BrainEdgeView(f"event:{memory.source_event_id}", node_id, "remembered")

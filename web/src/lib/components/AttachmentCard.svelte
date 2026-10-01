@@ -2,13 +2,7 @@
   /**
    * One attached file, shown the way an attached file should be shown.
    *
-   * It used to be a small grey pill with a generic paper icon and a filename —
-   * the same shape whether you had attached a photograph, a spreadsheet or a
-   * folder path. That tells you nothing you did not already know from typing
-   * the name, and it makes a composer carrying three files look like a row of
-   * tags rather than like work you are about to hand over.
-   *
-   * So: a picture shows the picture. Everything else shows what it actually is
+   * A picture shows the picture. Everything else shows what it actually is
    * — a coloured type badge, its name, and its size — because those are the two
    * facts you check before sending something ("did I pick the right file", "is
    * it the big one or the small one").

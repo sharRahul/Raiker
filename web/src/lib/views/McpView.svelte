@@ -62,9 +62,8 @@
   let sessions = $state<Record<string, McpSession[]>>({});
   let findings = $state<Record<string, McpFinding[]>>({});
   // B8 — connecting a server and the agent being able to *use* it are two
-  // different facts. The page used to report only the first, so a server could
-  // read `connected · 2 tool(s)` while every call was withheld by the decision
-  // mode. This is the second fact, read from the runtime rather than inferred.
+  // different facts; "connected" with every call withheld must not read as
+  // usable. This is the second fact, read from the runtime rather than inferred.
   let agentAccess = $state<McpAgentAccess | null>(null);
 
   const builderEnabled = $derived(
@@ -86,10 +85,8 @@
   /**
    * Plain English for the exact runtime reason MCP tools are not reachable.
    *
-   * Returns nothing when the connector's own block above already says it. A
-   * closed connector gate used to produce two amber notices one under the other,
-   * saying the same fact in different words and naming the same page by two
-   * different names — which reads as two problems rather than one.
+   * Returns nothing when the connector's own block above already says it: one
+   * fact said twice in different words reads as two problems.
    */
   const connectorBlocked = $derived(
     blocks.some((block) => block.reason.startsWith("The MCP connector")),
@@ -148,9 +145,8 @@
     if (e instanceof ApiError) {
       if (e.reasonCode === "disabled_by_capability_gate")
         return "The MCP capability is disabled. Enable it in Permissions to continue.";
-      // RR-MCP-02 — a refused endpoint used to arrive on screen as its reason
-      // code. `mcp_remote_host_not_public` is a true statement and not one an
-      // owner can do anything with.
+      // RR-MCP-02 — a refused endpoint is explained in words an owner can act
+      // on, not shown as its reason code.
       return (
         endpointRefusal(e.reasonCode) ?? e.reasonCode ?? `Request failed (${e.status})`
       );
@@ -493,8 +489,8 @@
           {/if}
         </div>
         <!-- BUG-234 — Raiker speaks the current revision and uses one part of
-             it. A server offering more used to be connected with none of that
-             said anywhere, which is the one thing this surface must not do. -->
+             it; what a server offers beyond that is said here, never left
+             unsaid. -->
         {#if s.unsupported_features.length}
           <ul class="unsupported">
             {#each s.unsupported_features as f (f.feature)}

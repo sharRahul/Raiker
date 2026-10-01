@@ -55,7 +55,7 @@
    *
    * The four-word vocabulary is enforced by this shape: `Default`, `Selected`,
    * `Effective` and `Fallback` are four different words for four different
-   * facts, and the page used to call all of them "active".
+   * facts, never one word for all of them.
    */
   const WORK = [
     { id: "chat", label: "Chat", hint: "Conversation" },
@@ -231,12 +231,9 @@
                 </span>
                 <span class="choice-where">
                   {row.profile ? providerName(row.profile.provider) : "Unknown provider"}
-                  <!-- BUG-286 — there is no third branch any more. `selected`
-                       used to carry the *shipped* default for an owner who had
-                       chosen nothing, and this said "Raiker's default" about
-                       it; a model nobody picked is not a selection, so that
-                       case now arrives with an empty model and is answered by
-                       "No model yet" above. -->
+                  <!-- BUG-286 — no third branch: a model nobody picked is not
+                       a selection, so that case arrives with an empty model and
+                       is answered by "No model yet" above. -->
                   {#if row.decision.selected.source === "surface_default"}
                     · chosen for {row.label}
                   {:else}

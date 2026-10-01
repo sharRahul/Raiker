@@ -21,13 +21,11 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { signInAsOwner, useHostedModel } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? process.cwd();
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const MODEL = "claude-haiku-4-5-20251001";
 
 test.describe.configure({ mode: "serial" });
 
@@ -141,12 +139,7 @@ test("a real tool-using turn fires both, and the audit log is the proof", async 
   test.setTimeout(300_000);
   expect(ANTHROPIC_KEY, "set RAIKER_LIVE_ANTHROPIC_KEY").not.toBe("");
 
-  await useHostedModel(page, BASE, {
-    provider: "Anthropic",
-    keyLabel: "Anthropic API key",
-    key: ANTHROPIC_KEY,
-    model: MODEL,
-  });
+  await useAnthropic(page);
 
   await page.goto(`${BASE}/#/new-chat`);
   const composer = page.getByPlaceholder("How can I help you today?");

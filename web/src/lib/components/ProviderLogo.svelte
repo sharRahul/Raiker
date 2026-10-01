@@ -17,9 +17,8 @@
   /**
    * Neutral marks for the runtimes that publish no redistributable logo.
    *
-   * They used to share one anonymous square, so four different rows on the
-   * model screen were identified by the same picture — which is the same as
-   * having no picture at all, but takes up the space of one. These are drawn
+   * One anonymous square for all of them would identify four different rows by
+   * the same picture, which is no picture at all. These are drawn
    * from what the runtime *is*: a chip for a local weight server, stacked
    * layers for MLX's arrays, a window for LM Studio's desktop app, and a plug
    * for any OpenAI-compatible endpoint the owner points Raiker at.

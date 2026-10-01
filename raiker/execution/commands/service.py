@@ -689,10 +689,13 @@ class CommandService:
                 **self.store.load_isolation(request.owner_principal_id, request.run_id),
             },
         )
-        self.store.finalize_with_receipt(request.owner_principal_id, request.run_id, state, receipt)
         # The handle authenticates to a channel that is about to stop existing.
-        # Keeping it would be storage of a secret with no remaining purpose.
+        # Keeping it would be storage of a secret with no remaining purpose. It
+        # goes *before* the terminal state is written, so no reader ever sees a
+        # finished run that still holds one, and a crash between the two writes
+        # leaves no secret behind.
         self.store.clear_backend_handle(request.owner_principal_id, request.run_id)
+        self.store.finalize_with_receipt(request.owner_principal_id, request.run_id, state, receipt)
         with self._lock:
             self._active.pop(request.run_id, None)
 

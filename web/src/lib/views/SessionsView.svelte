@@ -96,10 +96,9 @@
     if (kept.length !== selected.size) selected = new Set(kept);
   });
 
-  // BUG-303 — pin, rename, archive, move and the tag editor used to live here.
-  // They are how somebody organises the conversations they work in, and this is
-  // the page whose job is audit. They are on Threads now, beside the threads
-  // they organise. What stays is Delete, which removes the audit record itself.
+  // BUG-303 — this page is audit; organising conversations (pin, rename,
+  // archive, move, tags) is on Threads. What stays is Delete, which removes the
+  // audit record itself.
 
   async function deleteOne(id: string) {
     if (!window.confirm("Delete this conversation permanently? Its turns and governed events will be removed.")) return;
@@ -291,10 +290,8 @@
                 </span>
                 <span class="title-sub">
                   <!-- REM-SESSIONS — the row opens the record, and nothing
-                       else. This used to carry an "Open" link into Chat, which
-                       made the inspector a second place to resume a
-                       conversation; resuming lives in Threads, which now sends
-                       each thread to the surface that owns it. -->
+                       else; resuming lives in Threads, which sends each thread
+                       to the surface that owns it. -->
                   <span class="mono sub">{shortId(s.session_id)}</span>
                 </span>
               </td>
@@ -342,14 +339,9 @@
           <p class="sub">Created {relativeTime(detail.session.created_at)} · {detail.turns.length} turns</p>
           <p class="session-links">
             <!-- REM-SESSIONS / REM-THREAD-03 — one way back, to the surface
-                 this conversation was done on. It used to be two guesses side
-                 by side: "Open in chat" and "Open in Build", offered for every
-                 session because no session recorded which it was. A Build
-                 conversation opened in Chat loses its repository, its pending
-                 diffs and the approvals over them, so the guess was not a
-                 neutral one. BUG-242's point survives — Build restores a stored
-                 conversation on the same coordinate Chat does — it is simply
-                 the origin that now decides which. -->
+                 this conversation was done on, decided by its recorded origin:
+                 a Build conversation opened in Chat loses its repository, its
+                 pending diffs and the approvals over them. -->
             <a
               href={conversationLink(
                 workModeRoute(detail.session.origin),
@@ -405,11 +397,9 @@
             <p class="prompt-text">{turnDetail.turn.prompt_text}</p>
           {/if}
           {#if turnDetail.turn.summary}
-            <!-- BUG-300 — Sessions reopens a stored turn rather than a live
-                 response, so it used to print the raw `raiker:table` fence and
-                 its JSON where the conversation had shown a table. The parts
-                 arrive already split by the runtime, so the inspector shows the
-                 answer the conversation showed. -->
+            <!-- BUG-300 — a stored turn's parts arrive already split by the
+                 runtime, so the inspector shows the answer the conversation
+                 showed, never a raw `raiker:table` fence. -->
             {#if (turnDetail.turn.content_parts ?? []).length > 0}
               <div class="answer">
                 <AnswerParts

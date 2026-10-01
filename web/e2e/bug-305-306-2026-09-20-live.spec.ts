@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { join } from "node:path";
 import { capture } from "./capture";
 import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY, ANTHROPIC_MODEL as MODEL } from "./live";
 
 /**
  * The 2026-09-20 follow-up round, live: BUG-306's retry consequence and
@@ -17,10 +18,7 @@ import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-prov
  *   1. `raiker-web` on 127.0.0.1:8765
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment (entered through the UI)
  */
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-09-20-sources-and-commands");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const MODEL = "claude-haiku-4-5-20251001";
 const MODEL_LABEL = /Haiku 4\.5/;
 
 test.describe.configure({ mode: "serial" });

@@ -56,12 +56,9 @@
   /** A failed *action*, which is not a failed read and must not read as one. */
   let actionError = $state<string | null>(null);
   let refreshing = $state(false);
-  // NEW-MAP-01 — the graph's own freshness, which used to be a timestamp that
-  // only ever moved forward. A failed refresh left the previous graph on screen
-  // under the words **Live workspace graph**, because the label checked only
-  // that *some* update had once happened. A graph an hour old under a word
-  // meaning "now" is not a small inaccuracy on this page: the map is what an
-  // owner reads to decide what Raiker knows about them.
+  // NEW-MAP-01 — the graph's own freshness. A failed refresh must read as
+  // stale, never as "Live": the map is what an owner reads to decide what
+  // Raiker knows about them, so a word meaning "now" has to be true.
   let graph = $state<Freshness<BrainData>>(freshnessLoading());
   let selectedIds = $state<string[]>([]);
   let hoveredId = $state<string | null>(null);
@@ -230,15 +227,10 @@
   /**
    * Keep the canvas the size of the box it is drawn in.
    *
-   * This used to attach in `onMount`, once, to whatever `graphElement` happened
-   * to be — and the graph lives on the `{:else}` branch of a load state, so on
-   * any render where that branch was not up yet the observer attached to
-   * nothing and never ran again. `graphWidth` then stayed at its 900px default
-   * on every window: on a phone the canvas was more than twice the viewport,
-   * two-thirds of the graph was off screen, and the centring force was aiming at
-   * a point 450px from a 390px-wide edge. An effect re-attaches whenever the
-   * element appears, which is the only version of this that cannot silently
-   * do nothing.
+   * An effect, not `onMount`: the graph is on a load state's `{:else}` branch,
+   * so the element can appear after mount, and an observer attached once to
+   * nothing leaves the canvas at its 900px default — twice a phone's width,
+   * with the centring force aimed off screen.
    */
   $effect(() => {
     const element = graphElement;
@@ -275,19 +267,10 @@
     }
     return values;
   });
-  // REM-MAP-02 — a workspace with nothing in it says so, and draws nothing.
-  //
-  // A brand-new workspace used to be given an instructional graph: three
-  // placeholder nodes and two placeholder edges standing in for records nobody
-  // had made. They were flagged `is_real: false` and the pill called them a
-  // *Starter view*, so they were never covert — but they were still selectable,
-  // hoverable, centreable objects that opened an inspector, in the one surface
-  // whose whole job is to show what the workspace actually knows. A map that
-  // draws things that are not there teaches the owner to distrust the map.
-  //
-  // So the graph is now empty when the workspace is, and the way out — Add
-  // source, Open Memory — is in the empty state rather than inside a node the
-  // owner has to work out is not a record.
+  // REM-MAP-02 — a workspace with nothing in it says so, and draws nothing. A
+  // map that draws things that are not there teaches the owner to distrust it,
+  // so the way out — Add source, Open Memory — is in the empty state, never a
+  // placeholder node.
   //
   // The two emptinesses are different answers and are told apart deliberately:
   // nothing recorded is not the same as nothing matching, and offering "Add a
@@ -478,10 +461,8 @@
   /**
    * Bring every node on screen — which is what "Fit" has to mean.
    *
-   * It used to reset the transform to the identity, which is not a fit: on a
-   * phone-width window the graph's own extent is several times the viewport, so
-   * pressing **Fit** left most of the nodes off screen and the control read as
-   * broken. It now measures what is actually laid out and scales to it.
+   * It measures what is laid out and scales to it; resetting to the identity
+   * transform is not a fit on a window narrower than the graph.
    *
    * Zooming *in* is capped at 1: a two-node graph blown up to fill a monitor is
    * a worse picture than a small one in the middle, and it would make Fit feel
@@ -737,12 +718,8 @@
   }
 </script>
 
-<!-- NEW-MAP-01 — a *refresh* that fails used to replace the whole map with
-     this, even though the previous graph was still in memory. On a fifteen
-     second poll that meant one hiccup wiped the owner's map and told them it
-     could not be loaded, about a graph that had loaded. The error page is for
-     having nothing to show; a graph that has gone stale stays on screen and
-     says so in the corner. -->
+<!-- NEW-MAP-01 — the error page is for having nothing to show. A failed
+     refresh keeps the previous graph on screen and says it is stale. -->
 {#if graph.kind === "unavailable"}
   <PageState state="error" title="Couldn't load the knowledge graph" detail={loadError} />
 {:else if brain === null}
@@ -941,27 +918,16 @@
       {#if summaryOpen}<section class="summary-popover"><h3>Workspace summary</h3>{#each summary as item}<p><span>{item[0]}</span><b>{item[1]}</b></p>{/each}<small><Icon name="shield" size="sm" /> Governed workspace boundary</small></section>{/if}
 
       <div class="viewport-controls"><button aria-label="Fit graph" onclick={fitGraph}>Fit</button><button aria-label="Zoom out" onclick={() => transform = { ...transform, k: Math.max(.35, transform.k - .15) }}>−</button><span>{Math.round(transform.k * 100)}%</span><button aria-label="Zoom in" onclick={() => transform = { ...transform, k: Math.min(3, transform.k + .15) }}>+</button></div>
-      <!-- NEW-MAP-01 — the dot and the word both say what is actually true of
-           the graph on screen. "Live workspace graph" used to survive every
-           failed refresh, because it only ever asked whether an update had once
-           happened. -->
+      <!-- NEW-MAP-01 — the dot and the word say what is true of the graph on
+           screen now, not whether an update once happened. -->
       {#if actionError}<p class="action-error" role="alert">{actionError}<button onclick={() => (actionError = null)} aria-label="Dismiss">×</button></p>{/if}
       <div class="graph-meta"><span class="live-dot" class:stale={!graphIsLive}></span>{graphFreshness}<button onclick={(event) => { event.stopPropagation(); void load(); }} disabled={refreshing}>{refreshing ? "Updating…" : "Refresh"}</button></div>
 
       {#if settingsOpen}
         <aside class="settings-panel" aria-label="Graph settings">
-          <!-- REM-MAP-01 — the panel opens on the one section that is about the
-               knowledge, not about the drawing.
-               All five disclosures used to be `open`, so pressing "Graph
-               settings" produced a column containing five checkbox groups and
-               eleven sliders at once, of which "Centre force", "Repel force",
-               "Link force", "Link distance" and "Collision radius" are
-               simulation constants — visualisation tuning that has nothing to
-               do with what an owner keeps in their knowledge map. What the
-               panel is *for* is deciding which records are on screen, and that
-               is Filters.
-               Nothing is removed and no preference is reset: every control is
-               one click away and holds whatever value it held. -->
+          <!-- REM-MAP-01 — the panel opens on Filters, the section about which
+               records are on screen; the simulation constants are drawing
+               tuning and stay closed. Every control keeps its value. -->
           <div class="panel-title"><div><span>Graph settings</span><small>Personal workspace view</small></div><button aria-label="Close graph settings" onclick={() => settingsOpen = false}>×</button></div>
           <details open><summary>Filters</summary>{#each FILTER_TYPES as type}<label class="check-row"><input type="checkbox" checked={enabledTypes[type]} onchange={(event) => enabledTypes = { ...enabledTypes, [type]: event.currentTarget.checked }} /><span>{FILTER_LABELS[type] ?? type.charAt(0).toUpperCase() + type.slice(1) + "s"}</span></label>{/each}<label class="check-row"><input type="checkbox" bind:checked={showOrphans} /><span>Orphan records</span></label></details>
           <details><summary>Groups</summary>{#each groups as group}<div class="group-row"><i style={`background:${group.color}`}></i><span><b>{group.name}</b><small>{group.query}</small></span></div>{/each}<button class="text-action" onclick={() => newGroupOpen = !newGroupOpen}>+ New group</button>{#if newGroupOpen}<div class="group-form"><input bind:value={groupName} placeholder="Group name" /><input bind:value={groupQuery} placeholder='type:memory status:approved' /><label>Colour <input type="color" bind:value={groupColor} /></label><button onclick={addGroup}>Add group</button></div>{/if}</details>
@@ -1045,17 +1011,8 @@
   :global(.content:has(.knowledge-shell)) { padding:0 !important; overflow:hidden; }
 
   /* The graph keeps the Obsidian interaction model, drawn in Raiker's own
-     surface language.
-
-     It used to carry four palettes: a hard-coded dark one, a hard-coded light
-     one that overrode it, and a tokenised dark override written out twice —
-     once keyed on `[data-theme="dark"]` and once, verbatim, inside a
-     `prefers-color-scheme` query for the viewer who never chose a theme. The
-     comment on that duplicate named the symptom exactly ("the Knowledge Map
-     stayed light inside an otherwise dark app") without naming the cause: the
-     base rules were painted in literals, so every theme had to be patched back
-     on top of them. Painted in tokens, the base is already right in both
-     themes, and all three override blocks are gone. */
+     surface language. Painted in tokens only, so the base is right in both
+     themes with no per-theme override block. */
   .knowledge-shell { height:calc(100vh - 58px); min-height:650px; display:grid; grid-template-rows:64px 1fr; background:var(--bg); color:var(--text-1); }
   /* The map's own ladder (vignette, stage, pills, popover, panels)
      is local to the canvas and stays in single digits; the toolbar sits above

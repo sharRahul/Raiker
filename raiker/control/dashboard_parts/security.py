@@ -96,9 +96,8 @@ class SecurityService:
     def list_capability_containment(self: DashboardService, principal_id: str) -> dict[str, Any]:
         """Every monitored capability's containment state, in one owner-facing shape.
 
-        BUG-77 — the security surface used to list containment for exactly one
-        capability family. Monitored MCP connections keep their richer per-session
-        view; this is the same three facts (state, reason, the control that clears
+        BUG-77 — monitored MCP connections keep their richer per-session view;
+        this is the same three facts (state, reason, the control that clears
         it) for connectors, plugins, subagents, providers, tools and local
         execution, so nothing is contained without being visible.
         """

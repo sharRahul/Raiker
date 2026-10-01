@@ -1077,11 +1077,10 @@ class ConversationStore:
     ) -> list[dict[str, Any]]:
         """What else was cited by the conversations that cited this.
 
-        The edge a graph view actually draws. Two sources used to answer the
-        same question are related in the only sense Raiker can evidence — some
-        work needed both — and that is a weaker claim than a hyperlink, so it is
-        reported with the number of conversations behind it rather than as a
-        bare edge.
+        The edge a graph view actually draws. Two sources cited by the same work
+        are related in the only sense Raiker can evidence — some work needed
+        both — which is weaker than a hyperlink, so it is reported with the
+        number of conversations behind it rather than as a bare edge.
         """
         cleaned = locator.strip()
         if not cleaned:
@@ -1502,13 +1501,10 @@ class ConversationStore:
         return dict(row) if row else None
 
     #
-    # The map used to be built from `list_event_index`, one node per event row
-    # typed `tool`. Measured on a workspace after a single live round: 20 of 22
-    # nodes were that type, and none of them was a tool — they were "turn
-    # started", "model request completed" and their kin. These three reads are
-    # what the map is actually about: the tools a session really used, what a
-    # turn's answer actually came from, and the files the owner actually
-    # attached.
+    # The map is about three things, read directly: the tools a session really
+    # used, what a turn's answer came from, and the files the owner attached.
+    # The event index is not one of them — most of its `tool` rows are
+    # lifecycle events, not tools.
 
     def summarize_session_tool_use(
         self: SQLiteStore, session_ids: Sequence[str], *, owner_principal_id: str | None = None
@@ -1656,14 +1652,11 @@ class ConversationStore:
     def get_last_event_sha256(self: SQLiteStore, session_id: str) -> str | None:
         """The hash of the event this session's next event follows.
 
-        Ordered by ``jsonl_offset`` — the same key ``verify_session_events``
-        walks the chain by — and **not** by ``timestamp``, which is what this
-        used to do. `utc_now()` truncates to whole seconds, so every event a busy
-        turn writes inside one second shares a timestamp and `ORDER BY timestamp
-        DESC LIMIT 1` picked an arbitrary one of them as "the last". The write
-        path is properly serialised; what was missing is that the writer's notion
-        of *previous* and the verifier's notion of *previous* were different
-        keys, so a correctly written log could still report `chain_intact: false`.
+        Invariant: the writer's *previous* and the verifier's *previous* are the
+        same key, ``jsonl_offset``, the key ``verify_session_events`` walks the
+        chain by. Never ``timestamp``: `utc_now()` truncates to whole seconds, so
+        events a busy turn writes within one second tie, and a correctly written
+        log would report `chain_intact: false`.
 
         `rowid` breaks any remaining tie, which covers legacy rows written before
         an offset was recorded.

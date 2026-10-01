@@ -60,8 +60,7 @@
   // MEM-04 — what the runtime captured while it worked. Loaded beside the
   // memories rather than behind a tab click, because the summary counters at
   // the top of this page are only honest if this half is known: "0 observations
-  // captured" and "everything was refused on sensitivity" are different facts
-  // and used to be indistinguishable.
+  // captured" and "everything was refused on sensitivity" are different facts.
   let observations = $state<ObservationsView | null>(null);
   let observationFilter = $state("all");
 
@@ -89,12 +88,9 @@
       query_embeddable: false,
     },
   );
-  // Three states, not two. The card used to have a sentence for "the fallback"
-  // and a sentence for "a semantic space", and the second one claimed a recall
-  // the runtime does not perform yet: the stored vectors are semantic, and the
-  // question is not embedded into them, so matching is still by words. Saying
-  // "matches meaning" there would be the same defect MEM-03 was raised to
-  // remove, one layer further in.
+  // Three states, not two. Stored vectors being semantic does not make recall
+  // semantic: until the question is embedded too, matching is by words, and
+  // saying "matches meaning" then is the claim MEM-03 removes.
   const recall = $derived(
     !retrieval.semantic
       ? "lexical"
@@ -439,11 +435,10 @@
       <div class="memory-title">{#if editingId === m.memory_id}<textarea rows="3" bind:value={editDraft} aria-label="Memory text"></textarea>{:else}<h4>{m.text}</h4>{/if}{#if m.pinned}<span class="pin-label"><Icon name="check" size="sm" /> Pinned</span>{/if}</div>
       <div class="meta"><span>Approved</span><span>{m.scope} scope</span><span>{m.sensitivity} sensitivity</span></div>
       <dl><div><dt>Source</dt><dd>{provenanceLabel(m)}</dd></div><div><dt>Approved</dt><dd>{relativeTime(m.created_at)}</dd></div><div><dt>Review or expiry</dt><dd>{m.expires_at ? relativeTime(m.expires_at) : "No date set"}</dd></div></dl>
-      <!-- REM-MEM-01 — two everyday actions and one way in to the rest. The
-           row used to carry seven controls at one weight, so "edit the words"
-           and "delete this permanently" were the same size and the same colour,
-           and the four that only *show* something looked exactly like the three
-           that change what Raiker remembers. -->
+      <!-- REM-MEM-01 — two everyday actions and one way in to the rest, so
+           "edit the words" and "delete this permanently" never share a weight,
+           and showing something never looks like changing what Raiker
+           remembers. -->
       <div class="card-actions">{#if editingId === m.memory_id}<button class="btn btn-primary btn-sm" aria-label="Save memory" onclick={() => void saveEdit(m)}>Save</button><button class="btn btn-ghost btn-sm" onclick={() => editingId = null}>Cancel</button>{:else}<button class="btn btn-ghost btn-sm" aria-label="Edit memory" onclick={() => { editingId = m.memory_id; editDraft = m.text; }}>Edit</button><button class="btn btn-ghost btn-sm" aria-label={m.pinned ? "Unpin memory" : "Pin memory"} onclick={() => void togglePin(m)}>{m.pinned ? "Unpin" : "Pin"}</button><button class="btn btn-ghost btn-sm" aria-expanded={drawerId === m.memory_id} aria-label={`More for “${m.text.slice(0, 40)}”`} onclick={() => drawerId = drawerId === m.memory_id ? null : m.memory_id}>More</button>{/if}</div>
       {#if drawerId === m.memory_id}
         <MemoryRecordDrawer
@@ -631,15 +626,8 @@
           {/if}
         </span>
       </p>
-      <!--
-        The mechanics of the index used to be three lines here: how many vectors
-        are ranked exactly, what happens past that, and when it rebuilds. None of
-        it is a decision the owner makes on this page, and the page already says
-        the only thing they act on — whether recall is matching meaning or words.
-        The full account moved to the guide's *Recall backend and token budget*,
-        which is where the rest of this page's reasoning already lives; what
-        stays is the one number a reader might want to check.
-      -->
+      <!-- The index's mechanics are in the guide's *Recall backend and token
+           budget*; this page keeps the one number a reader might check. -->
       {#if settings.vector_search_strategy === "exact_then_approximate"}
         <p class="control-note">
           Ranks {settings.vector_search_exact_limit ?? 512} vectors exactly, then approximates.
@@ -659,12 +647,9 @@
 {/if}
 
   <details class="advanced"><summary><span><strong>Advanced memory management</strong><small>Import or export governed memory records.</small></span><Icon name="chevron-down" size="md" /></summary><div class="advanced-body"><button class="btn btn-ghost" onclick={() => void exportMemories()}>Export memories</button><label class="btn btn-ghost file-button">Review import<input type="file" accept="application/json,.json" onchange={(e) => void reviewImport(e)} /></label>{#if importPreview}
-      <!-- BUG-244 — what this would change, before it changes anything. An
-           import used to report the number of records in the file and write
-           every one of them, so re-importing the same file made a second copy
-           of every sentence and said "4 records" both times. Recall is
-           budgeted: four copies of one sentence occupy four of the slots a
-           turn has for remembering anything. -->
+      <!-- BUG-244 — what this would change, before it changes anything. A
+           re-import must not duplicate: recall is budgeted, and four copies of
+           one sentence take four of the slots a turn has for remembering. -->
       <div class="import-review" role="status">
         <strong>{importFileName}</strong>
         {#if importAlready === null}

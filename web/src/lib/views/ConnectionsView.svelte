@@ -43,9 +43,8 @@
 
   function reason(e: unknown): string {
     if (!(e instanceof ApiError)) return "Request failed";
-    // RR-MCP-02 — a refused endpoint used to arrive here as its reason code.
-    // `mcp_remote_host_not_public` is a true statement and not one an owner can
-    // do anything with.
+    // RR-MCP-02 — a refused endpoint is explained in words an owner can act on,
+    // not shown as its reason code.
     return (
       endpointRefusal(e.reasonCode) ??
       e.reasonCode ??

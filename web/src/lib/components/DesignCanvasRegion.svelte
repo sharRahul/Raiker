@@ -1,14 +1,8 @@
 <script lang="ts">
   /*
-   * Design's canvas, now that there is something to compose.
-   *
-   * This component used to be one region and said so: "five of them describe a
-   * canvas runtime Raiker does not have", because the governed image endpoint
-   * took a prompt and returned one picture. BUG-277 built that runtime — a
-   * request can name a prior generation as its subject, ask for several
-   * pictures, and the store records what each was made from — so the regions the
-   * review asks for now have real relationships to draw and are no longer empty
-   * shells.
+   * Design's canvas. A request can name a prior generation as its subject and
+   * ask for several pictures, and the store records what each was made from
+   * (BUG-277), so the regions draw real relationships.
    *
    * Three regions, and the review's rule about which dominates:
    *

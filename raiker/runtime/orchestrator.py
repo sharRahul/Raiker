@@ -219,10 +219,8 @@ _SYSTEM_PROMPT = (
     "series must be the length of the labels. Raiker renders these as a real table or chart; "
     "anything malformed is shown to the user as refused, so send the shape only when you have the "
     "data for it, and write ordinary prose the rest of the time. "
-    # Found live on 2026-09-15: asked for "this as a table and a bar chart", the
-    # model reached for `create_document` and wrote a file. That is the right
-    # tool for a file and the wrong one for an answer, and nothing had told it
-    # which question it was being asked.
+    # Tell the model which question it is answering: a table or chart asked for
+    # in the answer is a typed part, not a file written with `create_document`.
     "These blocks are how you answer *in the conversation*. Use `create_document` only when the "
     "user asked for a file to keep or to send; do not write one to show a table or a chart."
 )
@@ -588,12 +586,12 @@ class RuntimeOrchestrator:
     ) -> dict[str, Any] | None:
         """Refuse a subagent result that is not bound to the spawn (BUG-78).
 
-        Delegation is the one governed hand-off that used to skip the machine
-        identity Raiker already issues and verifies everywhere else. A result now
-        arrives with an attestation binding it to its spawn and to its own
-        content; one that fails verification is refused with a stated reason
-        rather than silently consumed, and the successful binding is recorded on
-        the turn's hash-chained event so the delegation is provable afterwards.
+        A result arrives with an attestation binding it to its spawn and to its
+        own content, under the same machine identity every other governed
+        hand-off uses; one that fails verification is refused with a stated
+        reason rather than silently consumed, and the successful binding is
+        recorded on the turn's hash-chained event so the delegation is provable
+        afterwards.
         """
         if action.tool_name != "spawn_subagent" or payload.get("status") != "success":
             return None
@@ -1550,11 +1548,9 @@ class RuntimeOrchestrator:
     ) -> None:
         """A refused call, as the same transcript row every other call gets.
 
-        BUG-206 slice E. A refusal used to be a separate card at the bottom of
-        the turn, because it was the *only* call the transcript could speak
-        about. Now that every call has a row, a refused one is that row in a
-        refused state, in the place it was refused — which is where the owner is
-        looking when they wonder what happened to it.
+        BUG-206 slice E. A refused call is that call's row in a refused state,
+        in the place it was refused — where the owner looks when they wonder
+        what happened to it.
         """
         if self._sink is None:
             return
@@ -1814,10 +1810,9 @@ class RuntimeOrchestrator:
     ) -> str | None:
         """Skip a provider the breaker has contained; return its reason code.
 
-        BUG-76 — the chain used to try a hard-down provider on every turn, once
-        per fallback entry, until the turn's budget was gone. A contained
-        provider is now stepped over with a stated reason so the chain reaches a
-        working one immediately, and the turn that runs out of providers reports
+        BUG-76 — a contained provider is stepped over with a stated reason, so
+        the chain reaches a working one immediately instead of spending the
+        turn's budget on it, and a turn that runs out of providers reports
         containment rather than a generic connection failure.
         """
         if breaker is None:
@@ -2649,14 +2644,10 @@ class RuntimeOrchestrator:
         turn_reasoning: list[str] = []
         # BUG-300 — and the same is true of the *answer*, for the same reason.
         #
-        # `final_text` used to be the last round's text alone, so anything the
-        # model wrote alongside a tool call streamed to the browser and then
-        # vanished: the turn the owner read and the turn Raiker stored were
-        # different strings. A reopened conversation lost those paragraphs, an
-        # export lost them, and — found live on 2026-09-16 — a turn that
-        # declared a ```raiker:table``` before calling `update_plan` had its
-        # table dropped from the response's own parts, so the one surface that
-        # could render it fell back to drawing the fence as a code block.
+        # `final_text` is every round's text, not the last round's: what the
+        # model wrote alongside a tool call is part of the answer the owner read,
+        # so the stored, reopened and exported turn — and the typed parts
+        # declared in it — must hold it too (FIXED-550).
         #
         # Joined with a blank line, because each entry is a separate assistant
         # message and Markdown's paragraph boundary is what separates two of

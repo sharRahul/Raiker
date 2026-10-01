@@ -11,6 +11,7 @@ turns off.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from pathlib import Path
@@ -23,7 +24,13 @@ from raiker.control.project_paths import MANAGED_PROJECT_ROOT as _MANAGED_PROJEC
 from raiker.control.project_paths import contained_project_root as _contained_project_root
 from raiker.control.project_paths import project_root_parts as _project_root_parts
 from raiker.control.project_roots import resolve_project_root
-from raiker.control.views.projects import ProjectDetailView, ProjectsListView, ProjectView
+from raiker.control.views.projects import (
+    ProjectAttachmentView,
+    ProjectDeletionPreviewView,
+    ProjectDetailView,
+    ProjectsListView,
+    ProjectView,
+)
 from raiker.events.export import generate_export
 from raiker.runtime.authority.models import PrincipalType
 
@@ -49,7 +56,12 @@ class ProjectService:
             active_project_id=active,
         )
 
-    def get_project(self: DashboardService, project_id: str, user_id: str | None = None) -> ProjectDetailView | None:
+    def get_project(
+        self: DashboardService,
+        project_id: str,
+        user_id: str | None = None,
+        owner_principal_id: str | None = None,
+    ) -> ProjectDetailView | None:
         row = self.store.load_project(project_id, user_id)
         if row is None:
             return None
@@ -62,12 +74,39 @@ class ProjectService:
             self._checkpoint_view(c) for c in self.store.list_checkpoints(project_id=project_id)
         )
         row["session_count"] = len(sessions)
+        row["last_activity_at"] = max((s.updated_at for s in sessions if s.updated_at), default=None)
+        context = self.store.load_project_context(project_id)
         return ProjectDetailView(
             project=self._project_view(row, active),
             sessions=sessions,
             checkpoints=checkpoints,
-            context=self.store.load_project_context(project_id),
+            context=context,
+            attachments=self._project_attachments(context.get("attachment_ids", []), owner_principal_id),
         )
+
+    def _project_attachments(
+        self: DashboardService, attachment_ids: list[str], owner_principal_id: str | None
+    ) -> tuple[ProjectAttachmentView, ...]:
+        """UX-PROJ-04 — resolve the context's attachment ids to what a person reads.
+
+        Scoped to the owner who is reading, so an id that names another
+        account's file resolves exactly like one that names nothing.
+        """
+        resolved: list[ProjectAttachmentView] = []
+        for attachment_id in attachment_ids:
+            meta = self.store.load_attachment_metadata(
+                attachment_id, owner_principal_id=owner_principal_id
+            )
+            resolved.append(
+                ProjectAttachmentView(
+                    attachment_id=attachment_id,
+                    filename=str(meta.get("filename") or "") if meta else "",
+                    media_type=str(meta.get("media_type") or "") if meta else "",
+                    byte_size=int(meta.get("byte_size") or 0) if meta else 0,
+                    available=meta is not None,
+                )
+            )
+        return tuple(resolved)
 
     def export_project(self: DashboardService, project_id: str, acting_principal_id: str | None) -> ControlResult:
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
@@ -383,28 +422,123 @@ class ProjectService:
         self.store.archive_project(project_id)
         return ControlResult(ok=True, data={"project_id": project_id, "archived": True})
 
-    def move_project(
-        self: DashboardService, project_id: str, new_parent_id: str | None, acting_principal_id: str | None
+    def restore_project(
+        self: DashboardService, project_id: str, acting_principal_id: str | None
     ) -> ControlResult:
-        """Move a project to a new parent (human-only)."""
+        """UX-PROJ-05 — bring an archived project back, with what was archived with it.
+
+        Human-only: archiving is reversible precisely because a person can undo
+        it. A project whose parent is still archived would come back into a
+        tree that does not show it, so that is refused by name rather than
+        restored somewhere the owner cannot find.
+        """
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        if self.store.load_project(project_id, principal.delegated_by_user_id) is None:
+        project = self.store.load_project(project_id, principal.delegated_by_user_id)
+        if project is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
-        if (
-            new_parent_id is not None
-            and self.store.load_project(new_parent_id, principal.delegated_by_user_id) is None
-        ):
-            return ControlResult(ok=False, reason_code=f"unknown_parent:{new_parent_id}")
-        ok = self.store.move_project(project_id, new_parent_id)
-        if not ok:
-            return ControlResult(ok=False, reason_code="move_failed_or_cycle")
+        parent_id = project.get("parent_id")
+        if parent_id:
+            parent = self.store.load_project(str(parent_id), principal.delegated_by_user_id)
+            if parent is not None and parent.get("is_archived"):
+                return ControlResult(ok=False, reason_code="project_parent_archived")
+        self.store.restore_project(project_id)
+        return ControlResult(ok=True, data={"project_id": project_id, "archived": False})
+
+    def move_project(
+        self: DashboardService, project_id: str, new_parent_id: str | None, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Move a project to a new parent (human-only).
+
+        UX-PROJ-06 — every refusal has its own name, so the page can say which
+        destination was wrong: the project itself, one of its own descendants,
+        an archived folder, or one that is not there.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        user_id = principal.delegated_by_user_id
+        if self.store.load_project(project_id, user_id) is None:
+            return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
+        if new_parent_id is not None:
+            if new_parent_id == project_id:
+                return ControlResult(ok=False, reason_code="project_move_into_itself")
+            parent = self.store.load_project(new_parent_id, user_id)
+            if parent is None:
+                return ControlResult(ok=False, reason_code=f"unknown_parent:{new_parent_id}")
+            if new_parent_id in self.store.subtree_project_ids(project_id):
+                return ControlResult(ok=False, reason_code="project_move_into_descendant")
+            if parent.get("is_archived"):
+                return ControlResult(ok=False, reason_code="project_move_into_archived")
+        if not self.store.move_project(project_id, new_parent_id):
+            return ControlResult(ok=False, reason_code="project_move_into_descendant")
         return ControlResult(
             ok=True, data={"project_id": project_id, "new_parent_id": new_parent_id}
         )
+
+    #: How many entries the deletion preview walks before it says "at least".
+    _DELETION_PREVIEW_ENTRY_LIMIT = 20_000
+
+    def project_deletion_preview(
+        self: DashboardService, project_id: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        """UX-PROJ-07 — what deleting this project removes, before anything is removed."""
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        project = self.store.load_project(project_id, principal.delegated_by_user_id)
+        if project is None:
+            return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
+        root = resolve_project_root(
+            project,
+            self.store.list_brain_source_grants(str(acting_principal_id)),
+            self.workspace_root,
+        )
+        files = folder_bytes = 0
+        truncated = False
+        if root.kind == "managed" and root.path is not None and root.path.is_dir():
+            # A symlink inside the folder is removed as a link, never followed,
+            # so it is not counted as what it points at.
+            for directory, _subdirs, names in os.walk(root.path, followlinks=False):
+                for name in names:
+                    if files >= self._DELETION_PREVIEW_ENTRY_LIMIT:
+                        truncated = True
+                        break
+                    entry = Path(directory) / name
+                    try:
+                        if entry.is_symlink() or not entry.is_file():
+                            continue
+                        folder_bytes += entry.stat().st_size
+                        files += 1
+                    except OSError:
+                        continue
+                if truncated:
+                    break
+        counts = self.store.project_deletion_counts(project_id)
+        view = ProjectDeletionPreviewView(
+            project_id=project_id,
+            name=str(project["name"]),
+            root_kind=root.kind,
+            root_label=str(project.get("root_label") or "") or _default_root_label(project),
+            sessions=counts.get("sessions", 0),
+            turns=counts.get("turns", 0),
+            tasks=counts.get("tasks", 0),
+            checkpoints=counts.get("checkpoints", 0),
+            managed_files=counts.get("managed_files", 0),
+            descendants=counts.get("descendants", 0),
+            folder_files=files,
+            folder_bytes=folder_bytes,
+            folder_truncated=truncated,
+            requires_step_up=root.kind == "managed",
+        )
+        return ControlResult(ok=True, data={"preview": view})
 
     def _project_view(self: DashboardService, row: dict[str, Any], active_project_id: str | None) -> ProjectView:
         return ProjectView(
@@ -420,4 +554,5 @@ class ProjectService:
             archived_at=row.get("archived_at"),
             root_kind=str(row.get("root_kind") or "managed"),
             root_label=str(row.get("root_label") or "") or _default_root_label(row),
+            last_activity_at=row.get("last_activity_at") or None,
         )

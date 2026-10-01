@@ -55,18 +55,10 @@ def memory_search(
 ) -> dict[str, Any]:
     """Search approved memory the way the runtime does — all three legs.
 
-    **MEM-11.** This used to call ``search_memory``, which is the lexical index
-    and nothing else, while the ambient recall the gatherer injects into the
-    same turn used :func:`retrieve_hybrid_memory` — lexical *plus* vector *plus*
-    graph. Two different answers to the same question reached the model in one
-    turn, and the weaker one was the half the model could actually steer.
-
-    It was also the half that silently ignored the owner's settings: choosing a
-    recall backend on the Memory page changed the injected context and left this
-    tool exactly as it was, so the interface described a choice that did not
-    apply to the search the model ran.
-
-    Both now go through one function. The result names the legs each hit came
+    **MEM-11.** The tool and the ambient recall the gatherer injects go through
+    one function, :func:`retrieve_hybrid_memory` — lexical *plus* vector *plus*
+    graph — so the model never gets two answers to one question in one turn,
+    and the owner's recall-backend choice applies to the search the model runs. The result names the legs each hit came
     from and the embedding space that was searched, because "recalled by
     similarity" means something different in a learned space than in the hashing
     fallback, and a model reasoning about its own sources should be able to

@@ -20,6 +20,7 @@
   import type { ModelProfile, SetupState } from "../apiTypes";
   import { modelName } from "../modelPresentation";
   import { isReachableProfile } from "../modelReadiness.svelte";
+  import { setModels } from "../models.svelte";
   import {
     PERMISSIONS_NOTE,
     PRIVACY_CHOICES,
@@ -79,6 +80,10 @@
     try {
       const view = await api.models();
       profiles = view.profiles;
+      // The composer every work surface mounts reads the shared store. Without
+      // this, Ready → Chat opened on the model selected before setup, with no
+      // readiness check, beside the one the owner had just chosen and checked.
+      setModels(view);
       // BUG-261 — the picker's switches have to open showing what is already
       // kept offered, or every one of them reads as off.
       chatProfiles = view.chat_profiles ?? [];
@@ -184,7 +189,7 @@
       id: "chat",
       label: "Chat",
       icon: "chat",
-      route: "#/chat",
+      route: "#/new-chat",
       ready: modelChosen,
       missing: modelChosen ? "" : "Needs a model to answer with.",
       remedy: "#/models?tab=add",

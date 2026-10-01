@@ -153,6 +153,20 @@ pub fn linger(marker: &Path) {
     std::thread::sleep(Duration::from_secs(600));
 }
 
+/// Remove what the probe wrote, from outside the boundary.
+///
+/// The child deletes each file it wrote, but a boundary may allow a write and
+/// refuse the delete — a restricted token on Windows does — and the child's own
+/// cleanup then fails silently, leaving `.raiker-probe-inside.tmp` in the
+/// owner's workspace. The parent runs with the owner's own rights and removes
+/// it, and any file an escaping write left outside.
+pub fn remove_probe_writes(test: &SelfTest) {
+    let _ = std::fs::remove_file(&test.inside_path);
+    for path in &test.outside_paths {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
 fn write_probe(path: &Path) -> Value {
     match std::fs::write(path, b"raiker-probe") {
         Ok(()) => {
@@ -216,6 +230,26 @@ pub fn verdict(inside_allowed: bool, outside_allowed: bool) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_parent_removes_what_the_probe_wrote_in_the_workspace() {
+        let dir = std::env::temp_dir().join(format!("raiker-probe-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let test = SelfTest {
+            nonce: "n".to_owned(),
+            inside_path: dir.join(".raiker-probe-inside.tmp"),
+            outside_paths: vec![dir.join(".raiker-probe-escape.tmp")],
+            masked_read_path: dir.join("state"),
+            connect_address: "127.0.0.1:9".to_owned(),
+            spawn_grandchild: false,
+        };
+        std::fs::write(&test.inside_path, b"raiker-probe").unwrap();
+        std::fs::write(&test.outside_paths[0], b"raiker-probe").unwrap();
+        remove_probe_writes(&test);
+        assert!(!test.inside_path.exists());
+        assert!(!test.outside_paths[0].exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn a_refusal_without_a_control_arm_is_indeterminate_not_proof() {

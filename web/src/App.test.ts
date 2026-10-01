@@ -268,6 +268,25 @@ describe("App shell", () => {
     });
   });
 
+  it("asks nothing of a stale cookie but whether it still signs anyone in", async () => {
+    // A reset or reinstalled workspace on the same host leaves Raiker's readable
+    // CSRF cookie behind. Until the boot probe answers, that cookie looks like a
+    // session, and the background readiness check used to ask for the model
+    // list on the lock screen — a 401 in the console on every such load.
+    document.cookie = "raiker_csrf=stale-from-an-earlier-workspace; path=/";
+    const mock = stubFetch({
+      ...BOOTSTRAP_ROUTES,
+      "GET /api/auth/session-state": { principal_id: null },
+    });
+    render(App);
+    await waitFor(() => expect(screen.getByLabelText("Username")).toBeInTheDocument());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const paths = mock.mock.calls.map((call) => String(call[0]).split("?")[0]);
+    expect(paths).toContain("/api/auth/session-state");
+    expect(paths).not.toContain("/api/models");
+    document.cookie = "raiker_csrf=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  });
+
   it("shows an honest auth error at the lock screen when the API is unreachable", async () => {
     vi.stubGlobal(
       "fetch",

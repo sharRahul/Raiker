@@ -180,10 +180,6 @@
       }
     };
     window.addEventListener("keydown", openPalette);
-    // BUG-83 — while a work surface is open, the selected model's readiness is
-    // re-confirmed in the background as its window runs down, so a long session
-    // does not spontaneously disable Send.
-    const stopRevalidation = startReadinessRevalidation();
     // Warm the split route chunks off the critical path, so the first click on
     // a secondary destination is as instant as it was in the single-chunk build.
     prefetchRoutes();
@@ -191,8 +187,17 @@
       window.removeEventListener("hashchange", handler);
       window.removeEventListener("keydown", openPalette);
       navigationQuery?.removeEventListener("change", updateNavigationMode);
-      stopRevalidation();
     };
+  });
+
+  // BUG-83 — while a work surface is open, the selected model's readiness is
+  // re-confirmed in the background as its window runs down, so a long session
+  // does not spontaneously disable Send. Only once the shell is ready: a stale
+  // CSRF cookie from an earlier workspace on this host reads as "signed in"
+  // until the boot probe says otherwise, and asking before then logged a 401.
+  $effect(() => {
+    if (authState !== "ready") return;
+    return startReadinessRevalidation();
   });
 
   // Called by the lock screen once a full control session exists.

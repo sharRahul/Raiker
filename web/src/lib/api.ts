@@ -1,36 +1,21 @@
 import type {
   AgentPlan,
   AgentResponse,
-  AuditExportResult,
-  AuditExportView,
   ApprovalDetailView,
   ApprovalView,
   AttachmentPreview,
-  SourceExcerptView,
-  AuthSession,
-  BrainView,
-  BrainSourceResult,
+  AuditExportResult,
+  AuditExportView,
   BrainSourceBrowse,
-  BrainSourceRoot,
+  BrainSourceResult,
   BrainSourceReview,
+  BrainSourceRoot,
+  BrainView,
   CapabilityContainmentView,
   CapabilityDecisionMode,
   CapabilityGate,
-  ContainedSubject,
-  ContextUsage,
-  ConversationBranch,
-  ConversationCompaction,
-  OwnerQuestionAnswered,
-  ConversationBranchOrigin,
-  ConversationBranchPlan,
-  EnvironmentContext,
-  ReadCapabilities,
+  ChannelsView,
   Checkpoint,
-  CommandChunkView,
-  CommandReceiptView,
-  CommandRunView,
-  CredentialDeltaView,
-  ComposerApprovalModeSettings,
   CodeMapPaths,
   CodeMapStatus,
   CodeRepoBrowseView,
@@ -38,102 +23,42 @@ import type {
   CodeRepoDiagnosticsView,
   CodeRepoFileView,
   CodeReposView,
-  CredentialLifecycle,
+  CodexSubscriptionStatus,
+  CommandChunkView,
+  CommandReceiptView,
+  CommandRunView,
+  ComposerApprovalModeSettings,
   ConnectionsView,
   ConnectorStoreView,
-  HostActionResult,
-  HostPathListing,
-  HostStatusView,
-  UpdateCheckResult,
-  UpdateApplyResult,
-  UpdateStatusView,
+  ContainedSubject,
+  ContextUsage,
+  ConversationBranch,
+  ConversationBranchOrigin,
+  ConversationBranchPlan,
+  ConversationCompaction,
+  CredentialDeltaView,
+  CredentialLifecycle,
   Diagnostics,
-  MemoryIntegrity,
-  SessionRecallView,
   DiagnosticsExport,
+  EnvironmentContext,
   EventEntry,
   ExecutionEnvironment,
   ExecutionEnvironmentsView,
   ExtensionsOverview,
-  InterruptRequestBody,
-  InstanceLaunchResult,
-  InterruptResult,
-  StopAllResult,
-  WorkInFlight,
-  McpAgentAccess,
-  ChannelsView,
-  McpOffer,
-  McpServer,
-  McpSession,
-  McpFinding,
-  Notification,
-  MemoryControlView,
-  MemoryImportPreview,
-  MemoryImportResult,
-  MemoryProposal,
-  MemoryRelationshipProposal,
-  MemoryHistoryEvent,
+  GitCredentialStatus,
   GuideIndex,
   GuideSection,
-  MemorySettingsView,
-  ObservationsView,
-  ModelDecision,
-  ModelPricingView,
-  ModelReadinessView,
-  ModelSetupState,
-  SetupState,
-  ModelOperation,
-  PartialFiles,
-  PluginsView,
   HooksView,
-  RuntimeInstallPlan,
-  ModelLibraryView,
-  HuggingFaceSearchResult,
-  HuggingFaceVariant,
+  HostActionResult,
+  HostPathListing,
+  HostStatusView,
   HuggingFaceDownloadPreview,
   HuggingFaceDownloadResult,
-  ModelConversionPreview,
-  ModelCapacitiesView,
-  ModelsView,
-  PasswordRecoveryBeginResult,
-  ProjectDetail,
-  ProjectFilesView,
-  ProjectTreeNode,
-  ProjectsList,
-  PromptAttachment,
-  PromptRequestBody,
-  ProviderModelList,
-  ProviderCatalogueRefresh,
-  CodexSubscriptionStatus,
-  ProviderWeeklyUsageView,
-  ResolveApprovalResult,
-  ResumableTurnsView,
-  ResolveCriticalApprovalResult,
-  RestorePlan,
-  RestoreRequestResult,
-  RuntimeMode,
-  RuntimeReadiness,
-  SecurityHealth,
-  SessionAttachmentsView,
-  SessionDetail,
-  SessionSummary,
-  SkillMutationResult,
-  SkillVerification,
-  SkillView,
-  StandingGrant,
-  StreamEvent,
-  TaskDetailView,
-  TaskView,
-  TranscriptExportManifest,
-  TurnDetail,
-  TurnSourceExcerptView,
-  TurnSourcesView,
-  UploadedAttachment,
-  WebBlocklist,
-  WebBlocklistProbe,
-  WorkThread,
-  WorkThreadPage,
-  GitCredentialStatus,
+  HuggingFaceSearchResult,
+  HuggingFaceVariant,
+  ImageGenerationsView,
+  InterruptRequestBody,
+  InterruptResult,
   KnowledgeSourceKind,
   KnowledgeSourcesView,
   ManagedFile,
@@ -141,370 +66,96 @@ import type {
   ManagedFileList,
   ManagedFileScope,
   ManagedFileUpload,
+  McpAgentAccess,
+  McpFinding,
+  McpOffer,
+  McpServer,
+  McpSession,
+  MemoryControlView,
+  MemoryHistoryEvent,
+  MemoryImportPreview,
+  MemoryImportResult,
+  MemoryIntegrity,
+  MemoryProposal,
+  MemoryRelationshipProposal,
+  MemorySettingsView,
+  ModelCapacitiesView,
+  ModelConversionPreview,
+  ModelDecision,
+  ModelLibraryView,
+  ModelOperation,
+  ModelPricingView,
+  ModelReadinessView,
+  ModelSetupState,
+  ModelsView,
+  Notification,
+  ObservationsView,
+  OwnerQuestionAnswered,
+  PartialFiles,
+  PluginsView,
   ProjectBrowseView,
+  ProjectDetail,
+  ProjectFilesView,
   ProjectRootIndexResult,
   ProjectRootStatus,
+  ProjectsList,
+  ProjectTreeNode,
+  PromptAttachment,
+  PromptRequestBody,
+  ProviderCatalogueRefresh,
+  ProviderModelList,
+  ProviderWeeklyUsageView,
+  ReadCapabilities,
+  ResolveApprovalResult,
+  ResolveCriticalApprovalResult,
+  RestorePlan,
+  RestoreRequestResult,
+  ResumableTurnsView,
+  RuntimeInstallPlan,
+  RuntimeMode,
+  RuntimeReadiness,
+  SecurityHealth,
+  SessionAttachmentsView,
+  SessionDetail,
+  SessionRecallView,
+  SessionSummary,
+  SetupState,
+  SkillMutationResult,
+  SkillVerification,
+  SkillView,
+  SourceExcerptView,
   SpeechRuntimeChange,
   SpeechRuntimeProbe,
   SpeechRuntimeView,
-  ImageGenerationsView,
+  StandingGrant,
+  StopAllResult,
+  TaskDetailView,
+  TaskView,
   TelemetryDestination,
+  TranscriptExportManifest,
+  TurnDetail,
+  TurnSourceExcerptView,
+  TurnSourcesView,
+  UpdateApplyResult,
+  UpdateCheckResult,
+  UpdateStatusView,
+  UploadedAttachment,
+  WebBlocklist,
+  WebBlocklistProbe,
+  WorkInFlight,
+  WorkThread,
+  WorkThreadPage,
 } from "./apiTypes";
 import type { ApprovalMode } from "./approvalMode";
+import { restoreSession } from "./api/auth";
+import { postJson, request, requestBlob, withQuery } from "./api/core";
 
-// Bearer token held in memory only — never localStorage/sessionStorage (security requirement).
-let token: string | null = null;
-
-/**
- * The CSRF token that pairs with the session cookie (BUG-253).
- *
- * The cookie is what makes a reload keep the session; it is also what creates a
- * CSRF surface, because a browser attaches a cookie by itself and never
- * attaches an `Authorization` header by itself. This value — handed back by the
- * sign-in, and readable from Raiker's own cookie after a reload — is echoed in a
- * header on every state-changing request, which is the half a cross-site page
- * cannot produce. Holding it in a variable is not a secrecy claim: it is a
- * convenience over re-reading the readable cookie on every call.
- */
-let csrfToken: string | null = null;
-
-export function setToken(value: string | null): void {
-  token = value;
-}
-
-export function setCsrfToken(value: string | null): void {
-  csrfToken = value;
-}
-
-/**
- * Raiker's own readable CSRF cookie, for the case where a reload dropped it.
- *
- * Wrapped because reading `document.cookie` can throw — a document with an
- * opaque origin, a browser configured to block site data, an embedding context
- * with no cookie access. None of those are reasons to fail the request that was
- * about to be sent: the correct answer to "can this be read?" is "no", and the
- * server's own refusal is what governs the outcome.
- */
-function csrfFromCookie(): string | null {
-  try {
-    if (typeof document === "undefined") return null;
-    const match = document.cookie.match(/(?:^|;\s*)raiker_csrf=([^;]*)/);
-    return match ? decodeURIComponent(match[1]) : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Whether this browser holds something that can authenticate.
- *
- * After a reload the in-memory bearer token is gone and the session cookie is
- * `HttpOnly`, so it cannot be seen from here at all. The readable CSRF cookie is
- * the observable half of the same sign-in, which is what makes it the right
- * question to ask: the *authoritative* answer is still the server's, asked
- * once on boot through `/api/auth/session-state`.
- */
-export function hasToken(): boolean {
-  return token !== null || csrfToken !== null || csrfFromCookie() !== null;
-}
-
-export function getToken(): string | null {
-  return token;
-}
-
-/** The auth headers for one request, whichever way this browser is signed in. */
-function authHeaders(headers: Headers, method: string | undefined): Headers {
-  if (token !== null) headers.set("Authorization", `Bearer ${token}`);
-  const verb = (method ?? "GET").toUpperCase();
-  if (verb !== "GET" && verb !== "HEAD" && verb !== "OPTIONS") {
-    const csrf = csrfToken ?? csrfFromCookie();
-    if (csrf !== null) headers.set("X-Raiker-CSRF", csrf);
-  }
-  return headers;
-}
-
-export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly reasonCode: string | null,
-    message: string,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
-
-/**
- * Read the machine-readable reason out of a failed response.
- *
- * Every governed refusal answers with `{"detail": {"reason_code": …}}`, and that
- * code is the only part of a failure the interface can reason about — the status
- * number alone cannot tell a lost race from a broken turn. Shared by the plain
- * and the streaming paths, because BUG-196 was exactly the streaming path
- * throwing the code away and leaving the UI to guess from `409`.
- */
-function reasonCodeFrom(body: unknown): string | null {
-  const envelope = body as { detail?: { reason_code?: unknown }; reason_code?: unknown } | null;
-  const detail = envelope?.detail ?? envelope;
-  const code = (detail as { reason_code?: unknown } | null)?.reason_code;
-  return typeof code === "string" ? code : null;
-}
-
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = authHeaders(new Headers(init.headers), init.method);
-  // `same-origin` so the session cookie rides along after a reload. It is not
-  // `include`: Raiker never calls another origin, and a cookie should not be
-  // offered to one.
-  const resp = await fetch(instancePath(path), { ...init, headers, credentials: "same-origin" });
-  if (!resp.ok) {
-    let reasonCode: string | null = null;
-    try {
-      reasonCode = reasonCodeFrom(await resp.json());
-    } catch {
-      /* Non-JSON error response */
-    }
-    throw new ApiError(
-      resp.status,
-      reasonCode,
-      `Request failed: ${resp.status} ${path}`,
-    );
-  }
-  return (await resp.json()) as T;
-}
-
-async function requestBlob(
-  path: string,
-  init: RequestInit = {},
-): Promise<Blob> {
-  const headers = authHeaders(new Headers(init.headers), init.method);
-  const resp = await fetch(instancePath(path), { ...init, headers, credentials: "same-origin" });
-  if (!resp.ok) {
-    let reasonCode: string | null = null;
-    try {
-      const body = await resp.json();
-      const detail = body?.detail ?? body;
-      reasonCode = detail?.reason_code ?? null;
-    } catch {
-      /* Non-JSON error response */
-    }
-    throw new ApiError(
-      resp.status,
-      reasonCode,
-      `Request failed: ${resp.status} ${path}`,
-    );
-  }
-  return resp.blob();
-}
-
-function instancePath(path: string): string {
-  if (typeof window === "undefined") return path;
-  const match = window.location.pathname.match(/^(\/instances\/[^/]+)/);
-  return match ? `${match[1]}${path}` : path;
-}
-
-function withQuery(
-  path: string,
-  params: Record<string, string | number | undefined>,
-): string {
-  const q = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== "") q.set(key, String(value));
-  }
-  const suffix = q.toString();
-  return suffix ? `${path}?${suffix}` : path;
-}
-
-function postJson<T>(path: string, body: unknown): Promise<T> {
-  return request<T>(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
-/** Mint a bearer token for the local owner principal and hold it in memory. */
-export async function connect(): Promise<AuthSession> {
-  const session = await postJson<AuthSession & { csrf_token?: string | null }>(
-    "/api/auth/session",
-    { as_principal: null },
-  );
-  setToken(session.token);
-  setCsrfToken(session.csrf_token ?? null);
-  return session;
-}
-
-// ── Lock screen: local-account auth ─────────────────────────────────────────
-
-export type HealthView = {
-  status: string;
-  /** "ok" when the encrypted store opens and reads; "unavailable" otherwise. */
-  store?: string;
-  /** Stable code for an unavailable store, e.g. store_memory_lock_unavailable. */
-  reason?: string;
-  detail?: string;
-  cipher_memory_security?: string;
-  memory_security_mode?: "auto" | "on" | "off";
-  memory_security_probe?: "supported" | "failed" | "not_run";
-  memory_security_reason?: string;
-  memory_security_checked_at?: string | null;
-  sqlcipher_version?: string | null;
-};
-
-/**
- * Privacy-safe pre-auth reachability probe. `/api/health` is the only
- * unauthenticated read: it names whether the server answers and whether the
- * encrypted store opens, and nothing else about the workspace. Both facts are
- * needed pre-auth, because a store that will not open is exactly what makes
- * every sign-in fail (BUG-86) — reporting only reachability let the lock
- * screen call the runtime operational while refusing every attempt.
- */
-export function health(): Promise<HealthView> {
-  return request<HealthView>("/api/health");
-}
-
-export function createInstance(
-  name: string,
-  username: string,
-  password: string,
-): Promise<InstanceLaunchResult> {
-  return postJson<InstanceLaunchResult>("/api/instances", {
-    name,
-    username,
-    password,
-  });
-}
-
-export interface LoginResult {
-  stage: "session" | "mfa_required";
-  principal_id: string;
-  token: string | null;
-  ticket: string | null;
-  /** Pairs with the session cookie on every write (BUG-253). */
-  csrf_token?: string | null;
-}
-
-/**
- * On a full 'session' result the bearer token is stored in memory, and the CSRF
- * token that guards the reload-surviving cookie is stored beside it.
- */
-function adoptSession(result: LoginResult): LoginResult {
-  if (result.stage === "session" && result.token) {
-    setToken(result.token);
-    setCsrfToken(result.csrf_token ?? null);
-  }
-  return result;
-}
-
-/**
- * Whether this browser is already signed in, from the server's point of view
- * (BUG-253).
- *
- * After a reload there is no bearer token in memory and the session cookie is
- * `HttpOnly`, so the only honest way to answer is to ask. "Nobody" is one of the
- * two expected answers, and it is what puts the lock screen up.
- *
- * It asks `/api/auth/session-state` rather than `/api/auth/whoami` (BUG-267). Both
- * answer the same question; only one answers "nobody" with a `200`. Asking the
- * governed route made the browser log a failed request on every locked load —
- * routine noise in the one place a real fault is supposed to stand out.
- */
-export async function restoreSession(): Promise<string | null> {
-  if (!hasToken()) return null;
-  try {
-    const who = await request<{ principal_id: string | null }>("/api/auth/session-state");
-    if (who.principal_id === null) {
-      // The server has already cleared the cookie that said otherwise; drop the
-      // half this page was holding so the next load has nothing to ask with.
-      setToken(null);
-      setCsrfToken(null);
-      return null;
-    }
-    setCsrfToken(csrfFromCookie());
-    return who.principal_id;
-  } catch {
-    // A cookie that no longer authenticates is worse than none: it would make
-    // every later call fail with the owner looking at a workspace. Forget it.
-    setToken(null);
-    setCsrfToken(null);
-    return null;
-  }
-}
-
-export const auth = {
-  register: (username: string, password: string) =>
-    postJson<LoginResult>("/api/auth/register", { username, password }).then(
-      adoptSession,
-    ),
-  login: (username: string, password: string) =>
-    postJson<LoginResult>("/api/auth/login", { username, password }).then(
-      adoptSession,
-    ),
-  verifyMfa: (ticket: string, code: string) =>
-    postJson<LoginResult>("/api/auth/mfa/verify", { ticket, code }).then(
-      adoptSession,
-    ),
-  bootstrapStatus: () =>
-    request<{ can_register: boolean }>("/api/auth/bootstrap-status"),
-  beginPasswordRecovery: (username: string) =>
-    postJson<PasswordRecoveryBeginResult>("/api/auth/password-recovery/begin", {
-      username,
-    }),
-  completePasswordRecovery: (
-    ticket: string,
-    code: string,
-    newPassword: string,
-  ) =>
-    postJson<{ ok: boolean }>("/api/auth/password-recovery/complete", {
-      ticket,
-      code,
-      new_password: newPassword,
-    }),
-  logout: async () => {
-    try {
-      await postJson<{ ok: boolean }>("/api/auth/logout", {});
-    } finally {
-      setToken(null);
-      setCsrfToken(null);
-    }
-  },
-  elevate: (password?: string, mfaCode?: string) =>
-    postJson<{ token: string }>("/api/auth/elevate", {
-      password,
-      mfa_code: mfaCode,
-    }),
-  enrollMfa: () =>
-    postJson<{
-      secret: string;
-      provisioning_uri: string;
-      backup_codes: string[];
-    }>("/api/auth/mfa/enroll", {}),
-  activateMfa: (code: string) =>
-    postJson<{ ok: boolean }>("/api/auth/mfa/activate", { code }),
-  changePassword: (oldPassword: string, newPassword: string) =>
-    postJson<{ ok: boolean }>("/api/auth/password", {
-      old_password: oldPassword,
-      new_password: newPassword,
-    }),
-  listDeviceSessions: () =>
-    request<
-      Array<{
-        session_id: string;
-        created_at: string;
-        last_seen_at: string | null;
-        device_label: string | null;
-        revoked: boolean;
-        scope: string;
-        current: boolean;
-      }>
-    >("/api/auth/sessions"),
-  revokeDeviceSession: (sessionId: string) =>
-    postJson<{ ok: boolean }>(
-      `/api/auth/sessions/${encodeURIComponent(sessionId)}/revoke`,
-      {},
-    ),
-  deleteAccount: () =>
-    request<{ ok: boolean }>("/api/account", { method: "DELETE" }),
-};
+// The endpoint catalogue. Transport, sign-in and streaming live under ./api/;
+// what they export is re-exported here, so a caller imports from one place.
+export { ApiError, getToken, hasToken, setCsrfToken, setToken } from "./api/core";
+export { connect, health, createInstance, restoreSession, auth } from "./api/auth";
+export type { HealthView, LoginResult } from "./api/auth";
+export { streamPrompt, streamResumeAfterApproval } from "./api/streaming";
 
 export interface SettingsView {
   settings: Record<string, unknown>;
@@ -2441,131 +2092,3 @@ export const api = {
       { reason },
     ),
 };
-
-/**
- * Stream a governed turn over SSE (POST /api/prompts/stream). The turn is created by the
- * stream from the prompt body, so this is a POST that reads the response body incrementally
- * rather than an EventSource (which can't send the bearer token or a request body).
- *
- * `onEvent` is invoked for each parsed `StreamEvent`; the promise resolves once the stream
- * closes (the final event carries the complete AgentResponse). Tool execution still flows
- * through the governed broker/policy/approval path — this only observes the turn.
- */
-export async function streamPrompt(
-  body: PromptRequestBody,
-  onEvent: (event: StreamEvent) => void,
-  signal?: AbortSignal,
-): Promise<void> {
-  return streamSse(
-    "/api/prompts/stream",
-    JSON.stringify(body),
-    onEvent,
-    signal,
-  );
-}
-
-/**
- * Stream the continuation of a turn that was parked for an approval (B2).
- *
- * Resolving an approval closes the tool call the model was waiting on, so the
- * *same* turn can pick up from where it stopped instead of the owner re-prompting
- * and the model losing its working state. Same governed path as an ordinary
- * turn — this only surfaces the continuation as it happens.
- */
-export async function streamResumeAfterApproval(
-  approvalId: string,
-  onEvent: (event: StreamEvent) => void,
-  signal?: AbortSignal,
-): Promise<void> {
-  return streamSse(
-    `/api/approvals/${encodeURIComponent(approvalId)}/resume/stream`,
-    null,
-    onEvent,
-    signal,
-  );
-}
-
-async function streamSse(
-  path: string,
-  body: string | null,
-  onEvent: (event: StreamEvent) => void,
-  signal?: AbortSignal,
-): Promise<void> {
-  const headers = authHeaders(new Headers({ "Content-Type": "application/json" }), "POST");
-  // Streaming routes go through `instancePath` like every other call, so a
-  // dashboard served under /instances/<name> streams from its own instance
-  // rather than the default workspace.
-  const url = instancePath(path);
-  const resp = await fetch(url, {
-    method: "POST",
-    headers,
-    credentials: "same-origin",
-    ...(body === null ? {} : { body }),
-    signal,
-  });
-  if (!resp.ok || resp.body === null) {
-    // BUG-196 — a refused stream carries the same `reason_code` a refused plain
-    // request does. Dropping it here is what made a lost resume race read as
-    // "The turn could not continue (409)" underneath a turn that had in fact
-    // completed: the surface had a status number and no way to tell why.
-    let reasonCode: string | null = null;
-    if (!resp.ok) {
-      try {
-        reasonCode = reasonCodeFrom(await resp.json());
-      } catch {
-        /* Non-JSON error response */
-      }
-    }
-    throw new ApiError(
-      resp.status,
-      reasonCode,
-      `Stream failed: ${resp.status} ${url}`,
-    );
-  }
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      buffer = drainSseBuffer(buffer, onEvent);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  // Flush any trailing event that wasn't terminated by a blank line.
-  drainSseBuffer(buffer + "\n\n", onEvent);
-}
-
-/** Parse complete `data:` SSE records out of `buffer`, returning the unconsumed remainder. */
-function drainSseBuffer(
-  buffer: string,
-  onEvent: (event: StreamEvent) => void,
-): string {
-  let rest = buffer;
-  let sep = rest.indexOf("\n\n");
-  while (sep !== -1) {
-    const chunk = rest.slice(0, sep);
-    rest = rest.slice(sep + 2);
-    const event = parseSseChunk(chunk);
-    if (event !== null) onEvent(event);
-    sep = rest.indexOf("\n\n");
-  }
-  return rest;
-}
-
-function parseSseChunk(chunk: string): StreamEvent | null {
-  const data = chunk
-    .split("\n")
-    .filter((line) => line.startsWith("data:"))
-    .map((line) => line.slice(5).trimStart())
-    .join("\n");
-  if (data === "") return null;
-  try {
-    return JSON.parse(data) as StreamEvent;
-  } catch {
-    return null;
-  }
-}

@@ -43,46 +43,14 @@ from raiker.memory.eidetic import (
     record_observation,
 )
 from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
+from raiker.models.tool_registry import OBSERVATION_SOURCE_BY_TOOL
 from raiker.storage.sqlite import SQLiteStore
 
 #: Which tool produced which kind of material. A tool absent from this map
 #: produced bookkeeping rather than material — `update_plan` returns a
 #: checklist, `create_task` returns an id — and observing it would fill the
 #: owner's list with rows that say nothing about what the agent read.
-SOURCE_TYPES: Mapping[str, str] = {
-    "read_file": "workspace_file",
-    "diff_files": "workspace_file",
-    "stat_path": "workspace_file",
-    "list_directory": "workspace_index",
-    "glob": "workspace_index",
-    "grep": "workspace_index",
-    "code_map_search": "workspace_index",
-    "code_map_references": "workspace_index",
-    "run_command": "command_output",
-    "background_run": "command_output",
-    "web_fetch": "external_web",
-    "web_search": "external_web",
-    "web_extract": "external_web",
-    "weather_lookup": "external_web",
-    "github_read": "connector",
-    "gmail_read": "connector",
-    "gcal_read": "connector",
-    "slack_read": "connector",
-    "connector_read": "connector",
-    "conversation_search": "conversation",
-    "knowledge_graph": "graph",
-    "vector_get": "memory_index",
-    "memory_search": "memory_index",
-    "consult_advisor": "advisor",
-    "spawn_subagent": "subagent",
-    # `create_document` is the one write path whose executor returns the
-    # produced material rather than a proposal snapshot. `write_file`,
-    # `edit_file` and `apply_patch` return what *would* happen and are executed
-    # elsewhere after approval, so observing them here would record an artifact
-    # that may never exist.
-    "create_document": "generated_artifact",
-    "skill_load": "skill",
-}
+SOURCE_TYPES: Mapping[str, str] = OBSERVATION_SOURCE_BY_TOOL
 
 #: How long each kind is kept, absent an owner deleting it sooner. Outside
 #: material and command output get the short class because their value decays

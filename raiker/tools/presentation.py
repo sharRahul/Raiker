@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from raiker.context.redaction import redact_text
+from raiker.models.tool_registry import TOOL_FAMILY_BY_TOOL, TOOL_LABEL_BY_TOOL
 from raiker.tools.mcp_tools import parse_mcp_tool_name
 
 # The icon families the client draws one glyph for. `tool` is the neutral
@@ -62,134 +63,9 @@ TOOL_FAMILIES: tuple[str, ...] = (
     FAMILY_TOOL,
 )
 
-_FAMILY_BY_TOOL: dict[str, str] = {
-    # Reading the workspace.
-    "read_file": FAMILY_FILE_READ,
-    "list_directory": FAMILY_FILE_READ,
-    "glob": FAMILY_FILE_READ,
-    "grep": FAMILY_FILE_READ,
-    "stat_path": FAMILY_FILE_READ,
-    "diff_files": FAMILY_FILE_READ,
-    "skill_load": FAMILY_FILE_READ,
-    "vector_get": FAMILY_FILE_READ,
-    # Changing the workspace.
-    "write_file": FAMILY_FILE_WRITE,
-    "edit_file": FAMILY_FILE_WRITE,
-    "apply_patch": FAMILY_FILE_WRITE,
-    "create_document": FAMILY_FILE_WRITE,
-    # Running something.
-    "shell": FAMILY_SHELL,
-    "run_command": FAMILY_SHELL,
-    # BUG-194 — observing a background run belongs with running one: the owner
-    # reading the transcript is following one activity, not two.
-    "background_run": FAMILY_SHELL,
-    "remote_execute": FAMILY_SHELL,
-    "cloud_execute": FAMILY_SHELL,
-    # Leaving the machine for the open web.
-    "web_fetch": FAMILY_WEB,
-    "web_search": FAMILY_WEB,
-    "web_extract": FAMILY_WEB,
-    "weather_lookup": FAMILY_WEB,
-    # The repository and what Raiker knows about it.
-    "git_status": FAMILY_REPOSITORY,
-    "git_diff": FAMILY_REPOSITORY,
-    "git_log": FAMILY_REPOSITORY,
-    "git_branch": FAMILY_REPOSITORY,
-    "git_commit": FAMILY_REPOSITORY,
-    "git_push": FAMILY_REPOSITORY,
-    "github_read": FAMILY_REPOSITORY,
-    "github_write": FAMILY_REPOSITORY,
-    "code_map_search": FAMILY_REPOSITORY,
-    "code_map_references": FAMILY_REPOSITORY,
-    # B10 — three more reads of the repository, so the same family.
-    "document_symbols": FAMILY_REPOSITORY,
-    "find_definition": FAMILY_REPOSITORY,
-    "diagnostics": FAMILY_REPOSITORY,
-    "knowledge_graph": FAMILY_MEMORY,
-    # The owner's own accounts, reached through a governed connector.
-    "gmail_read": FAMILY_CONNECTOR,
-    "gcal_read": FAMILY_CONNECTOR,
-    "slack_read": FAMILY_CONNECTOR,
-    "connector_read": FAMILY_CONNECTOR,
-    "connector_write": FAMILY_CONNECTOR,
-    # What Raiker remembers.
-    "memory_search": FAMILY_MEMORY,
-    "memory_list": FAMILY_MEMORY,
-    "memory_get": FAMILY_MEMORY,
-    "memory_write": FAMILY_MEMORY,
-    "memory_forget": FAMILY_MEMORY,
-    "conversation_search": FAMILY_MEMORY,
-    # Another model doing bounded work for this turn.
-    "spawn_subagent": FAMILY_SUBAGENT,
-    "consult_advisor": FAMILY_SUBAGENT,
-    # The turn's own spine.
-    "update_plan": FAMILY_PLAN,
-    # ADD-22 — asking the owner is planning work, not doing it: the turn is
-    # deciding what to do next, which is the family the plan row already means.
-    "ask_owner_question": FAMILY_PLAN,
-    "create_task": FAMILY_PLAN,
-    "assign_session_project": FAMILY_PLAN,
-    # Backlog #16 — fetching a tool's schema is the turn working out what it can
-    # do next, which is what the plan family already means. It reaches nothing
-    # and changes nothing, so it must not sit in a family that implies either.
-    "tool_search": FAMILY_PLAN,
-}
+_FAMILY_BY_TOOL: dict[str, str] = TOOL_FAMILY_BY_TOOL
 
-_LABEL_BY_TOOL: dict[str, str] = {
-    "read_file": "Read file",
-    "list_directory": "List folder",
-    "glob": "Find files",
-    "grep": "Search files",
-    "stat_path": "Inspect path",
-    "diff_files": "Compare files",
-    "skill_load": "Load skill",
-    "vector_get": "Open vector",
-    "write_file": "Write file",
-    "edit_file": "Edit file",
-    "apply_patch": "Apply patch",
-    "create_document": "Create document",
-    "shell": "Run command",
-    "run_command": "Run command",
-    "background_run": "Check a background command",
-    "remote_execute": "Run command on the remote host",
-    "cloud_execute": "Run command in the cloud",
-    "web_fetch": "Fetch page",
-    "web_search": "Search the web",
-    "web_extract": "Read part of a page",
-    "weather_lookup": "Check the weather",
-    "git_status": "Check repository status",
-    "git_diff": "Read repository changes",
-    "git_log": "Read repository history",
-    "git_branch": "Create branch",
-    "git_commit": "Commit",
-    "git_push": "Push",
-    "github_read": "Read from GitHub",
-    "github_write": "Write to GitHub",
-    "code_map_search": "Search the code map",
-    "code_map_references": "Find references",
-    "document_symbols": "Outline a file",
-    "find_definition": "Find where this is defined",
-    "diagnostics": "Check files for problems",
-    "gmail_read": "Read Gmail",
-    "gcal_read": "Read Calendar",
-    "slack_read": "Read Slack",
-    "connector_read": "Read connector",
-    "connector_write": "Write through connector",
-    "knowledge_graph": "Explore related memories",
-    "memory_search": "Search memory",
-    "memory_list": "List memory",
-    "memory_get": "Open memory",
-    "memory_write": "Save memory",
-    "memory_forget": "Forget memory",
-    "conversation_search": "Search past conversations",
-    "spawn_subagent": "Delegate to a subagent",
-    "consult_advisor": "Consult the advisor model",
-    "update_plan": "Update the plan",
-    "ask_owner_question": "Ask you a question",
-    "create_task": "Create task",
-    "assign_session_project": "Assign to project",
-    "tool_search": "Look up a tool",
-}
+_LABEL_BY_TOOL: dict[str, str] = TOOL_LABEL_BY_TOOL
 
 # How long a phrase may be before it stops being a summary. A path is trimmed
 # from the *left* so the filename survives; everything else from the right.

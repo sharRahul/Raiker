@@ -44,6 +44,12 @@ def _fake(**overrides: object) -> ToolDefinition:
         "source_kind": "repository",
         "delegable": True,
         "read_shaped": True,
+        "family": "repository",
+        "label": "Probe",
+        "audit_arguments": "values",
+        "audit_result": "content",
+        "untrusted_result": False,
+        "observation_source": "workspace_index",
         "required_args": ("query",),
         "required_list_args": (),
         "optional_args": ("max_results",),
@@ -54,7 +60,7 @@ def _fake(**overrides: object) -> ToolDefinition:
     return ToolDefinition(**values)  # type: ignore[arg-type]
 
 
-def test_one_definition_reaches_all_seven_consumers(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_one_definition_reaches_every_consumer(monkeypatch: pytest.MonkeyPatch) -> None:
     """The test OPT-01 exists for.
 
     A tool declared once must appear in the model's catalogue, the contract's
@@ -89,6 +95,7 @@ def test_one_definition_reaches_all_seven_consumers(monkeypatch: pytest.MonkeyPa
         ("name", "  ", "tool_definition_name_required"),
         ("description", "", "tool_definition_description_required"),
         ("risk", "spicy", "tool_definition_risk_invalid"),
+        ("audit_result", "everything", "tool_definition_audit_invalid"),
     ),
 )
 def test_a_half_written_definition_fails_construction(
@@ -132,6 +139,32 @@ def test_the_derived_tables_are_the_ones_the_consumers_actually_use() -> None:
     assert policy.allowed_read_actions >= READ_SHAPED_TOOL_NAMES
     for name, capability in TOOL_CAPABILITY_BY_TOOL.items():
         assert CAPABILITY_GATE_MAP[name] == capability
+
+
+def test_audit_presentation_and_observation_tables_are_derived() -> None:
+    """OPT-13 — five tables that each restated a fact about every tool."""
+    from raiker.memory import capture
+    from raiker.models import tool_registry
+    from raiker.security import capability_registry
+    from raiker.tools import broker, presentation
+
+    assert broker._METADATA_ONLY_TOOLS is tool_registry.METADATA_ARGUMENT_TOOLS
+    assert broker._CONTENT_RESULT_TOOLS is tool_registry.METADATA_RESULT_TOOLS
+    assert capability_registry.UNTRUSTED_CONTENT_TOOLS is tool_registry.UNTRUSTED_RESULT_TOOLS
+    assert presentation._FAMILY_BY_TOOL is tool_registry.TOOL_FAMILY_BY_TOOL
+    assert presentation._LABEL_BY_TOOL is tool_registry.TOOL_LABEL_BY_TOOL
+    assert capture.SOURCE_TYPES is tool_registry.OBSERVATION_SOURCE_BY_TOOL
+    # What the audit trail drops did not change in the move.
+    assert {"consult_advisor"} == tool_registry.METADATA_ARGUMENT_TOOLS
+    assert {"run_command", "background_run", "web_fetch", "gmail_read", "spawn_subagent"} <= (
+        tool_registry.METADATA_RESULT_TOOLS
+    )
+
+
+def test_untrusted_content_is_never_copied_into_the_audit_trail() -> None:
+    """Content the injection scanner must cover is content events never keep."""
+    with pytest.raises(ValueError, match="tool_definition_untrusted_result_audited"):
+        _fake(untrusted_result=True, audit_result="content")
 
 
 def test_the_advertised_schema_is_built_from_the_registry() -> None:

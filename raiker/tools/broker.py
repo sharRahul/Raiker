@@ -34,6 +34,7 @@ from raiker.hooks.dispatcher import HookDispatcher
 from raiker.memory.capture import capture_tool_observation
 from raiker.memory.governance import GovernedMemoryService
 from raiker.models.tool_projection import search_tools
+from raiker.models.tool_registry import METADATA_ARGUMENT_TOOLS, METADATA_RESULT_TOOLS
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.alignment import AlignmentVerdict, check_alignment
 from raiker.runtime.identity.contracts import (
@@ -100,13 +101,9 @@ class ToolExecutionContext:
     owner_principal_id: str
     verified_identity: TrustedTurnIdentity
 
-# Tools whose arguments/results are scrubbed to metadata before entering event
-# payloads or the stored tool-action record. The advisor question/answer flow
-# only between the models (that is the tool's purpose); the audit trail records
-# lengths and profile metadata, never the text.
-# Tools whose *arguments* are scrubbed to lengths before entering events (the
-# argument text is itself sensitive prompt content — the advisor question).
-_METADATA_ONLY_TOOLS = frozenset({"consult_advisor"})
+# What the audit trail keeps of each tool's arguments and result is declared
+# on its definition (`audit_arguments`, `audit_result`; OPT-13).
+_METADATA_ONLY_TOOLS = METADATA_ARGUMENT_TOOLS
 
 
 def _drops_argument_values(tool_name: str) -> bool:
@@ -119,13 +116,8 @@ def _drops_argument_values(tool_name: str) -> bool:
     broker events do the same (BUG-12).
     """
     return tool_name in _METADATA_ONLY_TOOLS or is_mcp_tool(tool_name)
-# Tools whose *result content* is dropped from events. The advisor answer and the
-# fetched GitHub body are untrusted content that flows only to the calling model;
-# the audit trail keeps metadata (lengths, ids), never the content itself.
-# The connector tools' arguments (repo / resource / number / message_id /
-# calendar_id / event_id / channel) are governance-relevant non-secret
-# identifiers and are kept verbatim (redacted) for the audit trail; only the
-# fetched *content* is dropped from events.
+
+
 #: The ceiling a background run may occupy (BUG-194). Deliberately a hard cap
 #: rather than "until it finishes": a run with no deadline is a run whose lease
 #: renews forever, and the reclaim path would never fire. Two hours is long
@@ -133,24 +125,10 @@ def _drops_argument_values(tool_name: str) -> bool:
 #: reaped the same working day.
 _BACKGROUND_TIMEOUT_SECONDS = 7200.0
 
-_CONTENT_RESULT_TOOLS = frozenset(
-    {
-        "consult_advisor", "github_read", "gmail_read", "gcal_read", "slack_read",
-        "connector_read", "run_command",
-        # BUG-194 — a background run's log is the same program output
-        # `run_command` returns, arriving one page at a time. It gets the same
-        # treatment: metadata into the audit trail, content only to the model.
-        "background_run",
-        # B12/C7 — a fetched page and a search result set are outside content the
-        # agent read on the owner's behalf. They flow to the calling model as
-        # untrusted data; the audit trail keeps the URL, the query and the sizes.
-        "web_fetch", "web_search", "web_extract", "weather_lookup",
-        # B7 — a subagent's digest is workspace content it read on the parent's
-        # behalf. It flows to the calling model and nowhere else; the audit
-        # trail keeps the contract, the steps, and the tools used.
-        "spawn_subagent",
-    }
-)
+# A connector's arguments (repo, number, message_id, channel…) are non-secret,
+# governance-relevant identifiers and stay in the audit trail, redacted; only
+# the content it fetched is dropped.
+_CONTENT_RESULT_TOOLS = METADATA_RESULT_TOOLS
 _CONTENT_RESULT_FIELDS = ("answer", "content")
 
 

@@ -23,6 +23,7 @@ import json
 from typing import Any
 from urllib.parse import urlsplit
 
+from raiker.models.tool_registry import UNTRUSTED_RESULT_TOOLS
 from raiker.security.containment import (
     CAPABILITY_CONNECTOR,
     CAPABILITY_EXECUTION,
@@ -43,13 +44,7 @@ __all__ = [
 # behalf rather than text the owner wrote. This is the set the prompt-injection
 # scanner covers (BUG-81): a page, a message, a connector record, a subagent's
 # digest, and anything an owner-registered MCP server returned.
-UNTRUSTED_CONTENT_TOOLS = frozenset(
-    {
-        "web_fetch", "web_search", "web_extract", "weather_lookup",
-        "github_read", "gmail_read", "gcal_read",
-        "slack_read", "connector_read", "spawn_subagent",
-    }
-)
+UNTRUSTED_CONTENT_TOOLS = UNTRUSTED_RESULT_TOOLS
 
 # Connector-family tools. A subject is the *connector*, not the tool: a Gmail
 # read and a Gmail search share a baseline because they share a credential, an

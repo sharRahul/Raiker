@@ -79,7 +79,7 @@ When these disagree with an older topic review's current-status prose, re-verify
 
 | Document | Role now |
 |---|---|
-| `CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md` | Optimization review with work still in it. Wave 0, OPT-03, -04, -07, -12, -14 and -19 closed 2026-09-28 (FIXED-623 to FIXED-629) with the splits of OPT-06 and OPT-08 (FIXED-616, FIXED-617); OPT-05, -06, -08, -09, -10, -11, -17, -18 and -20 closed 2026-09-30 (FIXED-634 to FIXED-643) and OPT-15 started. OPT-01, -02, -13, -15 and -16 remain |
+| `CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md` | Optimization review with work still in it. Wave 0, OPT-03, -04, -07, -12, -14 and -19 closed 2026-09-28 (FIXED-623 to FIXED-629) with the splits of OPT-06 and OPT-08 (FIXED-616, FIXED-617); OPT-05, -06, -08, -09, -10, -11, -17, -18 and -20 closed 2026-09-30 (FIXED-634 to FIXED-643) and OPT-15 started; OPT-13 and -16 closed 2026-10-01 (FIXED-650, FIXED-651) and OPT-01 and -02 started (FIXED-648, FIXED-649). OPT-01, -02 and -15 remain |
 | `GAP_BUILD_CHAT.md` | Build/Chat gap ledger; row-level status is stronger evidence than old narrative paragraphs |
 | `GOVERNANCE_ENTRY_PATHS.md` | Canonical governance entry-path inventory; no open item since 2026-09-28 (GEP-02 and GEP-03 closed). Kept as the enumeration, not as a review |
 | `LIVE_TEST_ROUNDS.md` | Historical live-test evidence by round |

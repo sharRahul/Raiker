@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-01 | Targeted | `2026-10-01-optimisation-round/` | Ollama `gpt-oss:20b-cloud` on the local Ollama service, no key; the Anthropic, OpenAI and OpenRouter keys the owner supplied were not entered by the agent | BUG-310, OPT-01 and -02 (first parts), OPT-13 and OPT-16. Proved live on Windows: setup → Ready → Chat on the chosen, checked model; a real tool-using turn whose row reads **List folder** from the registry; every destination through the generated types and the split client with **no 4xx, no 5xx and no console error**; and a second instance created from the lock screen. **Four defects found and fixed** — the sandbox probe left a file in the workspace, Ready's Chat opened Home, Chat after setup offered the model setup had replaced, and a stale cookie cost a 401 on the lock screen; one inconsistency filed as BUG-311 |
 | 2026-09-30 | Targeted | `2026-09-30-optimisation-round/` | Ollama `gpt-oss:20b-cloud` on the local Ollama service, no key; the Anthropic, OpenAI and OpenRouter keys the owner supplied were not entered by the agent | Ten items from the optimisation review — OPT-05, -06 stage B, -08, -09, -10, -11, -17, -18, -20 and a first slice of OPT-15. Proved live: setup → Chat on a reset workspace, a real streamed answer and a readiness probe both through the shared provider transport, the palette naming **Memory engine**, and twenty-four destinations answering with **no 4xx, no 5xx and no traceback**, with no horizontal overflow at 390 wide. **Two defects found and fixed** — setup recommended llama.cpp beside "No complete GGUF found" (and My models offered Use on four empty slots), and the first message after setup was refused as never checked |
 | 2026-09-28 (third) | Targeted | `2026-09-28-docs-items-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that asked to run `python`, the key entered through the Connect dialog | Ten items from `docs/plans/`: BUG-309, Wave 0 and OPT-03, -04, -07, -12, -14 and -19, two stale index rows, and BUG-248's sign-ins. Proved live: readiness naming the provider from the registry; an approval notice docked on Home, opening Approvals, and absent there at 1440 and 390 wide with the bell agreeing; a misspelled field refused with 422; and every destination at both capture widths with **no 422, no 5xx and no console error**. **Four defects found and fixed** — the bell kept counting a notice the dock had just read, an approval card covered Settings' **Save changes**, a disclosure closed when its default was chosen, and (by CI) shutdown closed a connection a worker was using. The key's credit ran out part-way through BUG-248's four conversions |
 | 2026-09-28 (second) | Targeted | `2026-09-28-review-closure-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that asked to run `python`, the key entered through the Connect dialog | Nine items from `docs/plans/` that closed three review documents: BUG-308 (CR-05, CR-09) by the owner's decision, CR-01, GCR-10, GCR-11, GCR-13, GCR-41 and GCR-43. Proved live: Permissions naming *Code with this machine's network* and saying, measured on this host, where scripts run; a real model's `python hello.py` approved under that capability, run, and recorded as `code_placement_classified`; a plugin card saying where its code would run; no stored key in four redacted answers; and every destination at four widths through the split store and service with **no console error**. **Five defects found by the round and fixed in it** — a fresh capability that would have refused `python` to an owner who had turned shell on, an approval that named the tool rather than the capability the code would run under, the same approval promising a rewind a command cannot have, and an approval card covering the composer's **Send** and staying over Approvals |
@@ -78,6 +79,59 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-10-01 — The contract is derived, and a probe cleans up after itself
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py` before
+each attempt, on Windows 11. Provider: Ollama `gpt-oss:20b-cloud` through the
+local Ollama service — no key. The owner supplied Anthropic, OpenAI and
+OpenRouter keys for the round; the agent did not enter them, because they are
+live keys the host would send on to those providers. Browser: Playwright's
+Chromium. Spec: `web/e2e/optimisation-round-2026-10-01-live.spec.ts`. Captures:
+[`docs/screenshots/2026-10-01-optimisation-round/`](../screenshots/2026-10-01-optimisation-round).**
+
+**What it proved.**
+
+1. **Setup ends where the owner asked.** Account, Ollama, `gpt-oss:20b-cloud`,
+   *Local, and the providers I connect*, then **Chat** on Ready: the composer on
+   **GPT oss:20B Cloud** with no readiness warning, and Design's tile saying it
+   needs an image provider — read from the generated `image_models`
+   (FIXED-648, FIXED-653, FIXED-654).
+2. **A real turn names its tool from the registry.** `list_directory` on the
+   workspace root, the row reading **List folder**, a source chip and one call
+   of evidence (FIXED-650).
+3. **Every destination reads through the generated types and the split
+   client.** Each nav destination and hub tab rendered with no `/api/` response
+   at 4xx or 5xx and no console error (FIXED-648, FIXED-649).
+4. **A second instance is created on Windows** from the lock screen and opens at
+   `/instances/<name>/`, its workspace under `.raiker/instances/` (FIXED-647).
+5. **The sandbox probe leaves nothing behind.** `raiker-command-runner --probe`
+   reported every observation `enforced` and the workspace held only `.raiker`
+   (FIXED-652).
+
+**What it found, and fixed in the round.**
+
+* The first turn listed `.raiker-probe-inside.tmp` in the workspace root
+  ([FIXED-652](FIXED_ITEMS.md#fixed-652--the-sandbox-probe-left-a-file-in-the-owners-workspace)).
+* Ready → **Chat** opened the Work Dashboard at `#/chat`
+  ([FIXED-653](FIXED_ITEMS.md#fixed-653--choosing-chat-at-the-end-of-setup-opened-home)).
+* Ready → Chat offered **Gemma 4:31B Cloud** with *No readiness check exists for
+  this exact model* after setup chose and checked GPT oss
+  ([FIXED-654](FIXED_ITEMS.md#fixed-654--chat-after-setup-opened-on-the-model-setup-had-just-replaced)).
+* The lock screen logged `401` for `/api/models` under a cookie left by the
+  previous workspace
+  ([FIXED-655](FIXED_ITEMS.md#fixed-655--a-stale-cookie-cost-a-401-on-the-lock-screen)).
+
+**What it found and did not fix.** Models calls Design **Ready** on a chat-only
+model ([BUG-311](TO_BE_FIXED.md#bug-311--models-calls-design-ready-on-a-model-that-returns-no-images)).
+
+**What it did not prove.** Anthropic, OpenAI and OpenRouter turns, for the
+reason above. The rollback of a failed first account is not reachable from the
+interface — registration has no refusal an owner can provoke — so FIXED-647's
+rollback is proved by the Windows unit tests.
 
 ---
 

@@ -66,6 +66,14 @@ Move or delete historical narrative already preserved in Git history/issues/PRs.
 
 ## OPT-01 — Generate frontend API types from FastAPI/OpenAPI
 
+**Status: started 2026-10-01 — [FIXED-648](FIXED_ITEMS.md#fixed-648--the-web-client-kept-its-own-copy-of-every-read-model).**
+`scripts/generate_web_api_types.py` derives `web/src/lib/generated/apiViews.ts`
+from every view whose JSON is its fields, and a stale file fails
+`tests/test_web_api_types.py`; 31 mirrors are aliases of it. Open: nine views
+whose nested payloads are `dict[str, Any]` in Python (named in FIXED-648), and
+the envelopes routes assemble, which need response models before OpenAPI can
+describe them.
+
 **Priority: P0/P1 — Effort: Medium — LOC reduction: Very High — Risk: Low/Medium with contract tests**
 
 ### Evidence
@@ -105,6 +113,12 @@ apps/web/src/lib/generated/api-schema.ts
 ---
 
 ## OPT-02 — Generate ordinary REST endpoint wrappers; keep only special transports handwritten
+
+**Status: started 2026-10-01 — [FIXED-649](FIXED_ITEMS.md#fixed-649--the-clients-transport-sat-inside-its-endpoint-catalogue-and-nothing-checked-the-paths-it-called).**
+Transport, sign-in and streaming are `web/src/lib/api/core.ts`, `auth.ts` and
+`streaming.ts`, and every path the catalogue calls is held to the OpenAPI
+document. Open: generating the ordinary wrappers, which waits on OPT-01's
+response types.
 
 **Priority: P1 — Effort: Medium/High — LOC reduction: Very High — Risk: Medium**
 
@@ -567,6 +581,11 @@ Shorter readiness code and one place to fix edge-case gaps such as GCR-30.
 
 ## OPT-13 — Create one typed tool-definition registry
 
+**Status: done 2026-10-01 — [FIXED-650](FIXED_ITEMS.md#fixed-650--five-tables-restated-a-fact-about-every-tool).**
+The registry already carried the catalogue, risk, capability and source kind;
+the audit treatment, untrusted-result flag, transcript family and label and the
+observation source joined it, and their five tables are derived.
+
 **Priority: P1 — Effort: High — LOC reduction: High — Risk: High; requires strong invariant tests**
 
 ### Evidence
@@ -672,6 +691,11 @@ Do **not** strip comments around security boundaries simply to hit a LOC target.
 ---
 
 ## OPT-16 — Consolidate repeated Playwright setup into fixtures/page objects
+
+**Status: done 2026-10-01 — [FIXED-651](FIXED_ITEMS.md#fixed-651--a-hundred-and-eleven-live-specs-each-declared-the-host).**
+`web/e2e/live.ts` is the base URL, the key table, the signed-in `ownerPage` and
+`runChatTurn`, beside the product actions `hosted-provider.ts` already shared.
+The per-spec `ask()` copies convert under BUG-248's one-spec-at-a-time rule.
 
 **Priority: P2 — Effort: Medium — LOC reduction: Medium/High — Risk: Low**
 

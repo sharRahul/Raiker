@@ -113,7 +113,8 @@ names.
 | [BUG-307](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true) | Low | Web UI / security headers | **Closed 2026-09-28 ([FIXED-609](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true))** — `style-src 'self'`; Svelte 5 styles through the CSSOM, and a live sweep of every destination at four widths found nothing refused |
 | [BUG-308](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so) | Medium | Plugins / commands / sandbox | **Closed 2026-09-28 ([FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so))** — by the owner's decision: code runs in the sandbox where there is one, and otherwise under *Code with this machine's network*, its own switch, starting at *Ask me* |
 | [BUG-309](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing) | Low | Web UI / notifications | **Closed 2026-09-28 ([FIXED-622](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing))** — a notice whose subject is the page on screen is not docked there and is read; running it live found the bell disagreeing for a poll, fixed with it |
-| [BUG-310](#bug-310--seven-python-tests-fail-on-windows-and-nowhere-else) | Low | Tests / Windows | Open — four plugin-runtime tests and a source-review test read fixtures written with Windows line endings as other bytes; two instance tests meet [BUG-266](#bug-266--a-live-workspace-directory-cannot-be-deleted-while-the-host-holds-it)'s held directory. Each also fails on untouched `main` on the same host |
+| [BUG-310](FIXED_ITEMS.md#fixed-647--seven-python-tests-failed-on-windows-and-two-of-them-were-the-product) | Low | Tests / Windows | **Closed 2026-10-01 ([FIXED-647](FIXED_ITEMS.md#fixed-647--seven-python-tests-failed-on-windows-and-two-of-them-were-the-product))** — CRLF fixtures, and two product causes behind the instance tests: a failed create kept its database open, and Windows' sharing refusal read as an empty registry |
+| [BUG-311](#bug-311--models-calls-design-ready-on-a-model-that-returns-no-images) | Low | Models / Design | Open — the Models overview calls Design **Ready** on a chat-only model while setup's Ready step says Design needs an image provider |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2141,29 +2142,34 @@ the card's own surface.
 
 ## BUG-310 — Seven Python tests fail on Windows and nowhere else
 
-**Severity: Low. Area: Tests / Windows. Status: Open — raised 2026-09-30 by the
-full local suite. Each also fails on an untouched `origin/main` checkout on the
-same host, and CI's Linux job does not run them into failure.**
+**Closed 2026-10-01 as [FIXED-647](FIXED_ITEMS.md#fixed-647--seven-python-tests-failed-on-windows-and-two-of-them-were-the-product).**
+The first two were line endings, as this entry guessed. The instance tests were
+the product: a failed create's rollback could not remove a database its own
+thread held open, the registry's readers took Windows' sharing refusal for an
+empty file, and a create racing another could build a `\\?\UNC\?\C:\…` path.
+The proposed remedy — release the store's handles before removal — is what
+fixed the first.
 
-**Observed.** On the Windows development host:
+---
 
-* `test_phase_4_plugin_runtime.py` — four tests (`executes_installed_allowlisted_plugin`,
-  `defaults_to_direct_python_on_windows`, `reports_nonzero_exit`,
-  `allows_entrypoint_within_plugin_scope`) end `execution_failed:plugin_entrypoint_digest_mismatch`.
-* `test_knowledge_source_review_budget.py::…::test_a_single_file_is_reviewed_as_itself`
-  counts 7 bytes for `"hello\n"`.
-* `test_instance_runtime_lifecycle.py` — `test_a_failed_first_account_leaves_nothing_behind_and_the_retry_works`
-  and `test_the_registry_is_published_atomically` find the instance directory
-  still present after the failed create.
+## BUG-311 — Models calls Design ready on a model that returns no images
 
-**Likely causes, not yet confirmed.** The first two are line endings: the test
-writes with `write_text`, which on Windows writes `\r\n`, so the file on disk is
-not the bytes the test recorded — its digest, its size. The third is the
-[BUG-266](#bug-266--a-live-workspace-directory-cannot-be-deleted-while-the-host-holds-it)
-family: Windows will not remove a directory a handle is still open in.
+**Severity: Low. Area: Models / Design. Status: Open — raised 2026-10-01 by the
+live round.**
 
-**Proposed fix.** Write fixtures with `newline=""` or as bytes; for the instance
-case, release the store's handles before removal, as BUG-266 proposes.
+**Observed.** After setup chose `gpt-oss:20b-cloud`, setup's Ready step said
+Design *Needs a provider that returns images*, and the Models overview's *What
+powers your work* listed Design on the same model as **Ready**
+(`docs/screenshots/2026-10-01-optimisation-round/04-models.png`).
 
-**Required user-interface outcome.** None for the first two, which are
-test-only. The third, if the product behaves the same way, is BUG-266's.
+**Why it is not simply wrong.** Design's canvas uses the chat model for its
+research and the image model for drawing, so "ready" is true of half of it.
+The two surfaces answer different questions without saying which.
+
+**Proposed fix.** The overview's Design row says what it is ready for — research
+on the chat model, and an image provider still to connect — using the same
+`image_models` fact setup reads.
+
+**Required user-interface outcome.** No page calls Design ready to draw when no
+connected model returns images.
+

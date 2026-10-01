@@ -668,6 +668,15 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-644](#fixed-644--setup-recommended-llamacpp-beside-no-complete-gguf-found) | Medium | Models / first run | Fixed 2026-09-30 — found by the live round |
 | [FIXED-645](#fixed-645--the-first-message-after-setup-was-refused-as-never-checked) | Medium | Chat / model readiness | Fixed 2026-09-30 — found by the live round |
 | [FIXED-646](#fixed-646--the-web-job-would-not-have-run-for-a-change-to-a-moved-read-model) | Low | CI | Fixed 2026-09-30 — the web job's trigger followed the moved views, and a same-day `brace-expansion` advisory |
+| [FIXED-647](#fixed-647--seven-python-tests-failed-on-windows-and-two-of-them-were-the-product) | Medium | Tests / instances / Windows | Fixed 2026-10-01 — BUG-310 |
+| [FIXED-648](#fixed-648--the-web-client-kept-its-own-copy-of-every-read-model) | Low | API / web contract | Fixed 2026-10-01 — first part of OPT-01 |
+| [FIXED-649](#fixed-649--the-clients-transport-sat-inside-its-endpoint-catalogue-and-nothing-checked-the-paths-it-called) | Low | Web client | Fixed 2026-10-01 — first part of OPT-02 |
+| [FIXED-650](#fixed-650--five-tables-restated-a-fact-about-every-tool) | Low | Tools / registry | Fixed 2026-10-01 — OPT-13 |
+| [FIXED-651](#fixed-651--a-hundred-and-eleven-live-specs-each-declared-the-host) | Low | Live test harness | Fixed 2026-10-01 — OPT-16 |
+| [FIXED-652](#fixed-652--the-sandbox-probe-left-a-file-in-the-owners-workspace) | Medium | Execution / native sandbox | Fixed 2026-10-01 — found by the live round |
+| [FIXED-653](#fixed-653--choosing-chat-at-the-end-of-setup-opened-home) | Medium | First run / navigation | Fixed 2026-10-01 — found by the live round |
+| [FIXED-654](#fixed-654--chat-after-setup-opened-on-the-model-setup-had-just-replaced) | Medium | First run / Chat | Fixed 2026-10-01 — found by the live round |
+| [FIXED-655](#fixed-655--a-stale-cookie-cost-a-401-on-the-lock-screen) | Low | Web shell / sign-in | Fixed 2026-10-01 — found by the live round |
 
 ---
 
@@ -27610,3 +27619,227 @@ transitive dev dependency, and changes nothing else.
 **Evidence.** `tests/test_web_workflow.py`; `npm audit --audit-level=moderate`
 reports no vulnerabilities, and the web job's lint, check, unit tests and build
 pass.
+
+---
+
+## FIXED-647 — Seven Python tests failed on Windows, and two of them were the product
+
+**Severity: Medium. Area: Tests / instances / Windows. Status: Fixed 2026-10-01.
+Closes [BUG-310](TO_BE_FIXED.md#bug-310--seven-python-tests-fail-on-windows-and-nowhere-else),
+including the part it filed under the
+[BUG-266](TO_BE_FIXED.md#bug-266--a-live-workspace-directory-cannot-be-deleted-while-the-host-holds-it)
+family.**
+
+**Observed.** Four plugin-runtime tests ended `plugin_entrypoint_digest_mismatch`,
+a one-file review counted 7 bytes for `"hello\n"`, and three instance tests
+found a failed create's directory still present, a registry write refused with
+`PermissionError`, or a create that tried to make `\\?\UNC\?\C:\…`.
+
+**Root cause.** Four, of which two were in the product:
+
+* the fixtures wrote with `write_text`, which writes CRLF on Windows, so the
+  file on disk was not the bytes the test pinned or counted;
+* registering the first account opens the staged workspace's SQLCipher
+  database and the thread keeps that connection cached, so `rmtree` — with
+  `ignore_errors=True` — left the database and the directory behind, and the
+  owner's retry met `instance_already_exists`;
+* Windows refuses `os.replace` over a file another handle holds, and refuses
+  opening the name for a moment after a replace; `_stored_instance_names` read
+  that refusal as "no registry" — the GCR-09 failure, by another door;
+* `ntpath.realpath` keeps the `\\?\` prefix when a directory on the path is
+  being created by another thread, and `internal_io_path` read that answer as a
+  UNC share.
+
+**Fixed.** The fixtures write bytes. The rollback releases the workspace's
+connections (`invalidate_workspace_connections`) before removing it. The
+registry's read and replace retry Windows' sharing refusal for up to two
+seconds. `internal_io_path` accepts a `resolve()` that already answered in
+extended form.
+
+**Evidence.** The seven tests, and `test_instance_runtime_lifecycle.py` passing
+twelve consecutive runs on this host; `test_a_resolve_that_answers_in_extended_form_is_not_read_as_unc`,
+which fails against the previous code; live, a second instance created from the
+lock screen on Windows and opening at `/instances/<name>/`
+([the 2026-10-01 round](LIVE_TEST_ROUNDS.md#2026-10-01--the-contract-is-derived-and-a-probe-cleans-up-after-itself)).
+
+---
+
+## FIXED-648 — The web client kept its own copy of every read model
+
+**Severity: Low. Area: API / web contract. Status: Fixed 2026-10-01 — the first
+part of OPT-01 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-01--generate-frontend-api-types-from-fastapiopenapi),
+which stays open for what is listed below.**
+
+**Observed.** `apiTypes.ts` restated each backend view field by field, held to
+it only by a field-presence check. Deriving the types showed what that let
+through: Setup read `profile.image_model`, which the backend stopped sending
+when it began sending `image_models`, and four component tests built model
+profiles no backend can send.
+
+**Fixed.** `scripts/generate_web_api_types.py` reads every view whose JSON is
+exactly its fields — a `View` with the shared `to_dict`, all the way down —
+through Pydantic's JSON Schema, the schema FastAPI publishes, and prints
+`web/src/lib/generated/apiViews.ts`. Thirty-one hand-written interfaces are
+aliases of it now, and `ModelReadinessState` is generated from the Python
+`StrEnum`, so the readiness vocabulary is written once. A project's
+`root_kind` is a `Literal`. `test-helpers.ts` builds complete profiles and gates
+with the backend's own defaults.
+
+**Still open.** Nine views keep a hand-written mirror because their nested
+payloads are `dict[str, Any]` in Python while the UI reads their members
+(`SessionDetail`, `TurnDetail`, `ContextUsage`, `TaskView`, `TaskDetailView`,
+`ProjectDetail`, `McpServer`, `Diagnostics`, `MemorySettingsView`), and most of
+the remaining interfaces describe envelopes a route assembles rather than one
+view's fields.
+
+**Evidence.** `tests/test_web_api_types.py` fails when the generated file is
+stale; the web job's check, lint and 1,939 unit tests.
+
+---
+
+## FIXED-649 — The client's transport sat inside its endpoint catalogue, and nothing checked the paths it called
+
+**Severity: Low. Area: Web client. Status: Fixed 2026-10-01 — the first part of
+OPT-02 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-02--generate-ordinary-rest-endpoint-wrappers-keep-only-special-transports-handwritten).**
+
+**Fixed.** `web/src/lib/api/core.ts` holds the token, the CSRF echo, the instance
+prefix and the one path a failed response takes to an `ApiError` —
+`request` and `requestBlob` had two copies of it. `api/auth.ts` holds sign-in
+and session restore, `api/streaming.ts` the turn streams; `api.ts` re-exports
+them, so no caller changed. `tests/test_web_api_routes.py` holds every path the
+client builds — following template parts and `+` concatenation — to a route in
+the backend's OpenAPI document.
+
+**Still open.** Generating the ordinary wrappers needs typed responses in the
+OpenAPI document, which is the rest of OPT-01.
+
+**Evidence.** The route test (about 290 client paths, all served); three
+component tests that had passed only on microtask order now wait for their
+condition.
+
+---
+
+## FIXED-650 — Five tables restated a fact about every tool
+
+**Severity: Low. Area: Tools / registry. Status: Fixed 2026-10-01. Closes
+OPT-13 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-13--create-one-typed-tool-definition-registry).**
+
+**Observed.** `ToolDefinition` already drove the model's catalogue, risk,
+capability and source kind, but the broker's two audit sets, the injection
+scanner's untrusted set, the transcript's family and label maps, and eidetic
+capture's source types each named tools again.
+
+**Fixed.** `family`, `label`, `audit_arguments`, `audit_result`,
+`untrusted_result` and `observation_source` are required fields of the
+definition, and the five tables are comprehensions over the registry. A
+definition whose result is untrusted but copied into the audit trail does not
+construct. Authority stays outside the definition. The broker's executor map is
+still a second list, by design, held equal to the registry by a test.
+
+**Evidence.** `test_audit_presentation_and_observation_tables_are_derived`,
+`test_untrusted_content_is_never_copied_into_the_audit_trail`; live, a real
+turn's tool row reading **List folder**.
+
+---
+
+## FIXED-651 — A hundred and eleven live specs each declared the host
+
+**Severity: Low. Area: Live test harness. Status: Fixed 2026-10-01. Closes
+OPT-16 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-16--consolidate-repeated-playwright-setup-into-fixturespage-objects).**
+
+**Observed.** Seventy-nine specs hard-coded `http://127.0.0.1:8765`, so a round
+could not point them at another port; sixty-odd read the same three key
+variables under four names.
+
+**Fixed.** `web/e2e/live.ts` — `LIVE_BASE`, `LIVE_KEYS`, a `test` whose
+`ownerPage` is signed in past setup, and `runChatTurn`. With the product actions
+`hosted-provider.ts` already shared, a spec states its scenario and imports its
+setup. The ten copies of `ask()` convert one spec at a time, each re-run, which
+is [BUG-248](TO_BE_FIXED.md#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body)'s rule.
+
+**Evidence.** The live suite type-checks; this round's spec uses `ownerPage`
+and `runChatTurn` and passed.
+
+---
+
+## FIXED-652 — The sandbox probe left a file in the owner's workspace
+
+**Severity: Medium. Area: Execution / native sandbox. Status: Fixed 2026-10-01 —
+found by the live round.**
+
+**Observed.** On a reset workspace the first real turn listed
+`.raiker-probe-inside.tmp` beside `.raiker`, and the model reported it as part
+of the owner's folder.
+
+**Root cause.** The probe's child writes a marker inside the boundary and
+deletes it. Under the Windows restricted token the write is allowed and the
+delete refused, and the child ignored the refusal.
+
+**Fixed.** The runner, outside the boundary, removes what the probe wrote — the
+inside marker and any file an escaping write left — after the inside run, on
+Windows and POSIX alike.
+
+**Evidence.** `the_parent_removes_what_the_probe_wrote_in_the_workspace` in the
+runner's tests; live, `raiker-command-runner --probe` reporting every
+observation `enforced` and leaving only `.raiker`, and the round's turn finding
+nothing named `.raiker-probe`.
+
+---
+
+## FIXED-653 — Choosing Chat at the end of setup opened Home
+
+**Severity: Medium. Area: First run / navigation. Status: Fixed 2026-10-01 —
+found by the live round.**
+
+**Observed.** Setup's Ready step, **Chat** → the Work Dashboard, at `#/chat`.
+
+**Root cause.** The tile linked `#/chat`, which is not a route; an unknown route
+falls back to Home and says nothing.
+
+**Fixed.** The tile opens `#/new-chat`, and `nav.test.ts` reads every component
+and module for a hard-coded `#/route` and fails on one that does not resolve to
+a destination or an alias.
+
+**Evidence.** The guard fails against the previous code, naming
+`ModelSetupView.svelte: #/chat`; live, Ready → **Chat** opening the composer.
+
+---
+
+## FIXED-654 — Chat after setup opened on the model setup had just replaced
+
+**Severity: Medium. Area: First run / Chat. Status: Fixed 2026-10-01 — found by
+the live round.**
+
+**Observed.** Setup, choosing `gpt-oss:20b-cloud`, then Ready → Chat: the
+composer offered **Gemma 4:31B Cloud** and *No readiness check exists for this
+exact model*, with Send disabled. A reload showed the right model.
+
+**Root cause.** Setup refreshed its own rows after the choice and its first
+check, but not the shared store every composer reads, which still held the
+snapshot from before setup.
+
+**Fixed.** Setup mirrors its refreshed snapshot into the shared store, as Models
+already did.
+
+**Evidence.** `ModelSetupView.test.ts` — the store holds setup's snapshot after
+a choice, failing against the previous code; live, Ready → Chat on
+**GPT oss:20B Cloud** with no readiness warning.
+
+---
+
+## FIXED-655 — A stale cookie cost a 401 on the lock screen
+
+**Severity: Low. Area: Web shell / sign-in. Status: Fixed 2026-10-01 — found by
+the live round.**
+
+**Observed.** On a reset workspace, the first load logged `401` for
+`/api/models` on the lock screen.
+
+**Root cause.** A readable CSRF cookie left by an earlier workspace on the same
+host reads as a session until the boot probe answers, and the background
+readiness check started at mount, before that answer.
+
+**Fixed.** The check starts when the shell is ready and stops when it locks.
+
+**Evidence.** `App.test.ts` — *asks nothing of a stale cookie but whether it
+still signs anyone in*, failing against the previous code.

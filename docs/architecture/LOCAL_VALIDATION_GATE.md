@@ -31,6 +31,16 @@ npx --prefix web playwright install --with-deps chromium
 npm --prefix web run test:e2e:mocked
 ```
 
+When a read-model view in `raiker/control/views/` or `raiker/control/dtos.py`
+changes, regenerate the client's types; `pytest` fails while they are stale:
+
+```powershell
+python -m scripts.generate_web_api_types
+```
+
+A live round points the suite at another host with `RAIKER_LIVE_BASE`, which
+every live spec reads through `web/e2e/live.ts`.
+
 The mocked end-to-end suite runs against the build above and answers every API
 call from a fixture, so it needs no credential and no network. CI runs it too.
 The `live` suite is separate and deliberately not automated: it drives a running

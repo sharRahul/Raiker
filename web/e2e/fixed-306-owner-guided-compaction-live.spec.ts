@@ -13,10 +13,11 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
 import { signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const ANTHROPIC_KEY = LIVE_KEYS.anthropic;
 const MODEL = "claude-haiku-4-5-20251001";
 
 test.describe.configure({ mode: "serial" });

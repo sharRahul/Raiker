@@ -13,8 +13,9 @@
 import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { join } from "node:path";
 import { OWNER_CREDENTIALS, dismissFirstRunModelSetup, hostedProviderCard, keepModelAvailable, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
 const PASSWORD = OWNER_CREDENTIALS.password;
 
@@ -29,19 +30,19 @@ const LEGS: ProviderLeg[] = [
   {
     provider: "Anthropic",
     keyLabel: "Anthropic API key",
-    key: process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "",
+    key: LIVE_KEYS.anthropic,
     model: "claude-sonnet-4-6",
   },
   {
     provider: "OpenRouter",
     keyLabel: "OpenRouter API key",
-    key: process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "",
+    key: LIVE_KEYS.openrouter,
     model: "openai/gpt-oss-20b:free",
   },
   {
     provider: "OpenAI",
     keyLabel: "OpenAI API key",
-    key: process.env.RAIKER_LIVE_OPENAI_KEY ?? "",
+    key: LIVE_KEYS.openai,
     model: "gpt-4o-mini",
   },
   {

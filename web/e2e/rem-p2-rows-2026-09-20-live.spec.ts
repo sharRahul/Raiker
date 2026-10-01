@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { join } from "node:path";
 import { capture } from "./capture";
 import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
 /**
  * The 2026-09-20 P2 round, live: the eleven §18.3 rows that were still open.
@@ -16,9 +17,9 @@ import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-prov
  *   1. `raiker-web` on 127.0.0.1:8765
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment (entered through the UI)
  */
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-09-20-p2-rows");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const ANTHROPIC_KEY = LIVE_KEYS.anthropic;
 const MODEL = "claude-haiku-4-5-20251001";
 const MODEL_LABEL = /Haiku 4\.5/;
 

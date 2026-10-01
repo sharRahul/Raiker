@@ -21,8 +21,9 @@ import { capture } from "./capture";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? process.cwd();
 const SHOTS = "../../docs/plans/screenshots/working";
 

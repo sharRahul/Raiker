@@ -7,8 +7,9 @@ import { join } from "node:path";
 import { settled } from "./destinations";
 import { capture } from "./capture";
 import { chooseModelForTurn, dismissFirstRunModelSetup, OWNER_CREDENTIALS, refreshHostedReadiness, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const PASSWORD = OWNER_CREDENTIALS.password;
 
@@ -40,7 +41,7 @@ test("Anthropic connects and answers a real turn", async () => {
   await useHostedModel(page, BASE, {
     provider: "Anthropic",
     keyLabel: "Anthropic API key",
-    key: process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "",
+    key: LIVE_KEYS.anthropic,
     model: "claude-haiku-4-5-20251001",
   });
   await capture(page, join(SHOTS, "fixed-309-anthropic-connected.png"));

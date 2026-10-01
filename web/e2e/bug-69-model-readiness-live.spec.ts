@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
 import { OWNER_CREDENTIALS, keepOffered, offeredModelIds, openModelDialog } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
 /**
  * BUG-69's live evidence, runnable with **one** provider key (BUG-84).
@@ -25,7 +26,7 @@ import { OWNER_CREDENTIALS, keepOffered, offeredModelIds, openModelDialog } from
  * `default-ollama-live.spec.ts`); this spec is the readiness gate.
  */
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(
   import.meta.dirname,
   "..",
@@ -48,21 +49,21 @@ const LEGS: ProviderLeg[] = [
   {
     provider: "Anthropic",
     keyLabel: "Anthropic API key",
-    key: process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "",
+    key: LIVE_KEYS.anthropic,
     preferredModel: "claude-haiku-4-5-20251001",
     marker: "BUG69 ANTHROPIC LIVE",
   },
   {
     provider: "OpenRouter",
     keyLabel: "OpenRouter API key",
-    key: process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "",
+    key: LIVE_KEYS.openrouter,
     preferredModel: "openai/gpt-4o-mini",
     marker: "BUG69 OPENROUTER LIVE",
   },
   {
     provider: "OpenAI",
     keyLabel: "OpenAI API key",
-    key: process.env.RAIKER_LIVE_OPENAI_KEY ?? "",
+    key: LIVE_KEYS.openai,
     preferredModel: "gpt-4o-mini",
     marker: "BUG69 OPENAI LIVE",
   },

@@ -24,9 +24,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
-const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const BASE = LIVE_BASE;
+const KEY = LIVE_KEYS.anthropic;
 const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 const SHOTS = "../../docs/screenshots";
 

@@ -7,8 +7,9 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 import { join } from "node:path";
 import { capture, captureElement } from "./capture";
 import { chooseModelForTurn, refreshHostedReadiness, signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 
 test.describe.configure({ mode: "serial" });

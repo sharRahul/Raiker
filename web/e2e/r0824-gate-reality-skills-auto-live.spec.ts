@@ -22,8 +22,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = "../../docs/plans/screenshots/working";
 
 /**

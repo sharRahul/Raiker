@@ -8,6 +8,7 @@ import {
   signInAsOwner,
   useHostedModel,
 } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
 /**
  * The 2026-09-03 round against a real provider turn.
@@ -22,9 +23,9 @@ import {
  * keep a credential.
  */
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
-const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const KEY = LIVE_KEYS.anthropic;
 const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 
 test.skip(KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is not set");

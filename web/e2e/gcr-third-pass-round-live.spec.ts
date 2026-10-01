@@ -26,9 +26,10 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { connectHostedProvider, signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
-const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const BASE = LIVE_BASE;
+const KEY = LIVE_KEYS.anthropic;
 /** A folder on this machine that plays the part of the owner's model library. */
 const LIBRARY = process.env.RAIKER_LIVE_LIBRARY ?? "/tmp/raiker-live-models";
 const REVISION = "d".repeat(40);

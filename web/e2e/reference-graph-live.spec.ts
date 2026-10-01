@@ -20,8 +20,9 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = "../../docs/plans/screenshots/working";
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 

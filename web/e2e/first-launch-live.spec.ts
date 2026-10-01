@@ -14,8 +14,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { OWNER_CREDENTIALS } from "./hosted-provider";
+import { LIVE_BASE } from "./live";
 
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 
 const SHOTS = "../../docs/screenshots/2026-09-12-first-launch";
 

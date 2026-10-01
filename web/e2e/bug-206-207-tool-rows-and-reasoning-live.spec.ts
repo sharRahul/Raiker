@@ -27,10 +27,11 @@ import {
   signInAsOwner,
   useHostedModel,
 } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const ANTHROPIC_KEY = LIVE_KEYS.anthropic;
 // Haiku 4.5 refuses `thinking.type.adaptive` and names the budgeted spelling in
 // the refusal, so this model is also what proves the negotiation in BUG-207
 // slice B: the turn thinks rather than failing with a 400.

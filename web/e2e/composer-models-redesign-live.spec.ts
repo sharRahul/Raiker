@@ -31,8 +31,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { join } from "node:path";
 import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 
 /**
@@ -50,9 +51,9 @@ const FALLBACK_MODEL: Record<string, string> = {
 };
 
 const KEYS = {
-  anthropic: process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "",
-  openai: process.env.RAIKER_LIVE_OPENAI_KEY ?? "",
-  openrouter: process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "",
+  anthropic: LIVE_KEYS.anthropic,
+  openai: LIVE_KEYS.openai,
+  openrouter: LIVE_KEYS.openrouter,
 };
 
 test.describe.configure({ mode: "serial" });

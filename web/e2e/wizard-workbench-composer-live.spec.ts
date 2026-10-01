@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
 /**
  * Live evidence for the 2026-08-16 round: the first-run provider matrix, the
@@ -14,7 +15,7 @@ import { join } from "node:path";
  * which, and the suite fails only when a row cannot reach a stated state at all.
  */
 
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 // Written straight into the tracked evidence folder rather than into the ignored
 // `output/` tree: the FIXED-* entries cite these paths, and a citation a reader
 // cannot open is not evidence.
@@ -31,9 +32,9 @@ const SHOTS = join(
 const PASSWORD = "Wizard-workbench-composer-1!";
 
 const KEYS = {
-  Anthropic: process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "",
-  OpenRouter: process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "",
-  OpenAI: process.env.RAIKER_LIVE_OPENAI_KEY ?? "",
+  Anthropic: LIVE_KEYS.anthropic,
+  OpenRouter: LIVE_KEYS.openrouter,
+  OpenAI: LIVE_KEYS.openai,
 };
 
 const consoleErrors: string[] = [];

@@ -49,11 +49,12 @@ import { expect, test, type Browser, type BrowserContext, type Locator, type Pag
 import { capture } from "./capture";
 import { join } from "node:path";
 import { signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const REPO = join(import.meta.dirname, "..", "..");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const ANTHROPIC_KEY = LIVE_KEYS.anthropic;
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 

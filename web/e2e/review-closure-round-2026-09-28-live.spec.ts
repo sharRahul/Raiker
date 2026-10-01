@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { capture } from "./capture";
 import { DESTINATIONS, WIDTHS, settled } from "./destinations";
 import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
 /**
  * The second 2026-09-28 round, live: the items from `docs/plans/` this run
@@ -27,7 +28,7 @@ import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-prov
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment — entered through the UI
  *   3. `RAIKER_LIVE_WORKSPACE` naming that workspace, holding `hello.py`
  */
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(
   import.meta.dirname,
   "..",
@@ -36,7 +37,7 @@ const SHOTS = join(
   "screenshots",
   "2026-09-28-review-closure-round",
 );
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const ANTHROPIC_KEY = LIVE_KEYS.anthropic;
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 const PYTHON = process.env.RAIKER_LIVE_PYTHON ?? "python";
 const MODEL = "claude-haiku-4-5-20251001";

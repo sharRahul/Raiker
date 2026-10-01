@@ -30,16 +30,17 @@ import { join } from "node:path";
 import { refreshHostedReadiness, signInAsOwner, useHostedModel } from "./hosted-provider";
 
 import { roundName } from "./naming";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
 // BUG-250 — named per run, so a round that has already worked in this
 // workspace cannot find its own leftovers and assert on them. The suite shares
 // one workspace by design; this is what keeps a shared workspace honest.
 const PROJECT = roundName("Staging rotation");
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? process.cwd();
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const ANTHROPIC_KEY = LIVE_KEYS.anthropic;
 const MODEL = "claude-haiku-4-5-20251001";
 const PYTHON = process.env.RAIKER_LIVE_PYTHON ?? "python";
 

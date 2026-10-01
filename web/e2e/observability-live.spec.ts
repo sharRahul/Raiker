@@ -1,13 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE } from "./live";
 
 // This spec used to drive `127.0.0.1:5174` — a Vite dev server, not the
 // `raiker-web` every other live spec runs against. It had drifted with nothing
 // to catch it, because its own sign-in was one of the twenty-seven copies
 // BUG-248 is about: a spec that carries its own base and its own credential is
 // a spec nobody re-reads.
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 
 test("live Observability and Sessions visual review", async ({ page }) => {
   const consoleErrors: string[] = [];

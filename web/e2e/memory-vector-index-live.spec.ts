@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { join } from "node:path";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE } from "./live";
 
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
 
 test("Memory exposes the revision-checked vector search strategy", async ({ page }) => {

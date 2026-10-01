@@ -2,12 +2,13 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
 import { OWNER_CREDENTIALS, hostedProviderCard, keepModelAvailable, keepOffered, offeredModelIds, openModelDialog } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
 const PASSWORD = OWNER_CREDENTIALS.password;
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const OPENROUTER_KEY = process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "";
+const ANTHROPIC_KEY = LIVE_KEYS.anthropic;
+const OPENROUTER_KEY = LIVE_KEYS.openrouter;
 
 test.describe.configure({ mode: "serial" });
 

@@ -3,8 +3,9 @@ import { capture } from "./capture";
 import { join } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const ROOT = join(
   import.meta.dirname,
   "..",

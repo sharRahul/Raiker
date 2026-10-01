@@ -7,6 +7,7 @@ import {
   signInAsOwner,
   useHostedModel,
 } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
 /**
  * The 2026-09-18 pass of the removal and simplification review, driven live.
@@ -31,9 +32,9 @@ import {
  *   1. `raiker-web` on 127.0.0.1:8765
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment (entered through the UI)
  */
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-09-18-round");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const ANTHROPIC_KEY = LIVE_KEYS.anthropic;
 const MODEL = "claude-haiku-4-5-20251001";
 const MODEL_LABEL = /Haiku 4\.5/;
 

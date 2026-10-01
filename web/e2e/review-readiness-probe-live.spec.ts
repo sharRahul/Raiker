@@ -10,6 +10,7 @@ import {
   openModelDialog,
   signInAsOwner,
 } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
 /**
  * What the **Test** control on a hosted provider card actually does.
@@ -21,9 +22,9 @@ import {
  * rather than a guess.
  */
 
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
-const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const KEY = LIVE_KEYS.anthropic;
 
 test("Test on a connected provider card resolves the pinned model's readiness", async ({
   page,

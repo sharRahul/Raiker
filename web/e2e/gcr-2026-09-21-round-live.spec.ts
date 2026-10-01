@@ -10,6 +10,7 @@ import {
   signInAsOwner,
   useHostedModel,
 } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
 /**
  * The 2026-09-21 round, live: the static-review items closed this run, proved
@@ -33,11 +34,11 @@ import {
  *      entered through the UI too, and asserted to fail *honestly* on a host
  *      whose egress policy refuses them (BUG-290).
  */
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-09-21-static-review-round");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const OPENAI_KEY = process.env.RAIKER_LIVE_OPENAI_KEY ?? "";
-const OPENROUTER_KEY = process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "";
+const ANTHROPIC_KEY = LIVE_KEYS.anthropic;
+const OPENAI_KEY = LIVE_KEYS.openai;
+const OPENROUTER_KEY = LIVE_KEYS.openrouter;
 const MODEL = "claude-haiku-4-5-20251001";
 const MODEL_LABEL = /Haiku 4\.5/;
 

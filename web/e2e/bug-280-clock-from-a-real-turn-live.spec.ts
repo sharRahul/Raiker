@@ -27,9 +27,10 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const BASE = LIVE_BASE;
+const ANTHROPIC_KEY = LIVE_KEYS.anthropic;
 const MODEL = "claude-haiku-4-5-20251001";
 const MODEL_LABEL = /Haiku 4\.5/i;
 

@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
 import { connectHostedProvider, keepOffered, offeredModelIds, openModelDialog, signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
 /**
  * Live evidence for the 2026-08-10 round: FIXED-161 through FIXED-170.
@@ -11,9 +12,9 @@ import { connectHostedProvider, keepOffered, offeredModelIds, openModelDialog, s
  * not through an API call and not through a fixture.
  */
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const ANTHROPIC_KEY = LIVE_KEYS.anthropic;
 
 /**
  * Navigate and wait for the page to settle.

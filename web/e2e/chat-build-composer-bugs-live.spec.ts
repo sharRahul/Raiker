@@ -12,8 +12,9 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
 import { OWNER_CREDENTIALS, signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 // Anchored to this file rather than to the working directory, so evidence lands
 // in the repository whether the runner is started from web or the root.
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");

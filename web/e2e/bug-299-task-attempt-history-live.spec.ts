@@ -23,8 +23,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { join } from "node:path";
 import { capture } from "./capture";
 import { chooseModelForTurn, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(
   import.meta.dirname,
   "..",
@@ -33,7 +34,7 @@ const SHOTS = join(
   "screenshots",
   "2026-09-15-task-history",
 );
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+const ANTHROPIC_KEY = LIVE_KEYS.anthropic;
 const MODEL = "claude-haiku-4-5-20251001";
 /** How the composer's own menu names it — a display name, not the wire id. */
 const MODEL_LABEL = /Haiku 4\.5/;

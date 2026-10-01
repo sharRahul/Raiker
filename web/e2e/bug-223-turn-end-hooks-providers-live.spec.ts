@@ -22,8 +22,9 @@ import { capture } from "./capture";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { keepModelAvailable, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? process.cwd();
 
@@ -31,19 +32,19 @@ const PROVIDERS = [
   {
     provider: "Anthropic",
     keyLabel: "Anthropic API key",
-    key: process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "",
+    key: LIVE_KEYS.anthropic,
     model: "claude-haiku-4-5-20251001",
   },
   {
     provider: "OpenAI",
     keyLabel: "OpenAI API key",
-    key: process.env.RAIKER_LIVE_OPENAI_KEY ?? "",
+    key: LIVE_KEYS.openai,
     model: process.env.RAIKER_LIVE_OPENAI_MODEL ?? "gpt-4o-mini",
   },
   {
     provider: "OpenRouter",
     keyLabel: "OpenRouter API key",
-    key: process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "",
+    key: LIVE_KEYS.openrouter,
     model: process.env.RAIKER_LIVE_OPENROUTER_MODEL ?? "openai/gpt-4o-mini",
   },
 ] as const;

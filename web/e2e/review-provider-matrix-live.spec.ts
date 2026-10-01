@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
 import { OWNER_CREDENTIALS, keepOffered, offeredModelIds, openModelDialog } from "./hosted-provider";
+import { LIVE_BASE, LIVE_KEYS } from "./live";
 
 /**
  * One owner, four backends, through the product's own surfaces.
@@ -19,7 +20,7 @@ import { OWNER_CREDENTIALS, keepOffered, offeredModelIds, openModelDialog } from
  * cannot reach a classified state at all.
  */
 
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
+const BASE = LIVE_BASE;
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
 const PASSWORD = OWNER_CREDENTIALS.password;
 
@@ -35,21 +36,21 @@ const LEGS: Leg[] = [
   {
     provider: "Anthropic",
     keyLabel: "Anthropic API key",
-    key: process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "",
+    key: LIVE_KEYS.anthropic,
     model: process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001",
     marker: "REVIEW ANTHROPIC LIVE",
   },
   {
     provider: "OpenRouter",
     keyLabel: "OpenRouter API key",
-    key: process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "",
+    key: LIVE_KEYS.openrouter,
     model: process.env.RAIKER_LIVE_OPENROUTER_MODEL ?? "openai/gpt-4o-mini",
     marker: "REVIEW OPENROUTER LIVE",
   },
   {
     provider: "OpenAI",
     keyLabel: "OpenAI API key",
-    key: process.env.RAIKER_LIVE_OPENAI_KEY ?? "",
+    key: LIVE_KEYS.openai,
     model: process.env.RAIKER_LIVE_OPENAI_MODEL ?? "gpt-4o-mini",
     marker: "REVIEW OPENAI LIVE",
   },

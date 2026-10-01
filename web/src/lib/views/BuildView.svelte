@@ -147,7 +147,7 @@
     sentenceAround,
     sourcesForTurn,
   } from "../citations";
-  import { chatProfiles, refreshModels, modelCatalogues } from "../models.svelte";
+  import { chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
   import { catalogueChoices } from "../modelCatalogue";
   import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
   import {
@@ -2546,7 +2546,7 @@
     >
       {#snippet above()}
         <ComposerChips store={attachStore} disabled={streaming} oninline={(text) => { draft.text += text; }} />
-        <ModelReadinessStrip readiness={modelReadiness} draftPreserved={draft.text.trim() !== ""} />
+        <ModelReadinessStrip readiness={modelsKnown() ? modelReadiness : null} draftPreserved={draft.text.trim() !== ""} />
         <SkillLinkNotice text={draft.text} />
 
         {#if shortcutsOpen}

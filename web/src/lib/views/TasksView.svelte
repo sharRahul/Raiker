@@ -52,7 +52,7 @@
   import { relativeTime } from "../format";
   import { AGENT_CADENCES, cadenceLabel } from "../agentCadence";
   import { ACTIVE_TASK_STATES, isActiveTask, taskBadge, taskStatusLabel } from "../statusMaps";
-  import { chatProfiles, refreshModels, modelCatalogues } from "../models.svelte";
+  import { chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
   import { catalogueChoices } from "../modelCatalogue";
   import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
 
@@ -769,7 +769,7 @@
         </div>
       {/if}
       <ModelReadinessStrip
-        readiness={modelReadiness}
+        readiness={modelsKnown() ? modelReadiness : null}
         draftPreserved={Boolean(objective.trim())}
       />
     {/snippet}

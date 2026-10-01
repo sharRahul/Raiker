@@ -95,7 +95,7 @@
     sentenceAround,
     sourcesForTurn,
   } from "../citations";
-  import { chatProfiles, refreshModels, modelCatalogues } from "../models.svelte";
+  import { chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
   import { catalogueChoices } from "../modelCatalogue";
   import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
   import {
@@ -178,7 +178,9 @@
   let voiceProvenanceSnapshot = { dictated: false, typedBefore: false, editedAfter: false };
   let promptSelectionStart = $state(0);
   let promptSelectionEnd = $state(0);
-  let userName = $state("there");
+  // Empty until the account is read: "What would you like to work on, there?"
+  // is what the greeting said for the first second of every load.
+  let userName = $state("");
   let turns = $state<ChatTurn[]>([]);
   // What the last copy action did. Shown, not only announced: a copy that
   // reports nothing leaves the owner guessing whether it worked.
@@ -886,7 +888,7 @@
       // name, because `username` is the fixed handle and the two were conflated.
       // The server resolves which one applies, so the greeting and the model's
       // own identity block cannot disagree about what to call the same person.
-      userName = view.status.display_name || view.status.username || "there";
+      userName = view.status.display_name || view.status.username || "";
       speechLanguage = speechLanguagePreference(view.settings["general.speech_language"]);
     }).catch(() => {});
     // The Workbench composer hands its text to this mounted chat rather than
@@ -1948,7 +1950,7 @@
     {:else if turns.length === 0}
       <EmptyState
         icon="chat"
-        title={`What would you like to work on, ${userName}?`}
+        title={userName ? `What would you like to work on, ${userName}?` : "What would you like to work on?"}
         compactTitle="What can I help with?"
         body="Start with a question, a task, or a file."
         serif={true}
@@ -2296,7 +2298,7 @@
   >
     {#snippet above()}
       <ComposerChips store={attachStore} disabled={streaming} oninline={(text) => { draft.text += text; }} />
-      <ModelReadinessStrip readiness={modelReadiness} draftPreserved={draft.text.trim() !== ""} />
+      <ModelReadinessStrip readiness={modelsKnown() ? modelReadiness : null} draftPreserved={draft.text.trim() !== ""} />
       <SkillLinkNotice text={draft.text} />
 
       {#if shortcutsOpen}

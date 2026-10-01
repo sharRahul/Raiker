@@ -7,8 +7,8 @@ import { join } from "node:path";
 import { settled } from "./destinations";
 import { capture } from "./capture";
 import { chooseModelForTurn, dismissFirstRunModelSetup, OWNER_CREDENTIALS, refreshHostedReadiness, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { LIVE_BASE as BASE } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const PASSWORD = OWNER_CREDENTIALS.password;
 

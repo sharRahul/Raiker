@@ -31,8 +31,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { join } from "node:path";
 import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 
 /**

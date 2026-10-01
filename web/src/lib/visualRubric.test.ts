@@ -356,6 +356,14 @@ describe("visual rubric", () => {
     for (const layer of LAYERS) {
       expect(stylesheet, `app.css does not declare ${layer}`).toContain(`${layer}:`);
     }
+    // The order is the decision. A menu the owner just opened sits above a tray
+    // docked to a corner (found 2026-10-01: the approval card took the clicks
+    // meant for the composer's model menu), and below a panel or a modal.
+    const value = (layer: string) =>
+      Number(new RegExp(`${layer}:\\s*(\\d+)`).exec(stylesheet)?.[1] ?? NaN);
+    expect(value("--z-popover")).toBeGreaterThan(value("--z-docked"));
+    expect(value("--z-popover-panel")).toBeGreaterThan(value("--z-popover"));
+    expect(value("--z-panel")).toBeGreaterThan(value("--z-popover-panel"));
 
     const files = [
       ...readdirSync(VIEWS).filter((name) => name.endsWith(".svelte")).map((name) => resolve(VIEWS, name)),

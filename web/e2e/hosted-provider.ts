@@ -664,9 +664,9 @@ export async function chooseModelForTurn(
   model: RegExp,
   composerLabel = "Message composer",
 ): Promise<void> {
-  // Chat, Build and Design label their composer "Message composer"; Tasks
-  // labels its own "Plan work", because what it composes is a plan rather than
-  // a message. Same control, same decision, one helper — a second copy here is
+  // Each surface names its composer for what it composes: "Message composer"
+  // in Chat, "Build composer", "Image composer" in Design and "Plan work" in
+  // Tasks. Same control, same decision, one helper — a second copy here is
   // exactly the drift FIXED-503 describes.
   const composer = page.getByRole("group", { name: composerLabel });
   await composer.getByRole("button", { name: /^Model for this turn:/ }).click();

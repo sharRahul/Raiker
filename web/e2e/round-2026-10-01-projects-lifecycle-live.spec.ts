@@ -13,13 +13,10 @@ import {
   OWNER_CREDENTIALS,
   chooseModelForTurn,
   signInAsOwner,
-  useHostedModel,
-} from "./hosted-provider";
+  } from "./hosted-provider";
 import { roundName } from "./naming";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY, sendTurn, useAnthropic } from "./live";
 
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const MODEL = process.env.RAIKER_LIVE_MODEL ?? "claude-haiku-4-5-20251001";
 const SHOTS = "../../docs/screenshots/2026-10-01-projects-lifecycle";
 
 const PARENT = roundName("Lifecycle parent");
@@ -61,12 +58,7 @@ test("the owner connects Anthropic through Models", async ({ page }) => {
   test.setTimeout(300_000);
   expect(ANTHROPIC_KEY, "set RAIKER_LIVE_ANTHROPIC_KEY").not.toBe("");
   await signInAsOwner(page, BASE);
-  const card = await useHostedModel(page, BASE, {
-    provider: "Anthropic",
-    keyLabel: "Anthropic API key",
-    key: ANTHROPIC_KEY,
-    model: MODEL,
-  });
+  const card = await useAnthropic(page);
   await expect(card.getByText(/can reach/i).first()).toBeVisible();
 });
 
@@ -89,9 +81,7 @@ test("a chat filed under a project is a row that resumes it, and the project is 
   await parent.getByRole("button", { name: "New chat" }).click();
   await expect(page).toHaveURL(/#\/new-chat/);
   await chooseModelForTurn(page, /Haiku 4\.5/i);
-  const composer = page.getByRole("group", { name: "Message composer" });
-  await composer.getByRole("textbox").first().fill("Reply with exactly: lifecycle check ok");
-  await composer.getByRole("button", { name: /^Send/ }).click();
+  await sendTurn(page, "Reply with exactly: lifecycle check ok");
   await expect(page.getByText(/lifecycle check ok/i).last()).toBeVisible({ timeout: 120_000 });
   // A new chat is filed when its turn settles, and the composer says so. Leaving
   // before that is leaving before the thing this test is about has happened.
@@ -244,4 +234,28 @@ test("Projects at phone width keeps its lifecycle reachable", async ({ page }) =
   );
   expect(bleed).toBeLessThanOrEqual(0);
   await capture(page, `${SHOTS}/08-mobile-archived.png`);
+});
+
+test("a pending approval is shown once, by its card, and nothing covers Chat's header (found 2026-10-01)", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await signInAsOwner(page, BASE);
+  const pending = (await inPage(page, "GET", "/api/approvals?status=pending")) as unknown[];
+  test.skip(pending.length === 0, "No approval is pending in this workspace to show.");
+  await page.goto(`${BASE}/#/new-chat`);
+  await expect(page.getByRole("region", { name: "Approval needed" })).toBeVisible({
+    timeout: 30_000,
+  });
+  const dock = page.getByRole("region", { name: "Notifications" });
+  await expect(dock.filter({ hasText: "Approval needed" })).toHaveCount(0);
+  // Whatever the header holds is the header's to be pressed.
+  const newChat = page.getByRole("button", { name: "New chat" }).first();
+  const covered = await newChat.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return !(top === el || el.contains(top));
+  });
+  expect(covered).toBe(false);
+  await capture(page, `${SHOTS}/09-approval-shown-once-on-chat.png`);
 });

@@ -15,12 +15,10 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { signInAsOwner, useHostedModel } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
 
-const BASE = "http://127.0.0.1:8765";
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? process.cwd();
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 const SHOTS = "../../docs/plans/screenshots/working";
 
 const PLUGIN_ID = "acme-live";
@@ -88,12 +86,7 @@ test("the Anthropic credential is entered through the UI and a model pinned", as
   test.setTimeout(300_000);
   expect(ANTHROPIC_KEY, "set RAIKER_LIVE_ANTHROPIC_KEY").not.toBe("");
 
-  const card = await useHostedModel(page, BASE, {
-    provider: "Anthropic",
-    keyLabel: "Anthropic API key",
-    key: ANTHROPIC_KEY,
-    model: MODEL,
-  });
+  const card = await useAnthropic(page);
   await expect(card.getByText(/can reach/i)).toBeVisible({ timeout: 120_000 });
   await capture(page, `${SHOTS}/bug-221-live-anthropic-ready.png`);
 });

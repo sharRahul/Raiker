@@ -38,8 +38,7 @@ import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { DESTINATIONS, hubReachability, settled } from "./destinations";
 import { signInAsOwner } from "./hosted-provider";
-
-const BASE = "http://127.0.0.1:8765";
+import { LIVE_BASE as BASE } from "./live";
 
 /** Every routed destination the navigation offers.
  *

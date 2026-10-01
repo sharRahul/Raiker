@@ -13,12 +13,10 @@
  */
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
-import { pickAnyThinkingLevel, setThinkingEffort, signInAsOwner, useHostedModel } from "./hosted-provider";
+import { pickAnyThinkingLevel, setThinkingEffort, signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY, useAnthropic } from "./live";
 
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
-const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 
 test.describe.configure({ mode: "serial" });
 
@@ -34,12 +32,7 @@ test.beforeAll(async ({ browser }) => {
   context = await browser.newContext();
   page = await context.newPage();
   await signInAsOwner(page, BASE);
-  await useHostedModel(page, BASE, {
-    provider: "Anthropic",
-    keyLabel: "Anthropic API key",
-    key: KEY,
-    model: MODEL,
-  });
+  await useAnthropic(page);
 });
 
 test.afterAll(async () => {

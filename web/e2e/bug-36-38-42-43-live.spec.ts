@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { OWNER_CREDENTIALS, hostedProviderCard, keepModelAvailable } from "./hosted-provider";
 
 import { roundName } from "./naming";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY } from "./live";
 
 // BUG-250 — named per run, so a round that has already worked in this
 // workspace cannot find its own leftovers and assert on them. The suite shares
@@ -12,10 +13,8 @@ import { roundName } from "./naming";
 const TASK = roundName("Review attached passage");
 const PROJECT = roundName("Budget evidence sandbox");
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const PASSWORD = OWNER_CREDENTIALS.password;
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const OPENROUTER_KEY = process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "";
 
 test.describe.configure({ mode: "serial" });

@@ -12,8 +12,7 @@ import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { DESTINATIONS, horizontalBleed, hubReachability, settled, WIDTHS } from "./destinations";
 import { signInAsOwner } from "./hosted-provider";
-
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
+import { LIVE_BASE as BASE } from "./live";
 
 /** Wait for the routed view to have finished arriving, not merely to exist. */
 async function settle(page: import("@playwright/test").Page): Promise<void> {

@@ -350,8 +350,8 @@
      names what it *is*, and the arithmetic between them is settled here:
 
        raised    lifted inside its own card or row — an overflow, a sticky head
-       popover   a menu or inspector anchored to the control that opened it
        docked    a tray or prompt fixed to a corner of the viewport
+       popover   a menu or inspector anchored to the control that opened it
        panel     a drawer or sheet that shares the page with its content
        scrim     the dimming layer that makes the surface above it modal
        modal     the modal surface itself, directly above its own scrim
@@ -361,13 +361,19 @@
      Two rules follow from the ladder and are worth stating: a scrim and the
      surface it dims are adjacent, never separated by another layer; and nothing
      is allowed above `--z-alert`, because the control that stops a running turn
-     must remain reachable from every state the product can be in. */
+     must remain reachable from every state the product can be in.
+
+     A popover sits above a docked tray. It was below until 2026-10-01, when a
+     live round could not choose a model: the approval card rises to sit just
+     above a composer (FIXED-621), which is exactly where the composer's model
+     menu opens, and the card took every click meant for the menu. A menu is
+     the thing the owner opened this moment; a tray is waiting for them. */
   --z-raised: 10;
-  --z-popover: 40;
+  --z-docked: 50;
+  --z-popover: 54;
   /* A popover's own dismiss layer sits at `--z-popover`; the panel it dismisses
      is one step above it, the same relationship a scrim has with its modal. */
-  --z-popover-panel: 41;
-  --z-docked: 50;
+  --z-popover-panel: 55;
   --z-panel: 60;
   --z-scrim: 70;
   --z-modal: 71;

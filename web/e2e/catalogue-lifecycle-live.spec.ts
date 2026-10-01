@@ -23,9 +23,7 @@ import {
   openProviderDetails,
   signInAsOwner,
 } from "./hosted-provider";
-
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
-const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY } from "./live";
 
 const SHOTS = "../../docs/screenshots/2026-09-12-catalogue-lifecycle";
 

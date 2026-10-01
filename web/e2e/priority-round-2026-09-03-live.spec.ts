@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { join } from "node:path";
 import { capture } from "./capture";
 import { signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE } from "./live";
 
 /**
  * The five items of the 2026-09-03 round, verified against a running host.
@@ -12,7 +13,6 @@ import { signInAsOwner } from "./hosted-provider";
  * thread can be found beside the owner's own conversations (C18).
  */
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 
 /** Every route in the rail, so a sweep cannot quietly skip one. */

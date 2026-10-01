@@ -10,8 +10,8 @@ import { createServer, type Server } from "node:http";
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { dismissFirstRunModelSetup, signInAsOwner } from "./hosted-provider";
+import { LIVE_BASE as BASE } from "./live";
 
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = "../../docs/plans/screenshots/working";
 const TRANSCRIPT = "dictated entirely on this machine";
 

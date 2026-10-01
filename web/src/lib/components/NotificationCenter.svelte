@@ -31,6 +31,7 @@
     announceNoticesChanged,
     answeredByPage,
     noticeDestination,
+    shownByApprovalCard,
     onNoticeRecord,
   } from "../noticeDestination";
 
@@ -57,7 +58,9 @@
    * Tasks) repeats a row of it, and on the record every notice is a row.
    */
   const shown = $derived(
-    onNoticeRecord(hash) ? [] : unread.filter((item) => !answeredByPage(item, hash)),
+    onNoticeRecord(hash)
+      ? []
+      : unread.filter((item) => !answeredByPage(item, hash) && !shownByApprovalCard(item)),
   );
 
   /**
@@ -121,6 +124,74 @@
     announceNoticesChanged();
   }
 
+  /**
+   * Read it here, without going anywhere.
+   *
+   * Opening was the only way to clear the dock, so a notice the owner had
+   * already understood sat over the top of whatever page they were on — on
+   * Chat, over the conversation's own **New chat** — until they left that page
+   * to read it. Dismissing marks it read through the same route; the record
+   * keeps it.
+   */
+  async function dismiss(notification: RaikerNotification) {
+    notifications = notifications.map((item) =>
+      item.notification_id === notification.notification_id ? { ...item, read: true } : item,
+    );
+    try {
+      await api.markNotificationRead(notification.notification_id);
+    } catch {
+      // The next poll shows it again if the mark did not land, which is the truth.
+    }
+    announceNoticesChanged();
+  }
+
+  /**
+   * How far the dock drops so it never covers a page's own top actions.
+   *
+   * Found live on 2026-10-01: docked under the top bar, the notice sat over the
+   * conversation header's **New chat** on Chat and Build and over **Refresh**
+   * on the list pages, and a click meant for either opened the notice instead.
+   * The approval card learned the same thing about composers at the bottom
+   * (FIXED-621); this is the top half. A page's top action row is measured and
+   * the dock sits just below any row it would cover, and back under the top bar
+   * when there is none.
+   */
+  const KEEP_CLEAR_TOP = ".head-row, .header-actions, [data-dock-clear-top]";
+  const DOCK_RIGHT = 20;
+  let drop = $state(0);
+  let dock = $state<HTMLElement | null>(null);
+
+  function measure() {
+    if (typeof document === "undefined" || dock === null) return;
+    const width = dock.offsetWidth || 384;
+    const left = window.innerWidth - DOCK_RIGHT - width;
+    // Where the dock sits with no drop. `offsetTop` ignores the transform the
+    // drop is applied as, so measuring never feeds back into itself.
+    const baseTop = dock.offsetTop;
+    // Its own height, or a typical card's before it has been laid out.
+    const baseBottom = baseTop + (dock.offsetHeight || 96);
+    let needed = 0;
+    for (const row of document.querySelectorAll<HTMLElement>(KEEP_CLEAR_TOP)) {
+      if (dock.contains(row)) continue;
+      const rect = row.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0 || rect.right <= left) continue;
+      if (rect.bottom <= baseTop || rect.top >= baseBottom) continue;
+      needed = Math.max(needed, rect.bottom + 8 - baseTop);
+    }
+    drop = Math.max(0, Math.round(needed));
+  }
+
+  $effect(() => {
+    if (shown.length === 0 || dock === null) return;
+    measure();
+    const tick = setInterval(measure, 1000);
+    window.addEventListener("resize", measure);
+    return () => {
+      clearInterval(tick);
+      window.removeEventListener("resize", measure);
+    };
+  });
+
   // Mirror new unread notifications to the desktop through the one path every
   // surface uses (BUG-255). Best-effort only — the in-app record is the source
   // of truth.
@@ -144,14 +215,28 @@
 
 {#if uiPrefs.inApp && shown.length > 0}
   {@const newest = shown[0]}
-  <section class="notifications" aria-label="Notifications">
+  <section
+    class="notifications"
+    aria-label="Notifications"
+    bind:this={dock}
+    style:transform={drop > 0 ? `translateY(${drop}px)` : undefined}
+  >
     <!-- One, not a stack. Three docked cards covered Home's primary actions at
          1080p and most of the screen at 390px, which is a worse obstruction
          than the banner nobody could see. The rest are never lost: the bell
          counts them and the link below opens the record. -->
-    <button type="button" class="notice" onclick={() => void open(newest)}>
-      <strong>{newest.title}</strong><span>{newest.body}</span>
-    </button>
+    <div class="notice-row">
+      <button type="button" class="notice" onclick={() => void open(newest)}>
+        <strong>{newest.title}</strong><span>{newest.body}</span>
+      </button>
+      <button
+        type="button"
+        class="dismiss"
+        aria-label={`Dismiss: ${newest.title}`}
+        title="Mark read"
+        onclick={() => void dismiss(newest)}>×</button
+      >
+    </div>
     {#if shown.length > 1}
       <!-- Inside the card, on its surface: drawn beside it, the link read as
            part of whatever page was underneath (BUG-309 found it across a
@@ -199,6 +284,19 @@
     border: 0;
     background: transparent;
   }
+  .notice-row { display: flex; align-items: flex-start; }
+  .notice-row .notice { flex: 1; min-width: 0; }
+  .dismiss {
+    flex: none;
+    border: 0;
+    background: transparent;
+    color: var(--text-3);
+    font-size: var(--text-lg);
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.6rem 0.7rem;
+  }
+  .dismiss:hover { color: var(--text-1); }
   .notice strong { color: var(--text-1); font-size: var(--text-sm); }
   .notice span { color: var(--text-2); font-size: var(--text-sm); overflow-wrap: anywhere; }
   .all {

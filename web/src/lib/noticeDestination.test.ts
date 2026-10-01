@@ -7,6 +7,7 @@ import {
   answeredByPage,
   noticeDestination,
   onNoticeRecord,
+  shownByApprovalCard,
 } from "./noticeDestination";
 
 function notice(kind: string): RaikerNotification {
@@ -68,5 +69,14 @@ describe("announceNoticesChanged", () => {
     announceNoticesChanged();
     window.removeEventListener(NOTICES_CHANGED, heard);
     expect(heard).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("shownByApprovalCard", () => {
+  it("is true for the two approval kinds and nothing else", () => {
+    expect(shownByApprovalCard(notice("approval_pending"))).toBe(true);
+    expect(shownByApprovalCard(notice("critical_approval_pending"))).toBe(true);
+    expect(shownByApprovalCard(notice("task_finished"))).toBe(false);
+    expect(shownByApprovalCard(notice("security_alert"))).toBe(false);
   });
 });

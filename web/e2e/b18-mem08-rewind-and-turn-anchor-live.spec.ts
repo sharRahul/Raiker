@@ -24,19 +24,17 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
 import { capture } from "./capture";
-import { signInAsOwner, useHostedModel } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
 
 import { roundName } from "./naming";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
 
 // BUG-250 — named per run, so a round that has already worked in this
 // workspace cannot find its own leftovers and assert on them. The suite shares
 // one workspace by design; this is what keeps a shared workspace honest.
 const CHECKPOINT = roundName("Rewind round");
 
-const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
-const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
-const MODEL = "claude-haiku-4-5-20251001";
 
 test.describe.configure({ mode: "serial" });
 
@@ -67,12 +65,7 @@ test.beforeAll(async ({ browser }: { browser: Browser }) => {
   page = await context.newPage();
   await signInAsOwner(page, BASE);
   test.skip(ANTHROPIC_KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is required for this round.");
-  await useHostedModel(page, BASE, {
-    provider: "Anthropic",
-    keyLabel: "Anthropic API key",
-    key: ANTHROPIC_KEY,
-    model: MODEL,
-  });
+  await useAnthropic(page);
 });
 
 test.afterAll(async () => {

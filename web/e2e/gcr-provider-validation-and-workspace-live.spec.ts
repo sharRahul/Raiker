@@ -30,9 +30,7 @@ import {
   openModelDialog,
   signInAsOwner,
 } from "./hosted-provider";
-
-const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
-const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
+import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY } from "./live";
 
 test.skip(KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is unset");
 

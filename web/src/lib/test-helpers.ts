@@ -2,7 +2,7 @@
 // prefix (query strings ignored), so tests declare only the endpoints they use;
 // anything unrouted rejects loudly instead of fabricating data.
 import { vi } from "vitest";
-import type { CapabilityGate, Diagnostics, RuntimeMode } from "./apiTypes";
+import type { CapabilityGate, Diagnostics, ModelProfile, RuntimeMode } from "./apiTypes";
 
 /** A fetch that never settles — for asserting route-level loading states. */
 export function stubFetchPending(): ReturnType<typeof vi.fn> {
@@ -100,6 +100,69 @@ export function makeGate(partial: Partial<CapabilityGate>): CapabilityGate {
     blocked_reason_code: null,
     readiness: {},
     decision_mode: "ask",
+    requires_threat_model_ack: false,
+    requires_human_confirmation: false,
+    threat_model_ack_recorded: false,
+    gate_reality: "own_gate",
+    governance_note: "",
+    unset_resolution: "off",
+    enforced_enabled: false,
+    side_effect: "",
+    ungoverned_consequence: "",
+    authority_requirement: "",
+    network_boundary: "",
+    ...partial,
+  };
+}
+
+/**
+ * A complete model profile, defaulted as the backend's `ModelProfileView` is, so
+ * a test states only what it is about. The type is generated (OPT-01): a field
+ * the backend adds is required here until it has a default below.
+ */
+export function makeModelProfile(partial: Partial<ModelProfile> = {}): ModelProfile {
+  return {
+    profile_id: "local-gguf",
+    provider: "llama.cpp",
+    model: "qwen2.5-7b-instruct",
+    default_state: "enabled",
+    local_only: true,
+    requires_network: false,
+    endpoint_kind: "local_process",
+    requires_egress_policy: false,
+    requires_budget_policy: false,
+    runtime_gate: null,
+    off_machine: false,
+    selected: false,
+    connection_configured: false,
+    usage_admin_configured: false,
+    workspace_configured: false,
+    prompt_cache_ttl: null,
+    context_window_tokens: null,
+    context_window_source: null,
+    configured: false,
+    provider_detected: null,
+    readiness_state: "not_configured",
+    readiness_summary: "No readiness check exists for this exact model.",
+    readiness_reason_code: "model_not_checked",
+    readiness_checked_at: null,
+    readiness_expires_at: null,
+    readiness_remediation: "Set up or check this model before sending.",
+    ready: false,
+    billable: false,
+    models_used: 0,
+    turns_used: 0,
+    total_tokens: 0,
+    total_cost: null,
+    cost_currency: null,
+    price_source: null,
+    price_as_of: null,
+    supports_reasoning: false,
+    supports_reasoning_effort: false,
+    reasoning_effort_values: [],
+    reasoning_modes: [],
+    supports_reasoning_summary: false,
+    image_models: [],
     ...partial,
   };
 }

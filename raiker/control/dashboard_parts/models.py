@@ -142,7 +142,11 @@ class ModelService:
         # than the gate row alone.
         enforced_policy = provider_runtime_policy_from_gates(self.store, acting_principal_id)
         from raiker.models.connections import get_model_connection
-        from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
+        from raiker.models.readiness import (
+            ModelReadinessService,
+            ModelReadinessState,
+            ProviderCatalogueProbe,
+        )
         from raiker.runtime.model_usage import ModelUsageLedger, sum_totals
 
         # One ledger read for the whole page, grouped by provider, so each card
@@ -261,7 +265,9 @@ class ModelService:
                     if profile.provider in LOCAL_RUNTIME_PROVIDERS
                     else None
                 ),
-                readiness_state=(readiness.state.value if readiness else "not_configured"),
+                readiness_state=(
+                    readiness.state if readiness else ModelReadinessState.NOT_CONFIGURED
+                ),
                 readiness_summary=(
                     readiness.summary
                     if readiness

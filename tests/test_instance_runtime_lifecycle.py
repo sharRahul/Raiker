@@ -18,7 +18,12 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from raiker.api.app import _stored_instance_names, _write_instance_names, create_app
+from raiker.api.app import (
+    _read_instance_registry,
+    _stored_instance_names,
+    _write_instance_names,
+    create_app,
+)
 from raiker.auth.accounts import AuthError
 from raiker.cli.principal_resolver import bootstrap_owner
 
@@ -122,10 +127,13 @@ def test_the_registry_is_published_atomically(workspace: Path) -> None:
     stop = threading.Event()
 
     def read_forever() -> None:
+        # Through the product's own reader: on Windows a raw read is refused
+        # for a moment around each replace, and the reader waits that out
+        # (BUG-310) rather than reporting the registry missing.
         while not stop.is_set():
             try:
-                seen.append(registry.read_text(encoding="utf-8"))
-            except OSError:  # pragma: no cover — the file is never absent here
+                seen.append(_read_instance_registry(workspace))
+            except OSError:
                 seen.append("<missing>")
 
     reader = threading.Thread(target=read_forever, daemon=True)

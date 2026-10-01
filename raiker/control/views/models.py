@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from raiker.contracts.views import View
+from raiker.models.readiness import ModelReadinessState
 
 # Capability states that mean the gate is off / fail-closed.
 _DISABLED_STATES = {"disabled", "planned"}
@@ -110,7 +111,7 @@ class ModelProfileView(View):
     # depend on a local runtime, and the UI says nothing in that case rather
     # than claiming an absence it has not established.
     provider_detected: bool | None = None
-    readiness_state: str = "not_configured"
+    readiness_state: ModelReadinessState = ModelReadinessState.NOT_CONFIGURED
     readiness_summary: str = "No readiness check exists for this exact model."
     readiness_reason_code: str = "model_not_checked"
     readiness_checked_at: str | None = None

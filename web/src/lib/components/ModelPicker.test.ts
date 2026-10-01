@@ -3,9 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { ModelProfile } from "../apiTypes";
 import { resetModelSetup, setupDialog } from "../modelReadiness.svelte";
 import ModelPicker from "./ModelPicker.svelte";
+import { makeModelProfile } from "../test-helpers";
 
 const profiles: ModelProfile[] = [
-  {
+  makeModelProfile({
     profile_id: "anthropic-haiku",
     provider: "anthropic",
     model: "claude-haiku-4-5-20251001",
@@ -18,10 +19,13 @@ const profiles: ModelProfile[] = [
     runtime_gate: "hosted_model_runtime",
     off_machine: true,
     connection_configured: true,
+    configured: true,
+    ready: true,
+    readiness_state: "ready",
     selected: true,
     prompt_cache_ttl: null,
-  },
-  {
+  }),
+  makeModelProfile({
     profile_id: "anthropic-sonnet",
     provider: "anthropic",
     model: "claude-sonnet-4-5-20250929",
@@ -34,10 +38,13 @@ const profiles: ModelProfile[] = [
     runtime_gate: "hosted_model_runtime",
     off_machine: true,
     connection_configured: true,
+    configured: true,
+    ready: true,
+    readiness_state: "ready",
     selected: false,
     prompt_cache_ttl: null,
-  },
-  {
+  }),
+  makeModelProfile({
     profile_id: "openai-gpt",
     provider: "openai",
     model: "gpt-4o-mini",
@@ -50,9 +57,12 @@ const profiles: ModelProfile[] = [
     runtime_gate: "hosted_model_runtime",
     off_machine: true,
     connection_configured: true,
+    configured: true,
+    ready: true,
+    readiness_state: "ready",
     selected: false,
     prompt_cache_ttl: null,
-  },
+  }),
 ];
 
 describe("ModelPicker", () => {

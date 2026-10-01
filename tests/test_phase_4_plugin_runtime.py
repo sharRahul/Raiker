@@ -99,7 +99,9 @@ def _run_action(principal_id: str, *, action_type: str = _CAP, **args: object) -
 
 def _write_entry(ws: Path, name: str, body: str) -> str:
     (ws / name).parent.mkdir(parents=True, exist_ok=True)
-    (ws / name).write_text(body, encoding="utf-8")
+    # Bytes, not text: on Windows `write_text` writes CRLF, and the pin is over
+    # the bytes on disk (BUG-310).
+    (ws / name).write_bytes(body.encode())
     # BUG-308 (CR-05) — the owner pins the bytes that may run, not only the id.
     # Cleared after every test by `_no_pins_between_tests`.
     os.environ[_DIGESTS_ENV] = f"{_PLUGIN}:{hashlib.sha256(body.encode()).hexdigest()}"

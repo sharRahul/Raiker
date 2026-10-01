@@ -12,7 +12,7 @@ import {
 } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelProfile, ModelsView as ModelsData } from "../apiTypes";
-import { stubFetch, stubFetchPending } from "../test-helpers";
+import { makeModelProfile, stubFetch, stubFetchPending } from "../test-helpers";
 import ModelsView from "./ModelsView.svelte";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -51,8 +51,8 @@ async function rowAction(label: string, nth = 0): Promise<void> {
   await fireEvent.click(within(menu).getByRole("menuitem", { name: label }));
 }
 
-function profile(partial: Partial<ModelProfile>): ModelProfile {
-  return {
+function profile(partial: Partial<ModelProfile> = {}): ModelProfile {
+  return makeModelProfile({
     profile_id: "p",
     provider: "llama.cpp",
     model: "local-gguf",
@@ -67,7 +67,7 @@ function profile(partial: Partial<ModelProfile>): ModelProfile {
     selected: false,
     prompt_cache_ttl: null,
     ...partial,
-  };
+  });
 }
 
 function models(partial: Partial<ModelsData>): ModelsData {
@@ -580,6 +580,7 @@ describe("ModelsView state grammar", () => {
       requires_network: true,
       off_machine: true,
       endpoint_kind: "hosted",
+      configured: true,
     });
 
   // Local and Hosted were peers because that is how the

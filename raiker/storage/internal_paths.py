@@ -50,6 +50,14 @@ def internal_io_path(path: str | Path) -> Path:
     if sys.platform != "win32":
         return resolved
     normalized = str(resolved)
+    # `resolve()` itself can answer in extended form — `ntpath.realpath` keeps
+    # the prefix when the plain path does not resolve to the same file, which
+    # happens while a directory on it is being created by another thread. That
+    # is already the transport form; read as UNC it became `\\?\UNC\?\C:\…`, a
+    # network path that does not exist (BUG-310).
+    already_extended = _validated_extended(normalized)
+    if already_extended:
+        return Path(already_extended)
     if normalized.startswith("\\\\"):
         return Path(_EXTENDED_UNC + normalized[2:])
     drive, _tail = os.path.splitdrive(normalized)

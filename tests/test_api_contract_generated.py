@@ -16,6 +16,8 @@ shape nobody thought to transcribe.
 
 from __future__ import annotations
 
+import re
+
 from scripts.check_api_contract import (
     API_TYPES,
     backend_dataclasses,
@@ -38,9 +40,14 @@ def test_the_gate_actually_pairs_a_meaningful_share_of_the_mirror() -> None:
     number moves whenever an interface or a DTO is added, and a test that has to
     be edited for every such change gets edited without being read.
     """
-    interfaces = parse_interfaces(API_TYPES.read_text(encoding="utf-8"))
+    source = API_TYPES.read_text(encoding="utf-8")
+    interfaces = parse_interfaces(source)
     matched = pairs(interfaces, backend_dataclasses())
-    assert len(matched) >= 30, f"only {len(matched)} of {len(interfaces)} paired"
+    # OPT-01 — a mirror that became an alias of a generated view is covered by
+    # generation, not by pairing, and counts toward the same floor.
+    aliased = re.findall(r"^export type (?:\{ )?\w+(?: \})?(?: = \w+)?;$", source, re.M)
+    covered = len(matched) + len(aliased)
+    assert covered >= 30, f"only {covered} of {len(interfaces) + len(aliased)} covered"
 
 
 def test_a_key_a_view_computes_counts_as_a_field_it_sends() -> None:

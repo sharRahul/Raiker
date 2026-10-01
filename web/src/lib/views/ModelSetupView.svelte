@@ -163,7 +163,7 @@
     profiles.some(
       (profile) =>
         isReachableProfile(profile) &&
-        ((profile.image_model ?? "") !== "" || (profile.image_models?.length ?? 0) > 0),
+        profile.image_models.length > 0,
     ),
   );
 

@@ -24,9 +24,10 @@ import {
   runtimeBlock,
   unsetResolutionNote,
 } from "./capabilityModel";
+import { makeGate } from "./test-helpers";
 
-function gate(partial: Partial<CapabilityGate>): CapabilityGate {
-  return {
+function gate(partial: Partial<CapabilityGate> = {}): CapabilityGate {
+  return makeGate({
     capability: "x",
     phase: 1,
     state: "disabled",
@@ -39,7 +40,7 @@ function gate(partial: Partial<CapabilityGate>): CapabilityGate {
     readiness: {},
     decision_mode: "ask",
     ...partial,
-  };
+  });
 }
 
 describe("capability state → badge mapping", () => {

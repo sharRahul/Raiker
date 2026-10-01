@@ -2,9 +2,10 @@ import { render, screen } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
 import type { ModelProfile, ModelsView } from "../apiTypes";
 import ModelChip from "./ModelChip.svelte";
+import { makeModelProfile } from "../test-helpers";
 
-function makeProfile(partial: Partial<ModelProfile>): ModelProfile {
-  return {
+function makeProfile(partial: Partial<ModelProfile> = {}): ModelProfile {
+  return makeModelProfile({
     profile_id: "local-gguf",
     provider: "llama.cpp",
     model: "qwen2.5-7b-instruct",
@@ -19,7 +20,7 @@ function makeProfile(partial: Partial<ModelProfile>): ModelProfile {
     selected: false,
     prompt_cache_ttl: null,
     ...partial,
-  };
+  });
 }
 
 function makeModels(partial: Partial<ModelsView>): ModelsView {

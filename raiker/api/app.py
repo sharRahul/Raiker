@@ -7,10 +7,11 @@ import logging
 import os
 import shutil
 import threading
+import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
@@ -67,7 +68,7 @@ from raiker.runtime.attachments import MAX_ATTACHMENT_BYTES
 from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.skills.package import MAX_BUNDLE_BYTES as MAX_SKILL_BUNDLE_BYTES
 from raiker.storage.internal_paths import display_path, internal_io_path
-from raiker.storage.sqlite import StoreUnavailableError
+from raiker.storage.sqlite import StoreUnavailableError, invalidate_workspace_connections
 from raiker.tasks.wakeup import SchedulerWakeup
 
 _LOG = logging.getLogger(__name__)
@@ -271,13 +272,55 @@ def _instances_registry(root: Path) -> Path:
 #: process-wide lock costs nothing and removes the class.
 _INSTANCE_LOCK = threading.Lock()
 
+_T = TypeVar("_T")
+
+
+def _windows_sharing_retry(operation: Callable[[], _T]) -> _T:
+    """Run a registry read or replace, waiting out the other side on Windows.
+
+    BUG-310 — Windows refuses to replace a file another handle has open without
+    delete sharing, which is how every Python ``open`` opens one; and for a
+    moment after a replace, opening the name is refused too. Either side of a
+    concurrent read and write could therefore fail with ``PermissionError`` —
+    and a reader that took that as "no registry" concluded the host had no
+    instances, the failure GCR-09 removed. Each side holds the file for
+    microseconds, so a short retry lands between them; after about two seconds
+    the refusal is real and is raised.
+    """
+    deadline = time.monotonic() + 2.0
+    while True:
+        try:
+            return operation()
+        except PermissionError:
+            if os.name != "nt" or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.002)
+
+
+def _read_instance_registry(root: Path) -> str:
+    registry = _instances_registry(root)
+    return _windows_sharing_retry(lambda: registry.read_text(encoding="utf-8"))
+
 
 def _stored_instance_names(root: Path) -> list[str]:
     try:
-        raw = json.loads(_instances_registry(root).read_text(encoding="utf-8"))
+        raw = json.loads(_read_instance_registry(root))
     except (OSError, ValueError, TypeError):
         return []
     return [name for name in raw if isinstance(name, str) and name]
+
+
+def _remove_staged_workspace(internal_workspace: Path, workspace: Path) -> None:
+    """Remove a workspace that was staged and never published.
+
+    BUG-310 — registering the first account opens the workspace's SQLCipher
+    database, and this thread keeps that connection cached. Windows will not
+    delete a file with an open handle, so ``rmtree`` left the database (and the
+    directory) behind and the owner's retry met ``instance_already_exists``.
+    Release this workspace's handles first; then the removal can complete.
+    """
+    invalidate_workspace_connections(workspace)
+    shutil.rmtree(internal_workspace, ignore_errors=True)
 
 
 def _write_instance_names(root: Path, names: list[str]) -> None:
@@ -295,7 +338,7 @@ def _write_instance_names(root: Path, names: list[str]) -> None:
     staging = registry.with_name(f"{registry.name}.{os.getpid()}.tmp")
     try:
         staging.write_text(json.dumps(names), encoding="utf-8")
-        os.replace(staging, registry)
+        _windows_sharing_retry(lambda: os.replace(staging, registry))
     finally:
         with suppress(OSError):
             staging.unlink()
@@ -368,7 +411,7 @@ async def create_and_mount_instance(
             except BaseException:
                 # Nothing has been published yet, so the rollback is the staged
                 # directory and nothing else.
-                shutil.rmtree(internal_workspace, ignore_errors=True)
+                _remove_staged_workspace(internal_workspace, workspace)
                 raise
             _write_instance_names(root, [*_stored_instance_names(root), name])
         return workspace

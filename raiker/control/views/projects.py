@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from raiker.contracts.views import View
 from raiker.control.views.sessions import CheckpointView, SessionView
@@ -28,7 +28,7 @@ class ProjectView(View):
     # Which kind of root this project has, and what to call it. Carried on the
     # list rather than fetched per card, because the delete confirmation has to
     # say whether a folder survives *before* the owner opens anything.
-    root_kind: str = "managed"
+    root_kind: Literal["managed", "attached"] = "managed"
     root_label: str = ""
 
 

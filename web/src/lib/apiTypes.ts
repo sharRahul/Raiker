@@ -1275,6 +1275,39 @@ export interface ProjectView {
    *  survives before the owner opens anything. */
   root_kind: "managed" | "attached";
   root_label: string;
+  /** UX-PROJ-09 — the newest update among this project's sessions, or null
+   *  when nothing has run in it. "Recently active" is this, never a selection. */
+  last_activity_at?: string | null;
+}
+
+/** UX-PROJ-04 — a file shared with every chat in a project, as a person names it. */
+export interface ProjectAttachment {
+  attachment_id: string;
+  filename: string;
+  media_type: string;
+  byte_size: number;
+  /** False when the id no longer resolves to a file this owner holds. */
+  available: boolean;
+}
+
+/** UX-PROJ-07 — everything a delete removes, counted before it runs. */
+export interface ProjectDeletionPreview {
+  project_id: string;
+  name: string;
+  root_kind: "managed" | "attached";
+  root_label: string;
+  sessions: number;
+  turns: number;
+  tasks: number;
+  checkpoints: number;
+  managed_files: number;
+  descendants: number;
+  /** Files and bytes in the managed folder Raiker removes; 0 for an attached one. */
+  folder_files: number;
+  folder_bytes: number;
+  folder_truncated: boolean;
+  /** A managed project's folder goes with it, so its delete takes a step-up. */
+  requires_step_up: boolean;
 }
 
 export interface ProjectsList {
@@ -1357,6 +1390,7 @@ export interface ProjectDetail {
   sessions: SessionSummary[];
   checkpoints: Checkpoint[];
   context: ProjectContext;
+  attachments?: ProjectAttachment[];
 }
 
 export interface ProjectContext {
@@ -1578,7 +1612,7 @@ export interface ExtensionView {
   transport: string | null;
   monitor_state: string | null;
   tool_count: number;
-  last_activity_at: string | null;
+  last_activity_at?: string | null;
 }
 
 export interface ExtensionsOverview {

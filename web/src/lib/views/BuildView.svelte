@@ -1,5 +1,6 @@
 <script lang="ts">
   import { LARGE_PASTE_CHARS } from "../composerAttachments.svelte";
+  import { pickableProjects } from "../projectLifecycle";
   import { workDraft } from "../workDraft.svelte";
   /**
    * Build — Raiker's coding workspace.
@@ -2595,7 +2596,7 @@
               }}
             >
               <option value="">Select a project</option>
-              {#each projects?.projects ?? [] as project (project.project_id)}
+              {#each pickableProjects(projects, projectId) as project (project.project_id)}
                 <option value={project.project_id}>{project.name}</option>
               {/each}
             </select>

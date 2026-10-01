@@ -1,5 +1,6 @@
 <script lang="ts">
   import { LARGE_PASTE_CHARS } from "../composerAttachments.svelte";
+  import { pickableProjects } from "../projectLifecycle";
   import { workDraft } from "../workDraft.svelte";
   import { onMount, tick, untrack } from "svelte";
   import Icon from "../components/Icon.svelte";
@@ -2334,7 +2335,7 @@
             }}
           >
             <option value="">No project — this chat stands alone</option>
-            {#each projects?.projects ?? [] as project (project.project_id)}
+            {#each pickableProjects(projects, projectId) as project (project.project_id)}
               <option value={project.project_id}>{project.name}</option>
             {/each}
           </select>

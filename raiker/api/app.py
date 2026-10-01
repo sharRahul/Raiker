@@ -7,6 +7,7 @@ import logging
 import os
 import shutil
 import threading
+import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -295,10 +296,55 @@ def _write_instance_names(root: Path, names: list[str]) -> None:
     staging = registry.with_name(f"{registry.name}.{os.getpid()}.tmp")
     try:
         staging.write_text(json.dumps(names), encoding="utf-8")
-        os.replace(staging, registry)
+        _replace_with_retry(staging, registry)
     finally:
         with suppress(OSError):
             staging.unlink()
+
+
+#: How long a registry replace or a staged-workspace removal keeps trying
+#: while another handle holds the file (BUG-310).
+_SHARING_RETRY_ATTEMPTS = 50
+_SHARING_RETRY_SECONDS = 0.02
+
+
+def _replace_with_retry(source: Path, target: Path) -> None:
+    """``os.replace``, waiting out a reader that has ``target`` open.
+
+    BUG-310 — Windows refuses to replace a file another handle has open, and a
+    reader of the registry holds it for the moment its read takes. That is a
+    sharing violation, not a failure: the reader lets go. Elsewhere the first
+    attempt succeeds, so this costs nothing there.
+    """
+    for attempt in range(_SHARING_RETRY_ATTEMPTS):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if attempt == _SHARING_RETRY_ATTEMPTS - 1:
+                raise
+            time.sleep(_SHARING_RETRY_SECONDS)
+
+
+def _remove_staged_workspace(internal_workspace: Path, workspace: Path) -> None:
+    """Remove a staged instance directory completely, or say that it could not.
+
+    BUG-310 — a registration that opened the workspace's database leaves its
+    cached SQLCipher handles open, and Windows will not remove a directory a
+    handle is still open in. ``rmtree(ignore_errors=True)`` then left the
+    directory behind in silence, and the retry this rollback exists to allow
+    answered ``instance_already_exists``. The handles are released first, and
+    the removal is retried while anything else lets go.
+    """
+    from raiker.storage.sqlite import invalidate_workspace_connections
+
+    invalidate_workspace_connections(workspace)
+    for _attempt in range(_SHARING_RETRY_ATTEMPTS):
+        shutil.rmtree(internal_workspace, ignore_errors=True)
+        if not internal_workspace.exists():
+            return
+        time.sleep(_SHARING_RETRY_SECONDS)
+    _LOG.warning("Could not remove the staged instance directory %s", internal_workspace)
 
 
 def _mount_instance(app: FastAPI, name: str, workspace: Path) -> FastAPI | None:
@@ -368,7 +414,7 @@ async def create_and_mount_instance(
             except BaseException:
                 # Nothing has been published yet, so the rollback is the staged
                 # directory and nothing else.
-                shutil.rmtree(internal_workspace, ignore_errors=True)
+                _remove_staged_workspace(internal_workspace, workspace)
                 raise
             _write_instance_names(root, [*_stored_instance_names(root), name])
         return workspace

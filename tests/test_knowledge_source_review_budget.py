@@ -177,7 +177,8 @@ class TestTheAnswerIsUnchangedWhereItWasRight:
     def test_a_single_file_is_reviewed_as_itself(self, tmp_path: Path) -> None:
         folder = tmp_path / "one"
         folder.mkdir()
-        (folder / "research.md").write_text("hello\n", encoding="utf-8")
+        # Bytes, so the size is six on every platform (BUG-310).
+        (folder / "research.md").write_bytes(b"hello\n")
 
         service = _service(tmp_path)
         root_id = _granted(service, folder)

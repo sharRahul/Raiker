@@ -16,6 +16,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
+from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.context.gatherer import ContextGatherer
 from raiker.contracts.ids import utc_now
@@ -434,9 +435,18 @@ class TestProjectsApi:
             "/api/projects", json={"name": "Alpha"}, headers=owner_headers
         ).json()["project_id"]
 
+        # A managed project's folder goes with it, so the delete takes the
+        # elevated session a step-up issues (UX-PROJ-07).
+        control = ApiSessionStore(workspace).get_by_token(
+            owner_headers["Authorization"].removeprefix("Bearer ")
+        )
+        assert control is not None
+        elevated, _ = ApiSessionStore(workspace).create_session(
+            control.principal_id, scope="elevated", expires_in_seconds=60
+        )
         response = client.delete(
             f"/api/projects/{project_id}",
-            headers={**owner_headers, "X-Project-Delete-Confirm": project_id},
+            headers={"Authorization": f"Bearer {elevated}", "X-Project-Delete-Confirm": project_id},
         )
 
         assert response.status_code == 200, response.text

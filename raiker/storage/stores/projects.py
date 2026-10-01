@@ -20,6 +20,11 @@ from raiker.contracts.ids import utc_now
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 
+#: A row inside the subtree whose materialised path is the second parameter;
+#: the first is that path's length. A prefix comparison rather than ``LIKE``,
+#: because project ids carry ``_``, which ``LIKE`` reads as "any character".
+_IN_SUBTREE = "substr(path, 1, ?) = ?"
+
 
 class ProjectStore:
 
@@ -235,6 +240,7 @@ class ProjectStore:
         rows = self._rows(
             """
             SELECT projects.*, COUNT(sessions.session_id) AS session_count,
+                   MAX(sessions.updated_at) AS last_activity_at,
                    grants.path AS root_grant_path
             FROM projects
             LEFT JOIN sessions ON sessions.project_id = projects.project_id
@@ -372,7 +378,13 @@ class ProjectStore:
         return roots
 
     def move_project(self: SQLiteStore, project_id: str, new_parent_id: str | None) -> bool:
-        """Move project (and subtree) under new parent. Returns False if cycle or not found."""
+        """Move a project and its subtree under a new parent, in one transaction.
+
+        Returns False for an unknown project or parent, a self-parent, or a
+        parent inside the moving subtree (a cycle). The service names which of
+        those it was before calling; this refusal is the one that holds even
+        when a caller skips the service.
+        """
         with self.connect() as conn:
             row = conn.execute(
                 "SELECT project_id, path FROM projects WHERE project_id = ?", (project_id,)
@@ -389,20 +401,42 @@ class ProjectStore:
                     return False
                 new_parent_path = new_parent_row["path"]
                 if new_parent_path.startswith(old_path):
-                    return False  # would create cycle
+                    return False  # the parent is this project or one of its descendants
                 new_path = f"{new_parent_path}{project_id}/"
+            now = utc_now()
             conn.execute(
-                "UPDATE projects SET path = ? || substr(path, ?), updated_at = ? WHERE path LIKE ?",
-                (new_path, len(old_path) + 1, utc_now(), old_path + "%"),
+                "UPDATE projects SET path = ? || substr(path, ?), updated_at = ? "
+                f"WHERE {_IN_SUBTREE}",
+                (new_path, len(old_path) + 1, now, len(old_path), old_path),
             )
             conn.execute(
                 "UPDATE projects SET parent_id = ?, updated_at = ? WHERE project_id = ?",
-                (new_parent_id, utc_now(), project_id),
+                (new_parent_id, now, project_id),
             )
         return True
 
+    def subtree_project_ids(self: SQLiteStore, project_id: str) -> list[str]:
+        """The project and every descendant, by materialised path. Empty if unknown."""
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT path FROM projects WHERE project_id = ?", (project_id,)
+            ).fetchone()
+            if not row:
+                return []
+            path = str(row["path"])
+            rows = conn.execute(
+                f"SELECT project_id FROM projects WHERE {_IN_SUBTREE} ORDER BY path",
+                (len(path), path),
+            ).fetchall()
+        return [str(r["project_id"]) for r in rows]
+
     def archive_project(self: SQLiteStore, project_id: str) -> bool:
-        """Soft-archive project and all descendants. Idempotent."""
+        """Soft-archive project and all descendants. Idempotent.
+
+        A descendant archived earlier keeps its own ``archived_at``, so a
+        restore of this project brings back what this archive took and leaves
+        what was archived on its own.
+        """
         with self.connect() as conn:
             row = conn.execute(
                 "SELECT path FROM projects WHERE project_id = ?", (project_id,)
@@ -412,10 +446,67 @@ class ProjectStore:
             path = row["path"]
             now = utc_now()
             conn.execute(
-                "UPDATE projects SET is_archived = 1, archived_at = ?, updated_at = ? WHERE path LIKE ?",
-                (now, now, path + "%"),
+                "UPDATE projects SET is_archived = 1, archived_at = ?, updated_at = ? "
+                f"WHERE {_IN_SUBTREE} AND is_archived = 0",
+                (now, now, len(path), path),
+            )
+            # An archived project receives no new work, so it stops being the
+            # account-level filing target for anything in the subtree.
+            conn.execute(
+                "UPDATE active_project SET project_id = NULL WHERE project_id IN "
+                f"(SELECT project_id FROM projects WHERE {_IN_SUBTREE})",
+                (len(path), path),
             )
         return True
+
+    def restore_project(self: SQLiteStore, project_id: str) -> bool:
+        """Undo one archive: the project and the descendants archived with it.
+
+        Matching on ``archived_at`` is what makes this the inverse of
+        :meth:`archive_project` rather than "unarchive everything below": a
+        child the owner archived on its own, earlier, stays archived.
+        """
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT path, is_archived, archived_at FROM projects WHERE project_id = ?",
+                (project_id,),
+            ).fetchone()
+            if not row:
+                return False
+            if not row["is_archived"]:
+                return True
+            path = row["path"]
+            conn.execute(
+                "UPDATE projects SET is_archived = 0, archived_at = NULL, updated_at = ? "
+                f"WHERE {_IN_SUBTREE} AND is_archived = 1 AND archived_at IS ?",
+                (utc_now(), len(path), path, row["archived_at"]),
+            )
+        return True
+
+    def project_deletion_counts(self: SQLiteStore, project_id: str) -> dict[str, int]:
+        """What deleting this project removes from the database, counted.
+
+        The same session set :meth:`delete_project_with_orphanage` deletes, so
+        the preview and the delete cannot disagree about what a chat is.
+        """
+        row = self._row(
+            """
+            SELECT
+              (SELECT COUNT(*) FROM sessions WHERE project_id = :p) AS sessions,
+              (SELECT COUNT(*) FROM turns WHERE session_id IN
+                 (SELECT session_id FROM sessions WHERE project_id = :p)) AS turns,
+              (SELECT COUNT(*) FROM tasks WHERE session_id IN
+                 (SELECT session_id FROM sessions WHERE project_id = :p)) AS tasks,
+              (SELECT COUNT(*) FROM checkpoints WHERE session_id IN
+                 (SELECT session_id FROM sessions WHERE project_id = :p)) AS checkpoints,
+              (SELECT COUNT(*) FROM managed_files WHERE project_id = :p) AS managed_files
+            """,
+            {"p": project_id},
+        )
+        fields = ("sessions", "turns", "tasks", "checkpoints", "managed_files")
+        counts = {key: int(row[key] or 0) if row is not None else 0 for key in fields}
+        counts["descendants"] = max(len(self.subtree_project_ids(project_id)) - 1, 0)
+        return counts
 
     def delete_project_with_orphanage(self: SQLiteStore, project_id: str) -> bool:
         """Hard-delete project; archive descendants + reparent to NULL with orphaned/ path."""
@@ -455,8 +546,9 @@ class ProjectStore:
                 conn.execute(f"DELETE FROM sessions WHERE session_id IN ({marks})", session_ids)
             # 1) Archive descendants (excluding target)
             conn.execute(
-                "UPDATE projects SET is_archived = 1, archived_at = ?, parent_id = CASE WHEN parent_id = ? THEN NULL ELSE parent_id END, path = '/orphaned/' || ? || '/' || substr(path, ?), updated_at = ? WHERE path LIKE ? AND project_id != ?",
-                (now, project_id, project_id, len(path) + 1, now, path + "%", project_id),
+                "UPDATE projects SET is_archived = 1, archived_at = ?, parent_id = CASE WHEN parent_id = ? THEN NULL ELSE parent_id END, path = '/orphaned/' || ? || '/' || substr(path, ?), updated_at = ? "
+                f"WHERE {_IN_SUBTREE} AND project_id != ?",
+                (now, project_id, project_id, len(path) + 1, now, len(path), path, project_id),
             )
             conn.execute(
                 "UPDATE active_project SET project_id = NULL WHERE project_id = ?", (project_id,)
@@ -490,7 +582,8 @@ class ProjectStore:
                 """
                 SELECT pc.* FROM project_contexts pc
                 JOIN projects p ON p.project_id = pc.project_id
-                WHERE ? LIKE p.path || '%' AND p.project_id != ? AND p.is_archived = 0
+                WHERE substr(?, 1, length(p.path)) = p.path
+                  AND p.project_id != ? AND p.is_archived = 0
                 """
                 + (" AND p.owner_user_id = ?" if user_id is not None else "")
                 + """

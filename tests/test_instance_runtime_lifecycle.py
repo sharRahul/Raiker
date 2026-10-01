@@ -166,3 +166,78 @@ def test_the_same_name_twice_is_refused_once(app: FastAPI) -> None:
     with TestClient(app) as client:
         assert _create(client, "alex").status_code == 200  # type: ignore[attr-defined]
         assert _create(client, "alex").status_code == 409  # type: ignore[attr-defined]
+
+
+# ── BUG-310 ──────────────────────────────────────────────────────────────────
+#
+# Windows refuses two things Linux allows: replacing a file another handle has
+# open, and removing a directory a handle is open in. Neither can be produced on
+# the CI runner, so each is simulated at the call that refuses.
+
+
+def test_a_registry_replace_waits_out_a_reader(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import raiker.api.app as app_module
+
+    real_replace = app_module.os.replace
+    refusals = {"left": 3}
+
+    def sharing_violation(source: object, target: object) -> None:
+        if refusals["left"] > 0:
+            refusals["left"] -= 1
+            raise PermissionError(32, "The process cannot access the file")
+        real_replace(source, target)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(app_module.os, "replace", sharing_violation)
+    monkeypatch.setattr(app_module, "_SHARING_RETRY_SECONDS", 0.0)
+    _write_instance_names(workspace, ["alex"])
+    assert refusals["left"] == 0
+    assert _stored_instance_names(workspace) == ["alex"]
+    registry = workspace / ".raiker" / "instances.json"
+    assert [path.name for path in registry.parent.glob("instances.json.*")] == []
+
+
+def test_a_registry_replace_that_never_succeeds_is_an_error(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import raiker.api.app as app_module
+
+    def always_held(source: object, target: object) -> None:
+        raise PermissionError(32, "held")
+
+    monkeypatch.setattr(app_module.os, "replace", always_held)
+    monkeypatch.setattr(app_module, "_SHARING_RETRY_SECONDS", 0.0)
+    with pytest.raises(PermissionError):
+        _write_instance_names(workspace, ["alex"])
+
+
+def test_a_rollback_releases_the_staged_databases_handles_before_removing_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import raiker.api.app as app_module
+    from raiker.storage import sqlite as sqlite_module
+    from raiker.storage.sqlite import SQLiteStore
+
+    staged = tmp_path / "staged"
+    staged.mkdir()
+    SQLiteStore(staged).connect()  # a cached handle, as a registration leaves one
+    root = staged.resolve()
+    assert any(key[0] == root for key in sqlite_module._CONNECTIONS)  # noqa: SLF001
+
+    # Two refused removals first, as Windows refuses while a handle is open.
+    real_rmtree = app_module.shutil.rmtree
+    refusals = {"left": 2}
+
+    def held_rmtree(path: Path, ignore_errors: bool = False) -> None:
+        if refusals["left"] > 0:
+            refusals["left"] -= 1
+            return
+        real_rmtree(path, ignore_errors=ignore_errors)
+
+    monkeypatch.setattr(app_module.shutil, "rmtree", held_rmtree)
+    monkeypatch.setattr(app_module, "_SHARING_RETRY_SECONDS", 0.0)
+    app_module._remove_staged_workspace(staged, staged)  # noqa: SLF001
+
+    assert not any(key[0] == root for key in sqlite_module._CONNECTIONS)  # noqa: SLF001
+    assert not staged.exists()

@@ -1,5 +1,6 @@
 <script lang="ts">
   import WorkMeta from "../components/WorkMeta.svelte";
+  import { pickableProjects } from "../projectLifecycle";
   import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
@@ -660,7 +661,7 @@
             }}
           >
             <option value="">No project — this work stands alone</option>
-            {#each projects?.projects ?? [] as entry (entry.project_id)}
+            {#each pickableProjects(projects, workProject()) as entry (entry.project_id)}
               <option value={entry.project_id}>{entry.name}</option>
             {/each}
           </select>

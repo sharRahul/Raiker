@@ -1435,7 +1435,11 @@ async def get_project(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    view = _service(request).get_project(project_id, auth_data[1].delegated_by_user_id)
+    view = _service(request).get_project(
+        project_id,
+        auth_data[1].delegated_by_user_id,
+        owner_principal_id=auth_data[0].principal_id,
+    )
     if view is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown project: {project_id}"
@@ -1491,6 +1495,19 @@ async def save_project_context(
     return {"ok": True, **result.data}
 
 
+@router.get("/api/projects/{project_id}/deletion-preview")
+async def project_deletion_preview(
+    project_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """UX-PROJ-07 — what a delete would remove, counted, before it is asked for."""
+    result = _service(request).project_deletion_preview(project_id, auth_data[0].principal_id)
+    if not result.ok:
+        raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
+    return serialize_dto(result.data["preview"])
+
+
 @router.delete("/api/projects/{project_id}")
 async def delete_project(
     project_id: str,
@@ -1500,10 +1517,41 @@ async def delete_project(
 ) -> dict[str, Any]:
     if x_project_delete_confirm != project_id:
         raise refusal(status.HTTP_409_CONFLICT, "project_delete_confirmation_required")
-    result = _service(request).delete_project(project_id, auth_data[0].principal_id, confirm=True)
+    service = _service(request)
+    # UX-PROJ-07 / DEC-04 step 9 — removing a managed project removes a folder
+    # Raiker owns from disk, so it takes a recent step-up, the same elevated
+    # session account deletion takes. An attached folder is never touched, and
+    # its delete keeps the ordinary session.
+    preview = service.project_deletion_preview(project_id, auth_data[0].principal_id)
+    if not preview.ok:
+        raise refusal(_project_refusal_status(preview.reason_code), preview.reason_code)
+    if preview.data["preview"].requires_step_up and auth_data[0].scope != "elevated":
+        raise refusal(status.HTTP_403_FORBIDDEN, "project_delete_requires_step_up")
+    result = service.delete_project(project_id, auth_data[0].principal_id, confirm=True)
     if not result.ok:
-        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+        raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
     return {"ok": True, **result.data}
+
+
+#: Refusals that describe the request's target rather than the caller's right.
+_PROJECT_CONFLICTS = frozenset(
+    {
+        "project_move_into_itself",
+        "project_move_into_descendant",
+        "project_move_into_archived",
+        "project_parent_archived",
+    }
+)
+
+
+def _project_refusal_status(reason_code: str | None) -> int:
+    """404 for a project that is not there, 409 for a destination that cannot be, else 403."""
+    code = reason_code or ""
+    if code.startswith(("unknown_project:", "unknown_parent:")):
+        return status.HTTP_404_NOT_FOUND
+    if code in _PROJECT_CONFLICTS:
+        return status.HTTP_409_CONFLICT
+    return status.HTTP_403_FORBIDDEN
 
 
 @router.put("/api/projects/{project_id}/move")
@@ -1514,13 +1562,14 @@ async def move_project(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Move a project to a new parent folder (human-only).
-    
-    ``body.parent_id`` may be null to reparent to root. A cycle check is
-    performed server-side — a descendant cannot become its own ancestor.
+
+    ``body.parent_id`` may be null to reparent to root. The server refuses the
+    project itself, any of its descendants (a cycle) and an archived folder as
+    a destination, each by name.
     """
     result = _service(request).move_project(project_id, body.parent_id, auth_data[0].principal_id)
     if not result.ok:
-        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+        raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
     return {"ok": True, **result.data}
 
 
@@ -1533,7 +1582,20 @@ async def archive_project(
     """Soft-delete a project subtree (human-only)."""
     result = _service(request).archive_project(project_id, auth_data[0].principal_id)
     if not result.ok:
-        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+        raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/projects/{project_id}/restore")
+async def restore_project(
+    project_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """UX-PROJ-05 — undo an archive: the project and what was archived with it."""
+    result = _service(request).restore_project(project_id, auth_data[0].principal_id)
+    if not result.ok:
+        raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
     return {"ok": True, **result.data}
 
 

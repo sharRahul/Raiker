@@ -91,6 +91,32 @@ const REASON_CODES: Record<string, ReasonCopy> = {
     plain: "That folder is already attached to a project.",
     remediation: "Open the project that holds it, or choose another folder.",
   },
+  // UX-PROJ-05/06/07 — the project lifecycle's refusals, each naming the
+  // destination or step that was wrong.
+  project_move_into_itself: {
+    plain: "A project cannot be moved inside itself.",
+    remediation: "Choose another folder, or Top level.",
+  },
+  project_move_into_descendant: {
+    plain: "That folder is inside the project you are moving.",
+    remediation: "Choose a folder outside this project, or Top level.",
+  },
+  project_move_into_archived: {
+    plain: "That folder is archived.",
+    remediation: "Restore it first, or choose another folder.",
+  },
+  project_parent_archived: {
+    plain: "This project's parent folder is archived.",
+    remediation: "Restore the parent first; this project comes back with it.",
+  },
+  project_delete_requires_step_up: {
+    plain: "Deleting a project's folder needs your password again.",
+    remediation: "Enter your password (or authenticator code) to confirm it is you.",
+  },
+  project_delete_confirmation_required: {
+    plain: "The delete was not confirmed.",
+    remediation: "Type the project's name to confirm.",
+  },
   // Policy / execution outcomes (route_action).
   denied_by_policy: {
     plain: "Policy blocked this action.",

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { workDraft } from "../workDraft.svelte";
+  import { pickableProjects } from "../projectLifecycle";
   /**
    * Design — describe an image, and it answers with one.
    *
@@ -766,7 +767,7 @@
             }}
           >
             <option value="">No project — this work stands alone</option>
-            {#each projects?.projects ?? [] as entry (entry.project_id)}
+            {#each pickableProjects(projects, workProject()) as entry (entry.project_id)}
               <option value={entry.project_id}>{entry.name}</option>
             {/each}
           </select>

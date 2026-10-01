@@ -96,6 +96,7 @@ import type {
   ModelCapacitiesView,
   ModelsView,
   PasswordRecoveryBeginResult,
+  ProjectDeletionPreview,
   ProjectDetail,
   ProjectFilesView,
   ProjectTreeNode,
@@ -2202,6 +2203,17 @@ export const api = {
     request<{ ok: boolean; project_id: string }>(
       `/api/projects/${encodeURIComponent(id)}/archive`,
       { method: "PUT" },
+    ),
+  // UX-PROJ-05 — undo an archive: the project and what was archived with it.
+  restoreProject: (id: string) =>
+    request<{ ok: boolean; project_id: string; archived: boolean }>(
+      `/api/projects/${encodeURIComponent(id)}/restore`,
+      { method: "PUT" },
+    ),
+  // UX-PROJ-07 — what a delete would remove, counted before it is asked for.
+  projectDeletionPreview: (id: string) =>
+    request<ProjectDeletionPreview>(
+      `/api/projects/${encodeURIComponent(id)}/deletion-preview`,
     ),
   session: (id: string) =>
     request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),

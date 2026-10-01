@@ -16,6 +16,7 @@
    * and approvals exactly like a prompt typed by hand.
    */
   import Badge from "./Badge.svelte";
+  import { pickableProjects } from "../projectLifecycle";
   import EmptyState from "./EmptyState.svelte";
   import Icon from "./Icon.svelte";
   import PageState from "./PageState.svelte";
@@ -315,7 +316,7 @@
             Project
             <select class="select" bind:value={agentProjectId} aria-label="Project for this agent">
               <option value="">{projectId ? "Active project" : "No project"}</option>
-              {#each projects.projects as project (project.project_id)}
+              {#each pickableProjects(projects, agentProjectId) as project (project.project_id)}
                 <option value={project.project_id}>{project.name}</option>
               {/each}
             </select>

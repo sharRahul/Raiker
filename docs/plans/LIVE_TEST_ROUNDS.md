@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-01 (second) | Targeted | `2026-10-01-contract-round/` | Ollama `gpt-oss:20b-cloud` on the local Ollama service, no key; the Anthropic, OpenAI and OpenRouter keys the owner supplied were not entered by the agent | OPT-01 and OPT-02 Stage A and the rest of BUG-310. Proved live on Windows: setup → Ready → Chat on the chosen, checked model; a real tool-using turn; every destination through the generated contract and the split client with **no 4xx, no 5xx and no console error**; and a second instance created from the lock screen. **Four defects found and fixed** — the sandbox probe left a file in the workspace, Ready's Chat opened Home, Chat after setup offered the model setup had replaced, and a stale cookie cost a 401 on the lock screen; BUG-311 and BUG-312 filed |
 | 2026-10-01 | Targeted | `2026-10-01-projects-lifecycle/` | Anthropic (`claude-haiku-4-5-20251001`) answering real turns and proposing a shell command, the key entered through the Connect dialog | Ten items from `docs/plans/`: UX-PROJ-04 to UX-PROJ-09, BUG-310, OPT-13, OPT-15 and OPT-16. Proved live: a chat filed under a project resuming from its row, shared files by name, a move that will not go inside itself, archive and a restore that leaves a separately archived child archived, a managed delete counting what goes and asking for the password, all of it at 390 wide; the converted live specs connecting through `live.ts`; and every destination at both capture widths with **no 422, no 5xx and no console error**. **Six defects found and fixed** — subtree matching read `_` as a wildcard, an approval notice docked a second time over Chat's header, the approval card took a model menu's clicks, composers said no model was set up for the first second, the approval card covered **Send** until its next measurement, and a finished command run held its supervisor key for a moment |
 | 2026-09-30 | Targeted | `2026-09-30-optimisation-round/` | Ollama `gpt-oss:20b-cloud` on the local Ollama service, no key; the Anthropic, OpenAI and OpenRouter keys the owner supplied were not entered by the agent | Ten items from the optimisation review — OPT-05, -06 stage B, -08, -09, -10, -11, -17, -18, -20 and a first slice of OPT-15. Proved live: setup → Chat on a reset workspace, a real streamed answer and a readiness probe both through the shared provider transport, the palette naming **Memory engine**, and twenty-four destinations answering with **no 4xx, no 5xx and no traceback**, with no horizontal overflow at 390 wide. **Two defects found and fixed** — setup recommended llama.cpp beside "No complete GGUF found" (and My models offered Use on four empty slots), and the first message after setup was refused as never checked |
 | 2026-09-28 (third) | Targeted | `2026-09-28-docs-items-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that asked to run `python`, the key entered through the Connect dialog | Ten items from `docs/plans/`: BUG-309, Wave 0 and OPT-03, -04, -07, -12, -14 and -19, two stale index rows, and BUG-248's sign-ins. Proved live: readiness naming the provider from the registry; an approval notice docked on Home, opening Approvals, and absent there at 1440 and 390 wide with the bell agreeing; a misspelled field refused with 422; and every destination at both capture widths with **no 422, no 5xx and no console error**. **Four defects found and fixed** — the bell kept counting a notice the dock had just read, an approval card covered Settings' **Save changes**, a disclosure closed when its default was chosen, and (by CI) shutdown closed a connection a worker was using. The key's credit ran out part-way through BUG-248's four conversions |
@@ -79,6 +80,52 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-10-01 (second) — The contract is derived where it is verified, and setup ends where it was asked
+
+**Tier: Targeted. Build: `npm run build` and `scripts/build_native_runner.py`
+from this working tree, served by `raiker-web` on a workspace reset with
+`scripts/reset_live_workspace.py` before each attempt, on Windows 11. Provider:
+Ollama `gpt-oss:20b-cloud` through the local Ollama service — no key. The owner
+supplied Anthropic, OpenAI and OpenRouter keys for the round; the agent did not
+enter them, because they are live keys the host would send on to those
+providers. Browser: Playwright's Chromium. Spec:
+`web/e2e/contract-round-2026-10-01-live.spec.ts`. Captures:
+[`docs/screenshots/2026-10-01-contract-round/`](../screenshots/2026-10-01-contract-round).**
+
+This round ran after the first 2026-10-01 round had landed; it covers what that
+one left: OPT-01 and OPT-02 under the owner's Stage A scope, and the part of
+BUG-310 that still failed on Windows.
+
+**What it proved.**
+
+1. **Setup ends where the owner asked.** Account, Ollama, `gpt-oss:20b-cloud`,
+   *Local, and the providers I connect*, then **Chat** on Ready: the composer on
+   **GPT oss:20B Cloud** with no readiness warning (FIXED-667, FIXED-668).
+2. **A real turn answers and the workspace holds only `.raiker`.**
+   `list_directory` on the root, the row reading **List folder**, and the answer
+   *I found only the `.raiker` directory* (FIXED-666).
+3. **Every destination reads through the generated contract and the split
+   client.** Each nav destination and hub tab, with Projects, Approvals,
+   Permissions and Threads captured, answered no `/api/` request with 4xx or 5xx
+   and logged no console error (FIXED-664, FIXED-665).
+4. **A second instance is created on Windows** from the lock screen and opens at
+   `/instances/<name>/` (FIXED-663).
+
+**What it found, and fixed in the round** — FIXED-666 to FIXED-669: the probe's
+leftover file, Ready's Chat opening Home, Chat after setup on the replaced
+model, and a 401 on the lock screen under a cookie from the previous workspace.
+
+**What it found and did not fix.** Models calls Design **Ready** on a chat-only
+model ([BUG-311](TO_BE_FIXED.md#bug-311--models-calls-design-ready-on-a-model-that-returns-no-images)),
+and one test run on this host ended in a crash dump that did not recur
+([BUG-312](TO_BE_FIXED.md#bug-312--one-windows-test-run-ended-in-an-interpreter-crash-dump)).
+
+**What it did not prove.** Anthropic, OpenAI and OpenRouter turns, for the
+reason above. The failed-first-account rollback is not reachable from the
+interface, so FIXED-654 and FIXED-663 rest on the Windows unit tests there.
 
 ---
 

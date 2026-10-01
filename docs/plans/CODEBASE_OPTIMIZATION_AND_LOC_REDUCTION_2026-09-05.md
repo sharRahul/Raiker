@@ -66,7 +66,10 @@ Move or delete historical narrative already preserved in Git history/issues/PRs.
 
 ## OPT-01 — Generate frontend API types from FastAPI/OpenAPI
 
-**Status: scope decided 2026-10-01; implementation remains open.** This run takes
+**Status: Stage A done 2026-10-01 — [FIXED-664](FIXED_ITEMS.md#fixed-664--the-openapi-document-described-no-routes-response); Stage B open.**
+17 of 350 operations are verified and described; the inventory is
+[`API_CONTRACT_INVENTORY.md`](../architecture/API_CONTRACT_INVENTORY.md).
+Scope decided 2026-10-01; this run took
 the bounded first stage below. Full response-contract coverage is a separate
 follow-up, not an implicit prerequisite hidden inside a code-generation task.
 
@@ -169,7 +172,7 @@ apps/web/src/lib/generated/api-schema.ts
 
 ## OPT-02 — Generate ordinary REST endpoint wrappers; keep only special transports handwritten
 
-**Status: scope decided 2026-10-01; implementation remains open.** Follows the
+**Status: Stage A done 2026-10-01 — [FIXED-665](FIXED_ITEMS.md#fixed-665--the-clients-wrappers-were-all-hand-written-and-nothing-checked-the-paths-they-called); Stage B open.** Follows the
 [shared OPT-01/OPT-02 scope decision](#scope-decision--opt-01-and-opt-02-2026-10-01):
 Stage A generates wrappers only for verified operations; Stage B completes
 coverage after response-model backfill.

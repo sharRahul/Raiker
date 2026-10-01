@@ -46,6 +46,7 @@ from raiker.control.views.knowledge import BrainEdgeView, BrainNodeView, BrainVi
 from raiker.control.views.tasks import _task_detail
 from raiker.events.writer import EventLogWriter
 from raiker.memory.store import list_memory
+from raiker.models.tool_registry import TOOL_LABEL_BY_TOOL
 from raiker.storage.internal_paths import internal_io_path
 from raiker.tools.graph_tools import reference_resolution
 
@@ -179,10 +180,10 @@ def _walk_source_for_review(path: Path, base: Path) -> _SourceReviewWalk:
     )
 
 
-#: BUG-218 — how a tool is named on the Knowledge Map. The registry's own
-#: labels are written for a transcript line ("Run command"); a graph node has
-#: room for a noun. Anything unlisted falls back to its underscored name made
-#: readable, so a new tool appears sensibly without being registered twice.
+#: BUG-218 — how a tool is named on the Knowledge Map, where it differs from the
+#: transcript. The registry's labels are written for a transcript line ("Check
+#: the weather"); a graph node has room for a noun ("Weather"). Anything unlisted
+#: uses the registry's own label (OPT-13), so a new tool is named once.
 TOOL_LABELS: dict[str, str] = {
     "read_file": "Read file",
     "write_file": "Write file",
@@ -808,7 +809,9 @@ class KnowledgeService:
                 BrainNodeView(
                     node_id,
                     "tool",
-                    TOOL_LABELS.get(tool_name, tool_name.replace("_", " ")),
+                    TOOL_LABELS.get(
+                        tool_name, TOOL_LABEL_BY_TOOL.get(tool_name, tool_name.replace("_", " "))
+                    ),
                     "failed" if failures and failures == uses else "used",
                     f"{uses} use{'' if uses == 1 else 's'}"
                     + (f", {failures} failed" if failures else ""),

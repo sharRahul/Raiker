@@ -33,6 +33,9 @@ from raiker.tools.broker import ToolBroker
 def _fake(**overrides: object) -> ToolDefinition:
     values: dict[str, object] = {
         "name": "fake_probe_tool",
+        "label": "Probe",
+        "family": "repository",
+        "audit": "full",
         # The band and the reasons for it are one declaration: `risk` has to be
         # what `risk_signals` produces, or the definition does not construct.
         "risk": "medium",
@@ -89,6 +92,9 @@ def test_one_definition_reaches_all_seven_consumers(monkeypatch: pytest.MonkeyPa
         ("name", "  ", "tool_definition_name_required"),
         ("description", "", "tool_definition_description_required"),
         ("risk", "spicy", "tool_definition_risk_invalid"),
+        ("label", " ", "tool_definition_label_required"),
+        ("family", "sparkles", "tool_definition_family_invalid"),
+        ("audit", "everything", "tool_definition_audit_invalid"),
     ),
 )
 def test_a_half_written_definition_fails_construction(
@@ -202,3 +208,28 @@ def test_a_signal_this_build_does_not_define_is_refused() -> None:
     """A dropped signal would be a control that silently stopped working."""
     with pytest.raises(ValueError, match="tool_definition_risk_signal_unknown"):
         _fake(risk_signals=("sounds_dangerous",))
+
+
+def test_what_the_audit_trail_keeps_is_read_from_the_definition() -> None:
+    """OPT-13 — the broker's two audit sets are the registry's, not a third list.
+
+    Before, `_CONTENT_RESULT_TOOLS` and `_METADATA_ONLY_TOOLS` were literals in
+    the broker, so a new tool that fetched outside content was audited in full
+    until someone remembered the set. Now the definition cannot be written
+    without saying, and the broker reads exactly what it says.
+    """
+    from raiker.tools import broker
+    from raiker.tools.presentation import _FAMILY_BY_TOOL, _LABEL_BY_TOOL
+
+    by_audit = {level: {d.name for d in TOOL_DEFINITIONS if d.audit == level} for level in
+                ("full", "content_withheld", "metadata_only")}
+    assert by_audit["content_withheld"] | by_audit["metadata_only"] == broker._CONTENT_RESULT_TOOLS  # noqa: SLF001
+    assert by_audit["metadata_only"] == broker._METADATA_ONLY_TOOLS  # noqa: SLF001
+    # The two that matter most, named, so a regression reads as what it is.
+    assert broker._drops_argument_values("consult_advisor")  # noqa: SLF001
+    for fetched in ("web_fetch", "gmail_read", "run_command", "spawn_subagent"):
+        assert broker._drops_result_content(fetched), fetched  # noqa: SLF001
+    assert not broker._drops_result_content("read_file")  # noqa: SLF001
+    # And the transcript's names and glyphs are the definitions' own.
+    assert {d.name: d.label for d in TOOL_DEFINITIONS} == _LABEL_BY_TOOL
+    assert {d.name: d.family for d in TOOL_DEFINITIONS} == _FAMILY_BY_TOOL

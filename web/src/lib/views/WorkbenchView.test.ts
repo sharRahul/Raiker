@@ -282,7 +282,7 @@ describe("WorkbenchView", () => {
     expect(await within(rail).findByText(/this is not an all-clear/i)).toBeInTheDocument();
     expect(within(rail).queryByText(/nothing needs you right now/i)).toBeNull();
     const tile = within(rail).getByText("Runtime health").closest("article");
-    expect(tile).toHaveTextContent(/unavailable \(HTTP 503\)/i);
+    await waitFor(() => expect(tile).toHaveTextContent(/unavailable \(HTTP 503\)/i));
     // Never a number. There is no number to give.
     expect(within(rail).queryByText("Runtime issues")).toBeNull();
   });

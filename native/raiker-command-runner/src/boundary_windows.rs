@@ -129,15 +129,14 @@ pub fn probe(workspace: &Path) -> Value {
     // The control arm. Whatever the boundary does, these are what this token
     // can do without one.
     let outside = selftest::attempt(&test);
-    let inside = match run_inside(&workspace, &test) {
-        Ok(value) => value,
-        Err(reason) => {
-            let _ = std::fs::remove_file(&test.masked_read_path);
-            return unavailable(&reason);
-        }
-    };
+    let inside = run_inside(&workspace, &test);
     let _ = std::fs::remove_file(&test.masked_read_path);
     let _ = std::fs::remove_dir_all(&scratch);
+    selftest::remove_probe_writes(&test);
+    let inside = match inside {
+        Ok(value) => value,
+        Err(reason) => return unavailable(&reason),
+    };
 
     let relay = inside.get("nonce").and_then(Value::as_str) == Some(test.nonce.as_str());
     let inside_write = allowed(&inside, "inside_write");

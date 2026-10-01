@@ -267,9 +267,27 @@ def _instances_registry(root: Path) -> Path:
 _INSTANCE_LOCK = threading.Lock()
 
 
+def _read_instance_registry(root: Path) -> str:
+    """The registry's text, waiting out a replace in progress on Windows.
+
+    BUG-310 — for a moment around each replace Windows refuses to open the name
+    at all. Read as ``OSError``, that refusal made ``_stored_instance_names``
+    answer "no instances", which is the GCR-09 failure by another door.
+    """
+    registry = _instances_registry(root)
+    for attempt in range(_SHARING_RETRY_ATTEMPTS):
+        try:
+            return registry.read_text(encoding="utf-8")
+        except PermissionError:
+            if attempt == _SHARING_RETRY_ATTEMPTS - 1:
+                raise
+            time.sleep(_SHARING_RETRY_SECONDS)
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
 def _stored_instance_names(root: Path) -> list[str]:
     try:
-        raw = json.loads(_instances_registry(root).read_text(encoding="utf-8"))
+        raw = json.loads(_read_instance_registry(root))
     except (OSError, ValueError, TypeError):
         return []
     return [name for name in raw if isinstance(name, str) and name]

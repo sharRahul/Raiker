@@ -3946,6 +3946,37 @@ WHERE capability IN ('shell_execution', 'process_execution')
 HAVING COUNT(*) > 0;
 """
 
+# UX-MEM-05 and UX-MEM-08. Two reads the Memory page now makes per listing.
+#
+# `turn_recalls` was only ever read by conversation ("which memories did this
+# turn get"); the record drawer reads it the other way ("which turns got this
+# memory"), so the column that question filters on needs its own index.
+#
+# An import is a batch the owner can take back. The batch row names the records
+# it wrote, so undo removes exactly those and nothing an owner added by hand in
+# between — and `undone_at` makes a second undo a no-op instead of a second set
+# of tombstones.
+MEMORY_RECALL_USAGE_AND_IMPORT_BATCHES_MIGRATION_ID = (
+    "RAIKER-2081-memory-recall-usage-and-import-batches"
+)
+MEMORY_RECALL_USAGE_AND_IMPORT_BATCHES_SQL = """
+CREATE INDEX IF NOT EXISTS idx_turn_recalls_memory
+  ON turn_recalls(memory_id, principal_id, created_at);
+CREATE TABLE IF NOT EXISTS memory_import_batches (
+  batch_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  file_name TEXT NOT NULL DEFAULT '',
+  source_class TEXT NOT NULL,
+  memory_ids_json TEXT NOT NULL,
+  skipped_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  undone_at TEXT,
+  undo_details_json TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_memory_import_batches_owner
+  ON memory_import_batches(owner_principal_id, created_at DESC);
+"""
+
 
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
@@ -4168,6 +4199,10 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(TURN_SOURCE_LOCATOR_INDEX_MIGRATION_ID, TURN_SOURCE_LOCATOR_INDEX_SQL),
     Migration(MEMORY_VECTOR_SEARCH_REVISION_MIGRATION_ID, MEMORY_VECTOR_SEARCH_REVISION_SQL),
     Migration(HOST_NETWORK_CODE_CARRY_OVER_MIGRATION_ID, HOST_NETWORK_CODE_CARRY_OVER_SQL),
+    Migration(
+        MEMORY_RECALL_USAGE_AND_IMPORT_BATCHES_MIGRATION_ID,
+        MEMORY_RECALL_USAGE_AND_IMPORT_BATCHES_SQL,
+    ),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

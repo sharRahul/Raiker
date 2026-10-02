@@ -287,7 +287,9 @@ describe("MemoryView", () => {
     render(MemoryView, { props: { tab: "suggestions" } });
 
     expect(await screen.findByText("Rahul works on Raiker.")).toBeInTheDocument();
-    expect(screen.getByText(/97% confidence/i)).toBeInTheDocument();
+    // UX-MEM-04 — a reason, not a decimal that reads as a probability.
+    expect(screen.getByText("Strong evidence")).toBeInTheDocument();
+    expect(screen.queryByText(/97% confidence/i)).toBeNull();
     await fireEvent.click(screen.getByRole("button", { name: /approve relationship/i }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/memory/relationship-proposals/relcand_1/decision",
@@ -462,26 +464,40 @@ describe("MemoryView import review (BUG-244)", () => {
     await fireEvent.change(input!);
   }
 
-  it("says how many records are new before anything is written", async () => {
+  it("says what each record would do before anything is written", async () => {
     const fetchMock = stubFetch({
       ...base,
       "POST /api/memory/import/preview": {
         ok: true,
         total: 4,
-        new_count: 1,
-        duplicate_count: 3,
-        duplicates: [{ index: 1, text: "already", scope: "project", memory_id: "mem_9" }],
+        new_count: 2,
+        duplicate_count: 2,
+        duplicates: [],
+        similar_count: 1,
+        source_class: "foreign",
+        records: [
+          { index: 0, text: "a", scope: "project", memory_id: "", status: "new" },
+          { index: 1, text: "already", scope: "project", memory_id: "mem_9", status: "duplicate" },
+          { index: 2, text: "c", scope: "project", memory_id: "mem_8", status: "similar" },
+          { index: 3, text: "a", scope: "project", memory_id: "", status: "duplicate_in_file" },
+        ],
       },
     });
     render(MemoryView, { props: { tab: "recall" } });
     await waitFor(() => expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument());
 
-    await chooseFile([{ text: "a" }, { text: "b" }, { text: "c" }, { text: "d" }]);
+    await chooseFile([{ text: "a" }, { text: "already" }, { text: "c" }, { text: "a" }]);
 
-    // The count that matters is stated before the button that acts on it.
-    expect(await screen.findByText("1 new", { selector: "strong" })).toBeInTheDocument();
-    expect(screen.getByText(/3 already stored, and will be skipped/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Import 1 new record$/ })).toBeInTheDocument();
+    // UX-MEM-08 — the file's kind, then one row per record with its status.
+    expect(await screen.findByText(/Not a Raiker export/)).toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "Records in this file" });
+    expect(within(list).getByText("Already stored")).toBeInTheDocument();
+    expect(within(list).getByText("Like one you have")).toBeInTheDocument();
+    expect(within(list).getByText("Repeated in this file")).toBeInTheDocument();
+    // A stored copy cannot be chosen; a new or similar record can.
+    expect(screen.getByRole("checkbox", { name: /Import “already”/ })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: /Import “c”/ })).toBeChecked();
+    expect(screen.getByRole("button", { name: /Import 2 records$/ })).toBeInTheDocument();
     // Asking is a read. Nothing was written by choosing the file.
     expect(
       fetchMock.mock.calls.some(([url]) => String(url) === "/api/memory/import"),
@@ -497,6 +513,12 @@ describe("MemoryView import review (BUG-244)", () => {
         new_count: 0,
         duplicate_count: 2,
         duplicates: [],
+        similar_count: 0,
+        source_class: "raiker_export",
+        records: [
+          { index: 0, text: "a", scope: "project", memory_id: "mem_1", status: "duplicate" },
+          { index: 1, text: "b", scope: "project", memory_id: "mem_2", status: "duplicate" },
+        ],
       },
     });
     render(MemoryView, { props: { tab: "recall" } });
@@ -504,50 +526,86 @@ describe("MemoryView import review (BUG-244)", () => {
 
     await chooseFile([{ text: "a" }, { text: "b" }]);
 
-    expect(
-      await screen.findByText(/All 2 records are already stored/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Looks like a Raiker export/)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing selected to import/)).toBeInTheDocument();
     // The deliberate second copy stays available — an owner who means to hold
     // the same sentence at a second scope is doing something legitimate.
-    expect(screen.getByRole("button", { name: /Import anyway/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Import \d+ new record/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /Import all 2 anyway/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Import \d+ records?$/ })).toBeNull();
   });
 
-  it("reports what the import changed, not how many records were offered", async () => {
+  it("sends the owner's skips, reports what changed, and can undo it", async () => {
     const fetchMock = stubFetch({
       ...base,
       "POST /api/memory/import/preview": {
         ok: true,
-        total: 4,
-        new_count: 1,
-        duplicate_count: 3,
+        total: 3,
+        new_count: 2,
+        duplicate_count: 1,
         duplicates: [],
+        similar_count: 0,
+        source_class: "foreign",
+        records: [
+          { index: 0, text: "keep", scope: "project", memory_id: "", status: "new" },
+          { index: 1, text: "leave out", scope: "project", memory_id: "", status: "new" },
+          { index: 2, text: "stored", scope: "project", memory_id: "mem_1", status: "duplicate" },
+        ],
       },
       "POST /api/memory/import": {
         ok: true,
         count: 1,
-        reviewed: 4,
+        reviewed: 3,
         imported: 1,
-        skipped_duplicates: 3,
+        skipped_duplicates: 1,
+        skipped_by_owner: 1,
         relationship_proposals: 0,
+        batch_id: "mib_1",
+        source_class: "foreign",
+      },
+      "GET /api/memory/import/batches": {
+        ok: true,
+        batches: [
+          {
+            batch_id: "mib_1",
+            file_name: "memories.json",
+            source_class: "foreign",
+            imported: 1,
+            skipped: 2,
+            created_at: "2026-10-02T00:00:00Z",
+            undone_at: null,
+          },
+        ],
+      },
+      "POST /api/memory/import/batches/mib_1/undo": {
+        ok: true,
+        batch_id: "mib_1",
+        removed: 1,
+        kept_changed: 0,
+        already_gone: 0,
       },
     });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
     render(MemoryView, { props: { tab: "recall" } });
     await waitFor(() => expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument());
 
-    await chooseFile([{ text: "a" }, { text: "b" }, { text: "c" }, { text: "d" }]);
-    await fireEvent.click(await screen.findByRole("button", { name: /Import 1 new record$/ }));
+    await chooseFile([{ text: "keep" }, { text: "leave out" }, { text: "stored" }]);
+    await fireEvent.click(await screen.findByRole("checkbox", { name: /Import “leave out”/ }));
+    await fireEvent.click(screen.getByRole("button", { name: /Import 1 record$/ }));
 
     expect(
-      await screen.findByText("Imported 1 record; skipped 3 already stored."),
-    ).toBeInTheDocument();
-    expect(
-      fetchMock.mock.calls.some(
-        ([url, init]) =>
-          String(url) === "/api/memory/import" &&
-          String((init as RequestInit | undefined)?.body).includes('"skip_duplicates":true'),
+      await screen.findByText(
+        "Imported 1 record; skipped 1 already stored, 1 you left out. You can undo this import below.",
       ),
-    ).toBe(true);
+    ).toBeInTheDocument();
+    const sent = fetchMock.mock.calls.find(([url]) => String(url) === "/api/memory/import");
+    const body = JSON.parse(String((sent?.[1] as RequestInit).body));
+    expect(body.skip_duplicates).toBe(true);
+    expect(body.exclude_indices).toEqual([1]);
+    expect(body.file_name).toBe("memories.json");
+
+    const receipts = await screen.findByRole("region", { name: "Recent imports" });
+    await fireEvent.click(within(receipts).getByRole("button", { name: "Undo import" }));
+    expect(await screen.findByText("Undid the import: forgot 1 record.")).toBeInTheDocument();
   });
 });
 
@@ -853,5 +911,114 @@ describe("MemoryView observations (MEM-04)", () => {
         }),
       ),
     );
+  });
+});
+
+// UX-MEM-02/03/05/06 — the lifecycle, the retention summary, recall usage and
+// the pipeline, all read from the one listing the page now asks for with its
+// archived and expired records included.
+describe("MemoryView lifecycle and usage", () => {
+  const record = {
+    memory_id: "mem_live",
+    text: "Deploys happen on Thursdays.",
+    scope: "project",
+    sensitivity: "normal",
+    memory_type: "project",
+    created_at: new Date(Date.now() - 86_400_000).toISOString(),
+    tags: [],
+    source: "human_approved_proposal",
+    provenance: { source_type: "memory_proposal" },
+    confidence: 0.9,
+    trust_score: 1,
+    retention: "until_forget",
+    approval_state: "approved",
+    pinned: false,
+    search_enabled: true,
+    expires_at: null,
+    archived_at: null,
+    updated_at: null,
+    last_used_at: new Date(Date.now() - 3_600_000).toISOString(),
+    recall_turn_count: 2,
+    last_recalled_session_id: "sess_b",
+    last_recalled_turn_id: "turn_9",
+    last_recalled_origin: "build",
+  };
+  const archived = {
+    ...record,
+    memory_id: "mem_archived",
+    text: "Old office address.",
+    archived_at: "2026-09-01T00:00:00Z",
+    recall_turn_count: 0,
+    last_recalled_session_id: null,
+    last_recalled_turn_id: null,
+    last_recalled_origin: null,
+    last_used_at: null,
+  };
+
+  it("asks for archived and expired records, and leads with the pipeline and retention", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/memory": [record, archived],
+      "GET /api/memory/settings": { incognito: false },
+      "GET /api/memory/observations": { observations: [], captured: 4, skipped: 0, due_for_expiry: [] },
+    });
+    render(MemoryView, { props: { tab: "overview" } });
+
+    const pipeline = await screen.findByRole("region", { name: "How a memory moves through Raiker" });
+    // Observations are read after the memories, so this waits for them.
+    expect(await within(pipeline).findByRole("link", { name: /4\s*Observed/ })).toBeInTheDocument();
+    expect(within(pipeline).getByRole("link", { name: /1\s*Recalled/ })).toBeInTheDocument();
+    expect(within(pipeline).getByRole("link", { name: /1\s*Expired or archived/ })).toBeInTheDocument();
+    // Only the recallable record counts as one Raiker can recall.
+    expect(screen.getByText(/Raiker can recall 1 approved memory/i)).toBeInTheDocument();
+
+    const retention = screen.getByRole("region", { name: "Retention" });
+    expect(within(retention).getByText("Archived")).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url) === "/api/memory?include_inactive=true"),
+    ).toBe(true);
+  });
+
+  it("lists archived records only under their filter, and restores one", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/memory": [record, archived],
+      "GET /api/memory/settings": { incognito: false },
+      "PUT /api/memory/mem_archived/archive": { ok: true, memory_id: "mem_archived", archived: false },
+    });
+    render(MemoryView, { props: { tab: "memories", filter: "archived" } });
+
+    expect(await screen.findByText("Old office address.")).toBeInTheDocument();
+    expect(screen.queryByText("Deploys happen on Thursdays.")).toBeNull();
+    await fireEvent.click(screen.getByRole("button", { name: /More for “Old office address/ }));
+    await fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) =>
+            String(url) === "/api/memory/mem_archived/archive" &&
+            String((init as RequestInit).body) === JSON.stringify({ archived: false }),
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it("says where a record came from in words and links the latest turn it was given", async () => {
+    stubFetch({
+      "GET /api/memory": [record],
+      "GET /api/memory/settings": { incognito: false },
+    });
+    render(MemoryView, { props: { tab: "memories" } });
+
+    expect(await screen.findByText("Strong evidence · approved by you")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: /More for “Deploys/ }));
+    const drawer = screen.getByRole("region", { name: "Memory record" });
+    expect(within(drawer).getByText(/2 turns/)).toBeInTheDocument();
+    // The turn reopens on Build, the surface its conversation belongs to.
+    expect(within(drawer).getByRole("link", { name: "Open the latest" })).toHaveAttribute(
+      "href",
+      "#/build?session=sess_b&turn=turn_9",
+    );
+    // Archive is offered as the reversible way out, beside the two that are not.
+    expect(within(drawer).getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(within(drawer).getByText(/Neither of these can be undone/)).toBeInTheDocument();
   });
 });

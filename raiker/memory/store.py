@@ -333,12 +333,14 @@ def list_memory(
     store: SQLiteStore | None = None,
     include_search_disabled: bool = False,
     owner_principal_id: str | None = None,
+    include_inactive: bool = False,
 ) -> list[MemoryEntry]:
     if store is not None:
         return [
             _entry_from_row(row)
             for row in store.list_approved_memory(
-                scope=scope, limit=limit, include_search_disabled=include_search_disabled, owner_principal_id=owner_principal_id
+                scope=scope, limit=limit, include_search_disabled=include_search_disabled, owner_principal_id=owner_principal_id,
+                include_inactive=include_inactive,
             )
         ]
     results: list[MemoryEntry] = []
@@ -382,7 +384,9 @@ def list_memory(
             remembered_reason=meta.get("remembered_reason"),
             owner_principal_id=str(meta.get("owner_principal_id", "")),
         )
-        if entry.deleted_at is not None or entry.archived_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
+        if entry.deleted_at is not None:
+            continue
+        if not include_inactive and (entry.archived_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now())):
             continue
         if scope is not None and entry.scope != scope:
             continue

@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-02 (second) | Targeted | `2026-10-02-memory-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that recalled an imported memory, the key entered through the Connect dialog | Ten items from the release-readiness review: §3.9 Memory (UX-MEM-01 to UX-MEM-08) and UX-PERM-02 to UX-PERM-05. Proved live: an import reviewed record by record with one left out and a receipt, a real turn given the imported memory and its record linking back to that turn, archive / retention / restore as one lifecycle, an undo that keeps the record the owner changed, Permissions by goal, and 390 wide with no horizontal overflow, with **no 4xx, no 5xx and no console error** in the Memory and Permissions steps. **Four defects found** — three fixed (the Expired filter could never show a record, *last included* ignored a turn's own recall, an imported record said *agent*) and one filed (BUG-313: an instruction in the prompt stops recall) |
 | 2026-10-02 | Targeted | `2026-10-02-contract-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn and a Design research turn, the key entered through the Connect dialog | OPT-01 and OPT-02 Stage B — every ordinary route described and called through the generated client — and what describing them found. Proved live: Design's Research reaching its turn (it had been refused with 422), Models calling Design **Research only** with the way to fix it, MFA's recovery codes shown once and one of them recovering the password from the lock screen (and refused the second time), and every destination with **no 4xx, no 5xx and no console error**. **Three defects found and fixed** — the recovery codes were never shown, every composer called Web fetch off while Permissions said on, and research answers printed raw markdown |
 | 2026-10-01 (second) | Targeted | `2026-10-01-contract-round/` | Ollama `gpt-oss:20b-cloud` on the local Ollama service, no key; the Anthropic, OpenAI and OpenRouter keys the owner supplied were not entered by the agent | OPT-01 and OPT-02 Stage A and the rest of BUG-310. Proved live on Windows: setup → Ready → Chat on the chosen, checked model; a real tool-using turn; every destination through the generated contract and the split client with **no 4xx, no 5xx and no console error**; and a second instance created from the lock screen. **Four defects found and fixed** — the sandbox probe left a file in the workspace, Ready's Chat opened Home, Chat after setup offered the model setup had replaced, and a stale cookie cost a 401 on the lock screen; BUG-311 and BUG-312 filed |
 | 2026-10-01 | Targeted | `2026-10-01-projects-lifecycle/` | Anthropic (`claude-haiku-4-5-20251001`) answering real turns and proposing a shell command, the key entered through the Connect dialog | Ten items from `docs/plans/`: UX-PROJ-04 to UX-PROJ-09, BUG-310, OPT-13, OPT-15 and OPT-16. Proved live: a chat filed under a project resuming from its row, shared files by name, a move that will not go inside itself, archive and a restore that leaves a separately archived child archived, a managed delete counting what goes and asking for the password, all of it at 390 wide; the converted live specs connecting through `live.ts`; and every destination at both capture widths with **no 422, no 5xx and no console error**. **Six defects found and fixed** — subtree matching read `_` as a wildcard, an approval notice docked a second time over Chat's header, the approval card took a model menu's clicks, composers said no model was set up for the first second, the approval card covered **Send** until its next measurement, and a finished command run held its supervisor key for a moment |
@@ -81,6 +82,70 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-10-02 (second) — One memory lifecycle, and a record that links to the turn it was given to
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py`, in a
+Linux container whose egress is limited to a proxy. Provider: Anthropic
+`claude-haiku-4-5-20251001`, the key the owner supplied entered through the
+Connect dialog by the spec from the process environment — never written to a
+file. Browser: Playwright's Chromium. Spec:
+`web/e2e/round-2026-10-02-memory-live.spec.ts` (7 of 7 on the final, fresh
+workspace). Captures:
+[`docs/screenshots/2026-10-02-memory-round/`](../screenshots/2026-10-02-memory-round).**
+
+§3.9 of the release-readiness review and four of §3.1's rows: FIXED-687 to
+FIXED-695, with UX-MEM-01, UX-MEM-07 and UX-PERM-02 to UX-PERM-04 re-verified
+against the closures that had already met them.
+
+**What it proved.**
+
+1. **An import is reviewed record by record.** A second file holding a stored
+   sentence, a re-typed copy of it and two new ones listed *Already stored*,
+   *Like one you have* and *New*; the re-typed copy was left out, and the
+   notice said *Imported 2 records; skipped 1 already stored, 1 you left out*,
+   with the receipt under **Recent imports** (FIXED-694,
+   [02](../screenshots/2026-10-02-memory-round/02-import-review.png),
+   [03](../screenshots/2026-10-02-memory-round/03-import-receipts.png)).
+2. **A real turn is given the memory, and the record links back to it.**
+   *What is my favourite tea?* answered from the imported memory with
+   **Remembered 1**; the record read *Imported by you*, *1 turn · Open the
+   latest*, and the link reopened that turn (FIXED-690, FIXED-691, FIXED-692,
+   [04](../screenshots/2026-10-02-memory-round/04-chat-remembered.png),
+   [05](../screenshots/2026-10-02-memory-round/05-record-usage-and-evidence.png)).
+3. **Archive, retention and restore read as one lifecycle.** Archiving took a
+   record out of the recallable list without a confirmation; a review date
+   three days out marked another *Expires soon*; the Overview's pipeline and
+   retention summary counted both, and **Show** on *Archived* opened exactly
+   that record for **Restore** (FIXED-687, FIXED-689, FIXED-693,
+   [06](../screenshots/2026-10-02-memory-round/06-overview-pipeline-retention.png),
+   [07](../screenshots/2026-10-02-memory-round/07-archived-filter.png)).
+4. **Undo takes an import back and keeps the owner's later decision**:
+   *forgot 1 record. Kept 1 you changed since.* — the one given a review date
+   ([08](../screenshots/2026-10-02-memory-round/08-import-undone.png)).
+5. **Permissions says what Raiker can do by goal**, *Change* opening the row
+   that decides it (FIXED-695,
+   [09](../screenshots/2026-10-02-memory-round/09-permissions-goals.png)).
+6. **390 wide**, the Memory overview with no horizontal overflow and the goal
+   lines readable
+   ([10](../screenshots/2026-10-02-memory-round/10-memory-overview-390.png),
+   [11](../screenshots/2026-10-02-memory-round/11-permissions-390.png)).
+
+**What it found.** Fixed in the run: the **Expired** filter and tile could
+never show a record (FIXED-688), *last included* never counted a turn's own
+recall (FIXED-692), and an imported record's *Source* read *agent* (in
+FIXED-694). An archive pressed while the page's first reads were still
+arriving could be overwritten on screen by them; the page now lets only its
+newest reload write. Filed: asking *What is my favourite tea? Answer in one
+sentence.* recalled nothing, because the lexical leg needs every content word
+in the record ([BUG-313](TO_BE_FIXED.md#bug-313--an-instruction-in-the-prompt-stops-recall-finding-the-memory-it-asks-about)).
+
+**What it did not prove.** An observation captured by a tool turn — the
+round's turns read no files, so **Observed** read 0 — and a semantic recall
+backend; this host has no embedding provider.
 
 ---
 

@@ -113,7 +113,9 @@ import type {
   McpToolDeclaration,
   MemoryControlView,
   MemoryHistoryEvent,
+  MemoryImportBatch,
   MemoryImportPreview,
+  MemoryImportRecord,
   MemoryImportResult,
   MemoryIntegrity,
   MemoryProposal,
@@ -682,6 +684,10 @@ export interface InterruptRequestBody {
 }
 
 export type { MemoryImportPreview };
+
+export type { MemoryImportRecord };
+
+export type { MemoryImportBatch };
 
 export type { MemoryImportResult };
 

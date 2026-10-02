@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goalSummaries } from "../permissionGoals";
   import { onMount, tick } from "svelte";
   import AuthorityMatrix from "../components/AuthorityMatrix.svelte";
   import Icon from "../components/Icon.svelte";
@@ -395,6 +396,7 @@
   const authorityGates = $derived(authorityMatrixGates(governedGates));
   const domains = $derived(groupByDomain(governedGates).map(group => group.domain));
   const posture = $derived(permissionPosture(governedGates));
+  const goals = $derived(goalSummaries(effective));
 
   /**
    * The status filters, as one control instead of two.
@@ -669,6 +671,34 @@
       </p>
     {/if}
   </section>
+
+  {#if !filtering && goals.some((goal) => goal.verdict !== "not_reported")}
+    <!-- UX-PERM-05 — the posture by goal, read-only. The owner's question is
+         "can Raiker edit my files?", not "what is file_write_execution set
+         to"; each line is derived from the same effective gates as the rows
+         below, and Change opens the row that decides it. -->
+    <section class="panel goals" aria-label="What Raiker can do for you">
+      <h2>What Raiker can do for you</h2>
+      <ul class="goal-list">
+        {#each goals.filter((goal) => goal.verdict !== "not_reported") as goal (goal.id)}
+          <li class="goal goal-{goal.verdict}">
+            <Icon name={goal.verdict === "never" ? "x" : goal.verdict === "unknown" ? "info" : "check"} size="sm" />
+            <span class="goal-sentence">{goal.sentence}</span>
+            {#if goal.firstCapability}
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                aria-label={`Change: ${goal.sentence}`}
+                onclick={() => void revealCapability(goal.firstCapability ?? "")}
+              >
+                Change
+              </button>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
 
   {#if !filtering && attention.length > 0}
     <!-- What needs a decision comes before what is merely configured. Narrow on
@@ -975,6 +1005,14 @@
     margin: 0 0 var(--space-3);
     font-size: var(--text-md);
   }
+  .goal-list { display:grid; gap:.4rem; margin:var(--space-2) 0 0; padding:0; list-style:none; }
+  .goal { display:flex; align-items:center; gap:var(--space-2); min-width:0; }
+  .goal :global(svg) { flex:none; color:var(--ok,var(--text-3)); }
+  .goal-never :global(svg) { color:var(--text-3); }
+  .goal-unknown :global(svg),.goal-automatic :global(svg) { color:var(--warn,var(--text-3)); }
+  .goal-sentence { flex:1; min-width:0; color:var(--text-1); font-size:var(--text-sm); }
+  .goal-never .goal-sentence { color:var(--text-2); }
+  .goals h2 { margin:0; font-size:var(--text-md); }
   .posture {
     display: grid;
     gap: var(--space-3);

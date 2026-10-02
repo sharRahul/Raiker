@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**350 operations: 339 verified, 0 eligible, 0 deferred, 11 special.**
+**352 operations: 341 verified, 0 eligible, 0 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -184,6 +184,8 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/memory/files` | dict | ManagedFileImport | verified | _import |
 | POST | `/api/memory/gists/{gist_id}/discard` |  | GistDiscarded | verified | declared by cast |
 | POST | `/api/memory/import` | dict | MemoryImportResult | verified | declared by cast |
+| GET | `/api/memory/import/batches` |  | MemoryImportBatches | verified | declared by cast |
+| POST | `/api/memory/import/batches/{batch_id}/undo` |  | MemoryImportUndone | verified | declared by cast |
 | POST | `/api/memory/import/preview` | dict | MemoryImportPreview | verified | declared by cast |
 | PUT | `/api/memory/incognito` | dict | IncognitoSet | verified | declared by cast |
 | GET | `/api/memory/integrity` |  | MemoryIntegrity | verified | declared by cast |

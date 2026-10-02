@@ -31,8 +31,10 @@ from raiker.api.wire.memory import (
     MemoryExport,
     MemoryForgotten,
     MemoryHistory,
+    MemoryImportBatches,
     MemoryImportPreview,
     MemoryImportResult,
+    MemoryImportUndone,
     MemoryIntegrity,
     MemoryPinned,
     MemoryProposal,
@@ -70,11 +72,20 @@ def _service(request: Request) -> DashboardService:
 async def list_memories(
     request: Request,
     scope: str | None = None,
+    include_inactive: bool = False,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
-    """List approved memories with governance metadata + pin state."""
+    """List approved memories with governance metadata + pin state.
+
+    ``include_inactive`` adds the archived and expired records the owner can
+    restore or extend. It changes what is *listed*, never what is recalled.
+    """
     return serialize_dto(
-        _service(request).list_memories(scope=scope, acting_principal_id=auth_data[0].principal_id)
+        _service(request).list_memories(
+            scope=scope,
+            acting_principal_id=auth_data[0].principal_id,
+            include_inactive=include_inactive,
+        )
     )
 
 
@@ -244,12 +255,56 @@ async def import_memories(
     # Skipping what is already stored is the default; the owner can ask for a
     # second copy deliberately, having been shown which record it copies.
     skip_duplicates = body.get("skip_duplicates", True) is not False
+    # UX-MEM-08 — the records the owner chose to skip in the review. Anything
+    # that is not a whole number is dropped rather than guessed at.
+    raw_excluded = body.get("exclude_indices", [])
+    excluded = frozenset(
+        value
+        for value in (raw_excluded if isinstance(raw_excluded, list) else [])
+        if isinstance(value, int) and not isinstance(value, bool)
+    )
+    raw_name = body.get("file_name", "")
     result = _service(request).import_memories(
-        memories, auth_data[0].principal_id, skip_duplicates=skip_duplicates
+        memories,
+        auth_data[0].principal_id,
+        skip_duplicates=skip_duplicates,
+        exclude_indices=excluded,
+        file_name=raw_name if isinstance(raw_name, str) else "",
     )
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     answer = cast(MemoryImportResult, {"ok": True, **result.data})
+    return serialize_dto(answer)
+
+
+@router.get("/api/memory/import/batches")
+async def list_memory_import_batches(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """UX-MEM-08 — recent import receipts, each one an import that can be taken back."""
+    result = _service(request).list_memory_import_batches(auth_data[0].principal_id)
+    if not result.ok:
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+    answer = cast(MemoryImportBatches, {"ok": True, **result.data})
+    return serialize_dto(answer)
+
+
+@router.post("/api/memory/import/batches/{batch_id}/undo")
+async def undo_memory_import(
+    batch_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """UX-MEM-08 — forget what one import wrote, except what the owner has changed since."""
+    result = _service(request).undo_memory_import(batch_id, auth_data[0].principal_id)
+    if not result.ok:
+        code = {
+            "unknown_import_batch": status.HTTP_404_NOT_FOUND,
+            "import_batch_already_undone": status.HTTP_409_CONFLICT,
+        }.get(result.reason_code or "", status.HTTP_403_FORBIDDEN)
+        raise refusal(code, result.reason_code)
+    answer = cast(MemoryImportUndone, {"ok": True, **result.data})
     return serialize_dto(answer)
 
 

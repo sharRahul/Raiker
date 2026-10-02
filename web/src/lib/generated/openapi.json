@@ -12483,6 +12483,42 @@
             "default": null,
             "title": "Expires At"
           },
+          "last_recalled_origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Recalled Origin"
+          },
+          "last_recalled_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Recalled Session Id"
+          },
+          "last_recalled_turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Recalled Turn Id"
+          },
           "last_used_at": {
             "anyOf": [
               {
@@ -12511,6 +12547,11 @@
             "additionalProperties": true,
             "title": "Provenance",
             "type": "object"
+          },
+          "recall_turn_count": {
+            "default": 0,
+            "title": "Recall Turn Count",
+            "type": "integer"
           },
           "remembered_reason": {
             "anyOf": [
@@ -12755,6 +12796,82 @@
         "title": "MemoryHistoryEvent",
         "type": "object"
       },
+      "MemoryImportBatch": {
+        "description": "UX-MEM-08 — one import receipt.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "imported": {
+            "title": "Imported",
+            "type": "integer"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "source_class": {
+            "enum": [
+              "raiker_export",
+              "foreign"
+            ],
+            "title": "Source Class",
+            "type": "string"
+          },
+          "undone_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undone At"
+          }
+        },
+        "required": [
+          "batch_id",
+          "file_name",
+          "source_class",
+          "imported",
+          "skipped",
+          "created_at",
+          "undone_at"
+        ],
+        "title": "MemoryImportBatch",
+        "type": "object"
+      },
+      "MemoryImportBatches": {
+        "properties": {
+          "batches": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryImportBatch"
+            },
+            "title": "Batches",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "batches"
+        ],
+        "title": "MemoryImportBatches",
+        "type": "object"
+      },
       "MemoryImportDuplicate": {
         "description": "A record that is already stored, or that the file holds twice (``memory_id`` empty).",
         "properties": {
@@ -12785,7 +12902,7 @@
         "type": "object"
       },
       "MemoryImportPreview": {
-        "description": "What an import would change, before it changes anything (BUG-244).",
+        "description": "What an import would change, before it changes anything (BUG-244, UX-MEM-08).",
         "properties": {
           "duplicate_count": {
             "title": "Duplicate Count",
@@ -12806,6 +12923,25 @@
             "title": "Ok",
             "type": "boolean"
           },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryImportRecord"
+            },
+            "title": "Records",
+            "type": "array"
+          },
+          "similar_count": {
+            "title": "Similar Count",
+            "type": "integer"
+          },
+          "source_class": {
+            "enum": [
+              "raiker_export",
+              "foreign"
+            ],
+            "title": "Source Class",
+            "type": "string"
+          },
           "total": {
             "title": "Total",
             "type": "integer"
@@ -12816,13 +12952,60 @@
           "total",
           "new_count",
           "duplicate_count",
-          "duplicates"
+          "duplicates",
+          "similar_count",
+          "source_class",
+          "records"
         ],
         "title": "MemoryImportPreview",
         "type": "object"
       },
+      "MemoryImportRecord": {
+        "description": "UX-MEM-08 — one record of the file, and what importing it would do.\n\n``status`` is ``new``, ``duplicate`` (already stored word for word),\n``duplicate_in_file`` or ``similar`` (stored already, differing only in\ncase, spacing or punctuation). ``memory_id`` names the stored record a\nduplicate or similar one matches, and is empty otherwise.",
+        "properties": {
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "new",
+              "duplicate",
+              "duplicate_in_file",
+              "similar"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "text",
+          "scope",
+          "memory_id",
+          "status"
+        ],
+        "title": "MemoryImportRecord",
+        "type": "object"
+      },
       "MemoryImportResult": {
         "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
           "count": {
             "title": "Count",
             "type": "integer"
@@ -12843,9 +13026,21 @@
             "title": "Reviewed",
             "type": "integer"
           },
+          "skipped_by_owner": {
+            "title": "Skipped By Owner",
+            "type": "integer"
+          },
           "skipped_duplicates": {
             "title": "Skipped Duplicates",
             "type": "integer"
+          },
+          "source_class": {
+            "enum": [
+              "raiker_export",
+              "foreign"
+            ],
+            "title": "Source Class",
+            "type": "string"
           }
         },
         "required": [
@@ -12854,9 +13049,46 @@
           "reviewed",
           "imported",
           "skipped_duplicates",
-          "relationship_proposals"
+          "skipped_by_owner",
+          "relationship_proposals",
+          "batch_id",
+          "source_class"
         ],
         "title": "MemoryImportResult",
+        "type": "object"
+      },
+      "MemoryImportUndone": {
+        "description": "What taking an import back did, record by record.",
+        "properties": {
+          "already_gone": {
+            "title": "Already Gone",
+            "type": "integer"
+          },
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "kept_changed": {
+            "title": "Kept Changed",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "batch_id",
+          "removed",
+          "kept_changed",
+          "already_gone"
+        ],
+        "title": "MemoryImportUndone",
         "type": "object"
       },
       "MemoryIntegrity": {
@@ -29498,7 +29730,7 @@
     },
     "/api/memory": {
       "get": {
-        "description": "List approved memories with governance metadata + pin state.",
+        "description": "List approved memories with governance metadata + pin state.\n\n``include_inactive`` adds the archived and expired records the owner can\nrestore or extend. It changes what is *listed*, never what is recalled.",
         "operationId": "list_memories_api_memory_get",
         "parameters": [
           {
@@ -29515,6 +29747,16 @@
                 }
               ],
               "title": "Scope"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Inactive",
+              "type": "boolean"
             }
           }
         ],
@@ -29979,6 +30221,65 @@
           }
         },
         "summary": "Import Memories"
+      }
+    },
+    "/api/memory/import/batches": {
+      "get": {
+        "description": "UX-MEM-08 — recent import receipts, each one an import that can be taken back.",
+        "operationId": "list_memory_import_batches_api_memory_import_batches_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryImportBatches"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Memory Import Batches"
+      }
+    },
+    "/api/memory/import/batches/{batch_id}/undo": {
+      "post": {
+        "description": "UX-MEM-08 — forget what one import wrote, except what the owner has changed since.",
+        "operationId": "undo_memory_import_api_memory_import_batches__batch_id__undo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryImportUndone"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Undo Memory Import"
       }
     },
     "/api/memory/import/preview": {

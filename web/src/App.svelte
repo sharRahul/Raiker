@@ -44,6 +44,11 @@
   let currentTab = $state(
     typeof window === "undefined" ? null : tabFromHash(window.location.hash),
   );
+  // UX-MEM-03 — a list filter a deep link names (`#/memory?tab=memories&filter=archived`),
+  // so a count on an overview can open the records it counted.
+  let currentFilter = $state<string | null>(
+    typeof window === "undefined" ? null : routeStateFromHash(window.location.hash).filter,
+  );
   // The guide page a deep link names, so "Learn more" from another surface can
   // open the section it means rather than the guide's front page.
   let currentSection = $state(
@@ -158,6 +163,7 @@
       navigationDrawerOpen = false;
       current = routeFromHash(window.location.hash);
       currentTab = tabFromHash(window.location.hash);
+      currentFilter = routeStateFromHash(window.location.hash).filter;
       currentSection = sectionFromHash(window.location.hash);
       continuedSessionId = routeStateFromHash(window.location.hash).sessionId;
       anchoredTurnId = routeStateFromHash(window.location.hash).turnId;
@@ -329,7 +335,7 @@
           {:else if current === "search-chat"}
             <LazyRoute route="search-chat" />
           {:else if current === "memory"}
-            <LazyRoute route="memory" props={{ tab: currentTab ?? "overview" }} />
+            <LazyRoute route="memory" props={{ tab: currentTab ?? "overview", filter: currentFilter }} />
           {:else if current === "approvals"}
             <LazyRoute
               route="approvals"

@@ -3,7 +3,7 @@
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import FileInspector from "../components/FileInspector.svelte";
-  import type { CapabilityGate, MemoryControlView, MemoryHistoryEvent, MemoryImportPreview, MemoryProposal, MemoryRelationshipProposal, MemorySettingsView, ObservationsView, SourceExcerptView } from "../apiTypes";
+  import type { CapabilityGate, MemoryControlView, MemoryHistoryEvent, MemoryImportBatch, MemoryImportPreview, MemoryProposal, MemoryRelationshipProposal, MemorySettingsView, ObservationsView, SourceExcerptView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { memoryWritePosture } from "../memoryPosture";
   import GuideLink from "../components/GuideLink.svelte";
@@ -19,6 +19,21 @@
     type MemoryCounts,
     type MemoryTab,
   } from "../memoryHub";
+  import {
+    LIFECYCLE_VERBS,
+    MEMORY_FILTERS,
+    MEMORY_FILTER_LABELS,
+    MEMORY_STATE_LABELS,
+    isMemoryFilter,
+    isRecallable,
+    matchesFilter,
+    memoryPipeline,
+    memoryState,
+    retentionRows,
+    retentionSummary,
+    type MemoryFilter,
+  } from "../memoryLifecycle";
+  import { memoryEvidence, proposalEvidence } from "../memoryEvidence";
 
   type MemoryImport = Array<Partial<MemoryControlView> & { text: string }>;
   let memories = $state<MemoryControlView[] | null>(null);
@@ -29,7 +44,9 @@
   let actionError = $state<string | null>(null);
   let busy = $state(false);
   let query = $state("");
-  let statusFilter = $state("all");
+  // UX-MEM-03 — the list filter. A deep link's `filter=` wins, so a count on
+  // the Overview opens exactly the records it counted.
+  let statusFilter = $state<MemoryFilter>("active");
   let scopeFilter = $state("all");
   let sensitivityFilter = $state("all");
   let pinnedOnly = $state(false);
@@ -42,6 +59,10 @@
   let importBusy = $state(false);
   let importNotice = $state<string | null>(null);
   let importFileName = $state("");
+  // UX-MEM-08 — the records the owner chose to leave out, by index in the file,
+  // and the receipts of recent imports, each one an import that can be undone.
+  let importExcluded = $state<Set<number>>(new Set());
+  let importBatches = $state<MemoryImportBatch[]>([]);
   let proposalEditingId = $state<string | null>(null);
   let proposalDraft = $state("");
   let historyById = $state<Record<string, MemoryHistoryEvent[]>>({});
@@ -99,18 +120,30 @@
         : "stored_only",
   );
 
+  // Every action reloads the page's reads, and a reload can start while the
+  // previous one is still waiting on its later reads. Only the newest may
+  // write, so an archive is never undone on screen by a read taken before it.
+  let loadSeq = 0;
   async function load() {
+    const seq = ++loadSeq;
+    const current = () => seq === loadSeq;
     loadError = null;
     try {
-      [memories, settings] = await Promise.all([api.memories(), api.memorySettings()]);
-      try { proposals = await api.memoryProposals(); } catch { proposals = []; }
-      try { relationshipProposals = await api.memoryRelationshipProposals(); } catch { relationshipProposals = []; }
-      try { gates = await api.capabilityGates(); } catch { gates = null; }
+      const [listed, read] = await Promise.all([api.memories(undefined, true), api.memorySettings()]);
+      if (!current()) return;
+      [memories, settings] = [listed, read];
+      try { const value = await api.memoryProposals(); if (current()) proposals = value; } catch { if (current()) proposals = []; }
+      try { const value = await api.memoryRelationshipProposals(); if (current()) relationshipProposals = value; } catch { if (current()) relationshipProposals = []; }
+      try { const value = await api.capabilityGates(); if (current()) gates = value; } catch { if (current()) gates = null; }
       // A failed read is null, never an empty list: "capture is not reporting"
       // must not render as "capture found nothing".
-      try { observations = await api.observations(); } catch { observations = null; }
+      try { const value = await api.observations(); if (current()) observations = value; } catch { if (current()) observations = null; }
+      try { const value = (await api.memoryImportBatches()).batches; if (current()) importBatches = value; } catch { if (current()) importBatches = []; }
     }
-    catch (e) { memories = null; settings = null; loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable"; }
+    catch (e) {
+      if (!current()) return;
+      memories = null; settings = null; loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+    }
   }
   async function toggleIncognito() {
     if (!settings || busy) return;
@@ -128,9 +161,15 @@
     catch { actionError = "Could not edit this memory."; }
   }
   async function forget(m: MemoryControlView) {
-    if (!window.confirm("Forget this memory? Raiker will stop using it in future work. Existing responses and required audit records will not be rewritten.")) return;
+    if (!window.confirm(`Forget this memory? ${LIFECYCLE_VERBS.forget.consequence} To stop recalling it and keep it, archive it instead.`)) return;
     try { await api.forgetMemory(m.memory_id); await load(); }
     catch { actionError = "Could not forget this memory."; }
+  }
+  // UX-MEM-02 — archive and restore are the reversible pair; neither asks to
+  // confirm, because neither loses anything.
+  async function setArchived(m: MemoryControlView, archived: boolean) {
+    try { await api.setMemoryArchived(m.memory_id, archived); await load(); }
+    catch { actionError = archived ? "Could not archive this memory." : "Could not restore this memory."; }
   }
   async function decideProposal(proposal: MemoryProposal, decision: "approved" | "rejected", editedText?: string) {
     const reason = decision === "rejected" ? window.prompt("Why should this proposal be rejected?", "Not useful as durable memory") : "";
@@ -190,7 +229,10 @@
     } catch { actionError = "Could not export memories."; }
   }
   async function reviewImport(event: Event) {
-    const file = (event.currentTarget as HTMLInputElement).files?.[0];
+    // Held before the first await: `currentTarget` is cleared once the event
+    // has finished dispatching.
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
     try {
       const parsed = JSON.parse(await file.text()) as unknown;
@@ -198,23 +240,60 @@
       if (!values.every((value) => typeof value === "object" && value !== null && typeof (value as { text?: unknown }).text === "string")) throw new Error("schema");
       importPreview = values as MemoryImport; importFileName = file.name; actionError = null;
       importNotice = null;
+      importExcluded = new Set();
       // BUG-244 — ask what this would actually change before offering to do it.
       // A read: it writes nothing, so it is safe on every file chosen.
       importAlready = null;
       try { importAlready = await api.previewMemoryImport(importPreview); }
       catch { importAlready = null; }
     } catch { importPreview = null; importAlready = null; actionError = "This file is not a valid Raiker memory export."; }
+    // A file input keeps its value, so choosing the same file again after an
+    // undo would otherwise not fire `change`.
+    input.value = "";
+  }
+  function toggleImportRecord(index: number) {
+    const next = new Set(importExcluded);
+    if (next.has(index)) next.delete(index); else next.add(index);
+    importExcluded = next;
+  }
+  /** Records that would be written: new or similar, and not skipped by the owner. */
+  const importChosen = $derived(
+    (importAlready?.records ?? []).filter(
+      (record) => (record.status === "new" || record.status === "similar") && !importExcluded.has(record.index),
+    ).length,
+  );
+  const IMPORT_STATUS_LABELS: Record<string, string> = {
+    new: "New",
+    similar: "Like one you have",
+    duplicate: "Already stored",
+    duplicate_in_file: "Repeated in this file",
+  };
+  async function undoImport(batch: MemoryImportBatch) {
+    if (!window.confirm(`Undo the import of ${batch.imported} record${batch.imported === 1 ? "" : "s"}${batch.file_name ? ` from ${batch.file_name}` : ""}? Each one is forgotten, except any you have changed since.`)) return;
+    try {
+      const result = await api.undoMemoryImport(batch.batch_id);
+      const kept = result.kept_changed > 0 ? ` Kept ${result.kept_changed} you changed since.` : "";
+      importNotice = `Undid the import: forgot ${result.removed} record${result.removed === 1 ? "" : "s"}.${kept}`;
+      await load();
+    } catch (e) {
+      actionError = e instanceof ApiError && e.status === 409 ? "That import was already undone." : "Could not undo that import.";
+    }
   }
   async function applyImport(skipDuplicates = true) {
     if (!importPreview) return;
     importBusy = true;
     try {
-      const result = await api.importMemories(importPreview, skipDuplicates);
+      const result = await api.importMemories(importPreview, skipDuplicates, {
+        excludeIndices: [...importExcluded],
+        fileName: importFileName,
+      });
       // BUG-244 — say what changed, not how many records were offered.
-      importNotice = result.skipped_duplicates > 0
-        ? `Imported ${result.imported} record${result.imported === 1 ? "" : "s"}; skipped ${result.skipped_duplicates} already stored.`
-        : `Imported ${result.imported} record${result.imported === 1 ? "" : "s"}.`;
-      importPreview = null; importAlready = null; importFileName = "";
+      const skipped = [
+        result.skipped_duplicates > 0 ? `${result.skipped_duplicates} already stored` : "",
+        result.skipped_by_owner > 0 ? `${result.skipped_by_owner} you left out` : "",
+      ].filter(Boolean).join(", ");
+      importNotice = `Imported ${result.imported} record${result.imported === 1 ? "" : "s"}${skipped ? `; skipped ${skipped}` : ""}.${result.batch_id ? " You can undo this import below." : ""}`;
+      importPreview = null; importAlready = null; importFileName = ""; importExcluded = new Set();
       await load();
     }
     catch { actionError = "Could not import memories."; }
@@ -319,7 +398,10 @@
     return m.approval_state === "approved" || m.approval_state === "policy_allowed";
   }
 
-  let { tab = "overview" }: { tab?: string } = $props();
+  let { tab = "overview", filter = null }: { tab?: string; filter?: string | null } = $props();
+  $effect(() => {
+    if (isMemoryFilter(filter)) statusFilter = filter;
+  });
 
   const tabs = HUB_TABS.memory.map((id) => ({
     id,
@@ -327,20 +409,31 @@
   }));
 
   /** The hash owns which panel is open, so a deep link and the strip agree. */
-  function selectTab(next: string) {
-    window.location.hash = `#/memory?tab=${encodeURIComponent(next)}`;
+  function selectTab(next: string, listFilter?: MemoryFilter) {
+    const filterPart = listFilter ? `&filter=${encodeURIComponent(listFilter)}` : "";
+    window.location.hash = `#/memory?tab=${encodeURIComponent(next)}${filterPart}`;
   }
 
-  const approved = $derived((memories ?? []).filter(isApproved));
+  // Every approved record the page was given, recallable or not, and the
+  // recallable ones — the only ones a turn can be given.
+  const records = $derived((memories ?? []).filter(isApproved));
+  const approved = $derived(records.filter((m) => isRecallable(m)));
   const pending = $derived(proposals);
-  const expired = $derived((memories ?? []).filter((m) => m.expires_at && new Date(m.expires_at) <= new Date()));
+  const expired = $derived(records.filter((m) => memoryState(m) === "expired"));
   const scopes = $derived([...new Set((memories ?? []).map((m) => m.scope))]);
   const sensitivities = $derived([...new Set((memories ?? []).map((m) => m.sensitivity))]);
   const filtered = $derived(
-    approved.filter((m) => {
-      const matchStatus = statusFilter === "all" || (statusFilter === "approved" && isApproved(m)) || (statusFilter === "expired" && !!m.expires_at && new Date(m.expires_at) <= new Date());
-      return matchStatus && (scopeFilter === "all" || m.scope === scopeFilter) && (sensitivityFilter === "all" || m.sensitivity === sensitivityFilter) && (!pinnedOnly || m.pinned) && `${m.text} ${provenanceLabel(m)} ${m.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase());
+    records.filter((m) => {
+      return matchesFilter(m, statusFilter) && (scopeFilter === "all" || m.scope === scopeFilter) && (sensitivityFilter === "all" || m.sensitivity === sensitivityFilter) && (!pinnedOnly || m.pinned) && `${m.text} ${provenanceLabel(m)} ${m.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase());
     }).sort((a, b) => sort === "review-date" ? (a.expires_at ?? "9999").localeCompare(b.expires_at ?? "9999") : b.created_at.localeCompare(a.created_at)),
+  );
+  const retention = $derived(retentionRows(retentionSummary(records)));
+  const pipeline = $derived(
+    memoryPipeline({
+      observations: observations ? observations.captured : null,
+      suggestions: pending.length + relationshipProposals.length,
+      memories: records,
+    }),
   );
   /** One reading of what the hub holds, shared by the Overview and its tabs. */
   const counts = $derived<MemoryCounts>({
@@ -383,13 +476,44 @@
   <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
     <p class="page-lead">{memorySentence(counts)}</p>
 
-  <!-- the empty-board rule, applied here too: a board that is empty is not a board.
-       On a fresh install these four tiles all read 0, which is the sentence
-       above restated as four containers. They appear when there is something
-       in them. -->
-  {#if counts.approved + counts.proposals + counts.relationshipProposals + counts.expired > 0}
-  <section class="summary" aria-label="Memory summary">
-    <div><strong>{approved.length}</strong><span>Approved</span></div><div><strong>{pending.length + relationshipProposals.length}</strong><span>Pending review</span></div><div><strong>{approved.filter((m) => m.pinned).length}</strong><span>Pinned</span></div><div><strong>{expired.length}</strong><span>Withheld or expired</span></div>
+  <!-- UX-MEM-06 — where every record is in the one pipeline it passes
+       through, so "why is Raiker using this?" has an answer on the page that
+       lists it. The empty-board rule still holds: on a fresh install every
+       count is 0, which is the sentence above restated, so the strip appears
+       once there is something in it. -->
+  {#if pipeline.some((stage) => (stage.count ?? 0) > 0)}
+  <section class="pipeline" aria-label="How a memory moves through Raiker">
+    <ol>
+      {#each pipeline as stage (stage.id)}
+        <li>
+          <a href={stage.href}>
+            <strong>{stage.count === null ? "—" : stage.count}</strong>
+            <span>{stage.label}</span>
+          </a>
+          <p>{stage.meaning}</p>
+        </li>
+      {/each}
+    </ol>
+  </section>
+  {/if}
+
+  <!-- UX-MEM-03 — retention as a policy, not as a date on each card: what is
+       kept, what is about to lapse, what has gone quiet, and what is no longer
+       recalled. Each row opens the records it counts. -->
+  {#if records.length > 0}
+  <section class="memory-section retention" aria-label="Retention">
+    <div class="section-head"><h3>Retention</h3></div>
+    <ul class="retention-list">
+      {#each retention as row (row.filter + row.label)}
+        <li>
+          <span class="retention-count">{row.count}</span>
+          <span class="retention-text"><strong>{row.label}</strong><small>{row.note}</small></span>
+          {#if row.count > 0}
+            <button type="button" class="btn btn-ghost btn-sm" onclick={() => selectTab("memories", row.filter)}>Show</button>
+          {/if}
+        </li>
+      {/each}
+    </ul>
   </section>
   {/if}
 
@@ -417,23 +541,25 @@
   <div id="panel-memories" role="tabpanel" aria-labelledby="tab-memories">
   <section class="filters" aria-label="Filter memories">
     <label class="search"><Icon name="search" size="md" /><input bind:value={query} aria-label="Search memories" placeholder="Search memories…" /></label>
-    <select bind:value={statusFilter} aria-label="Memory status"><option value="all">All statuses</option><option value="approved">Approved</option><option value="expired">Expired</option></select>
+    <select bind:value={statusFilter} aria-label="Memory status">{#each MEMORY_FILTERS as option (option)}<option value={option}>{MEMORY_FILTER_LABELS[option]}</option>{/each}</select>
     <select bind:value={scopeFilter} aria-label="Memory scope"><option value="all">All scopes</option>{#each scopes as scope}<option value={scope}>{scope}</option>{/each}</select>
     <select bind:value={sensitivityFilter} aria-label="Memory sensitivity"><option value="all">All sensitivities</option>{#each sensitivities as sensitivity}<option value={sensitivity}>{sensitivity}</option>{/each}</select>
     <select bind:value={sort} aria-label="Sort memories"><option value="recently-approved">Recently approved</option><option value="review-date">Review date</option></select>
     <label class="pinned-filter"><input type="checkbox" bind:checked={pinnedOnly} /> Pinned only</label>
   </section>
 
-  <section class="memory-section"><div class="section-head"><h3>Approved memories</h3><span>{filtered.length}</span></div>
+  <section class="memory-section"><div class="section-head"><h3>{statusFilter === "active" ? "Approved memories" : MEMORY_FILTER_LABELS[statusFilter]}</h3><span>{filtered.length}</span></div>
     <!-- The posture card at the top of the page already states *why* there are
          none. Repeating its sentence here put the same line on screen twice;
          the empty state keeps the action, which is the half that is not
          already said. -->
-    {#if approved.length === 0}<div class="empty"><Icon name="spark" size="xl" /><h4>No approved memories yet</h4><a href={posture.action ? "#/capabilities" : "#/approvals"}>{posture.action ?? "Learn how governed review works"}</a></div>
+    {#if records.length === 0}<div class="empty"><Icon name="spark" size="xl" /><h4>No approved memories yet</h4><a href={posture.action ? "#/capabilities" : "#/approvals"}>{posture.action ?? "Learn how governed review works"}</a></div>
     {:else if filtered.length === 0}<div class="empty"><h4>No memories match these filters</h4><p>Clear or change the filters to see approved memories.</p></div>
     {:else}<div class="memory-grid">{#each filtered as m (m.memory_id)}<article class="memory-card" class:pinned={m.pinned}>
       <div class="memory-title">{#if editingId === m.memory_id}<textarea rows="3" bind:value={editDraft} aria-label="Memory text"></textarea>{:else}<h4>{m.text}</h4>{/if}{#if m.pinned}<span class="pin-label"><Icon name="check" size="sm" /> Pinned</span>{/if}</div>
-      <div class="meta"><span>Approved</span><span>{m.scope} scope</span><span>{m.sensitivity} sensitivity</span></div>
+      <!-- UX-MEM-04 — who put it there, in words; UX-MEM-02 — its state, when
+           it is anything but current. -->
+      <div class="meta">{#if memoryState(m) !== "current"}<span class="state-chip state-{memoryState(m)}">{MEMORY_STATE_LABELS[memoryState(m)]}</span>{/if}<span>{memoryEvidence(m).label}</span><span>{m.scope} scope</span><span>{m.sensitivity} sensitivity</span></div>
       <dl><div><dt>Source</dt><dd>{provenanceLabel(m)}</dd></div><div><dt>Approved</dt><dd>{relativeTime(m.created_at)}</dd></div><div><dt>Review or expiry</dt><dd>{m.expires_at ? relativeTime(m.expires_at) : "No date set"}</dd></div></dl>
       <!-- REM-MEM-01 — two everyday actions and one way in to the rest, so
            "edit the words" and "delete this permanently" never share a weight,
@@ -451,6 +577,7 @@
           onViewHistory={(r) => void viewHistory(r)}
           onForget={(r) => void forget(r)}
           onPurge={(r) => void purge(r)}
+          onArchive={(r, archived) => void setArchived(r, archived)}
         />
       {/if}
     </article>{/each}</div>{/if}
@@ -463,7 +590,7 @@
       {#each pending as proposal (proposal.candidate_id)}<article class="memory-card pending">
         {#if proposalEditingId === proposal.candidate_id}<textarea rows="3" bind:value={proposalDraft} aria-label="Edit proposed memory"></textarea>{:else}<h4>{proposal.text}</h4>{/if}
         <p>Proposed from event: {proposal.source_event_id}</p>
-        <div class="meta"><span>{proposal.scope}</span><span>{proposal.sensitivity} sensitivity</span><span>{Math.round(proposal.confidence * 100)}% confidence</span></div>
+        <div class="meta"><span>{proposal.scope}</span><span>{proposal.sensitivity} sensitivity</span><span title={proposalEvidence(proposal.confidence).why}>{proposalEvidence(proposal.confidence).label}</span></div>
         <details><summary>View source details</summary><p>Source event: {proposal.source_event_id}. The original event remains governed by its session access.</p></details>
         <div class="card-actions">
           {#if proposalEditingId === proposal.candidate_id}<button class="btn btn-primary btn-sm" onclick={() => void decideProposal(proposal, "approved", proposalDraft)}>Approve edited proposal</button><button class="btn btn-ghost btn-sm" onclick={() => proposalEditingId = null}>Cancel</button>
@@ -483,7 +610,7 @@
         <article class="memory-card pending relationship-card">
           <h4>{proposal.subject_name} <span>{proposal.predicate.replaceAll("_", " ")}</span> {proposal.object_name}</h4>
           <blockquote>{proposal.evidence_text}</blockquote>
-          <div class="meta"><span>{proposal.subject_type} → {proposal.object_type}</span><span>{Math.round(proposal.confidence * 100)}% confidence</span><span>{proposal.extractor_version}</span></div>
+          <div class="meta"><span>{proposal.subject_type} → {proposal.object_type}</span><span title={proposalEvidence(proposal.confidence).why}>{proposalEvidence(proposal.confidence).label}</span><span>{proposal.extractor_version}</span></div>
           <p>Evidence: {proposal.evidence_memory_id}. Approving adds the reviewed edge; denying leaves the evidence memory unchanged.</p>
           <div class="card-actions"><button class="btn btn-primary btn-sm" onclick={() => void decideRelationship(proposal, "approved")}>Approve relationship</button><button class="btn btn-ghost btn-sm danger" onclick={() => void decideRelationship(proposal, "denied")}>Reject relationship</button></div>
         </article>
@@ -655,24 +782,74 @@
         {#if importAlready === null}
           <span>{importPreview.length} valid record{importPreview.length === 1 ? "" : "s"} ready for governed import.</span>
           <button class="btn btn-primary btn-sm" disabled={importBusy} onclick={() => void applyImport()}>Import reviewed records</button>
-        {:else if importAlready.new_count === 0}
-          <span>All {importAlready.total} record{importAlready.total === 1 ? " is" : "s are"} already stored. Importing again would only make copies.</span>
-          <button class="btn btn-ghost btn-sm" disabled={importBusy} onclick={() => void applyImport(false)}>Import anyway</button>
         {:else}
-          <span>
-            <strong>{importAlready.new_count} new</strong> of {importAlready.total}
-            {#if importAlready.duplicate_count > 0}· {importAlready.duplicate_count} already stored, and will be skipped{/if}
+          <!-- UX-MEM-08 — the file is an untrusted batch. Say what it looks
+               like, then what each record would do, and let the owner leave
+               any of them out before anything is written. -->
+          <span class="import-class">
+            {importAlready.source_class === "raiker_export"
+              ? "Looks like a Raiker export."
+              : "Not a Raiker export — read each record before you import it."}
+            Imported records are marked as imported by you.
           </span>
-          <button class="btn btn-primary btn-sm" disabled={importBusy} onclick={() => void applyImport()}>
-            {importBusy ? "Importing…" : `Import ${importAlready.new_count} new record${importAlready.new_count === 1 ? "" : "s"}`}
-          </button>
-          {#if importAlready.duplicate_count > 0}
-            <button class="btn btn-ghost btn-sm" disabled={importBusy} onclick={() => void applyImport(false)}>Import all {importAlready.total} anyway</button>
+          <ul class="import-records" aria-label="Records in this file">
+            {#each importAlready.records ?? [] as record (record.index)}
+              {@const writable = record.status === "new" || record.status === "similar"}
+              <li class="import-record" class:skipped={!writable || importExcluded.has(record.index)}>
+                <label>
+                  <input
+                    type="checkbox"
+                    disabled={!writable || importBusy}
+                    checked={writable && !importExcluded.has(record.index)}
+                    onchange={() => toggleImportRecord(record.index)}
+                    aria-label={`Import “${record.text.slice(0, 60)}”`}
+                  />
+                  <span class="import-text">{record.text}</span>
+                </label>
+                <span class="import-status status-{record.status}">{IMPORT_STATUS_LABELS[record.status] ?? record.status}</span>
+              </li>
+            {/each}
+          </ul>
+          {#if importAlready.total > (importAlready.records ?? []).length}
+            <span class="muted">Showing the first {(importAlready.records ?? []).length} of {importAlready.total}.</span>
+          {/if}
+          {#if importChosen === 0}
+            <span>Nothing selected to import. Records already stored are skipped so recall is not spent on copies.</span>
+            {#if importAlready.duplicate_count > 0}
+              <button class="btn btn-ghost btn-sm" disabled={importBusy} onclick={() => void applyImport(false)}>Import all {importAlready.total} anyway</button>
+            {/if}
+          {:else}
+            <button class="btn btn-primary btn-sm" disabled={importBusy} onclick={() => void applyImport()}>
+              {importBusy ? "Importing…" : `Import ${importChosen} record${importChosen === 1 ? "" : "s"}`}
+            </button>
           {/if}
         {/if}
       </div>
     {/if}
-    {#if importNotice}<p class="import-notice" role="status">{importNotice}</p>{/if}</div></details>
+    {#if importNotice}<p class="import-notice" role="status">{importNotice}</p>{/if}
+    {#if importBatches.length > 0}
+      <!-- UX-MEM-08 — each import is a receipt that can be taken back. -->
+      <section class="import-batches" aria-label="Recent imports">
+        <h4>Recent imports</h4>
+        <ul>
+          {#each importBatches as batch (batch.batch_id)}
+            <li>
+              <span>
+                <strong>{batch.imported} record{batch.imported === 1 ? "" : "s"}</strong>
+                {#if batch.file_name}from {batch.file_name}{/if}
+                · {relativeTime(batch.created_at)}
+                {#if batch.skipped > 0}· {batch.skipped} skipped{/if}
+              </span>
+              {#if batch.undone_at}
+                <span class="muted">Undone {relativeTime(batch.undone_at)}</span>
+              {:else}
+                <button class="btn btn-ghost btn-sm" type="button" onclick={() => void undoImport(batch)}>Undo import</button>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}</div></details>
   </div>
 {/if}
 
@@ -722,7 +899,36 @@
   .posture-denied :global(svg),.posture-unknown :global(svg) { color:var(--warn,var(--text-3)); }
   .posture-action { flex:none; white-space:nowrap; font-weight:600; }
   .switch { min-width:76px; min-height:44px; display:flex; align-items:center; gap:.45rem; border:1px solid var(--border-strong); border-radius:var(--r-pill); padding:.25rem .55rem .25rem .3rem; background:var(--sunken); color:var(--text-2); cursor:pointer; } .switch span { width:1.65rem; height:1.65rem; border-radius:50%; background:var(--text-3); } .switch.on { background:var(--accent-soft); color:var(--accent); border-color:var(--accent-border); } .switch.on span { background:var(--accent); }
-  .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:var(--space-4) 0; overflow:hidden; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--border); } .summary div { display:grid; gap:.15rem; padding:var(--space-3); background:var(--surface); } .summary strong { font-size:var(--text-xl); } .summary span { color:var(--text-3); font-size:var(--text-xs); }
+  /* UX-MEM-06 — the pipeline reads left to right on a wide window and top to
+     bottom on a narrow one; a count is a link to where those records live. */
+  .pipeline ol { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:1px; margin:var(--space-4) 0; padding:0; list-style:none; overflow:hidden; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--border); }
+  .pipeline li { display:grid; align-content:start; gap:.3rem; padding:var(--space-3); background:var(--surface); min-width:0; }
+  .pipeline a { display:grid; gap:.1rem; color:inherit; text-decoration:none; }
+  .pipeline a:hover span,.pipeline a:focus-visible span { color:var(--accent); text-decoration:underline; }
+  .pipeline strong { font-size:var(--text-xl); }
+  .pipeline span { color:var(--text-2); font-size:var(--text-sm); font-weight:600; }
+  .pipeline p { margin:0; color:var(--text-3); font-size:var(--text-xs); }
+  .retention-list { display:grid; gap:1px; margin:0; padding:0; list-style:none; overflow:hidden; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--border); }
+  .retention-list li { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); background:var(--surface); }
+  .retention-count { flex:none; min-width:2.5rem; font-size:var(--text-lg); font-weight:650; text-align:right; }
+  .retention-text { display:grid; gap:.1rem; flex:1; min-width:0; }
+  .retention-text small { color:var(--text-3); font-size:var(--text-xs); }
+  .state-chip { font-weight:600; }
+  .meta span.state-expires_soon,.meta span.state-stale { background:var(--warn-soft); }
+  /* UX-MEM-08 — one row per record in the file, its status beside it. */
+  .import-class { width:100%; color:var(--text-2); font-size:var(--text-sm); }
+  .import-records { width:100%; display:grid; gap:.35rem; max-height:22rem; overflow:auto; margin:0; padding:0; list-style:none; }
+  .import-record { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-3); padding:.45rem .6rem; border:1px solid var(--border); border-radius:var(--r-sm); background:var(--surface); }
+  .import-record label { display:flex; align-items:flex-start; gap:.5rem; min-width:0; }
+  .import-record.skipped .import-text { color:var(--text-3); }
+  .import-text { overflow-wrap:anywhere; font-size:var(--text-sm); }
+  .import-status { flex:none; padding:.15rem .45rem; border-radius:var(--r-pill); background:var(--sunken); color:var(--text-2); font-size:var(--text-2xs); }
+  .import-status.status-similar { background:var(--warn-soft); }
+  .import-batches { width:100%; margin-top:var(--space-3); }
+  .import-batches h4 { margin:0 0 var(--space-2); font-size:var(--text-sm); }
+  .import-batches ul { display:grid; gap:.35rem; margin:0; padding:0; list-style:none; }
+  .import-batches li { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-2); font-size:var(--text-sm); color:var(--text-2); }
+  .muted { color:var(--text-3); font-size:var(--text-sm); }
   .filters { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; margin-bottom:var(--space-5); } .search { min-height:var(--control-min-h); border:1px solid var(--border-strong); border-radius:var(--r-sm); background:var(--surface); color:var(--text-1); } .search { display:flex; align-items:center; gap:.45rem; padding:0 .7rem; flex:1; min-width:15rem; } .search input { width:100%; border:0; outline:0; background:transparent; color:inherit; } .pinned-filter { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:var(--text-sm); }
   /* The library is a card like the posture controls above it, not a bare run of
      text. Without the enclosure its empty state ("No files yet.") sat directly
@@ -755,7 +961,8 @@
   .empty { padding:var(--space-6); text-align:center; border:1px dashed var(--border-strong); border-radius:var(--r-lg); color:var(--text-2); } .empty h4 { color:var(--text-1); margin-top:var(--space-2); }
   .advanced { margin-top:var(--space-6); padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .advanced summary { margin:0; list-style:none; } .advanced summary span { display:grid; gap:.2rem; } .advanced small { color:var(--text-2); font-weight:400; } .advanced-body { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); padding-top:var(--space-4); } .file-button input { position:absolute; width:1px; height:1px; opacity:0; } .import-review { width:100%; display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding:var(--space-3); background:var(--sunken); border-radius:var(--r-md); } .import-notice { width:100%; margin:var(--space-2) 0 0; color:var(--text-2); font-size:var(--text-sm); }
   @media (max-width:45rem) {
-    .summary { grid-template-columns:repeat(2,1fr); }
+    .pipeline ol { grid-template-columns:1fr; }
+    .retention-list li { flex-wrap:wrap; }
     dl { grid-template-columns:1fr; }
     .page-intro,.control-card,.posture-card { flex-direction:column; }
     .posture-action { white-space:normal; }

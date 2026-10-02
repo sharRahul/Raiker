@@ -622,3 +622,21 @@ it("names the host-network capability and says where code runs on this machine",
     /no native sandbox: python, node, npm and npx commands run with its network/,
   );
 });
+
+// UX-PERM-05 — the owner's question is "can Raiker edit my files?", not what
+// one registry row is set to. The page says it by goal, read-only, from the
+// same effective gates the rows render.
+describe("CapabilitiesView — posture by goal", () => {
+  it("summarises what Raiker can do for the owner, and leaves out goals nothing reports", async () => {
+    stubFetch({ "GET /api/capability-gates": GATES });
+    render(CapabilitiesView, { props: { principal: "prin_owner" } });
+
+    const goals = await screen.findByRole("region", { name: "What Raiker can do for you" });
+    expect(within(goals).getByText("Can run commands and code after asking you")).toBeInTheDocument();
+    expect(within(goals).getByText("Can read web pages after asking you")).toBeInTheDocument();
+    // Nothing in this runtime reports a way to edit files, so the page does
+    // not claim either answer about it.
+    expect(within(goals).queryByText(/edit project files/)).toBeNull();
+    expect(within(goals).getAllByRole("button", { name: /Change/ })).toHaveLength(2);
+  });
+});

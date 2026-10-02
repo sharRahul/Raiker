@@ -198,6 +198,16 @@ def _embedding_index(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
 IMPORTED = {"memories": [{"text": "Deploys happen on Thursdays."}]}
 
 
+def _import_batches(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    client.post("/api/memory/import", json=IMPORTED, headers=h)
+    return "/api/memory/import/batches"
+
+
+def _undo_import(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    batch = client.post("/api/memory/import", json=IMPORTED, headers=h).json()["batch_id"]
+    return f"/api/memory/import/batches/{batch}/undo"
+
+
 def _upload(client: TestClient, h: dict[str, str]) -> str:
     uploaded = client.post(
         "/api/brain/sources/upload",
@@ -275,6 +285,8 @@ CASES: Cases = {
     ("GET", "/api/memory/export"): _export,
     ("POST", "/api/memory/import/preview"): plain("/api/memory/import/preview", IMPORTED),
     ("POST", "/api/memory/import"): plain("/api/memory/import", IMPORTED),
+    ("GET", "/api/memory/import/batches"): _import_batches,
+    ("POST", "/api/memory/import/batches/{batch_id}/undo"): _undo_import,
     ("POST", "/api/memory/reconcile"): plain("/api/memory/reconcile"),
     ("GET", "/api/memory/integrity"): plain("/api/memory/integrity"),
     ("POST", "/api/memory/conversation-index/rebuild"): plain("/api/memory/conversation-index/rebuild"),

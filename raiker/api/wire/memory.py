@@ -93,14 +93,35 @@ class MemoryImportDuplicate(TypedDict):
     memory_id: str
 
 
+class MemoryImportRecord(TypedDict):
+    """UX-MEM-08 — one record of the file, and what importing it would do.
+
+    ``status`` is ``new``, ``duplicate`` (already stored word for word),
+    ``duplicate_in_file`` or ``similar`` (stored already, differing only in
+    case, spacing or punctuation). ``memory_id`` names the stored record a
+    duplicate or similar one matches, and is empty otherwise.
+    """
+
+    index: int
+    text: str
+    scope: str
+    memory_id: str
+    status: Literal["new", "duplicate", "duplicate_in_file", "similar"]
+
+
 class MemoryImportPreview(TypedDict):
-    """What an import would change, before it changes anything (BUG-244)."""
+    """What an import would change, before it changes anything (BUG-244, UX-MEM-08)."""
 
     ok: bool
     total: int
     new_count: int
     duplicate_count: int
     duplicates: list[MemoryImportDuplicate]
+    similar_count: int
+    #: ``raiker_export`` when the file has the shape Raiker's own export writes,
+    #: ``foreign`` otherwise. A shape, not a signature.
+    source_class: Literal["raiker_export", "foreign"]
+    records: list[MemoryImportRecord]
 
 
 class MemoryImportResult(TypedDict):
@@ -109,7 +130,38 @@ class MemoryImportResult(TypedDict):
     reviewed: int
     imported: int
     skipped_duplicates: int
+    skipped_by_owner: int
     relationship_proposals: int
+    #: The receipt to take this import back by; empty when nothing was written.
+    batch_id: str
+    source_class: Literal["raiker_export", "foreign"]
+
+
+class MemoryImportBatch(TypedDict):
+    """UX-MEM-08 — one import receipt."""
+
+    batch_id: str
+    file_name: str
+    source_class: Literal["raiker_export", "foreign"]
+    imported: int
+    skipped: int
+    created_at: str
+    undone_at: str | None
+
+
+class MemoryImportBatches(TypedDict):
+    ok: bool
+    batches: list[MemoryImportBatch]
+
+
+class MemoryImportUndone(TypedDict):
+    """What taking an import back did, record by record."""
+
+    ok: bool
+    batch_id: str
+    removed: int
+    kept_changed: int
+    already_gone: int
 
 
 class MemoryReconciled(TypedDict):

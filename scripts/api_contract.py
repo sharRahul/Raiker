@@ -306,6 +306,8 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/memory/files"),
         ("POST", "/api/memory/gists/{gist_id}/discard"),
         ("POST", "/api/memory/import"),
+        ("GET", "/api/memory/import/batches"),
+        ("POST", "/api/memory/import/batches/{batch_id}/undo"),
         ("POST", "/api/memory/import/preview"),
         ("POST", "/api/memory/observations/delete"),
         ("POST", "/api/memory/proposals/{candidate_id}/decision"),

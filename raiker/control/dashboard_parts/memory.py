@@ -42,9 +42,19 @@ class MemoryService:
     # the memory_write/memory_forget tools already use.
 
     def list_memories(
-        self: DashboardService, scope: str | None = None, *, acting_principal_id: str | None = None
+        self: DashboardService,
+        scope: str | None = None,
+        *,
+        acting_principal_id: str | None = None,
+        include_inactive: bool = False,
     ) -> list[MemoryControlView]:
-        """List approved memories with their governance metadata + pin state."""
+        """List approved memories with their governance metadata + pin state.
+
+        ``include_inactive`` adds archived and expired records for the Memory
+        page, which offers to restore or extend them (UX-MEM-02/03). Every
+        other caller — the source resolver and export among them — reads the
+        active records only, as before.
+        """
         pinned_ids = self.store.list_pinned_memory_ids()
         entries = list_memory(
             workspace_root=self.workspace_root,
@@ -53,6 +63,7 @@ class MemoryService:
             store=self.store,
             include_search_disabled=True,
             owner_principal_id=acting_principal_id,
+            include_inactive=include_inactive,
         )
         histories = {
             e.memory_id: self.store.list_memory_lifecycle_events(
@@ -60,6 +71,28 @@ class MemoryService:
             )
             for e in entries
         }
+        # UX-MEM-05 — which turns were given each record, read from the ledger
+        # the transcript's "Remembered" strip reads. The lifecycle `recall`
+        # event is the other path into a context (retrieval augmentation); it
+        # names no turn, so it can move "last included" but not the link.
+        usage = self.store.memory_recall_usage(
+            [e.memory_id for e in entries], acting_principal_id or ""
+        )
+
+        def _last_included(memory_id: str) -> str | None:
+            # Histories are newest first, so the first recall event is the latest.
+            retrieval = next(
+                (
+                    str(event["created_at"])
+                    for event in histories[memory_id]
+                    if event["action"] == "recall"
+                ),
+                None,
+            )
+            turn = usage.get(memory_id, {}).get("last_recalled_at")
+            moments = [moment for moment in (retrieval, turn) if moment]
+            return max(moments) if moments else None
+
         views = [
             MemoryControlView(
                 memory_id=e.memory_id,
@@ -86,14 +119,11 @@ class MemoryService:
                 supersedes_memory_id=e.supersedes_memory_id,
                 remembered_reason=e.remembered_reason,
                 updated_at=e.updated_at,
-                last_used_at=next(
-                    (
-                        event["created_at"]
-                        for event in histories[e.memory_id]
-                        if event["action"] == "recall"
-                    ),
-                    None,
-                ),
+                last_used_at=_last_included(e.memory_id),
+                recall_turn_count=int(usage.get(e.memory_id, {}).get("turn_count", 0)),
+                last_recalled_session_id=usage.get(e.memory_id, {}).get("last_session_id"),
+                last_recalled_turn_id=usage.get(e.memory_id, {}).get("last_turn_id"),
+                last_recalled_origin=usage.get(e.memory_id, {}).get("last_session_origin"),
             )
             for e in entries
         ]
@@ -617,44 +647,97 @@ class MemoryService:
         """
         return str(item.get("scope", "project"))
 
+    @staticmethod
+    def _import_source_class(memories: list[dict[str, Any]]) -> str:
+        """UX-MEM-08 — what kind of file this is, read from its shape alone.
+
+        ``raiker_export`` when every record carries the fields Raiker's own
+        export writes (an id, a creation time and an approval state);
+        ``foreign`` otherwise. A shape is a claim the file makes about itself,
+        not a signature, so the preview calls it *looks like* and the import
+        still writes every record as the owner's own import — classification
+        decides what the owner is shown, never what the record is trusted to do.
+        """
+        if memories and all(
+            isinstance(item, dict)
+            and str(item.get("memory_id", "")).startswith("mem_")
+            and item.get("created_at")
+            and item.get("approval_state")
+            for item in memories
+        ):
+            return "raiker_export"
+        return "foreign"
+
+    @staticmethod
+    def _near_key(text: str) -> str:
+        """The words of a sentence without case, spacing or punctuation.
+
+        Two records that differ only in those are the same statement to a
+        reader, and a re-typed copy of a memory is the duplicate an exact
+        checksum cannot see. Nothing finer is claimed: a paraphrase is new.
+        """
+        return " ".join("".join(ch if ch.isalnum() else " " for ch in text.lower()).split())
+
     def preview_memory_import(
         self: DashboardService, memories: list[dict[str, Any]], acting_principal_id: str | None
     ) -> ControlResult:
-        """BUG-244 — how many of these records the workspace already holds.
+        """BUG-244 and UX-MEM-08 — what each record in this file would do.
 
         A read, and only a read: it writes nothing, proposes nothing, and is
-        safe to call as often as a file is chosen. The owner sees the answer
-        *before* deciding, which is the difference between an import that says
-        "4 records" and one that says "1 new, 3 already stored".
+        safe to call as often as a file is chosen. Every record gets one status
+        the owner can act on before deciding — ``new``, ``duplicate`` (already
+        stored, word for word), ``duplicate_in_file`` (the file repeats itself)
+        or ``similar`` (stored already, differing only in case, spacing or
+        punctuation) — plus the file's ``source_class``.
         """
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
         stored = self.store.stored_memory_checksums(owner_principal_id=acting_principal_id)
+        near: dict[tuple[str, str], str] = {}
+        for row in self.store.list_approved_memory(
+            limit=10_000,
+            include_search_disabled=True,
+            owner_principal_id=acting_principal_id,
+            include_inactive=True,
+        ):
+            near.setdefault(
+                (self._near_key(str(row["text"])), str(row["scope"])), str(row["memory_id"])
+            )
         duplicates: list[dict[str, Any]] = []
+        records: list[dict[str, Any]] = []
         # A file that repeats a record inside itself is the same defect arriving
         # by a different route, so the run is deduplicated against itself too.
         seen: set[tuple[str, str]] = set()
         new_count = 0
+        similar_count = 0
         for index, item in enumerate(memories):
             text = str(item.get("text", "")).strip()
             if not text:
                 continue
-            key = (hashlib.sha256(text.encode()).hexdigest(), self._import_scope(item))
+            scope = self._import_scope(item)
+            key = (hashlib.sha256(text.encode()).hexdigest(), scope)
             existing = stored.get(key)
+            record = {"index": index, "text": text[:200], "scope": scope, "memory_id": ""}
             if existing is not None or key in seen:
-                duplicates.append(
-                    {
-                        "index": index,
-                        "text": text[:200],
-                        "scope": key[1],
-                        # Absent when the duplicate is inside the file itself,
-                        # which is a different thing from one already stored.
-                        "memory_id": existing or "",
-                    }
+                duplicate = {
+                    **record,
+                    # Absent when the duplicate is inside the file itself,
+                    # which is a different thing from one already stored.
+                    "memory_id": existing or "",
+                }
+                duplicates.append(duplicate)
+                records.append(
+                    {**duplicate, "status": "duplicate" if existing else "duplicate_in_file"}
                 )
                 continue
             seen.add(key)
             new_count += 1
+            similar = near.get((self._near_key(text), scope))
+            if similar is not None:
+                similar_count += 1
+                records.append({**record, "memory_id": similar, "status": "similar"})
+            else:
+                records.append({**record, "status": "new"})
         return ControlResult(
             ok=True,
             data={
@@ -662,6 +745,9 @@ class MemoryService:
                 "new_count": new_count,
                 "duplicate_count": len(duplicates),
                 "duplicates": duplicates[:50],
+                "similar_count": similar_count,
+                "source_class": self._import_source_class(memories),
+                "records": records[:200],
             },
         )
 
@@ -671,14 +757,22 @@ class MemoryService:
         acting_principal_id: str | None,
         *,
         skip_duplicates: bool = True,
+        exclude_indices: frozenset[int] = frozenset(),
+        file_name: str = "",
     ) -> ControlResult:
-        """Write reviewed records, skipping ones the workspace already holds.
+        """Write reviewed records as one batch the owner can take back.
 
         BUG-244 — the skip is the default rather than the only behaviour. An
         owner who means to store the same sentence at a second scope is doing
         something legitimate, and the record they would be duplicating is named
         in the preview, so ``skip_duplicates=False`` is an informed choice
         rather than a way around a rule.
+
+        UX-MEM-08 — ``exclude_indices`` are the records the owner chose to skip
+        in the preview. They are skipped here, by the server, so the receipt
+        counts what the owner decided rather than what the browser happened to
+        send. The receipt is a batch row naming every record written, which is
+        what makes :meth:`undo_memory_import` exact.
         """
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
@@ -690,14 +784,21 @@ class MemoryService:
             if skip_duplicates
             else {}
         )
+        source_class = self._import_source_class(memories)
+        batch_id = new_id("mib_")
         written: set[tuple[str, str]] = set()
+        written_ids: list[str] = []
         relationship_proposals = 0
         imported = 0
         skipped = 0
-        for item in memories:
+        skipped_by_owner = 0
+        for index, item in enumerate(memories):
             text = str(item.get("text", "")).strip()
             if not text:
                 return ControlResult(ok=False, reason_code="empty_memory_text")
+            if index in exclude_indices:
+                skipped_by_owner += 1
+                continue
             key = (hashlib.sha256(text.encode()).hexdigest(), self._import_scope(item))
             if skip_duplicates and (key in stored or key in written):
                 skipped += 1
@@ -707,6 +808,9 @@ class MemoryService:
                 text,
                 workspace_root=self.workspace_root,
                 scope=str(item.get("scope", "project")),
+                # The card's Source line reads this; left at the default it said
+                # "agent" for a record the owner imported.
+                source="user_import",
                 store=self.store,
                 governance=MemoryGovernance(
                     new_id("evt_"),
@@ -731,12 +835,25 @@ class MemoryService:
                 owner_principal_id=acting_principal_id,
             )
             self.store.record_memory_lifecycle_event(
-                entry.memory_id, "import", acting_principal_id or "", {"source": "user_import"}
+                entry.memory_id,
+                "import",
+                acting_principal_id or "",
+                {"source": "user_import", "batch_id": batch_id, "source_class": source_class},
             )
+            written_ids.append(entry.memory_id)
             relationship_proposals += propose_memory_relationships(
                 self.store, entry.memory_id, acting_principal_id or ""
             ).proposed
             imported += 1
+        if written_ids:
+            self.store.create_memory_import_batch(
+                batch_id=batch_id,
+                owner_principal_id=acting_principal_id or "",
+                file_name=file_name,
+                source_class=source_class,
+                memory_ids=written_ids,
+                skipped_count=skipped + skipped_by_owner,
+            )
         return ControlResult(
             ok=True,
             data={
@@ -747,7 +864,104 @@ class MemoryService:
                 "reviewed": len(memories),
                 "imported": imported,
                 "skipped_duplicates": skipped,
+                "skipped_by_owner": skipped_by_owner,
                 "relationship_proposals": relationship_proposals,
+                # Empty when nothing was written: there is nothing to take back.
+                "batch_id": batch_id if written_ids else "",
+                "source_class": source_class,
+            },
+        )
+
+    def list_memory_import_batches(
+        self: DashboardService, acting_principal_id: str | None
+    ) -> ControlResult:
+        """UX-MEM-08 — the recent import receipts, newest first."""
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        batches = self.store.list_memory_import_batches(
+            owner_principal_id=acting_principal_id or ""
+        )
+        return ControlResult(
+            ok=True,
+            data={
+                "batches": [
+                    {
+                        "batch_id": batch["batch_id"],
+                        "file_name": batch["file_name"],
+                        "source_class": batch["source_class"],
+                        "imported": len(batch["memory_ids"]),
+                        "skipped": int(batch["skipped_count"]),
+                        "created_at": batch["created_at"],
+                        "undone_at": batch["undone_at"],
+                    }
+                    for batch in batches
+                ]
+            },
+        )
+
+    #: Lifecycle actions that leave an imported record as the import wrote it.
+    #: Anything else — an edit, a correction, a scope or expiry change, an
+    #: archive — is the owner's own decision about that record since, and undo
+    #: does not overrule it.
+    _UNCHANGED_SINCE_IMPORT = frozenset({"import", "recall", "admin_access", "pin", "unpin"})
+
+    def undo_memory_import(
+        self: DashboardService, batch_id: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        """UX-MEM-08 — take an import back, record by record.
+
+        Each record the batch wrote is forgotten through the same governed
+        forget the Memory page uses, so it leaves the tombstone and lifecycle
+        event any forget leaves. Two kinds are left in place and counted: one
+        the owner has changed since the import (their later decision stands),
+        and one that is already gone. A batch settles as undone once; asking
+        again is refused rather than repeated.
+        """
+        principal_id = acting_principal_id or ""
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        batch = self.store.get_memory_import_batch(batch_id, owner_principal_id=principal_id)
+        if batch is None:
+            return ControlResult(ok=False, reason_code="unknown_import_batch")
+        if batch["undone_at"]:
+            return ControlResult(ok=False, reason_code="import_batch_already_undone")
+        removed: list[str] = []
+        changed: list[str] = []
+        gone: list[str] = []
+        for memory_id in batch["memory_ids"]:
+            entry = get_memory(
+                memory_id,
+                workspace_root=self.workspace_root,
+                include_expired=True,
+                include_archived=True,
+                owner_principal_id=principal_id,
+            )
+            if entry is None:
+                # Forgotten or deleted permanently since: nothing left to take back.
+                gone.append(memory_id)
+                continue
+            history = self.store.list_memory_lifecycle_events(
+                memory_id, owner_principal_id=principal_id
+            )
+            if any(event["action"] not in self._UNCHANGED_SINCE_IMPORT for event in history):
+                changed.append(memory_id)
+                continue
+            if self.forget_memory_controlled(memory_id, acting_principal_id).ok:
+                removed.append(memory_id)
+            else:
+                gone.append(memory_id)
+        details = {"removed": removed, "kept_changed": changed, "already_gone": gone}
+        if not self.store.mark_memory_import_batch_undone(
+            batch_id, owner_principal_id=principal_id, details=details
+        ):
+            return ControlResult(ok=False, reason_code="import_batch_already_undone")
+        return ControlResult(
+            ok=True,
+            data={
+                "batch_id": batch_id,
+                "removed": len(removed),
+                "kept_changed": len(changed),
+                "already_gone": len(gone),
             },
         )
 

@@ -116,6 +116,7 @@ names.
 | [BUG-310](FIXED_ITEMS.md#fixed-654--seven-python-tests-failed-on-windows-and-nowhere-else) | Low | Tests / Windows | **Closed 2026-10-01 ([FIXED-654](FIXED_ITEMS.md#fixed-654--seven-python-tests-failed-on-windows-and-nowhere-else))** — fixtures are written as bytes; a failed instance create releases the staged store's handles and retries its removal, and the registry replace retries through a reader |
 | [BUG-311](FIXED_ITEMS.md#fixed-676--models-called-design-ready-on-a-model-that-returns-no-images) | Low | Models / Design | **Closed 2026-10-02 ([FIXED-676](FIXED_ITEMS.md#fixed-676--models-called-design-ready-on-a-model-that-returns-no-images))** — the overview says *Research only* and offers an image provider, from the same fact setup reads |
 | [BUG-312](#bug-312--one-windows-test-run-ended-in-an-interpreter-crash-dump) | Low | Tests / Windows | Open — one of 28 runs of the instance-lifecycle and internal-path tests printed a crash dump; not reproduced since |
+| [BUG-313](#bug-313--an-instruction-in-the-prompt-stops-recall-finding-the-memory-it-asks-about) | Medium | Memory / recall | Open — a question carrying an instruction ("Answer in one sentence") recalls nothing, because the lexical leg needs every content word in the record |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2173,3 +2174,31 @@ output kept, and fix what the first complete dump names.
 
 **Required user-interface outcome.** None; test harness only unless the dump
 names product code.
+
+## BUG-313 — An instruction in the prompt stops recall finding the memory it asks about
+
+**Severity: Medium. Area: Memory / recall. Status: Open — raised 2026-10-02, found by this run's live round.**
+
+**Observed.** With the approved memory *My favourite tea is Assam with a splash
+of oat milk.*, a real Anthropic turn asked *What is my favourite tea? Answer in
+one sentence.* was given no memory — no **Remembered** strip, and the answer
+said it had no information. *What is my favourite tea?* recalls it.
+
+**Root cause.** `SQLiteStore._match_terms` keeps every non-stopword of three or
+more letters and `_match_expression` joins them as an implicit **AND**, so
+`favourite tea answer one sentence` requires *answer*, *one* and *sentence* in
+the record. BUG-243 dropped function words for the same reason; instruction
+words about the *shape of the answer* are the same failure from a different
+vocabulary. On a default install the vector leg is the lexical hashing
+fallback, which does not rescue it.
+
+**Proposed fix (needs the owner's decision on ranking).** When the full AND
+finds nothing, retry with the longest prefix-free subsets that do match, or run
+an OR query ranked by `bm25()` and admit a row only when it matches a stated
+share of the content terms. Either changes which memories reach a model's
+context, which is why it is not done in passing; the acceptance test is the
+sentence above recalling the tea memory while *the* alone, or an unrelated
+two-word overlap, still recalls nothing.
+
+**Required user-interface outcome.** None new: the **Remembered** strip and the
+memory's *Turns it was given to* (FIXED-691) show it working once fixed.

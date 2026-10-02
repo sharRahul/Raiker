@@ -91,6 +91,13 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-02.** §3.9 Memory is closed: UX-MEM-02 to
+> UX-MEM-06 and UX-MEM-08 as FIXED-687 and FIXED-689 to FIXED-694, with
+> UX-MEM-01 and UX-MEM-07 recorded against the §18.3 closures that had already
+> met them. In §3.1, UX-PERM-02 to UX-PERM-04 are recorded the same way and
+> UX-PERM-05 closed as FIXED-695; UX-PERM-01 is the one Permissions row left.
+> See the status notes at the head of each section.
+>
 > **Implementation status, 2026-10-01.** §3.12 Projects is closed. UX-PROJ-04
 > to UX-PROJ-09 closed as [FIXED-647](FIXED_ITEMS.md#fixed-647--a-projects-shared-files-were-listed-by-attachment-id)
 > to [FIXED-653](FIXED_ITEMS.md#fixed-653--projects-called-the-selected-project-and-the-unarchived-ones-both-active)
@@ -392,6 +399,20 @@ explicitly asks for them.
 
 ## 3.1 Permissions
 
+> **Implementation status, 2026-10-02.** Four of the five rows are closed.
+> UX-PERM-02 to UX-PERM-04 had closed on 2026-09-14 under their §18.3 names —
+> the two questions as
+> [FIXED-513](FIXED_ITEMS.md#fixed-513--the-permissions-page-answered-what-am-i-looking-at-twice-and-led-with-neither),
+> the four mode words and the name before the registry key as
+> [FIXED-512](FIXED_ITEMS.md#fixed-512--one-policy-three-sets-of-words-on-one-screen)
+> — and this table had gone on listing them as open; each was re-verified in
+> source (`permissionLanguage.ts`, `PermissionRow.svelte`, `AuthorityMatrix.svelte`).
+> UX-PERM-05 closed as
+> [FIXED-695](FIXED_ITEMS.md#fixed-695--permissions-answered-sixty-questions-and-not-the-one-an-owner-asks).
+> **UX-PERM-01 remains open:** the posture summary, attention list and Build
+> preset ship, but the five task groups it recommends do not replace the
+> registry's domain grouping.
+
 ### Current strengths
 
 - Capability availability and decision behavior are separate controls, which is
@@ -405,10 +426,10 @@ explicitly asks for them.
 | ID | Priority | Finding | Simplification |
 |---|---:|---|---|
 | UX-PERM-01 | P1 | Sixty-plus capabilities create scan and comprehension load. | Lead with task-based presets and “Recently used / Needs attention”; preserve the full registry under Advanced. |
-| UX-PERM-02 | P1 | Availability and behavior are visually similar, so users can conflate “can exist” with “what happens when requested.” | Phrase them as two questions: “Can Raiker use this?” and “When Raiker wants to use it”. |
-| UX-PERM-03 | P1 | Bulk actions still use “Ask” and “Deny” while other surfaces use “Ask me / Allow / Automatic / Never”. | Adopt the same four terms in buttons, MCP explanations, approvals and documentation. |
-| UX-PERM-04 | P2 | Technical capability names are useful for evidence but weak as the first label. | Show plain-language action, consequence and example first; registry key in Details. |
-| UX-PERM-05 | P2 | The page does not summarize effective posture by user goal. | Add read-only summaries such as “Can edit project files after asking” and “Cannot send messages”. |
+| ~~UX-PERM-02~~ **closed** — [FIXED-513](FIXED_ITEMS.md#fixed-513--the-permissions-page-answered-what-am-i-looking-at-twice-and-led-with-neither) | P1 | Availability and behavior are visually similar, so users can conflate “can exist” with “what happens when requested.” | Phrase them as two questions: “Can Raiker use this?” and “When Raiker wants to use it”. |
+| ~~UX-PERM-03~~ **closed** — [FIXED-512](FIXED_ITEMS.md#fixed-512--one-policy-three-sets-of-words-on-one-screen) | P1 | Bulk actions still use “Ask” and “Deny” while other surfaces use “Ask me / Allow / Automatic / Never”. | Adopt the same four terms in buttons, MCP explanations, approvals and documentation. |
+| ~~UX-PERM-04~~ **closed** — [FIXED-512](FIXED_ITEMS.md#fixed-512--one-policy-three-sets-of-words-on-one-screen) | P2 | Technical capability names are useful for evidence but weak as the first label. | Show plain-language action, consequence and example first; registry key in Details. |
+| ~~UX-PERM-05~~ **closed** — [FIXED-695](FIXED_ITEMS.md#fixed-695--permissions-answered-sixty-questions-and-not-the-one-an-owner-asks) | P2 | The page does not summarize effective posture by user goal. | Add read-only summaries such as “Can edit project files after asking” and “Cannot send messages”. |
 
 ### Recommended interaction
 
@@ -610,6 +631,24 @@ it must not be advertised as a shipped setting.
 
 ## 3.9 Memory, age, management and usage
 
+> **Implementation status, 2026-10-02. Every row in this table is closed.**
+> UX-MEM-01 and UX-MEM-07 had closed under their §18.3 names, REM-MEM-01
+> ([FIXED-561](FIXED_ITEMS.md#fixed-561--seven-equally-prominent-actions-on-every-memory-card))
+> and REM-MEM-03
+> ([FIXED-587](FIXED_ITEMS.md#fixed-587--the-recall-engines-controls-were-on-the-page-for-reading-your-own-memories)),
+> and were re-verified in source. The other six closed as FIXED-687 and
+> FIXED-689 to FIXED-694, driven live against a running host with a real
+> Anthropic key. Closing them found two defects that were not in the table: the
+> **Expired** filter and tile could never show a record, because the listing
+> excluded every expired one
+> ([FIXED-688](FIXED_ITEMS.md#fixed-688--the-expired-filter-and-the-expired-tile-could-never-show-a-record)),
+> and *last included* never counted a turn's own recall
+> ([FIXED-692](FIXED_ITEMS.md#fixed-692--last-included-never-counted-a-turns-own-recall)).
+> The recommended states below include *Conflicted* and *Pending deletion*;
+> the product has neither — a contradiction is settled by a correction that
+> supersedes, and **Delete permanently** has no grace period — so neither is
+> drawn, and the guide says why.
+
 ### Current strengths
 
 - Memory has separate Overview, Memories, Suggestions, Sources and Recall tabs.
@@ -623,14 +662,14 @@ it must not be advertised as a shipped setting.
 
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
-| UX-MEM-01 | P1 | Each memory card can expose seven actions plus advanced deletion. | Keep Edit, Pin and More; move source/scope/expiry/history/archive/delete into a details drawer. |
-| UX-MEM-02 | P1 | Forget, archive, expiry and permanent deletion are close in meaning. | Publish one lifecycle and use the same verbs in UI, API, audit and documentation. |
-| UX-MEM-03 | P1 | Retention and “memory age” are record-level concepts, but users need policy-level understanding. | Add a retention summary: permanent, expires soon, stale for review, archived and pending deletion. |
-| UX-MEM-04 | P1 | Confidence and trust decimals are technical and can imply precision the user cannot evaluate. | Translate into reasoned labels with “Why?”; retain raw scores in Advanced. |
-| UX-MEM-05 | P1 | The product shows what is stored but not enough about actual use. | Add last recalled, recall count, which answer used it, and a direct turn link. |
-| UX-MEM-06 | P1 | Sources, observations, suggestions and approved memory require a mental model. | Explain the pipeline: observed → suggested → approved → recalled → reviewed/expired. |
-| UX-MEM-07 | P2 | Embedding backend controls sit beside personal-memory controls. | Move engine configuration to Advanced or Models; show only health and repair action in Memory. |
-| UX-MEM-08 | P2 | Imports can introduce conflicts, duplicates and foreign provenance. | Require a preview with merge/skip choices, source trust classification and reversible batch receipt. |
+| ~~UX-MEM-01~~ **closed** — [FIXED-561](FIXED_ITEMS.md#fixed-561--seven-equally-prominent-actions-on-every-memory-card) | P1 | Each memory card can expose seven actions plus advanced deletion. | Keep Edit, Pin and More; move source/scope/expiry/history/archive/delete into a details drawer. |
+| ~~UX-MEM-02~~ **closed** — [FIXED-687](FIXED_ITEMS.md#fixed-687--archive-had-a-route-and-no-button-and-four-removal-words-meant-four-close-things) | P1 | Forget, archive, expiry and permanent deletion are close in meaning. | Publish one lifecycle and use the same verbs in UI, API, audit and documentation. |
+| ~~UX-MEM-03~~ **closed** — [FIXED-689](FIXED_ITEMS.md#fixed-689--retention-was-a-date-on-each-card-and-a-policy-nowhere) | P1 | Retention and “memory age” are record-level concepts, but users need policy-level understanding. | Add a retention summary: permanent, expires soon, stale for review, archived and pending deletion. |
+| ~~UX-MEM-04~~ **closed** — [FIXED-690](FIXED_ITEMS.md#fixed-690--confidence-and-trust-were-decimals-that-read-as-probabilities) | P1 | Confidence and trust decimals are technical and can imply precision the user cannot evaluate. | Translate into reasoned labels with “Why?”; retain raw scores in Advanced. |
+| ~~UX-MEM-05~~ **closed** — [FIXED-691](FIXED_ITEMS.md#fixed-691--a-memory-said-when-it-was-last-included-and-never-where) | P1 | The product shows what is stored but not enough about actual use. | Add last recalled, recall count, which answer used it, and a direct turn link. |
+| ~~UX-MEM-06~~ **closed** — [FIXED-693](FIXED_ITEMS.md#fixed-693--nothing-on-the-memory-page-said-how-a-record-got-there) | P1 | Sources, observations, suggestions and approved memory require a mental model. | Explain the pipeline: observed → suggested → approved → recalled → reviewed/expired. |
+| ~~UX-MEM-07~~ **closed** — [FIXED-587](FIXED_ITEMS.md#fixed-587--the-recall-engines-controls-were-on-the-page-for-reading-your-own-memories) | P2 | Embedding backend controls sit beside personal-memory controls. | Move engine configuration to Advanced or Models; show only health and repair action in Memory. |
+| ~~UX-MEM-08~~ **closed** — [FIXED-694](FIXED_ITEMS.md#fixed-694--an-import-was-a-count-not-a-batch-that-could-be-reviewed-or-taken-back) | P2 | Imports can introduce conflicts, duplicates and foreign provenance. | Require a preview with merge/skip choices, source trust classification and reversible batch receipt. |
 
 ### Recommended memory-age model
 

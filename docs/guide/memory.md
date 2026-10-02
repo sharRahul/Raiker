@@ -33,6 +33,13 @@ The stages deliberately have different authority:
 - An **approved relationship** may appear in relationship recall and the
   Knowledge Map. A guessed link remains a proposal until you approve it.
 
+**Memory → Overview** draws the same path as five counts — **Observed**,
+**Suggested**, **Approved**, **Recalled** and **Expired or archived** — each a
+link to where those records live. The counts are different sets, not a funnel:
+a memory you wrote yourself was never observed, and most observations are never
+suggested. *Recalled* counts approved records a turn has been given; being given
+one is not evidence the answer relied on it.
+
 ## Reviewing what Raiker proposes
 
 The **Pending review** section shows the proposed text, scope, sensitivity, and
@@ -191,6 +198,17 @@ product claims.
 
 ## Correcting and controlling an approved memory
 
+A memory card says, in words, where the record came from — **You wrote this**,
+**You corrected this**, **Imported by you**, or, for a record Raiker inferred,
+**Strong**, **Some** or **Weak evidence** with who approved it. **Why?** in the
+record's **More** drawer explains the label. The confidence and trust values
+behind it are Raiker's own estimates, not measured probabilities, so they sit
+under **Advanced** in the same drawer rather than on the card.
+
+The drawer also says how many turns were given the record and offers **Open the
+latest**, which reopens that conversation at that turn — in Build when the
+conversation is Build's. Only turns run by your account are linked.
+
 Each approved memory provides owner controls:
 
 - **View source** opens the evidence attached to the record.
@@ -200,6 +218,8 @@ Each approved memory provides owner controls:
 - **Review expiry** changes its lifecycle timing through the governed control.
 - **Pin / Unpin** marks owner importance; it does not override privacy filters.
 - **View history** shows corrections and lifecycle decisions.
+- **Archive / Restore** takes the record out of recall and keeps it, or brings
+  it back exactly as it was.
 - **Forget** removes the memory from every retrieval path and leaves a tombstone
   so projections can be reconciled safely.
 - **Delete permanently** is the advanced, human-confirmed purge path.
@@ -210,13 +230,20 @@ preserving an auditable history.
 
 ## Archive, forget, and purge
 
-These actions are intentionally different:
+These actions are intentionally different, and the drawer groups them by that
+difference: **Change how long it lives** holds the reversible ones, **Remove
+it** the two that cannot be undone. The same verbs are used on the page, in the
+record's history and here.
 
 | Action | Recall | Stored state | Reversible |
 |---|---|---|---|
-| Archive | Excluded from normal active recall | Record and evidence retained | Yes, by restore |
-| Forget | Excluded from all recall | Tombstone and purge work retained | Not as ordinary active memory |
-| Purge | Unavailable | Primary data and projections removed; disposition recorded | No |
+| Archive | Excluded from recall | Record and evidence retained | Yes — **Restore** |
+| Review expiry | Excluded from recall once the date passes | Record retained, listed as **Expired** | Yes — set a later date or none |
+| Forget | Excluded from all recall | Words erased; tombstone and purge work retained | No |
+| Delete permanently | Unavailable | Primary data and projections removed; disposition recorded | No |
+
+Archived and expired records stay on the **Memories** tab under their own
+filters, so you can restore or extend them. They are listed, never recalled.
 
 Purge is not a plain row deletion. Its preview and exact-target confirmation
 cover the primary record, text index, vectors, graph edges, artifacts, exports,
@@ -225,16 +252,34 @@ own retention/erasure process; Raiker must not claim that copy vanished early.
 
 ## Exporting and importing
 
-**Memory → Advanced memory management** exports every approved memory as JSON and
-takes one back.
+**Memory → Recall & indexing → Advanced memory management** exports every
+recallable memory as JSON and takes one back.
 
 An import is not a second way into the store: each record goes through the same
 governed write path a proposal does, and is recorded as a lifecycle event with
 `source: user_import`. What it will not do is store the same sentence twice.
-Choosing a file asks the workspace what it already holds and says so before
-anything is written — *"1 new of 4 · 3 already stored, and will be skipped"* —
-and the button names what it is about to do. Afterwards the notice reports what
-actually changed, not how many records the file had.
+Choosing a file asks the workspace what it already holds and lists every
+record in the file before anything is written, each with what importing it
+would do:
+
+| Status | Meaning | Imported by default |
+|---|---|---|
+| **New** | Nothing like it is stored | Yes |
+| **Like one you have** | Stored already, differing only in case, spacing or punctuation | Yes — untick it to skip |
+| **Already stored** | The same words at the same scope | No |
+| **Repeated in this file** | The file holds it twice | No — the first copy is used |
+
+The review also says whether the file *looks like* a Raiker export. That is a
+reading of its shape, not a signature: every imported record is marked
+**Imported by you** whatever the file claims, and is only as reliable as the
+file. Untick any record to leave it out; the button names how many will be
+written, and afterwards the notice reports what changed — how many were
+imported, how many were already stored and how many you left out.
+
+Every import that wrote something is listed under **Recent imports** with
+**Undo import**. Undo forgets the records that import wrote, except any you
+have changed since — edited, re-scoped, given a review date or archived — which
+are kept because that later decision is yours. An import is undone once.
 
 Two details worth knowing:
 
@@ -248,6 +293,20 @@ A memory you have forgotten is gone, so re-importing it is how you bring it
 back — it does not count as something the workspace already holds.
 
 ## Retention and observations
+
+**Memory → Overview** summarises approved records by retention, and each row
+opens the records it counts:
+
+| Row | Meaning |
+|---|---|
+| Kept until you change it | Recallable, with no review date |
+| Expires soon | A review date within 14 days |
+| Stale — worth a look | Not recalled or edited in 90 days. Still recalled; age alone never removes anything, and a pinned record ages like any other |
+| Expired | Past its review date and no longer recalled |
+| Archived | Kept and not recalled |
+
+There is no grace period between **Delete permanently** and the deletion, so
+there is no *pending deletion* row: the typed confirmation is the last chance.
 
 Observation retention classes are visible under **Observations**:
 

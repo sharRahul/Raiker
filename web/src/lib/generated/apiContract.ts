@@ -2527,6 +2527,10 @@ export type MemoryControlView = {
   remembered_reason: string | null;
   updated_at: string | null;
   last_used_at: string | null;
+  recall_turn_count: number;
+  last_recalled_session_id: string | null;
+  last_recalled_turn_id: string | null;
+  last_recalled_origin: string | null;
 };
 
 export type MemoryCorrected = {
@@ -2559,6 +2563,22 @@ export type MemoryHistoryEvent = {
   details: Record<string, unknown>;
 };
 
+/** UX-MEM-08 — one import receipt. */
+export type MemoryImportBatch = {
+  batch_id: string;
+  file_name: string;
+  source_class: "raiker_export" | "foreign";
+  imported: number;
+  skipped: number;
+  created_at: string;
+  undone_at: string | null;
+};
+
+export type MemoryImportBatches = {
+  ok: boolean;
+  batches: MemoryImportBatch[];
+};
+
 /** A record that is already stored, or that the file holds twice (``memory_id`` empty). */
 export type MemoryImportDuplicate = {
   index: number;
@@ -2567,13 +2587,25 @@ export type MemoryImportDuplicate = {
   memory_id: string;
 };
 
-/** What an import would change, before it changes anything (BUG-244). */
+/** What an import would change, before it changes anything (BUG-244, UX-MEM-08). */
 export type MemoryImportPreview = {
   ok: boolean;
   total: number;
   new_count: number;
   duplicate_count: number;
   duplicates: MemoryImportDuplicate[];
+  similar_count: number;
+  source_class: "raiker_export" | "foreign";
+  records: MemoryImportRecord[];
+};
+
+/** UX-MEM-08 — one record of the file, and what importing it would do. */
+export type MemoryImportRecord = {
+  index: number;
+  text: string;
+  scope: string;
+  memory_id: string;
+  status: "new" | "duplicate" | "duplicate_in_file" | "similar";
 };
 
 export type MemoryImportResult = {
@@ -2582,7 +2614,19 @@ export type MemoryImportResult = {
   reviewed: number;
   imported: number;
   skipped_duplicates: number;
+  skipped_by_owner: number;
   relationship_proposals: number;
+  batch_id: string;
+  source_class: "raiker_export" | "foreign";
+};
+
+/** What taking an import back did, record by record. */
+export type MemoryImportUndone = {
+  ok: boolean;
+  batch_id: string;
+  removed: number;
+  kept_changed: number;
+  already_gone: number;
 };
 
 /** How far each projection of approved memory has drifted from it; nothing is repaired. */
@@ -4993,7 +5037,7 @@ export const contract = {
     call<McpContainment>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/resume`),
   listMcpSessions: (serverId: string) =>
     request<McpSessionView[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/sessions`),
-  listMemories: (query: { scope?: string } = {}) =>
+  listMemories: (query: { scope?: string; include_inactive?: boolean } = {}) =>
     request<MemoryControlView[]>(withQuery("/api/memory", query)),
   rebuildConversationIndex: () =>
     call<ConversationIndexRebuilt>("POST", "/api/memory/conversation-index/rebuild"),
@@ -5021,6 +5065,10 @@ export const contract = {
     call<GistDiscarded>("POST", `/api/memory/gists/${encodeURIComponent(gistId)}/discard`),
   importMemories: (body: Record<string, unknown>) =>
     call<MemoryImportResult>("POST", "/api/memory/import", { body }),
+  listMemoryImportBatches: () =>
+    request<MemoryImportBatches>("/api/memory/import/batches"),
+  undoMemoryImport: (batchId: string) =>
+    call<MemoryImportUndone>("POST", `/api/memory/import/batches/${encodeURIComponent(batchId)}/undo`),
   previewMemoryImport: (body: Record<string, unknown>) =>
     call<MemoryImportPreview>("POST", "/api/memory/import/preview", { body }),
   setMemoryIncognito: (body: Record<string, unknown>) =>

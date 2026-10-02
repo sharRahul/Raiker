@@ -708,6 +708,15 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-684](#fixed-684--mfas-recovery-codes-were-issued-and-never-shown) | High | Authentication / Settings | Fixed 2026-10-02 |
 | [FIXED-685](#fixed-685--every-composer-called-web-fetch-off-while-permissions-said-it-was-on) | Medium | Composer / Permissions | Fixed 2026-10-02 — found by the live round |
 | [FIXED-686](#fixed-686--designs-research-printed-the-models-markdown-as-text) | Low | Design | Fixed 2026-10-02 — found by the live round |
+| [FIXED-687](#fixed-687--archive-had-a-route-and-no-button-and-four-removal-words-meant-four-close-things) | Medium | Memory | Fixed 2026-10-02 (closes UX-MEM-02) |
+| [FIXED-688](#fixed-688--the-expired-filter-and-the-expired-tile-could-never-show-a-record) | Medium | Memory | Fixed 2026-10-02 — found closing UX-MEM-02 |
+| [FIXED-689](#fixed-689--retention-was-a-date-on-each-card-and-a-policy-nowhere) | Low | Memory | Fixed 2026-10-02 (closes UX-MEM-03) |
+| [FIXED-690](#fixed-690--confidence-and-trust-were-decimals-that-read-as-probabilities) | Low | Memory | Fixed 2026-10-02 (closes UX-MEM-04) |
+| [FIXED-691](#fixed-691--a-memory-said-when-it-was-last-included-and-never-where) | Medium | Memory | Fixed 2026-10-02 (closes UX-MEM-05) |
+| [FIXED-692](#fixed-692--last-included-never-counted-a-turns-own-recall) | Medium | Memory | Fixed 2026-10-02 — found closing UX-MEM-05 |
+| [FIXED-693](#fixed-693--nothing-on-the-memory-page-said-how-a-record-got-there) | Low | Memory | Fixed 2026-10-02 (closes UX-MEM-06) |
+| [FIXED-694](#fixed-694--an-import-was-a-count-not-a-batch-that-could-be-reviewed-or-taken-back) | Medium | Memory | Fixed 2026-10-02 (closes UX-MEM-08) |
+| [FIXED-695](#fixed-695--permissions-answered-sixty-questions-and-not-the-one-an-owner-asks) | Low | Permissions | Fixed 2026-10-02 (closes UX-PERM-05) |
 
 ---
 
@@ -28472,3 +28481,233 @@ answer.
 
 **Evidence.** `DesignView.test.ts` — *renders the findings as prose, not as raw
 markdown*, failing against the previous view; live capture 04 of this round.
+
+---
+
+## FIXED-687 — Archive had a route and no button, and four removal words meant four close things
+
+**Severity: Medium. Area: Memory. Status: Fixed 2026-10-02.
+Closes [UX-MEM-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#39-memory-age-management-and-usage).**
+
+**Observed.** A record could be taken out of recall four ways — **Forget**,
+**Review expiry**, **Delete permanently**, and archiving — and the meanings sat
+close together. The only reversible one, archive, existed as `PUT
+/api/memory/{id}/archive` and as a lifecycle event, and was offered nowhere: an
+owner who wanted Raiker to stop using a fact and keep it had to forget it, which
+erases the words. The drawer's **Forget** note said Raiker "stops using this
+record", which is equally true of archive.
+
+**Fixed.** One statement of the lifecycle, `web/src/lib/memoryLifecycle.ts`
+(`LIFECYCLE_VERBS`), used by the record drawer, the forget confirmation and the
+guide. The drawer groups the reversible verbs — **Edit scope**, **Review
+expiry**, **Archive** / **Restore** — under *Change how long it lives*, and the
+two that cannot be undone under *Remove it*, with *Neither of these can be
+undone. To stop recalling it and keep it, archive it instead.* **Forget** now
+says what it does: erases the words and keeps a tombstone. Archived and expired
+records stay listed under their own filters so they can be restored or
+extended; `GET /api/memory?include_inactive=true` lists them, and nothing that
+builds a turn's context passes that flag, so listing is never recall.
+
+The review's lifecycle has no *Conflicted* or *Pending deletion* state here
+because the product has neither: a contradiction is resolved by a correction
+that supersedes the old record, and **Delete permanently** has no grace period.
+The guide says so rather than drawing an empty row.
+
+**Evidence.** `tests/test_memory_lifecycle_usage_import.py` —
+*TestInactiveRecordsAreListedNotRecalled* (archived and expired records listed
+only when asked, and absent from `search_memory`); `memoryLifecycle.test.ts`;
+`MemoryView.test.ts` — *lists archived records only under their filter, and
+restores one*; live, this run's round: archive from the drawer, the **Archived**
+row opening exactly that record, **Restore** returning it.
+
+The round also found that an archive pressed while the page's first reads were
+still arriving could be shown undone by them, because every reload wrote its
+answers whenever they came back. `MemoryView`'s reload now carries a sequence
+number, and only the newest one writes.
+
+---
+
+## FIXED-688 — The Expired filter and the expired tile could never show a record
+
+**Severity: Medium. Area: Memory. Status: Fixed 2026-10-02 — found closing UX-MEM-02.**
+
+**Observed.** The Memories tab offered **Expired** as a status, and the Overview
+counted *Withheld or expired*. Both read from `GET /api/memory`, whose store
+query has always excluded `expires_at <= now` (and archived rows). So the filter
+always answered *No memories match these filters* and the tile always read 0 —
+a record past its review date simply vanished from the page that offered to
+show it, with no way to extend it.
+
+**Fixed.** The Memory page asks for its listing with `include_inactive`, and its
+filters read one state per record (`memoryState`). Expired records are listed,
+marked **Expired**, and can be given a later date.
+
+**Evidence.** `test_archived_and_expired_records_list_only_when_asked`;
+`memoryLifecycle.test.ts` — *filters the list by the same states*.
+
+---
+
+## FIXED-689 — Retention was a date on each card and a policy nowhere
+
+**Severity: Low. Area: Memory. Status: Fixed 2026-10-02.
+Closes [UX-MEM-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#39-memory-age-management-and-usage).**
+
+**Observed.** Each card said *Review or expiry: No date set* or a relative date.
+Nothing said how many records would lapse soon, how many had gone quiet, or how
+many were no longer recalled — the policy-level reading the review asks for.
+
+**Fixed.** **Memory → Overview** carries a **Retention** summary — *Kept until
+you change it*, *Expires soon* (a review date within 14 days), *Stale — worth a
+look* (not recalled or edited in 90 days), *Expired*, *Archived* — and **Show**
+on each row opens the Memories tab filtered to exactly those records
+(`#/memory?tab=memories&filter=…`; the router now passes `filter` to Memory).
+Age alone never removes anything, and a pinned record ages like any other.
+
+**Evidence.** `memoryLifecycle.test.ts` — *counts each record once, by policy*
+and the staleness cases; `MemoryView.test.ts`; live capture
+`06-overview-pipeline-retention.png` and `07-archived-filter.png`.
+
+---
+
+## FIXED-690 — Confidence and trust were decimals that read as probabilities
+
+**Severity: Low. Area: Memory. Status: Fixed 2026-10-02.
+Closes [UX-MEM-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#39-memory-age-management-and-usage).**
+
+**Observed.** The drawer showed *Confidence 0.75 · Trust 0.75*; proposals and
+relationship proposals showed *97% confidence*. Confidence is the proposing
+step's own estimate and trust a fixed weight set by how the record was written;
+neither is calibrated, and an owner cannot evaluate either.
+
+**Fixed.** `web/src/lib/memoryEvidence.ts` says who put the record there —
+*You wrote this*, *You corrected this*, *Imported by you* — or, for an inferred
+record, *Strong*, *Some* or *Weak evidence* with who approved it. **Why?**
+explains the label and says the values are estimates, not probabilities, without
+inventing a reason the record does not carry. The raw values sit under
+**Advanced** in the drawer. Proposals use the same bands.
+
+**Evidence.** `memoryEvidence.test.ts`; `MemoryView.test.ts` — *reviews
+extracted relationships with visible evidence* (no `97% confidence`) and *says
+where a record came from in words*; live capture
+`05-record-usage-and-evidence.png`.
+
+---
+
+## FIXED-691 — A memory said when it was last included and never where
+
+**Severity: Medium. Area: Memory. Status: Fixed 2026-10-02.
+Closes [UX-MEM-05](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#39-memory-age-management-and-usage).**
+
+**Observed.** The drawer said *Last included in a model's context: 3 days ago*.
+How often, and in which answer, was not said — although the per-turn ledger the
+transcript's **Remembered** strip reads (`turn_recalls`) records exactly that.
+
+**Fixed.** `SQLiteStore.memory_recall_usage` reads the ledger from the memory's
+end, keyed by the principal that ran the turn, so a link never points into
+another account's conversation. Each record carries `recall_turn_count` and the
+latest turn's session, turn and surface; the drawer says *2 turns · Open the
+latest*, which reopens the conversation at that turn on Chat, Build or Design.
+Inclusion, never reliance — the same claim REM-MEM-02 made. Migration
+`RAIKER-2081` indexes the ledger by memory.
+
+**Evidence.** `tests/test_memory_lifecycle_usage_import.py` — *TestRecallUsage*,
+including another account's turns never linked; `MemoryView.test.ts` — the
+Build link; live: a real Anthropic turn recalled an imported memory, its record
+read *1 turn*, and **Open the latest** landed on that turn.
+
+---
+
+## FIXED-692 — “Last included” never counted a turn's own recall
+
+**Severity: Medium. Area: Memory. Status: Fixed 2026-10-02 — found closing UX-MEM-05.**
+
+**Observed.** `last_used_at` was read from `recall` lifecycle events, which only
+retrieval augmentation (`raiker/runtime/retrieval.py`) writes. The ambient
+recall every turn makes through the context bundle writes `turn_recalls`
+instead. So a memory a turn had just been given — shown in that answer's
+**Remembered** strip — read *Last included in a model's context: Never* on the
+Memory page.
+
+**Fixed.** `last_used_at` is the later of the two paths.
+
+**Evidence.** `test_a_record_counts_the_turns_it_was_given_and_names_the_latest`
+asserts `last_used_at` from a turn's recall alone.
+
+---
+
+## FIXED-693 — Nothing on the Memory page said how a record got there
+
+**Severity: Low. Area: Memory. Status: Fixed 2026-10-02.
+Closes [UX-MEM-06](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#39-memory-age-management-and-usage).**
+
+**Observed.** Observations, suggestions and approved memories lived on different
+tabs, and the Overview's four tiles counted approved, pending, pinned and
+expired. The path between them — and that a suggestion is not recalled until it
+is approved — had to be learned from the guide.
+
+**Fixed.** The Overview's tiles are replaced by the pipeline itself:
+**Observed → Suggested → Approved → Recalled → Expired or archived**, each a
+count, a one-line meaning and a link to where those records live. The counts
+are different sets and are not drawn as a funnel. The empty-board rule still
+holds: on a fresh install the strip does not appear.
+
+**Evidence.** `memoryLifecycle.test.ts` — *memoryPipeline*, including *unknown*
+rather than 0 when capture could not be asked; `MemoryView.test.ts`; live
+captures 06 and 10 (390 px, no horizontal overflow).
+
+---
+
+## FIXED-694 — An import was a count, not a batch that could be reviewed or taken back
+
+**Severity: Medium. Area: Memory. Status: Fixed 2026-10-02.
+Closes [UX-MEM-08](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#39-memory-age-management-and-usage).**
+
+**Observed.** BUG-244 had made import say *1 new of 4 · 3 already stored*. It
+did not show which records, could not leave one out, could not see a re-typed
+copy of a stored memory, said nothing about where the file came from, and once
+written an import could only be undone by forgetting its records one by one.
+
+**Fixed.** The preview lists every record with a status — **New**, **Like one
+you have** (stored already, differing only in case, spacing or punctuation),
+**Already stored**, **Repeated in this file** — and says whether the file *looks
+like* a Raiker export, a reading of its shape rather than a signature. The owner
+unticks any record; the indices travel as `exclude_indices` and the server skips
+them, so the receipt counts what the owner decided. Every import that wrote
+something is a batch (`memory_import_batches`, migration `RAIKER-2081`) listed
+under **Recent imports** with **Undo import**, which forgets what that import
+wrote except a record the owner has changed since, and settles once
+(`POST /api/memory/import/batches/{id}/undo`; a second undo is a 409). An
+imported record is now stored with `source: user_import`: the round's capture
+05 showed the card's *Source* line reading *agent* for a record the owner had
+imported.
+
+**Evidence.** `tests/test_memory_lifecycle_usage_import.py` —
+*TestImportPreviewNamesEveryRecord* and *TestImportIsABatchThatCanBeTakenBack*
+(skips honoured, no receipt when nothing was written, undo keeps an edited
+record, a second undo refused, another account cannot read a batch); two new
+contract cases; `MemoryView.test.ts`; live captures 02, 03 and 08.
+
+---
+
+## FIXED-695 — Permissions answered sixty questions and not the one an owner asks
+
+**Severity: Low. Area: Permissions. Status: Fixed 2026-10-02.
+Closes [UX-PERM-05](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#31-permissions).**
+
+**Observed.** The page says, per capability, whether Raiker may use it and what
+happens when it wants to. An owner arrives asking *can Raiker edit my files?
+send an email for me?*, and had to assemble that from two or three rows.
+
+**Fixed.** **What Raiker can do for you**, under the posture sentence: one
+read-only line per goal — edit project files, run commands and code, commit and
+push, read web pages, send messages and email, remember things, run work on a
+schedule — derived by `web/src/lib/permissionGoals.ts` from the same effective
+gates the rows render. A goal reads as open as its most open runnable path, says
+*(1 of 3 ways)* when only some can run, treats off, not ready and **Never** as
+*cannot*, reads an unrecognised mode as unknown rather than as permission, and
+is left out when the runtime reports nothing for it. **Change** opens the row
+that decides it.
+
+**Evidence.** `permissionGoals.test.ts`; `CapabilitiesView.test.ts` — *posture
+by goal*; live captures `09-permissions-goals.png` and
+`11-permissions-390.png`.

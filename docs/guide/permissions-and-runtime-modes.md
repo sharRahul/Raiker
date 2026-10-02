@@ -24,6 +24,16 @@ counts beneath it as the page's status filter — **All**, **Available**,
 something. Availability describes the capability gate; policy, decision mode and
 runtime checks still determine whether an action can execute.
 
+**What Raiker can do for you** follows: the same posture said by goal, one
+read-only line each — *Can edit project files after asking you*, *Can read web
+pages without asking*, *Cannot send messages and email*. Each line is the most
+open way the goal can be reached among the capabilities that answer it, and
+says *(1 of 3 ways)* when only some of them can run; a capability that is off,
+not ready or set to **Never** counts as a way Raiker cannot. A mode the page
+does not recognise makes the line say it is unknown rather than read it as
+permission, and a goal this runtime reports nothing for is left out rather than
+called impossible. **Change** opens the row that decides it.
+
 **Needs your attention** and **Common permissions** come next, when there is
 anything in them, and both are shortcuts into the registry rather than a second
 copy of it. **All permissions** holds everything, grouped, with one toolbar:

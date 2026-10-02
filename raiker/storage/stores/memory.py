@@ -1369,13 +1369,29 @@ class MemoryStore:
         *,
         include_search_disabled: bool = False,
         owner_principal_id: str | None = None,
+        include_inactive: bool = False,
     ) -> list[dict[str, Any]]:
+        """Approved records, newest first.
+
+        ``include_inactive`` adds the archived and the expired ones — records
+        the owner can still restore or extend, and so must be able to *see* on
+        the Memory page. It is for that listing only: nothing that builds a
+        model's context passes it, so an archived or expired record still
+        cannot be recalled. Forgotten, purged and superseded records stay out
+        either way; there is nothing left in them to restore.
+        """
         now = utc_now()
-        query = """SELECT * FROM approved_memory WHERE deleted_at IS NULL AND archived_at IS NULL
-        AND (expires_at IS NULL OR expires_at > ?)
-        AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until > ?)
-        AND superseded_at IS NULL"""
-        params: list[Any] = [now, now, now]
+        if include_inactive:
+            query = """SELECT * FROM approved_memory WHERE deleted_at IS NULL
+            AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until > ?)
+            AND superseded_at IS NULL"""
+            params: list[Any] = [now, now]
+        else:
+            query = """SELECT * FROM approved_memory WHERE deleted_at IS NULL AND archived_at IS NULL
+            AND (expires_at IS NULL OR expires_at > ?)
+            AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until > ?)
+            AND superseded_at IS NULL"""
+            params = [now, now, now]
         if not include_search_disabled:
             query += " AND search_enabled = 1"
         if scope is not None:
@@ -1544,6 +1560,70 @@ class MemoryStore:
         return [{**dict(row), "details": json.loads(row["details_json"] or "{}")} for row in rows]
 
 
+    # UX-MEM-08 — an import is a batch with a receipt. The row names exactly the
+    # records the import wrote, so taking it back cannot reach a record the
+    # owner added any other way.
+
+    def create_memory_import_batch(
+        self: SQLiteStore,
+        *,
+        batch_id: str,
+        owner_principal_id: str,
+        file_name: str,
+        source_class: str,
+        memory_ids: Sequence[str],
+        skipped_count: int,
+    ) -> None:
+        self._execute(
+            """INSERT INTO memory_import_batches
+               (batch_id, owner_principal_id, file_name, source_class, memory_ids_json,
+                skipped_count, created_at, undone_at, undo_details_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL)""",
+            (
+                batch_id,
+                owner_principal_id,
+                file_name[:200],
+                source_class,
+                json.dumps(list(memory_ids)),
+                int(skipped_count),
+                utc_now(),
+            ),
+        )
+
+    def get_memory_import_batch(
+        self: SQLiteStore, batch_id: str, *, owner_principal_id: str
+    ) -> dict[str, Any] | None:
+        """One batch, only for the account that made it."""
+        row = self._row(
+            "SELECT * FROM memory_import_batches WHERE batch_id = ? AND owner_principal_id = ?",
+            (batch_id, owner_principal_id),
+        )
+        if row is None:
+            return None
+        return _import_batch_row(dict(row))
+
+    def list_memory_import_batches(
+        self: SQLiteStore, *, owner_principal_id: str, limit: int = 10
+    ) -> list[dict[str, Any]]:
+        rows = self._rows(
+            """SELECT * FROM memory_import_batches WHERE owner_principal_id = ?
+               ORDER BY created_at DESC, batch_id DESC LIMIT ?""",
+            (owner_principal_id, max(1, min(int(limit), 50))),
+        )
+        return [_import_batch_row(dict(row)) for row in rows]
+
+    def mark_memory_import_batch_undone(
+        self: SQLiteStore, batch_id: str, *, owner_principal_id: str, details: dict[str, Any]
+    ) -> bool:
+        """Settle a batch as undone, once. False when it already was."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE memory_import_batches SET undone_at = ?, undo_details_json = ?
+                   WHERE batch_id = ? AND owner_principal_id = ? AND undone_at IS NULL""",
+                (utc_now(), json.dumps(details), batch_id, owner_principal_id),
+            )
+            return bool(cursor.rowcount)
+
     def insert_semantic_memory_write(self: SQLiteStore, record: SemanticMemoryWriteRecord) -> None:
         self._execute(
             """
@@ -1699,3 +1779,14 @@ class MemoryStore:
         """
         row = self._row("SELECT revision FROM memory_vector_search_state WHERE singleton = 1")
         return int(row["revision"]) if row is not None else 0
+
+
+def _import_batch_row(row: dict[str, Any]) -> dict[str, Any]:
+    """A batch row as callers read it: the id list decoded, nothing else added."""
+    memory_ids = json.loads(row.pop("memory_ids_json") or "[]")
+    undo = row.pop("undo_details_json")
+    return {
+        **row,
+        "memory_ids": [str(memory_id) for memory_id in memory_ids],
+        "undo_details": json.loads(undo) if undo else None,
+    }

@@ -999,6 +999,51 @@ class ConversationStore:
         rows = self._rows(query, tuple(params))
         return [dict(row) for row in rows]
 
+    def memory_recall_usage(
+        self: SQLiteStore, memory_ids: Sequence[str], principal_id: str
+    ) -> dict[str, dict[str, Any]]:
+        """UX-MEM-05 — the same ledger read from the memory's end.
+
+        For each memory: how many turns were given it, when the latest was, and
+        which conversation that turn belongs to, so the record can link to the
+        answer it was put in front of. Inclusion, never reliance: the ledger
+        records what a turn was given, not whether the answer leaned on it.
+
+        Keyed by the principal that ran the turn, so a turn link never points
+        into another account's conversation. No principal, no rows.
+        """
+        ids = [str(memory_id) for memory_id in memory_ids if memory_id]
+        if not principal_id or not ids:
+            return {}
+        usage: dict[str, dict[str, Any]] = {}
+        # Chunked so a long listing cannot exceed SQLite's bound-parameter limit.
+        for start in range(0, len(ids), 400):
+            chunk = ids[start : start + 400]
+            marks = ",".join("?" for _ in chunk)
+            rows = self._rows(
+                f"""SELECT r.memory_id, r.session_id, r.turn_id, r.created_at,
+                           COALESCE(s.origin, 'chat') AS origin
+                      FROM turn_recalls r
+                      LEFT JOIN sessions s ON s.session_id = r.session_id
+                     WHERE r.principal_id = ? AND r.memory_id IN ({marks})
+                     ORDER BY r.created_at DESC, r.ordinal ASC""",  # noqa: S608 - placeholders only
+                (principal_id, *chunk),
+            )
+            for row in rows:
+                memory_id = str(row["memory_id"])
+                entry = usage.get(memory_id)
+                if entry is None:
+                    usage[memory_id] = {
+                        "turn_count": 1,
+                        "last_recalled_at": str(row["created_at"]),
+                        "last_session_id": str(row["session_id"]),
+                        "last_turn_id": str(row["turn_id"]),
+                        "last_session_origin": str(row["origin"]),
+                    }
+                else:
+                    entry["turn_count"] += 1
+        return usage
+
     #
     # `turn_sources` is a link table that was only ever read forwards: "what did
     # this turn use". Read backwards and sideways it is the graph Obsidian's

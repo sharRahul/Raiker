@@ -683,7 +683,11 @@ export const api = {
   // provenance/scope/sensitivity/confidence/retention + pin; forget reuses
   // the governed forget path (human-only); incognito withholds approved
   // project memory from the turn context.
-  memories: (scope?: string) => contract.listMemories({ scope }),
+  // UX-MEM-02/03 — the Memory page lists archived and expired records too, so
+  // it can offer Restore and say what is about to lapse. Recall never reads
+  // this listing; it changes what is shown, not what a turn is given.
+  memories: (scope?: string, includeInactive = false) =>
+    contract.listMemories(includeInactive ? { scope, include_inactive: true } : { scope }),
   memoryProposals: () => contract.listMemoryProposals(),
   memoryRelationshipProposals: () => contract.getMemoryRelationshipProposals(),
   scanMemoryRelationships: () => contract.postMemoryRelationshipProposalsScan(),
@@ -727,10 +731,23 @@ export const api = {
   // BUG-244 — what an import would actually change, before it changes anything.
   previewMemoryImport: (memories: Array<Partial<MemoryControlView> & { text: string }>) =>
     contract.previewMemoryImport({ memories }),
+  // UX-MEM-08 — the owner's per-record skips travel as indices, and the server
+  // honours them, so the receipt counts what the owner decided.
   importMemories: (
     memories: Array<Partial<MemoryControlView> & { text: string }>,
     skipDuplicates = true,
-  ) => contract.importMemories({ memories, skip_duplicates: skipDuplicates }),
+    options: { excludeIndices?: number[]; fileName?: string } = {},
+  ) =>
+    contract.importMemories({
+      memories,
+      skip_duplicates: skipDuplicates,
+      exclude_indices: options.excludeIndices ?? [],
+      file_name: options.fileName ?? "",
+    }),
+  memoryImportBatches: () => contract.listMemoryImportBatches(),
+  undoMemoryImport: (batchId: string) => contract.undoMemoryImport(batchId),
+  setMemoryArchived: (id: string, archived: boolean) =>
+    contract.setMemoryArchived(id, { archived }),
   forgetMemory: (id: string) => contract.forgetMemory(id),
   memorySettings: () => contract.getMemorySettings(),
   setMemoryIncognito: (incognito: boolean) => contract.setMemoryIncognito({ incognito }),

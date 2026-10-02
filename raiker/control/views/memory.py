@@ -45,7 +45,21 @@ class MemoryControlView(View):
     supersedes_memory_id: str | None = None
     remembered_reason: str | None = None
     updated_at: str | None = None
+    #: REM-MEM-02 — the latest moment this record was put into a model's
+    #: context, by either path (a turn's ambient recall or retrieval
+    #: augmentation). Inclusion, never reliance: nothing records whether an
+    #: answer leaned on what it was given.
     last_used_at: str | None = None
+    #: UX-MEM-05 — how many turns were given this record, and the latest of
+    #: them, so the record links to the answer it was put in front of. Read from
+    #: the per-turn recall ledger, owner-scoped; ``None`` when no turn recorded
+    #: it, never a guess.
+    recall_turn_count: int = 0
+    last_recalled_session_id: str | None = None
+    last_recalled_turn_id: str | None = None
+    #: The surface that conversation belongs to (``chat``/``build``/``design``),
+    #: so the link reopens it where its own context is.
+    last_recalled_origin: str | None = None
 
 
 @dataclass(frozen=True)

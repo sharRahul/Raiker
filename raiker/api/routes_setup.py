@@ -6,8 +6,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from raiker.api.dependencies import authenticate as _auth
-from raiker.api.schemas import SetupBackupRequest, SetupUpdateRequest
+from raiker.api.schemas import SetupBackupRequest, SetupUpdateRequest, serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.models import SetupBackupCreated
 from raiker.app.backup import create_local_backup
 from raiker.contracts.ids import utc_now
 from raiker.models.setup import SetupState
@@ -22,7 +23,9 @@ def get_setup(
     request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
 ) -> dict[str, Any]:
     session, _ = auth_data
-    return SQLiteStore(request.app.state.workspace_root).load_setup_state(session.principal_id).to_dict()  # type: ignore[attr-defined]
+    return serialize_dto(
+        SQLiteStore(request.app.state.workspace_root).load_setup_state(session.principal_id)  # type: ignore[attr-defined]
+    )
 
 
 @router.put("/api/setup")
@@ -37,7 +40,7 @@ def update_setup(
     privacy_ack = current.privacy_acknowledged_at
     if body.stage in {"backup", "finish"} and body.privacy_mode and not privacy_ack:
         privacy_ack = utc_now()
-    return store.save_setup_state(
+    return serialize_dto(store.save_setup_state(
         SetupState(
             owner_principal_id=session.principal_id,
             status=body.status,
@@ -53,7 +56,7 @@ def update_setup(
             background_service_enabled=body.background_service_enabled,
             created_at=current.created_at,
         )
-    ).to_dict()
+    ))
 
 
 @router.post("/api/setup/backup/create")
@@ -85,4 +88,5 @@ def create_setup_backup(
             )
         )
     )
-    return {"ok": True, "path": str(result.path), "setup": saved.to_dict()}
+    answer: SetupBackupCreated = {"ok": True, "path": str(result.path), "setup": saved}
+    return serialize_dto(answer)

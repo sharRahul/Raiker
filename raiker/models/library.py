@@ -6,10 +6,11 @@ import os
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from raiker.contracts.ids import utc_now
 from raiker.models.gguf import read_gguf_metadata
+from raiker.models.wire import LocalModelView
 
 _SHARD = re.compile(r"^(?P<base>.+)-(?P<part>\d{5})-of-(?P<total>\d{5})\.gguf$", re.IGNORECASE)
 
@@ -33,8 +34,8 @@ class LocalModel:
     def format(self) -> str:
         return "gguf" if Path(self.primary_path).suffix.lower() == ".gguf" else "mlx"
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self) | {"format": self.format}
+    def to_dict(self) -> LocalModelView:
+        return cast(LocalModelView, asdict(self) | {"format": self.format})
 
 
 class ModelLibraryService:

@@ -102,7 +102,9 @@
   let capacityRefreshAttempted = false;
   let catalogueRefreshing = $state(false);
   let catalogueNotice = $state<string | null>(null);
-  let codexSubscriptionStatus = $state<CodexSubscriptionStatus["connection_status"]>("signed_out");
+  let codexSubscriptionStatus = $state<
+    CodexSubscriptionStatus["connection_status"] | "login_pending"
+  >("signed_out");
   let codexSubscriptionPlan = $state<string | null>(null);
   let codexSubscriptionBusy = $state(false);
   let codexSubscriptionNotice = $state<string | null>(null);

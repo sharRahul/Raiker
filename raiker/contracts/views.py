@@ -18,7 +18,7 @@ from collections.abc import Mapping
 from dataclasses import fields, is_dataclass
 from typing import Any
 
-__all__ = ["View", "view_to_dict"]
+__all__ = ["View", "json_ready", "view_to_dict"]
 
 
 def _value(value: Any) -> Any:
@@ -34,6 +34,11 @@ def _value(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [_value(item) for item in value]
     return value
+
+
+def json_ready(value: Any) -> Any:
+    """``value`` with every nested view projected, as a view's own fields are."""
+    return _value(value)
 
 
 def view_to_dict(view: Any) -> dict[str, Any]:

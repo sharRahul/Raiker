@@ -30,6 +30,31 @@
         "title": "ActivateRuntimeModeRequest",
         "type": "object"
       },
+      "AdvisorSet": {
+        "properties": {
+          "advisor_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Advisor Profile Id"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "advisor_profile_id"
+        ],
+        "title": "AdvisorSet",
+        "type": "object"
+      },
       "AgentPlan": {
         "description": "The agent's standing plan for one conversation (B6); only ``steps`` when there is none.",
         "properties": {
@@ -629,6 +654,32 @@
           "models"
         ],
         "title": "AvailableModelsRequest",
+        "type": "object"
+      },
+      "AvailableModelsSet": {
+        "properties": {
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "profile_id",
+          "models"
+        ],
+        "title": "AvailableModelsSet",
         "type": "object"
       },
       "BackgroundWorkerHealth": {
@@ -1500,6 +1551,215 @@
         "title": "CapabilityGateView",
         "type": "object"
       },
+      "CapacitiesRefreshed": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/CapacityRefreshOutcome"
+            },
+            "title": "Profiles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "profiles"
+        ],
+        "title": "CapacitiesRefreshed",
+        "type": "object"
+      },
+      "CapacityHistoryEntry": {
+        "description": "One recorded change to a model's context capacity.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "capacity_id": {
+            "title": "Capacity Id",
+            "type": "string"
+          },
+          "context_window_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window Tokens"
+          },
+          "endpoint_identity": {
+            "title": "Endpoint Identity",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "recorded_at": {
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "recorded_by": {
+            "title": "Recorded By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capacity_id",
+          "endpoint_identity",
+          "context_window_tokens",
+          "action",
+          "reason",
+          "recorded_by",
+          "recorded_at"
+        ],
+        "title": "CapacityHistoryEntry",
+        "type": "object"
+      },
+      "CapacityRefreshOutcome": {
+        "properties": {
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "status",
+          "reason_code"
+        ],
+        "title": "CapacityRefreshOutcome",
+        "type": "object"
+      },
+      "CapacityRefreshState": {
+        "description": "When one local profile's capacity was last read from its runtime.",
+        "properties": {
+          "last_refresh_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Refresh At"
+          },
+          "next_refresh_at": {
+            "title": "Next Refresh At",
+            "type": "string"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "last_refresh_at",
+          "next_refresh_at",
+          "status",
+          "reason_code"
+        ],
+        "title": "CapacityRefreshState",
+        "type": "object"
+      },
+      "CapacitySet": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens"
+          }
+        },
+        "required": [
+          "ok",
+          "profile_id",
+          "model",
+          "tokens"
+        ],
+        "title": "CapacitySet",
+        "type": "object"
+      },
+      "CatalogueRefreshed": {
+        "description": "One explicit refresh of the connected providers' model lists, provider by provider.",
+        "properties": {
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderCatalogueRefreshView"
+            },
+            "title": "Providers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "providers"
+        ],
+        "title": "CatalogueRefreshed",
+        "type": "object"
+      },
       "ChangePasswordRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1932,6 +2192,93 @@
         "title": "CodeReposView",
         "type": "object"
       },
+      "CodexConnected": {
+        "properties": {
+          "connection_configured": {
+            "title": "Connection Configured",
+            "type": "boolean"
+          },
+          "connection_status": {
+            "const": "connected",
+            "title": "Connection Status",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "plan_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Type"
+          }
+        },
+        "required": [
+          "ok",
+          "connection_status",
+          "plan_type",
+          "connection_configured"
+        ],
+        "title": "CodexConnected",
+        "type": "object"
+      },
+      "CodexLoginStarted": {
+        "properties": {
+          "connection_status": {
+            "const": "login_pending",
+            "title": "Connection Status",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "connection_status"
+        ],
+        "title": "CodexLoginStarted",
+        "type": "object"
+      },
+      "CodexStatus": {
+        "description": "Whether the ChatGPT subscription is connected, offered, signed out or not installed.",
+        "properties": {
+          "connection_status": {
+            "enum": [
+              "connected",
+              "available",
+              "signed_out",
+              "codex_missing"
+            ],
+            "title": "Connection Status",
+            "type": "string"
+          },
+          "plan_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Type"
+          }
+        },
+        "required": [
+          "connection_status",
+          "plan_type"
+        ],
+        "title": "CodexStatus",
+        "type": "object"
+      },
       "CommandGrant": {
         "description": "Owner-defined, expiry-bound command prefixes for one conversation.",
         "properties": {
@@ -2074,6 +2421,24 @@
           "kind"
         ],
         "title": "ConnectCodeRepoRequest",
+        "type": "object"
+      },
+      "ConnectionSet": {
+        "properties": {
+          "connection_configured": {
+            "title": "Connection Configured",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "connection_configured"
+        ],
+        "title": "ConnectionSet",
         "type": "object"
       },
       "ConnectionsView": {
@@ -2832,6 +3197,126 @@
         "title": "ConversationIndexRebuilt",
         "type": "object"
       },
+      "ConversionIsolation": {
+        "properties": {
+          "credential_environment": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Credential Environment",
+            "type": "array"
+          },
+          "max_cpu_count": {
+            "default": 4,
+            "title": "Max Cpu Count",
+            "type": "integer"
+          },
+          "max_memory_bytes": {
+            "default": 17179869184,
+            "title": "Max Memory Bytes",
+            "type": "integer"
+          },
+          "max_processes": {
+            "default": 256,
+            "title": "Max Processes",
+            "type": "integer"
+          },
+          "network": {
+            "const": false,
+            "default": false,
+            "title": "Network",
+            "type": "boolean"
+          },
+          "source_read_only": {
+            "const": true,
+            "default": true,
+            "title": "Source Read Only",
+            "type": "boolean"
+          },
+          "timeout_seconds": {
+            "default": 21600,
+            "title": "Timeout Seconds",
+            "type": "integer"
+          },
+          "workspace_mounted": {
+            "const": false,
+            "default": false,
+            "title": "Workspace Mounted",
+            "type": "boolean"
+          }
+        },
+        "title": "ConversionIsolation",
+        "type": "object"
+      },
+      "ConversionPreview": {
+        "properties": {
+          "architecture": {
+            "title": "Architecture",
+            "type": "string"
+          },
+          "convert_argv": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Convert Argv",
+            "type": "array"
+          },
+          "isolation": {
+            "$ref": "#/components/schemas/ConversionIsolation"
+          },
+          "output": {
+            "title": "Output",
+            "type": "string"
+          },
+          "quantization": {
+            "title": "Quantization",
+            "type": "string"
+          },
+          "quantize_argv": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Quantize Argv",
+            "type": "array"
+          },
+          "required_free_bytes": {
+            "title": "Required Free Bytes",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_bytes": {
+            "title": "Source Bytes",
+            "type": "integer"
+          },
+          "toolchain_image": {
+            "title": "Toolchain Image",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "output",
+          "revision",
+          "architecture",
+          "quantization",
+          "source_bytes",
+          "required_free_bytes",
+          "toolchain_image",
+          "convert_argv",
+          "quantize_argv",
+          "isolation"
+        ],
+        "title": "ConversionPreview",
+        "type": "object"
+      },
       "CreateMcpServerRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3080,6 +3565,54 @@
         "title": "CredentialRequest",
         "type": "object"
       },
+      "DecisionProblem": {
+        "properties": {
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "remediation": {
+            "title": "Remediation",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason_code",
+          "summary",
+          "remediation"
+        ],
+        "title": "DecisionProblem",
+        "type": "object"
+      },
+      "DecisionScope": {
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "surface": {
+            "title": "Surface",
+            "type": "string"
+          }
+        },
+        "required": [
+          "surface",
+          "project_id"
+        ],
+        "title": "DecisionScope",
+        "type": "object"
+      },
       "DeviceSessionView": {
         "description": "One sign-in of this account, without its token.",
         "properties": {
@@ -3278,6 +3811,35 @@
           }
         },
         "title": "DisableRuntimeModeRequest",
+        "type": "object"
+      },
+      "EffectiveChoice": {
+        "description": "The pair that will run, and why it is that one rather than the selection.",
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "selected",
+              "fallback",
+              "no_ready_candidate"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "model",
+          "reason"
+        ],
+        "title": "EffectiveChoice",
         "type": "object"
       },
       "ElevateRequest": {
@@ -3832,6 +4394,27 @@
         "title": "ExtensionsOverviewView",
         "type": "object"
       },
+      "FallbackSet": {
+        "properties": {
+          "fallback_sequence": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fallback Sequence",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "fallback_sequence"
+        ],
+        "title": "FallbackSet",
+        "type": "object"
+      },
       "FileProvenanceEntryView": {
         "description": "One governed write that touched a file, as recorded by checkpoint capture.\n\nContent addresses and sizes only — the pre-image bytes are never returned.\n``turn_id`` and ``action_id`` let the interface link back to the turn and the\napproval that produced the change.",
         "properties": {
@@ -4024,6 +4607,154 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HfDownloadPreview": {
+        "properties": {
+          "cached_bytes": {
+            "title": "Cached Bytes",
+            "type": "integer"
+          },
+          "download_bytes": {
+            "title": "Download Bytes",
+            "type": "integer"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "repo_id": {
+            "title": "Repo Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
+          "total_bytes": {
+            "title": "Total Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "repo_id",
+          "revision",
+          "files",
+          "total_bytes",
+          "cached_bytes",
+          "download_bytes"
+        ],
+        "title": "HfDownloadPreview",
+        "type": "object"
+      },
+      "HfSearchResult": {
+        "properties": {
+          "downloads": {
+            "title": "Downloads",
+            "type": "integer"
+          },
+          "gated": {
+            "title": "Gated",
+            "type": "boolean"
+          },
+          "likes": {
+            "title": "Likes",
+            "type": "integer"
+          },
+          "repo_id": {
+            "title": "Repo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_id",
+          "downloads",
+          "likes",
+          "gated"
+        ],
+        "title": "HfSearchResult",
+        "type": "object"
+      },
+      "HfVariant": {
+        "properties": {
+          "cached_bytes": {
+            "title": "Cached Bytes",
+            "type": "integer"
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "format": {
+            "enum": [
+              "gguf",
+              "safetensors"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "gated": {
+            "title": "Gated",
+            "type": "boolean"
+          },
+          "license_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Id"
+          },
+          "quantization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantization"
+          },
+          "repo_id": {
+            "title": "Repo Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
+          "total_bytes": {
+            "title": "Total Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "repo_id",
+          "revision",
+          "files",
+          "format",
+          "quantization",
+          "total_bytes",
+          "cached_bytes",
+          "gated",
+          "license_id",
+          "complete"
+        ],
+        "title": "HfVariant",
+        "type": "object"
+      },
       "HuggingFaceCredentialRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4036,6 +4767,196 @@
           "token"
         ],
         "title": "HuggingFaceCredentialRequest",
+        "type": "object"
+      },
+      "HuggingFaceCredentialSaved": {
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configured"
+        ],
+        "title": "HuggingFaceCredentialSaved",
+        "type": "object"
+      },
+      "HuggingFaceDownloadResult": {
+        "description": "The queued download, and where its snapshot and any conversion will land.",
+        "properties": {
+          "conversion_output_path": {
+            "title": "Conversion Output Path",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Detail"
+          },
+          "kind": {
+            "enum": [
+              "install",
+              "download",
+              "convert",
+              "deploy",
+              "pull"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "owner_principal_id": {
+            "title": "Owner Principal Id",
+            "type": "string"
+          },
+          "partial_files_present": {
+            "title": "Partial Files Present",
+            "type": "boolean"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "progress_bytes": {
+            "title": "Progress Bytes",
+            "type": "integer"
+          },
+          "progress_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Percent"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          },
+          "snapshot_path": {
+            "title": "Snapshot Path",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "cancel_requested",
+              "cancelled",
+              "failed",
+              "complete"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Bytes"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation_id",
+          "owner_principal_id",
+          "kind",
+          "target",
+          "state",
+          "phase",
+          "progress_bytes",
+          "total_bytes",
+          "progress_percent",
+          "source_url",
+          "destination",
+          "error_code",
+          "error_detail",
+          "created_at",
+          "updated_at",
+          "retryable",
+          "partial_files_present",
+          "snapshot_path",
+          "conversion_output_path"
+        ],
+        "title": "HuggingFaceDownloadResult",
+        "type": "object"
+      },
+      "HuggingFaceSearch": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HfSearchResult"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "HuggingFaceSearch",
         "type": "object"
       },
       "HuggingFaceSelectionRequest": {
@@ -4079,6 +5000,67 @@
           "files"
         ],
         "title": "HuggingFaceSelectionRequest",
+        "type": "object"
+      },
+      "HuggingFaceTrending": {
+        "description": "The most-downloaded repositories; an unreachable Hub is an answer here (BUG-296).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HfSearchResult"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "unreachable": {
+            "$ref": "#/components/schemas/HuggingFaceUnreachable"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "HuggingFaceTrending",
+        "type": "object"
+      },
+      "HuggingFaceUnreachable": {
+        "properties": {
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "repository_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Url"
+          }
+        },
+        "required": [
+          "reason_code",
+          "repository_url"
+        ],
+        "title": "HuggingFaceUnreachable",
+        "type": "object"
+      },
+      "HuggingFaceVariants": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HfVariant"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "HuggingFaceVariants",
         "type": "object"
       },
       "IdentityView": {
@@ -4167,6 +5149,231 @@
           "display_name"
         ],
         "title": "IdentityView",
+        "type": "object"
+      },
+      "ImageGallery": {
+        "properties": {
+          "generations": {
+            "items": {
+              "$ref": "#/components/schemas/ImageGeneration"
+            },
+            "title": "Generations",
+            "type": "array"
+          },
+          "sized_providers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sized Providers",
+            "type": "array"
+          },
+          "sizes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sizes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sizes",
+          "sized_providers",
+          "generations"
+        ],
+        "title": "ImageGallery",
+        "type": "object"
+      },
+      "ImageGeneration": {
+        "description": "One generation as the page sees it — metadata only, never the bytes.",
+        "properties": {
+          "byte_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Byte Size"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "generation_id": {
+            "title": "Generation Id",
+            "type": "string"
+          },
+          "has_image": {
+            "title": "Has Image",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "create",
+              "edit",
+              "variation"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Type"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "size": {
+            "title": "Size",
+            "type": "string"
+          },
+          "source_generation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Generation Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "generation_id",
+          "profile_id",
+          "provider",
+          "model",
+          "prompt",
+          "size",
+          "status",
+          "reason_code",
+          "has_image",
+          "media_type",
+          "byte_size",
+          "created_at",
+          "source_generation_id",
+          "kind",
+          "project_id"
+        ],
+        "title": "ImageGeneration",
+        "type": "object"
+      },
+      "ImagesGenerated": {
+        "description": "One governed generation request; ``generation_ids`` holds every variation made.",
+        "properties": {
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "generation_id": {
+            "title": "Generation Id",
+            "type": "string"
+          },
+          "generation_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Generation Ids",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "create",
+              "edit",
+              "variation"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "string"
+          },
+          "source_generation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Generation Id"
+          }
+        },
+        "required": [
+          "ok",
+          "generation_id",
+          "generation_ids",
+          "provider",
+          "model",
+          "size",
+          "kind",
+          "source_generation_id",
+          "byte_size"
+        ],
+        "title": "ImagesGenerated",
         "type": "object"
       },
       "ImportRefused": {
@@ -4324,6 +5531,52 @@
           "incognito"
         ],
         "title": "IncognitoSet",
+        "type": "object"
+      },
+      "InstallPlan": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "argv": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Argv",
+            "type": "array"
+          },
+          "redistribution": {
+            "default": false,
+            "title": "Redistribution",
+            "type": "boolean"
+          },
+          "requires_elevation": {
+            "title": "Requires Elevation",
+            "type": "boolean"
+          },
+          "runtime": {
+            "title": "Runtime",
+            "type": "string"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          },
+          "terms_url": {
+            "title": "Terms Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "runtime",
+          "action",
+          "source_url",
+          "argv",
+          "requires_elevation",
+          "terms_url"
+        ],
+        "title": "InstallPlan",
         "type": "object"
       },
       "InstanceCreateRequest": {
@@ -4568,6 +5821,36 @@
         "title": "KnowledgeSources",
         "type": "object"
       },
+      "LanguageCheck": {
+        "description": "A grammar check, or the reason no checker could answer.",
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/LanguageMatch"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "available",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "matches"
+        ],
+        "title": "LanguageCheck",
+        "type": "object"
+      },
       "LanguageCheckRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4589,6 +5872,142 @@
         "title": "LanguageCheckRequest",
         "type": "object"
       },
+      "LanguageMatch": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "length": {
+            "title": "Length",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "replacements": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Replacements",
+            "type": "array"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "offset",
+          "length",
+          "message",
+          "replacements",
+          "rule_id",
+          "category"
+        ],
+        "title": "LanguageMatch",
+        "type": "object"
+      },
+      "LibraryRescanned": {
+        "properties": {
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/LocalModelView"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "models"
+        ],
+        "title": "LibraryRescanned",
+        "type": "object"
+      },
+      "LibraryRoot": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "LibraryRoot",
+        "type": "object"
+      },
+      "LibraryRootAdded": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "path"
+        ],
+        "title": "LibraryRootAdded",
+        "type": "object"
+      },
+      "LimitWindow": {
+        "description": "One limit the provider stated, exactly as stated.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "resets_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resets At"
+          },
+          "used_percent": {
+            "title": "Used Percent",
+            "type": "number"
+          },
+          "window_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Minutes"
+          }
+        },
+        "required": [
+          "label",
+          "used_percent",
+          "window_minutes",
+          "resets_at"
+        ],
+        "title": "LimitWindow",
+        "type": "object"
+      },
       "LocalModelDeployRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4605,6 +6024,143 @@
           }
         },
         "title": "LocalModelDeployRequest",
+        "type": "object"
+      },
+      "LocalModelView": {
+        "description": "One model file set found under an approved library root.",
+        "properties": {
+          "architecture": {
+            "title": "Architecture",
+            "type": "string"
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "expected_shards": {
+            "title": "Expected Shards",
+            "type": "integer"
+          },
+          "format": {
+            "enum": [
+              "gguf",
+              "mlx"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "indexed_at": {
+            "title": "Indexed At",
+            "type": "string"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "owner_principal_id": {
+            "title": "Owner Principal Id",
+            "type": "string"
+          },
+          "primary_path": {
+            "title": "Primary Path",
+            "type": "string"
+          },
+          "quantization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantization"
+          },
+          "root_path": {
+            "title": "Root Path",
+            "type": "string"
+          },
+          "shard_count": {
+            "title": "Shard Count",
+            "type": "integer"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "owner_principal_id",
+          "root_path",
+          "model_id",
+          "name",
+          "architecture",
+          "quantization",
+          "primary_path",
+          "shard_count",
+          "expected_shards",
+          "complete",
+          "size_bytes",
+          "indexed_at",
+          "format"
+        ],
+        "title": "LocalModelView",
+        "type": "object"
+      },
+      "LocalRuntime": {
+        "description": "A local model runtime found (or not) on this machine by a PATH lookup.",
+        "properties": {
+          "detected_at": {
+            "title": "Detected At",
+            "type": "string"
+          },
+          "executable": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executable"
+          },
+          "present": {
+            "title": "Present",
+            "type": "boolean"
+          },
+          "runtime": {
+            "title": "Runtime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "runtime",
+          "present",
+          "executable",
+          "detected_at"
+        ],
+        "title": "LocalRuntime",
+        "type": "object"
+      },
+      "LocalRuntimes": {
+        "properties": {
+          "runtimes": {
+            "items": {
+              "$ref": "#/components/schemas/LocalRuntime"
+            },
+            "title": "Runtimes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "runtimes"
+        ],
+        "title": "LocalRuntimes",
         "type": "object"
       },
       "LoginRequest": {
@@ -6328,6 +7884,110 @@
         "title": "MfaVerifyRequest",
         "type": "object"
       },
+      "ModelCapacities": {
+        "properties": {
+          "cadence_hours": {
+            "title": "Cadence Hours",
+            "type": "integer"
+          },
+          "can_override": {
+            "title": "Can Override",
+            "type": "boolean"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ModelCapacityEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "refresh_due": {
+            "title": "Refresh Due",
+            "type": "boolean"
+          },
+          "sync": {
+            "items": {
+              "$ref": "#/components/schemas/CapacityRefreshState"
+            },
+            "title": "Sync",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "entries",
+          "sync",
+          "refresh_due",
+          "cadence_hours",
+          "can_override"
+        ],
+        "title": "ModelCapacities",
+        "type": "object"
+      },
+      "ModelCapacityEntry": {
+        "properties": {
+          "context_window_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window Tokens"
+          },
+          "endpoint_identity": {
+            "title": "Endpoint Identity",
+            "type": "string"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/CapacityHistoryEntry"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": [
+          "profile_id",
+          "provider",
+          "model",
+          "endpoint_identity",
+          "context_window_tokens",
+          "source",
+          "history"
+        ],
+        "title": "ModelCapacityEntry",
+        "type": "object"
+      },
       "ModelCatalogueRefreshRequest": {
         "additionalProperties": false,
         "description": "An owner-requested refresh of known, connected provider catalogues.",
@@ -6442,6 +8102,76 @@
         "title": "ModelConversionRequestBody",
         "type": "object"
       },
+      "ModelDecisionView": {
+        "description": "Which model is selected for a surface, and which one will actually run.",
+        "properties": {
+          "effective": {
+            "$ref": "#/components/schemas/EffectiveChoice"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionProblem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
+          "running": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Running"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/DecisionScope"
+          },
+          "selected": {
+            "$ref": "#/components/schemas/SelectedChoice"
+          }
+        },
+        "required": [
+          "scope",
+          "selected",
+          "effective",
+          "ready",
+          "running",
+          "problem",
+          "revision"
+        ],
+        "title": "ModelDecisionView",
+        "type": "object"
+      },
+      "ModelDecisions": {
+        "properties": {
+          "surfaces": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModelDecisionView"
+            },
+            "title": "Surfaces",
+            "type": "object"
+          }
+        },
+        "required": [
+          "surfaces"
+        ],
+        "title": "ModelDecisions",
+        "type": "object"
+      },
       "ModelLibraryRootRequest": {
         "additionalProperties": false,
         "properties": {
@@ -6454,6 +8184,30 @@
           "path"
         ],
         "title": "ModelLibraryRootRequest",
+        "type": "object"
+      },
+      "ModelLibraryView": {
+        "properties": {
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/LocalModelView"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "roots": {
+            "items": {
+              "$ref": "#/components/schemas/LibraryRoot"
+            },
+            "title": "Roots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "roots",
+          "models"
+        ],
+        "title": "ModelLibraryView",
         "type": "object"
       },
       "ModelOperationRequestBody": {
@@ -6507,6 +8261,173 @@
           "target"
         ],
         "title": "ModelOperationRequestBody",
+        "type": "object"
+      },
+      "ModelOperationView": {
+        "description": "One install, download, conversion, deployment or pull — redacted, with what it allows.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Detail"
+          },
+          "kind": {
+            "enum": [
+              "install",
+              "download",
+              "convert",
+              "deploy",
+              "pull"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "owner_principal_id": {
+            "title": "Owner Principal Id",
+            "type": "string"
+          },
+          "partial_files_present": {
+            "title": "Partial Files Present",
+            "type": "boolean"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "progress_bytes": {
+            "title": "Progress Bytes",
+            "type": "integer"
+          },
+          "progress_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Percent"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "cancel_requested",
+              "cancelled",
+              "failed",
+              "complete"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Bytes"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation_id",
+          "owner_principal_id",
+          "kind",
+          "target",
+          "state",
+          "phase",
+          "progress_bytes",
+          "total_bytes",
+          "progress_percent",
+          "source_url",
+          "destination",
+          "error_code",
+          "error_detail",
+          "created_at",
+          "updated_at",
+          "retryable",
+          "partial_files_present"
+        ],
+        "title": "ModelOperationView",
+        "type": "object"
+      },
+      "ModelOperations": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelOperationView"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ModelOperations",
         "type": "object"
       },
       "ModelPriceRequest": {
@@ -6601,6 +8522,253 @@
         "title": "ModelPriceRequest",
         "type": "object"
       },
+      "ModelPricingEntryView": {
+        "description": "One exact model's pricing row for the Models → Pricing surface (BUG-21).",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "cache_read_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Per Mtok"
+          },
+          "cache_write_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Per Mtok"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "has_owner_override": {
+            "title": "Has Owner Override",
+            "type": "boolean"
+          },
+          "history": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PricingHistoryEntry"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "input_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Per Mtok"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "output_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Per Mtok"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "recorded_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded At"
+          },
+          "recorded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded By"
+          },
+          "review_due_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Due At"
+          },
+          "review_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "current",
+                  "overdue",
+                  "invalid"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Status"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": [
+          "provider",
+          "model",
+          "profile_id",
+          "source",
+          "currency",
+          "input_per_mtok",
+          "output_per_mtok",
+          "cache_write_per_mtok",
+          "cache_read_per_mtok",
+          "effective_from",
+          "as_of",
+          "reviewed_at",
+          "review_due_at",
+          "review_status",
+          "recorded_at",
+          "recorded_by",
+          "reason",
+          "has_owner_override"
+        ],
+        "title": "ModelPricingEntryView",
+        "type": "object"
+      },
+      "ModelPricingView": {
+        "description": "Everything Models → Pricing has to state, in one governed read.",
+        "properties": {
+          "can_override": {
+            "title": "Can Override",
+            "type": "boolean"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ModelPricingEntryView"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "sync": {
+            "items": {
+              "$ref": "#/components/schemas/PricingSyncState"
+            },
+            "title": "Sync",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries",
+          "sync",
+          "can_override"
+        ],
+        "title": "ModelPricingView",
+        "type": "object"
+      },
       "ModelProfileSource": {
         "description": "Where the built-in model registry was read from: ``packaged`` or ``override``.",
         "properties": {
@@ -6620,6 +8788,320 @@
         "title": "ModelProfileSource",
         "type": "object"
       },
+      "ModelProfileView": {
+        "properties": {
+          "billable": {
+            "default": false,
+            "title": "Billable",
+            "type": "boolean"
+          },
+          "configured": {
+            "default": false,
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "connection_configured": {
+            "default": false,
+            "title": "Connection Configured",
+            "type": "boolean"
+          },
+          "context_window_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Context Window Source"
+          },
+          "context_window_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Context Window Tokens"
+          },
+          "cost_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cost Currency"
+          },
+          "default_state": {
+            "title": "Default State",
+            "type": "string"
+          },
+          "endpoint_kind": {
+            "title": "Endpoint Kind",
+            "type": "string"
+          },
+          "image_models": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Image Models",
+            "type": "array"
+          },
+          "local_only": {
+            "title": "Local Only",
+            "type": "boolean"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "models_used": {
+            "default": 0,
+            "title": "Models Used",
+            "type": "integer"
+          },
+          "off_machine": {
+            "title": "Off Machine",
+            "type": "boolean"
+          },
+          "price_as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Price As Of"
+          },
+          "price_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Price Source"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "prompt_cache_ttl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Prompt Cache Ttl"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_detected": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider Detected"
+          },
+          "readiness_checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Readiness Checked At"
+          },
+          "readiness_expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Readiness Expires At"
+          },
+          "readiness_reason_code": {
+            "default": "model_not_checked",
+            "title": "Readiness Reason Code",
+            "type": "string"
+          },
+          "readiness_remediation": {
+            "default": "Set up or check this model before sending.",
+            "title": "Readiness Remediation",
+            "type": "string"
+          },
+          "readiness_state": {
+            "default": "not_configured",
+            "enum": [
+              "not_configured",
+              "checking",
+              "ready",
+              "runtime_missing",
+              "runtime_stopped",
+              "model_missing",
+              "policy_blocked",
+              "authentication_failed",
+              "quota_exhausted",
+              "unreachable",
+              "unsupported",
+              "stale",
+              "configuration_unreadable"
+            ],
+            "title": "Readiness State",
+            "type": "string"
+          },
+          "readiness_summary": {
+            "default": "No readiness check exists for this exact model.",
+            "title": "Readiness Summary",
+            "type": "string"
+          },
+          "ready": {
+            "default": false,
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "reasoning_effort_values": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Effort Values",
+            "type": "array"
+          },
+          "reasoning_modes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoning Modes",
+            "type": "array"
+          },
+          "requires_budget_policy": {
+            "title": "Requires Budget Policy",
+            "type": "boolean"
+          },
+          "requires_egress_policy": {
+            "title": "Requires Egress Policy",
+            "type": "boolean"
+          },
+          "requires_network": {
+            "title": "Requires Network",
+            "type": "boolean"
+          },
+          "runtime_gate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtime Gate"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "boolean"
+          },
+          "supports_reasoning": {
+            "default": false,
+            "title": "Supports Reasoning",
+            "type": "boolean"
+          },
+          "supports_reasoning_effort": {
+            "default": false,
+            "title": "Supports Reasoning Effort",
+            "type": "boolean"
+          },
+          "supports_reasoning_summary": {
+            "default": false,
+            "title": "Supports Reasoning Summary",
+            "type": "boolean"
+          },
+          "total_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total Cost"
+          },
+          "total_tokens": {
+            "default": 0,
+            "title": "Total Tokens",
+            "type": "integer"
+          },
+          "turns_used": {
+            "default": 0,
+            "title": "Turns Used",
+            "type": "integer"
+          },
+          "usage_admin_configured": {
+            "default": false,
+            "title": "Usage Admin Configured",
+            "type": "boolean"
+          },
+          "workspace_configured": {
+            "default": false,
+            "title": "Workspace Configured",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profile_id",
+          "provider",
+          "model",
+          "default_state",
+          "local_only",
+          "requires_network",
+          "endpoint_kind",
+          "requires_egress_policy",
+          "requires_budget_policy",
+          "runtime_gate",
+          "off_machine",
+          "selected"
+        ],
+        "title": "ModelProfileView",
+        "type": "object"
+      },
       "ModelReadinessCheckRequest": {
         "additionalProperties": false,
         "properties": {
@@ -6637,6 +9119,247 @@
           "model"
         ],
         "title": "ModelReadinessCheckRequest",
+        "type": "object"
+      },
+      "ModelReadinessList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelReadinessView"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ModelReadinessList",
+        "type": "object"
+      },
+      "ModelReadinessView": {
+        "description": "Whether one exact profile and model can answer now, and what it would take.",
+        "properties": {
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "endpoint_fingerprint": {
+            "title": "Endpoint Fingerprint",
+            "type": "string"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "owner_principal_id": {
+            "title": "Owner Principal Id",
+            "type": "string"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "remediation": {
+            "title": "Remediation",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "not_configured",
+              "checking",
+              "ready",
+              "runtime_missing",
+              "runtime_stopped",
+              "model_missing",
+              "policy_blocked",
+              "authentication_failed",
+              "quota_exhausted",
+              "unreachable",
+              "unsupported",
+              "stale",
+              "configuration_unreadable"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner_principal_id",
+          "profile_id",
+          "model",
+          "endpoint_fingerprint",
+          "state",
+          "checked_at",
+          "expires_at",
+          "summary",
+          "reason_code",
+          "remediation",
+          "evidence",
+          "ready"
+        ],
+        "title": "ModelReadinessView",
+        "type": "object"
+      },
+      "ModelSelectionSet": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "profile_id",
+          "model"
+        ],
+        "title": "ModelSelectionSet",
+        "type": "object"
+      },
+      "ModelSetupState": {
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Created At"
+          },
+          "owner_principal_id": {
+            "title": "Owner Principal Id",
+            "type": "string"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "enum": [
+                  "provider",
+                  "ollama",
+                  "lm_studio",
+                  "local_gguf",
+                  "hugging_face"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Path"
+          },
+          "selected_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Selected Model"
+          },
+          "selected_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Selected Profile Id"
+          },
+          "status": {
+            "default": "required",
+            "enum": [
+              "required",
+              "in_progress",
+              "skipped",
+              "complete"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "step": {
+            "default": "choose_path",
+            "enum": [
+              "choose_path",
+              "provider",
+              "model",
+              "review",
+              "ready"
+            ],
+            "title": "Step",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "owner_principal_id"
+        ],
+        "title": "ModelSetupState",
         "type": "object"
       },
       "ModelSetupUpdateRequest": {
@@ -6730,6 +9453,202 @@
         "title": "ModelWeeklyBudgetRequest",
         "type": "object"
       },
+      "ModelsView": {
+        "properties": {
+          "advisor_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Advisor Model"
+          },
+          "advisor_model_gate_state": {
+            "default": "unknown",
+            "title": "Advisor Model Gate State",
+            "type": "string"
+          },
+          "advisor_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Advisor Profile Id"
+          },
+          "advisor_readiness_checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Advisor Readiness Checked At"
+          },
+          "advisor_readiness_remediation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Advisor Readiness Remediation"
+          },
+          "advisor_readiness_state": {
+            "default": "not_configured",
+            "enum": [
+              "not_configured",
+              "checking",
+              "ready",
+              "runtime_missing",
+              "runtime_stopped",
+              "model_missing",
+              "policy_blocked",
+              "authentication_failed",
+              "quota_exhausted",
+              "unreachable",
+              "unsupported",
+              "stale",
+              "configuration_unreadable"
+            ],
+            "title": "Advisor Readiness State",
+            "type": "string"
+          },
+          "advisor_readiness_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Advisor Readiness Summary"
+          },
+          "catalogues": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Catalogues",
+            "type": "object"
+          },
+          "chat_profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ModelProfileView"
+            },
+            "title": "Chat Profiles",
+            "type": "array"
+          },
+          "current_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Current Model"
+          },
+          "current_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Profile Id"
+          },
+          "fallback_sequence": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Fallback Sequence",
+            "type": "array"
+          },
+          "hosted_model_gate_enforced": {
+            "title": "Hosted Model Gate Enforced",
+            "type": "boolean"
+          },
+          "hosted_model_gate_state": {
+            "title": "Hosted Model Gate State",
+            "type": "string"
+          },
+          "model_egress_allowlist_configured": {
+            "title": "Model Egress Allowlist Configured",
+            "type": "boolean"
+          },
+          "no_silent_hosted_fallback": {
+            "default": true,
+            "title": "No Silent Hosted Fallback",
+            "type": "boolean"
+          },
+          "private_network_model_gate_enforced": {
+            "title": "Private Network Model Gate Enforced",
+            "type": "boolean"
+          },
+          "private_network_model_gate_state": {
+            "title": "Private Network Model Gate State",
+            "type": "string"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ModelProfileView"
+            },
+            "title": "Profiles",
+            "type": "array"
+          },
+          "ready_provider_count": {
+            "default": 0,
+            "title": "Ready Provider Count",
+            "type": "integer"
+          },
+          "remote_profile_count": {
+            "title": "Remote Profile Count",
+            "type": "integer"
+          },
+          "usable_provider_count": {
+            "default": 0,
+            "title": "Usable Provider Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profiles",
+          "chat_profiles",
+          "current_profile_id",
+          "hosted_model_gate_state",
+          "private_network_model_gate_state",
+          "hosted_model_gate_enforced",
+          "private_network_model_gate_enforced",
+          "model_egress_allowlist_configured",
+          "remote_profile_count"
+        ],
+        "title": "ModelsView",
+        "type": "object"
+      },
       "MoveProjectRequest": {
         "additionalProperties": false,
         "properties": {
@@ -6746,6 +9665,148 @@
           }
         },
         "title": "MoveProjectRequest",
+        "type": "object"
+      },
+      "NativeUsageMetricView": {
+        "properties": {
+          "limit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "remaining": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining"
+          },
+          "reset_interval": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reset Interval"
+          },
+          "resets_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resets At"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "source": {
+            "const": "provider",
+            "title": "Source",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "used": {
+            "title": "Used",
+            "type": "string"
+          }
+        },
+        "required": [
+          "unit",
+          "used",
+          "limit",
+          "remaining",
+          "reset_interval",
+          "resets_at",
+          "scope",
+          "source"
+        ],
+        "title": "NativeUsageMetricView",
+        "type": "object"
+      },
+      "NativeUsageView": {
+        "description": "What the provider's own usage API said, when it was asked and could answer.",
+        "properties": {
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/NativeUsageMetricView"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "status": {
+            "enum": [
+              "available",
+              "unavailable",
+              "not_configured",
+              "not_supported",
+              "not_checked"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "reason_code",
+          "checked_at",
+          "expires_at",
+          "metrics"
+        ],
+        "title": "NativeUsageView",
         "type": "object"
       },
       "NotificationView": {
@@ -6993,6 +10054,99 @@
         "title": "ObservationsView",
         "type": "object"
       },
+      "ObservedUsageView": {
+        "description": "What Raiker's own ledger recorded for one provider over the rolling week.",
+        "properties": {
+          "cache_read_tokens": {
+            "title": "Cache Read Tokens",
+            "type": "integer"
+          },
+          "cache_write_tokens": {
+            "title": "Cache Write Tokens",
+            "type": "integer"
+          },
+          "compactions": {
+            "title": "Compactions",
+            "type": "integer"
+          },
+          "cost_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Currency"
+          },
+          "input_tokens": {
+            "title": "Input Tokens",
+            "type": "integer"
+          },
+          "known_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known Cost"
+          },
+          "output_tokens": {
+            "title": "Output Tokens",
+            "type": "integer"
+          },
+          "requests": {
+            "title": "Requests",
+            "type": "integer"
+          },
+          "source": {
+            "const": "raiker_ledger",
+            "title": "Source",
+            "type": "string"
+          },
+          "total_tokens": {
+            "title": "Total Tokens",
+            "type": "integer"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          },
+          "unpriced_models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unpriced Models",
+            "type": "array"
+          },
+          "window": {
+            "const": "rolling_7_days",
+            "title": "Window",
+            "type": "string"
+          }
+        },
+        "required": [
+          "input_tokens",
+          "output_tokens",
+          "cache_read_tokens",
+          "cache_write_tokens",
+          "total_tokens",
+          "requests",
+          "turns",
+          "compactions",
+          "known_cost",
+          "cost_currency",
+          "unpriced_models",
+          "source",
+          "window"
+        ],
+        "title": "ObservedUsageView",
+        "type": "object"
+      },
       "Ok": {
         "description": "The acknowledgement a route gives when the change it was asked for is done.",
         "properties": {
@@ -7022,6 +10176,49 @@
           "model"
         ],
         "title": "OllamaPullRequestBody",
+        "type": "object"
+      },
+      "OperationCleared": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "OperationCleared",
+        "type": "object"
+      },
+      "OperationReview": {
+        "description": "An operation other than an install, shown for review before it is confirmed.",
+        "properties": {
+          "action": {
+            "const": "review_operation",
+            "title": "Action",
+            "type": "string"
+          },
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "target",
+          "action",
+          "confirmed"
+        ],
+        "title": "OperationReview",
         "type": "object"
       },
       "PairChannelRequest": {
@@ -7091,6 +10288,152 @@
           "created_at"
         ],
         "title": "ParkedApproval",
+        "type": "object"
+      },
+      "PartialFiles": {
+        "description": "What a confirmed cleanup would delete: the exact paths, and their bytes.",
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "file_count": {
+            "title": "File Count",
+            "type": "integer"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Paths",
+            "type": "array"
+          }
+        },
+        "required": [
+          "path",
+          "paths",
+          "exists",
+          "bytes",
+          "file_count"
+        ],
+        "title": "PartialFiles",
+        "type": "object"
+      },
+      "PartialFilesDeleted": {
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "file_count": {
+            "title": "File Count",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Paths",
+            "type": "array"
+          }
+        },
+        "required": [
+          "path",
+          "paths",
+          "exists",
+          "bytes",
+          "file_count",
+          "ok"
+        ],
+        "title": "PartialFilesDeleted",
+        "type": "object"
+      },
+      "PartialFilesRefused": {
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "file_count": {
+            "title": "File Count",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Paths",
+            "type": "array"
+          },
+          "reason_code": {
+            "const": "no_partial_files",
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "paths",
+          "exists",
+          "bytes",
+          "file_count",
+          "ok",
+          "reason_code"
+        ],
+        "title": "PartialFilesRefused",
         "type": "object"
       },
       "PasswordRecoveryBeginRequest": {
@@ -7187,6 +10530,285 @@
           }
         },
         "title": "PauseHostRequest",
+        "type": "object"
+      },
+      "PriceSet": {
+        "description": "An owner price recorded, or cleared (``cleared``) back to the published one.",
+        "properties": {
+          "cache_read_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Per Mtok"
+          },
+          "cache_write_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Per Mtok"
+          },
+          "cleared": {
+            "title": "Cleared",
+            "type": "boolean"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "input_per_mtok": {
+            "title": "Input Per Mtok",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "output_per_mtok": {
+            "title": "Output Per Mtok",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "model"
+        ],
+        "title": "PriceSet",
+        "type": "object"
+      },
+      "PricingHistoryEntry": {
+        "description": "One recorded rate for an exact model, kept so a change can be read back.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "cache_read_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Per Mtok"
+          },
+          "cache_write_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Per Mtok"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "effective_from": {
+            "title": "Effective From",
+            "type": "string"
+          },
+          "input_per_mtok": {
+            "title": "Input Per Mtok",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "output_per_mtok": {
+            "title": "Output Per Mtok",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "recorded_at": {
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "recorded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded By"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "model",
+          "source",
+          "effective_from",
+          "recorded_at",
+          "as_of",
+          "recorded_by",
+          "reason",
+          "currency",
+          "input_per_mtok",
+          "output_per_mtok",
+          "cache_write_per_mtok",
+          "cache_read_per_mtok"
+        ],
+        "title": "PricingHistoryEntry",
+        "type": "object"
+      },
+      "PricingRefreshed": {
+        "properties": {
+          "changes_written": {
+            "title": "Changes Written",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/SyncResult"
+            },
+            "title": "Providers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "providers",
+          "changes_written"
+        ],
+        "title": "PricingRefreshed",
+        "type": "object"
+      },
+      "PricingSyncState": {
+        "description": "When one provider's published prices were last read, and whether that is due again.",
+        "properties": {
+          "due": {
+            "title": "Due",
+            "type": "boolean"
+          },
+          "has_last_good": {
+            "title": "Has Last Good",
+            "type": "boolean"
+          },
+          "interval_hours": {
+            "title": "Interval Hours",
+            "type": "integer"
+          },
+          "last_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Attempt At"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "models_recorded": {
+            "title": "Models Recorded",
+            "type": "integer"
+          },
+          "next_refresh_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Refresh At"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "provider",
+          "interval_hours",
+          "last_attempt_at",
+          "last_success_at",
+          "next_refresh_at",
+          "last_error",
+          "models_recorded",
+          "has_last_good",
+          "due",
+          "stale"
+        ],
+        "title": "PricingSyncState",
         "type": "object"
       },
       "ProjectArchived": {
@@ -8320,6 +11942,47 @@
         "title": "ProposalDecided",
         "type": "object"
       },
+      "ProviderCatalogueRefreshView": {
+        "description": "Safe outcome for one provider in an explicit catalogue refresh.",
+        "properties": {
+          "model_count": {
+            "title": "Model Count",
+            "type": "integer"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "provider",
+          "status",
+          "reason_code",
+          "model_count"
+        ],
+        "title": "ProviderCatalogueRefreshView",
+        "type": "object"
+      },
       "ProviderHealthView": {
         "properties": {
           "detail": {
@@ -8371,6 +12034,126 @@
           "detail"
         ],
         "title": "ProviderHealthView",
+        "type": "object"
+      },
+      "ProviderModelListView": {
+        "description": "On-demand, user-initiated listing of the models a provider serves.\n\n``status`` is honest: \"available\" only when the provider actually answered;\npolicy denials and unreachable/unsupported backends never fabricate model\nnames.\n\nA failed listing may still carry ``models``, but only ones\nthis provider published on a previous, successful call. ``remembered`` says\nwhich of the two happened, and ``listed_at`` when the provider last spoke, so\na stale answer is offered as stale rather than as current. The status and\nreason code are unchanged by remembering: a provider that is unreachable is\nstill reported unreachable.",
+        "properties": {
+          "listed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Listed At"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "remembered": {
+            "default": false,
+            "title": "Remembered",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "available",
+              "policy_denied",
+              "unsupported",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "provider",
+          "status",
+          "reason_code",
+          "models"
+        ],
+        "title": "ProviderModelListView",
+        "type": "object"
+      },
+      "ProviderWeeklyUsage": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "native": {
+            "$ref": "#/components/schemas/NativeUsageView"
+          },
+          "observed": {
+            "$ref": "#/components/schemas/ObservedUsageView"
+          },
+          "owner_budget": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Budget"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "subscription": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubscriptionLimitsView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "profile_id",
+          "provider",
+          "display_name",
+          "observed",
+          "owner_budget",
+          "native"
+        ],
+        "title": "ProviderWeeklyUsage",
         "type": "object"
       },
       "RecalledMemory": {
@@ -9034,6 +12817,35 @@
           }
         },
         "title": "SelectProjectRequest",
+        "type": "object"
+      },
+      "SelectedChoice": {
+        "description": "The owner's choice, and where it came from — most specific first.",
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "surface_default",
+              "global_default",
+              "native_default"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "model",
+          "source"
+        ],
+        "title": "SelectedChoice",
         "type": "object"
       },
       "SessionArchived": {
@@ -9728,6 +13540,28 @@
         "title": "SettingsRequest",
         "type": "object"
       },
+      "SetupBackupCreated": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "setup": {
+            "$ref": "#/components/schemas/SetupState"
+          }
+        },
+        "required": [
+          "ok",
+          "path",
+          "setup"
+        ],
+        "title": "SetupBackupCreated",
+        "type": "object"
+      },
       "SetupBackupRequest": {
         "additionalProperties": false,
         "properties": {
@@ -9740,6 +13574,162 @@
           "target"
         ],
         "title": "SetupBackupRequest",
+        "type": "object"
+      },
+      "SetupState": {
+        "properties": {
+          "background_service_enabled": {
+            "default": false,
+            "title": "Background Service Enabled",
+            "type": "boolean"
+          },
+          "backup_mode": {
+            "default": "later",
+            "enum": [
+              "later",
+              "local"
+            ],
+            "title": "Backup Mode",
+            "type": "string"
+          },
+          "backup_target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Backup Target"
+          },
+          "backup_verified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Backup Verified At"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Created At"
+          },
+          "model_deferred": {
+            "default": false,
+            "title": "Model Deferred",
+            "type": "boolean"
+          },
+          "owner_principal_id": {
+            "title": "Owner Principal Id",
+            "type": "string"
+          },
+          "privacy_acknowledged_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Privacy Acknowledged At"
+          },
+          "privacy_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "local_first",
+                  "balanced"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Privacy Mode"
+          },
+          "selected_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Selected Model"
+          },
+          "selected_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Selected Profile Id"
+          },
+          "stage": {
+            "default": "welcome",
+            "enum": [
+              "welcome",
+              "account",
+              "model",
+              "privacy",
+              "backup",
+              "finish"
+            ],
+            "title": "Stage",
+            "type": "string"
+          },
+          "status": {
+            "default": "required",
+            "enum": [
+              "required",
+              "in_progress",
+              "skipped",
+              "complete"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "owner_principal_id"
+        ],
+        "title": "SetupState",
         "type": "object"
       },
       "SetupUpdateRequest": {
@@ -9891,6 +13881,53 @@
         "title": "SourceAnchorView",
         "type": "object"
       },
+      "SpeechProbe": {
+        "properties": {
+          "endpoint": {
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          }
+        },
+        "required": [
+          "ok",
+          "reason_code",
+          "endpoint"
+        ],
+        "title": "SpeechProbe",
+        "type": "object"
+      },
+      "SpeechRuntime": {
+        "properties": {
+          "max_audio_bytes": {
+            "title": "Max Audio Bytes",
+            "type": "integer"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/SpeechRuntimeView"
+          }
+        },
+        "required": [
+          "runtime",
+          "max_audio_bytes"
+        ],
+        "title": "SpeechRuntime",
+        "type": "object"
+      },
       "SpeechRuntimeRequest": {
         "additionalProperties": false,
         "description": "The local transcription runtime dictation should use, if any (BUG-256).\n\nBoth fields are optional so a caller can set the address without restating\nthe model, which is the common case: most transcription servers serve one.",
@@ -9921,6 +13958,39 @@
         "title": "SpeechRuntimeRequest",
         "type": "object"
       },
+      "SpeechRuntimeView": {
+        "description": "The speech runtime the owner set up, and which one the microphone will use.",
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "effective": {
+            "enum": [
+              "local",
+              "browser"
+            ],
+            "title": "Effective",
+            "type": "string"
+          },
+          "endpoint": {
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint",
+          "model",
+          "configured",
+          "effective"
+        ],
+        "title": "SpeechRuntimeView",
+        "type": "object"
+      },
       "StopHostRequest": {
         "additionalProperties": false,
         "properties": {
@@ -9931,6 +14001,39 @@
           }
         },
         "title": "StopHostRequest",
+        "type": "object"
+      },
+      "SubscriptionLimitsView": {
+        "description": "What a provider volunteered with a turn about its own limits — never fetched.",
+        "properties": {
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "source": {
+            "const": "provider_turn",
+            "title": "Source",
+            "type": "string"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/LimitWindow"
+            },
+            "title": "Windows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "windows",
+          "observed_at",
+          "stale",
+          "source"
+        ],
+        "title": "SubscriptionLimitsView",
         "type": "object"
       },
       "SurfaceModelDefaultRequest": {
@@ -9956,6 +14059,109 @@
           "surface"
         ],
         "title": "SurfaceModelDefaultRequest",
+        "type": "object"
+      },
+      "SurfaceModelSet": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "surface": {
+            "title": "Surface",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "surface",
+          "profile_id",
+          "model"
+        ],
+        "title": "SurfaceModelSet",
+        "type": "object"
+      },
+      "SurfaceModels": {
+        "description": "Where each surface's model picker starts — a preference, never readiness.",
+        "properties": {
+          "surfaces": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SurfacePick"
+            },
+            "title": "Surfaces",
+            "type": "object"
+          }
+        },
+        "required": [
+          "surfaces"
+        ],
+        "title": "SurfaceModels",
+        "type": "object"
+      },
+      "SurfacePick": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "model"
+        ],
+        "title": "SurfacePick",
+        "type": "object"
+      },
+      "SyncResult": {
+        "properties": {
+          "changes_written": {
+            "title": "Changes Written",
+            "type": "integer"
+          },
+          "models_recorded": {
+            "title": "Models Recorded",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason Code"
+          }
+        },
+        "required": [
+          "provider",
+          "ok",
+          "models_recorded",
+          "changes_written"
+        ],
+        "title": "SyncResult",
         "type": "object"
       },
       "TaskAttemptView": {
@@ -11209,6 +15415,46 @@
           "key"
         ],
         "title": "VaultKeyRequest",
+        "type": "object"
+      },
+      "WeeklyBudgetSet": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "profile_id"
+        ],
+        "title": "WeeklyBudgetSet",
+        "type": "object"
+      },
+      "WeeklyUsage": {
+        "properties": {
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderWeeklyUsage"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "window": {
+            "const": "rolling_7_days",
+            "title": "Window",
+            "type": "string"
+          }
+        },
+        "required": [
+          "window",
+          "providers"
+        ],
+        "title": "WeeklyUsage",
         "type": "object"
       },
       "WhoamiView": {
@@ -16338,11 +20584,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "boolean"
-                  },
-                  "title": "Response Save Hugging Face Credential Api Hugging Face Credential Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HuggingFaceCredentialSaved"
                 }
               }
             },
@@ -16381,9 +20623,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Download Hugging Face Model Api Hugging Face Download Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HuggingFaceDownloadResult"
                 }
               }
             },
@@ -16421,9 +20661,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Preview Hugging Face Download Api Hugging Face Download Preview Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HfDownloadPreview"
                 }
               }
             },
@@ -16462,9 +20700,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Search Hugging Face Api Hugging Face Search Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HuggingFaceSearch"
                 }
               }
             },
@@ -16493,9 +20729,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Trending Hugging Face Api Hugging Face Trending Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HuggingFaceTrending"
                 }
               }
             },
@@ -16549,9 +20783,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Hugging Face Variants Api Hugging Face  Owner   Repository  Variants Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HuggingFaceVariants"
                 }
               }
             },
@@ -16579,9 +20811,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Images Api Images Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ImageGallery"
                 }
               }
             },
@@ -16607,9 +20837,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Generate Image Api Images Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ImagesGenerated"
                 }
               }
             },
@@ -16833,9 +21061,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Check Language Api Language Check Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/LanguageCheck"
                 }
               }
             },
@@ -16864,9 +21090,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Local Runtimes Api Local Runtimes Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/LocalRuntimes"
                 }
               }
             },
@@ -16885,9 +21109,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Detect Local Runtimes Api Local Runtimes Detect Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/LocalRuntimes"
                 }
               }
             },
@@ -18934,9 +23156,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Model Advisor Api Model Advisor Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AdvisorSet"
                 }
               }
             },
@@ -18974,9 +23194,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Start Model Conversion Api Model Conversion Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelOperationView"
                 }
               }
             },
@@ -19014,9 +23232,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Preview Model Conversion Api Model Conversion Preview Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversionPreview"
                 }
               }
             },
@@ -19067,9 +23283,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Model Decision Api Model Decision Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelDecisionView"
                 }
               }
             },
@@ -19098,9 +23312,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Model Decisions Api Model Decisions Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelDecisions"
                 }
               }
             },
@@ -19129,9 +23341,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Model Fallback Api Model Fallback Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/FallbackSet"
                 }
               }
             },
@@ -19159,9 +23369,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Model Library Api Model Library Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelLibraryView"
                 }
               }
             },
@@ -19179,9 +23387,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Rescan Model Library Api Model Library Rescan Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/LibraryRescanned"
                 }
               }
             },
@@ -19209,9 +23415,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Remove Model Library Root Api Model Library Roots Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/OperationCleared"
                 }
               }
             },
@@ -19247,9 +23451,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Add Model Library Root Api Model Library Roots Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/LibraryRootAdded"
                 }
               }
             },
@@ -19305,9 +23507,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Deploy Local Model Api Model Library  Model Id  Deploy Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelOperationView"
                 }
               }
             },
@@ -19363,9 +23563,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Deploy Mlx Model Api Model Library  Model Id  Deploy Mlx Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelOperationView"
                 }
               }
             },
@@ -19393,9 +23591,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Model Operations Api Model Operations Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelOperations"
                 }
               }
             },
@@ -19421,9 +23617,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Start Model Operation Api Model Operations Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelOperationView"
                 }
               }
             },
@@ -19461,9 +23655,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Preview Model Operation Api Model Operations Preview Post",
-                  "type": "object"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InstallPlan"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OperationReview"
+                    }
+                  ]
                 }
               }
             },
@@ -19502,9 +23701,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Cleanup Model Operation Api Model Operations  Operation Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/OperationCleared"
                 }
               }
             },
@@ -19543,9 +23740,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Cancel Model Operation Api Model Operations  Operation Id  Cancel Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelOperationView"
                 }
               }
             },
@@ -19595,9 +23790,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Partial Files Api Model Operations  Operation Id  Delete Partial Files Post",
-                  "type": "object"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PartialFilesDeleted"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PartialFilesRefused"
+                    }
+                  ]
                 }
               }
             },
@@ -19637,9 +23837,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Preview Partial Files Api Model Operations  Operation Id  Partial Files Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PartialFiles"
                 }
               }
             },
@@ -19679,9 +23877,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Retry Model Operation Api Model Operations  Operation Id  Retry Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelOperationView"
                 }
               }
             },
@@ -19709,9 +23905,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Model Readiness Api Model Readiness Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelReadinessList"
                 }
               }
             },
@@ -19739,9 +23933,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Check Model Readiness Api Model Readiness Check Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelReadinessView"
                 }
               }
             },
@@ -19780,9 +23972,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Model Selection Api Model Selection Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelSelectionSet"
                 }
               }
             },
@@ -19810,9 +24000,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Model Setup Api Model Setup Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelSetupState"
                 }
               }
             },
@@ -19838,9 +24026,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Update Model Setup Api Model Setup Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelSetupState"
                 }
               }
             },
@@ -19868,9 +24054,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Models Api Models Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelsView"
                 }
               }
             },
@@ -19888,9 +24072,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Model Capacities Api Models Capacities Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelCapacities"
                 }
               }
             },
@@ -19920,9 +24102,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Refresh Model Capacities Api Models Capacities Refresh Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CapacitiesRefreshed"
                 }
               }
             },
@@ -19961,9 +24141,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Refresh Connected Provider Catalogues Api Models Catalogues Refresh Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CatalogueRefreshed"
                 }
               }
             },
@@ -19991,9 +24169,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Disconnect Chatgpt Codex Api Models Chatgpt Codex Connection Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConnectionSet"
                 }
               }
             },
@@ -20010,9 +24186,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Connect Chatgpt Codex Api Models Chatgpt Codex Connection Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CodexConnected"
                 }
               }
             },
@@ -20030,9 +24204,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Start Chatgpt Codex Login Api Models Chatgpt Codex Login Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CodexLoginStarted"
                 }
               }
             },
@@ -20050,9 +24222,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Chatgpt Codex Status Api Models Chatgpt Codex Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CodexStatus"
                 }
               }
             },
@@ -20071,9 +24241,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Model Pricing Api Models Pricing Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelPricingView"
                 }
               }
             },
@@ -20092,9 +24260,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Refresh Model Pricing Api Models Pricing Refresh Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PricingRefreshed"
                 }
               }
             },
@@ -20125,9 +24291,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Weekly Model Usage Api Models Weekly Usage Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/WeeklyUsage"
                 }
               }
             },
@@ -20177,9 +24341,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Available Models Api Models  Profile Id  Available Models Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AvailableModelsSet"
                 }
               }
             },
@@ -20230,9 +24392,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Model Capacity Api Models  Profile Id  Capacity Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CapacitySet"
                 }
               }
             },
@@ -20282,9 +24442,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Model Connection Api Models  Profile Id  Connection Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConnectionSet"
                 }
               }
             },
@@ -20334,9 +24492,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Model Price Api Models  Profile Id  Price Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PriceSet"
                 }
               }
             },
@@ -20376,9 +24532,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Provider Models Api Models  Profile Id  Provider Models Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProviderModelListView"
                 }
               }
             },
@@ -20427,9 +24581,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Weekly Model Budget Api Models  Profile Id  Weekly Budget Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/WeeklyBudgetSet"
                 }
               }
             },
@@ -20553,9 +24705,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Pull Ollama Model Api Ollama Pull Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ModelOperationView"
                 }
               }
             },
@@ -23303,9 +27453,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Setup Api Setup Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SetupState"
                 }
               }
             },
@@ -23331,9 +27479,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Update Setup Api Setup Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SetupState"
                 }
               }
             },
@@ -23371,9 +27517,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Setup Backup Api Setup Backup Create Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SetupBackupCreated"
                 }
               }
             },
@@ -23814,9 +27958,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Read Speech Runtime Api Speech Runtime Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SpeechRuntime"
                 }
               }
             },
@@ -23843,9 +27985,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Write Speech Runtime Api Speech Runtime Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SpeechRuntime"
                 }
               }
             },
@@ -23891,9 +28031,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Probe Speech Runtime Api Speech Runtime Probe Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SpeechProbe"
                 }
               }
             },
@@ -24086,9 +28224,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Surface Models Api Surface Models Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SurfaceModels"
                 }
               }
             },
@@ -24115,9 +28251,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Surface Model Api Surface Models Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SurfaceModelSet"
                 }
               }
             },

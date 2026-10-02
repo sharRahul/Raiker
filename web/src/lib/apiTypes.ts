@@ -15,6 +15,7 @@ import type {
   CheckpointView,
   CodeReposView,
   CodeRepoView,
+  CodexStatus,
   ConnectionsView,
   ConnectorView,
   ContentPartView,
@@ -23,6 +24,7 @@ import type {
   ConversationBranchOrigin,
   ConversationBranchPlan,
   ConversationCompaction,
+  ConversionPreview,
   CredentialLifecycleView,
   DiagnosticsView,
   EmbeddingProviderView,
@@ -31,12 +33,20 @@ import type {
   ExtensionsOverviewView,
   ExtensionView,
   FileProvenanceEntryView,
+  HfDownloadPreview,
+  HfSearchResult,
+  HfVariant,
+  HuggingFaceDownloadResult,
   IdentityView,
+  ImageGallery,
+  ImageGeneration,
   ImportedFile,
   ImportRefused,
+  InstallPlan,
   IssuedSessionView,
   KnowledgeSource,
   KnowledgeSources,
+  LocalModelView,
   ManagedFile,
   ManagedFileImport,
   ManagedFileList,
@@ -52,10 +62,24 @@ import type {
   MemoryRelationshipProposal,
   MemorySettingsView,
   MemorySource,
+  ModelCapacities,
+  ModelCapacityEntry,
+  ModelDecisionView,
+  ModelLibraryView,
+  ModelOperationView,
+  ModelPricingEntryView,
+  ModelPricingView,
+  ModelProfileView,
+  ModelReadinessView,
+  ModelSetupState,
+  ModelsView,
+  NativeUsageMetricView,
   NotificationView,
   ObservationsView,
   PasswordRecoveryBeginView,
   PathAttachment,
+  PricingHistoryEntry,
+  PricingSyncState,
   ProjectAttachmentView,
   ProjectBrowseEntry,
   ProjectBrowseView,
@@ -70,6 +94,9 @@ import type {
   ProjectTreeNode,
   ProjectView,
   ProviderHealthView,
+  ProviderModelListView,
+  ProviderWeeklyUsage,
+  ModelConversionRequestBody,
   RecalledMemory,
   RestorePlan,
   RestorePlanFile,
@@ -82,7 +109,11 @@ import type {
   SessionDetail,
   SessionRecall,
   SessionView,
+  SetupState,
   SourceAnchorView,
+  SpeechProbe,
+  SpeechRuntime,
+  SpeechRuntimeView,
   TaskDetailView,
   TaskView,
   TranscriptFile,
@@ -94,6 +125,7 @@ import type {
   TurnSourceView,
   TurnView,
   UploadAttachment,
+  WeeklyUsage,
   WorkInFlight,
   WorkThreadFacet,
   WorkThreadPage,
@@ -310,101 +342,15 @@ export interface CapabilityDecisionMode {
 
 export type ProviderHealth = ProviderHealthView;
 
-export type ModelReadinessState =
-  | "not_configured"
-  | "checking"
-  | "ready"
-  | "runtime_missing"
-  | "runtime_stopped"
-  | "model_missing"
-  | "policy_blocked"
-  | "authentication_failed"
-  | "quota_exhausted"
-  | "unreachable"
-  | "unsupported"
-  | "stale"
-  // GCR-46 — Raiker could not read which model the owner chose. A verdict about
-  // Raiker's own storage, not about the model, and deliberately not
-  // `not_configured`: that one asks the owner to make a choice they made.
-  | "configuration_unreadable";
+export type ModelReadinessState = ModelReadinessView["state"];
 
-/** Reachability of one exact owner/profile/model/endpoint tuple. */
-export interface ModelReadinessView {
-  owner_principal_id: string;
-  profile_id: string;
-  model: string;
-  endpoint_fingerprint: string;
-  state: ModelReadinessState;
-  checked_at: string | null;
-  expires_at: string | null;
-  summary: string;
-  reason_code: string;
-  remediation: string;
-  evidence: Record<string, unknown>;
-  ready: boolean;
-}
+export type { ModelReadinessView };
 
-export interface ModelSetupState {
-  owner_principal_id: string;
-  status: "required" | "in_progress" | "skipped" | "complete";
-  step: "choose_path" | "provider" | "model" | "review" | "ready";
-  path:
-    "provider" | "ollama" | "lm_studio" | "local_gguf" | "hugging_face" | null;
-  selected_profile_id: string | null;
-  selected_model: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-}
+export type { ModelSetupState };
 
-export interface SetupState {
-  owner_principal_id: string;
-  status: "required" | "in_progress" | "skipped" | "complete";
-  /**
-   * `welcome` is where first launch opens. `account` and `backup` are retired
-   * stages that a stored row may still carry — `visibleStage` in `firstRun.ts`
-   * maps them onto the rail rather than rendering a blank screen.
-   */
-  stage: "welcome" | "account" | "model" | "privacy" | "backup" | "finish";
-  selected_profile_id: string | null;
-  selected_model: string | null;
-  model_deferred: boolean;
-  privacy_mode: "local_first" | "balanced" | null;
-  privacy_acknowledged_at: string | null;
-  backup_mode: "later" | "local";
-  backup_target: string | null;
-  backup_verified_at: string | null;
-  background_service_enabled: boolean;
-  created_at: string | null;
-  updated_at: string | null;
-}
+export type { SetupState };
 
-export interface ModelOperation {
-  operation_id: string;
-  owner_principal_id: string;
-  kind: "install" | "download" | "convert" | "deploy" | "pull";
-  target: string;
-  state:
-    | "queued"
-    | "running"
-    | "cancel_requested"
-    | "cancelled"
-    | "failed"
-    | "complete";
-  phase: string;
-  progress_bytes: number;
-  total_bytes: number | null;
-  progress_percent: number | null;
-  source_url: string | null;
-  destination: string | null;
-  error_code: string | null;
-  error_detail: string | null;
-  created_at: string;
-  updated_at: string;
-  /** True when a retry can really reconstruct and dispatch this job (BUG-75). */
-  retryable: boolean;
-  /** True when a terminal operation may have left an incomplete destination. */
-  partial_files_present: boolean;
-}
+export type ModelOperation = ModelOperationView;
 
 /**
  * What a confirmed "Delete partial files" would remove — named exactly.
@@ -589,92 +535,22 @@ export interface PluginsView {
   contribution_kinds: PluginContributionKind[];
 }
 
-export interface RuntimeInstallPlan {
-  runtime: string;
-  action: string;
-  source_url: string;
-  argv: string[];
-  requires_elevation: boolean;
-  terms_url: string;
-  redistribution: boolean;
-}
+export type RuntimeInstallPlan = InstallPlan;
 
-export interface LocalModel {
-  owner_principal_id: string;
-  root_path: string;
-  model_id: string;
-  name: string;
-  architecture: string;
-  quantization: string | null;
-  primary_path: string;
-  shard_count: number;
-  expected_shards: number;
-  complete: boolean;
-  size_bytes: number;
-  indexed_at: string;
-  /** Runtime format detected from the approved local model folder. */
-  format?: "gguf" | "mlx";
-}
+export type LocalModel = LocalModelView;
 
-export interface ModelLibraryView {
-  roots: Array<{ path: string }>;
-  models: LocalModel[];
-}
+export type { ModelLibraryView };
 
-export interface HuggingFaceSearchResult {
-  repo_id: string;
-  downloads: number;
-  likes: number;
-  gated: boolean;
-}
+export type HuggingFaceSearchResult = HfSearchResult;
 
-export interface HuggingFaceVariant {
-  repo_id: string;
-  revision: string;
-  files: string[];
-  format: "gguf" | "safetensors";
-  quantization: string | null;
-  total_bytes: number;
-  cached_bytes: number;
-  gated: boolean;
-  license_id: string | null;
-  complete: boolean;
-}
+export type HuggingFaceVariant = HfVariant;
 
-export interface HuggingFaceDownloadPreview {
-  repo_id: string;
-  revision: string;
-  files: string[];
-  total_bytes: number;
-  cached_bytes: number;
-  download_bytes: number;
-}
+export type HuggingFaceDownloadPreview = HfDownloadPreview;
 
-export type HuggingFaceDownloadResult = ModelOperation & {
-  snapshot_path: string;
-  conversion_output_path: string;
-};
+export type { HuggingFaceDownloadResult };
 
-export interface ModelConversionPreview {
-  source: string;
-  output: string;
-  revision: string;
-  architecture: string;
-  quantization: string;
-  source_bytes: number;
-  required_free_bytes: number;
-  toolchain_image: string;
-  isolation: {
-    network: false;
-    source_read_only: true;
-    credential_environment: string[];
-    workspace_mounted: false;
-    max_memory_bytes: number;
-    max_cpu_count: number;
-    max_processes: number;
-    timeout_seconds: number;
-  };
-}
+export type ModelConversionPreview = ConversionPreview;
+export type ConversionQuantization = ModelConversionRequestBody["quantization"];
 
 export type Diagnostics = DiagnosticsView;
 
@@ -682,139 +558,17 @@ export type { MemoryIntegrity };
 
 export type { CheckpointCaptureHealth };
 
-export interface ModelProfile {
-  profile_id: string;
-  provider: string;
-  model: string;
-  /** Image models this provider declares, default first. Empty for most. */
-  image_models?: string[];
-  default_state: string;
-  local_only: boolean;
-  requires_network: boolean;
-  endpoint_kind: string;
-  requires_egress_policy: boolean;
-  requires_budget_policy: boolean;
-  runtime_gate: string | null;
-  off_machine: boolean;
-  selected: boolean;
-  connection_configured?: boolean;
-  /** A separate organization-usage credential is stored; never its value. */
-  usage_admin_configured?: boolean;
-  /** BUG-274 — a workspace is named on this connection. Never which one. */
-  workspace_configured?: boolean;
-  prompt_cache_ttl: string | null;
-  context_window_tokens?: number | null;
-  /** "provider" | "config" — which source supplied the capacity above. */
-  context_window_source?: string | null;
-  /**
-   * BUG-270 — "this profile names a model that exists on this machine". It used
-   * to mean only "names a model string", which is why a host with no Ollama
-   * still saw `gemma4:31b-cloud` offered as the default. A profile declaring
-   * `disabled_until_provider_detected` now earns this by detection, a saved
-   * connection, or a completed deployment.
-   */
-  configured?: boolean;
-  /**
-   * Whether the local runtime behind this profile was found on this machine.
-   * `null`/absent means nothing has looked, or the profile does not depend on
-   * one — in either case the UI says nothing rather than claiming an absence.
-   */
-  provider_detected?: boolean | null;
-  /** Only API-key providers can accrue an API bill; local runtimes cannot. */
-  billable?: boolean;
-  /** Whether this exact provider/model profile supports a reasoning mode. */
-  supports_reasoning?: boolean;
-  /** Whether this exact profile accepts one of `reasoning_effort_values`. */
-  supports_reasoning_effort?: boolean;
-  /** Backend-advertised effort values; never inferred by the client. */
-  reasoning_effort_values?: string[];
-  /**
-   * Backend-advertised reasoning *modes* (BUG-207 slice B). A provider declares
-   * reasoning as an effort (OpenAI: low/medium/high) or as a mode (Anthropic:
-   * adaptive). Offering only the first is why the composer had no reasoning
-   * control at all for the provider that ships in the box.
-   */
-  reasoning_modes?: string[];
-  /** Whether the provider can return a *summary* of its reasoning rather than raw text. */
-  supports_reasoning_summary?: boolean;
-  models_used?: number;
-  turns_used?: number;
-  total_tokens?: number;
-  /** Decimal string, or null when no price is resolvable. Never "0" for unknown. */
-  total_cost?: string | null;
-  cost_currency?: string | null;
-  price_source?: string | null;
-  price_as_of?: string | null;
-  readiness_state?: ModelReadinessState;
-  readiness_summary?: string;
-  readiness_reason_code?: string;
-  readiness_remediation?: string;
-  readiness_checked_at?: string | null;
-  readiness_expires_at?: string | null;
-  ready?: boolean;
-}
+export type ModelProfile = ModelProfileView;
 
 export type ContextUsage = ContextUsageView;
 
-/** BUG-21 — one exact model's row in the Models → Pricing surface. */
-export interface ModelPricingHistoryEntry {
-  provider: string;
-  model: string;
-  source: string;
-  effective_from: string;
-  recorded_at: string;
-  as_of: string | null;
-  recorded_by: string | null;
-  reason: string | null;
-  currency: string;
-  input_per_mtok: string;
-  output_per_mtok: string;
-  cache_write_per_mtok: string | null;
-  cache_read_per_mtok: string | null;
-}
+export type ModelPricingHistoryEntry = PricingHistoryEntry;
 
-export interface ModelPricingEntry {
-  provider: string;
-  model: string;
-  profile_id: string | null;
-  source: string | null;
-  currency: string | null;
-  input_per_mtok: string | null;
-  output_per_mtok: string | null;
-  cache_write_per_mtok: string | null;
-  cache_read_per_mtok: string | null;
-  effective_from: string | null;
-  as_of: string | null;
-  reviewed_at: string | null;
-  review_due_at: string | null;
-  review_status: "current" | "overdue" | "invalid" | null;
-  recorded_at: string | null;
-  recorded_by: string | null;
-  reason: string | null;
-  has_owner_override: boolean;
-  history: ModelPricingHistoryEntry[];
-}
+export type ModelPricingEntry = ModelPricingEntryView;
 
-export interface ModelPricingSyncState {
-  provider: string;
-  interval_hours: number;
-  last_attempt_at: string | null;
-  last_success_at: string | null;
-  next_refresh_at: string | null;
-  last_error: string | null;
-  models_recorded: number;
-  has_last_good: boolean;
-  due: boolean;
-  stale: boolean;
-}
+export type ModelPricingSyncState = PricingSyncState;
 
-export interface ModelPricingView {
-  entries: ModelPricingEntry[];
-  sync: ModelPricingSyncState[];
-  /** Overrides are administrator work; a non-gate-manager sees the registry
-   *  read-only rather than an action that would be refused on submit. */
-  can_override: boolean;
-}
+export type { ModelPricingView };
 
 export type TranscriptExportMessage = TranscriptMessage;
 
@@ -837,61 +591,9 @@ export interface ResumableTurnsView {
   turns: ResumableTurn[];
 }
 
-export interface ModelsView {
-  profiles: ModelProfile[];
-  chat_profiles?: ModelProfile[];
-  /**
-   * What each provider last published, keyed by profile.
-   *
-   * One catalogue, in the read every Work surface already makes, so no composer
-   * reconstructs its own idea of what could be chosen. Read from the store
-   * rather than probed, so it costs no network; a profile nobody has listed
-   * successfully simply has no key, rather than an empty list that would read
-   * as "this provider serves nothing".
-   */
-  catalogues?: Record<string, string[]>;
-  current_profile_id: string | null;
-  current_model: string | null;
-  advisor_profile_id: string | null;
-  advisor_model_gate_state: string;
-  // BUG-82 — readiness for the exact model a consult would call: the advisor is
-  // a second model, and a broken one is reported before a consult fails mid-turn.
-  advisor_model?: string | null;
-  advisor_readiness_state?: ModelReadinessState;
-  advisor_readiness_summary?: string | null;
-  advisor_readiness_remediation?: string | null;
-  advisor_readiness_checked_at?: string | null;
-  hosted_model_gate_state: string;
-  /**
-   * What the enforcing path answers for these two gates right now — not the same
-   * question as the gate row above. A saved connection is the owner's consent to
-   * use that provider, so a hosted provider runs with the gate row still unset.
-   */
-  hosted_model_gate_enforced?: boolean;
-  private_network_model_gate_enforced?: boolean;
-  private_network_model_gate_state: string;
-  model_egress_allowlist_configured: boolean;
-  remote_profile_count: number;
-  fallback_sequence: string[];
-  no_silent_hosted_fallback: boolean;
-  ready_provider_count?: number;
-  /**
-   * BUG-270 — models the owner actually has set up, counted on the server where
-   * the deployment and detection facts live, so an empty local slot is never one.
-   */
-  usable_provider_count?: number;
-}
+export type { ModelsView };
 
-export interface NativeUsageMetric {
-  unit: string;
-  used: string;
-  limit: string | null;
-  remaining: string | null;
-  reset_interval: string | null;
-  resets_at: string | null;
-  scope: string;
-  source: "provider";
-}
+export type NativeUsageMetric = NativeUsageMetricView;
 
 /**
  * One limit window a subscription volunteered as part of a turn (BUG-254).
@@ -914,45 +616,9 @@ export interface SubscriptionLimits {
   source: "provider_turn";
 }
 
-export interface ProviderWeeklyUsage {
-  profile_id: string;
-  provider: string;
-  display_name: string;
-  observed: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_tokens: number;
-    cache_write_tokens: number;
-    total_tokens: number;
-    requests: number;
-    turns: number;
-    compactions: number;
-    known_cost: string | null;
-    cost_currency: string | null;
-    unpriced_models: string[];
-    source: "raiker_ledger";
-    window: "rolling_7_days";
-  };
-  owner_budget: number | null;
-  native: {
-    status: "available" | "unavailable" | "not_configured" | "not_supported" | "not_checked";
-    reason_code: string | null;
-    checked_at: string | null;
-    expires_at: string | null;
-    metrics: NativeUsageMetric[];
-  };
-  /**
-   * Null when this provider has never volunteered a limit window, and absent
-   * altogether from a host that predates BUG-254. Both mean the same thing to a
-   * reader — nothing was reported — so every use site tests for truth, not null.
-   */
-  subscription?: SubscriptionLimits | null;
-}
+export type { ProviderWeeklyUsage };
 
-export interface ProviderWeeklyUsageView {
-  window: "rolling_7_days";
-  providers: ProviderWeeklyUsage[];
-}
+export type ProviderWeeklyUsageView = WeeklyUsage;
 
 /** Read-only status of one governed service connector (web-app task 4). Every
  * field derives from stored/config state — the view never reaches the network
@@ -990,15 +656,7 @@ export interface ConnectorStoreView {
   vault_configured: boolean;
 }
 
-/** On-demand listing of the models one provider serves. Failures come back as an
- * honest status with an empty list — the backend never fabricates model names. */
-export interface ProviderModelList {
-  profile_id: string;
-  provider: string;
-  status: "available" | "policy_denied" | "unsupported" | "unavailable";
-  reason_code: string | null;
-  models: string[];
-}
+export type ProviderModelList = ProviderModelListView;
 
 /** Outcome for one provider in an explicit connected-catalogue refresh. */
 export interface ProviderCatalogueRefresh {
@@ -1011,23 +669,7 @@ export interface ProviderCatalogueRefresh {
   }>;
 }
 
-/** Status of the locally installed Codex client session. No account identifier,
- * token, or login URL is exposed to the browser UI. */
-export interface CodexSubscriptionStatus {
-  /**
-   * `available` is the state BUG-259 added: the local Codex client is signed in
-   * to ChatGPT, and *this owner has not said to use it*. Reading the status no
-   * longer adopts the account, so the two facts are reported separately and the
-   * row offers to connect rather than announcing that it already did.
-   */
-  connection_status:
-    | "connected"
-    | "available"
-    | "signed_out"
-    | "login_pending"
-    | "codex_missing";
-  plan_type: string | null;
-}
+export type CodexSubscriptionStatus = CodexStatus;
 
 /** A project is an organizing scope (workspace-contained subpath + its
  * sessions/checkpoints), never an authority — selecting one grants nothing. */
@@ -1815,37 +1457,9 @@ export interface CredentialDeltaView {
   recipient_boundary: "disposable_container_tcb";
 }
 
-export interface ModelCapacityEntry {
-  profile_id: string;
-  provider: string;
-  model: string;
-  endpoint_identity: string;
-  context_window_tokens: number | null;
-  source: string | null;
-  history: Array<{
-    capacity_id: string;
-    context_window_tokens: number | null;
-    action: string;
-    reason: string | null;
-    recorded_by: string;
-    recorded_at: string;
-  }>;
-}
+export type { ModelCapacityEntry };
 
-export interface ModelCapacitiesView {
-  ok: boolean;
-  entries: ModelCapacityEntry[];
-  sync: Array<{
-    profile_id: string;
-    last_refresh_at: string | null;
-    next_refresh_at: string;
-    status: string;
-    reason_code: string | null;
-  }>;
-  refresh_due: boolean;
-  cadence_hours: number;
-  can_override: boolean;
-}
+export type ModelCapacitiesView = ModelCapacities;
 
 export interface InstanceLaunchResult {
   name: string;
@@ -2198,87 +1812,21 @@ export interface HostPathListing {
   missing: boolean;
 }
 
-/** The local transcription runtime dictation uses, if one is set up (BUG-256). */
-export interface SpeechRuntimeSettings {
-  /** The loopback address of a local transcription server, or "" for none. */
-  endpoint: string;
-  /** Optional, for a runtime that serves more than one model. */
-  model: string;
-  configured: boolean;
-  /**
-   * Which runtime the microphone will use, resolved by the host. A fact about
-   * this install rather than a preference — there is no mode to choose.
-   */
-  effective: "local" | "browser";
-}
+export type { SpeechRuntimeView };
 
-export interface SpeechRuntimeView {
-  runtime: SpeechRuntimeSettings;
-  max_audio_bytes: number;
-}
+export type { SpeechRuntime };
 
 export interface SpeechRuntimeChange {
   endpoint?: string;
   model?: string;
 }
 
-export interface SpeechRuntimeProbe {
-  ok: boolean;
-  reason_code: string | null;
-  endpoint: string;
-}
+export type SpeechRuntimeProbe = SpeechProbe;
 
 
-/**
- * Backlog #18 — one owner-configured OpenTelemetry destination.
- *
- * `header_ref` is the *name* of an environment variable holding an
- * `Authorization` value; the value itself never reaches the browser or the
- * database. `include_content` is the owner's explicit opt-in to the redacted
- * payload — without it a record carries identifiers and an event type and
- * nothing else. The cursor fields say how far delivery has got, so a failed run
- * is visible as events still waiting rather than as events quietly lost.
- */
-/** One governed image generation, as the Design page sees it. */
-export interface ImageGeneration {
-  generation_id: string;
-  profile_id: string;
-  provider: string;
-  model: string;
-  prompt: string;
-  size: string;
-  /** `ok` or `refused`. A refusal is a record, not an absence. */
-  status: string;
-  reason_code: string | null;
-  has_image: boolean;
-  media_type: string | null;
-  byte_size: number;
-  created_at: string;
-  /**
-   * BUG-277 — what this picture was made from, and which of the three requests
-   * made it: `create` from a prompt alone, `edit` from a named image,
-   * `variation` from asking the same question again. Together they are the
-   * lineage, and a chain of single parents is what a version strip draws.
-   *
-   * Optional because a row written before the lineage existed carries neither,
-   * and an image that predates the feature is an origin rather than a broken
-   * row.
-   */
-  source_generation_id?: string | null;
-  kind?: string;
-  /** BUG-282 — the project this was made in, when it was made in one. */
-  project_id?: string | null;
-}
+export type { ImageGeneration };
 
-export interface ImageGenerationsView {
-  sizes: string[];
-  /**
-   * REM-DESIGN-01 — providers the size is actually sent to. Absent on a host
-   * older than the field, which is read as "no claim" rather than as "none".
-   */
-  sized_providers?: string[];
-  generations: ImageGeneration[];
-}
+export type ImageGenerationsView = ImageGallery;
 
 export interface TelemetryDestination {
   destination_id: string;
@@ -2303,34 +1851,4 @@ export interface TelemetryDestination {
   next_delivery_at: string | null;
 }
 
-/**
- * The one authoritative answer to "which model is this, and which
- * one will actually run".
- *
- * `selected` is the owner's choice and persists whether or not it can serve;
- * `effective` is what a turn started right now would use. They are the same
- * pair in the ordinary case, and when they are not, that is a fact the owner is
- * entitled to read rather than a silent substitution. Every surface that names
- * a model reads this instead of assembling its own answer.
- */
-export interface ModelDecision {
-  scope: { surface: string; project_id: string | null };
-  selected: {
-    profile_id: string;
-    model: string;
-    /** Where the choice came from, most specific first. */
-    source: "surface_default" | "global_default" | "native_default";
-  };
-  effective: {
-    profile_id: string;
-    model: string;
-    /** Why this pair, rather than the selection. */
-    reason: "selected" | "fallback" | "no_ready_candidate";
-  };
-  ready: boolean;
-  /** Only meaningful for a profile with a managed local slot; null otherwise. */
-  running: boolean | null;
-  problem: { reason_code: string; summary: string; remediation: string } | null;
-  /** Changes exactly when the decision changes. A fingerprint, not a counter. */
-  revision: string;
-}
+export type ModelDecision = ModelDecisionView;

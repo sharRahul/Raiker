@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from raiker.contracts.views import json_ready
+
 
 class StrictRequest(BaseModel):
     """Every JSON request body the API validates with Pydantic.
@@ -821,4 +823,6 @@ def serialize_dto(dto: Any) -> Any:
         return dto.to_dict()
     if isinstance(dto, (list, tuple)):
         return [serialize_dto(item) for item in dto]
-    return dict(dto)
+    # A declared body (a TypedDict) may carry views; each is projected the way a
+    # view's own nested fields are, so the wire never depends on who built it.
+    return json_ready(dict(dto))

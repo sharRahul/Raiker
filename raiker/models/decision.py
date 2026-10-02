@@ -48,10 +48,14 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal, cast
 
 from raiker.contracts.views import View
 from raiker.models.readiness import ModelReadiness, ModelReadinessService
+from raiker.models.wire import DecisionProblem, ModelDecisionView
+
+SelectionSource = Literal["surface_default", "global_default", "native_default"]
+EffectiveReason = Literal["selected", "fallback", "no_ready_candidate"]
 
 #: The work surfaces that may hold their own default model.
 #:
@@ -96,21 +100,25 @@ class ModelDecision:
     problem: dict[str, str] | None
     revision: str
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> ModelDecisionView:
         return {
             "scope": {"surface": self.surface, "project_id": self.project_id},
-            "selected": self.selected.to_dict(),
+            "selected": {
+                "profile_id": self.selected.profile_id,
+                "model": self.selected.model,
+                "source": cast(SelectionSource, self.selected.source),
+            },
             # `effective.source` answers "why this one", which for the effective
             # pair is the reason it displaced the selection — so the field is
             # spelled `reason` on the wire, matching how the interface reads it.
             "effective": {
                 "profile_id": self.effective.profile_id,
                 "model": self.effective.model,
-                "reason": self.effective.source,
+                "reason": cast(EffectiveReason, self.effective.source),
             },
             "ready": self.ready,
             "running": self.running,
-            "problem": self.problem,
+            "problem": cast("DecisionProblem | None", self.problem),
             "revision": self.revision,
         }
 

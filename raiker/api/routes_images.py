@@ -15,14 +15,15 @@ apply — the same long way round the telemetry export and the audit export take
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Request, Response, status
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
 from raiker.api.dependencies import workspace_root as _ws
-from raiker.api.schemas import GenerateImageRequest
+from raiker.api.schemas import GenerateImageRequest, serialize_dto
+from raiker.api.wire.models import ImageGallery, ImageGeneration, ImagesGenerated
 from raiker.runtime.executors.tier2_image import SIZED_PROVIDERS, SUPPORTED_SIZES
 from raiker.storage.sqlite import SQLiteStore
 
@@ -35,7 +36,7 @@ def _service(request: Request) -> Any:
     return RuntimeControlService(_ws(request))
 
 
-def _public(row: dict[str, Any]) -> dict[str, Any]:
+def _public(row: dict[str, Any]) -> ImageGeneration:
     """One generation as the page sees it — metadata only, never the bytes."""
     return {
         "generation_id": row["generation_id"],
@@ -67,7 +68,7 @@ async def list_images(request: Request) -> dict[str, Any]:
     _, principal = _auth(request)
     store = SQLiteStore(_ws(request))
     rows = store.list_image_generations(owner_principal_id=principal.principal_id)
-    return {
+    answer: ImageGallery = {
         "sizes": list(SUPPORTED_SIZES),
         # REM-DESIGN-01 — which providers the size is actually sent to, so the
         # page can stop offering a choice to one that ignores it and stop
@@ -75,6 +76,7 @@ async def list_images(request: Request) -> dict[str, Any]:
         "sized_providers": list(SIZED_PROVIDERS),
         "generations": [_public(row) for row in rows],
     }
+    return serialize_dto(answer)
 
 
 @router.post("/api/images")
@@ -101,7 +103,8 @@ async def generate_image(body: GenerateImageRequest, request: Request) -> dict[s
         # The refusal is already recorded against the owner by the executor, so
         # the page can show it in the gallery as well as in the response.
         raise refusal(status.HTTP_400_BAD_REQUEST, result.reason_code)
-    return {"ok": True, **(result.data or {})}
+    answer = cast(ImagesGenerated, {"ok": True, **(result.data or {})})
+    return serialize_dto(answer)
 
 
 @router.get("/api/images/{generation_id}/bytes")

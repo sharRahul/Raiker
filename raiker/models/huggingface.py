@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from raiker.contracts.views import View
 
@@ -84,7 +84,7 @@ class HfVariant(View):
     repo_id: str
     revision: str
     files: tuple[str, ...]
-    format: str
+    format: Literal["gguf", "safetensors"]
     quantization: str | None
     total_bytes: int
     cached_bytes: int

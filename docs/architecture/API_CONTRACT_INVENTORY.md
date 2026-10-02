@@ -13,7 +13,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
   `to_dict`; it needs a dedicated response model first (Stage B).
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**350 operations: 149 verified, 1 eligible, 190 deferred, 10 special.**
+**350 operations: 211 verified, 0 eligible, 128 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -140,22 +140,22 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/host/update` |  |  | deferred | body assembled in the route |
 | POST | `/api/host/update/apply` | ApplyUpdateRequest |  | deferred | body assembled in the route |
 | POST | `/api/host/update/check` |  |  | deferred | body assembled in the route |
-| PUT | `/api/hugging-face/credential` | HuggingFaceCredentialRequest |  | deferred | body assembled in the route |
-| POST | `/api/hugging-face/download` | HuggingFaceSelectionRequest |  | deferred | body assembled in the route |
-| POST | `/api/hugging-face/download/preview` | HuggingFaceSelectionRequest |  | deferred | body assembled in the route |
-| GET | `/api/hugging-face/search` |  |  | deferred | body assembled in the route |
-| GET | `/api/hugging-face/trending` |  |  | deferred | body assembled in the route |
-| GET | `/api/hugging-face/{owner}/{repository}/variants` |  |  | deferred | body assembled in the route |
-| GET | `/api/images` |  |  | deferred | body assembled in the route |
-| POST | `/api/images` | GenerateImageRequest |  | deferred | body assembled in the route |
+| PUT | `/api/hugging-face/credential` | HuggingFaceCredentialRequest | HuggingFaceCredentialSaved | verified | declared HuggingFaceCredentialSaved |
+| POST | `/api/hugging-face/download` | HuggingFaceSelectionRequest | HuggingFaceDownloadResult | verified | declared HuggingFaceDownloadResult |
+| POST | `/api/hugging-face/download/preview` | HuggingFaceSelectionRequest | HfDownloadPreview | verified | HuggingFaceService.dry_run |
+| GET | `/api/hugging-face/search` |  | HuggingFaceSearch | verified | declared HuggingFaceSearch |
+| GET | `/api/hugging-face/trending` |  | HuggingFaceTrending | verified | declared HuggingFaceTrending |
+| GET | `/api/hugging-face/{owner}/{repository}/variants` |  | HuggingFaceVariants | verified | declared HuggingFaceVariants |
+| GET | `/api/images` |  | ImageGallery | verified | declared ImageGallery |
+| POST | `/api/images` | GenerateImageRequest | ImagesGenerated | verified | declared by cast |
 | GET | `/api/images/{generation_id}/bytes` |  |  | special | special |
 | POST | `/api/instances` | InstanceCreateRequest |  | deferred | body assembled in the route |
 | POST | `/api/interrupts` | InterruptRequest |  | deferred | body assembled in the route |
 | DELETE | `/api/knowledge-sources` |  | KnowledgeSourceRevoked | verified | DashboardService.revoke_knowledge_source |
 | GET | `/api/knowledge-sources` |  | KnowledgeSources | verified | DashboardService.knowledge_sources |
-| POST | `/api/language/check` | LanguageCheckRequest |  | deferred | body assembled in the route |
-| GET | `/api/local-runtimes` |  |  | deferred | body assembled in the route |
-| POST | `/api/local-runtimes/detect` |  |  | deferred | body assembled in the route |
+| POST | `/api/language/check` | LanguageCheckRequest | LanguageCheck | verified | declared LanguageCheck |
+| GET | `/api/local-runtimes` |  | LocalRuntimes | verified | declared LocalRuntimes |
+| POST | `/api/local-runtimes/detect` |  | LocalRuntimes | verified | declared LocalRuntimes |
 | DELETE | `/api/managed-files/{file_id}` |  | ManagedFileChanged | verified | declared by cast |
 | POST | `/api/managed-files/{file_id}/retry` |  | ManagedFileChanged | verified | declared by cast |
 | GET | `/api/mcp/agent-access` |  |  | deferred | body assembled in the route |
@@ -209,51 +209,51 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | PUT | `/api/memory/{memory_id}/scope` | dict | MemoryScopeChanged | verified | declared by cast |
 | PUT | `/api/memory/{memory_id}/search` | dict | MemoryUpdated | verified | declared by cast |
 | GET | `/api/memory/{memory_id}/source` |  | MemorySource | verified | declared by cast |
-| PUT | `/api/model-advisor` | SetModelAdvisorRequest |  | deferred | body assembled in the route |
-| POST | `/api/model-conversion` | ModelConversionRequestBody |  | deferred | body assembled in the route |
-| POST | `/api/model-conversion/preview` | ModelConversionRequestBody |  | deferred | body assembled in the route |
-| GET | `/api/model-decision` |  |  | deferred | body assembled in the route |
-| GET | `/api/model-decisions` |  |  | deferred | body assembled in the route |
-| PUT | `/api/model-fallback` | SetModelFallbackRequest |  | deferred | body assembled in the route |
-| GET | `/api/model-library` |  |  | deferred | body assembled in the route |
-| POST | `/api/model-library/rescan` |  |  | deferred | body assembled in the route |
-| DELETE | `/api/model-library/roots` | ModelLibraryRootRequest |  | deferred | body assembled in the route |
-| POST | `/api/model-library/roots` | ModelLibraryRootRequest |  | deferred | body assembled in the route |
-| POST | `/api/model-library/{model_id:path}/deploy` |  |  | deferred | body assembled in the route |
-| POST | `/api/model-library/{model_id:path}/deploy-mlx` |  |  | deferred | body assembled in the route |
-| GET | `/api/model-operations` |  |  | deferred | body assembled in the route |
-| POST | `/api/model-operations` | ModelOperationRequestBody |  | deferred | body assembled in the route |
-| POST | `/api/model-operations/preview` | ModelOperationRequestBody |  | deferred | body assembled in the route |
-| DELETE | `/api/model-operations/{operation_id}` |  |  | deferred | body assembled in the route |
-| POST | `/api/model-operations/{operation_id}/cancel` |  |  | deferred | body assembled in the route |
-| POST | `/api/model-operations/{operation_id}/delete-partial-files` |  |  | deferred | body assembled in the route |
-| GET | `/api/model-operations/{operation_id}/partial-files` |  |  | deferred | body assembled in the route |
-| POST | `/api/model-operations/{operation_id}/retry` |  |  | deferred | body assembled in the route |
-| GET | `/api/model-readiness` |  |  | deferred | body assembled in the route |
-| POST | `/api/model-readiness/check` | ModelReadinessCheckRequest |  | deferred | body assembled in the route |
-| PUT | `/api/model-selection` | SetModelSelectionRequest |  | deferred | body assembled in the route |
-| GET | `/api/model-setup` |  |  | deferred | body assembled in the route |
-| PUT | `/api/model-setup` | ModelSetupUpdateRequest |  | deferred | body assembled in the route |
-| GET | `/api/models` |  |  | deferred | get_models returns ModelsView, not a fields-only view |
-| GET | `/api/models/capacities` |  |  | deferred | body assembled in the route |
-| POST | `/api/models/capacities/refresh` |  |  | deferred | body assembled in the route |
-| POST | `/api/models/catalogues/refresh` | ModelCatalogueRefreshRequest |  | deferred | body assembled in the route |
-| DELETE | `/api/models/chatgpt-codex/connection` |  |  | deferred | body assembled in the route |
-| POST | `/api/models/chatgpt-codex/connection` |  |  | deferred | body assembled in the route |
-| POST | `/api/models/chatgpt-codex/login` |  |  | deferred | body assembled in the route |
-| GET | `/api/models/chatgpt-codex/status` |  |  | deferred | body assembled in the route |
-| GET | `/api/models/pricing` |  |  | deferred | list_model_pricing returns ModelPricingView, not a fields-only view |
-| POST | `/api/models/pricing/refresh` |  |  | deferred | body assembled in the route |
-| GET | `/api/models/weekly-usage` |  |  | deferred | body assembled in the route |
-| PUT | `/api/models/{profile_id}/available-models` | AvailableModelsRequest |  | deferred | body assembled in the route |
-| PUT | `/api/models/{profile_id}/capacity` | dict |  | deferred | body assembled in the route |
-| PUT | `/api/models/{profile_id}/connection` | ModelConnectionRequest |  | deferred | body assembled in the route |
-| PUT | `/api/models/{profile_id}/price` | ModelPriceRequest |  | deferred | body assembled in the route |
-| GET | `/api/models/{profile_id}/provider-models` |  | ProviderModelListView | eligible | DashboardService.list_provider_models |
-| PUT | `/api/models/{profile_id}/weekly-budget` | ModelWeeklyBudgetRequest |  | deferred | body assembled in the route |
+| PUT | `/api/model-advisor` | SetModelAdvisorRequest | AdvisorSet | verified | declared AdvisorSet |
+| POST | `/api/model-conversion` | ModelConversionRequestBody | ModelOperationView | verified | ModelOperationService.start |
+| POST | `/api/model-conversion/preview` | ModelConversionRequestBody | ConversionPreview | verified | ModelConversionService.preview |
+| GET | `/api/model-decision` |  | ModelDecisionView | verified | ModelDecisionService.decide |
+| GET | `/api/model-decisions` |  | ModelDecisions | verified | declared ModelDecisions |
+| PUT | `/api/model-fallback` | SetModelFallbackRequest | FallbackSet | verified | declared FallbackSet |
+| GET | `/api/model-library` |  | ModelLibraryView | verified | declared ModelLibraryView |
+| POST | `/api/model-library/rescan` |  | LibraryRescanned | verified | declared LibraryRescanned |
+| DELETE | `/api/model-library/roots` | ModelLibraryRootRequest | OperationCleared | verified | declared OperationCleared |
+| POST | `/api/model-library/roots` | ModelLibraryRootRequest | LibraryRootAdded | verified | declared LibraryRootAdded |
+| POST | `/api/model-library/{model_id:path}/deploy` |  | ModelOperationView | verified | declared ModelOperationView |
+| POST | `/api/model-library/{model_id:path}/deploy-mlx` |  | ModelOperationView | verified | declared ModelOperationView |
+| GET | `/api/model-operations` |  | ModelOperations | verified | declared ModelOperations |
+| POST | `/api/model-operations` | ModelOperationRequestBody | ModelOperationView | verified | ModelOperationService.start |
+| POST | `/api/model-operations/preview` | ModelOperationRequestBody | InstallPlan \| OperationReview | verified | RuntimeInstallerRegistry.preview \| declared OperationReview |
+| DELETE | `/api/model-operations/{operation_id}` |  | OperationCleared | verified | declared OperationCleared |
+| POST | `/api/model-operations/{operation_id}/cancel` |  | ModelOperationView | verified | ModelOperationService.cancel |
+| POST | `/api/model-operations/{operation_id}/delete-partial-files` |  | PartialFilesDeleted \| PartialFilesRefused | verified | declared PartialFilesDeleted \| declared PartialFilesRefused |
+| GET | `/api/model-operations/{operation_id}/partial-files` |  | PartialFiles | verified | ModelOperationService.partial_files |
+| POST | `/api/model-operations/{operation_id}/retry` |  | ModelOperationView | verified | ModelOperationService.retry |
+| GET | `/api/model-readiness` |  | ModelReadinessList | verified | declared ModelReadinessList |
+| POST | `/api/model-readiness/check` | ModelReadinessCheckRequest | ModelReadinessView | verified | ModelReadinessService.check_selected |
+| PUT | `/api/model-selection` | SetModelSelectionRequest | ModelSelectionSet | verified | declared ModelSelectionSet |
+| GET | `/api/model-setup` |  | ModelSetupState | verified | SQLiteStore.load_model_setup_state |
+| PUT | `/api/model-setup` | ModelSetupUpdateRequest | ModelSetupState | verified | SQLiteStore.save_model_setup_state |
+| GET | `/api/models` |  | ModelsView | verified | DashboardService.get_models |
+| GET | `/api/models/capacities` |  | ModelCapacities | verified | declared by cast |
+| POST | `/api/models/capacities/refresh` |  | CapacitiesRefreshed | verified | declared by cast |
+| POST | `/api/models/catalogues/refresh` | ModelCatalogueRefreshRequest | CatalogueRefreshed | verified | declared CatalogueRefreshed |
+| DELETE | `/api/models/chatgpt-codex/connection` |  | ConnectionSet | verified | declared ConnectionSet |
+| POST | `/api/models/chatgpt-codex/connection` |  | CodexConnected | verified | declared CodexConnected |
+| POST | `/api/models/chatgpt-codex/login` |  | CodexLoginStarted | verified | declared CodexLoginStarted |
+| GET | `/api/models/chatgpt-codex/status` |  | CodexStatus | verified | declared CodexStatus |
+| GET | `/api/models/pricing` |  | ModelPricingView | verified | DashboardService.list_model_pricing |
+| POST | `/api/models/pricing/refresh` |  | PricingRefreshed | verified | declared by cast |
+| GET | `/api/models/weekly-usage` |  | WeeklyUsage | verified | declared WeeklyUsage |
+| PUT | `/api/models/{profile_id}/available-models` | AvailableModelsRequest | AvailableModelsSet | verified | declared AvailableModelsSet |
+| PUT | `/api/models/{profile_id}/capacity` | dict | CapacitySet | verified | declared CapacitySet |
+| PUT | `/api/models/{profile_id}/connection` | ModelConnectionRequest | ConnectionSet | verified | declared ConnectionSet |
+| PUT | `/api/models/{profile_id}/price` | ModelPriceRequest | PriceSet | verified | declared by cast |
+| GET | `/api/models/{profile_id}/provider-models` |  | ProviderModelListView | verified | DashboardService.list_provider_models |
+| PUT | `/api/models/{profile_id}/weekly-budget` | ModelWeeklyBudgetRequest | WeeklyBudgetSet | verified | declared WeeklyBudgetSet |
 | GET | `/api/notifications` |  | NotificationView[] | verified | DashboardService.list_notifications |
 | POST | `/api/notifications/{notification_id}/read` |  |  | deferred | body assembled in the route |
-| POST | `/api/ollama/pull` | OllamaPullRequestBody |  | deferred | body assembled in the route |
+| POST | `/api/ollama/pull` | OllamaPullRequestBody | ModelOperationView | verified | ModelOperationService.start |
 | GET | `/api/plugins` |  |  | deferred | body assembled in the route |
 | GET | `/api/projects` |  | ProjectsListView | verified | DashboardService.list_projects |
 | POST | `/api/projects` | CreateProjectRequest | ProjectCreated | verified | declared ProjectCreated |
@@ -322,9 +322,9 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | PUT | `/api/settings` | SettingsRequest |  | deferred | body assembled in the route |
 | GET | `/api/settings/composer-approval-mode` |  |  | deferred | body assembled in the route |
 | PUT | `/api/settings/composer-approval-mode` | ComposerApprovalModeRequest |  | deferred | body assembled in the route |
-| GET | `/api/setup` |  |  | deferred | body assembled in the route |
-| PUT | `/api/setup` | SetupUpdateRequest |  | deferred | body assembled in the route |
-| POST | `/api/setup/backup/create` | SetupBackupRequest |  | deferred | body assembled in the route |
+| GET | `/api/setup` |  | SetupState | verified | SQLiteStore.load_setup_state |
+| PUT | `/api/setup` | SetupUpdateRequest | SetupState | verified | SQLiteStore.save_setup_state |
+| POST | `/api/setup/backup/create` | SetupBackupRequest | SetupBackupCreated | verified | declared SetupBackupCreated |
 | GET | `/api/skills` |  |  | deferred | body assembled in the route |
 | POST | `/api/skills` | UploadSkillRequest |  | deferred | body assembled in the route |
 | POST | `/api/skills/build` | BuildSkillRequest |  | deferred | body assembled in the route |
@@ -335,16 +335,16 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | PUT | `/api/skills/{skill_id}/active` | SetSkillActiveRequest |  | deferred | body assembled in the route |
 | PUT | `/api/skills/{skill_id}/command` | SetSkillCommandRequest |  | deferred | body assembled in the route |
 | GET | `/api/skills/{skill_id}/download` |  |  | special | special |
-| GET | `/api/speech/runtime` |  |  | deferred | body assembled in the route |
-| PUT | `/api/speech/runtime` | SpeechRuntimeRequest |  | deferred | body assembled in the route |
-| POST | `/api/speech/runtime/probe` |  |  | deferred | body assembled in the route |
-| POST | `/api/speech/transcribe` |  |  | deferred | body assembled in the route |
+| GET | `/api/speech/runtime` |  | SpeechRuntime | verified | declared SpeechRuntime |
+| PUT | `/api/speech/runtime` | SpeechRuntimeRequest | SpeechRuntime | verified | declared SpeechRuntime |
+| POST | `/api/speech/runtime/probe` |  | SpeechProbe | verified | declared SpeechProbe |
+| POST | `/api/speech/transcribe` |  |  | special | special |
 | GET | `/api/standing-grants` |  |  | deferred | body assembled in the route |
 | POST | `/api/standing-grants` | CreateStandingGrantRequest |  | deferred | body assembled in the route |
 | POST | `/api/standing-grants/{grant_id}/revoke` |  |  | deferred | body assembled in the route |
 | POST | `/api/stop-all` |  |  | deferred | body assembled in the route |
-| GET | `/api/surface-models` |  |  | deferred | body assembled in the route |
-| PUT | `/api/surface-models` | SurfaceModelDefaultRequest |  | deferred | body assembled in the route |
+| GET | `/api/surface-models` |  | SurfaceModels | verified | declared SurfaceModels |
+| PUT | `/api/surface-models` | SurfaceModelDefaultRequest | SurfaceModelSet | verified | declared SurfaceModelSet |
 | GET | `/api/tasks` |  | TaskView[] | verified | DashboardService.list_tasks |
 | POST | `/api/tasks` | TaskCreateRequest | TaskView | verified | DashboardService.create_task |
 | GET | `/api/tasks/{task_id}` |  | TaskDetailView | verified | DashboardService.get_task_detail |

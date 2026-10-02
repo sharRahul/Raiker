@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -57,13 +58,22 @@ NON_SECRET_TOKEN_COUNT_KEYS = frozenset(
 )
 
 
+_TOKENS_WORD = re.compile(r"(?:^|_)tokens(?:_|$)")
+
+
 def is_token_count_field(key: str, value: Any) -> bool:
     """True when *key*/*value* is a token **count**, not a credential.
 
     ``None`` is included because "capacity unknown" must reach the UI as an
     honest absence; redacting it to a string made the browser compute NaN.
     """
-    if key.lower() not in NON_SECRET_TOKEN_COUNT_KEYS:
+    lower = key.lower()
+    # Named one by one, every count added after the list was written reached the
+    # browser as "***REDACTED***" (a capacity's `tokens`, a week's
+    # `cache_read_tokens`, a compaction's `estimated_summary_tokens`). The value
+    # check is the guard — a credential is never an integer — so a key with a
+    # whole "tokens" word in it, holding an integer or null, is a count.
+    if lower not in NON_SECRET_TOKEN_COUNT_KEYS and not _TOKENS_WORD.search(lower):
         return False
     return value is None or (isinstance(value, int) and not isinstance(value, bool))
 

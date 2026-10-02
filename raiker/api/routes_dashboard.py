@@ -48,6 +48,24 @@ from raiker.api.schemas import (
 from raiker.api.session_cookie import issue as issue_session_cookie
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.auth import IssuedSessionView
+from raiker.api.wire.models import (
+    AdvisorSet,
+    AvailableModelsSet,
+    CapacitiesRefreshed,
+    CapacitySet,
+    CatalogueRefreshed,
+    CodexConnected,
+    CodexLoginStarted,
+    CodexStatus,
+    ConnectionSet,
+    FallbackSet,
+    ModelCapacities,
+    ModelSelectionSet,
+    PriceSet,
+    PricingRefreshed,
+    WeeklyBudgetSet,
+    WeeklyUsage,
+)
 from raiker.api.wire.projects import (
     ProjectArchived,
     ProjectContextSaved,
@@ -1904,7 +1922,8 @@ async def get_weekly_model_usage(
         now=datetime.now(UTC),
         refresh_native=refresh_native,
     )
-    return {"window": "rolling_7_days", "providers": [row.to_dict() for row in rows]}
+    answer: WeeklyUsage = {"window": "rolling_7_days", "providers": [row.to_dict() for row in rows]}
+    return serialize_dto(answer)
 
 
 @router.put("/api/models/{profile_id}/weekly-budget")
@@ -1934,7 +1953,8 @@ async def set_weekly_model_budget(
     ModelUsageLedger(store).set_weekly_token_budget(
         session.principal_id, profile_id, body.token_budget
     )
-    return {"ok": True, "profile_id": profile_id}
+    answer: WeeklyBudgetSet = {"ok": True, "profile_id": profile_id}
+    return serialize_dto(answer)
 
 
 @router.get("/api/connections")
@@ -2030,7 +2050,8 @@ async def get_chatgpt_codex_status(
         # report: the row can only tell the owner what to install if the read
         # answers.
         if safe_error(str(exc)) == "codex_app_server_not_installed":
-            return {"connection_status": "codex_missing", "plan_type": None}
+            missing: CodexStatus = {"connection_status": "codex_missing", "plan_type": None}
+            return serialize_dto(missing)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"reason_code": safe_error(str(exc))},
@@ -2057,16 +2078,13 @@ async def get_chatgpt_codex_status(
         # Leaving the marker would keep offering models nothing can serve.
         _record_codex_connection(request, session.principal_id, signed_in=False)
         adopted = False
-    if adopted:
-        connection_status = "connected"
-    elif account.signed_in:
-        connection_status = "available"
-    else:
-        connection_status = "signed_out"
-    return {
-        "connection_status": connection_status,
+    answer: CodexStatus = {
+        "connection_status": (
+            "connected" if adopted else "available" if account.signed_in else "signed_out"
+        ),
         "plan_type": account.plan_type,
     }
+    return serialize_dto(answer)
 
 
 @router.post("/api/models/chatgpt-codex/connection")
@@ -2092,12 +2110,13 @@ async def connect_chatgpt_codex(
     if not account.signed_in:
         raise refusal(status.HTTP_409_CONFLICT, "chatgpt_subscription_signed_out")
     _record_codex_connection(request, session.principal_id, signed_in=True)
-    return {
+    answer: CodexConnected = {
         "ok": True,
         "connection_status": "connected",
         "plan_type": account.plan_type,
         "connection_configured": True,
     }
+    return serialize_dto(answer)
 
 
 @router.post("/api/models/chatgpt-codex/login")
@@ -2113,7 +2132,8 @@ async def start_chatgpt_codex_login(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"reason_code": safe_error(str(exc))},
         ) from exc
-    return {"ok": True, "connection_status": "login_pending"}
+    answer: CodexLoginStarted = {"ok": True, "connection_status": "login_pending"}
+    return serialize_dto(answer)
 
 
 @router.delete("/api/models/chatgpt-codex/connection")
@@ -2128,7 +2148,8 @@ async def disconnect_chatgpt_codex(
     store.invalidate_model_readiness(
         session.principal_id, CODEX_SUBSCRIPTION_PROFILE_ID, reason_code="connection_changed"
     )
-    return {"ok": True, "connection_configured": False}
+    answer: ConnectionSet = {"ok": True, "connection_configured": False}
+    return serialize_dto(answer)
 
 
 @router.post("/api/models/catalogues/refresh")
@@ -2148,7 +2169,8 @@ async def refresh_connected_provider_catalogues(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"reason_code": str(exc)},
         ) from exc
-    return {"providers": [provider.to_dict() for provider in providers]}
+    answer: CatalogueRefreshed = {"providers": list(providers)}
+    return serialize_dto(answer)
 
 
 @router.put("/api/models/{profile_id}/available-models")
@@ -2170,7 +2192,12 @@ def set_available_models(
             ),
             detail={"reason_code": result.reason_code},
         )
-    return {"ok": True, **(result.data or {})}
+    answer: AvailableModelsSet = {
+        "ok": True,
+        "profile_id": result.data["profile_id"],
+        "models": result.data["models"],
+    }
+    return serialize_dto(answer)
 
 
 @router.get("/api/sessions/{session_id}/context-usage")
@@ -2219,7 +2246,8 @@ async def set_model_price(
         raise refusal(status.HTTP_403_FORBIDDEN
                 if result.reason_code == "not_authorized_gate_manager"
                 else status.HTTP_400_BAD_REQUEST, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(PriceSet, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.get("/api/models/pricing")
@@ -2252,7 +2280,8 @@ async def refresh_model_pricing(
     result = _service(request).refresh_model_pricing(session.principal_id)
     if not result.ok:
         raise refusal(status.HTTP_400_BAD_REQUEST, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(PricingRefreshed, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.get("/api/models/capacities")
@@ -2263,7 +2292,8 @@ async def get_model_capacities(
     result = _service(request).model_capacity_status(auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_400_BAD_REQUEST, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(ModelCapacities, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/models/capacities/refresh")
@@ -2277,7 +2307,8 @@ async def refresh_model_capacities(
     )
     if not result.ok:
         raise refusal(status.HTTP_400_BAD_REQUEST, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(CapacitiesRefreshed, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.put("/api/models/{profile_id}/capacity")
@@ -2301,7 +2332,13 @@ async def set_model_capacity(
             status.HTTP_403_FORBIDDEN if result.reason_code == "not_authorized_gate_manager" else status.HTTP_400_BAD_REQUEST,
             result.reason_code,
         )
-    return {"ok": True, **result.data}
+    answer: CapacitySet = {
+        "ok": True,
+        "profile_id": result.data["profile_id"],
+        "model": result.data["model"],
+        "tokens": result.data["tokens"],
+    }
+    return serialize_dto(answer)
 
 
 @router.put("/api/model-selection")
@@ -2321,7 +2358,12 @@ async def set_model_selection(
     )
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: ModelSelectionSet = {
+        "ok": True,
+        "profile_id": result.data["profile_id"],
+        "model": result.data["model"],
+    }
+    return serialize_dto(answer)
 
 
 @router.put("/api/models/{profile_id}/connection")
@@ -2376,7 +2418,8 @@ async def set_model_connection(
         store.invalidate_model_readiness(
             session.principal_id, profile_id, reason_code="connection_changed"
         )
-        return {"ok": True, "connection_configured": False}
+        cleared: ConnectionSet = {"ok": True, "connection_configured": False}
+        return serialize_dto(cleared)
     # The vault key encrypts what we are about to store. It is a local
     # encryption key, not a secret the owner has to invent, so requiring them to
     # go and generate one before they may save an API key is friction with no
@@ -2401,7 +2444,8 @@ async def set_model_connection(
     store.invalidate_model_readiness(
         session.principal_id, profile_id, reason_code="connection_changed"
     )
-    return {"ok": True, "connection_configured": True}
+    saved: ConnectionSet = {"ok": True, "connection_configured": True}
+    return serialize_dto(saved)
 
 
 @router.put("/api/model-advisor")
@@ -2420,7 +2464,11 @@ async def set_model_advisor(
     result = _service(request).set_model_advisor(body.profile_id, session.principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: AdvisorSet = {
+        "ok": True,
+        "advisor_profile_id": result.data["advisor_profile_id"],
+    }
+    return serialize_dto(answer)
 
 
 @router.put("/api/model-fallback")
@@ -2434,7 +2482,11 @@ async def set_model_fallback(
     result = _service(request).set_model_fallback_sequence(body.profile_ids, session.principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: FallbackSet = {
+        "ok": True,
+        "fallback_sequence": result.data["fallback_sequence"],
+    }
+    return serialize_dto(answer)
 
 
 @router.get("/api/diagnostics")

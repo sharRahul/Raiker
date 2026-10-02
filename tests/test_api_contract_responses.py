@@ -75,6 +75,17 @@ def _check(annotation: Any, value: Any, where: str) -> None:
         if len(members) == 1 and structured:
             _check(members[0], value, where)
             return
+        if structured and len(structured) == len(members):
+            # One of several declared shapes: it must be exactly one of them.
+            failures = []
+            for member in members:
+                try:
+                    _check(member, value, where)
+                except (AssertionError, ValueError) as exc:
+                    failures.append(str(exc))
+                else:
+                    return
+            raise AssertionError(f"{where}: matches none of its shapes — " + " / ".join(failures))
     if typing.get_origin(annotation) in (list, tuple) and isinstance(value, list):
         inner = [arg for arg in typing.get_args(annotation) if arg is not Ellipsis]
         if len(inner) == 1 and is_typeddict(inner[0]):
@@ -88,6 +99,16 @@ def _check(annotation: Any, value: Any, where: str) -> None:
                 _check(args[1], item, f"{where}[{key!r}]")
             return
     TypeAdapter(annotation).validate_python(value)
+
+
+@pytest.fixture(scope="module")
+def described() -> dict[tuple[str, str], Any]:
+    """The contract each operation claims, read before any case patches a helper.
+
+    The resolver evaluates helper annotations from the route modules, so a case
+    that swaps one for a stub would otherwise change the claim it is testing.
+    """
+    return {(item.method, item.path): item for item in contracts(build_app())}
 
 
 @pytest.fixture
@@ -114,6 +135,7 @@ def test_a_verified_route_is_one_the_inventory_found_eligible() -> None:
 def test_the_real_response_is_exactly_the_attached_view(
     operation: tuple[str, str],
     workspace: Path,
+    described: dict[tuple[str, str], Any],
     offline_default_model: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -131,9 +153,7 @@ def test_the_real_response_is_exactly_the_attached_view(
     call = seed(workspace, client, headers)
     url, payload, sent = (call, None, headers) if isinstance(call, str) else (*call, headers)[:3]
     response = client.request(operation[0], url, headers=sent, json=payload)
-    contract = next(
-        item for item in contracts(client.app) if (item.method, item.path) == operation  # type: ignore[arg-type]
-    )
+    contract = described[operation]
     assert str(response.status_code) == contract.code, response.text
     body = response.json()
     view = contract.response

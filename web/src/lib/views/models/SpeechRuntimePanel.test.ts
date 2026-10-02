@@ -2,9 +2,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { beforeEach, expect, it, vi } from "vitest";
 import SpeechRuntimePanel from "./SpeechRuntimePanel.svelte";
 import { api } from "../../api";
-import type { SpeechRuntimeSettings } from "../../apiTypes";
+import type { SpeechRuntimeView } from "../../apiTypes";
 
-function runtime(overrides: Partial<SpeechRuntimeSettings> = {}): SpeechRuntimeSettings {
+function runtime(overrides: Partial<SpeechRuntimeView> = {}): SpeechRuntimeView {
   return { endpoint: "", model: "", configured: false, effective: "browser", ...overrides };
 }
 
@@ -14,7 +14,7 @@ it("keeps an address typed before the read resolved", async () => {
   // FIXED-85's defect, in a new place: the row renders before the read answers,
   // so an owner can type into it first. Adopting the stored value afterwards
   // would clear what they had already entered.
-  type View = { runtime: SpeechRuntimeSettings; max_audio_bytes: number };
+  type View = { runtime: SpeechRuntimeView; max_audio_bytes: number };
   const pending: { settle: (view: View) => void } = { settle: () => {} };
   vi.spyOn(api, "speechRuntime").mockReturnValue(
     new Promise<View>((resolve) => { pending.settle = resolve; }),

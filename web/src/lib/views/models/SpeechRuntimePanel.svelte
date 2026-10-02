@@ -2,9 +2,9 @@
   import { onMount } from "svelte";
   import { api, ApiError } from "../../api";
   import Icon from "../../components/Icon.svelte";
-  import type { SpeechRuntimeSettings } from "../../apiTypes";
+  import type { SpeechRuntimeView } from "../../apiTypes";
 
-  let runtime = $state<SpeechRuntimeSettings | null>(null);
+  let runtime = $state<SpeechRuntimeView | null>(null);
   let draft = $state("");
   /**
    * FIXED-85's rule, applied here: an address typed while the read was in

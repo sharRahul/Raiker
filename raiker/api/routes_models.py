@@ -26,8 +26,30 @@ from raiker.api.schemas import (
     ModelSetupUpdateRequest,
     OllamaPullRequestBody,
     SurfaceModelDefaultRequest,
+    serialize_dto,
 )
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.models import (
+    HuggingFaceCredentialSaved,
+    HuggingFaceDownloadResult,
+    HuggingFaceSearch,
+    HuggingFaceTrending,
+    HuggingFaceVariants,
+    LibraryRescanned,
+    LibraryRootAdded,
+    LocalRuntimes,
+    ModelDecisions,
+    ModelLibraryView,
+    ModelOperations,
+    ModelOperationView,
+    ModelReadinessList,
+    OperationCleared,
+    OperationReview,
+    PartialFilesDeleted,
+    PartialFilesRefused,
+    SurfaceModels,
+    SurfaceModelSet,
+)
 from raiker.models import local_presence
 from raiker.models.conversion import (
     ConversionCancelled,
@@ -98,7 +120,8 @@ def list_model_readiness(
     items = SQLiteStore(request.app.state.workspace_root).list_model_readiness(  # type: ignore[attr-defined]
         session.principal_id
     )
-    return {"items": [item.to_dict() for item in items]}
+    answer: ModelReadinessList = {"items": [item.to_dict() for item in items]}
+    return serialize_dto(answer)
 
 
 @router.post("/api/model-readiness/check")
@@ -119,7 +142,7 @@ async def check_model_readiness(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"reason_code": "unknown_model_profile"},
         ) from exc
-    return readiness.to_dict()
+    return serialize_dto(readiness)
 
 
 # The work surfaces that may hold their own default model. Declared beside the
@@ -134,7 +157,7 @@ def get_surface_models(
 ) -> dict[str, Any]:
     session, _principal = auth_data
     store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
-    return {
+    answer: SurfaceModels = {
         "surfaces": {
             surface: {"profile_id": profile_id, "model": model}
             for surface, profile_id, model in store.list_surface_model_defaults(
@@ -142,6 +165,7 @@ def get_surface_models(
             )
         }
     }
+    return serialize_dto(answer)
 
 
 @router.put("/api/surface-models")
@@ -163,9 +187,11 @@ def set_surface_model(
         raise HTTPException(status_code=422, detail={"reason_code": "unknown_surface"})
     store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
     profile_id = body.profile_id.strip()
+    answer: SurfaceModelSet
     if not profile_id:
         store.clear_surface_model_default(session.principal_id, surface)
-        return {"ok": True, "surface": surface, "profile_id": "", "model": ""}
+        answer = {"ok": True, "surface": surface, "profile_id": "", "model": ""}
+        return serialize_dto(answer)
     from raiker.models.registry import ModelProfileRegistry
 
     try:
@@ -180,7 +206,8 @@ def set_surface_model(
             status_code=422, detail={"reason_code": f"model_required_for_profile:{profile_id}"}
         )
     store.save_surface_model_default(session.principal_id, surface, profile.profile_id, model)
-    return {"ok": True, "surface": surface, "profile_id": profile.profile_id, "model": model}
+    answer = {"ok": True, "surface": surface, "profile_id": profile.profile_id, "model": model}
+    return serialize_dto(answer)
 
 
 @router.get("/api/model-decision")
@@ -211,7 +238,7 @@ def get_model_decision(
     decision = ModelDecisionService(
         store, readiness=_service(request), runtimes=_runtimes(request)
     ).decide(session.principal_id, requested, project_id.strip() or None)
-    return decision.to_dict()
+    return serialize_dto(decision)
 
 
 def _runtimes(request: Request) -> tuple[Any, ...]:
@@ -246,12 +273,13 @@ def get_model_decisions(
     service = ModelDecisionService(
         store, readiness=_service(request), runtimes=_runtimes(request)
     )
-    return {
+    answer: ModelDecisions = {
         "surfaces": {
             surface: service.decide(session.principal_id, surface).to_dict()
             for surface in SURFACES
         }
     }
+    return serialize_dto(answer)
 
 
 @router.get("/api/model-setup")
@@ -260,12 +288,10 @@ def get_model_setup(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     session, _principal = auth_data
-    return (
-        SQLiteStore(request.app.state.workspace_root)
-        .load_model_setup_state(  # type: ignore[attr-defined]
+    return serialize_dto(
+        SQLiteStore(request.app.state.workspace_root).load_model_setup_state(  # type: ignore[attr-defined]
             session.principal_id
         )
-        .to_dict()
     )
 
 
@@ -278,7 +304,7 @@ def update_model_setup(
     session, _principal = auth_data
     store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
     current = store.load_model_setup_state(session.principal_id)
-    return store.save_model_setup_state(
+    return serialize_dto(store.save_model_setup_state(
         ModelSetupState(
             owner_principal_id=session.principal_id,
             status=body.status,
@@ -288,7 +314,7 @@ def update_model_setup(
             selected_model=body.selected_model,
             created_at=current.created_at,
         )
-    ).to_dict()
+    ))
 
 
 @router.get("/api/local-runtimes")
@@ -305,7 +331,7 @@ def list_local_runtimes(
     _session, principal = auth_data
     _require_human(principal)
     store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
-    return {
+    answer: LocalRuntimes = {
         "runtimes": [
             {
                 "runtime": result.runtime,
@@ -316,6 +342,7 @@ def list_local_runtimes(
             for result in sorted(local_presence.cached(store).values(), key=lambda r: r.runtime)
         ]
     }
+    return serialize_dto(answer)
 
 
 @router.post("/api/local-runtimes/detect")
@@ -332,7 +359,7 @@ def detect_local_runtimes(
     _session, principal = auth_data
     _require_human(principal)
     store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
-    return {
+    answer: LocalRuntimes = {
         "runtimes": [
             {
                 "runtime": result.runtime,
@@ -345,6 +372,7 @@ def detect_local_runtimes(
             )
         ]
     }
+    return serialize_dto(answer)
 
 
 @router.post("/api/model-operations/preview")
@@ -356,17 +384,18 @@ def preview_model_operation(
     _session, principal = auth_data
     _require_human(principal)
     if body.kind != "install":
-        return {
+        review: OperationReview = {
             "kind": body.kind,
             "target": body.target,
             "action": "review_operation",
             "confirmed": False,
         }
+        return serialize_dto(review)
     try:
-        return (
-            RuntimeInstallerRegistry()
-            .preview(body.target, platform="windows" if sys.platform == "win32" else sys.platform)
-            .to_dict()
+        return serialize_dto(
+            RuntimeInstallerRegistry().preview(
+                body.target, platform="windows" if sys.platform == "win32" else sys.platform
+            )
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail={"reason_code": str(exc)}) from exc
@@ -379,9 +408,10 @@ def list_model_operations(
 ) -> dict[str, Any]:
     session, principal = auth_data
     _require_human(principal)
-    return {
+    answer: ModelOperations = {
         "items": [item.to_dict() for item in _operation_service(request).list(session.principal_id)]
     }
+    return serialize_dto(answer)
 
 
 @router.post("/api/model-operations")
@@ -394,7 +424,7 @@ def start_model_operation(
     _require_human(principal)
     if not body.confirmed:
         raise HTTPException(status_code=409, detail={"reason_code": "confirmation_required"})
-    return (
+    return serialize_dto(
         _operation_service(request)
         .start(
             session.principal_id,
@@ -406,7 +436,6 @@ def start_model_operation(
                 destination=body.destination,
             ),
         )
-        .to_dict()
     )
 
 
@@ -530,28 +559,17 @@ def _run_hugging_face_download(
     )
 
 
-def _operation_action(
-    action: str,
-    operation_id: str,
-    request: Request,
-    auth_data: tuple[ApiSession, Principal],
-) -> dict[str, Any]:
-    session, principal = auth_data
-    _require_human(principal)
-    service = _operation_service(request)
-    try:
-        if action == "cancel":
-            return service.cancel(session.principal_id, operation_id).to_dict()
-        return {"ok": service.cleanup(session.principal_id, operation_id)}
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail={"reason_code": str(exc.args[0])}) from exc
-
-
 @router.post("/api/model-operations/{operation_id}/cancel")
 def cancel_model_operation(
     operation_id: str, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
 ) -> dict[str, Any]:
-    return _operation_action("cancel", operation_id, request, auth_data)
+    session, principal = auth_data
+    _require_human(principal)
+    try:
+        cancelled = _operation_service(request).cancel(session.principal_id, operation_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail={"reason_code": str(exc.args[0])}) from exc
+    return serialize_dto(cancelled)
 
 
 @router.post("/api/model-operations/{operation_id}/retry")
@@ -583,7 +601,7 @@ def retry_model_operation(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail={"reason_code": str(exc)}) from exc
     _dispatch_operation(background, request, session.principal_id, requeued)
-    return requeued.to_dict()
+    return serialize_dto(requeued)
 
 
 @router.get("/api/model-operations/{operation_id}/partial-files")
@@ -594,7 +612,7 @@ def preview_partial_files(
     session, principal = auth_data
     _require_human(principal)
     try:
-        return _operation_service(request).partial_files(session.principal_id, operation_id)
+        return serialize_dto(_operation_service(request).partial_files(session.principal_id, operation_id))
     except KeyError as exc:
         raise HTTPException(status_code=404, detail={"reason_code": str(exc.args[0])}) from exc
 
@@ -628,7 +646,8 @@ def delete_partial_files(
         raise HTTPException(status_code=404, detail={"reason_code": str(exc.args[0])}) from exc
     paths = [str(item) for item in summary.get("paths") or []]
     if not paths or not summary.get("exists"):
-        return {"ok": False, "reason_code": "no_partial_files", **summary}
+        refused: PartialFilesRefused = {"ok": False, "reason_code": "no_partial_files", **summary}
+        return serialize_dto(refused)
     # Re-read what this operation owns rather than trusting the summary: the
     # deletion set is the recorded one, checked again at the moment of deletion.
     owned = {str(Path(item).resolve()) for item in operation.cleanup_targets()}
@@ -649,14 +668,23 @@ def delete_partial_files(
         else:
             target.unlink(missing_ok=True)
     _library_service(request).rescan(session.principal_id)
-    return {"ok": True, **summary}
+    deleted: PartialFilesDeleted = {"ok": True, **summary}
+    return serialize_dto(deleted)
 
 
 @router.delete("/api/model-operations/{operation_id}")
 def cleanup_model_operation(
     operation_id: str, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
 ) -> dict[str, Any]:
-    return _operation_action("cleanup", operation_id, request, auth_data)
+    session, principal = auth_data
+    _require_human(principal)
+    try:
+        cleared: OperationCleared = {
+            "ok": _operation_service(request).cleanup(session.principal_id, operation_id)
+        }
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail={"reason_code": str(exc.args[0])}) from exc
+    return serialize_dto(cleared)
 
 
 @router.get("/api/model-library")
@@ -666,10 +694,11 @@ def get_model_library(
     session, principal = auth_data
     _require_human(principal)
     service = _library_service(request)
-    return {
+    answer: ModelLibraryView = {
         "roots": [{"path": path} for path in service.roots(session.principal_id)],
         "models": [model.to_dict() for model in service.list_models(session.principal_id)],
     }
+    return serialize_dto(answer)
 
 
 @router.post("/api/model-library/roots")
@@ -684,7 +713,8 @@ def add_model_library_root(
         path = _library_service(request).add_root(session.principal_id, Path(body.path))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail={"reason_code": str(exc)}) from exc
-    return {"ok": True, "path": path}
+    added: LibraryRootAdded = {"ok": True, "path": path}
+    return serialize_dto(added)
 
 
 @router.delete("/api/model-library/roots")
@@ -695,7 +725,10 @@ def remove_model_library_root(
 ) -> dict[str, Any]:
     session, principal = auth_data
     _require_human(principal)
-    return {"ok": _library_service(request).remove_root(session.principal_id, Path(body.path))}
+    removed: OperationCleared = {
+        "ok": _library_service(request).remove_root(session.principal_id, Path(body.path))
+    }
+    return serialize_dto(removed)
 
 
 @router.post("/api/model-library/rescan")
@@ -705,7 +738,8 @@ def rescan_model_library(
     session, principal = auth_data
     _require_human(principal)
     models = _library_service(request).rescan(session.principal_id)
-    return {"ok": True, "models": [model.to_dict() for model in models]}
+    answer: LibraryRescanned = {"ok": True, "models": [model.to_dict() for model in models]}
+    return serialize_dto(answer)
 
 
 def _wait_until_serving(
@@ -808,7 +842,7 @@ def deploy_local_model(
     profile_id = body.profile_id if body is not None else None
     if profile_id is not None and profile_id not in {slot.profile_id for slot in LOCAL_SLOTS}:
         raise HTTPException(status_code=422, detail={"reason_code": "unknown_local_runtime_slot"})
-    operation = (
+    operation: ModelOperationView = (
         _operation_service(request)
         .start(
             session.principal_id,
@@ -837,7 +871,7 @@ def deploy_local_model(
         background.add_task(_run_local_deployment, *arguments, profile_id)
     else:
         background.add_task(_run_local_deployment, *arguments)
-    return operation
+    return serialize_dto(operation)
 
 
 def _run_mlx_deployment(
@@ -909,7 +943,7 @@ def deploy_mlx_model(
     profile_id = body.profile_id if body is not None else None
     if profile_id is not None and profile_id not in {slot.profile_id for slot in MLX_SLOTS}:
         raise HTTPException(status_code=422, detail={"reason_code": "unknown_mlx_runtime_slot"})
-    operation = (
+    operation: ModelOperationView = (
         _operation_service(request)
         .start(
             session.principal_id,
@@ -936,7 +970,7 @@ def deploy_mlx_model(
         request.app.state.managed_mlx_runtime,
         profile_id,
     )
-    return operation
+    return serialize_dto(operation)
 
 
 @router.put("/api/hugging-face/credential")
@@ -953,7 +987,8 @@ def save_hugging_face_credential(
     ConnectorVault(SQLiteStore(request.app.state.workspace_root)).put(
         session.principal_id, "huggingface", {"token": token}
     )  # type: ignore[attr-defined]
-    return {"configured": True}
+    saved: HuggingFaceCredentialSaved = {"configured": True}
+    return serialize_dto(saved)
 
 
 @router.get("/api/hugging-face/search")
@@ -974,7 +1009,8 @@ def search_hugging_face(
         raise HTTPException(
             status_code=503, detail={"reason_code": exc.code, "repository_url": exc.repository_url}
         ) from exc
-    return {"items": [item.to_dict() for item in items]}
+    answer: HuggingFaceSearch = {"items": list(items)}
+    return serialize_dto(answer)
 
 
 @router.get("/api/hugging-face/trending")
@@ -1014,14 +1050,16 @@ def trending_hugging_face(
             token=_hugging_face_token(request, session.principal_id)
         )
     except HuggingFaceAccessError as exc:
-        return {
+        unreachable: HuggingFaceTrending = {
             "items": [],
             "unreachable": {
                 "reason_code": exc.code,
                 "repository_url": exc.repository_url,
             },
         }
-    return {"items": [item.to_dict() for item in items]}
+        return serialize_dto(unreachable)
+    answer: HuggingFaceTrending = {"items": list(items)}
+    return serialize_dto(answer)
 
 
 @router.get("/api/hugging-face/{owner}/{repository}/variants")
@@ -1049,7 +1087,8 @@ def list_hugging_face_variants(
         raise HTTPException(
             status_code=409, detail={"reason_code": code, "repository_url": link}
         ) from exc
-    return {"items": [item.to_dict() for item in items]}
+    answer: HuggingFaceVariants = {"items": list(items)}
+    return serialize_dto(answer)
 
 
 def _variant_from_body(body: HuggingFaceSelectionRequest) -> HfVariant:
@@ -1090,12 +1129,10 @@ def preview_hugging_face_download(
     _require_human(principal)
     try:
         variant = _resolve_hugging_face_selection(body, request, session.principal_id)
-        return (
-            _hugging_face_service(request)
-            .dry_run(
+        return serialize_dto(
+            _hugging_face_service(request).dry_run(
                 body.repo_id, variant, token=_hugging_face_token(request, session.principal_id)
             )
-            .to_dict()
         )
     except (ValueError, HuggingFaceAccessError) as exc:
         code = exc.code if isinstance(exc, HuggingFaceAccessError) else str(exc)
@@ -1178,13 +1215,15 @@ def download_hugging_face_model(
         },
     )
     _dispatch_operation(background, request, session.principal_id, operation)
-    result = operation.to_dict()
     # Both paths are derived from the approved destination and the immutable
     # revision, so they are known before a byte moves: the panel can offer the
     # conversion review the moment the operation reports `complete`.
-    result["snapshot_path"] = str(destination)
-    result["conversion_output_path"] = str(conversion_output)
-    return result
+    result: HuggingFaceDownloadResult = {
+        **operation.to_dict(),
+        "snapshot_path": str(destination),
+        "conversion_output_path": str(conversion_output),
+    }
+    return serialize_dto(result)
 
 
 def _require_approved_conversion_paths(
@@ -1210,10 +1249,8 @@ def preview_model_conversion(
     source, output = Path(body.source), Path(body.output)
     _require_approved_conversion_paths(request, session.principal_id, source, output)
     try:
-        return (
-            ModelConversionService()
-            .preview(source, output, body.revision, body.quantization)
-            .to_dict()
+        return serialize_dto(
+            ModelConversionService().preview(source, output, body.revision, body.quantization)
         )
     except ConversionRefused as exc:
         raise HTTPException(status_code=422, detail={"reason_code": str(exc)}) from exc
@@ -1299,7 +1336,7 @@ def start_model_conversion(
         operation.operation_id,
         body,
     )
-    return operation.to_dict()
+    return serialize_dto(operation)
 
 
 async def _pull_ollama_model(workspace: Path, owner: str, operation_id: str, model: str) -> None:
@@ -1371,4 +1408,4 @@ def pull_ollama_model(
         operation.operation_id,
         model,
     )
-    return operation.to_dict()
+    return serialize_dto(operation)

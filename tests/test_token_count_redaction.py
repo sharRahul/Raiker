@@ -28,6 +28,23 @@ class TestTokenCountRedaction:
         }
         assert redact_event_payload(payload) == payload
 
+    def test_a_count_is_recognised_by_its_shape_not_by_a_list(self) -> None:
+        """Counts added after the allowlist was written reached the page redacted.
+
+        A capacity's `tokens`, a week's `cache_read_tokens`, a compaction's
+        `estimated_summary_tokens`: each was "***REDACTED***" on the wire. A key
+        with a whole "tokens" word in it, holding an integer or null, is a count.
+        """
+        body = {
+            "tokens": 8192,
+            "cache_read_tokens": 12,
+            "cache_write_tokens": 0,
+            "estimated_summary_tokens": 300,
+            "estimated_input_tokens_before": None,
+        }
+        assert redact_response_body(body) == body
+        assert redact_response_body({"tokens": "sk-ant-leak"}) == {"tokens": "***REDACTED***"}
+
     def test_credentials_named_token_are_still_redacted(self) -> None:
         body = {"api_token": "sk-ant-secret", "owner_token": "abc123", "authorization": "Bearer x"}
         redacted = redact_response_body(body)

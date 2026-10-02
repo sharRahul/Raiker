@@ -71,35 +71,143 @@ INVENTORY_MD = REPO_ROOT / "docs" / "architecture" / "API_CONTRACT_INVENTORY.md"
 #: this set is where the evidence for each claim is recorded.
 VERIFIED: frozenset[tuple[str, str]] = frozenset(
     {
+        ("DELETE", "/api/account"),
         ("DELETE", "/api/brain/sources"),
         ("DELETE", "/api/brain/sources/grants"),
         ("DELETE", "/api/knowledge-sources"),
+        ("DELETE", "/api/managed-files/{file_id}"),
         ("DELETE", "/api/memory/{memory_id}"),
         ("DELETE", "/api/memory/{memory_id}/purge"),
+        ("DELETE", "/api/model-library/roots"),
+        ("DELETE", "/api/model-operations/{operation_id}"),
+        ("DELETE", "/api/models/chatgpt-codex/connection"),
+        ("DELETE", "/api/projects/{project_id}"),
+        ("DELETE", "/api/projects/{project_id}/root"),
+        ("DELETE", "/api/sessions/bulk"),
+        ("DELETE", "/api/sessions/{session_id}"),
+        ("DELETE", "/api/sessions/{session_id}/command-grant"),
+        ("GET", "/api/approvals"),
+        ("GET", "/api/approvals/{approval_id}"),
+        ("GET", "/api/auth/bootstrap-status"),
+        ("GET", "/api/auth/session-state"),
+        ("GET", "/api/auth/sessions"),
+        ("GET", "/api/auth/whoami"),
         ("GET", "/api/brain"),
         ("GET", "/api/brain/settings"),
         ("GET", "/api/brain/sources/browse"),
         ("GET", "/api/brain/sources/roots"),
+        ("GET", "/api/capability-gates"),
+        ("GET", "/api/capability-gates/{capability}"),
+        ("GET", "/api/chat-search"),
+        ("GET", "/api/checkpoints"),
+        ("GET", "/api/checkpoints/{checkpoint_id}"),
+        ("GET", "/api/checkpoints/{checkpoint_id}/branch-plan"),
+        ("GET", "/api/checkpoints/{checkpoint_id}/restore-plan"),
+        ("GET", "/api/code/repos"),
+        ("GET", "/api/connections"),
+        ("GET", "/api/diagnostics"),
+        ("GET", "/api/events"),
+        ("GET", "/api/extensions"),
+        ("GET", "/api/hugging-face/search"),
+        ("GET", "/api/hugging-face/trending"),
+        ("GET", "/api/hugging-face/{owner}/{repository}/variants"),
+        ("GET", "/api/images"),
         ("GET", "/api/knowledge-sources"),
+        ("GET", "/api/local-runtimes"),
+        ("GET", "/api/mcp/servers"),
+        ("GET", "/api/mcp/servers/{server_id}/findings"),
+        ("GET", "/api/mcp/servers/{server_id}/sessions"),
+        ("GET", "/api/memory"),
         ("GET", "/api/memory/entity-proposals"),
         ("GET", "/api/memory/export"),
+        ("GET", "/api/memory/files"),
         ("GET", "/api/memory/integrity"),
         ("GET", "/api/memory/observations"),
         ("GET", "/api/memory/proposals"),
         ("GET", "/api/memory/relationship-proposals"),
+        ("GET", "/api/memory/settings"),
         ("GET", "/api/memory/{memory_id}/history"),
         ("GET", "/api/memory/{memory_id}/purge-preview"),
         ("GET", "/api/memory/{memory_id}/source"),
+        ("GET", "/api/model-decision"),
+        ("GET", "/api/model-decisions"),
+        ("GET", "/api/model-library"),
+        ("GET", "/api/model-operations"),
+        ("GET", "/api/model-operations/{operation_id}/partial-files"),
+        ("GET", "/api/model-readiness"),
+        ("GET", "/api/model-setup"),
+        ("GET", "/api/models"),
+        ("GET", "/api/models/capacities"),
+        ("GET", "/api/models/chatgpt-codex/status"),
+        ("GET", "/api/models/pricing"),
+        ("GET", "/api/models/weekly-usage"),
+        ("GET", "/api/models/{profile_id}/provider-models"),
+        ("GET", "/api/notifications"),
+        ("GET", "/api/projects"),
+        ("GET", "/api/projects/tree"),
+        ("GET", "/api/projects/{project_id}"),
+        ("GET", "/api/projects/{project_id}/browse"),
+        ("GET", "/api/projects/{project_id}/deletion-preview"),
+        ("GET", "/api/projects/{project_id}/files"),
+        ("GET", "/api/projects/{project_id}/managed-files"),
+        ("GET", "/api/projects/{project_id}/root/status"),
+        ("GET", "/api/runtime-mode"),
+        ("GET", "/api/runtime-readiness"),
+        ("GET", "/api/security/credentials"),
+        ("GET", "/api/security/findings"),
+        ("GET", "/api/sessions"),
+        ("GET", "/api/sessions/{session_id}"),
+        ("GET", "/api/sessions/{session_id}/attachments"),
+        ("GET", "/api/sessions/{session_id}/attachments/{attachment_id}/preview"),
+        ("GET", "/api/sessions/{session_id}/attachments/{attachment_id}/provenance"),
+        ("GET", "/api/sessions/{session_id}/branch-origin"),
+        ("GET", "/api/sessions/{session_id}/context-usage"),
+        ("GET", "/api/sessions/{session_id}/export/manifest"),
+        ("GET", "/api/sessions/{session_id}/plan"),
+        ("GET", "/api/sessions/{session_id}/recall"),
+        ("GET", "/api/sessions/{session_id}/sources"),
+        ("GET", "/api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt"),
+        ("GET", "/api/setup"),
+        ("GET", "/api/speech/runtime"),
+        ("GET", "/api/surface-models"),
+        ("GET", "/api/tasks"),
+        ("GET", "/api/tasks/{task_id}"),
+        ("GET", "/api/turns/{turn_id}"),
+        ("GET", "/api/work-in-flight"),
+        ("GET", "/api/work-threads"),
+        ("GET", "/api/work-threads/page"),
+        ("POST", "/api/auth/elevate"),
+        ("POST", "/api/auth/login"),
+        ("POST", "/api/auth/logout"),
+        ("POST", "/api/auth/mfa/activate"),
+        ("POST", "/api/auth/mfa/disable"),
+        ("POST", "/api/auth/mfa/enroll"),
+        ("POST", "/api/auth/mfa/verify"),
+        ("POST", "/api/auth/password"),
+        ("POST", "/api/auth/password-recovery/begin"),
+        ("POST", "/api/auth/password-recovery/complete"),
+        ("POST", "/api/auth/register"),
+        ("POST", "/api/auth/session"),
+        ("POST", "/api/auth/sessions/{session_id}/revoke"),
         ("POST", "/api/brain/sources"),
         ("POST", "/api/brain/sources/grants"),
         ("POST", "/api/brain/sources/review"),
         ("POST", "/api/brain/sources/upload"),
+        ("POST", "/api/checkpoints/{checkpoint_id}/branch"),
+        ("POST", "/api/checkpoints/{checkpoint_id}/restore"),
+        ("POST", "/api/hugging-face/download"),
+        ("POST", "/api/hugging-face/download/preview"),
+        ("POST", "/api/images"),
+        ("POST", "/api/language/check"),
+        ("POST", "/api/local-runtimes/detect"),
+        ("POST", "/api/managed-files/{file_id}/retry"),
         ("POST", "/api/memory/conversation-index/rebuild"),
         ("POST", "/api/memory/eidetic/cleanup"),
         ("POST", "/api/memory/embedding-index"),
         ("POST", "/api/memory/entity-proposals/scan"),
         ("POST", "/api/memory/entity-proposals/{candidate_id}/decision"),
         ("POST", "/api/memory/entity-relationships/{relationship_id}/reject"),
+        ("POST", "/api/memory/files"),
         ("POST", "/api/memory/gists/{gist_id}/discard"),
         ("POST", "/api/memory/import"),
         ("POST", "/api/memory/import/preview"),
@@ -109,7 +217,39 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/memory/relationship-proposals/scan"),
         ("POST", "/api/memory/relationship-proposals/{candidate_id}/decision"),
         ("POST", "/api/memory/{memory_id}/correct"),
+        ("POST", "/api/model-conversion"),
+        ("POST", "/api/model-conversion/preview"),
+        ("POST", "/api/model-library/rescan"),
+        ("POST", "/api/model-library/roots"),
+        ("POST", "/api/model-library/{model_id:path}/deploy"),
+        ("POST", "/api/model-library/{model_id:path}/deploy-mlx"),
+        ("POST", "/api/model-operations"),
+        ("POST", "/api/model-operations/preview"),
+        ("POST", "/api/model-operations/{operation_id}/cancel"),
+        ("POST", "/api/model-operations/{operation_id}/delete-partial-files"),
+        ("POST", "/api/model-operations/{operation_id}/retry"),
+        ("POST", "/api/model-readiness/check"),
+        ("POST", "/api/models/capacities/refresh"),
+        ("POST", "/api/models/catalogues/refresh"),
+        ("POST", "/api/models/chatgpt-codex/connection"),
+        ("POST", "/api/models/chatgpt-codex/login"),
+        ("POST", "/api/models/pricing/refresh"),
+        ("POST", "/api/ollama/pull"),
+        ("POST", "/api/projects"),
+        ("POST", "/api/projects/{project_id}/managed-files"),
+        ("POST", "/api/projects/{project_id}/root/attach"),
+        ("POST", "/api/projects/{project_id}/root/index"),
+        ("POST", "/api/security/breach-check"),
+        ("POST", "/api/security/credentials/{provider}/verify"),
+        ("POST", "/api/security/scan"),
+        ("POST", "/api/sessions/{session_id}/compact"),
+        ("POST", "/api/setup/backup/create"),
+        ("POST", "/api/speech/runtime/probe"),
+        ("POST", "/api/tasks"),
+        ("POST", "/api/tasks/{task_id}/resume"),
+        ("POST", "/api/tasks/{task_id}/run"),
         ("PUT", "/api/brain/settings"),
+        ("PUT", "/api/hugging-face/credential"),
         ("PUT", "/api/memory/embedding-backend"),
         ("PUT", "/api/memory/incognito"),
         ("PUT", "/api/memory/{memory_id}"),
@@ -118,47 +258,20 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("PUT", "/api/memory/{memory_id}/pin"),
         ("PUT", "/api/memory/{memory_id}/scope"),
         ("PUT", "/api/memory/{memory_id}/search"),
-        ("DELETE", "/api/managed-files/{file_id}"),
-        ("DELETE", "/api/projects/{project_id}"),
-        ("DELETE", "/api/projects/{project_id}/root"),
-        ("GET", "/api/memory/files"),
-        ("GET", "/api/projects/tree"),
-        ("GET", "/api/projects/{project_id}/browse"),
-        ("GET", "/api/projects/{project_id}/deletion-preview"),
-        ("GET", "/api/projects/{project_id}/files"),
-        ("GET", "/api/projects/{project_id}/managed-files"),
-        ("GET", "/api/projects/{project_id}/root/status"),
-        ("POST", "/api/managed-files/{file_id}/retry"),
-        ("POST", "/api/memory/files"),
-        ("POST", "/api/projects"),
-        ("POST", "/api/projects/{project_id}/managed-files"),
-        ("POST", "/api/projects/{project_id}/root/attach"),
-        ("POST", "/api/projects/{project_id}/root/index"),
+        ("PUT", "/api/model-advisor"),
+        ("PUT", "/api/model-fallback"),
+        ("PUT", "/api/model-selection"),
+        ("PUT", "/api/model-setup"),
+        ("PUT", "/api/models/{profile_id}/available-models"),
+        ("PUT", "/api/models/{profile_id}/capacity"),
+        ("PUT", "/api/models/{profile_id}/connection"),
+        ("PUT", "/api/models/{profile_id}/price"),
+        ("PUT", "/api/models/{profile_id}/weekly-budget"),
         ("PUT", "/api/projects/selection"),
         ("PUT", "/api/projects/{project_id}/archive"),
         ("PUT", "/api/projects/{project_id}/context"),
         ("PUT", "/api/projects/{project_id}/move"),
         ("PUT", "/api/projects/{project_id}/restore"),
-        ("DELETE", "/api/sessions/bulk"),
-        ("DELETE", "/api/sessions/{session_id}"),
-        ("DELETE", "/api/sessions/{session_id}/command-grant"),
-        ("GET", "/api/checkpoints/{checkpoint_id}/branch-plan"),
-        ("GET", "/api/checkpoints/{checkpoint_id}/restore-plan"),
-        ("GET", "/api/sessions/{session_id}"),
-        ("GET", "/api/sessions/{session_id}/attachments"),
-        ("GET", "/api/sessions/{session_id}/attachments/{attachment_id}/preview"),
-        ("GET", "/api/sessions/{session_id}/attachments/{attachment_id}/provenance"),
-        ("GET", "/api/sessions/{session_id}/branch-origin"),
-        ("GET", "/api/sessions/{session_id}/export/manifest"),
-        ("GET", "/api/sessions/{session_id}/plan"),
-        ("GET", "/api/sessions/{session_id}/recall"),
-        ("GET", "/api/sessions/{session_id}/sources"),
-        ("GET", "/api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt"),
-        ("GET", "/api/work-in-flight"),
-        ("POST", "/api/checkpoints/{checkpoint_id}/branch"),
-        ("POST", "/api/checkpoints/{checkpoint_id}/restore"),
-        ("POST", "/api/sessions/{session_id}/compact"),
-        ("POST", "/api/tasks/{task_id}/resume"),
         ("PUT", "/api/sessions/{session_id}/archive"),
         ("PUT", "/api/sessions/{session_id}/command-grant"),
         ("PUT", "/api/sessions/{session_id}/pin"),
@@ -166,64 +279,21 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("PUT", "/api/sessions/{session_id}/rename"),
         ("PUT", "/api/sessions/{session_id}/tags"),
         ("PUT", "/api/sessions/{session_id}/unarchive"),
-        ("POST", "/api/auth/register"),
-        ("POST", "/api/auth/login"),
-        ("POST", "/api/auth/session"),
-        ("GET", "/api/auth/bootstrap-status"),
-        ("POST", "/api/auth/password-recovery/begin"),
-        ("POST", "/api/auth/password-recovery/complete"),
-        ("POST", "/api/auth/mfa/verify"),
-        ("POST", "/api/auth/mfa/enroll"),
-        ("POST", "/api/auth/mfa/activate"),
-        ("POST", "/api/auth/mfa/disable"),
-        ("POST", "/api/auth/elevate"),
-        ("POST", "/api/auth/password"),
-        ("POST", "/api/auth/logout"),
-        ("GET", "/api/auth/whoami"),
-        ("GET", "/api/auth/session-state"),
-        ("GET", "/api/auth/sessions"),
-        ("POST", "/api/auth/sessions/{session_id}/revoke"),
-        ("DELETE", "/api/account"),
-        ("GET", "/api/approvals"),
-        ("GET", "/api/capability-gates"),
-        ("GET", "/api/checkpoints"),
-        ("GET", "/api/code/repos"),
-        ("GET", "/api/connections"),
-        ("GET", "/api/events"),
-        ("GET", "/api/extensions"),
-        ("GET", "/api/mcp/servers"),
-        ("GET", "/api/mcp/servers/{server_id}/sessions"),
-        ("GET", "/api/memory"),
-        ("GET", "/api/projects"),
-        ("GET", "/api/runtime-mode"),
-        ("GET", "/api/runtime-readiness"),
-        ("GET", "/api/sessions"),
-        ("GET", "/api/tasks"),
-        ("GET", "/api/work-threads"),
-        ("GET", "/api/work-threads/page"),
-        ("GET", "/api/approvals/{approval_id}"),
-        ("GET", "/api/capability-gates/{capability}"),
-        ("GET", "/api/chat-search"),
-        ("GET", "/api/checkpoints/{checkpoint_id}"),
-        ("GET", "/api/diagnostics"),
-        ("GET", "/api/mcp/servers/{server_id}/findings"),
-        ("GET", "/api/memory/settings"),
-        ("GET", "/api/notifications"),
-        ("GET", "/api/projects/{project_id}"),
-        ("POST", "/api/security/breach-check"),
-        ("GET", "/api/security/credentials"),
-        ("POST", "/api/security/credentials/{provider}/verify"),
-        ("GET", "/api/security/findings"),
-        ("POST", "/api/security/scan"),
-        ("GET", "/api/sessions/{session_id}/context-usage"),
-        ("POST", "/api/tasks"),
-        ("GET", "/api/tasks/{task_id}"),
-        ("POST", "/api/tasks/{task_id}/run"),
-        ("GET", "/api/turns/{turn_id}"),
+        ("PUT", "/api/setup"),
+        ("PUT", "/api/speech/runtime"),
+        ("PUT", "/api/surface-models"),
     }
 )
 
-_SPECIAL_MARKERS = ("StreamingResponse", "FileResponse", "EventSourceResponse", "Response(")
+#: A stream, a file, or a raw (non-JSON) request body: none of them is an
+#: ordinary JSON operation, so each stays hand-written.
+_SPECIAL_MARKERS = (
+    "StreamingResponse",
+    "FileResponse",
+    "EventSourceResponse",
+    "Response(",
+    "await request.body()",
+)
 
 
 # --- route analysis ---------------------------------------------------------
@@ -282,13 +352,38 @@ def _view_of(annotation: Any) -> Any | None:
     origin = typing.get_origin(annotation)
     if origin in (typing.Union, types.UnionType):
         members = [arg for arg in typing.get_args(annotation) if arg is not type(None)]
-        return _view_of(members[0]) if len(members) == 1 else None
+        if len(members) == 1:
+            return _view_of(members[0])
+        # One of several shapes — every member must be a wire view itself.
+        views = [_view_of(member) for member in members]
+        if any(view is None or typing.get_origin(view) is list for view in views):
+            return None
+        return typing.Union[tuple(views)]  # noqa: UP007 - built at runtime
     if origin in (list, tuple):
         args = [arg for arg in typing.get_args(annotation) if arg is not Ellipsis]
-        if len(args) == 1 and _wire_is_fields(args[0]):
-            return list[args[0]]  # type: ignore[valid-type]
+        inner = _view_of(args[0]) if len(args) == 1 else None
+        if inner is None or typing.get_origin(inner) is list:
+            return None
+        return list[inner]  # type: ignore[valid-type]
+    if _wire_is_fields(annotation):
+        return annotation
+    projected = _projection(annotation)
+    return projected if projected is not None and _wire_is_fields(projected) else None
+
+
+def _projection(annotation: Any) -> Any | None:
+    """The TypedDict a class's own ``to_dict`` is declared to return, if it is one.
+
+    A read model whose wire differs from its fields (it renames, nests or
+    derives a key) keeps its ``to_dict``; declaring that method's return as a
+    TypedDict makes the projection itself the contract, checked by mypy where
+    the dict is built.
+    """
+    to_dict = getattr(annotation, "to_dict", None) if isinstance(annotation, type) else None
+    if to_dict is None:
         return None
-    return annotation if _wire_is_fields(annotation) else None
+    returned = _hints(to_dict).get("return")
+    return returned if is_typeddict(returned) else None
 
 
 def _own_nodes(function: ast.AST) -> list[ast.AST]:
@@ -438,9 +533,13 @@ def _handler_view(endpoint: Callable[..., Any]) -> tuple[Any | None, str]:
         if view is None:
             return None, how
         found.append((view, how))
-    if len({view for view, _ in found}) != 1:
-        return None, "returns more than one shape"
-    return found[0]
+    views = list(dict.fromkeys(view for view, _ in found))
+    if len(views) == 1:
+        return found[0]
+    if any(typing.get_origin(view) is list for view in views):
+        return None, "returns a list in one branch and an object in another"
+    # A route answering one of several declared shapes: the union is the contract.
+    return typing.Union[tuple(views)], " | ".join(how for _, how in found)  # noqa: UP007
 
 
 def _namespace() -> dict[str, Any]:
@@ -558,7 +657,7 @@ def openapi_document(app: FastAPI) -> dict[str, Any]:
             components.setdefault(name, schema)
         for item, mode in _keys:
             schema = _keys[(item, mode)]
-            operation = document["paths"][item.path][item.method.lower()]
+            operation = document["paths"][_openapi_path(item.path)][item.method.lower()]
             responses = operation.setdefault("responses", {})
             if item.code != "200":
                 responses.pop("200", None)
@@ -567,6 +666,11 @@ def openapi_document(app: FastAPI) -> dict[str, Any]:
                 "content": {"application/json": {"schema": schema}},
             }
     return document
+
+
+def _openapi_path(path: str) -> str:
+    """The path as OpenAPI spells it: Starlette's ``{name:path}`` converter dropped."""
+    return re.sub(r"\{(\w+):\w+\}", r"{\1}", path)
 
 
 def render_openapi(document: dict[str, Any]) -> str:
@@ -713,13 +817,13 @@ def render_typescript(document: dict[str, Any], app: FastAPI) -> str:
     for item in contracts(app):
         if item.status != "verified":
             continue
-        operation = document["paths"][item.path][item.method.lower()]
+        operation = document["paths"][_openapi_path(item.path)][item.method.lower()]
         response = _ts(operation["responses"][item.code]["content"]["application/json"]["schema"])
         parameters = operation.get("parameters", [])
         path_params = [p for p in parameters if p.get("in") == "path"]
         query_params = [p for p in parameters if p.get("in") == "query"]
         args = [f"{_camel(p['name'])}: string" for p in path_params]
-        path = item.path
+        path = _openapi_path(item.path)
         for p in path_params:
             path = path.replace("{" + p["name"] + "}", "${encodeURIComponent(" + _camel(p["name"]) + ")}")
         target = f"`{path}`" if path_params else json.dumps(path)
@@ -738,9 +842,11 @@ def render_typescript(document: dict[str, Any], app: FastAPI) -> str:
             # One handler serving two paths (an alias): each wrapper is named by
             # its own path, so neither shadows the other.
             key = _camel(item.method.lower() + "_" + re.sub(r"[{}]", "", item.path.removeprefix("/api/")))
-        body = operation.get("requestBody", {}).get("content", {}).get("application/json", {})
+        request_body = operation.get("requestBody", {})
+        body = request_body.get("content", {}).get("application/json", {})
         if body:
-            args.append(f"body: {_ts(body.get('schema', {}))}")
+            optional = "" if request_body.get("required") else "?"
+            args.append(f"body{optional}: {_ts(body.get('schema', {}))}")
         header_params = [p for p in parameters if p.get("in") == "header"]
         headers = ", ".join(f'"{p["name"]}": {_camel(p["name"])}' for p in header_params)
         args += [f"{_camel(p['name'])}{'' if p.get('required') else '?'}: string" for p in header_params]
@@ -801,6 +907,8 @@ def render_inventory(app: FastAPI) -> str:
 
 
 def _type_name(annotation: Any) -> str:
+    if typing.get_origin(annotation) in (typing.Union, types.UnionType):
+        return " \\| ".join(_type_name(arg) for arg in typing.get_args(annotation))
     if typing.get_origin(annotation) in (list, tuple):
         return f"{_type_name(typing.get_args(annotation)[0])}[]"
     return getattr(annotation, "__name__", str(annotation))

@@ -12,20 +12,77 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Literal, NotRequired, cast
 
 import httpx
+from typing_extensions import TypedDict
 
 from raiker.models.connections import get_model_connection, list_model_connections
 from raiker.models.price_registry import PriceRegistry
 from raiker.models.pricing import resolve_model_facts
 from raiker.models.registry import ModelProfileRegistry
-from raiker.models.subscription_limits import SubscriptionLimits, SubscriptionLimitStore
+from raiker.models.subscription_limits import (
+    SubscriptionLimits,
+    SubscriptionLimitStore,
+    SubscriptionLimitsView,
+)
 from raiker.runtime.model_facts_store import ModelFactsStore
 from raiker.runtime.model_usage import ModelUsageLedger, UsageTotals
 
 MAX_PROVIDER_USAGE_BODY = 1024 * 1024
 MAX_PROVIDER_NUMBER = Decimal("1e30")
+
+
+class ObservedUsageView(TypedDict):
+    """What Raiker's own ledger recorded for one provider over the rolling week."""
+
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int
+    cache_write_tokens: int
+    total_tokens: int
+    requests: int
+    turns: int
+    compactions: int
+    known_cost: str | None
+    cost_currency: str | None
+    unpriced_models: list[str]
+    source: Literal["raiker_ledger"]
+    window: Literal["rolling_7_days"]
+
+
+class NativeUsageMetricView(TypedDict):
+    unit: str
+    used: str
+    limit: str | None
+    remaining: str | None
+    reset_interval: str | None
+    resets_at: str | None
+    scope: str
+    source: Literal["provider"]
+
+
+NativeStatus = Literal["available", "unavailable", "not_configured", "not_supported", "not_checked"]
+
+
+class NativeUsageView(TypedDict):
+    """What the provider's own usage API said, when it was asked and could answer."""
+
+    status: NativeStatus
+    reason_code: str | None
+    checked_at: str | None
+    expires_at: str | None
+    metrics: list[NativeUsageMetricView]
+
+
+class ProviderWeeklyUsage(TypedDict):
+    profile_id: str
+    provider: str
+    display_name: str
+    observed: ObservedUsageView
+    owner_budget: int | None
+    native: NativeUsageView
+    subscription: NotRequired[SubscriptionLimitsView | None]
 
 
 @dataclass(frozen=True)
@@ -65,7 +122,7 @@ class ProviderUsageRow:
     # nothing, and the surface shows nothing rather than an estimate.
     subscription: SubscriptionLimits | None = None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> ProviderWeeklyUsage:
         return {
             "profile_id": self.profile_id,
             "provider": self.provider,
@@ -87,7 +144,7 @@ class ProviderUsageRow:
             },
             "owner_budget": self.owner_budget,
             "native": {
-                "status": self.native.status,
+                "status": cast(NativeStatus, self.native.status),
                 "reason_code": self.native.reason_code,
                 "checked_at": self.native.checked_at,
                 "expires_at": self.native.expires_at,
@@ -102,7 +159,7 @@ class ProviderUsageRow:
                         "reset_interval": metric.reset_interval,
                         "resets_at": metric.resets_at,
                         "scope": metric.scope,
-                        "source": metric.source,
+                        "source": "provider",
                     }
                     for metric in self.native.metrics
                 ],

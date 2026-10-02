@@ -17,7 +17,8 @@ from fastapi import APIRouter, HTTPException, Request, status
 from raiker.api.auth import AuthMiddleware
 from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.refusals import refusal
-from raiker.api.schemas import SpeechRuntimeRequest
+from raiker.api.schemas import SpeechRuntimeRequest, serialize_dto
+from raiker.api.wire.models import SpeechProbe, SpeechRuntime
 from raiker.contracts.ids import utc_now
 from raiker.models.speech_runtime import (
     MAX_AUDIO_BYTES,
@@ -77,7 +78,8 @@ async def read_speech_runtime(request: Request) -> dict[str, Any]:
     """What the owner chose. Nothing is contacted to answer this."""
     _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
     settings = load_speech_runtime(_ws(request), principal.principal_id)
-    return {"runtime": settings.to_dict(), "max_audio_bytes": MAX_AUDIO_BYTES}
+    answer: SpeechRuntime = {"runtime": settings.to_dict(), "max_audio_bytes": MAX_AUDIO_BYTES}
+    return serialize_dto(answer)
 
 
 @router.put("/api/speech/runtime")
@@ -104,7 +106,8 @@ async def write_speech_runtime(
     }
     SQLiteStore(ws).put_user_settings(principal.principal_id, json.dumps(blob), utc_now())
     settings = SpeechRuntimeSettings(endpoint=endpoint, model=model)
-    return {"runtime": settings.to_dict(), "max_audio_bytes": MAX_AUDIO_BYTES}
+    answer: SpeechRuntime = {"runtime": settings.to_dict(), "max_audio_bytes": MAX_AUDIO_BYTES}
+    return serialize_dto(answer)
 
 
 @router.post("/api/speech/runtime/probe")
@@ -130,11 +133,14 @@ async def probe_speech_runtime(
         endpoint=endpoint,
         model=body.model.strip() if body and body.model is not None else stored.model,
     )
+    answer: SpeechProbe
     try:
         transcribe(candidate, silent_probe_clip(), timeout=20.0)
     except SpeechRuntimeError as exc:
-        return {"ok": False, "reason_code": exc.reason, "endpoint": endpoint}
-    return {"ok": True, "reason_code": None, "endpoint": endpoint}
+        answer = {"ok": False, "reason_code": exc.reason, "endpoint": endpoint}
+        return serialize_dto(answer)
+    answer = {"ok": True, "reason_code": None, "endpoint": endpoint}
+    return serialize_dto(answer)
 
 
 @router.post("/api/speech/transcribe")

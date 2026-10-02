@@ -10,6 +10,11 @@ export type ActivateRuntimeModeRequest = {
   as_principal?: string | null;
 };
 
+export type AdvisorSet = {
+  ok: boolean;
+  advisor_profile_id: string | null;
+};
+
 /** The agent's standing plan for one conversation (B6); only ``steps`` when there is none. */
 export type AgentPlan = {
   session_id: string;
@@ -122,6 +127,12 @@ export type AuthSessionRequest = {
 
 /** Which of one provider's models stay offered in every model picker. */
 export type AvailableModelsRequest = {
+  models: string[];
+};
+
+export type AvailableModelsSet = {
+  ok: boolean;
+  profile_id: string;
   models: string[];
 };
 
@@ -310,6 +321,49 @@ export type CapabilityGateView = {
   network_boundary: string;
 };
 
+export type CapacitiesRefreshed = {
+  ok: boolean;
+  profiles: CapacityRefreshOutcome[];
+};
+
+/** One recorded change to a model's context capacity. */
+export type CapacityHistoryEntry = {
+  capacity_id: string;
+  endpoint_identity: string;
+  context_window_tokens: number | null;
+  action: string;
+  reason: string | null;
+  recorded_by: string;
+  recorded_at: string;
+};
+
+export type CapacityRefreshOutcome = {
+  profile_id: string;
+  status: string;
+  reason_code: string | null;
+};
+
+/** When one local profile's capacity was last read from its runtime. */
+export type CapacityRefreshState = {
+  profile_id: string;
+  last_refresh_at: string | null;
+  next_refresh_at: string;
+  status: string;
+  reason_code: string | null;
+};
+
+export type CapacitySet = {
+  ok: boolean;
+  profile_id: string;
+  model: string;
+  tokens: number | null;
+};
+
+/** One explicit refresh of the connected providers' model lists, provider by provider. */
+export type CatalogueRefreshed = {
+  providers: ProviderCatalogueRefreshView[];
+};
+
 export type ChangePasswordRequest = {
   old_password: string;
   new_password: string;
@@ -394,6 +448,24 @@ export type CodeReposView = {
   note: string;
 };
 
+export type CodexConnected = {
+  ok: boolean;
+  connection_status: "connected";
+  plan_type: string | null;
+  connection_configured: boolean;
+};
+
+export type CodexLoginStarted = {
+  ok: boolean;
+  connection_status: "login_pending";
+};
+
+/** Whether the ChatGPT subscription is connected, offered, signed out or not installed. */
+export type CodexStatus = {
+  connection_status: "connected" | "available" | "signed_out" | "codex_missing";
+  plan_type: string | null;
+};
+
 /** Owner-defined, expiry-bound command prefixes for one conversation. */
 export type CommandGrant = {
   session_id: string;
@@ -422,6 +494,11 @@ export type ConnectCodeRepoRequest = {
   owner?: string | null;
   repo?: string | null;
   branch?: string | null;
+};
+
+export type ConnectionSet = {
+  ok: boolean;
+  connection_configured: boolean;
 };
 
 export type ConnectionsView = {
@@ -567,6 +644,31 @@ export type ConversationIndexRebuilt = {
   indexed_rows: number;
 };
 
+export type ConversionIsolation = {
+  network: false;
+  source_read_only: true;
+  credential_environment: string[];
+  workspace_mounted: false;
+  max_memory_bytes: number;
+  max_cpu_count: number;
+  max_processes: number;
+  timeout_seconds: number;
+};
+
+export type ConversionPreview = {
+  source: string;
+  output: string;
+  revision: string;
+  architecture: string;
+  quantization: string;
+  source_bytes: number;
+  required_free_bytes: number;
+  toolchain_image: string;
+  convert_argv: string[];
+  quantize_argv: string[];
+  isolation: ConversionIsolation;
+};
+
 export type CreateMcpServerRequest = {
   name: string;
   template: string;
@@ -615,6 +717,17 @@ export type CredentialRequest = {
   expires_at?: string | null;
 };
 
+export type DecisionProblem = {
+  reason_code: string;
+  summary: string;
+  remediation: string;
+};
+
+export type DecisionScope = {
+  surface: string;
+  project_id: string | null;
+};
+
 /** One sign-in of this account, without its token. */
 export type DeviceSessionView = {
   session_id: string;
@@ -649,6 +762,13 @@ export type DisableCapabilityRequest = {
 export type DisableRuntimeModeRequest = {
   reason?: string;
   as_principal?: string | null;
+};
+
+/** The pair that will run, and why it is that one rather than the selection. */
+export type EffectiveChoice = {
+  profile_id: string;
+  model: string;
+  reason: "selected" | "fallback" | "no_ready_candidate";
 };
 
 export type ElevateRequest = {
@@ -752,6 +872,11 @@ export type ExtensionsOverviewView = {
   deferred: Record<string, string>[];
 };
 
+export type FallbackSet = {
+  ok: boolean;
+  fallback_sequence: string[];
+};
+
 /** One governed write that touched a file, as recorded by checkpoint capture. */
 export type FileProvenanceEntryView = {
   turn_id: string | null;
@@ -791,8 +916,68 @@ export type GitTokenRequest = {
   token: string;
 };
 
+export type HfDownloadPreview = {
+  repo_id: string;
+  revision: string;
+  files: string[];
+  total_bytes: number;
+  cached_bytes: number;
+  download_bytes: number;
+};
+
+export type HfSearchResult = {
+  repo_id: string;
+  downloads: number;
+  likes: number;
+  gated: boolean;
+};
+
+export type HfVariant = {
+  repo_id: string;
+  revision: string;
+  files: string[];
+  format: "gguf" | "safetensors";
+  quantization: string | null;
+  total_bytes: number;
+  cached_bytes: number;
+  gated: boolean;
+  license_id: string | null;
+  complete: boolean;
+};
+
 export type HuggingFaceCredentialRequest = {
   token: string;
+};
+
+export type HuggingFaceCredentialSaved = {
+  configured: boolean;
+};
+
+/** The queued download, and where its snapshot and any conversion will land. */
+export type HuggingFaceDownloadResult = {
+  operation_id: string;
+  owner_principal_id: string;
+  kind: "install" | "download" | "convert" | "deploy" | "pull";
+  target: string;
+  state: "queued" | "running" | "cancel_requested" | "cancelled" | "failed" | "complete";
+  phase: string;
+  progress_bytes: number;
+  total_bytes: number | null;
+  progress_percent: number | null;
+  source_url: string | null;
+  destination: string | null;
+  error_code: string | null;
+  error_detail: string | null;
+  created_at: string;
+  updated_at: string;
+  retryable: boolean;
+  partial_files_present: boolean;
+  snapshot_path: string;
+  conversion_output_path: string;
+};
+
+export type HuggingFaceSearch = {
+  items: HfSearchResult[];
 };
 
 export type HuggingFaceSelectionRequest = {
@@ -801,6 +986,21 @@ export type HuggingFaceSelectionRequest = {
   files: string[];
   destination?: string | null;
   confirmed?: boolean;
+};
+
+/** The most-downloaded repositories; an unreachable Hub is an answer here (BUG-296). */
+export type HuggingFaceTrending = {
+  items: HfSearchResult[];
+  unreachable?: HuggingFaceUnreachable;
+};
+
+export type HuggingFaceUnreachable = {
+  reason_code: string;
+  repository_url: string | null;
+};
+
+export type HuggingFaceVariants = {
+  items: HfVariant[];
 };
 
 export type IdentityView = {
@@ -813,6 +1013,44 @@ export type IdentityView = {
   issued_at: string | null;
   expires_at: string | null;
   state: string;
+};
+
+export type ImageGallery = {
+  sizes: string[];
+  sized_providers: string[];
+  generations: ImageGeneration[];
+};
+
+/** One generation as the page sees it — metadata only, never the bytes. */
+export type ImageGeneration = {
+  generation_id: string;
+  profile_id: string;
+  provider: string;
+  model: string;
+  prompt: string;
+  size: string;
+  status: string;
+  reason_code: string | null;
+  has_image: boolean;
+  media_type: string | null;
+  byte_size: number | null;
+  created_at: string;
+  source_generation_id: string | null;
+  kind: "create" | "edit" | "variation";
+  project_id: string | null;
+};
+
+/** One governed generation request; ``generation_ids`` holds every variation made. */
+export type ImagesGenerated = {
+  ok: boolean;
+  generation_id: string;
+  generation_ids: string[];
+  provider: string;
+  model: string;
+  size: string;
+  kind: "create" | "edit" | "variation";
+  source_generation_id: string | null;
+  byte_size: number;
 };
 
 /** One file of a batch that was not stored, and why — its siblings still were. */
@@ -845,6 +1083,16 @@ export type InboundChannelMessage = {
 export type IncognitoSet = {
   ok: boolean;
   incognito: boolean;
+};
+
+export type InstallPlan = {
+  runtime: string;
+  action: string;
+  source_url: string;
+  argv: string[];
+  requires_elevation: boolean;
+  terms_url: string;
+  redistribution: boolean;
 };
 
 /** Name and optional first account for a locally isolated Raiker instance. */
@@ -897,13 +1145,80 @@ export type KnowledgeSources = {
   granted_count: number;
 };
 
+/** A grammar check, or the reason no checker could answer. */
+export type LanguageCheck = {
+  status: "available" | "unavailable";
+  reason_code?: string;
+  matches: LanguageMatch[];
+};
+
 export type LanguageCheckRequest = {
   text: string;
   language?: string;
 };
 
+export type LanguageMatch = {
+  offset: number;
+  length: number;
+  message: string;
+  replacements: string[];
+  rule_id: string;
+  category: string;
+};
+
+export type LibraryRescanned = {
+  ok: boolean;
+  models: LocalModelView[];
+};
+
+export type LibraryRoot = {
+  path: string;
+};
+
+export type LibraryRootAdded = {
+  ok: boolean;
+  path: string;
+};
+
+/** One limit the provider stated, exactly as stated. */
+export type LimitWindow = {
+  label: string;
+  used_percent: number;
+  window_minutes: number | null;
+  resets_at: string | null;
+};
+
 export type LocalModelDeployRequest = {
   profile_id?: string | null;
+};
+
+/** One model file set found under an approved library root. */
+export type LocalModelView = {
+  owner_principal_id: string;
+  root_path: string;
+  model_id: string;
+  name: string;
+  architecture: string;
+  quantization: string | null;
+  primary_path: string;
+  shard_count: number;
+  expected_shards: number;
+  complete: boolean;
+  size_bytes: number;
+  indexed_at: string;
+  format: "gguf" | "mlx";
+};
+
+/** A local model runtime found (or not) on this machine by a PATH lookup. */
+export type LocalRuntime = {
+  runtime: string;
+  present: boolean;
+  executable: string | null;
+  detected_at: string;
+};
+
+export type LocalRuntimes = {
+  runtimes: LocalRuntime[];
 };
 
 export type LoginRequest = {
@@ -1250,6 +1565,25 @@ export type MfaVerifyRequest = {
   code: string;
 };
 
+export type ModelCapacities = {
+  ok: boolean;
+  entries: ModelCapacityEntry[];
+  sync: CapacityRefreshState[];
+  refresh_due: boolean;
+  cadence_hours: number;
+  can_override: boolean;
+};
+
+export type ModelCapacityEntry = {
+  profile_id: string;
+  provider: string;
+  model: string;
+  endpoint_identity: string;
+  context_window_tokens: number | null;
+  source: string | null;
+  history: CapacityHistoryEntry[];
+};
+
 /** An owner-requested refresh of known, connected provider catalogues. */
 export type ModelCatalogueRefreshRequest = {
   profile_ids?: string[] | null;
@@ -1271,8 +1605,28 @@ export type ModelConversionRequestBody = {
   confirmed?: boolean;
 };
 
+/** Which model is selected for a surface, and which one will actually run. */
+export type ModelDecisionView = {
+  scope: DecisionScope;
+  selected: SelectedChoice;
+  effective: EffectiveChoice;
+  ready: boolean;
+  running: boolean | null;
+  problem: DecisionProblem | null;
+  revision: string;
+};
+
+export type ModelDecisions = {
+  surfaces: Record<string, ModelDecisionView>;
+};
+
 export type ModelLibraryRootRequest = {
   path: string;
+};
+
+export type ModelLibraryView = {
+  roots: LibraryRoot[];
+  models: LocalModelView[];
 };
 
 export type ModelOperationRequestBody = {
@@ -1281,6 +1635,31 @@ export type ModelOperationRequestBody = {
   confirmed?: boolean;
   source_url?: string | null;
   destination?: string | null;
+};
+
+/** One install, download, conversion, deployment or pull — redacted, with what it allows. */
+export type ModelOperationView = {
+  operation_id: string;
+  owner_principal_id: string;
+  kind: "install" | "download" | "convert" | "deploy" | "pull";
+  target: string;
+  state: "queued" | "running" | "cancel_requested" | "cancelled" | "failed" | "complete";
+  phase: string;
+  progress_bytes: number;
+  total_bytes: number | null;
+  progress_percent: number | null;
+  source_url: string | null;
+  destination: string | null;
+  error_code: string | null;
+  error_detail: string | null;
+  created_at: string;
+  updated_at: string;
+  retryable: boolean;
+  partial_files_present: boolean;
+};
+
+export type ModelOperations = {
+  items: ModelOperationView[];
 };
 
 /** An administrator's price override for one model, per million tokens. */
@@ -1295,15 +1674,126 @@ export type ModelPriceRequest = {
   reason?: string | null;
 };
 
+/** One exact model's pricing row for the Models → Pricing surface (BUG-21). */
+export type ModelPricingEntryView = {
+  provider: string;
+  model: string;
+  profile_id: string | null;
+  source: string | null;
+  currency: string | null;
+  input_per_mtok: string | null;
+  output_per_mtok: string | null;
+  cache_write_per_mtok: string | null;
+  cache_read_per_mtok: string | null;
+  effective_from: string | null;
+  as_of: string | null;
+  reviewed_at: string | null;
+  review_due_at: string | null;
+  review_status: "current" | "overdue" | "invalid" | null;
+  recorded_at: string | null;
+  recorded_by: string | null;
+  reason: string | null;
+  has_owner_override: boolean;
+  history: PricingHistoryEntry[];
+};
+
+/** Everything Models → Pricing has to state, in one governed read. */
+export type ModelPricingView = {
+  entries: ModelPricingEntryView[];
+  sync: PricingSyncState[];
+  can_override: boolean;
+};
+
 /** Where the built-in model registry was read from: ``packaged`` or ``override``. */
 export type ModelProfileSource = {
   kind: string;
   location: string;
 };
 
+export type ModelProfileView = {
+  profile_id: string;
+  provider: string;
+  model: string;
+  default_state: string;
+  local_only: boolean;
+  requires_network: boolean;
+  endpoint_kind: string;
+  requires_egress_policy: boolean;
+  requires_budget_policy: boolean;
+  runtime_gate: string | null;
+  off_machine: boolean;
+  selected: boolean;
+  connection_configured: boolean;
+  usage_admin_configured: boolean;
+  workspace_configured: boolean;
+  prompt_cache_ttl: string | null;
+  context_window_tokens: number | null;
+  context_window_source: string | null;
+  configured: boolean;
+  provider_detected: boolean | null;
+  readiness_state: "not_configured" | "checking" | "ready" | "runtime_missing" | "runtime_stopped" | "model_missing" | "policy_blocked" | "authentication_failed" | "quota_exhausted" | "unreachable" | "unsupported" | "stale" | "configuration_unreadable";
+  readiness_summary: string;
+  readiness_reason_code: string;
+  readiness_checked_at: string | null;
+  readiness_expires_at: string | null;
+  readiness_remediation: string;
+  ready: boolean;
+  billable: boolean;
+  models_used: number;
+  turns_used: number;
+  total_tokens: number;
+  total_cost: string | null;
+  cost_currency: string | null;
+  price_source: string | null;
+  price_as_of: string | null;
+  supports_reasoning: boolean;
+  supports_reasoning_effort: boolean;
+  reasoning_effort_values: string[];
+  reasoning_modes: string[];
+  supports_reasoning_summary: boolean;
+  image_models: string[];
+};
+
 export type ModelReadinessCheckRequest = {
   profile_id: string;
   model: string;
+};
+
+export type ModelReadinessList = {
+  items: ModelReadinessView[];
+};
+
+/** Whether one exact profile and model can answer now, and what it would take. */
+export type ModelReadinessView = {
+  owner_principal_id: string;
+  profile_id: string;
+  model: string;
+  endpoint_fingerprint: string;
+  state: "not_configured" | "checking" | "ready" | "runtime_missing" | "runtime_stopped" | "model_missing" | "policy_blocked" | "authentication_failed" | "quota_exhausted" | "unreachable" | "unsupported" | "stale" | "configuration_unreadable";
+  checked_at: string | null;
+  expires_at: string | null;
+  summary: string;
+  reason_code: string;
+  remediation: string;
+  evidence: Record<string, unknown>;
+  ready: boolean;
+};
+
+export type ModelSelectionSet = {
+  ok: boolean;
+  profile_id: string;
+  model: string;
+};
+
+export type ModelSetupState = {
+  owner_principal_id: string;
+  status: "required" | "in_progress" | "skipped" | "complete";
+  step: "choose_path" | "provider" | "model" | "review" | "ready";
+  path: "provider" | "ollama" | "lm_studio" | "local_gguf" | "hugging_face" | null;
+  selected_profile_id: string | null;
+  selected_model: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 };
 
 export type ModelSetupUpdateRequest = {
@@ -1319,8 +1809,53 @@ export type ModelWeeklyBudgetRequest = {
   token_budget?: number | null;
 };
 
+export type ModelsView = {
+  profiles: ModelProfileView[];
+  chat_profiles: ModelProfileView[];
+  current_profile_id: string | null;
+  hosted_model_gate_state: string;
+  private_network_model_gate_state: string;
+  hosted_model_gate_enforced: boolean;
+  private_network_model_gate_enforced: boolean;
+  model_egress_allowlist_configured: boolean;
+  remote_profile_count: number;
+  ready_provider_count: number;
+  usable_provider_count: number;
+  fallback_sequence: string[];
+  no_silent_hosted_fallback: boolean;
+  current_model: string | null;
+  advisor_profile_id: string | null;
+  advisor_model_gate_state: string;
+  advisor_model: string | null;
+  advisor_readiness_state: "not_configured" | "checking" | "ready" | "runtime_missing" | "runtime_stopped" | "model_missing" | "policy_blocked" | "authentication_failed" | "quota_exhausted" | "unreachable" | "unsupported" | "stale" | "configuration_unreadable";
+  advisor_readiness_summary: string | null;
+  advisor_readiness_remediation: string | null;
+  advisor_readiness_checked_at: string | null;
+  catalogues: Record<string, string[]>;
+};
+
 export type MoveProjectRequest = {
   parent_id?: string | null;
+};
+
+export type NativeUsageMetricView = {
+  unit: string;
+  used: string;
+  limit: string | null;
+  remaining: string | null;
+  reset_interval: string | null;
+  resets_at: string | null;
+  scope: string;
+  source: "provider";
+};
+
+/** What the provider's own usage API said, when it was asked and could answer. */
+export type NativeUsageView = {
+  status: "available" | "unavailable" | "not_configured" | "not_supported" | "not_checked";
+  reason_code: string | null;
+  checked_at: string | null;
+  expires_at: string | null;
+  metrics: NativeUsageMetricView[];
 };
 
 /**
@@ -1377,6 +1912,23 @@ export type ObservationsView = {
   due_for_expiry: string[];
 };
 
+/** What Raiker's own ledger recorded for one provider over the rolling week. */
+export type ObservedUsageView = {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  total_tokens: number;
+  requests: number;
+  turns: number;
+  compactions: number;
+  known_cost: string | null;
+  cost_currency: string | null;
+  unpriced_models: string[];
+  source: "raiker_ledger";
+  window: "rolling_7_days";
+};
+
 /** The acknowledgement a route gives when the change it was asked for is done. */
 export type Ok = {
   ok: boolean;
@@ -1385,6 +1937,18 @@ export type Ok = {
 export type OllamaPullRequestBody = {
   model: string;
   confirmed?: boolean;
+};
+
+export type OperationCleared = {
+  ok: boolean;
+};
+
+/** An operation other than an install, shown for review before it is confirmed. */
+export type OperationReview = {
+  kind: string;
+  target: string;
+  action: "review_operation";
+  confirmed: boolean;
 };
 
 /** Pair one connector profile. Paired is not enabled and not trusted. */
@@ -1400,6 +1964,34 @@ export type ParkedApproval = {
   turn_id: string;
   tool_name: string;
   created_at: string;
+};
+
+/** What a confirmed cleanup would delete: the exact paths, and their bytes. */
+export type PartialFiles = {
+  path: string | null;
+  paths: string[];
+  exists: boolean;
+  bytes: number;
+  file_count: number;
+};
+
+export type PartialFilesDeleted = {
+  path: string | null;
+  paths: string[];
+  exists: boolean;
+  bytes: number;
+  file_count: number;
+  ok: boolean;
+};
+
+export type PartialFilesRefused = {
+  path: string | null;
+  paths: string[];
+  exists: boolean;
+  bytes: number;
+  file_count: number;
+  ok: boolean;
+  reason_code: "no_partial_files";
 };
 
 export type PasswordRecoveryBeginRequest = {
@@ -1426,6 +2018,55 @@ export type PathAttachment = {
 
 export type PauseHostRequest = {
   reason?: string | null;
+};
+
+/** An owner price recorded, or cleared (``cleared``) back to the published one. */
+export type PriceSet = {
+  ok: boolean;
+  model: string;
+  cleared?: boolean;
+  input_per_mtok?: string;
+  output_per_mtok?: string;
+  cache_write_per_mtok?: string | null;
+  cache_read_per_mtok?: string | null;
+  currency?: string;
+};
+
+/** One recorded rate for an exact model, kept so a change can be read back. */
+export type PricingHistoryEntry = {
+  provider: string;
+  model: string;
+  source: string;
+  effective_from: string;
+  recorded_at: string;
+  as_of: string | null;
+  recorded_by: string | null;
+  reason: string | null;
+  currency: string;
+  input_per_mtok: string;
+  output_per_mtok: string;
+  cache_write_per_mtok: string | null;
+  cache_read_per_mtok: string | null;
+};
+
+export type PricingRefreshed = {
+  ok: boolean;
+  providers: SyncResult[];
+  changes_written: number;
+};
+
+/** When one provider's published prices were last read, and whether that is due again. */
+export type PricingSyncState = {
+  provider: string;
+  interval_hours: number;
+  last_attempt_at: string | null;
+  last_success_at: string | null;
+  next_refresh_at: string | null;
+  last_error: string | null;
+  models_recorded: number;
+  has_last_good: boolean;
+  due: boolean;
+  stale: boolean;
 };
 
 export type ProjectArchived = {
@@ -1651,6 +2292,15 @@ export type ProposalDecided = {
   relationship_proposals?: number;
 };
 
+/** Safe outcome for one provider in an explicit catalogue refresh. */
+export type ProviderCatalogueRefreshView = {
+  profile_id: string;
+  provider: string;
+  status: string;
+  reason_code: string | null;
+  model_count: number;
+};
+
 export type ProviderHealthView = {
   profile_id: string;
   provider: string;
@@ -1661,6 +2311,27 @@ export type ProviderHealthView = {
   selected: boolean;
   status: string;
   detail: string;
+};
+
+/** On-demand, user-initiated listing of the models a provider serves. */
+export type ProviderModelListView = {
+  profile_id: string;
+  provider: string;
+  status: "available" | "policy_denied" | "unsupported" | "unavailable";
+  reason_code: string | null;
+  models: string[];
+  remembered: boolean;
+  listed_at: string | null;
+};
+
+export type ProviderWeeklyUsage = {
+  profile_id: string;
+  provider: string;
+  display_name: string;
+  observed: ObservedUsageView;
+  owner_budget: number | null;
+  native: NativeUsageView;
+  subscription?: SubscriptionLimitsView | null;
 };
 
 /** An approved memory a turn of this conversation was given, as Raiker knows it now. */
@@ -1815,6 +2486,13 @@ export type SelectProjectRequest = {
   project_id?: string | null;
 };
 
+/** The owner's choice, and where it came from — most specific first. */
+export type SelectedChoice = {
+  profile_id: string;
+  model: string;
+  source: "surface_default" | "global_default" | "native_default";
+};
+
 export type SessionArchived = {
   ok: boolean;
   session_id: string;
@@ -1965,8 +2643,31 @@ export type SettingsRequest = {
   settings: Record<string, unknown>;
 };
 
+export type SetupBackupCreated = {
+  ok: boolean;
+  path: string;
+  setup: SetupState;
+};
+
 export type SetupBackupRequest = {
   target: string;
+};
+
+export type SetupState = {
+  owner_principal_id: string;
+  status: "required" | "in_progress" | "skipped" | "complete";
+  stage: "welcome" | "account" | "model" | "privacy" | "backup" | "finish";
+  selected_profile_id: string | null;
+  selected_model: string | null;
+  model_deferred: boolean;
+  privacy_mode: "local_first" | "balanced" | null;
+  privacy_acknowledged_at: string | null;
+  backup_mode: "later" | "local";
+  backup_target: string | null;
+  backup_verified_at: string | null;
+  background_service_enabled: boolean;
+  created_at: string | null;
+  updated_at: string | null;
 };
 
 export type SetupUpdateRequest = {
@@ -1995,14 +2696,41 @@ export type SourceAnchorView = {
   origin: string;
 };
 
+export type SpeechProbe = {
+  ok: boolean;
+  reason_code: string | null;
+  endpoint: string;
+};
+
+export type SpeechRuntime = {
+  runtime: SpeechRuntimeView;
+  max_audio_bytes: number;
+};
+
 /** The local transcription runtime dictation should use, if any (BUG-256). */
 export type SpeechRuntimeRequest = {
   endpoint?: string | null;
   model?: string | null;
 };
 
+/** The speech runtime the owner set up, and which one the microphone will use. */
+export type SpeechRuntimeView = {
+  endpoint: string;
+  model: string;
+  configured: boolean;
+  effective: "local" | "browser";
+};
+
 export type StopHostRequest = {
   confirm?: boolean;
+};
+
+/** What a provider volunteered with a turn about its own limits — never fetched. */
+export type SubscriptionLimitsView = {
+  windows: LimitWindow[];
+  observed_at: string;
+  stale: boolean;
+  source: "provider_turn";
 };
 
 /** Where one work surface's model picker should start. */
@@ -2010,6 +2738,31 @@ export type SurfaceModelDefaultRequest = {
   surface: string;
   profile_id?: string;
   model?: string;
+};
+
+export type SurfaceModelSet = {
+  ok: boolean;
+  surface: string;
+  profile_id: string;
+  model: string;
+};
+
+/** Where each surface's model picker starts — a preference, never readiness. */
+export type SurfaceModels = {
+  surfaces: Record<string, SurfacePick>;
+};
+
+export type SurfacePick = {
+  profile_id: string;
+  model: string;
+};
+
+export type SyncResult = {
+  provider: string;
+  ok: boolean;
+  models_recorded: number;
+  changes_written: number;
+  reason_code: string | null;
 };
 
 /** One run of a task, from where it started to how it settled. */
@@ -2231,6 +2984,16 @@ export type VaultKeyRequest = {
   mfa_code?: string | null;
 };
 
+export type WeeklyBudgetSet = {
+  ok: boolean;
+  profile_id: string;
+};
+
+export type WeeklyUsage = {
+  window: "rolling_7_days";
+  providers: ProviderWeeklyUsage[];
+};
+
 export type WhoamiView = {
   principal_id: string;
   display_name: string;
@@ -2376,10 +3139,32 @@ export const contract = {
     request<EventView[]>(withQuery("/api/events", query)),
   getExtensions: () =>
     request<ExtensionsOverviewView>("/api/extensions"),
+  saveHuggingFaceCredential: (body: HuggingFaceCredentialRequest) =>
+    call<HuggingFaceCredentialSaved>("PUT", "/api/hugging-face/credential", { body }),
+  downloadHuggingFaceModel: (body: HuggingFaceSelectionRequest) =>
+    call<HuggingFaceDownloadResult>("POST", "/api/hugging-face/download", { body }),
+  previewHuggingFaceDownload: (body: HuggingFaceSelectionRequest) =>
+    call<HfDownloadPreview>("POST", "/api/hugging-face/download/preview", { body }),
+  searchHuggingFace: (query: { query: string }) =>
+    request<HuggingFaceSearch>(withQuery("/api/hugging-face/search", query)),
+  trendingHuggingFace: () =>
+    request<HuggingFaceTrending>("/api/hugging-face/trending"),
+  listHuggingFaceVariants: (owner: string, repository: string, query: { revision?: string } = {}) =>
+    request<HuggingFaceVariants>(withQuery(`/api/hugging-face/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/variants`, query)),
+  listImages: () =>
+    request<ImageGallery>("/api/images"),
+  generateImage: (body: GenerateImageRequest) =>
+    call<ImagesGenerated>("POST", "/api/images", { body }),
   revokeKnowledgeSource: (query: { kind: string; source_id: string }) =>
     call<KnowledgeSourceRevoked>("DELETE", withQuery("/api/knowledge-sources", query)),
   listKnowledgeSources: () =>
     request<KnowledgeSources>("/api/knowledge-sources"),
+  checkLanguage: (body: LanguageCheckRequest) =>
+    call<LanguageCheck>("POST", "/api/language/check", { body }),
+  listLocalRuntimes: () =>
+    request<LocalRuntimes>("/api/local-runtimes"),
+  detectLocalRuntimes: () =>
+    call<LocalRuntimes>("POST", "/api/local-runtimes/detect"),
   deleteManagedFile: (fileId: string) =>
     call<ManagedFileChanged>("DELETE", `/api/managed-files/${encodeURIComponent(fileId)}`),
   retryManagedFile: (fileId: string) =>
@@ -2466,8 +3251,94 @@ export const contract = {
     call<MemoryUpdated>("PUT", `/api/memory/${encodeURIComponent(memoryId)}/search`, { body }),
   getMemorySource: (memoryId: string) =>
     request<MemorySource>(`/api/memory/${encodeURIComponent(memoryId)}/source`),
+  setModelAdvisor: (body: SetModelAdvisorRequest) =>
+    call<AdvisorSet>("PUT", "/api/model-advisor", { body }),
+  startModelConversion: (body: ModelConversionRequestBody) =>
+    call<ModelOperationView>("POST", "/api/model-conversion", { body }),
+  previewModelConversion: (body: ModelConversionRequestBody) =>
+    call<ConversionPreview>("POST", "/api/model-conversion/preview", { body }),
+  getModelDecision: (query: { surface?: string; project_id?: string } = {}) =>
+    request<ModelDecisionView>(withQuery("/api/model-decision", query)),
+  getModelDecisions: () =>
+    request<ModelDecisions>("/api/model-decisions"),
+  setModelFallback: (body: SetModelFallbackRequest) =>
+    call<FallbackSet>("PUT", "/api/model-fallback", { body }),
+  getModelLibrary: () =>
+    request<ModelLibraryView>("/api/model-library"),
+  rescanModelLibrary: () =>
+    call<LibraryRescanned>("POST", "/api/model-library/rescan"),
+  removeModelLibraryRoot: (body: ModelLibraryRootRequest) =>
+    call<OperationCleared>("DELETE", "/api/model-library/roots", { body }),
+  addModelLibraryRoot: (body: ModelLibraryRootRequest) =>
+    call<LibraryRootAdded>("POST", "/api/model-library/roots", { body }),
+  deployLocalModel: (modelId: string, body?: LocalModelDeployRequest | null) =>
+    call<ModelOperationView>("POST", `/api/model-library/${encodeURIComponent(modelId)}/deploy`, { body }),
+  deployMlxModel: (modelId: string, body?: LocalModelDeployRequest | null) =>
+    call<ModelOperationView>("POST", `/api/model-library/${encodeURIComponent(modelId)}/deploy-mlx`, { body }),
+  listModelOperations: () =>
+    request<ModelOperations>("/api/model-operations"),
+  startModelOperation: (body: ModelOperationRequestBody) =>
+    call<ModelOperationView>("POST", "/api/model-operations", { body }),
+  previewModelOperation: (body: ModelOperationRequestBody) =>
+    call<InstallPlan | OperationReview>("POST", "/api/model-operations/preview", { body }),
+  cleanupModelOperation: (operationId: string) =>
+    call<OperationCleared>("DELETE", `/api/model-operations/${encodeURIComponent(operationId)}`),
+  cancelModelOperation: (operationId: string) =>
+    call<ModelOperationView>("POST", `/api/model-operations/${encodeURIComponent(operationId)}/cancel`),
+  deletePartialFiles: (operationId: string, query: { confirmed?: boolean } = {}) =>
+    call<PartialFilesDeleted | PartialFilesRefused>("POST", withQuery(`/api/model-operations/${encodeURIComponent(operationId)}/delete-partial-files`, query)),
+  previewPartialFiles: (operationId: string) =>
+    request<PartialFiles>(`/api/model-operations/${encodeURIComponent(operationId)}/partial-files`),
+  retryModelOperation: (operationId: string) =>
+    call<ModelOperationView>("POST", `/api/model-operations/${encodeURIComponent(operationId)}/retry`),
+  listModelReadiness: () =>
+    request<ModelReadinessList>("/api/model-readiness"),
+  checkModelReadiness: (body: ModelReadinessCheckRequest) =>
+    call<ModelReadinessView>("POST", "/api/model-readiness/check", { body }),
+  setModelSelection: (body: SetModelSelectionRequest) =>
+    call<ModelSelectionSet>("PUT", "/api/model-selection", { body }),
+  getModelSetup: () =>
+    request<ModelSetupState>("/api/model-setup"),
+  updateModelSetup: (body: ModelSetupUpdateRequest) =>
+    call<ModelSetupState>("PUT", "/api/model-setup", { body }),
+  getModels: () =>
+    request<ModelsView>("/api/models"),
+  getModelCapacities: () =>
+    request<ModelCapacities>("/api/models/capacities"),
+  refreshModelCapacities: (query: { force?: boolean } = {}) =>
+    call<CapacitiesRefreshed>("POST", withQuery("/api/models/capacities/refresh", query)),
+  refreshConnectedProviderCatalogues: (body: ModelCatalogueRefreshRequest) =>
+    call<CatalogueRefreshed>("POST", "/api/models/catalogues/refresh", { body }),
+  disconnectChatgptCodex: () =>
+    call<ConnectionSet>("DELETE", "/api/models/chatgpt-codex/connection"),
+  connectChatgptCodex: () =>
+    call<CodexConnected>("POST", "/api/models/chatgpt-codex/connection"),
+  startChatgptCodexLogin: () =>
+    call<CodexLoginStarted>("POST", "/api/models/chatgpt-codex/login"),
+  getChatgptCodexStatus: () =>
+    request<CodexStatus>("/api/models/chatgpt-codex/status"),
+  getModelPricing: () =>
+    request<ModelPricingView>("/api/models/pricing"),
+  refreshModelPricing: () =>
+    call<PricingRefreshed>("POST", "/api/models/pricing/refresh"),
+  getWeeklyModelUsage: (query: { refresh_native?: boolean } = {}) =>
+    request<WeeklyUsage>(withQuery("/api/models/weekly-usage", query)),
+  setAvailableModels: (profileId: string, body: AvailableModelsRequest) =>
+    call<AvailableModelsSet>("PUT", `/api/models/${encodeURIComponent(profileId)}/available-models`, { body }),
+  setModelCapacity: (profileId: string, body: Record<string, unknown>) =>
+    call<CapacitySet>("PUT", `/api/models/${encodeURIComponent(profileId)}/capacity`, { body }),
+  setModelConnection: (profileId: string, body: ModelConnectionRequest) =>
+    call<ConnectionSet>("PUT", `/api/models/${encodeURIComponent(profileId)}/connection`, { body }),
+  setModelPrice: (profileId: string, body: ModelPriceRequest) =>
+    call<PriceSet>("PUT", `/api/models/${encodeURIComponent(profileId)}/price`, { body }),
+  listProviderModels: (profileId: string) =>
+    request<ProviderModelListView>(`/api/models/${encodeURIComponent(profileId)}/provider-models`),
+  setWeeklyModelBudget: (profileId: string, body: ModelWeeklyBudgetRequest) =>
+    call<WeeklyBudgetSet>("PUT", `/api/models/${encodeURIComponent(profileId)}/weekly-budget`, { body }),
   listNotifications: (query: { unread_only?: boolean } = {}) =>
     request<NotificationView[]>(withQuery("/api/notifications", query)),
+  pullOllamaModel: (body: OllamaPullRequestBody) =>
+    call<ModelOperationView>("POST", "/api/ollama/pull", { body }),
   listProjects: () =>
     request<ProjectsListView>("/api/projects"),
   createProject: (body: CreateProjectRequest) =>
@@ -2566,6 +3437,22 @@ export const contract = {
     request<TurnSourceExcerpt>(withQuery(`/api/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}/sources/${encodeURIComponent(sourceId)}/excerpt`, query)),
   unarchiveSession: (sessionId: string) =>
     call<SessionArchived>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/unarchive`),
+  getSetup: () =>
+    request<SetupState>("/api/setup"),
+  updateSetup: (body: SetupUpdateRequest) =>
+    call<SetupState>("PUT", "/api/setup", { body }),
+  createSetupBackup: (body: SetupBackupRequest) =>
+    call<SetupBackupCreated>("POST", "/api/setup/backup/create", { body }),
+  readSpeechRuntime: () =>
+    request<SpeechRuntime>("/api/speech/runtime"),
+  writeSpeechRuntime: (body: SpeechRuntimeRequest) =>
+    call<SpeechRuntime>("PUT", "/api/speech/runtime", { body }),
+  probeSpeechRuntime: (body?: SpeechRuntimeRequest | null) =>
+    call<SpeechProbe>("POST", "/api/speech/runtime/probe", { body }),
+  getSurfaceModels: () =>
+    request<SurfaceModels>("/api/surface-models"),
+  setSurfaceModel: (body: SurfaceModelDefaultRequest) =>
+    call<SurfaceModelSet>("PUT", "/api/surface-models", { body }),
   listTasks: (query: { session_id?: string; task_status?: string; project_id?: string } = {}) =>
     request<TaskView[]>(withQuery("/api/tasks", query)),
   createTask: (body: TaskCreateRequest) =>

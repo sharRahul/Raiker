@@ -12,7 +12,7 @@ import {
 } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelProfile, ModelsView as ModelsData } from "../apiTypes";
-import { stubFetch, stubFetchPending } from "../test-helpers";
+import { modelProfile, modelsView, stubFetch, stubFetchPending } from "../test-helpers";
 import ModelsView from "./ModelsView.svelte";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -52,7 +52,7 @@ async function rowAction(label: string, nth = 0): Promise<void> {
 }
 
 function profile(partial: Partial<ModelProfile>): ModelProfile {
-  return {
+  return modelProfile({
     profile_id: "p",
     provider: "llama.cpp",
     model: "local-gguf",
@@ -67,11 +67,11 @@ function profile(partial: Partial<ModelProfile>): ModelProfile {
     selected: false,
     prompt_cache_ttl: null,
     ...partial,
-  };
+  });
 }
 
 function models(partial: Partial<ModelsData>): ModelsData {
-  return {
+  return modelsView({
     profiles: [
       profile({ profile_id: "raiker-local-llama-cpp", provider: "llama.cpp" }),
       profile({
@@ -91,7 +91,7 @@ function models(partial: Partial<ModelsData>): ModelsData {
     fallback_sequence: [],
     no_silent_hosted_fallback: true,
     ...partial,
-  };
+  });
 }
 
 describe("BUG-270 — a card never claims a runtime that is not here", () => {
@@ -546,6 +546,7 @@ describe("ModelsView state grammar", () => {
         profiles: [anthropic],
         chat_profiles: [anthropic],
         ready_provider_count: 0,
+        usable_provider_count: 1,
       }),
     });
     render(ModelsView);
@@ -580,6 +581,7 @@ describe("ModelsView state grammar", () => {
       requires_network: true,
       off_machine: true,
       endpoint_kind: "hosted",
+      configured: true,
     });
 
   // Local and Hosted were peers because that is how the

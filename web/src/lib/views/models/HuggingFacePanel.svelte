@@ -4,6 +4,7 @@
   import ProviderLogo from "../../components/ProviderLogo.svelte";
   import { huggingFaceSteps, tokenControlVisible } from "../../huggingFaceSteps";
   import type {
+    ConversionQuantization,
     HuggingFaceDownloadPreview,
     HuggingFaceSearchResult,
     HuggingFaceVariant,
@@ -36,7 +37,7 @@
   let notice = $state<string | null>(null);
   let conversionSource = $state("");
   let conversionOutput = $state("");
-  let quantization = $state("Q4_K_M");
+  let quantization = $state<ConversionQuantization>("Q4_K_M");
   let conversionPreview = $state<ModelConversionPreview | null>(null);
   const size = (n: number) =>
     n < 1024 ** 3

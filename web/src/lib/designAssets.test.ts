@@ -35,6 +35,7 @@ function gen(over: Partial<ImageGeneration> & { generation_id: string }): ImageG
     created_at: "2026-09-12T10:00:00Z",
     kind: "create",
     source_generation_id: null,
+    project_id: null,
     ...over,
   };
 }

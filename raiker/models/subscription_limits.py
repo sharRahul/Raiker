@@ -32,7 +32,9 @@ import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Literal
+
+from typing_extensions import TypedDict
 
 from raiker.contracts.ids import utc_now
 from raiker.contracts.views import View
@@ -64,6 +66,15 @@ class LimitWindow(View):
     resets_at: str | None
 
 
+class SubscriptionLimitsView(TypedDict):
+    """What a provider volunteered with a turn about its own limits — never fetched."""
+
+    windows: list[LimitWindow]
+    observed_at: str
+    stale: bool
+    source: Literal["provider_turn"]
+
+
 @dataclass(frozen=True)
 class SubscriptionLimits:
     """Everything one provider volunteered, and when."""
@@ -77,9 +88,9 @@ class SubscriptionLimits:
             return True
         return (now or datetime.now(UTC)) - moment > STALE_AFTER
 
-    def to_dict(self, now: datetime | None = None) -> dict[str, Any]:
+    def to_dict(self, now: datetime | None = None) -> SubscriptionLimitsView:
         return {
-            "windows": [window.to_dict() for window in self.windows],
+            "windows": list(self.windows),
             "observed_at": self.observed_at,
             "stale": self.is_stale(now),
             # Named so a reader of the API can tell this apart from the usage

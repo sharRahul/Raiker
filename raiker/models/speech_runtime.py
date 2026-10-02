@@ -26,12 +26,13 @@ import struct
 import wave
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 import httpx
 
 from raiker.models.endpoint_policy import EndpointPolicy, validate_endpoint_policy
 from raiker.models.exceptions import ProviderPolicyError
+from raiker.models.wire import SpeechRuntimeView
 
 #: The largest clip the host will forward. 16 kHz mono PCM16 is 32 kB a second,
 #: so this is a little over six minutes — long past the point where a dictation
@@ -66,7 +67,7 @@ class SpeechRuntimeSettings:
         return bool(self.endpoint)
 
     @property
-    def effective(self) -> str:
+    def effective(self) -> Literal["local", "browser"]:
         """Which runtime the microphone will use — a fact, not a preference.
 
         Resolved here rather than in the browser so the composer and anything
@@ -74,7 +75,7 @@ class SpeechRuntimeSettings:
         """
         return "local" if self.configured else "browser"
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> SpeechRuntimeView:
         return {
             "endpoint": self.endpoint,
             "model": self.model,

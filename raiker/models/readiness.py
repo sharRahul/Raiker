@@ -26,6 +26,7 @@ from raiker.models.exceptions import (
     ProviderUnsupportedCapabilityError,
     ProviderWorkspaceRequiredError,
 )
+from raiker.models.wire import ModelReadinessView
 
 
 class ModelReadinessState(StrEnum):
@@ -72,7 +73,7 @@ class ModelReadiness:
     def ready(self) -> bool:
         return self.state is ModelReadinessState.READY
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> ModelReadinessView:
         return {
             "owner_principal_id": self.key.owner_principal_id,
             "profile_id": self.key.profile_id,

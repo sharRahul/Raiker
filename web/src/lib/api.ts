@@ -1,4 +1,5 @@
 import type {
+  ConversionQuantization,
   AgentResponse,
   ApprovalDetailView,
   AuditExportResult,
@@ -12,7 +13,6 @@ import type {
   CodeRepoChangesView,
   CodeRepoDiagnosticsView,
   CodeRepoFileView,
-  CodexSubscriptionStatus,
   CommandChunkView,
   CommandReceiptView,
   CommandRunView,
@@ -31,11 +31,7 @@ import type {
   HostActionResult,
   HostPathListing,
   HostStatusView,
-  HuggingFaceDownloadPreview,
-  HuggingFaceDownloadResult,
-  HuggingFaceSearchResult,
   HuggingFaceVariant,
-  ImageGenerationsView,
   InterruptRequestBody,
   InterruptResult,
   KnowledgeSourceKind,
@@ -46,28 +42,16 @@ import type {
   McpServer,
   McpSession,
   MemoryControlView,
-  ModelCapacitiesView,
-  ModelConversionPreview,
-  ModelDecision,
-  ModelLibraryView,
   ModelOperation,
-  ModelPricingView,
-  ModelReadinessView,
   ModelSetupState,
-  ModelsView,
   OwnerQuestionAnswered,
-  PartialFiles,
   PluginsView,
   ProjectContext,
   PromptRequestBody,
-  ProviderCatalogueRefresh,
-  ProviderModelList,
-  ProviderWeeklyUsageView,
   ReadCapabilities,
   ResolveApprovalResult,
   ResolveCriticalApprovalResult,
   ResumableTurnsView,
-  RuntimeInstallPlan,
   SecurityHealth,
   SessionSummary,
   SetupState,
@@ -75,8 +59,6 @@ import type {
   SkillVerification,
   SkillView,
   SpeechRuntimeChange,
-  SpeechRuntimeProbe,
-  SpeechRuntimeView,
   StandingGrant,
   StopAllResult,
   TelemetryDestination,
@@ -93,7 +75,11 @@ import { postJson, request, requestBlob, withQuery } from "./api/core";
 // OPT-02 Stage A — operations whose response a contract test verified are
 // generated (scripts/api_contract.py); the rest stay written here.
 import { contract } from "./generated/apiContract";
-import type { TaskCreateRequest } from "./generated/apiContract";
+import type {
+  GenerateImageRequest,
+  ModelPriceRequest,
+  TaskCreateRequest,
+} from "./generated/apiContract";
 
 // The endpoint catalogue. Transport, sign-in and streaming live under ./api/;
 // what they export is re-exported here, so a caller imports from one place.
@@ -151,19 +137,9 @@ export const api = {
   // Reading contacts nothing. Probing contacts only the address the owner
   // typed. Transcribing sends one clip and gets one transcript back; the audio
   // is never written anywhere on either side of the call.
-  speechRuntime: () => request<SpeechRuntimeView>("/api/speech/runtime"),
-  saveSpeechRuntime: (change: SpeechRuntimeChange) =>
-    request<SpeechRuntimeView>("/api/speech/runtime", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(change),
-    }),
-  probeSpeechRuntime: (change: SpeechRuntimeChange = {}) =>
-    request<SpeechRuntimeProbe>("/api/speech/runtime/probe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(change),
-    }),
+  speechRuntime: () => contract.readSpeechRuntime(),
+  saveSpeechRuntime: (change: SpeechRuntimeChange) => contract.writeSpeechRuntime(change),
+  probeSpeechRuntime: (change: SpeechRuntimeChange = {}) => contract.probeSpeechRuntime(change),
   transcribeSpeech: (clip: Blob, language?: string) =>
     request<{ text: string }>(
       language && language !== "auto"
@@ -240,53 +216,36 @@ export const api = {
   // separate, named action over a projection that can lose nothing.
   memoryIntegrity: () => contract.memoryIntegrity(),
   rebuildConversationIndex: () => contract.rebuildConversationIndex(),
-  models: () => request<ModelsView>("/api/models"),
+  models: () => contract.getModels(),
   weeklyModelUsage: (refreshNative = false) =>
-    request<ProviderWeeklyUsageView>(
-      withQuery("/api/models/weekly-usage", {
-        refresh_native: refreshNative ? "true" : undefined,
-      }),
-    ),
+    contract.getWeeklyModelUsage(refreshNative ? { refresh_native: true } : {}),
   setWeeklyModelBudget: (profileId: string, tokenBudget: number | null) =>
-    request<{ ok: boolean; profile_id: string }>(
-      `/api/models/${encodeURIComponent(profileId)}/weekly-budget`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token_budget: tokenBudget }),
-      },
-    ),
-  modelReadiness: () =>
-    request<{ items: ModelReadinessView[] }>("/api/model-readiness"),
+    contract.setWeeklyModelBudget(profileId, { token_budget: tokenBudget }),
+  modelReadiness: () => contract.listModelReadiness(),
   checkModelReadiness: (profile_id: string, model: string) =>
-    postJson<ModelReadinessView>("/api/model-readiness/check", {
-      profile_id,
-      model,
-    }),
+    contract.checkModelReadiness({ profile_id, model }),
   // BUG-270 — which local model runtimes are installed on this machine.
   // Detection is a PATH lookup cached in a row, so the read is free and this
   // POST is the owner saying "I just installed one, look again".
-  detectLocalRuntimes: () =>
-    postJson<{
-      runtimes: {
-        runtime: string;
-        present: boolean;
-        executable: string | null;
-        detected_at: string;
-      }[];
-    }>("/api/local-runtimes/detect", {}),
+  // BUG-270 — which local model runtimes are installed on this machine.
+  // Detection is a PATH lookup cached in a row, so the read is free and this
+  // POST is the owner saying "I just installed one, look again".
+  detectLocalRuntimes: () => contract.detectLocalRuntimes(),
   // Where each work surface's model picker starts. A preference only: the turn
   // still names its exact profile and model, and readiness judges that pair.
-  surfaceModels: () =>
-    request<{ surfaces: Record<string, { profile_id: string; model: string }> }>(
-      "/api/surface-models",
-    ),
+  // Where each work surface's model picker starts. A preference only: the turn
+  // still names its exact profile and model, and readiness judges that pair.
+  surfaceModels: () => contract.getSurfaceModels(),
   setSurfaceModel: (surface: string, profile_id: string, model: string) =>
-    request<{ ok: boolean }>("/api/surface-models", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ surface, profile_id, model }),
-    }),
+    contract.setSurfaceModel({ surface, profile_id, model }),
+  /**
+   * Which model is selected here, and which one will actually run.
+   *
+   * Read by every surface that names a model. Before this, the Models page, the
+   * composer picker, Chat, Build and Design each assembled their own answer
+   * from the selection store, the surface defaults, readiness and the fallback
+   * sequence — five correct facts that could not be made to agree.
+   */
   /**
    * Which model is selected here, and which one will actually run.
    *
@@ -296,129 +255,70 @@ export const api = {
    * sequence — five correct facts that could not be made to agree.
    */
   modelDecision: (surface: string, projectId?: string) =>
-    request<ModelDecision>(
-      `/api/model-decision?surface=${encodeURIComponent(surface)}` +
-        (projectId ? `&project_id=${encodeURIComponent(projectId)}` : ""),
-    ),
+    contract.getModelDecision({ surface, ...(projectId ? { project_id: projectId } : {}) }),
   /**
    * Every surface's decision in one read. The Models Overview answers "what
    * powers Chat, Build and Design" as its first fact; asking per surface would
    * be five separately-timed answers and a page that can show one row from
    * before a change beside one from after it.
    */
-  modelDecisions: () =>
-    request<{ surfaces: Record<string, ModelDecision> }>("/api/model-decisions"),
-  modelSetup: () => request<ModelSetupState>("/api/model-setup"),
+  /**
+   * Every surface's decision in one read. The Models Overview answers "what
+   * powers Chat, Build and Design" as its first fact; asking per surface would
+   * be five separately-timed answers and a page that can show one row from
+   * before a change beside one from after it.
+   */
+  modelDecisions: () => contract.getModelDecisions(),
+  modelSetup: () => contract.getModelSetup(),
   updateModelSetup: (
     body: Omit<
       ModelSetupState,
       "owner_principal_id" | "created_at" | "updated_at"
     >,
-  ) =>
-    request<ModelSetupState>("/api/model-setup", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-  setup: () => request<SetupState>("/api/setup"),
+  ) => contract.updateModelSetup(body),
+  setup: () => contract.getSetup(),
   updateSetup: (
     body: Omit<SetupState, "owner_principal_id" | "privacy_acknowledged_at" | "backup_verified_at" | "created_at" | "updated_at">,
-  ) => request<SetupState>("/api/setup", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }),
-  createSetupBackup: (target: string) =>
-    postJson<{ ok: boolean; path: string; setup: SetupState }>("/api/setup/backup/create", { target }),
-  modelLibrary: () => request<ModelLibraryView>("/api/model-library"),
-  addModelLibraryRoot: (path: string) =>
-    postJson<{ ok: boolean; path: string }>("/api/model-library/roots", {
-      path,
-    }),
-  removeModelLibraryRoot: (path: string) =>
-    request<{ ok: boolean }>("/api/model-library/roots", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path }),
-    }),
-  rescanModelLibrary: () =>
-    postJson<{ ok: boolean; models: ModelLibraryView["models"] }>(
-      "/api/model-library/rescan",
-      {},
-    ),
+  ) => contract.updateSetup(body),
+  createSetupBackup: (target: string) => contract.createSetupBackup({ target }),
+  modelLibrary: () => contract.getModelLibrary(),
+  addModelLibraryRoot: (path: string) => contract.addModelLibraryRoot({ path }),
+  removeModelLibraryRoot: (path: string) => contract.removeModelLibraryRoot({ path }),
+  rescanModelLibrary: () => contract.rescanModelLibrary(),
   deployLocalModel: (modelId: string, profileId?: string) =>
-    postJson<ModelOperation>(
-      `/api/model-library/${encodeURIComponent(modelId)}/deploy`,
-      profileId ? { profile_id: profileId } : {},
-    ),
+    contract.deployLocalModel(modelId, profileId ? { profile_id: profileId } : {}),
   deployMlxModel: (modelId: string, profileId?: string) =>
-    postJson<ModelOperation>(
-      `/api/model-library/${encodeURIComponent(modelId)}/deploy-mlx`,
-      profileId ? { profile_id: profileId } : {},
-    ),
-  modelOperations: () =>
-    request<{ items: ModelOperation[] }>("/api/model-operations"),
+    contract.deployMlxModel(modelId, profileId ? { profile_id: profileId } : {}),
+  modelOperations: () => contract.listModelOperations(),
   previewModelOperation: (kind: ModelOperation["kind"], target: string) =>
-    postJson<
-      | RuntimeInstallPlan
-      | { kind: string; target: string; action: string; confirmed: false }
-    >("/api/model-operations/preview", { kind, target, confirmed: false }),
-  pullOllamaModel: (model: string) =>
-    postJson<ModelOperation>("/api/ollama/pull", { model, confirmed: true }),
-  cancelModelOperation: (operationId: string) =>
-    postJson<ModelOperation>(
-      `/api/model-operations/${encodeURIComponent(operationId)}/cancel`,
-      {},
-    ),
-  retryModelOperation: (operationId: string) =>
-    postJson<ModelOperation>(
-      `/api/model-operations/${encodeURIComponent(operationId)}/retry`,
-      {},
-    ),
-  partialFiles: (operationId: string) =>
-    request<PartialFiles>(
-      `/api/model-operations/${encodeURIComponent(operationId)}/partial-files`,
-    ),
+    contract.previewModelOperation({ kind, target, confirmed: false }),
+  pullOllamaModel: (model: string) => contract.pullOllamaModel({ model, confirmed: true }),
+  cancelModelOperation: (operationId: string) => contract.cancelModelOperation(operationId),
+  retryModelOperation: (operationId: string) => contract.retryModelOperation(operationId),
+  partialFiles: (operationId: string) => contract.previewPartialFiles(operationId),
   deletePartialFiles: (operationId: string) =>
-    postJson<PartialFiles & { ok: boolean }>(
-      `/api/model-operations/${encodeURIComponent(operationId)}/delete-partial-files?confirmed=true`,
-      {},
-    ),
-  cleanupModelOperation: (operationId: string) =>
-    request<{ ok: boolean }>(
-      `/api/model-operations/${encodeURIComponent(operationId)}`,
-      { method: "DELETE" },
-    ),
-  saveHuggingFaceCredential: (token: string) =>
-    request<{ configured: boolean }>("/api/hugging-face/credential", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    }),
+    contract.deletePartialFiles(operationId, { confirmed: true }),
+  cleanupModelOperation: (operationId: string) => contract.cleanupModelOperation(operationId),
+  saveHuggingFaceCredential: (token: string) => contract.saveHuggingFaceCredential({ token }),
   // BUG-296 — this probe answers 200 even when the Hub is unreachable, and
   // names the reason in the body. A 503 here was an uncaught console error on
   // every Models visit for a host with no route to huggingface.co, which is the
   // budget that exists to catch real ones.
-  trendingHuggingFace: () =>
-    request<{
-      items: HuggingFaceSearchResult[];
-      unreachable?: { reason_code: string; repository_url: string | null };
-    }>("/api/hugging-face/trending"),
-  searchHuggingFace: (query: string) =>
-    request<{ items: HuggingFaceSearchResult[] }>(
-      withQuery("/api/hugging-face/search", { query }),
-    ),
+  // BUG-296 — this probe answers 200 even when the Hub is unreachable, and
+  // names the reason in the body. A 503 here was an uncaught console error on
+  // every Models visit for a host with no route to huggingface.co, which is the
+  // budget that exists to catch real ones.
+  trendingHuggingFace: () => contract.trendingHuggingFace(),
+  searchHuggingFace: (query: string) => contract.searchHuggingFace({ query }),
   huggingFaceVariants: (repoId: string) => {
     const [owner, repository] = repoId.split("/", 2);
-    return request<{ items: HuggingFaceVariant[] }>(
-      `/api/hugging-face/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/variants`,
-    );
+    return contract.listHuggingFaceVariants(owner, repository);
   },
   previewHuggingFaceDownload: (
     variant: HuggingFaceVariant,
     destination?: string,
   ) =>
-    postJson<HuggingFaceDownloadPreview>("/api/hugging-face/download/preview", {
+    contract.previewHuggingFaceDownload({
       repo_id: variant.repo_id,
       revision: variant.revision,
       files: variant.files,
@@ -429,7 +329,7 @@ export const api = {
     variant: HuggingFaceVariant,
     destination: string,
   ) =>
-    postJson<HuggingFaceDownloadResult>("/api/hugging-face/download", {
+    contract.downloadHuggingFaceModel({
       repo_id: variant.repo_id,
       revision: variant.revision,
       files: variant.files,
@@ -440,9 +340,9 @@ export const api = {
     source: string,
     output: string,
     revision: string,
-    quantization: string,
+    quantization: ConversionQuantization,
   ) =>
-    postJson<ModelConversionPreview>("/api/model-conversion/preview", {
+    contract.previewModelConversion({
       source,
       output,
       revision,
@@ -453,46 +353,27 @@ export const api = {
     source: string,
     output: string,
     revision: string,
-    quantization: string,
+    quantization: ConversionQuantization,
   ) =>
-    postJson<ModelOperation>("/api/model-conversion", {
+    contract.startModelConversion({
       source,
       output,
       revision,
       quantization,
       confirmed: true,
     }),
-  modelCapacities: () => request<ModelCapacitiesView>("/api/models/capacities"),
+  modelCapacities: () => contract.getModelCapacities(),
   refreshModelCapacities: (force = false) =>
-    postJson<{
-      ok: boolean;
-      profiles: Array<{
-        profile_id: string;
-        status: string;
-        reason_code: string | null;
-      }>;
-    }>(
-      withQuery("/api/models/capacities/refresh", {
-        force: force ? "true" : undefined,
-      }),
-      {},
-    ),
+    contract.refreshModelCapacities(force ? { force: true } : {}),
   setModelCapacity: (
     profileId: string,
     model: string,
     tokens: number | null,
     reason: string,
-  ) =>
-    request<{
-      ok: boolean;
-      profile_id: string;
-      model: string;
-      tokens: number | null;
-    }>(`/api/models/${encodeURIComponent(profileId)}/capacity`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, tokens, reason }),
-    }),
+  ) => contract.setModelCapacity(profileId, { model, tokens, reason }),
+  // Read-only status of governed service connectors (never reaches the network;
+  // never exposes a credential value). Enabling one is done via the capability
+  // gate + decision-mode control plane, not here.
   // Read-only status of governed service connectors (never reaches the network;
   // never exposes a credential value). Enabling one is done via the capability
   // gate + decision-mode control plane, not here.
@@ -686,66 +567,40 @@ export const api = {
       `/api/connector-store/${encodeURIComponent(connectorId)}/manifest`,
       { manifest },
     ),
-  checkLanguage: (text: string) =>
-    postJson<{
-      status: "available" | "unavailable";
-      reason_code?: string;
-      matches: Array<{
-        offset: number;
-        length: number;
-        message: string;
-        replacements: string[];
-        rule_id: string;
-        category: string;
-      }>;
-    }>("/api/language/check", { text, language: "en-US" }),
+  checkLanguage: (text: string) => contract.checkLanguage({ text, language: "en-US" }),
   // On-demand listing of the models a provider serves (user-initiated; provider
   // policy is enforced server-side before any network contact).
-  providerModels: (profileId: string) =>
-    request<ProviderModelList>(
-      `/api/models/${encodeURIComponent(profileId)}/provider-models`,
-    ),
+  // On-demand listing of the models a provider serves (user-initiated; provider
+  // policy is enforced server-side before any network contact).
+  providerModels: (profileId: string) => contract.listProviderModels(profileId),
   refreshProviderCatalogues: (profile_ids?: string[]) =>
-    postJson<ProviderCatalogueRefresh>("/api/models/catalogues/refresh", {
-      ...(profile_ids ? { profile_ids } : {}),
-    }),
-  codexSubscriptionStatus: () =>
-    request<CodexSubscriptionStatus>("/api/models/chatgpt-codex/status"),
-  startCodexSubscriptionLogin: () =>
-    postJson<CodexSubscriptionStatus>("/api/models/chatgpt-codex/login", {}),
+    contract.refreshConnectedProviderCatalogues(profile_ids ? { profile_ids } : {}),
+  codexSubscriptionStatus: () => contract.getChatgptCodexStatus(),
+  startCodexSubscriptionLogin: () => contract.startChatgptCodexLogin(),
   // BUG-259 — adopting the subscription is its own act. Reading the status no
   // longer connects anything, so this is the only way a ChatGPT account becomes
   // one of this owner's providers.
-  connectCodexSubscription: () =>
-    postJson<CodexSubscriptionStatus>("/api/models/chatgpt-codex/connection", {}),
-  disconnectCodexSubscription: () =>
-    request<{ ok: boolean; connection_configured: boolean }>(
-      "/api/models/chatgpt-codex/connection",
-      { method: "DELETE" },
-    ),
+  // BUG-259 — adopting the subscription is its own act. Reading the status no
+  // longer connects anything, so this is the only way a ChatGPT account becomes
+  // one of this owner's providers.
+  connectCodexSubscription: () => contract.connectChatgptCodex(),
+  disconnectCodexSubscription: () => contract.disconnectChatgptCodex(),
   // Persist (or clear, with null) the user-owned advisor model profile — the
   // model a local model may consult through the governed consult_advisor tool.
   // Gate-manager only, enforced server-side; selecting an advisor grants nothing.
-  setModelAdvisor: (profile_id: string | null) =>
-    request<{ ok: boolean; advisor_profile_id: string | null }>(
-      "/api/model-advisor",
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile_id }),
-      },
-    ),
+  // Persist (or clear, with null) the user-owned advisor model profile — the
+  // model a local model may consult through the governed consult_advisor tool.
+  // Gate-manager only, enforced server-side; selecting an advisor grants nothing.
+  setModelAdvisor: (profile_id: string | null) => contract.setModelAdvisor({ profile_id }),
+  // Persist the operator's model selection (human gate-manager only, enforced
+  // server-side; placeholder profiles require a concrete model).
   // Persist the operator's model selection (human gate-manager only, enforced
   // server-side; placeholder profiles require a concrete model).
   selectModel: (profile_id: string, model?: string) =>
-    request<{ ok: boolean; profile_id: string; model: string }>(
-      "/api/model-selection",
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile_id, model: model || null }),
-      },
-    ),
+    contract.setModelSelection({ profile_id, model: model || null }),
+  // `workspaceId` names where an identity-linked key acts (BUG-274). It is not
+  // a credential and is sent as an ordinary field; the server refuses a value
+  // that could not safely become a header before it stores anything.
   // `workspaceId` names where an identity-linked key acts (BUG-274). It is not
   // a credential and is sent as an ordinary field; the server refuses a value
   // that could not safely become a header before it stores anything.
@@ -756,30 +611,20 @@ export const api = {
     adminApiKey = "",
     workspaceId = "",
   ) =>
-    request<{ ok: boolean; connection_configured: boolean }>(
-      `/api/models/${encodeURIComponent(profileId)}/connection`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          endpoint: endpoint || null,
-          api_key: apiKey || null,
-          admin_api_key: adminApiKey || null,
-          workspace_id: workspaceId || null,
-        }),
-      },
-    ),
+    contract.setModelConnection(profileId, {
+      endpoint: endpoint || null,
+      api_key: apiKey || null,
+      admin_api_key: adminApiKey || null,
+      workspace_id: workspaceId || null,
+    }),
   // Persist the user-owned ordered model fallback sequence (human gate-manager only,
   // enforced server-side). Returns the cleaned/de-duplicated sequence.
-  setModelFallback: (profile_ids: string[]) =>
-    request<{ ok: boolean; fallback_sequence: string[] }>(
-      "/api/model-fallback",
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile_ids }),
-      },
-    ),
+  // Persist the user-owned ordered model fallback sequence (human gate-manager only,
+  // enforced server-side). Returns the cleaned/de-duplicated sequence.
+  setModelFallback: (profile_ids: string[]) => contract.setModelFallback({ profile_ids }),
+  // Upload one image (base64) into the governed attachment store. Validation
+  // is fail-closed server-side (media-type allowlist, 5 MB cap, magic-byte
+  // sniff); the response is metadata only.
   // Upload one image (base64) into the governed attachment store. Validation
   // is fail-closed server-side (media-type allowlist, 5 MB cap, magic-byte
   // sniff); the response is metadata only.
@@ -876,49 +721,15 @@ export const api = {
   // ── The Design surface ──
   // The list is metadata only; the bytes are a separate, owner-scoped request
   // that names one generation, so a gallery cannot accidentally ship megabytes.
-  images: () => request<ImageGenerationsView>("/api/images"),
-  generateImage: (body: {
-    profile_id: string;
-    prompt: string;
-    size: string;
-    model?: string;
-    /** BUG-277 — the prior generation this request is about, making it an edit. */
-    source_generation_id?: string;
-    /** How many pictures to ask for. More than one makes it a variation set. */
-    variations?: number;
-    project_id?: string;
-  }) =>
-    postJson<{ ok: boolean; generation_id: string }>("/api/images", body),
+  images: () => contract.listImages(),
+  generateImage: (body: GenerateImageRequest) => contract.generateImage(body),
   imageBytesUrl: (generationId: string) =>
     `/api/images/${encodeURIComponent(generationId)}/bytes`,
   // ── BUG-21: the normalised price registry ──
-  modelPricing: () => request<ModelPricingView>("/api/models/pricing"),
-  refreshModelPricing: () =>
-    postJson<{ ok: boolean; changes_written: number }>(
-      "/api/models/pricing/refresh",
-      {},
-    ),
-  setModelPrice: (
-    profileId: string,
-    body: {
-      model: string;
-      input_per_mtok?: string | null;
-      output_per_mtok?: string | null;
-      cache_write_per_mtok?: string | null;
-      cache_read_per_mtok?: string | null;
-      currency?: string | null;
-      effective_from?: string | null;
-      reason?: string | null;
-    },
-  ) =>
-    request<{ ok: boolean }>(
-      `/api/models/${encodeURIComponent(profileId)}/price`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      },
-    ),
+  modelPricing: () => contract.getModelPricing(),
+  refreshModelPricing: () => contract.refreshModelPricing(),
+  setModelPrice: (profileId: string, body: ModelPriceRequest) =>
+    contract.setModelPrice(profileId, body),
   sessionAttachments: (sessionId: string) => contract.listSessionAttachments(sessionId),
   attachmentPreview: (sessionId: string, attachmentId: string) =>
     contract.getAttachmentPreview(sessionId, attachmentId),
@@ -1544,14 +1355,7 @@ export const api = {
   // Which of a provider's models stay offered in every picker. The default
   // model is a different decision, made by `setModelSelection`.
   setAvailableModels: (profileId: string, models: string[]) =>
-    request<{ ok: boolean; profile_id: string; models: string[] }>(
-      `/api/models/${encodeURIComponent(profileId)}/available-models`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ models }),
-      },
-    ),
+    contract.setAvailableModels(profileId, { models }),
   approval: (id: string): Promise<ApprovalDetailView> => contract.getApproval(id),
   // B14 — `accepted_hunks` carries the reviewer's own narrowing: hunk positions
   // in the approved diff, validated server-side against that same diff. Omitted

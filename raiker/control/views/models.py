@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from typing_extensions import TypedDict
 
 from raiker.contracts.views import View
+from raiker.models.wire import ReadinessState
 
 # Capability states that mean the gate is off / fail-closed.
 _DISABLED_STATES = {"disabled", "planned"}
@@ -109,7 +110,7 @@ class ModelProfileView(View):
     # depend on a local runtime, and the UI says nothing in that case rather
     # than claiming an absence it has not established.
     provider_detected: bool | None = None
-    readiness_state: str = "not_configured"
+    readiness_state: ReadinessState = "not_configured"
     readiness_summary: str = "No readiness check exists for this exact model."
     readiness_reason_code: str = "model_not_checked"
     readiness_checked_at: str | None = None
@@ -217,8 +218,41 @@ class ContextUsageView(View):
     tools_deferred: int = 0
 
 
+class PricingHistoryEntry(TypedDict):
+    """One recorded rate for an exact model, kept so a change can be read back."""
+
+    provider: str
+    model: str
+    source: str
+    effective_from: str
+    recorded_at: str
+    as_of: str | None
+    recorded_by: str | None
+    reason: str | None
+    currency: str
+    input_per_mtok: str
+    output_per_mtok: str
+    cache_write_per_mtok: str | None
+    cache_read_per_mtok: str | None
+
+
+class PricingSyncState(TypedDict):
+    """When one provider's published prices were last read, and whether that is due again."""
+
+    provider: str
+    interval_hours: int
+    last_attempt_at: str | None
+    last_success_at: str | None
+    next_refresh_at: str | None
+    last_error: str | None
+    models_recorded: int
+    has_last_good: bool
+    due: bool
+    stale: bool
+
+
 @dataclass(frozen=True)
-class ModelPricingEntryView:
+class ModelPricingEntryView(View):
     """One exact model's pricing row for the Models → Pricing surface (BUG-21)."""
 
     provider: str
@@ -234,17 +268,12 @@ class ModelPricingEntryView:
     as_of: str | None
     reviewed_at: str | None
     review_due_at: str | None
-    review_status: str | None
+    review_status: Literal["current", "overdue", "invalid"] | None
     recorded_at: str | None
     recorded_by: str | None
     reason: str | None
     has_owner_override: bool
-    history: tuple[dict[str, Any], ...] = ()
-
-    def to_dict(self) -> dict[str, Any]:
-        data = asdict(self)
-        data["history"] = [dict(entry) for entry in self.history]
-        return data
+    history: tuple[PricingHistoryEntry, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -252,7 +281,7 @@ class ModelPricingView(View):
     """Everything Models → Pricing has to state, in one governed read."""
 
     entries: tuple[ModelPricingEntryView, ...]
-    sync: tuple[dict[str, Any], ...]
+    sync: tuple[PricingSyncState, ...]
     can_override: bool
 
 
@@ -274,7 +303,7 @@ class ProviderModelListView(View):
 
     profile_id: str
     provider: str
-    status: str  # "available" | "policy_denied" | "unsupported" | "unavailable"
+    status: Literal["available", "policy_denied", "unsupported", "unavailable"]
     reason_code: str | None
     models: tuple[str, ...]
     remembered: bool = False
@@ -293,7 +322,7 @@ class ProviderCatalogueRefreshView(View):
 
 
 @dataclass(frozen=True)
-class ModelsView:
+class ModelsView(View):
     profiles: tuple[ModelProfileView, ...]
     # Profiles with a concrete configured model are the only choices surfaced
     # by the conversational composer. The full list remains for Models setup.
@@ -342,7 +371,7 @@ class ModelsView:
     # check of *that* model found, so the selector can carry the same chip and
     # repair sentence a provider card does.
     advisor_model: str | None = None
-    advisor_readiness_state: str = "not_configured"
+    advisor_readiness_state: ReadinessState = "not_configured"
     advisor_readiness_summary: str | None = None
     advisor_readiness_remediation: str | None = None
     advisor_readiness_checked_at: str | None = None
@@ -355,31 +384,3 @@ class ModelsView:
     # The rule is: curation orders the quick list, it does not
     # decide what exists.
     catalogues: dict[str, tuple[str, ...]] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "profiles": [p.to_dict() for p in self.profiles],
-            "chat_profiles": [p.to_dict() for p in self.chat_profiles],
-            "catalogues": {
-                profile_id: list(models) for profile_id, models in self.catalogues.items()
-            },
-            "current_profile_id": self.current_profile_id,
-            "current_model": self.current_model,
-            "advisor_profile_id": self.advisor_profile_id,
-            "advisor_model_gate_state": self.advisor_model_gate_state,
-            "advisor_model": self.advisor_model,
-            "advisor_readiness_state": self.advisor_readiness_state,
-            "advisor_readiness_summary": self.advisor_readiness_summary,
-            "advisor_readiness_remediation": self.advisor_readiness_remediation,
-            "advisor_readiness_checked_at": self.advisor_readiness_checked_at,
-            "hosted_model_gate_state": self.hosted_model_gate_state,
-            "private_network_model_gate_state": self.private_network_model_gate_state,
-            "hosted_model_gate_enforced": self.hosted_model_gate_enforced,
-            "private_network_model_gate_enforced": self.private_network_model_gate_enforced,
-            "model_egress_allowlist_configured": self.model_egress_allowlist_configured,
-            "remote_profile_count": self.remote_profile_count,
-            "ready_provider_count": self.ready_provider_count,
-            "usable_provider_count": self.usable_provider_count,
-            "fallback_sequence": list(self.fallback_sequence),
-            "no_silent_hosted_fallback": self.no_silent_hosted_fallback,
-        }

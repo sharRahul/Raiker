@@ -987,9 +987,12 @@ class ModelService:
                     review_due_at=(review_by_model.get((provider, model)) or (None, None, None))[1]
                     if current.source == "config"
                     else None,
-                    review_status=(review_by_model.get((provider, model)) or (None, None, None))[2]
-                    if current.source == "config"
-                    else None,
+                    review_status=cast(
+                        "Literal['current', 'overdue', 'invalid'] | None",
+                        (review_by_model.get((provider, model)) or (None, None, None))[2]
+                        if current.source == "config"
+                        else None,
+                    ),
                     recorded_at=current.recorded_at,
                     recorded_by=current.recorded_by,
                     reason=current.reason,
@@ -1346,7 +1349,9 @@ class ModelService:
                 else None
             ),
         )
-        def _remembered(status: str, reason_code: str | None) -> ProviderModelListView:
+        def _remembered(
+            status: Literal["policy_denied", "unsupported", "unavailable"], reason_code: str | None
+        ) -> ProviderModelListView:
             """The failure, plus whatever this provider last published.
 
             A provider that is briefly unreachable keeps its catalogue in every

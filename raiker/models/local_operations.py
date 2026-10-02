@@ -5,10 +5,11 @@ from collections.abc import Awaitable, Callable, Sequence
 from contextlib import suppress
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePath
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlsplit, urlunsplit
 
 from raiker.contracts.ids import new_id, utc_now
+from raiker.models.wire import ModelOperationView, PartialFiles
 
 TERMINAL_STATES = frozenset({"cancelled", "failed", "complete"})
 
@@ -113,16 +114,16 @@ class ModelOperation:
         """Every column, in schema order. Storage only."""
         return asdict(self)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> ModelOperationView:
         """The owner-facing projection: redacted, plus what the controls can do."""
-        data = asdict(self)
+        data: dict[str, Any] = asdict(self)
         payload = self.payload()
         data.pop("payload_json", None)
         data["retryable"] = self.kind in RETRYABLE_KINDS and bool(payload)
         data["partial_files_present"] = bool(
             self.cleanup_targets() and self.state in set(RETRYABLE_STATES)
         )
-        return data
+        return cast(ModelOperationView, data)
 
 
 class ModelOperationService:
@@ -333,7 +334,7 @@ class ModelOperationService:
             raise ValueError("operation_not_retryable_from_state")
         return claimed
 
-    def partial_files(self, owner_principal_id: str, operation_id: str) -> dict[str, Any]:
+    def partial_files(self, owner_principal_id: str, operation_id: str) -> PartialFiles:
         """What a confirmed cleanup would delete: the exact paths and their bytes.
 
         Named exactly, because a destructive confirmation that says "the

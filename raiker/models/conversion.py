@@ -36,7 +36,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from raiker.contracts.views import View
 from raiker.models.gguf import read_gguf_metadata
@@ -85,11 +85,11 @@ CONTAINER_STOP_SECONDS = 10
 
 
 @dataclass(frozen=True)
-class ConversionIsolation:
-    network: bool = False
-    source_read_only: bool = True
+class ConversionIsolation(View):
+    network: Literal[False] = False
+    source_read_only: Literal[True] = True
     credential_environment: tuple[str, ...] = ()
-    workspace_mounted: bool = False
+    workspace_mounted: Literal[False] = False
     max_memory_bytes: int = 16 * 1024**3
     max_cpu_count: int = 4
     max_processes: int = 256

@@ -32,7 +32,7 @@
   import { modelDecisions } from "../../surfaceModel.svelte";
   import { providerName } from "../../format";
   import { modelName } from "../../modelPresentation";
-  import { isChoosableModel } from "../../modelReadiness.svelte";
+  import { drawsImages, isChoosableModel } from "../../modelReadiness.svelte";
   import type { ModelDecision, ModelProfile, ModelsView } from "../../apiTypes";
 
   let {
@@ -110,6 +110,12 @@
           decision !== null && decision.effective.reason === "fallback"
             ? decision.effective
             : null,
+        // BUG-311 — Design's decision is its research model. Ready for that is
+        // not ready to draw, and the row says which of the two it is.
+        researchOnly:
+          surface.id === "design" &&
+          decision?.ready === true &&
+          !drawsImages(models?.profiles ?? []),
       };
     }),
   );
@@ -240,6 +246,14 @@
                     · your global choice
                   {/if}
                 </span>
+                {#if row.researchOnly}
+                  <span class="displaced">
+                    No connected model returns images ·
+                    <button type="button" class="link" onclick={() => onopen("add")}>
+                      Connect an image provider
+                    </button>
+                  </span>
+                {/if}
                 {#if row.displaced !== null}
                   <!-- The model decision's invariant, rendered: the choice stays, and the
                        model that will really answer is named beside it rather
@@ -250,8 +264,11 @@
                 {/if}
               {/if}
             </div>
-            <span class="state" data-state={row.decision?.ready ? "ready" : "blocked"}>
-              {row.decision?.ready ? "Ready" : "Not ready"}
+            <span
+              class="state"
+              data-state={row.researchOnly ? "blocked" : row.decision?.ready ? "ready" : "blocked"}
+            >
+              {row.researchOnly ? "Research only" : row.decision?.ready ? "Ready" : "Not ready"}
             </span>
           </li>
         {/each}
@@ -398,6 +415,15 @@
     font-size: var(--text-2xs);
     color: var(--warn);
     font-weight: 650;
+  }
+  .link {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
   }
   /* Ready is the resting state and stays plain metadata; the one that
      needs a person keeps the tone. */

@@ -114,7 +114,7 @@ names.
 | [BUG-308](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so) | Medium | Plugins / commands / sandbox | **Closed 2026-09-28 ([FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so))** — by the owner's decision: code runs in the sandbox where there is one, and otherwise under *Code with this machine's network*, its own switch, starting at *Ask me* |
 | [BUG-309](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing) | Low | Web UI / notifications | **Closed 2026-09-28 ([FIXED-622](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing))** — a notice whose subject is the page on screen is not docked there and is read; running it live found the bell disagreeing for a poll, fixed with it |
 | [BUG-310](FIXED_ITEMS.md#fixed-654--seven-python-tests-failed-on-windows-and-nowhere-else) | Low | Tests / Windows | **Closed 2026-10-01 ([FIXED-654](FIXED_ITEMS.md#fixed-654--seven-python-tests-failed-on-windows-and-nowhere-else))** — fixtures are written as bytes; a failed instance create releases the staged store's handles and retries its removal, and the registry replace retries through a reader |
-| [BUG-311](#bug-311--models-calls-design-ready-on-a-model-that-returns-no-images) | Low | Models / Design | Open — the Models overview calls Design **Ready** on a chat-only model while setup's Ready step says Design needs an image provider |
+| [BUG-311](FIXED_ITEMS.md#fixed-676--models-called-design-ready-on-a-model-that-returns-no-images) | Low | Models / Design | **Closed 2026-10-02 ([FIXED-676](FIXED_ITEMS.md#fixed-676--models-called-design-ready-on-a-model-that-returns-no-images))** — the overview says *Research only* and offers an image provider, from the same fact setup reads |
 | [BUG-312](#bug-312--one-windows-test-run-ended-in-an-interpreter-crash-dump) | Low | Tests / Windows | Open — one of 28 runs of the instance-lifecycle and internal-path tests printed a crash dump; not reproduced since |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
@@ -2151,28 +2151,6 @@ failed create releases the staged workspace's cached handles before removing it,
 and retries; publishing the registry retries through a reader's sharing
 violation. This run had no Windows host, so the next Windows full suite is the
 confirmation.
-
----
-
-## BUG-311 — Models calls Design ready on a model that returns no images
-
-**Severity: Low. Area: Models / Design. Status: Open — raised 2026-10-01 by the
-second live round.**
-
-**Observed.** After setup chose `gpt-oss:20b-cloud`, setup's Ready step said
-Design *Needs a provider that returns images*, while the Models overview's *What
-powers your work* listed Design on the same model as **Ready**.
-
-**Why it is not simply wrong.** Design's canvas uses the chat model for its
-research and an image model for drawing, so "ready" is true of half of it. The
-two surfaces answer different questions without saying which.
-
-**Proposed fix.** The overview's Design row says what it is ready for —
-research on the chat model, and an image provider still to connect — from the
-same `image_models` fact setup reads.
-
-**Required user-interface outcome.** No page calls Design ready to draw when no
-connected model returns images.
 
 ---
 

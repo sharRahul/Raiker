@@ -162,6 +162,24 @@ export function isReachableProfile(profile: {
 }
 
 /**
+ * BUG-311 — whether anything this owner can reach returns images.
+ *
+ * Design researches on the chat model and draws on an image model, so a
+ * decision that is "ready" says nothing about the drawing half. Setup's Ready
+ * step and the Models overview both ask this one question, so they can no
+ * longer give an owner two answers about the same model.
+ */
+export function drawsImages(
+  profiles: readonly (Parameters<typeof isReachableProfile>[0] & {
+    image_models?: readonly string[];
+  })[],
+): boolean {
+  return profiles.some(
+    (profile) => isReachableProfile(profile) && (profile.image_models?.length ?? 0) > 0,
+  );
+}
+
+/**
  * True when the owner has something to fix before a turn can run.
  *
  * A model nobody has checked yet is not one of those things. The server takes

@@ -15,7 +15,7 @@
   import { api } from "../api";
   import type { ModelProfile, SetupState } from "../apiTypes";
   import { modelName } from "../modelPresentation";
-  import { isReachableProfile } from "../modelReadiness.svelte";
+  import { drawsImages } from "../modelReadiness.svelte";
   import { setModels } from "../models.svelte";
   import {
     PERMISSIONS_NOTE,
@@ -160,13 +160,7 @@
   // REM-MODEL-01 — "could Raiker reach this" is answered in one place, never
   // here from `configured` and `provider_detected`, which call a provider whose
   // key the last check rejected usable.
-  const imageReady = $derived(
-    profiles.some(
-      (profile) =>
-        isReachableProfile(profile) &&
-        (profile.image_models?.length ?? 0) > 0,
-    ),
-  );
+  const imageReady = $derived(drawsImages(profiles));
 
   interface StartAction {
     id: string;

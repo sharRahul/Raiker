@@ -119,7 +119,7 @@ leftover file, Ready's Chat opening Home, Chat after setup on the replaced
 model, and a 401 on the lock screen under a cookie from the previous workspace.
 
 **What it found and did not fix.** Models calls Design **Ready** on a chat-only
-model ([BUG-311](TO_BE_FIXED.md#bug-311--models-calls-design-ready-on-a-model-that-returns-no-images)),
+model ([BUG-311](FIXED_ITEMS.md#fixed-676--models-called-design-ready-on-a-model-that-returns-no-images), since fixed),
 and one test run on this host ended in a crash dump that did not recur
 ([BUG-312](TO_BE_FIXED.md#bug-312--one-windows-test-run-ended-in-an-interpreter-crash-dump)).
 

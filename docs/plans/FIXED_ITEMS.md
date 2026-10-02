@@ -691,6 +691,14 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-667](#fixed-667--choosing-chat-at-the-end-of-setup-opened-home) | Medium | First run / navigation | Fixed 2026-10-01 — found by the live round |
 | [FIXED-668](#fixed-668--chat-after-setup-opened-on-the-model-setup-had-just-replaced) | Medium | First run / Chat | Fixed 2026-10-01 — found by the live round |
 | [FIXED-669](#fixed-669--a-stale-cookie-cost-a-401-on-the-lock-screen) | Low | Web shell / sign-in | Fixed 2026-10-01 — found by the live round |
+| [FIXED-670](#fixed-670--the-lock-screens-password-recovery-could-never-finish) | Medium | Authentication / redaction | Fixed 2026-10-02 — found describing the auth routes (OPT-01 Stage B) |
+| [FIXED-671](#fixed-671--the-project-tree-sent-stored-rows-owner-ids-included) | Low | Projects / API | Fixed 2026-10-02 — found describing the project routes (OPT-01 Stage B) |
+| [FIXED-672](#fixed-672--memory-proposal-lists-sent-raw-candidate-rows) | Low | Memory / API | Fixed 2026-10-02 — found describing the memory routes (OPT-01 Stage B) |
+| [FIXED-673](#fixed-673--two-routes-answered-with-a-shape-the-client-did-not-expect) | Low | Knowledge / sessions / API | Fixed 2026-10-02 — found describing the routes (OPT-01 Stage B) |
+| [FIXED-674](#fixed-674--the-task-list-filter-sent-a-parameter-the-route-does-not-read) | Low | Tasks / web client | Fixed 2026-10-02 — found moving the tasks wrapper to the generated client (OPT-02 Stage B) |
+| [FIXED-675](#fixed-675--token-counts-were-redacted-from-exports-and-answers) | Medium | Events / API redaction | Fixed 2026-10-02 — found by the model contract cases |
+| [FIXED-676](#fixed-676--models-called-design-ready-on-a-model-that-returns-no-images) | Low | Models / Design | Fixed 2026-10-02 — was BUG-311 |
+| [FIXED-677](#fixed-677--the-lock-file-named-a-pypdf-version-its-files-were-not) | Medium | CI / dependencies | Fixed 2026-10-02 — found by CI |
 
 ---
 
@@ -28130,3 +28138,139 @@ readiness check started at mount, before that answer.
 
 **Evidence.** `App.test.ts` — *asks nothing of a stale cookie but whether it
 still signs anyone in*, failing against the previous code.
+
+---
+
+## FIXED-670 — The lock screen's password recovery could never finish
+
+**Severity: Medium. Area: Authentication / redaction. Status: Fixed 2026-10-02 — found describing the auth routes (OPT-01 Stage B).**
+
+**Observed.** `POST /api/auth/password-recovery/begin` answered with its
+recovery ticket replaced by `[REDACTED_SECRET]`, so the second step had nothing
+valid to send back and every recovery from the lock screen failed.
+
+**Root cause.** The ticket is a high-entropy token, and the API redactor's
+fallback treats any such run as a credential. The route hands the ticket to the
+person who just proved a backup code; it is the one answer that must carry it.
+
+**Fixed.** The route joins the redaction exemptions beside the other auth
+answers that return a token to their own caller.
+
+**Evidence.** `tests/test_routes_auth.py` — *password recovery completes through
+the API*, failing against the previous code.
+
+---
+
+## FIXED-671 — The project tree sent stored rows, owner ids included
+
+**Severity: Low. Area: Projects / API. Status: Fixed 2026-10-02 — found describing the project routes (OPT-01 Stage B).**
+
+**Observed.** `GET /api/projects/tree` returned each project as its database
+row — `owner_user_id` and other storage columns among them — while the client
+declared a `session_count` the server never sent.
+
+**Fixed.** The route answers with a typed projection (`ProjectTreeNode`), the
+contract test matches it key for key, and the client reads the generated type.
+
+**Evidence.** `tests/test_api_contract_responses.py` — `GET /api/projects/tree`.
+
+---
+
+## FIXED-672 — Memory proposal lists sent raw candidate rows
+
+**Severity: Low. Area: Memory / API. Status: Fixed 2026-10-02 — found describing the memory routes (OPT-01 Stage B).**
+
+**Observed.** The memory and relationship proposal lists returned stored
+candidate rows, including `owner_principal_id`, rather than a view.
+
+**Fixed.** Both routes answer with declared projections
+(`memory_proposal`, `relationship_proposal` in `raiker/api/wire/memory.py`),
+verified by the contract test.
+
+**Evidence.** `tests/test_api_contract_responses.py` — the two proposal routes.
+
+---
+
+## FIXED-673 — Two routes answered with a shape the client did not expect
+
+**Severity: Low. Area: Knowledge / sessions / API. Status: Fixed 2026-10-02 — found describing the routes (OPT-01 Stage B).**
+
+**Observed.** Revoking a knowledge source answered `{ok}` on one path and
+`{ok, source_id}` on the other, and the device-session list reported `revoked`
+as `0`/`1` where the client declared a boolean.
+
+**Fixed.** One revoke answer, `{ok, source_id}`, and `revoked` is a boolean.
+Both are now declared types the contract test checks.
+
+**Evidence.** `tests/test_api_contract_responses.py` — the revoke and
+device-session cases.
+
+---
+
+## FIXED-674 — The task list filter sent a parameter the route does not read
+
+**Severity: Low. Area: Tasks / web client. Status: Fixed 2026-10-02 — found moving the tasks wrapper to the generated client (OPT-02 Stage B).**
+
+**Observed.** The client's `tasks()` wrapper filtered with `status=`, while
+`GET /api/tasks` reads `task_status`; a filtered list silently returned every
+task.
+
+**Fixed.** The wrapper is the generated one, whose query names come from the
+route itself, so the two cannot drift again.
+
+---
+
+## FIXED-675 — Token counts were redacted from exports and answers
+
+**Severity: Medium. Area: Events / API redaction. Status: Fixed 2026-10-02 — found by the model contract cases.**
+
+**Observed.** Fields such as `tokens`, `cache_read_tokens`,
+`cache_write_tokens` and `estimated_input_tokens_before` came back as
+`***REDACTED***` — the capacity override answer among them — because only an
+allowlist of count names was exempt from the `token` rule.
+
+**Root cause.** The exemption listed names instead of recognising what a count
+is. Every new count field was a new redaction.
+
+**Fixed.** A field is a count when `tokens` is a whole word of its name and its
+value is an integer (or null); `is_token_count_field` keeps the allowlist and
+adds that shape rule. A credential named `*_token` still redacts.
+
+**Evidence.** `tests/test_token_count_redaction.py` — *a count is recognised by
+its shape, not by a list*.
+
+---
+
+## FIXED-676 — Models called Design ready on a model that returns no images
+
+**Severity: Low. Area: Models / Design. Status: Fixed 2026-10-02 — was BUG-311.**
+
+**Observed.** After setup chose `gpt-oss:20b-cloud`, setup's Ready step said
+Design *Needs a provider that returns images* while the Models overview listed
+Design on the same model as **Ready**.
+
+**Root cause.** Design's model decision is its research model. The overview
+printed that decision's readiness; setup asked whether any reachable model
+returns images. Two questions, one word.
+
+**Fixed.** Both read one fact, `drawsImages()` in `modelReadiness.svelte.ts`.
+When Design's research model is ready and nothing reachable draws, the overview
+says **Research only**, names why, and offers *Connect an image provider*.
+
+**Required user-interface outcome — met.** No page calls Design ready to draw
+when no connected model returns images.
+
+**Evidence.** `ModelsOverview.test.ts` — the three BUG-311 cases.
+
+---
+
+## FIXED-677 — The lock file named a pypdf version its files were not
+
+**Severity: Medium. Area: CI / dependencies. Status: Fixed 2026-10-02 — found by CI.**
+
+**Observed.** CI's *Dependency vulnerabilities* job failed before auditing
+anything: `uv.lock` gave `pypdf` version 6.19.0 against the 6.17.0 sdist and
+wheel, which uv refuses to parse.
+
+**Fixed.** Relocked with the pinned `uv==0.8.17` (`uv lock --upgrade-package
+pypdf`) and re-exported `requirements/`, so pypdf is 6.19.0 throughout.

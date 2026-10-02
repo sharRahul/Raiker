@@ -753,7 +753,7 @@ summary that made the same statement.
 
 | Document | Disposition after this audit |
 |---|---|
-| `CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md` | Historical analysis + active architecture recommendations. Paths such as old `apps/web` references must not be treated as current. Contract generation and module decomposition remain useful. |
+| `CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md` | **Removed 2026-10-02**, complete. Its items closed as FIXED-616/617, FIXED-623 to FIXED-629, FIXED-634 to FIXED-643, FIXED-655 to FIXED-657, FIXED-664/665 and FIXED-678/679. |
 | `CODEBASE_SECURITY_CODE_REVIEW_2026-09-05.md` | **Removed 2026-09-28**, complete. CR-01 closed as FIXED-619, CR-05 and CR-09 as FIXED-620; the rest are listed above the re-verification table. |
 | the environment-context plan | Implementation-plan history; later records say core time/weather work closed. Re-run contract tests before reopening. |
 | `FIXED_ITEMS.md` | Evidence ledger. Keep append-only in spirit; not a current-priority list. |
@@ -901,7 +901,7 @@ Following the repository's priority-before-effort rule:
 | 11 | Design persistent canvas/editing UX | P1/P2 | High | Reduced — [FIXED-491](FIXED_ITEMS.md#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach) (canvas workspace); RR-DESIGN-01 open |
 | 12 | CodeQL/secret/dependency/container security gates | P2 | Medium | Reduced — dependency audit gates in [FIXED-611](FIXED_ITEMS.md#fixed-611--nothing-failed-a-change-that-shipped-a-dependency-with-a-published-vulnerability); CodeQL/secret/container gates open |
 | 13 | Release provenance + publish SBOM/attestations | P2 | Medium | Open |
-| 14 | Generate frontend API contracts/ordinary wrappers | P2 | Medium | Open — OPT-01/OPT-02 of the optimisation review |
+| 14 | Generate frontend API contracts/ordinary wrappers | P2 | Medium | Done 2026-10-02 — FIXED-664/665 and FIXED-678/679 |
 | 15 | Simplify Permissions owner language | P2 | Medium | Reduced — [FIXED-513](FIXED_ITEMS.md#fixed-513--the-permissions-page-answered-what-am-i-looking-at-twice-and-led-with-neither) |
 | 16 | Regenerate canonical mobile/1080p screenshot catalogue from live app | P2 | Low once live host exists | Closed — regenerated from a live host into `docs/screenshots/pages/` (180 captures, last on 2026-09-22) |
 

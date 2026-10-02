@@ -699,6 +699,15 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-675](#fixed-675--token-counts-were-redacted-from-exports-and-answers) | Medium | Events / API redaction | Fixed 2026-10-02 — found by the model contract cases |
 | [FIXED-676](#fixed-676--models-called-design-ready-on-a-model-that-returns-no-images) | Low | Models / Design | Fixed 2026-10-02 — was BUG-311 |
 | [FIXED-677](#fixed-677--the-lock-file-named-a-pypdf-version-its-files-were-not) | Medium | CI / dependencies | Fixed 2026-10-02 — found by CI |
+| [FIXED-678](#fixed-678--most-routes-answers-were-described-nowhere-but-the-clients-copy) | Low | API contract | Fixed 2026-10-02 — OPT-01 Stage B; review closed |
+| [FIXED-679](#fixed-679--the-client-still-hand-wrote-the-wrappers-for-routes-openapi-now-describes) | Low | Web client | Fixed 2026-10-02 — OPT-02 Stage B |
+| [FIXED-680](#fixed-680--grants-telemetry-destinations-and-security-health-sent-stored-rows) | Low | Governance / API | Fixed 2026-10-02 — found by OPT-01 Stage B |
+| [FIXED-681](#fixed-681--the-web-access-blocklist-sent-stored-rows-and-the-client-dropped-a-commands-lease) | Low | Egress / commands / API | Fixed 2026-10-02 — found by OPT-01 Stage B |
+| [FIXED-682](#fixed-682--designs-research-was-refused-before-it-reached-the-turn) | High | Design / API | Fixed 2026-10-02 — found by OPT-01 Stage B |
+| [FIXED-683](#fixed-683--an-update-deferred-for-running-work-broke-the-updates-panel-and-its-signing-names-were-masked) | Medium | Settings / updates | Fixed 2026-10-02 — found by OPT-01 Stage B |
+| [FIXED-684](#fixed-684--mfas-recovery-codes-were-issued-and-never-shown) | High | Authentication / Settings | Fixed 2026-10-02 |
+| [FIXED-685](#fixed-685--every-composer-called-web-fetch-off-while-permissions-said-it-was-on) | Medium | Composer / Permissions | Fixed 2026-10-02 — found by the live round |
+| [FIXED-686](#fixed-686--designs-research-printed-the-models-markdown-as-text) | Low | Design | Fixed 2026-10-02 — found by the live round |
 
 ---
 
@@ -27065,7 +27074,7 @@ there at 1440 and 390 wide, reads as read, and the bell agrees
 ## FIXED-623 — Whether a route refused a misspelled field depended on who wrote it
 
 **Severity: Low. Area: API / input validation. Status: Fixed 2026-09-28. Closes
-OPT-03 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-03--introduce-one-strict-request-base-model).**
+OPT-03 of the optimisation review (removed 2026-10-02, complete).**
 
 **Observed.** Sixty-nine request models each declared `extra="forbid"` for
 themselves. Sixteen did not — five in `schemas.py` (`LocalModelDeployRequest`
@@ -27095,7 +27104,7 @@ and walks every destination at both capture widths with no 422 from any page.
 ## FIXED-624 — Twenty route modules rebuilt the same helpers, and one refusal was typed out 174 times
 
 **Severity: Low. Area: API / maintainability. Status: Fixed 2026-09-28. Closes
-OPT-04 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-04--centralize-api-dependencies-and-common-refusal-mapping).**
+OPT-04 of the optimisation review (removed 2026-10-02, complete).**
 
 **Observed.** Route modules each declared `_ws` (the workspace off the app
 state, with four spellings of one `type: ignore`), `_auth` (an
@@ -27123,7 +27132,7 @@ round's destination walk reads every page's API through them.
 ## FIXED-625 — The order a database is built in could only be read out of a 700-line method
 
 **Severity: Low. Area: Storage / migrations. Status: Fixed 2026-09-28. Closes
-OPT-07 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-07--replace-individual-migration-constant-imports-with-a-migration-registry).**
+OPT-07 of the optimisation review (removed 2026-10-02, complete).**
 
 **Observed.** `migration_runner.py` imported 336 names from `migrations.py`, and
 `bootstrap` called `_apply_migration` 166 times, interleaved with column
@@ -27152,7 +27161,7 @@ store does not have. `migration_runner.py` 1,384 → 488 lines; `migrations.py`
 ## FIXED-626 — Two exception ladders decided what a provider refusal meant
 
 **Severity: Low. Area: Models / readiness. Status: Fixed 2026-09-28. Closes
-OPT-12 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-12--replace-giant-provider-readiness-exception-ladders-with-a-typed-classifier).**
+OPT-12 of the optimisation review (removed 2026-10-02, complete).**
 
 **Observed.** `ProviderCatalogueProbe.check` carried two `except` ladders —
 eighteen branches, each constructing its own state, reason code, summary and
@@ -27179,7 +27188,7 @@ text never reaches the public result.
 ## FIXED-627 — A provider's name was a table inside the readiness code
 
 **Severity: Low. Area: Models / presentation. Status: Fixed 2026-09-28. Closes
-OPT-14 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-14--put-provider-display-metadata-in-the-profile-registry-instead-of-code-mappings).**
+OPT-14 of the optimisation review (removed 2026-10-02, complete).**
 
 **Observed.** `readiness._provider_label` mapped twelve provider ids to the name
 an owner reads, beside a registry that already describes every provider, and the
@@ -27201,7 +27210,7 @@ except for that one recorded difference. The live round's readiness check reads
 ## FIXED-628 — A workflow of its own to grep five documents, and two validators that ran nowhere
 
 **Severity: Low. Area: CI / workflows. Status: Fixed 2026-09-28. Closes OPT-19
-of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-19--reduce-workflow-duplication-with-reusable-setup-but-do-not-move-yaml-lines-into-opaque-shell-scripts-just-to-win-loc).**
+of the optimisation review (removed 2026-10-02, complete).**
 
 **Observed.** Every CI job repeated the same pinned `setup-python` step, and two
 repeated the editable install beside it. `phase-status.yml` was a whole runner —
@@ -27227,7 +27236,7 @@ validators pass in pytest; this change's own CI run.
 ## FIXED-629 — A simplification could only estimate what it had removed
 
 **Severity: Low. Area: CI / measurement. Status: Fixed 2026-09-28. Closes Wave 0
-of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#wave-0--establish-the-baseline).**
+of the optimisation review (removed 2026-10-02, complete).**
 
 **Observed.** The review's rules — a line moved between handwritten files scores
 nothing, generated code is counted apart — needed a baseline taken the same way
@@ -27350,7 +27359,7 @@ row shorten.
 ## FIXED-634 — Two provider adapters carried the same HTTP client, twice
 
 **Severity: Low. Area: Models / providers. Status: Fixed 2026-09-30. Closes
-OPT-09 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-09--introduce-a-shared-async-provider-http-transport).**
+OPT-09 of the optimisation review (removed 2026-10-02, complete).**
 
 **Observed.** `anthropic_messages.py` and `openai_compatible.py` each owned an
 `httpx.AsyncClient`, merged their headers into each request, translated timeouts
@@ -27376,7 +27385,7 @@ probe answered *Ollama can reach gpt-oss:20b-cloud* through the same transport
 ## FIXED-635 — The llama.cpp and MLX pools were the same lifecycle, written twice
 
 **Severity: Low. Area: Models / local runtimes. Status: Fixed 2026-09-30. Closes
-OPT-10 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-10--share-managed-local-runtime-processslot-lifecycle),
+OPT-10 of the optimisation review (removed 2026-10-02, complete),
 and the slot half of OPT-20.**
 
 **Observed.** Each pool kept a slot table, a process map, a reservation set, a
@@ -27419,7 +27428,7 @@ host's pool is running*, which fails against the previous code.
 ## FIXED-637 — Five model-operation workers each wrote their own claim, cancel and settle
 
 **Severity: Low. Area: Models / operations. Status: Fixed 2026-09-30. Closes
-OPT-11 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-11--create-a-model-operation-worker-harness).**
+OPT-11 of the optimisation review (removed 2026-10-02, complete).**
 
 **Observed.** The Hugging Face download, the conversion, the Ollama pull and the
 llama.cpp and MLX deployments each claimed the row, checked for Cancel, did the
@@ -27444,7 +27453,7 @@ hand.
 ## FIXED-638 — A hundred and thirty-four `to_dict` methods said "all my fields"
 
 **Severity: Low. Area: API / read models. Status: Fixed 2026-09-30. Closes
-OPT-05 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-05--replace-repetitive-dto-to_dict-implementations-with-one-serialization-strategy).**
+OPT-05 of the optimisation review (removed 2026-10-02, complete).**
 
 **Observed.** 74 view dataclasses returned `asdict(self)` and 59 typed the same
 thing out field by field — `list(self.tags)`, `[row.to_dict() for row in
@@ -27468,7 +27477,7 @@ walk of twenty-four destinations answered with no 4xx or 5xx.
 ## FIXED-639 — Every page's read models lived in one file beside the service
 
 **Severity: Low. Area: Control / read models. Status: Fixed 2026-09-30. Closes
-OPT-08 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-08--decompose-dashboardpy-by-read-model-domain-and-remove-embedded-api-dto-duplication)
+OPT-08 of the optimisation review (removed 2026-10-02, complete)
 ([FIXED-617](#fixed-617--one-service-file-held-every-page-the-product-serves)
 did the service half).**
 
@@ -27488,7 +27497,7 @@ re-exported, and `scripts/check_api_contract.py` reads the views modules.
 ## FIXED-640 — Three hundred and seventy-six transactions around one statement each
 
 **Severity: Low. Area: Storage. Status: Fixed 2026-09-30. Closes stage B of
-OPT-06 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-06--break-sqlitepy-into-domain-stores-then-deduplicate-only-proven-crud-patterns)
+OPT-06 of the optimisation review (removed 2026-10-02, complete)
 ([FIXED-616](#fixed-616--one-storage-file-held-every-domain-the-product-has) was
 stage A).**
 
@@ -27508,7 +27517,7 @@ rollback, and a check that no store hand-writes the shape again.
 ## FIXED-641 — The router's refusals were literals, a constant list, and a copy table
 
 **Severity: Low. Area: Authority / web copy. Status: Fixed 2026-09-30. Closes
-OPT-18 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-18--extract-shared-reason-codeenvelope-types-instead-of-repeating-string-dictionaries).**
+OPT-18 of the optimisation review (removed 2026-10-02, complete).**
 
 **Observed.** The authority router returned string literals; `control/dtos.py`
 kept `REASON_*` constants of the same strings, three of which
@@ -27532,7 +27541,7 @@ router spells a catalogue reason as a literal.
 ## FIXED-642 — The command palette offered Memory engine as "memory-engine"
 
 **Severity: Low. Area: Web UI / navigation. Status: Fixed 2026-09-30 — found
-under OPT-20 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-20--keep-generatedstatic-registries-as-data-when-behavior-is-table-driven),
+under OPT-20 of the optimisation review (removed 2026-10-02, complete),
 which it closes.**
 
 **Observed.** The command palette and All pages each kept a table of settings
@@ -27554,7 +27563,7 @@ rail does*, which fails against the previous code; live, the palette answering
 ## FIXED-643 — Tests spelled out every principal and action field by field
 
 **Severity: Low. Area: Tests. Status: Fixed 2026-09-30. Closes OPT-17 of the
-[optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-17--use-backend-factoriesbuilders-in-python-tests-instead-of-repeated-full-object-construction).**
+optimisation review (removed 2026-10-02, complete).**
 
 **Fixed.** `tests/factories.py` — `human`, `ai_agent`, `governed_action` and
 `tool_action`. They fill what no decision depends on and *require* what does: a
@@ -27819,7 +27828,7 @@ host, so the Windows confirmation is the next Windows full suite.
 ## FIXED-655 — A tool's label, glyph and audit treatment lived in four tables beside it
 
 **Severity: Low. Area: Runtime / tools. Status: Fixed 2026-10-01. Closes OPT-13
-of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-13--create-one-typed-tool-definition-registry).**
+of the optimisation review (removed 2026-10-02, complete).**
 
 **Fixed.** `ToolDefinition` in `raiker/models/tool_registry.py` gains `label`,
 `family` and `audit`, none defaulted, so a tool cannot reach a transcript or the
@@ -27838,7 +27847,7 @@ the broker audit tests, and the live tool-row round.
 ## FIXED-656 — Executable files retold how their bugs were found
 
 **Severity: Low. Area: Code comments. Status: Fixed 2026-10-01. Closes OPT-15 of
-the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-15--compress-historical-bugfixed-narratives-inside-executable-files).**
+the optimisation review (removed 2026-10-02, complete).**
 
 **Fixed.** The sweep the 2026-09-30 start left open: the production files
 whose comments said what the code *used to* do, or that it was *found live* on a
@@ -27858,7 +27867,7 @@ full suites.
 ## FIXED-657 — A hundred and twelve live specs each declared the host, key and model
 
 **Severity: Low. Area: Tests / Playwright. Status: Fixed 2026-10-01. Closes OPT-16
-of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#opt-16--consolidate-repeated-playwright-setup-into-fixturespage-objects).**
+of the optimisation review (removed 2026-10-02, complete).**
 
 **Fixed.** `web/e2e/live.ts` owns the live host address (`RAIKER_LIVE_BASE`), the
 round's Anthropic key and model, connecting Anthropic through Models
@@ -28005,7 +28014,7 @@ screen ([the round](LIVE_TEST_ROUNDS.md#2026-10-01-second--the-contract-is-deriv
 ## FIXED-664 — The OpenAPI document described no route's response
 
 **Severity: Low. Area: API contract. Status: Fixed 2026-10-01 — Stage A of OPT-01
-under the [scope decision](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#scope-decision--opt-01-and-opt-02-2026-10-01).
+under the scope decision of the optimisation review (removed 2026-10-02, complete).
 OPT-01 stays partial until Stage B.**
 
 **Observed.** Every route annotates `-> dict[str, Any]`, so the OpenAPI
@@ -28041,7 +28050,7 @@ case each.
 ## FIXED-665 — The client's wrappers were all hand-written, and nothing checked the paths they called
 
 **Severity: Low. Area: Web client. Status: Fixed 2026-10-01 — Stage A of OPT-02
-under the [scope decision](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#scope-decision--opt-01-and-opt-02-2026-10-01).**
+under the scope decision of the optimisation review (removed 2026-10-02, complete).**
 
 **Fixed.** The generated module carries a typed wrapper for each verified
 operation, with its query parameters, on the shared transport core; twelve
@@ -28274,3 +28283,192 @@ wheel, which uv refuses to parse.
 
 **Fixed.** Relocked with the pinned `uv==0.8.17` (`uv lock --upgrade-package
 pypdf`) and re-exported `requirements/`, so pypdf is 6.19.0 throughout.
+
+---
+
+## FIXED-678 — Most routes' answers were described nowhere but the client's copy
+
+**Severity: Low. Area: API contract. Status: Fixed 2026-10-02 — Stage B of OPT-01;
+the optimisation review closed with it and was removed 2026-10-02.**
+
+**Observed.** After Stage A ([FIXED-664](#fixed-664--the-openapi-document-described-no-routes-response))
+17 of 350 operations were described; 312 were deferred because the route
+assembled its answer as an untyped `dict`, and the web client kept a
+hand-written copy of each.
+
+**Fixed.** Every ordinary JSON operation declares what it answers with — a
+`TypedDict` under `raiker/api/wire/<domain>.py` or a fields-only `View` in
+`raiker/control/views/` — and `scripts/api_contract.py` reads the declaration
+from an annotated local, a `cast`, or a typed helper or service return.
+`tests/contract_cases/` holds one seeded call per operation, and
+`tests/test_api_contract_responses.py` matches each real answer to its schema
+key for key. **350 operations: 339 verified, 0 eligible, 0 deferred, 11
+special** (streams, file downloads, exports and transcription, which stay
+hand-written); the inventory is
+[`API_CONTRACT_INVENTORY.md`](../architecture/API_CONTRACT_INVENTORY.md).
+Loose Python types were tightened to `Literal`s where the client was more
+precise (readiness states, setup and catalogue statuses, variant formats,
+surfaces, runtime trust), as the scope decision required, rather than
+loosening the client.
+
+`test_every_ordinary_json_operation_is_described` fails if a route lands
+without a declared answer and a contract case, so the coverage cannot erode.
+
+**Evidence.** The contract test (339 cases); `--check` of the generator in CI.
+Describing the routes found the defects recorded as FIXED-670 to FIXED-675 and
+FIXED-680 to FIXED-683.
+
+---
+
+## FIXED-679 — The client still hand-wrote the wrappers for routes OpenAPI now describes
+
+**Severity: Low. Area: Web client. Status: Fixed 2026-10-02 — Stage B of OPT-02.**
+
+**Fixed.** `web/src/lib/generated/apiContract.ts` carries a typed wrapper for
+each verified operation — method, path parameters, query names and optional
+bodies taken from the route — and `api.ts` delegates to them, keeping its
+public facade so no view changed how it calls. Hand-written response types
+became aliases of the generated ones or went: `apiTypes.ts` fell from 3,219
+lines (203 interfaces) at the end of Stage A to 879 (7 interfaces, all
+frontend-only or request shapes), `api.ts` from 2,089 to 963. Test fixtures
+build complete generated shapes (`modelProfile()`, `modelsView()` and the
+fixtures for answers, environments and updates).
+
+**Evidence.** `svelte-check` with no errors, ESLint, and 1,966 web unit tests;
+`tests/test_web_api_routes.py` holds every path the client builds to a route.
+
+---
+
+## FIXED-680 — Grants, telemetry destinations and security health sent stored rows
+
+**Severity: Low. Area: Governance / API. Status: Fixed 2026-10-02 — found describing the governance routes (OPT-01 Stage B).**
+
+**Observed.** Standing grants came back as database rows, `revoked` as `0`/`1`
+and a just-created grant in a different shape from a listed one; telemetry
+destinations carried `principal_id` and the internal cursor sequence; security
+health carried `principal_id`.
+
+**Fixed.** Each answers with a projection (`standing_grant()`,
+`telemetry_destination()` in `raiker/api/wire/control.py`,
+`SecurityHealthView`), one shape for created and listed grants, `revoked` a
+boolean.
+
+**Evidence.** `tests/test_api_contract_responses.py` — the governance cases.
+
+---
+
+## FIXED-681 — The web-access blocklist sent stored rows, and the client dropped a command's lease
+
+**Severity: Low. Area: Egress / commands / API. Status: Fixed 2026-10-02 — found describing the extension routes (OPT-01 Stage B).**
+
+**Observed.** The blocklist answered with stored rows including
+`owner_principal_id` and `created_by`. Command runs sent `lease_expires_at`,
+which the client's hand-written type had left out.
+
+**Fixed.** The blocklist answers with a projection; the command-run type is the
+generated one, lease included.
+
+---
+
+## FIXED-682 — Design's Research was refused before it reached the turn
+
+**Severity: High. Area: Design / API. Status: Fixed 2026-10-02 — found describing the prompt route (OPT-01 Stage B).**
+
+**Observed.** Every Research question in Design failed with a validation error:
+the page sends `surface: "design"` to `POST /api/prompts`, and the request model
+accepted only `chat` and `build`.
+
+**Root cause.** The runtime's `PROMPT_SURFACES` gained Design; the request
+models (`PromptRequest`, `TaskCreateRequest`) kept their own older list.
+
+**Fixed.** Both accept `design`, and a test holds the request model's list to
+`PROMPT_SURFACES`.
+
+**Evidence.** `tests/test_context_surface_scoping.py` —
+*the prompt API accepts every surface the runtime has*, failing against the
+previous code; live in this run's round.
+
+---
+
+## FIXED-683 — An update deferred for running work broke the Updates panel, and its signing names were masked
+
+**Severity: Medium. Area: Settings / updates. Status: Fixed 2026-10-02 — found describing the update routes (OPT-01 Stage B).**
+
+**Observed.** When applying an update waited on running work, the route
+answered with the host's waiting work, but Settings › Updates stored it as the
+update status and rendered fields that answer does not have. Separately, each
+release target's `signing.secrets` — the *names* of the CI variables that hold
+signing material — reached the page as a redaction marker, because the response
+redactor masks any key containing `secrets`.
+
+**Fixed.** The client types the apply answer as the union it is and keeps the
+status it already shows on a deferral; the signing names travel as
+`required_env`.
+
+**Evidence.** `tests/test_api_contract_responses.py` — the update cases;
+`Updates.test.ts`.
+
+---
+
+## FIXED-684 — MFA's recovery codes were issued and never shown
+
+**Severity: High. Area: Authentication / Settings. Status: Fixed 2026-10-02 — found preparing this run's live round.**
+
+**Observed.** Enrolling in MFA under **Settings → Security & sign-in** created
+ten one-time recovery codes and answered with them, but the page showed only
+the authenticator link. The server keeps only their hashes, so they were lost
+the moment they were made — and the lock screen's **Forgot password?** asks for
+"an existing authenticator code or one-time backup recovery code". An owner
+without the authenticator had no way back in. A recovery that did succeed
+returned to the unlock form without a word.
+
+**Fixed.** Enrollment lists the codes beside the authenticator link, saying they
+work once, recover the password, and are not shown again. A finished recovery
+says *Your password was changed. Unlock with the new one.* The guide's
+security chapter describes both
+([A forgotten password](../guide/security-and-privacy.md#a-forgotten-password)).
+
+**Evidence.** `SecurityLogin.test.ts` — *shows the one-time recovery codes
+enrollment issues*, failing against the previous page; `LoginView.test.ts`;
+live in this run's round: codes shown, one recovering the password, the same
+code refused a second time, the next restoring it, and an unlock with the
+authenticator's code.
+
+---
+
+## FIXED-685 — Every composer called Web fetch off while Permissions said it was on
+
+**Severity: Medium. Area: Composer / Permissions. Status: Fixed 2026-10-02 — found by this run's live round.**
+
+**Observed.** On a new account, Permissions showed **Web fetch — On by
+default**, and the Tools menu of Chat, Build, Design and Tasks listed *Search
+the web*, *Read a URL*, *Extract page content* and *Check the weather* as
+**Turned off in Permissions**, linking to the page that said otherwise. Design's
+Research could not be started at all.
+
+**Root cause.** The gate answers `state: "disabled"` with `enforced_enabled:
+true` when nothing is stored and the capability ships on (BUG-239's untouched
+switch). Permissions reads that through `isAvailable`; the composer menu read
+`state` alone.
+
+**Fixed.** The menu asks `isAvailable`, the rule Permissions uses, so the two
+cannot disagree about one capability.
+
+**Evidence.** `composerCapabilities.test.ts` — *is offered when nothing is
+stored and the capability ships on*, failing against the previous code; live,
+Design's Research running from its Tools menu.
+
+---
+
+## FIXED-686 — Design's Research printed the model's markdown as text
+
+**Severity: Low. Area: Design. Status: Fixed 2026-10-02 — found by this run's live round.**
+
+**Observed.** A research answer showed its headings, lists and bold as `**`,
+`1.` and `#` in one plain paragraph.
+
+**Fixed.** The answer renders through the same `Markdown` component as a Chat
+answer.
+
+**Evidence.** `DesignView.test.ts` — *renders the findings as prose, not as raw
+markdown*, failing against the previous view; live capture 04 of this round.

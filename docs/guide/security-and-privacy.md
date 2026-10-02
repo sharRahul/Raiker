@@ -25,6 +25,16 @@ attaches on its own cannot be forged by another site. Changing the owner
 password signs out other devices. Individual sessions can also be revoked under
 **Settings → Security & sign-in**.
 
+### A forgotten password
+
+**Settings → Security & sign-in → Enroll in MFA** adds an authenticator code to
+your sign-in and shows a set of one-time recovery codes once, beside the
+authenticator link. Save them somewhere other than this computer: Raiker keeps
+only their hashes, so they cannot be shown again. On the lock screen, **Forgot
+password?** asks for your username, then for a current authenticator code or one
+unused recovery code, and then a new password. Without MFA enrolled there is
+nothing to prove the request with, so a password cannot be recovered.
+
 ### Your name and your key are two different things
 
 Two identities belong to your account and they are not interchangeable.

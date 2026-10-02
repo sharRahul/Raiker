@@ -54,6 +54,16 @@ and the memory reliability plan, whose fourteen MEM entries had all closed by
 code comments, as COMPOSER-xx did: every closure record names the finding it
 closes, so an ID leads to its record.
 
+The optimisation review went on 2026-10-02, when OPT-01 and OPT-02 — every
+ordinary JSON route described by OpenAPI and called through a generated
+wrapper — finished Stage B as
+[FIXED-678](FIXED_ITEMS.md#fixed-678--most-routes-answers-were-described-nowhere-but-the-clients-copy)
+and
+[FIXED-679](FIXED_ITEMS.md#fixed-679--the-client-still-hand-wrote-the-wrappers-for-routes-openapi-now-describes).
+Its other items closed between 2026-09-28 and 2026-10-01 (FIXED-616/617,
+FIXED-623 to FIXED-629, FIXED-634 to FIXED-643, FIXED-655 to FIXED-657,
+FIXED-664/665). Its OPT-xx IDs stay in code comments on the same terms.
+
 The typed channel's other half closed on 2026-09-16 as
 [FIXED-551](FIXED_ITEMS.md#fixed-551--a-declared-table-was-a-table-in-the-conversation-and-json-everywhere-else):
 an exported, reopened or spoken answer is the same answer the conversation
@@ -79,7 +89,6 @@ When these disagree with an older topic review's current-status prose, re-verify
 
 | Document | Role now |
 |---|---|
-| `CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md` | Optimization review with work still in it. Wave 0, OPT-03, -04, -07, -12, -14 and -19 closed 2026-09-28 (FIXED-623 to FIXED-629) with the splits of OPT-06 and OPT-08 (FIXED-616, FIXED-617); OPT-05, -06, -08, -09, -10, -11, -17, -18 and -20 closed 2026-09-30 (FIXED-634 to FIXED-643); OPT-13, -15 and -16 closed 2026-10-01 (FIXED-655 to FIXED-657). OPT-01 and -02 — generated API types and REST wrappers — finished Stage A 2026-10-01 (FIXED-664, FIXED-665) and remain partial until Stage B |
 | `GAP_BUILD_CHAT.md` | Build/Chat gap ledger; row-level status is stronger evidence than old narrative paragraphs |
 | `GOVERNANCE_ENTRY_PATHS.md` | Canonical governance entry-path inventory; no open item since 2026-09-28 (GEP-02 and GEP-03 closed). Kept as the enumeration, not as a review |
 | `LIVE_TEST_ROUNDS.md` | Historical live-test evidence by round |

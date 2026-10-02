@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-02 | Targeted | `2026-10-02-contract-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn and a Design research turn, the key entered through the Connect dialog | OPT-01 and OPT-02 Stage B — every ordinary route described and called through the generated client — and what describing them found. Proved live: Design's Research reaching its turn (it had been refused with 422), Models calling Design **Research only** with the way to fix it, MFA's recovery codes shown once and one of them recovering the password from the lock screen (and refused the second time), and every destination with **no 4xx, no 5xx and no console error**. **Three defects found and fixed** — the recovery codes were never shown, every composer called Web fetch off while Permissions said on, and research answers printed raw markdown |
 | 2026-10-01 (second) | Targeted | `2026-10-01-contract-round/` | Ollama `gpt-oss:20b-cloud` on the local Ollama service, no key; the Anthropic, OpenAI and OpenRouter keys the owner supplied were not entered by the agent | OPT-01 and OPT-02 Stage A and the rest of BUG-310. Proved live on Windows: setup → Ready → Chat on the chosen, checked model; a real tool-using turn; every destination through the generated contract and the split client with **no 4xx, no 5xx and no console error**; and a second instance created from the lock screen. **Four defects found and fixed** — the sandbox probe left a file in the workspace, Ready's Chat opened Home, Chat after setup offered the model setup had replaced, and a stale cookie cost a 401 on the lock screen; BUG-311 and BUG-312 filed |
 | 2026-10-01 | Targeted | `2026-10-01-projects-lifecycle/` | Anthropic (`claude-haiku-4-5-20251001`) answering real turns and proposing a shell command, the key entered through the Connect dialog | Ten items from `docs/plans/`: UX-PROJ-04 to UX-PROJ-09, BUG-310, OPT-13, OPT-15 and OPT-16. Proved live: a chat filed under a project resuming from its row, shared files by name, a move that will not go inside itself, archive and a restore that leaves a separately archived child archived, a managed delete counting what goes and asking for the password, all of it at 390 wide; the converted live specs connecting through `live.ts`; and every destination at both capture widths with **no 422, no 5xx and no console error**. **Six defects found and fixed** — subtree matching read `_` as a wildcard, an approval notice docked a second time over Chat's header, the approval card took a model menu's clicks, composers said no model was set up for the first second, the approval card covered **Send** until its next measurement, and a finished command run held its supervisor key for a moment |
 | 2026-09-30 | Targeted | `2026-09-30-optimisation-round/` | Ollama `gpt-oss:20b-cloud` on the local Ollama service, no key; the Anthropic, OpenAI and OpenRouter keys the owner supplied were not entered by the agent | Ten items from the optimisation review — OPT-05, -06 stage B, -08, -09, -10, -11, -17, -18, -20 and a first slice of OPT-15. Proved live: setup → Chat on a reset workspace, a real streamed answer and a readiness probe both through the shared provider transport, the palette naming **Memory engine**, and twenty-four destinations answering with **no 4xx, no 5xx and no traceback**, with no horizontal overflow at 390 wide. **Two defects found and fixed** — setup recommended llama.cpp beside "No complete GGUF found" (and My models offered Use on four empty slots), and the first message after setup was refused as never checked |
@@ -80,6 +81,63 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-10-02 — Every ordinary route is described, and what describing them found
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py`, with
+`RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com`, in a Linux container whose
+egress is limited to a proxy. Provider: Anthropic `claude-haiku-4-5-20251001`,
+the key the owner supplied entered through the Connect dialog by the spec from
+the process environment — never written to a file. Browser: Playwright's
+Chromium. Spec: `web/e2e/round-2026-10-02-contract-live.spec.ts` (5 of 5 on the
+final, fresh workspace). Captures:
+[`docs/screenshots/2026-10-02-contract-round/`](../screenshots/2026-10-02-contract-round).**
+
+OPT-01 and OPT-02 Stage B (FIXED-678, FIXED-679), which closed the optimisation
+review, and the defects describing the routes found (FIXED-670 to FIXED-675 and
+FIXED-680 to FIXED-683).
+
+**What it proved.**
+
+1. **Anthropic connects through Models and answers in Chat**
+   ([01](../screenshots/2026-10-02-contract-round/01-anthropic-connected.png),
+   [02](../screenshots/2026-10-02-contract-round/02-chat-answer.png)).
+2. **Models says Design can research but not draw**: Haiku as the global
+   model, Design reading **Research only** with *Connect an image provider*
+   (FIXED-676,
+   [03](../screenshots/2026-10-02-contract-round/03-models-design-research-only.png)).
+   Choosing the global model marked the profile's readiness stale, as the
+   selection invalidation hook is meant to; one check restored it.
+3. **Design's Research reaches the turn.** `POST /api/prompts` with
+   `surface: "design"` answered 200 — it had been refused with 422 — and the
+   answer rendered as prose (FIXED-682, FIXED-686,
+   [04](../screenshots/2026-10-02-contract-round/04-design-research-answers.png)).
+   The model said it could not search: this host has no search provider and
+   no route to one, which is the answer the runtime should give.
+4. **Every destination reads through the generated client** with no `/api/`
+   request answered 4xx or 5xx and no console error, including the pages whose
+   answers became projections or unions in this run — Security & sign-in,
+   Updates, Runtime, Observability and Extensions
+   ([05](../screenshots/2026-10-02-contract-round/05-settings-security.png)–[09](../screenshots/2026-10-02-contract-round/09-extensions.png)).
+5. **MFA's recovery codes are shown once, and one recovers the password**: the
+   codes beside the authenticator link (blurred in the capture), activation
+   with a computed TOTP code, a recovery from a fresh browser's lock screen
+   saying the password changed, the same code refused a second time, the next
+   one restoring the password, and an unlock with password and authenticator
+   code (FIXED-684,
+   [10](../screenshots/2026-10-02-contract-round/10-mfa-recovery-codes.png),
+   [11](../screenshots/2026-10-02-contract-round/11-recovered-by-backup-code.png)).
+
+**What it found, and fixed in the round** — FIXED-684 to FIXED-686: recovery
+codes issued and never shown, every composer's Tools menu calling Web fetch off
+while Permissions said on (Design's Research could not start), and research
+answers printing raw markdown.
+
+**What it did not prove.** An image drawn — no image provider is connected —
+and a web search with results, for the reason in 3.
 
 ---
 
@@ -145,7 +203,7 @@ captures were restored after the re-run, so its record is unchanged.**
 Ten items from `docs/plans/`: §3.12 Projects of the
 [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects)
 (UX-PROJ-04 to -09, FIXED-647 to FIXED-653), BUG-310 (FIXED-654), and OPT-13,
--15 and -16 of the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md)
+-15 and -16 of the optimisation review (`CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md`, removed 2026-10-02)
 (FIXED-655 to FIXED-657).
 
 **What it proved.**
@@ -213,7 +271,7 @@ live keys the host would send on to those providers. Browser: Playwright's
 Chromium. Captures:
 [`docs/screenshots/2026-09-30-optimisation-round/`](../screenshots/2026-09-30-optimisation-round).**
 
-Ten items from the [optimisation review](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md),
+Ten items from the optimisation review (`CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md`, removed 2026-10-02),
 FIXED-634 to FIXED-643. Most move code without changing what an owner sees, so
 what a round can prove is that nothing moved underneath a page.
 

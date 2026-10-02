@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
+
+from typing_extensions import TypedDict
 
 from raiker.contracts.views import View
 
@@ -24,7 +26,26 @@ def _handler_target(handler: Any) -> str:
     return handler.model or "owner-selected model"
 
 
-def _declaration_summaries(stored: Any) -> tuple[dict[str, Any], ...]:
+class McpToolDeclaration(TypedDict):
+    """What one MCP tool said it takes — the argument names, never a schema dump."""
+
+    name: str
+    title: str
+    description: str
+    has_schema: bool
+    schema_reason: str
+    arguments: list[str]
+    required: list[str]
+
+
+class UnsupportedFeature(TypedDict):
+    """Something a server offers that Raiker does not use, in one sentence."""
+
+    feature: str
+    note: str
+
+
+def _declaration_summaries(stored: Any) -> tuple[McpToolDeclaration, ...]:
     """The owner-facing summary of what a server declared for each of its tools.
 
     Backlog #16 (MCP half). A server whose tools declare no arguments must not
@@ -38,7 +59,7 @@ def _declaration_summaries(stored: Any) -> tuple[dict[str, Any], ...]:
     """
     from raiker.tools.mcp_schema import decode_declarations
 
-    summaries: list[dict[str, Any]] = []
+    summaries: list[McpToolDeclaration] = []
     for declaration in decode_declarations(stored):
         schema = declaration.input_schema or {}
         properties = schema.get("properties") if isinstance(schema, dict) else None
@@ -82,12 +103,12 @@ class McpServerView(View):
     # declared something: its name, the server's own sentence, and whether the
     # declared argument schema is carried or why it is not. Still never
     # arguments a call passed or output it returned.
-    tool_declarations: tuple[dict[str, Any], ...] = ()
+    tool_declarations: tuple[McpToolDeclaration, ...] = ()
     # BUG-234 — what this server offers that Raiker does not use, one sentence
     # each: capabilities it declared beyond `tools`, and what the transport was
     # observed doing. Empty when a server offers only what Raiker uses. The rule
     # is "supported, or named as unsupported" — never silently degraded.
-    unsupported_features: tuple[dict[str, str], ...] = ()
+    unsupported_features: tuple[UnsupportedFeature, ...] = ()
     # Remote (http) connection details. `endpoint_url` is the owner-added URL;
     # `auth_ref` names where the owner token lives (an env var name) — never the
     # token itself. Both are null for a local stdio connection.
@@ -97,7 +118,7 @@ class McpServerView(View):
     # revocable circuit breaker (auto on a high-severity anomaly, or the owner's
     # one-call stop); `killed` is the instant kill switch. `paused_reason` /
     # `paused_at` are redacted metadata (a rule code + summary, a timestamp).
-    monitor_state: str = "active"
+    monitor_state: Literal["active", "paused", "killed"] = "active"
     paused_reason: str | None = None
     paused_at: str | None = None
     # BUG-234 — the Model Context Protocol revision this server actually

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from raiker.contracts.views import View
 from raiker.control.views.security import IdentityView
@@ -41,6 +41,12 @@ class ApprovalView(View):
     queue_total: int = 1
 
 
+#: How an approval card renders what it is asking about.
+PreviewKind = Literal[
+    "file_diff", "patch", "git_change", "connector_request", "checkpoint_restore", "arguments"
+]
+
+
 @dataclass(frozen=True)
 class ApprovalDetailView(View):
     approval: ApprovalView
@@ -49,8 +55,8 @@ class ApprovalDetailView(View):
     # Unified diff for file-mutation proposals (write_file/edit_file); None otherwise.
     diff: str | None
     diff_path: str | None
-    # "file_diff" | "patch" | "arguments" — tells the UI how to render the preview.
-    preview_kind: str
+    # Tells the UI how to render the preview.
+    preview_kind: PreviewKind
     metadata_only_notice: str = (
         "Approval resolution is metadata-only. Recording a decision does NOT execute the action."
     )

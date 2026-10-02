@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
+
+from typing_extensions import TypedDict
 
 from raiker.contracts.views import View
 
@@ -55,6 +57,37 @@ class ProviderHealthView(View):
     detail: str
 
 
+class CheckpointCaptureHealth(TypedDict):
+    """The last checkpoint capture's outcome, as the store records it."""
+
+    ok: bool
+    stage: Literal["ineligible", "snapshot_ready", "snapshot", "commit"]
+    reason_code: str
+    display_path: str | None
+    checked_at: str
+    remediation: str
+
+
+class BackgroundWorkerHealth(TypedDict):
+    """One host-tick background pass: its last success, last failure and streak."""
+
+    pass_name: str
+    last_success_at: str | None
+    last_failure_at: str | None
+    last_error_class: str | None
+    consecutive_failures: int
+    total_failures: int
+    healthy: bool
+    updated_at: str
+
+
+class ModelProfileSource(TypedDict):
+    """Where the built-in model registry was read from: ``packaged`` or ``override``."""
+
+    kind: str
+    location: str
+
+
 @dataclass(frozen=True)
 class DiagnosticsView(View):
     runtime_mode: str
@@ -63,16 +96,18 @@ class DiagnosticsView(View):
     disabled_capabilities: tuple[str, ...]
     counts: dict[str, int]
     # M6 additions — an honest readiness/diagnostics surface derived from stored state only.
-    readiness: dict[str, Any] = field(default_factory=dict)
+    readiness: dict[str, bool | CheckpointCaptureHealth] = field(default_factory=dict)
     missing_config: tuple[str, ...] = ()
     provider_health: tuple[ProviderHealthView, ...] = ()
     # GCR-38 — one row per host-tick background pass: when it last succeeded,
     # when it last threw, the exception *class* it threw, and how many times in
     # a row, so a pass that fails every fifteen seconds is visible.
-    background_workers: tuple[dict[str, Any], ...] = ()
+    background_workers: tuple[BackgroundWorkerHealth, ...] = ()
     # GCR-45 — which file the built-in model registry was actually read from,
     # independent of the working directory the host was launched from.
-    model_profile_source: dict[str, str] = field(default_factory=dict)
+    model_profile_source: ModelProfileSource = field(
+        default_factory=lambda: ModelProfileSource(kind="", location="")
+    )
     scope_note: str = "Status reflects the local single-user runtime only."
 
 

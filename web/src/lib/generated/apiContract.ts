@@ -2,25 +2,36 @@
 // Do not edit: run `python -m scripts.api_contract`. CI fails when this file
 // differs from what the backend produces.
 
-import { request, withQuery } from "../api/core";
+import { postJson, request, withQuery } from "../api/core";
 
-export interface ActivateRuntimeModeRequest {
+export type ActivateRuntimeModeRequest = {
   mode_name: string;
   reason?: string;
   as_principal?: string | null;
-}
+};
 
 /** The owner's answer to a mid-turn question (ADD-22). */
-export interface AnswerOwnerQuestionRequest {
+export type AnswerOwnerQuestionRequest = {
   answers?: Record<string, unknown>;
   response?: string | null;
-}
+};
 
-export interface ApplyUpdateRequest {
+export type ApplyUpdateRequest = {
   confirm?: boolean;
-}
+};
 
-export interface ApprovalView {
+export type ApprovalDetailView = {
+  approval: ApprovalView;
+  arguments: Record<string, unknown>;
+  diff: string | null;
+  diff_path: string | null;
+  preview_kind: "file_diff" | "patch" | "git_change" | "connector_request" | "checkpoint_restore" | "arguments";
+  metadata_only_notice: string;
+  executes_on_approval: boolean;
+  execution_evidence: Record<string, unknown>;
+};
+
+export type ApprovalView = {
   approval_id: string;
   action_id: string;
   status: string;
@@ -42,56 +53,68 @@ export interface ApprovalView {
   resolved_by: string | null;
   queue_position: number;
   queue_total: number;
-}
+};
 
-export interface AuthSessionRequest {
+export type AuthSessionRequest = {
   as_principal?: string | null;
-}
+};
 
 /** Which of one provider's models stay offered in every model picker. */
-export interface AvailableModelsRequest {
+export type AvailableModelsRequest = {
   models: string[];
-}
+};
 
-export interface BlocklistRuleRequest {
+/** One host-tick background pass: its last success, last failure and streak. */
+export type BackgroundWorkerHealth = {
+  pass_name: string;
+  last_success_at: string | null;
+  last_failure_at: string | null;
+  last_error_class: string | null;
+  consecutive_failures: number;
+  total_failures: number;
+  healthy: boolean;
+  updated_at: string;
+};
+
+export type BlocklistRuleRequest = {
   rule: string;
   note?: string;
-}
+};
 
-export interface BlocklistTestRequest {
+export type BlocklistTestRequest = {
   host: string;
-}
+};
 
 /** One location inside the Knowledge Map's boundary. */
-export interface BrainSourceRequest {
+export type BrainSourceRequest = {
   path: string;
-}
+};
 
 /** A file the owner chose from their computer, to be *copied* into Raiker. */
-export interface BrainSourceUploadRequest {
+export type BrainSourceUploadRequest = {
   filename: string;
   content_base64: string;
   store_copy: boolean;
-}
+};
 
-export interface BreachCheckRequest {
+export type BreachCheckRequest = {
   password: string;
   enabled?: boolean;
-}
+};
 
 /** A skill Raiker authored: the name, the trigger description, the body. */
-export interface BuildSkillRequest {
+export type BuildSkillRequest = {
   name: string;
   description: string;
   body: string;
   command_trigger?: string | null;
-}
+};
 
-export interface BulkDeleteSessionsRequest {
+export type BulkDeleteSessionsRequest = {
   session_ids: string[];
-}
+};
 
-export interface CapabilityGateView {
+export type CapabilityGateView = {
   capability: string;
   phase: number;
   state: string;
@@ -114,46 +137,56 @@ export interface CapabilityGateView {
   ungoverned_consequence: string;
   authority_requirement: string;
   network_boundary: string;
-}
+};
 
-export interface ChangePasswordRequest {
+export type ChangePasswordRequest = {
   old_password: string;
   new_password: string;
-}
+};
 
 /** One exact, single-use response to a pending relayed approval. */
-export interface ChannelApprovalResponse {
+export type ChannelApprovalResponse = {
   sender_id: string;
   relay_id: string;
   action_id: string;
   approve: boolean;
   reason?: string;
-}
+};
 
-export interface ChannelEnabledRequest {
+export type ChannelEnabledRequest = {
   enabled: boolean;
-}
+};
 
 /** Owner-selected route. An inbound payload cannot override these fields. */
-export interface ChannelRoutingRequest {
+export type ChannelRoutingRequest = {
   routing_mode: "record_only" | "new_turn" | "side_question" | "interrupt";
   target_session_id?: string | null;
   owner_sender_id?: string | null;
   approval_relay_enabled?: boolean;
-}
+};
 
-export interface ChannelSendersRequest {
+export type ChannelSendersRequest = {
   senders: string[];
-}
+};
 
 /** One test delivery through the governed outbound path. */
-export interface ChannelTestDeliveryRequest {
+export type ChannelTestDeliveryRequest = {
   connector_id: string;
   url: string;
   text?: string;
-}
+};
 
-export interface CheckpointView {
+/** The last checkpoint capture's outcome, as the store records it. */
+export type CheckpointCaptureHealth = {
+  ok: boolean;
+  stage: "ineligible" | "snapshot_ready" | "snapshot" | "commit";
+  reason_code: string;
+  display_path: string | null;
+  checked_at: string;
+  remediation: string;
+};
+
+export type CheckpointView = {
   checkpoint_id: string;
   session_id: string;
   turn_id: string | null;
@@ -164,10 +197,10 @@ export interface CheckpointView {
   last_event_id: string | null;
   can_restore_state: boolean;
   can_restore_files: boolean;
-}
+};
 
 /** One repository a coding chat can be pointed at. */
-export interface CodeRepoView {
+export type CodeRepoView = {
   repo_id: string;
   kind: string;
   label: string;
@@ -178,48 +211,48 @@ export interface CodeRepoView {
   github_owner: string | null;
   github_repo: string | null;
   branch: string | null;
-}
+};
 
 /** Every repository reference for one account, plus the honest read posture. */
-export interface CodeReposView {
+export type CodeReposView = {
   repos: CodeRepoView[];
   selected_repo_id: string | null;
   github_gate_state: string;
   github_decision_mode: string;
   github_token_configured: boolean;
   note: string;
-}
+};
 
-export interface CompactConversationRequest {
+export type CompactConversationRequest = {
   through_turn_id: string;
-}
+};
 
-export interface ComposerApprovalModeRequest {
+export type ComposerApprovalModeRequest = {
   approval_mode: string;
-}
+};
 
 /** Reference a repository from the Build workspace. */
-export interface ConnectCodeRepoRequest {
+export type ConnectCodeRepoRequest = {
   kind: "local" | "github";
   path?: string | null;
   owner?: string | null;
   repo?: string | null;
   branch?: string | null;
-}
+};
 
-export interface ConnectionsView {
+export type ConnectionsView = {
   connectors: ConnectorView[];
   connector_egress_allowlist_configured: boolean;
-}
+};
 
-export interface ConnectorActionRequest {
+export type ConnectorActionRequest = {
   operation_id: string;
   arguments?: Record<string, unknown>;
   session_id?: string;
-}
+};
 
 /** Read-only status of one governed service connector (web-app task 4). */
-export interface ConnectorView {
+export type ConnectorView = {
   connector_id: string;
   display_name: string;
   capability: string;
@@ -232,36 +265,84 @@ export interface ConnectorView {
   egress_allowed: boolean;
   actions: string[];
   kind: string;
-}
+};
 
-export interface ContainMcpServerRequest {
+export type ContainMcpServerRequest = {
   reason?: string | null;
-}
+};
+
+/** One declared piece of a turn's answer, as ``raiker.runtime.typed_parts`` serialises it. */
+export type ContentPartView = {
+  type: "text" | "table" | "chart" | "refused";
+  text: string;
+  data: Record<string, unknown>;
+  reason_code: string;
+};
+
+/** The latest automatic provider-context compaction — metadata only. */
+export type ContextCompaction = {
+  status: "completed" | "failed";
+  created_at: string;
+  source_turn_count: number;
+  estimated_input_tokens_before: number;
+  estimated_summary_tokens: number;
+  reason_code: string | null;
+};
+
+/** What one conversation has used, and what it has cost. */
+export type ContextUsageView = {
+  session_id: string;
+  profile_id: string | null;
+  provider: string | null;
+  model: string | null;
+  used_tokens: number | null;
+  context_window_tokens: number | null;
+  context_window_source: string | null;
+  usage_source: string;
+  billable: boolean;
+  session_cost: string | null;
+  provider_total_cost: string | null;
+  currency: string | null;
+  price_source: string | null;
+  price_as_of: string | null;
+  session_turns: number;
+  session_input_tokens: number;
+  session_output_tokens: number;
+  price_input_per_mtok: string | null;
+  price_output_per_mtok: string | null;
+  price_cache_write_per_mtok: string | null;
+  price_cache_read_per_mtok: string | null;
+  price_effective_from: string | null;
+  price_unknown: boolean;
+  latest_compaction: ContextCompaction | null;
+  tools_projected: number;
+  tools_deferred: number;
+};
 
 /** A title for the branch, and nothing else (GAP-CHAT C14). */
-export interface ConversationBranchRequest {
+export type ConversationBranchRequest = {
   title?: string;
-}
+};
 
-export interface CreateMcpServerRequest {
+export type CreateMcpServerRequest = {
   name: string;
   template: string;
-}
+};
 
-export interface CreateProjectRequest {
+export type CreateProjectRequest = {
   name: string;
   parent_id?: string | null;
   attach_path?: string | null;
   attach_writable?: boolean;
-}
+};
 
-export interface CreateRemoteMcpServerRequest {
+export type CreateRemoteMcpServerRequest = {
   name: string;
   endpoint_url: string;
   auth_ref?: string | null;
-}
+};
 
-export interface CreateStandingGrantRequest {
+export type CreateStandingGrantRequest = {
   action_type: string;
   risk_ceiling: string;
   tool_name?: string;
@@ -269,36 +350,82 @@ export interface CreateStandingGrantRequest {
   reason?: string;
   ttl_days?: number | null;
   as_principal?: string | null;
-}
+};
 
-export interface CreateTelemetryDestinationRequest {
+export type CreateTelemetryDestinationRequest = {
   name: string;
   endpoint_url: string;
   header_ref?: string;
   include_content?: boolean;
-}
+};
 
-export interface CredentialRequest {
+export type CredentialLifecycleView = {
+  credential_id: string;
+  provider: string;
+  verified_at: string | null;
+  due_at: string;
+  status: "current" | "warning" | "overdue";
+};
+
+export type CredentialRequest = {
   values: Record<string, string>;
   expires_at?: string | null;
-}
+};
 
-export interface DisableCapabilityRequest {
+export type DiagnosticsView = {
+  runtime_mode: string;
+  production_ready_local_single_user_runtime: boolean;
+  summary: Record<string, unknown>;
+  disabled_capabilities: string[];
+  counts: Record<string, number>;
+  readiness: Record<string, boolean | CheckpointCaptureHealth>;
+  missing_config: string[];
+  provider_health: ProviderHealthView[];
+  background_workers: BackgroundWorkerHealth[];
+  model_profile_source: ModelProfileSource;
+  scope_note: string;
+};
+
+export type DisableCapabilityRequest = {
   reason?: string;
   as_principal?: string | null;
-}
+};
 
-export interface DisableRuntimeModeRequest {
+export type DisableRuntimeModeRequest = {
   reason?: string;
   as_principal?: string | null;
-}
+};
 
-export interface ElevateRequest {
+export type ElevateRequest = {
   password?: string | null;
   mfa_code?: string | null;
-}
+};
 
-export interface EventView {
+/** An embedding model this install could call, and what is waiting to be embedded by it. */
+export type EmbeddingProviderView = {
+  profile_id: string;
+  provider: string;
+  model: string;
+  space: string;
+  local_only: boolean;
+  requires_network: boolean;
+  unindexed_memories: number;
+  unindexed_file_chunks: number;
+  pending_count: number;
+};
+
+/** One embedding space: the vectors a backend produces and whether they mean anything. */
+export type EmbeddingSpaceView = {
+  backend_id: string;
+  kind: "lexical_fallback" | "local_model" | "provider";
+  model: string;
+  dimensions: number;
+  semantic: boolean;
+  reason_code: string;
+  query_embeddable?: boolean;
+};
+
+export type EventView = {
   event_id: string;
   session_id: string;
   turn_id: string | null;
@@ -308,15 +435,15 @@ export interface EventView {
   risk_level: string | null;
   summary: string | null;
   machine_identity: IdentityView | null;
-}
+};
 
 /** Which rendering of a conversation transcript to produce (BUG-22). */
-export interface ExportSessionRequest {
+export type ExportSessionRequest = {
   format?: string;
-}
+};
 
 /** One extension's lifecycle as four independent, server-derived facts. */
-export interface ExtensionView {
+export type ExtensionView = {
   extension_id: string;
   kind: string;
   display_name: string;
@@ -336,17 +463,17 @@ export interface ExtensionView {
   monitor_state: string | null;
   tool_count: number;
   last_activity_at: string | null;
-}
+};
 
-export interface ExtensionsOverviewView {
+export type ExtensionsOverviewView = {
   extensions: ExtensionView[];
   counts: Record<string, number>;
   vault_configured: boolean;
   connector_egress_allowlist_configured: boolean;
   deferred: Record<string, string>[];
-}
+};
 
-export interface GenerateImageRequest {
+export type GenerateImageRequest = {
   profile_id: string;
   prompt: string;
   size?: string;
@@ -354,31 +481,31 @@ export interface GenerateImageRequest {
   source_generation_id?: string;
   variations?: number;
   project_id?: string;
-}
+};
 
-export interface GitGrantRequest {
+export type GitGrantRequest = {
   scope?: string;
   session_id?: string | null;
   reason?: string;
-}
+};
 
-export interface GitTokenRequest {
+export type GitTokenRequest = {
   token: string;
-}
+};
 
-export interface HuggingFaceCredentialRequest {
+export type HuggingFaceCredentialRequest = {
   token: string;
-}
+};
 
-export interface HuggingFaceSelectionRequest {
+export type HuggingFaceSelectionRequest = {
   repo_id: string;
   revision: string;
   files: string[];
   destination?: string | null;
   confirmed?: boolean;
-}
+};
 
-export interface IdentityView {
+export type IdentityView = {
   principal_id: string;
   principal_type: string;
   display_name: string;
@@ -388,47 +515,47 @@ export interface IdentityView {
   issued_at: string | null;
   expires_at: string | null;
   state: string;
-}
+};
 
-export interface InboundChannelMessage {
+export type InboundChannelMessage = {
   sender_id: string;
   text?: string;
-}
+};
 
 /** Name and optional first account for a locally isolated Raiker instance. */
-export interface InstanceCreateRequest {
+export type InstanceCreateRequest = {
   name: string;
   username?: string | null;
   password?: string | null;
-}
+};
 
-export interface InterruptRequest {
+export type InterruptRequest = {
   session_id: string;
   task_id?: string | null;
   all?: boolean;
   action_type?: string;
   reason?: string;
   steer_text?: string | null;
-}
+};
 
-export interface LanguageCheckRequest {
+export type LanguageCheckRequest = {
   text: string;
   language?: string;
-}
+};
 
-export interface LocalModelDeployRequest {
+export type LocalModelDeployRequest = {
   profile_id?: string | null;
-}
+};
 
-export interface LoginRequest {
+export type LoginRequest = {
   username: string;
   password: string;
   device_label?: string | null;
-}
+};
 
-export interface ManifestRequest {
+export type ManifestRequest = {
   manifest: Record<string, unknown>;
-}
+};
 
 /**
  * Owner-scoped view of one local stdio MCP server profile (Control Deck task 4). ``command`` is
@@ -436,7 +563,7 @@ export interface ManifestRequest {
  * endpoint. Read-only — building or connecting a server is a governed runtime action, not a
  * REST mutation.
  */
-export interface McpServerView {
+export type McpServerView = {
   server_id: string;
   name: string;
   command: string[];
@@ -447,18 +574,18 @@ export interface McpServerView {
   last_connected_at: string | null;
   tools: string[];
   tool_count: number;
-  tool_declarations: Record<string, unknown>[];
-  unsupported_features: Record<string, string>[];
+  tool_declarations: McpToolDeclaration[];
+  unsupported_features: UnsupportedFeature[];
   endpoint_url: string | null;
   auth_ref: string | null;
-  monitor_state: string;
+  monitor_state: "active" | "paused" | "killed";
   paused_reason: string | null;
   paused_at: string | null;
   protocol_version: string | null;
-}
+};
 
 /** Owner-scoped, redacted monitor row for one MCP connection session. */
-export interface McpSessionView {
+export type McpSessionView = {
   session_row_id: string;
   server_id: string;
   transport: string;
@@ -471,10 +598,21 @@ export interface McpSessionView {
   outcome: string;
   started_at: string;
   ended_at: string | null;
-}
+};
+
+/** What one MCP tool said it takes — the argument names, never a schema dump. */
+export type McpToolDeclaration = {
+  name: string;
+  title: string;
+  description: string;
+  has_schema: boolean;
+  schema_reason: string;
+  arguments: string[];
+  required: string[];
+};
 
 /** User-facing view of one approved memory entry. */
-export interface MemoryControlView {
+export type MemoryControlView = {
   memory_id: string;
   text: string;
   scope: string;
@@ -500,52 +638,64 @@ export interface MemoryControlView {
   remembered_reason: string | null;
   updated_at: string | null;
   last_used_at: string | null;
-}
+};
 
-export interface MfaCodeRequest {
+export type MemorySettingsView = {
+  incognito: boolean;
+  embedding_backend: string;
+  retrieval: EmbeddingSpaceView | null;
+  spaces: EmbeddingSpaceView[];
+  embedding_providers: EmbeddingProviderView[];
+  unindexed_memories: number;
+  unindexed_file_chunks: number;
+  vector_search_strategy: "exact_then_approximate";
+  vector_search_exact_limit: number;
+};
+
+export type MfaCodeRequest = {
   code: string;
-}
+};
 
-export interface MfaVerifyRequest {
+export type MfaVerifyRequest = {
   ticket: string;
   code: string;
-}
+};
 
 /** An owner-requested refresh of known, connected provider catalogues. */
-export interface ModelCatalogueRefreshRequest {
+export type ModelCatalogueRefreshRequest = {
   profile_ids?: string[] | null;
-}
+};
 
 /** Encrypted per-user endpoint/key data for one model profile. */
-export interface ModelConnectionRequest {
+export type ModelConnectionRequest = {
   endpoint?: string | null;
   api_key?: string | null;
   admin_api_key?: string | null;
   workspace_id?: string | null;
-}
+};
 
-export interface ModelConversionRequestBody {
+export type ModelConversionRequestBody = {
   source: string;
   output: string;
   revision: string;
   quantization: "Q4_K_M" | "Q5_K_M" | "Q6_K" | "Q8_0";
   confirmed?: boolean;
-}
+};
 
-export interface ModelLibraryRootRequest {
+export type ModelLibraryRootRequest = {
   path: string;
-}
+};
 
-export interface ModelOperationRequestBody {
+export type ModelOperationRequestBody = {
   kind: "install" | "download" | "convert" | "deploy" | "pull";
   target: string;
   confirmed?: boolean;
   source_url?: string | null;
   destination?: string | null;
-}
+};
 
 /** An administrator's price override for one model, per million tokens. */
-export interface ModelPriceRequest {
+export type ModelPriceRequest = {
   model: string;
   input_per_mtok?: string | null;
   output_per_mtok?: string | null;
@@ -554,57 +704,109 @@ export interface ModelPriceRequest {
   currency?: string | null;
   effective_from?: string | null;
   reason?: string | null;
-}
+};
 
-export interface ModelReadinessCheckRequest {
+/** Where the built-in model registry was read from: ``packaged`` or ``override``. */
+export type ModelProfileSource = {
+  kind: string;
+  location: string;
+};
+
+export type ModelReadinessCheckRequest = {
   profile_id: string;
   model: string;
-}
+};
 
-export interface ModelSetupUpdateRequest {
+export type ModelSetupUpdateRequest = {
   status: "required" | "in_progress" | "skipped" | "complete";
   step: "choose_path" | "provider" | "model" | "review" | "ready";
   path?: "provider" | "ollama" | "lm_studio" | "local_gguf" | "hugging_face" | null;
   selected_profile_id?: string | null;
   selected_model?: string | null;
-}
+};
 
 /** Owner-defined advisory budget; null clears it. */
-export interface ModelWeeklyBudgetRequest {
+export type ModelWeeklyBudgetRequest = {
   token_budget?: number | null;
-}
+};
 
-export interface MoveProjectRequest {
+export type MoveProjectRequest = {
   parent_id?: string | null;
-}
+};
 
-export interface OllamaPullRequestBody {
+/**
+ * Owner-scoped view of one notification (Phase C). Redacted human-readable copy only;
+ * ``finding_id`` / ``subject_id`` link back to what raised it.
+ */
+export type NotificationView = {
+  notification_id: string;
+  kind: string;
+  title: string;
+  body: string;
+  finding_id: string | null;
+  subject_id: string | null;
+  read: boolean;
+  created_at: string;
+};
+
+export type OllamaPullRequestBody = {
   model: string;
   confirmed?: boolean;
-}
+};
 
 /** Pair one connector profile. Paired is not enabled and not trusted. */
-export interface PairChannelRequest {
+export type PairChannelRequest = {
   connector_id: string;
   display_name?: string | null;
   senders?: string[] | null;
-}
+};
 
-export interface PasswordRecoveryBeginRequest {
+export type PasswordRecoveryBeginRequest = {
   username: string;
-}
+};
 
-export interface PasswordRecoveryCompleteRequest {
+export type PasswordRecoveryCompleteRequest = {
   ticket: string;
   code: string;
   new_password: string;
-}
+};
 
-export interface PauseHostRequest {
+/** A workspace path a task reads. */
+export type PathAttachment = {
+  type: "path";
+  path: string;
+};
+
+export type PauseHostRequest = {
   reason?: string | null;
-}
+};
 
-export interface ProjectView {
+/** UX-PROJ-04 — a file shared with every chat in a project, as a person names it. */
+export type ProjectAttachmentView = {
+  attachment_id: string;
+  filename: string;
+  media_type: string;
+  byte_size: number;
+  available: boolean;
+};
+
+/** What a project gives every chat filed in it. */
+export type ProjectContext = {
+  instructions: string;
+  attachment_ids: string[];
+  memory_enabled: boolean;
+  memory_mode: "inherit" | "enabled" | "disabled";
+};
+
+export type ProjectDetailView = {
+  project: ProjectView;
+  sessions: SessionView[];
+  checkpoints: CheckpointView[];
+  context: ProjectContext;
+  attachments: ProjectAttachmentView[];
+};
+
+export type ProjectView = {
   project_id: string;
   name: string;
   root_subpath: string;
@@ -618,14 +820,14 @@ export interface ProjectView {
   root_kind: "managed" | "attached";
   root_label: string;
   last_activity_at: string | null;
-}
+};
 
-export interface ProjectsListView {
+export type ProjectsListView = {
   projects: ProjectView[];
   active_project_id: string | null;
-}
+};
 
-export interface PromptRequest {
+export type PromptRequest = {
   text: string;
   input_mode?: "typed" | "dictated" | "mixed";
   surface?: "chat" | "build";
@@ -640,80 +842,109 @@ export interface PromptRequest {
   capability_modes?: Record<string, string> | null;
   attachments?: Record<string, unknown>[] | null;
   client_type?: string | null;
-}
+};
 
-export interface RecordThreatModelAckRequest {
+export type ProviderHealthView = {
+  profile_id: string;
+  provider: string;
+  model: string;
+  endpoint_kind: string;
+  local_only: boolean;
+  requires_network: boolean;
+  selected: boolean;
+  status: string;
+  detail: string;
+};
+
+export type RecordThreatModelAckRequest = {
   reason?: string;
   as_principal?: string | null;
-}
+};
 
-export interface RegisterRequest {
+export type RegisterRequest = {
   username: string;
   password: string;
-}
+};
 
-export interface RenameMcpServerRequest {
+export type RenameMcpServerRequest = {
   name: string;
-}
+};
 
-export interface RenameSessionRequest {
+export type RenameSessionRequest = {
   title: string;
-}
+};
 
-export interface RenameSkillRequest {
+export type RenameSkillRequest = {
   name: string;
-}
+};
 
 /** BUG-271 — the reviewer corrected a line, so this is a *different action*. */
-export interface ReplaceApprovalRequest {
+export type ReplaceApprovalRequest = {
   patch: string;
   reason?: string;
-}
+};
 
-export interface ResolveApprovalRequest {
+export type ResolveApprovalRequest = {
   approve: boolean;
   reason: string;
   accepted_hunks?: string[] | null;
-}
+};
 
-export interface RuntimeModeView {
+export type RuntimeModeView = {
   mode_name: string;
   status: string;
   activated_by: string;
   activated_at: string;
   reason: string;
   allowed_modes: string[];
-}
+};
 
-export interface RuntimeReadinessView {
+export type RuntimeReadinessView = {
   mode: RuntimeModeView;
   gates: CapabilityGateView[];
   summary: Record<string, unknown>;
-}
+};
 
-export interface SaveProjectContextRequest {
+export type SaveProjectContextRequest = {
   instructions?: string;
   attachment_ids?: string[];
   memory_enabled?: boolean | null;
   memory_mode?: "inherit" | "enabled" | "disabled" | null;
-}
+};
+
+/**
+ * Owner-scoped view of one redacted security finding (monitored MCP connections, Phase B/C).
+ * ``redacted_detail`` holds redacted metadata only (labels, counts, hostnames, added/removed
+ * tool names) — never a raw value.
+ */
+export type SecurityFindingView = {
+  finding_id: string;
+  source: string;
+  severity: string;
+  code: string;
+  summary: string;
+  redacted_detail: Record<string, unknown>;
+  subject_id: string | null;
+  state: string;
+  created_at: string;
+};
 
 /** Point the Build workspace at one repository, or at none with ``null``. */
-export interface SelectCodeRepoRequest {
+export type SelectCodeRepoRequest = {
   repo_id?: string | null;
-}
+};
 
-export interface SelectProjectRequest {
+export type SelectProjectRequest = {
   project_id?: string | null;
-}
+};
 
-export interface SessionCommandGrantRequest {
+export type SessionCommandGrantRequest = {
   commands: string[][];
   timeout_seconds?: number;
   ttl_minutes?: number;
-}
+};
 
-export interface SessionView {
+export type SessionView = {
   session_id: string;
   title: string | null;
   status: string;
@@ -728,62 +959,62 @@ export interface SessionView {
   archived: boolean;
   archived_at: string | null;
   origin: string;
-}
+};
 
-export interface SetCapabilityDecisionModeRequest {
+export type SetCapabilityDecisionModeRequest = {
   reason?: string;
   as_principal?: string | null;
-}
+};
 
-export interface SetCapabilityStateRequest {
+export type SetCapabilityStateRequest = {
   target_state: string;
   reason?: string;
   as_principal?: string | null;
   confirmation_token?: string | null;
-}
+};
 
-export interface SetModelAdvisorRequest {
+export type SetModelAdvisorRequest = {
   profile_id?: string | null;
-}
+};
 
-export interface SetModelFallbackRequest {
+export type SetModelFallbackRequest = {
   profile_ids: string[];
-}
+};
 
-export interface SetModelSelectionRequest {
+export type SetModelSelectionRequest = {
   profile_id: string;
   model?: string | null;
-}
+};
 
-export interface SetSessionPinnedRequest {
+export type SetSessionPinnedRequest = {
   pinned: boolean;
-}
+};
 
-export interface SetSessionProjectRequest {
+export type SetSessionProjectRequest = {
   project_id?: string | null;
-}
+};
 
-export interface SetSessionTagsRequest {
+export type SetSessionTagsRequest = {
   tags: string[];
-}
+};
 
-export interface SetSkillActiveRequest {
+export type SetSkillActiveRequest = {
   active: boolean;
-}
+};
 
-export interface SetSkillCommandRequest {
+export type SetSkillCommandRequest = {
   command_trigger?: string | null;
-}
+};
 
-export interface SettingsRequest {
+export type SettingsRequest = {
   settings: Record<string, unknown>;
-}
+};
 
-export interface SetupBackupRequest {
+export type SetupBackupRequest = {
   target: string;
-}
+};
 
-export interface SetupUpdateRequest {
+export type SetupUpdateRequest = {
   status: "required" | "in_progress" | "skipped" | "complete";
   stage: "welcome" | "account" | "model" | "privacy" | "backup" | "finish";
   selected_profile_id?: string | null;
@@ -793,31 +1024,43 @@ export interface SetupUpdateRequest {
   backup_mode?: "later" | "local";
   backup_target?: string | null;
   background_service_enabled?: boolean;
-}
+};
 
 /** A published skill's URL, to verify or to import. */
-export interface SkillUrlRequest {
+export type SkillUrlRequest = {
   url: string;
-}
+};
 
 /** The local transcription runtime dictation should use, if any (BUG-256). */
-export interface SpeechRuntimeRequest {
+export type SpeechRuntimeRequest = {
   endpoint?: string | null;
   model?: string | null;
-}
+};
 
-export interface StopHostRequest {
+export type StopHostRequest = {
   confirm?: boolean;
-}
+};
 
 /** Where one work surface's model picker should start. */
-export interface SurfaceModelDefaultRequest {
+export type SurfaceModelDefaultRequest = {
   surface: string;
   profile_id?: string;
   model?: string;
-}
+};
 
-export interface TaskCreateRequest {
+/** One run of a task, from where it started to how it settled. */
+export type TaskAttemptView = {
+  index: number;
+  kind: string;
+  started_at: string;
+  ended_at: string | null;
+  outcome: string;
+  summary: string;
+  approval_id: string | null;
+  events: TaskEventView[];
+};
+
+export type TaskCreateRequest = {
   title: string;
   description?: string;
   priority?: string | null;
@@ -830,9 +1073,28 @@ export interface TaskCreateRequest {
   model?: string | null;
   surface?: "chat" | "build";
   attachments?: Record<string, unknown>[] | null;
-}
+};
 
-export interface TaskView {
+/** One task at its own address, with the attempts behind its status. */
+export type TaskDetailView = {
+  task: TaskView;
+  attempts: TaskAttemptView[];
+  approvals: ApprovalView[];
+  truncated: boolean;
+};
+
+/** One recorded transition, as the timeline draws it. */
+export type TaskEventView = {
+  event_id: string;
+  event_type: string;
+  timestamp: string;
+  actor: string;
+  detail: string;
+  turn_id: string | null;
+  session_id: string | null;
+};
+
+export type TaskView = {
   task_id: string;
   session_id: string;
   status: string;
@@ -855,43 +1117,75 @@ export interface TaskView {
   surface: string;
   thread_session_id: string | null;
   thread_turns: number;
-  attachments: Record<string, unknown>[];
-}
+  attachments: (PathAttachment | UploadAttachment)[];
+};
 
-export interface TelemetryCadenceRequest {
+export type TelemetryCadenceRequest = {
   cadence: string;
-}
+};
 
-export interface TraySessionRequest {
+export type TraySessionRequest = {
   secret: string;
-}
+};
 
-export interface UploadAttachmentRequest {
+export type TurnDetailView = {
+  turn: TurnView;
+  events: EventView[];
+};
+
+export type TurnView = {
+  turn_id: string;
+  session_id: string;
+  turn_type: string;
+  status: string;
+  prompt_text: string | null;
+  created_at: string;
+  completed_at: string | null;
+  summary: string | null;
+  reasoning_chars: number;
+  reasoning: string | null;
+  tool_rows: Record<string, unknown>[];
+  content_parts: ContentPartView[];
+};
+
+/** Something a server offers that Raiker does not use, in one sentence. */
+export type UnsupportedFeature = {
+  feature: string;
+  note: string;
+};
+
+/** An image or document uploaded through ``POST /api/attachments``. */
+export type UploadAttachment = {
+  type: "image" | "document";
+  attachment_id: string;
+};
+
+export type UploadAttachmentRequest = {
   filename: string;
   media_type: string;
   data_base64: string;
-}
+};
 
 /** One base64-encoded ``SKILL.md`` or ``*.skill`` upload. */
-export interface UploadSkillRequest {
+export type UploadSkillRequest = {
   filename: string;
   data_base64: string;
-}
+};
 
-export interface VaultKeyRequest {
+export type VaultKeyRequest = {
   key: string;
   mfa_code?: string | null;
-}
+};
 
 /** One filter choice, with how many threads it would select. */
-export interface WorkThreadFacet {
+export type WorkThreadFacet = {
   value: string;
   label: string;
   count: number;
-}
+};
 
 /** One page of the work index, and the filters that produced it. */
-export interface WorkThreadPage {
+export type WorkThreadPage = {
   threads: WorkThreadView[];
   next_cursor: string | null;
   total: number;
@@ -900,10 +1194,10 @@ export interface WorkThreadPage {
   archived_count: number;
   active_count: number;
   scan_truncated: boolean;
-}
+};
 
 /** One thread of the owner's work, whatever started it (GAP-CHAT C18). */
-export interface WorkThreadView {
+export type WorkThreadView = {
   session_id: string;
   title: string;
   kind: string;
@@ -920,40 +1214,78 @@ export interface WorkThreadView {
   pinned: boolean;
   archived: boolean;
   tags: string[];
-}
+};
 
 /** One typed wrapper per verified operation, on the shared transport core. */
 export const contract = {
   listApprovals: (query: { status_filter?: string } = {}) =>
     request<ApprovalView[]>(withQuery("/api/approvals", query)),
+  getApproval: (approvalId: string) =>
+    request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(approvalId)}`),
   listCapabilityGates: () =>
     request<CapabilityGateView[]>("/api/capability-gates"),
+  getCapabilityGate: (capability: string) =>
+    request<CapabilityGateView>(`/api/capability-gates/${encodeURIComponent(capability)}`),
+  searchChatHistory: (query: { q: string }) =>
+    request<SessionView[]>(withQuery("/api/chat-search", query)),
   listCheckpoints: (query: { session_id?: string; limit?: number; project_id?: string } = {}) =>
     request<CheckpointView[]>(withQuery("/api/checkpoints", query)),
+  getCheckpoint: (checkpointId: string) =>
+    request<CheckpointView>(`/api/checkpoints/${encodeURIComponent(checkpointId)}`),
   listCodeRepos: () =>
     request<CodeReposView>("/api/code/repos"),
   getConnections: () =>
     request<ConnectionsView>("/api/connections"),
+  getDiagnostics: () =>
+    request<DiagnosticsView>("/api/diagnostics"),
   listEvents: (query: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
     request<EventView[]>(withQuery("/api/events", query)),
   getExtensions: () =>
     request<ExtensionsOverviewView>("/api/extensions"),
   listMcpServers: () =>
     request<McpServerView[]>("/api/mcp/servers"),
+  listMcpFindings: (serverId: string) =>
+    request<SecurityFindingView[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/findings`),
   listMcpSessions: (serverId: string) =>
     request<McpSessionView[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/sessions`),
   listMemories: (query: { scope?: string } = {}) =>
     request<MemoryControlView[]>(withQuery("/api/memory", query)),
+  getMemorySettings: () =>
+    request<MemorySettingsView>("/api/memory/settings"),
+  listNotifications: (query: { unread_only?: boolean } = {}) =>
+    request<NotificationView[]>(withQuery("/api/notifications", query)),
   listProjects: () =>
     request<ProjectsListView>("/api/projects"),
+  getProject: (projectId: string) =>
+    request<ProjectDetailView>(`/api/projects/${encodeURIComponent(projectId)}`),
   getRuntimeMode: () =>
     request<RuntimeModeView>("/api/runtime-mode"),
   getRuntimeReadiness: () =>
     request<RuntimeReadinessView>("/api/runtime-readiness"),
+  checkPasswordBreach: (body: BreachCheckRequest) =>
+    postJson<SecurityFindingView[]>("/api/security/breach-check", body),
+  listSecurityCredentials: () =>
+    request<CredentialLifecycleView[]>("/api/security/credentials"),
+  verifySecurityCredential: (provider: string) =>
+    postJson<CredentialLifecycleView>(`/api/security/credentials/${encodeURIComponent(provider)}/verify`, {}),
+  listSecurityFindings: () =>
+    request<SecurityFindingView[]>("/api/security/findings"),
+  scanSecurity: () =>
+    postJson<SecurityFindingView[]>("/api/security/scan", {}),
   listSessions: (query: { limit?: number; project_id?: string; include_archived?: boolean; origin?: string } = {}) =>
     request<SessionView[]>(withQuery("/api/sessions", query)),
+  getSessionContextUsage: (sessionId: string) =>
+    request<ContextUsageView>(`/api/sessions/${encodeURIComponent(sessionId)}/context-usage`),
   listTasks: (query: { session_id?: string; task_status?: string; project_id?: string } = {}) =>
     request<TaskView[]>(withQuery("/api/tasks", query)),
+  createTask: (body: TaskCreateRequest) =>
+    postJson<TaskView>("/api/tasks", body),
+  getTaskDetail: (taskId: string) =>
+    request<TaskDetailView>(`/api/tasks/${encodeURIComponent(taskId)}`),
+  runTask: (taskId: string) =>
+    postJson<TaskView>(`/api/tasks/${encodeURIComponent(taskId)}/run`, {}),
+  getTurn: (turnId: string) =>
+    request<TurnDetailView>(`/api/turns/${encodeURIComponent(turnId)}`),
   listWorkThreads: (query: { limit?: number } = {}) =>
     request<WorkThreadView[]>(withQuery("/api/work-threads", query)),
   workThreadPage: (query: { project_id?: string; kind?: string; query?: string; cursor?: string; limit?: number; archived?: boolean } = {}) =>

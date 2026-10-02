@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal, NotRequired
+
+from typing_extensions import TypedDict
 
 from raiker.contracts.views import View
 
@@ -78,6 +80,35 @@ class ObservationView(View):
     gist_id: str = ""
 
 
+class EmbeddingSpaceView(TypedDict):
+    """One embedding space: the vectors a backend produces and whether they mean anything."""
+
+    backend_id: str
+    kind: Literal["lexical_fallback", "local_model", "provider"]
+    model: str
+    dimensions: int
+    semantic: bool
+    reason_code: str
+    #: Only on ``retrieval``: whether a question can be embedded into this space
+    #: at read time. A listed space carries no read-path claim.
+    query_embeddable: NotRequired[bool]
+
+
+class EmbeddingProviderView(TypedDict):
+    """An embedding model this install could call, and what is waiting to be embedded by it."""
+
+    profile_id: str
+    provider: str
+    model: str
+    #: The label the vectors will carry, and so the space that becomes selectable.
+    space: str
+    local_only: bool
+    requires_network: bool
+    unindexed_memories: int
+    unindexed_file_chunks: int
+    pending_count: int
+
+
 @dataclass(frozen=True)
 class MemorySettingsView(View):
     incognito: bool
@@ -86,17 +117,17 @@ class MemorySettingsView(View):
     #: backend is in force; `spaces` is what this workspace actually holds
     #: vectors in, which is the only thing worth offering as a choice.
     embedding_backend: str = "auto"
-    retrieval: dict[str, Any] = field(default_factory=dict)
-    spaces: tuple[dict[str, Any], ...] = ()
+    retrieval: EmbeddingSpaceView | None = None
+    spaces: tuple[EmbeddingSpaceView, ...] = ()
     #: MEM-10 - what it would take to have a semantic space at all. `spaces`
     #: above is read from the vectors that exist, so on a default install it
     #: holds only the lexical fallback and the page can offer no better choice.
     #: These two say why: the embedding models this install could call, and how
     #: many approved memories are waiting to be embedded into one.
-    embedding_providers: tuple[dict[str, Any], ...] = ()
+    embedding_providers: tuple[EmbeddingProviderView, ...] = ()
     unindexed_memories: int = 0
     unindexed_file_chunks: int = 0
     #: The retrieval implementation, stated separately from the embedding model:
     #: the owner should not have to infer whether growing history changes lookup.
-    vector_search_strategy: str = "exact_then_approximate"
+    vector_search_strategy: Literal["exact_then_approximate"] = "exact_then_approximate"
     vector_search_exact_limit: int = 512

@@ -13,14 +13,14 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
   `to_dict`; it needs a dedicated response model first (Stage B).
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**350 operations: 17 verified, 13 eligible, 312 deferred, 8 special.**
+**350 operations: 36 verified, 0 eligible, 306 deferred, 8 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
 | DELETE | `/api/account` |  |  | deferred | body assembled in the route |
 | GET | `/api/approvals` |  | ApprovalView[] | verified | DashboardService.list_approvals |
 | GET | `/api/approvals/resumable` |  |  | deferred | body assembled in the route |
-| GET | `/api/approvals/{approval_id}` |  |  | deferred | get_approval returns raiker.control.views.approvals.ApprovalDetailView \| None, not a fields-only view |
+| GET | `/api/approvals/{approval_id}` |  | ApprovalDetailView | verified | DashboardService.get_approval |
 | POST | `/api/approvals/{approval_id}/answer` | AnswerOwnerQuestionRequest |  | deferred | body assembled in the route |
 | POST | `/api/approvals/{approval_id}/replace` | ReplaceApprovalRequest |  | deferred | body assembled in the route |
 | POST | `/api/approvals/{approval_id}/resolve` | ResolveApprovalRequest |  | deferred | body assembled in the route |
@@ -60,7 +60,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/brain/sources/roots` |  |  | deferred | body assembled in the route |
 | POST | `/api/brain/sources/upload` | BrainSourceUploadRequest |  | deferred | body assembled in the route |
 | GET | `/api/capability-gates` |  | CapabilityGateView[] | verified | RuntimeControlService.list_capability_gates |
-| GET | `/api/capability-gates/{capability}` |  |  | deferred | get_capability_gate returns raiker.control.dtos.CapabilityGateView \| None, not a fields-only view |
+| GET | `/api/capability-gates/{capability}` |  | CapabilityGateView | verified | RuntimeControlService.get_capability_gate |
 | POST | `/api/capability-gates/{capability}/disable` | DisableCapabilityRequest |  | deferred | body assembled in the route |
 | POST | `/api/capability-gates/{capability}/set` | SetCapabilityStateRequest |  | deferred | body assembled in the route |
 | POST | `/api/capability-gates/{capability}/threat-ack` | RecordThreatModelAckRequest |  | deferred | body assembled in the route |
@@ -79,9 +79,9 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/channels/{connector_id}/approval-response` | ChannelApprovalResponse |  | deferred | body assembled in the route |
 | POST | `/api/channels/{connector_id}/inbound` | InboundChannelMessage |  | deferred | body assembled in the route |
 | POST | `/api/channels/{connector_id}/telegram` | dict |  | deferred | body assembled in the route |
-| GET | `/api/chat-search` |  | SessionView[] | eligible | DashboardService.search_sessions |
+| GET | `/api/chat-search` |  | SessionView[] | verified | DashboardService.search_sessions |
 | GET | `/api/checkpoints` |  | CheckpointView[] | verified | DashboardService.list_checkpoints |
-| GET | `/api/checkpoints/{checkpoint_id}` |  |  | deferred | get_checkpoint returns raiker.control.views.sessions.CheckpointView \| None, not a fields-only view |
+| GET | `/api/checkpoints/{checkpoint_id}` |  | CheckpointView | verified | DashboardService.get_checkpoint |
 | POST | `/api/checkpoints/{checkpoint_id}/branch` | ConversationBranchRequest |  | deferred | body assembled in the route |
 | GET | `/api/checkpoints/{checkpoint_id}/branch-plan` |  |  | deferred | body assembled in the route |
 | POST | `/api/checkpoints/{checkpoint_id}/restore` |  |  | deferred | body assembled in the route |
@@ -112,7 +112,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/connector-store/{connector_id}/manifest` | ManifestRequest |  | deferred | body assembled in the route |
 | GET | `/api/credential-deltas` |  |  | deferred | body assembled in the route |
 | POST | `/api/credential-deltas/{run_id}/discard` | dict |  | deferred | body assembled in the route |
-| GET | `/api/diagnostics` |  | DiagnosticsView | eligible | DashboardService.get_diagnostics |
+| GET | `/api/diagnostics` |  | DiagnosticsView | verified | DashboardService.get_diagnostics |
 | GET | `/api/diagnostics/export` |  |  | deferred | body assembled in the route |
 | GET | `/api/environment` |  |  | deferred | body assembled in the route |
 | GET | `/api/events` |  | EventView[] | verified | DashboardService.list_events |
@@ -166,7 +166,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | DELETE | `/api/mcp/servers/{server_id}` |  |  | deferred | body assembled in the route |
 | PUT | `/api/mcp/servers/{server_id}` | RenameMcpServerRequest |  | deferred | body assembled in the route |
 | POST | `/api/mcp/servers/{server_id}/connect` |  |  | deferred | body assembled in the route |
-| GET | `/api/mcp/servers/{server_id}/findings` |  | SecurityFindingView[] | eligible | DashboardService.list_mcp_findings |
+| GET | `/api/mcp/servers/{server_id}/findings` |  | SecurityFindingView[] | verified | DashboardService.list_mcp_findings |
 | POST | `/api/mcp/servers/{server_id}/kill` |  |  | deferred | body assembled in the route |
 | POST | `/api/mcp/servers/{server_id}/pause` |  |  | deferred | body assembled in the route |
 | POST | `/api/mcp/servers/{server_id}/resume` |  |  | deferred | body assembled in the route |
@@ -196,7 +196,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/memory/relationship-proposals` |  |  | deferred | body assembled in the route |
 | POST | `/api/memory/relationship-proposals/scan` |  |  | deferred | body assembled in the route |
 | POST | `/api/memory/relationship-proposals/{candidate_id}/decision` | dict |  | deferred | body assembled in the route |
-| GET | `/api/memory/settings` |  | MemorySettingsView | eligible | DashboardService.get_memory_settings |
+| GET | `/api/memory/settings` |  | MemorySettingsView | verified | DashboardService.get_memory_settings |
 | DELETE | `/api/memory/{memory_id}` |  |  | deferred | body assembled in the route |
 | PUT | `/api/memory/{memory_id}` | dict |  | deferred | body assembled in the route |
 | PUT | `/api/memory/{memory_id}/archive` | dict |  | deferred | body assembled in the route |
@@ -251,7 +251,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | PUT | `/api/models/{profile_id}/price` | ModelPriceRequest |  | deferred | body assembled in the route |
 | GET | `/api/models/{profile_id}/provider-models` |  |  | deferred | body assembled in the route |
 | PUT | `/api/models/{profile_id}/weekly-budget` | ModelWeeklyBudgetRequest |  | deferred | body assembled in the route |
-| GET | `/api/notifications` |  | NotificationView[] | eligible | DashboardService.list_notifications |
+| GET | `/api/notifications` |  | NotificationView[] | verified | DashboardService.list_notifications |
 | POST | `/api/notifications/{notification_id}/read` |  |  | deferred | body assembled in the route |
 | POST | `/api/ollama/pull` | OllamaPullRequestBody |  | deferred | body assembled in the route |
 | GET | `/api/plugins` |  |  | deferred | body assembled in the route |
@@ -260,7 +260,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | PUT | `/api/projects/selection` | SelectProjectRequest |  | deferred | body assembled in the route |
 | GET | `/api/projects/tree` |  |  | deferred | body assembled in the route |
 | DELETE | `/api/projects/{project_id}` |  |  | deferred | body assembled in the route |
-| GET | `/api/projects/{project_id}` |  |  | deferred | get_project returns raiker.control.views.projects.ProjectDetailView \| None, not a fields-only view |
+| GET | `/api/projects/{project_id}` |  | ProjectDetailView | verified | DashboardService.get_project |
 | PUT | `/api/projects/{project_id}/archive` |  |  | deferred | body assembled in the route |
 | GET | `/api/projects/{project_id}/browse` |  |  | deferred | body assembled in the route |
 | PUT | `/api/projects/{project_id}/context` | SaveProjectContextRequest |  | deferred | body assembled in the route |
@@ -282,15 +282,15 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/runtime-mode/activate` | ActivateRuntimeModeRequest |  | deferred | body assembled in the route |
 | POST | `/api/runtime-mode/disable` | DisableRuntimeModeRequest |  | deferred | body assembled in the route |
 | GET | `/api/runtime-readiness` |  | RuntimeReadinessView | verified | RuntimeControlService.get_runtime_readiness |
-| POST | `/api/security/breach-check` | BreachCheckRequest | SecurityFindingView[] | eligible | DashboardService.check_password_breach |
+| POST | `/api/security/breach-check` | BreachCheckRequest | SecurityFindingView[] | verified | DashboardService.check_password_breach |
 | GET | `/api/security/containment` |  |  | deferred | body assembled in the route |
 | POST | `/api/security/containment/{capability}/{subject_id}/{action}` |  |  | deferred | body assembled in the route |
-| GET | `/api/security/credentials` |  | CredentialLifecycleView[] | eligible | DashboardService.list_security_credentials |
-| POST | `/api/security/credentials/{provider}/verify` |  | CredentialLifecycleView | eligible | DashboardService.verify_security_credential |
-| GET | `/api/security/findings` |  | SecurityFindingView[] | eligible | DashboardService.list_security_findings |
+| GET | `/api/security/credentials` |  | CredentialLifecycleView[] | verified | DashboardService.list_security_credentials |
+| POST | `/api/security/credentials/{provider}/verify` |  | CredentialLifecycleView | verified | DashboardService.verify_security_credential |
+| GET | `/api/security/findings` |  | SecurityFindingView[] | verified | DashboardService.list_security_findings |
 | GET | `/api/security/health` |  |  | deferred | body assembled in the route |
 | POST | `/api/security/health-check` |  |  | deferred | body assembled in the route |
-| POST | `/api/security/scan` |  | SecurityFindingView[] | eligible | DashboardService.scan_security |
+| POST | `/api/security/scan` |  | SecurityFindingView[] | verified | DashboardService.scan_security |
 | GET | `/api/sessions` |  | SessionView[] | verified | DashboardService.list_sessions |
 | DELETE | `/api/sessions/bulk` | BulkDeleteSessionsRequest |  | deferred | body assembled in the route |
 | DELETE | `/api/sessions/{session_id}` |  |  | deferred | body assembled in the route |
@@ -306,7 +306,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | DELETE | `/api/sessions/{session_id}/command-grant` |  |  | deferred | body assembled in the route |
 | PUT | `/api/sessions/{session_id}/command-grant` | SessionCommandGrantRequest |  | deferred | body assembled in the route |
 | POST | `/api/sessions/{session_id}/compact` | CompactConversationRequest |  | deferred | body assembled in the route |
-| GET | `/api/sessions/{session_id}/context-usage` |  | ContextUsageView | eligible | DashboardService.get_context_usage |
+| GET | `/api/sessions/{session_id}/context-usage` |  | ContextUsageView | verified | DashboardService.get_context_usage |
 | POST | `/api/sessions/{session_id}/export` | ExportSessionRequest |  | special | special |
 | GET | `/api/sessions/{session_id}/export/manifest` |  |  | deferred | body assembled in the route |
 | PUT | `/api/sessions/{session_id}/pin` | SetSessionPinnedRequest |  | deferred | body assembled in the route |
@@ -346,17 +346,17 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/surface-models` |  |  | deferred | body assembled in the route |
 | PUT | `/api/surface-models` | SurfaceModelDefaultRequest |  | deferred | body assembled in the route |
 | GET | `/api/tasks` |  | TaskView[] | verified | DashboardService.list_tasks |
-| POST | `/api/tasks` | TaskCreateRequest | TaskView | eligible | DashboardService.create_task |
-| GET | `/api/tasks/{task_id}` |  |  | deferred | get_task_detail returns raiker.control.views.tasks.TaskDetailView \| None, not a fields-only view |
+| POST | `/api/tasks` | TaskCreateRequest | TaskView | verified | DashboardService.create_task |
+| GET | `/api/tasks/{task_id}` |  | TaskDetailView | verified | DashboardService.get_task_detail |
 | POST | `/api/tasks/{task_id}/resume` |  |  | deferred | body assembled in the route |
-| POST | `/api/tasks/{task_id}/run` |  | TaskView | eligible | DashboardService.run_task_now |
+| POST | `/api/tasks/{task_id}/run` |  | TaskView | verified | DashboardService.run_task_now |
 | GET | `/api/telemetry/destinations` |  |  | deferred | body assembled in the route |
 | POST | `/api/telemetry/destinations` | CreateTelemetryDestinationRequest |  | deferred | body assembled in the route |
 | DELETE | `/api/telemetry/destinations/{destination_id}` |  |  | deferred | body assembled in the route |
 | PUT | `/api/telemetry/destinations/{destination_id}/cadence` | TelemetryCadenceRequest |  | deferred | body assembled in the route |
 | POST | `/api/telemetry/destinations/{destination_id}/export` |  |  | deferred | body assembled in the route |
 | POST | `/api/tray/session` | TraySessionRequest |  | deferred | body assembled in the route |
-| GET | `/api/turns/{turn_id}` |  |  | deferred | get_turn returns raiker.control.views.sessions.TurnDetailView \| None, not a fields-only view |
+| GET | `/api/turns/{turn_id}` |  | TurnDetailView | verified | DashboardService.get_turn |
 | DELETE | `/api/vault/key` |  |  | deferred | body assembled in the route |
 | PUT | `/api/vault/key` | VaultKeyRequest |  | deferred | body assembled in the route |
 | GET | `/api/vault/status` |  |  | deferred | body assembled in the route |

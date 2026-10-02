@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import sys
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import Any, Literal
+
+from typing_extensions import TypedDict
 
 from raiker.contracts.views import View
 
@@ -148,6 +150,17 @@ class ModelProfileView(View):
     image_models: tuple[str, ...] = ()
 
 
+class ContextCompaction(TypedDict):
+    """The latest automatic provider-context compaction — metadata only."""
+
+    status: Literal["completed", "failed"]
+    created_at: str
+    source_turn_count: int
+    estimated_input_tokens_before: int
+    estimated_summary_tokens: int
+    reason_code: str | None
+
+
 @dataclass(frozen=True)
 class ContextUsageView(View):
     """What one conversation has used, and what it has cost.
@@ -194,7 +207,7 @@ class ContextUsageView(View):
     # Latest automatic provider-context compaction. This is deliberately
     # metadata-only; the summary remains in the encrypted workspace store and
     # transcript turns are never rewritten.
-    latest_compaction: dict[str, Any] | None = None
+    latest_compaction: ContextCompaction | None = None
     # Backlog #16 — how much of the tool catalogue this turn carries.
     # `tools_deferred` is the count whose schemas are fetched on request rather
     # than sent every time; both are stated because "25 of 50" is the honest

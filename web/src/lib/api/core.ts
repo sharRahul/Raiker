@@ -156,3 +156,12 @@ export function postJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
 }
+
+/** A JSON body sent with a method other than POST (PUT, PATCH, DELETE). */
+export function sendJson<T>(method: string, path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}

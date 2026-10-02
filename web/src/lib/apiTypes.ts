@@ -1,25 +1,51 @@
 import type { ApprovalMode } from "./approvalMode";
 import type {
   ApprovalView,
+  PathAttachment,
+  UploadAttachment,
+  BackgroundWorkerHealth,
   CapabilityGateView,
+  CheckpointCaptureHealth,
   CheckpointView,
   CodeReposView,
   CodeRepoView,
   ConnectionsView,
   ConnectorView,
+  ContentPartView,
+  ContextUsageView,
+  CredentialLifecycleView,
+  DiagnosticsView,
+  EmbeddingProviderView,
+  EmbeddingSpaceView,
+  EventView,
   ExtensionsOverviewView,
   ExtensionView,
   IdentityView,
+  McpServerView,
   McpSessionView,
+  McpToolDeclaration,
   MemoryControlView,
+  MemorySettingsView,
+  NotificationView,
+  ProjectAttachmentView,
+  ProjectContext,
+  ProjectDetailView,
   ProjectsListView,
   ProjectView,
+  ProviderHealthView,
   RuntimeModeView,
   RuntimeReadinessView,
+  SecurityFindingView,
+  SessionView,
+  TaskDetailView,
+  TaskView,
+  TurnDetailView,
+  TurnView,
   WorkThreadFacet,
   WorkThreadPage,
   WorkThreadView,
 } from "./generated/apiContract";
+import type { ApprovalDetailView as GeneratedApprovalDetailView } from "./generated/apiContract";
 
 // Response shapes from the governed read API (see raiker/control/dashboard.py and
 // raiker/control/dtos.py). These mirror the backend DTOs; the backend remains the source of truth.
@@ -138,55 +164,9 @@ export interface AgentPlan {
   current_step?: string;
 }
 
-/**
- * One connected tool as its server described it. `has_schema` false means the
- * server declared no usable argument schema — the tool is still callable, with
- * an open object — and `schema_reason` says which of the three reasons it was.
- */
-export interface McpToolDeclaration {
-  name: string;
-  title: string;
-  description: string;
-  has_schema: boolean;
-  schema_reason: string;
-  arguments: string[];
-  required: string[];
-}
+export type { McpToolDeclaration };
 
-export interface McpServer {
-  server_id: string;
-  name: string;
-  command: string[];
-  template: string | null;
-  transport: string;
-  status: string;
-  created_at: string;
-  last_connected_at: string | null;
-  tools: string[];
-  tool_count: number;
-  /**
-   * Backlog #16 (MCP half) — what each discovered tool said it takes, read from
-   * the server's own `tools/list` declaration and bounded before it was stored.
-   * Empty for a connection that has not been tested since declarations were
-   * recorded; the card says so rather than implying the tools take nothing.
-   */
-  tool_declarations: McpToolDeclaration[];
-  /**
-   * BUG-234 — what this server offers that Raiker does not use: capabilities it
-   * declared beyond `tools`, and what its transport was observed doing. Empty
-   * when a server offers only what Raiker uses. Supported, or named as
-   * unsupported — never silently degraded.
-   */
-  unsupported_features: { feature: string; note: string }[];
-  endpoint_url: string | null;
-  auth_ref: string | null;
-  monitor_state: "active" | "paused" | "killed";
-  paused_reason: string | null;
-  paused_at: string | null;
-  // BUG-234 — the MCP revision this server negotiated on its last successful
-  // handshake, or null when it has never connected.
-  protocol_version: string | null;
-}
+export type McpServer = McpServerView;
 
 /**
  * One installed skill. `active` is the owner's own switch: an inactive skill
@@ -256,28 +236,9 @@ export interface SkillMutationResult {
 
 export type McpSession = McpSessionView;
 
-export interface McpFinding {
-  finding_id: string;
-  source: string;
-  severity: string;
-  code: string;
-  summary: string;
-  redacted_detail: Record<string, unknown>;
-  subject_id: string | null;
-  state: string;
-  created_at: string;
-}
+export type McpFinding = SecurityFindingView;
 
-export interface Notification {
-  notification_id: string;
-  kind: string;
-  title: string;
-  body: string;
-  finding_id: string | null;
-  subject_id: string | null;
-  read: boolean;
-  created_at: string;
-}
+export type Notification = NotificationView;
 
 export interface StandingGrant {
   grant_id: string;
@@ -295,13 +256,7 @@ export interface StandingGrant {
   last_used_at: string | null;
 }
 
-export interface CredentialLifecycle {
-  credential_id?: string;
-  provider: string;
-  verified_at?: string | null;
-  due_at: string;
-  status: "current" | "warning" | "overdue";
-}
+export type CredentialLifecycle = CredentialLifecycleView;
 
 export interface SecurityHealth {
   source: string;
@@ -319,17 +274,7 @@ export interface CapabilityDecisionMode {
   decision_mode: string;
 }
 
-export interface ProviderHealth {
-  profile_id: string;
-  provider: string;
-  model: string;
-  endpoint_kind: string;
-  local_only: boolean;
-  requires_network: boolean;
-  selected: boolean;
-  status: string; // "selected" | "configured" — config-derived, never probed here
-  detail: string;
-}
+export type ProviderHealth = ProviderHealthView;
 
 export type ModelReadinessState =
   | "not_configured"
@@ -443,20 +388,7 @@ export interface PartialFiles {
   file_count: number;
 }
 
-/**
- * GCR-38 — one host-tick background pass and how it has been going, so a pass
- * that keeps failing is never reported as a healthy host.
- */
-export interface BackgroundWorkerHealth {
-  pass_name: string;
-  last_success_at: string | null;
-  last_failure_at: string | null;
-  last_error_class: string | null;
-  consecutive_failures: number;
-  total_failures: number;
-  healthy: boolean;
-  updated_at: string;
-}
+export type { BackgroundWorkerHealth };
 
 /** One monitored subject's containment state (BUG-76, BUG-77). */
 export interface ContainedSubject {
@@ -710,25 +642,7 @@ export interface ModelConversionPreview {
   };
 }
 
-export interface Diagnostics {
-  runtime_mode: string;
-  production_ready_local_single_user_runtime: boolean;
-  summary: Record<string, unknown>;
-  disabled_capabilities: string[];
-  counts: Record<string, number>;
-  readiness: Record<string, boolean | CheckpointCaptureHealth>;
-  missing_config: string[];
-  provider_health: ProviderHealth[];
-  background_workers: BackgroundWorkerHealth[];
-  /**
-   * GCR-45 — where the built-in model registry was read from. `packaged` is the
-   * resource that ships with Raiker; `override` is the file an explicit
-   * `RAIKER_CONFIG_DIR` named. The working directory the host was launched from
-   * is no longer one of the answers.
-   */
-  model_profile_source: { kind: string; location: string };
-  scope_note: string;
-}
+export type Diagnostics = DiagnosticsView;
 
 /**
  * MEM-09 — GET /api/memory/integrity. The owner-started scan of every index and
@@ -755,14 +669,7 @@ export interface MemoryIntegrity {
   stale_conversation_index_count: number;
 }
 
-export interface CheckpointCaptureHealth {
-  ok: boolean;
-  stage: "ineligible" | "snapshot_ready" | "snapshot" | "commit";
-  reason_code: string;
-  display_path: string | null;
-  checked_at: string;
-  remediation: string;
-}
+export type { CheckpointCaptureHealth };
 
 export interface ModelProfile {
   profile_id: string;
@@ -836,52 +743,7 @@ export interface ModelProfile {
   ready?: boolean;
 }
 
-/** Token usage and API cost for one conversation. Every figure names its source. */
-export interface ContextUsage {
-  session_id: string;
-  profile_id: string | null;
-  provider: string | null;
-  model: string | null;
-  used_tokens: number | null;
-  context_window_tokens: number | null;
-  context_window_source: string | null;
-  /** "provider" once a turn has run, else "unavailable". */
-  usage_source: string;
-  billable: boolean;
-  session_cost: string | null;
-  provider_total_cost: string | null;
-  currency: string | null;
-  price_source: string | null;
-  price_as_of: string | null;
-  session_turns: number;
-  session_input_tokens: number;
-  session_output_tokens: number;
-  /** BUG-21 — the individual rate components behind `session_cost`, read from
-   *  the normalised registry. Each is independently sourced; a provider that
-   *  publishes no cache rate leaves those null rather than having one inferred. */
-  price_input_per_mtok?: string | null;
-  price_output_per_mtok?: string | null;
-  price_cache_write_per_mtok?: string | null;
-  price_cache_read_per_mtok?: string | null;
-  price_effective_from?: string | null;
-  /** True on a billable provider with no exact rate for this model. The popover
-   *  states **Unknown** and offers Configure → rather than implying it was free. */
-  price_unknown?: boolean;
-  /** Backlog #16 — built-in tool schemas this turn carries, and how many are
-   *  fetched on request instead. Absent on an older server. */
-  tools_projected?: number;
-  tools_deferred?: number;
-  /** Most recent automatic context-compaction outcome. Transcript turns stay
-   *  unchanged; this describes only provider-context replay. */
-  latest_compaction?: {
-    status: "completed" | "failed";
-    created_at: string;
-    source_turn_count: number;
-    estimated_input_tokens_before: number;
-    estimated_summary_tokens: number;
-    reason_code: string | null;
-  } | null;
-}
+export type ContextUsage = ContextUsageView;
 
 /** BUG-21 — one exact model's row in the Models → Pricing surface. */
 export interface ModelPricingHistoryEntry {
@@ -1187,15 +1049,7 @@ export interface CodexSubscriptionStatus {
  * sessions/checkpoints), never an authority — selecting one grants nothing. */
 export type { ProjectView };
 
-/** UX-PROJ-04 — a file shared with every chat in a project, as a person names it. */
-export interface ProjectAttachment {
-  attachment_id: string;
-  filename: string;
-  media_type: string;
-  byte_size: number;
-  /** False when the id no longer resolves to a file this owner holds. */
-  available: boolean;
-}
+export type ProjectAttachment = ProjectAttachmentView;
 
 /** UX-PROJ-07 — everything a delete removes, counted before it runs. */
 export interface ProjectDeletionPreview {
@@ -1269,20 +1123,9 @@ export interface CodeMapPaths {
   error?: { type?: string; message?: string } | null;
 }
 
-export interface ProjectDetail {
-  project: ProjectView;
-  sessions: SessionSummary[];
-  checkpoints: Checkpoint[];
-  context: ProjectContext;
-  attachments?: ProjectAttachment[];
-}
+export type ProjectDetail = ProjectDetailView;
 
-export interface ProjectContext {
-  instructions: string;
-  attachment_ids: string[];
-  memory_enabled: boolean;
-  memory_mode: "inherit" | "enabled" | "disabled";
-}
+export type { ProjectContext };
 
 /** A node in the project tree hierarchy. Recursive — each node may have
  * children. Represents an active (non-archived) project/folder. */
@@ -1295,21 +1138,7 @@ export interface ProjectTreeNode {
   children: ProjectTreeNode[];
 }
 
-export interface EventEntry {
-  event_id: string;
-  session_id: string;
-  turn_id: string | null;
-  event_type: string;
-  actor: string;
-  timestamp: string;
-  risk_level: string | null;
-  summary: string | null;
-  machine_identity?: IdentityView | null;
-  priority: string | null;
-  scheduled_at: string | null;
-  recurrence: string | null;
-  reminder_at: string | null;
-}
+export type EventEntry = EventView;
 
 export type Checkpoint = CheckpointView;
 
@@ -1541,77 +1370,9 @@ export type { WorkThreadPage };
 
 export type WorkThread = WorkThreadView;
 
-export interface SessionSummary {
-  session_id: string;
-  title: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  turn_count: number;
-  // Conversation organisation: a per-session pin/bookmark flag. Pinned
-  // sessions surface first in the Sessions list. Organizing label only.
-  pinned: boolean;
-  // Conversation organisation remainder: per-session tags. Organizing labels
-  // only — like `pinned`, they grant nothing. Storage returns them sorted.
-  tags: string[];
-  // The organizing project this chat sits in, or null. A chat can be moved in
-  // or out; the project only bounds the context the chat receives.
-  project_id: string | null;
-  // Soft-archive state. Archiving is reversible and never deletes transcripts,
-  // events, checkpoints, or permissions.
-  archived: boolean;
-  archived_at: string | null;
-  // Where the session came from: "chat" for a conversation the owner typed,
-  // "task" for the server-owned session a task run executes in. Provenance
-  // only — a task session stays readable in Sessions and from Tasks.
-  origin?: string;
-  // RAIKER-2020 — set only on a search result: the exchange that matched and
-  // the turn it belongs to, so a result can say *why* it matched rather than
-  // only that it did. Empty on a plain listing.
-  match_snippet?: string;
-  match_turn_id?: string;
-}
+export type SessionSummary = SessionView;
 
-export interface TurnSummary {
-  turn_id: string;
-  session_id: string;
-  turn_type: string;
-  status: string;
-  prompt_text: string | null;
-  created_at: string;
-  completed_at: string | null;
-  summary: string | null;
-  /**
-   * BUG-215 — how much of its own working this turn produced, and the working
-   * itself when the owner has asked for it to be kept.
-   *
-   * The pair is what makes a re-opened turn honest. `reasoning_chars === 0`
-   * means the turn produced none; `reasoning_chars > 0` with `reasoning === null`
-   * means it did and the working was not retained — which the transcript says
-   * plainly instead of showing nothing and implying nothing happened.
-   */
-  reasoning_chars?: number;
-  reasoning?: string | null;
-  /**
-   * Backlog #25 — the turn's tool calls, rebuilt from the durable record.
-   *
-   * Live, these arrive on the stream; a reload had no stream and lost them, so
-   * a reopened transcript showed the answer and nothing about how it was
-   * reached. Each entry is the same payload shape a `kind: "tool"` stream event
-   * carries, rendered server-side by the same presentation function, so the two
-   * sources merge into one row rather than two.
-   */
-  tool_rows?: Array<Record<string, unknown>>;
-  /**
-   * BUG-300 — the parts this answer declared, derived server-side from the
-   * stored text by the same splitter a live turn goes through.
-   *
-   * Empty for every answer that declared nothing. Without it a reopened turn
-   * rendered the raw ` ```raiker:table ` fence and its JSON, which is a
-   * different answer from the one the conversation showed.
-   */
-  content_parts?: ContentPart[];
-}
+export type TurnSummary = TurnView;
 
 // GET /api/sessions/{id} — raiker/control/dashboard.py SessionDetailView.to_dict()
 export interface SessionDetail {
@@ -1625,11 +1386,7 @@ export interface SessionDetail {
   }>;
 }
 
-// GET /api/turns/{id} — raiker/control/dashboard.py TurnDetailView.to_dict()
-export interface TurnDetail {
-  turn: TurnSummary;
-  events: EventEntry[];
-}
+export type TurnDetail = TurnDetailView;
 
 export interface AuthSession {
   token: string;
@@ -1643,39 +1400,25 @@ export type { IdentityView };
 
 export type { ApprovalView };
 
-// Raiker/control/dashboard.py ApprovalDetailView.to_dict()
-export interface ApprovalDetailView {
-  approval: ApprovalView;
-  arguments: Record<string, unknown>;
-  diff: string | null;
-  diff_path: string | null;
-  // `connector_request` has always been produced by the server for a
-  // `connector_write`; it was missing here, so the union claimed a shape the
-  // backend does not only produce. `git_change` is B11's: a commit's file list
-  // and diff, or the two refs a branch moves between.
-  // `checkpoint_restore` is BUG-230's: the per-file rewind plan, recomputed by
-  // the server at read time so the decision is made on what will actually run.
-  preview_kind:
-    | "file_diff"
-    | "patch"
-    | "git_change"
-    | "connector_request"
-    | "checkpoint_restore"
-    | "arguments";
-  metadata_only_notice: string;
-  // Server-computed: does pressing Approve actually perform this action?
-  executes_on_approval: boolean;
-  execution_evidence: {
-    principal_id?: string;
-    returncode?: number;
-    stdout_bytes?: number;
-    stderr_bytes?: number;
-    stdout?: string;
-    stderr?: string;
-    truncated?: boolean;
-    output_redacted?: boolean;
-  };
+/**
+ * What the approval relay recorded when an approved action ran: who resolved it,
+ * plus whatever the executor reported. The backend carries the executor's own
+ * result record, which is open by nature, so this names the keys the card reads.
+ */
+export interface ExecutionEvidence {
+  principal_id?: string;
+  returncode?: number;
+  stdout_bytes?: number;
+  stderr_bytes?: number;
+  stdout?: string;
+  stderr?: string;
+  truncated?: boolean;
+  output_redacted?: boolean;
 }
+
+export type ApprovalDetailView = Omit<GeneratedApprovalDetailView, "execution_evidence"> & {
+  execution_evidence: ExecutionEvidence;
+};
 
 // POST /api/approvals/{id}/resolve response.
 export interface ResolveApprovalResult {
@@ -1750,22 +1493,7 @@ export interface ApprovalInfo {
   queued_calls?: number;
 }
 
-// Raiker.contracts.models.AgentResponse.to_dict()
-/**
- * One declared piece of a turn's answer (BUG-288).
- *
- * `raiker.runtime.typed_parts.ContentPart.to_dict()`. `text` carries prose,
- * `table` and `chart` carry a payload the runtime has already validated, and
- * `refused` carries the reason a declared block was not accepted — never
- * dropped, because a part that vanishes is an answer that silently lost a
- * section.
- */
-export interface ContentPart {
-  type: "text" | "table" | "chart" | "refused";
-  text?: string;
-  data?: Record<string, unknown>;
-  reason_code?: string;
-}
+export type ContentPart = ContentPartView;
 
 export interface AgentResponse {
   request_id: string;
@@ -1820,47 +1548,7 @@ export interface StreamEvent {
   turn_id?: string | null;
 }
 
-// Raiker/control/dashboard.py TaskView.to_dict()
-export interface TaskView {
-  task_id: string;
-  session_id: string;
-  status: string;
-  title: string;
-  objective: string;
-  current_step: string | null;
-  progress_percent: number | null;
-  created_at: string;
-  updated_at: string;
-  completed_at: string | null;
-  summary: string | null;
-  priority?: string | null;
-  scheduled_at?: string | null;
-  recurrence?: string | null;
-  reminder_at?: string | null;
-  // Project-scoped schedules: the project this task/schedule was created
-  // under, or null when it was created outside every project.
-  project_id: string | null;
-  parent_task_id?: string | null;
-  model_profile?: string | null;
-  model?: string | null;
-  /**
-   * Backlog #23 — the working method this task's cycles run under: "chat" or
-   * "build". A delegating parent chooses it per child, so one brief can put the
-   * reading half in Chat and the change-and-test half in Build. A build task
-   * needs a project.
-   */
-  surface?: string;
-  /**
-   * C11 — this task's own conversation. Every cycle runs in it, so a routine
-   * accumulates a readable thread rather than interleaving its turns with every
-   * other task's in one hidden Inbox transcript. Null for a task created before
-   * threads existed.
-   */
-  thread_session_id?: string | null;
-  /** How many turns that thread holds. Zero means there is nothing to open. */
-  thread_turns?: number;
-  attachments?: PromptAttachment[];
-}
+export type { TaskView };
 
 // Raiker/tasks/history.py TaskEventView.to_dict() — one recorded transition.
 export interface TaskEventView {
@@ -1894,21 +1582,7 @@ export interface TaskAttemptView {
   events: TaskEventView[];
 }
 
-/**
- * GET /api/tasks/{task_id} — raiker/control/dashboard.py TaskDetailView.
- *
- * BUG-299 — the address a task did not have. Derived from the governed events
- * the task's own lifecycle writes, so this can never disagree with the audit
- * log; it *is* the audit log, grouped into the runs it describes.
- */
-export interface TaskDetailView {
-  task: TaskView;
-  attempts: TaskAttemptView[];
-  /** Decisions still open on this task's session. */
-  approvals: ApprovalView[];
-  /** True when the read bound cut the history off, so the page says so. */
-  truncated: boolean;
-}
+export type { TaskDetailView };
 
 // POST /api/interrupts response (raiker/api/routes_prompts.py).
 export interface InterruptResult {
@@ -1923,10 +1597,7 @@ export interface InterruptResult {
 // One prompt attachment: a workspace path, or an image/document previously
 // uploaded through POST /api/attachments (referenced by id; the bytes stay
 // server-side).
-export type PromptAttachment =
-  | { type: "path"; path: string }
-  | { type: "image"; attachment_id: string }
-  | { type: "document"; attachment_id: string };
+export type PromptAttachment = PathAttachment | UploadAttachment;
 
 export interface PromptRequestBody {
   text: string;
@@ -2295,65 +1966,11 @@ export interface MemoryHistoryEvent {
   details: Record<string, unknown>;
 }
 
-export interface EmbeddingSpaceView {
-  backend_id: string;
-  kind: "lexical_fallback" | "local_model" | "provider";
-  model: string;
-  dimensions: number;
-  semantic: boolean;
-  reason_code: string;
-  /**
-   * MEM-10 — whether a *question* can be embedded into this space at read time.
-   *
-   * `semantic` and this are two different claims and only the first is true
-   * today: a workspace can build a semantic space and recall selects it, but
-   * embedding the query means calling the provider on every search, which needs
-   * its own gated path rather than a shortcut. Until it has one the vector leg
-   * is dropped and matching is still lexical — so a card that reads `semantic`
-   * as "matches meaning" would say something the retrieval does not do.
-   *
-   * Present only on `retrieval`; a listed space carries no read-path claim.
-   */
-  query_embeddable?: boolean;
-}
+export type { EmbeddingSpaceView };
 
-export interface MemorySettingsView {
-  incognito: boolean;
-  // MEM-03 — the owner's selection ("auto" or an exact model label), what that
-  // resolved to, and the spaces this workspace really holds vectors in.
-  embedding_backend: string;
-  retrieval: EmbeddingSpaceView;
-  spaces: EmbeddingSpaceView[];
-  // MEM-10 — `spaces` is read from the vectors that exist, so a default install
-  // has nothing semantic to offer. These two say what it would take: which
-  // embedding models this install could call, and how many approved memories
-  // are waiting to be embedded into one.
-  embedding_providers: EmbeddingProviderView[];
-  unindexed_memories: number;
-  unindexed_file_chunks: number;
-  /** Exact cosine ranking stays in force for small corpora; larger spaces use
-   * approximate candidate lookup followed by exact re-ranking. */
-  vector_search_strategy?: "exact_then_approximate";
-  vector_search_exact_limit?: number;
-}
+export type { MemorySettingsView };
 
-// Raiker/vector/backends.py embedding_capable_profiles(). A description of what
-// the model profiles declare — nothing here has performed egress or checked a
-// credential; the run still goes through model_provider_runtime.
-export interface EmbeddingProviderView {
-  profile_id: string;
-  provider: string;
-  model: string;
-  // The label the vectors will carry, and so the space that becomes selectable.
-  space: string;
-  local_only: boolean;
-  // The next governed run is capped at 500 total items. Counts are per vector
-  // space so the confirmation always describes the model the owner selected.
-  unindexed_memories?: number;
-  unindexed_file_chunks?: number;
-  pending_count?: number;
-  requires_network: boolean;
-}
+export type { EmbeddingProviderView };
 
 // Raiker/control/dashboard.py ObservationView.to_dict(). MEM-04 — metadata
 // about material the runtime saw while it worked. There is no field carrying

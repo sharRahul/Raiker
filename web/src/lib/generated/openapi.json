@@ -67,6 +67,76 @@
         "title": "ApplyUpdateRequest",
         "type": "object"
       },
+      "ApprovalDetailView": {
+        "properties": {
+          "approval": {
+            "$ref": "#/components/schemas/ApprovalView"
+          },
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "diff": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diff"
+          },
+          "diff_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diff Path"
+          },
+          "executes_on_approval": {
+            "default": false,
+            "title": "Executes On Approval",
+            "type": "boolean"
+          },
+          "execution_evidence": {
+            "additionalProperties": true,
+            "title": "Execution Evidence",
+            "type": "object"
+          },
+          "metadata_only_notice": {
+            "default": "Approval resolution is metadata-only. Recording a decision does NOT execute the action.",
+            "title": "Metadata Only Notice",
+            "type": "string"
+          },
+          "preview_kind": {
+            "enum": [
+              "file_diff",
+              "patch",
+              "git_change",
+              "connector_request",
+              "checkpoint_restore",
+              "arguments"
+            ],
+            "title": "Preview Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval",
+          "arguments",
+          "diff",
+          "diff_path",
+          "preview_kind"
+        ],
+        "title": "ApprovalDetailView",
+        "type": "object"
+      },
       "ApprovalView": {
         "properties": {
           "action_id": {
@@ -252,6 +322,76 @@
           "models"
         ],
         "title": "AvailableModelsRequest",
+        "type": "object"
+      },
+      "BackgroundWorkerHealth": {
+        "description": "One host-tick background pass: its last success, last failure and streak.",
+        "properties": {
+          "consecutive_failures": {
+            "title": "Consecutive Failures",
+            "type": "integer"
+          },
+          "healthy": {
+            "title": "Healthy",
+            "type": "boolean"
+          },
+          "last_error_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error Class"
+          },
+          "last_failure_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Failure At"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "pass_name": {
+            "title": "Pass Name",
+            "type": "string"
+          },
+          "total_failures": {
+            "title": "Total Failures",
+            "type": "integer"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pass_name",
+          "last_success_at",
+          "last_failure_at",
+          "last_error_class",
+          "consecutive_failures",
+          "total_failures",
+          "healthy",
+          "updated_at"
+        ],
+        "title": "BackgroundWorkerHealth",
         "type": "object"
       },
       "BlocklistRuleRequest": {
@@ -688,6 +828,58 @@
           "url"
         ],
         "title": "ChannelTestDeliveryRequest",
+        "type": "object"
+      },
+      "CheckpointCaptureHealth": {
+        "description": "The last checkpoint capture's outcome, as the store records it.",
+        "properties": {
+          "checked_at": {
+            "title": "Checked At",
+            "type": "string"
+          },
+          "display_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Path"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "remediation": {
+            "title": "Remediation",
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "ineligible",
+              "snapshot_ready",
+              "snapshot",
+              "commit"
+            ],
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "stage",
+          "reason_code",
+          "display_path",
+          "checked_at",
+          "remediation"
+        ],
+        "title": "CheckpointCaptureHealth",
         "type": "object"
       },
       "CheckpointView": {
@@ -1141,6 +1333,349 @@
         "title": "ContainMcpServerRequest",
         "type": "object"
       },
+      "ContentPartView": {
+        "description": "One declared piece of a turn's answer, as ``raiker.runtime.typed_parts`` serialises it.",
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "text",
+              "table",
+              "chart",
+              "refused"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "text",
+          "data",
+          "reason_code"
+        ],
+        "title": "ContentPartView",
+        "type": "object"
+      },
+      "ContextCompaction": {
+        "description": "The latest automatic provider-context compaction — metadata only.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "estimated_input_tokens_before": {
+            "title": "Estimated Input Tokens Before",
+            "type": "integer"
+          },
+          "estimated_summary_tokens": {
+            "title": "Estimated Summary Tokens",
+            "type": "integer"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "source_turn_count": {
+            "title": "Source Turn Count",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "created_at",
+          "source_turn_count",
+          "estimated_input_tokens_before",
+          "estimated_summary_tokens",
+          "reason_code"
+        ],
+        "title": "ContextCompaction",
+        "type": "object"
+      },
+      "ContextUsageView": {
+        "description": "What one conversation has used, and what it has cost.\n\nEvery figure is optional and every one names its source. A missing price, a\nprovider that reports no usage, or a model with no published capacity all\nresolve to None here and to an explicit \"unavailable\" in the UI — this view\nnever substitutes a zero or an estimate for a fact it does not have.",
+        "properties": {
+          "billable": {
+            "title": "Billable",
+            "type": "boolean"
+          },
+          "context_window_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window Source"
+          },
+          "context_window_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window Tokens"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "latest_compaction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContextCompaction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "price_as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price As Of"
+          },
+          "price_cache_read_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Price Cache Read Per Mtok"
+          },
+          "price_cache_write_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Price Cache Write Per Mtok"
+          },
+          "price_effective_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Price Effective From"
+          },
+          "price_input_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Price Input Per Mtok"
+          },
+          "price_output_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Price Output Per Mtok"
+          },
+          "price_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Source"
+          },
+          "price_unknown": {
+            "default": false,
+            "title": "Price Unknown",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "provider_total_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Total Cost"
+          },
+          "session_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Cost"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "session_input_tokens": {
+            "default": 0,
+            "title": "Session Input Tokens",
+            "type": "integer"
+          },
+          "session_output_tokens": {
+            "default": 0,
+            "title": "Session Output Tokens",
+            "type": "integer"
+          },
+          "session_turns": {
+            "default": 0,
+            "title": "Session Turns",
+            "type": "integer"
+          },
+          "tools_deferred": {
+            "default": 0,
+            "title": "Tools Deferred",
+            "type": "integer"
+          },
+          "tools_projected": {
+            "default": 0,
+            "title": "Tools Projected",
+            "type": "integer"
+          },
+          "usage_source": {
+            "title": "Usage Source",
+            "type": "string"
+          },
+          "used_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Tokens"
+          }
+        },
+        "required": [
+          "session_id",
+          "profile_id",
+          "provider",
+          "model",
+          "used_tokens",
+          "context_window_tokens",
+          "context_window_source",
+          "usage_source",
+          "billable",
+          "session_cost",
+          "provider_total_cost",
+          "currency",
+          "price_source",
+          "price_as_of"
+        ],
+        "title": "ContextUsageView",
+        "type": "object"
+      },
       "ConversationBranchRequest": {
         "additionalProperties": false,
         "description": "A title for the branch, and nothing else (GAP-CHAT C14).\n\nThe checkpoint is in the path and the owner comes from the authenticated\nsession, so the only thing a caller may supply is what to call the new\nconversation. An empty title lets the service derive one from the\ncheckpoint's own summary rather than accepting a caller-chosen default.",
@@ -1327,6 +1862,51 @@
         "title": "CreateTelemetryDestinationRequest",
         "type": "object"
       },
+      "CredentialLifecycleView": {
+        "properties": {
+          "credential_id": {
+            "title": "Credential Id",
+            "type": "string"
+          },
+          "due_at": {
+            "title": "Due At",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "current",
+              "warning",
+              "overdue"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          }
+        },
+        "required": [
+          "credential_id",
+          "provider",
+          "verified_at",
+          "due_at",
+          "status"
+        ],
+        "title": "CredentialLifecycleView",
+        "type": "object"
+      },
       "CredentialRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1355,6 +1935,92 @@
           "values"
         ],
         "title": "CredentialRequest",
+        "type": "object"
+      },
+      "DiagnosticsView": {
+        "properties": {
+          "background_workers": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/BackgroundWorkerHealth"
+            },
+            "title": "Background Workers",
+            "type": "array"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "disabled_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Disabled Capabilities",
+            "type": "array"
+          },
+          "missing_config": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Config",
+            "type": "array"
+          },
+          "model_profile_source": {
+            "$ref": "#/components/schemas/ModelProfileSource"
+          },
+          "production_ready_local_single_user_runtime": {
+            "title": "Production Ready Local Single User Runtime",
+            "type": "boolean"
+          },
+          "provider_health": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ProviderHealthView"
+            },
+            "title": "Provider Health",
+            "type": "array"
+          },
+          "readiness": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "$ref": "#/components/schemas/CheckpointCaptureHealth"
+                }
+              ]
+            },
+            "title": "Readiness",
+            "type": "object"
+          },
+          "runtime_mode": {
+            "title": "Runtime Mode",
+            "type": "string"
+          },
+          "scope_note": {
+            "default": "Status reflects the local single-user runtime only.",
+            "title": "Scope Note",
+            "type": "string"
+          },
+          "summary": {
+            "additionalProperties": true,
+            "title": "Summary",
+            "type": "object"
+          }
+        },
+        "required": [
+          "runtime_mode",
+          "production_ready_local_single_user_runtime",
+          "summary",
+          "disabled_capabilities",
+          "counts"
+        ],
+        "title": "DiagnosticsView",
         "type": "object"
       },
       "DisableCapabilityRequest": {
@@ -1428,6 +2094,108 @@
           }
         },
         "title": "ElevateRequest",
+        "type": "object"
+      },
+      "EmbeddingProviderView": {
+        "description": "An embedding model this install could call, and what is waiting to be embedded by it.",
+        "properties": {
+          "local_only": {
+            "title": "Local Only",
+            "type": "boolean"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "pending_count": {
+            "title": "Pending Count",
+            "type": "integer"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "requires_network": {
+            "title": "Requires Network",
+            "type": "boolean"
+          },
+          "space": {
+            "title": "Space",
+            "type": "string"
+          },
+          "unindexed_file_chunks": {
+            "title": "Unindexed File Chunks",
+            "type": "integer"
+          },
+          "unindexed_memories": {
+            "title": "Unindexed Memories",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile_id",
+          "provider",
+          "model",
+          "space",
+          "local_only",
+          "requires_network",
+          "unindexed_memories",
+          "unindexed_file_chunks",
+          "pending_count"
+        ],
+        "title": "EmbeddingProviderView",
+        "type": "object"
+      },
+      "EmbeddingSpaceView": {
+        "description": "One embedding space: the vectors a backend produces and whether they mean anything.",
+        "properties": {
+          "backend_id": {
+            "title": "Backend Id",
+            "type": "string"
+          },
+          "dimensions": {
+            "title": "Dimensions",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "lexical_fallback",
+              "local_model",
+              "provider"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "query_embeddable": {
+            "title": "Query Embeddable",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "semantic": {
+            "title": "Semantic",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "backend_id",
+          "kind",
+          "model",
+          "dimensions",
+          "semantic",
+          "reason_code"
+        ],
+        "title": "EmbeddingSpaceView",
         "type": "object"
       },
       "EventView": {
@@ -2234,6 +3002,11 @@
           },
           "monitor_state": {
             "default": "active",
+            "enum": [
+              "active",
+              "paused",
+              "killed"
+            ],
             "title": "Monitor State",
             "type": "string"
           },
@@ -2304,8 +3077,7 @@
           "tool_declarations": {
             "default": [],
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/McpToolDeclaration"
             },
             "title": "Tool Declarations",
             "type": "array"
@@ -2325,10 +3097,7 @@
           "unsupported_features": {
             "default": [],
             "items": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
+              "$ref": "#/components/schemas/UnsupportedFeature"
             },
             "title": "Unsupported Features",
             "type": "array"
@@ -2423,6 +3192,56 @@
           "ended_at"
         ],
         "title": "McpSessionView",
+        "type": "object"
+      },
+      "McpToolDeclaration": {
+        "description": "What one MCP tool said it takes — the argument names, never a schema dump.",
+        "properties": {
+          "arguments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Arguments",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "has_schema": {
+            "title": "Has Schema",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "required": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Required",
+            "type": "array"
+          },
+          "schema_reason": {
+            "title": "Schema Reason",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "title",
+          "description",
+          "has_schema",
+          "schema_reason",
+          "arguments",
+          "required"
+        ],
+        "title": "McpToolDeclaration",
         "type": "object"
       },
       "MemoryControlView": {
@@ -2617,6 +3436,72 @@
           "pinned"
         ],
         "title": "MemoryControlView",
+        "type": "object"
+      },
+      "MemorySettingsView": {
+        "properties": {
+          "embedding_backend": {
+            "default": "auto",
+            "title": "Embedding Backend",
+            "type": "string"
+          },
+          "embedding_providers": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EmbeddingProviderView"
+            },
+            "title": "Embedding Providers",
+            "type": "array"
+          },
+          "incognito": {
+            "title": "Incognito",
+            "type": "boolean"
+          },
+          "retrieval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmbeddingSpaceView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "spaces": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EmbeddingSpaceView"
+            },
+            "title": "Spaces",
+            "type": "array"
+          },
+          "unindexed_file_chunks": {
+            "default": 0,
+            "title": "Unindexed File Chunks",
+            "type": "integer"
+          },
+          "unindexed_memories": {
+            "default": 0,
+            "title": "Unindexed Memories",
+            "type": "integer"
+          },
+          "vector_search_exact_limit": {
+            "default": 512,
+            "title": "Vector Search Exact Limit",
+            "type": "integer"
+          },
+          "vector_search_strategy": {
+            "const": "exact_then_approximate",
+            "default": "exact_then_approximate",
+            "title": "Vector Search Strategy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "incognito"
+        ],
+        "title": "MemorySettingsView",
         "type": "object"
       },
       "MfaCodeRequest": {
@@ -2925,6 +3810,25 @@
         "title": "ModelPriceRequest",
         "type": "object"
       },
+      "ModelProfileSource": {
+        "description": "Where the built-in model registry was read from: ``packaged`` or ``override``.",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "location": {
+            "title": "Location",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "location"
+        ],
+        "title": "ModelProfileSource",
+        "type": "object"
+      },
       "ModelReadinessCheckRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3053,6 +3957,69 @@
         "title": "MoveProjectRequest",
         "type": "object"
       },
+      "NotificationView": {
+        "description": "Owner-scoped view of one notification (Phase C). Redacted human-readable\ncopy only; ``finding_id`` / ``subject_id`` link back to what raised it.",
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "finding_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Id"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "notification_id": {
+            "title": "Notification Id",
+            "type": "string"
+          },
+          "read": {
+            "title": "Read",
+            "type": "boolean"
+          },
+          "subject_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "notification_id",
+          "kind",
+          "title",
+          "body",
+          "finding_id",
+          "subject_id",
+          "read",
+          "created_at"
+        ],
+        "title": "NotificationView",
+        "type": "object"
+      },
       "OllamaPullRequestBody": {
         "additionalProperties": false,
         "properties": {
@@ -3150,6 +4117,26 @@
         "title": "PasswordRecoveryCompleteRequest",
         "type": "object"
       },
+      "PathAttachment": {
+        "description": "A workspace path a task reads.",
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "type": {
+            "const": "path",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "path"
+        ],
+        "title": "PathAttachment",
+        "type": "object"
+      },
       "PauseHostRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3167,6 +4154,117 @@
           }
         },
         "title": "PauseHostRequest",
+        "type": "object"
+      },
+      "ProjectAttachmentView": {
+        "description": "UX-PROJ-04 — a file shared with every chat in a project, as a person names it.\n\n``available`` is false when the id no longer resolves to a file this owner\nholds; the row says so rather than disappearing, because the context still\nnames it and the owner can only remove what they can see.",
+        "properties": {
+          "attachment_id": {
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attachment_id",
+          "filename",
+          "media_type",
+          "byte_size",
+          "available"
+        ],
+        "title": "ProjectAttachmentView",
+        "type": "object"
+      },
+      "ProjectContext": {
+        "description": "What a project gives every chat filed in it.",
+        "properties": {
+          "attachment_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Attachment Ids",
+            "type": "array"
+          },
+          "instructions": {
+            "title": "Instructions",
+            "type": "string"
+          },
+          "memory_enabled": {
+            "title": "Memory Enabled",
+            "type": "boolean"
+          },
+          "memory_mode": {
+            "enum": [
+              "inherit",
+              "enabled",
+              "disabled"
+            ],
+            "title": "Memory Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instructions",
+          "attachment_ids",
+          "memory_enabled",
+          "memory_mode"
+        ],
+        "title": "ProjectContext",
+        "type": "object"
+      },
+      "ProjectDetailView": {
+        "properties": {
+          "attachments": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ProjectAttachmentView"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
+          "checkpoints": {
+            "items": {
+              "$ref": "#/components/schemas/CheckpointView"
+            },
+            "title": "Checkpoints",
+            "type": "array"
+          },
+          "context": {
+            "$ref": "#/components/schemas/ProjectContext"
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectView"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/SessionView"
+            },
+            "title": "Sessions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "project",
+          "sessions",
+          "checkpoints",
+          "context"
+        ],
+        "title": "ProjectDetailView",
         "type": "object"
       },
       "ProjectView": {
@@ -3455,6 +4553,59 @@
         "title": "PromptRequest",
         "type": "object"
       },
+      "ProviderHealthView": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "endpoint_kind": {
+            "title": "Endpoint Kind",
+            "type": "string"
+          },
+          "local_only": {
+            "title": "Local Only",
+            "type": "boolean"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "requires_network": {
+            "title": "Requires Network",
+            "type": "boolean"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "provider",
+          "model",
+          "endpoint_kind",
+          "local_only",
+          "requires_network",
+          "selected",
+          "status",
+          "detail"
+        ],
+        "title": "ProviderHealthView",
+        "type": "object"
+      },
       "RecordThreatModelAckRequest": {
         "properties": {
           "as_principal": {
@@ -3702,6 +4853,68 @@
           }
         },
         "title": "SaveProjectContextRequest",
+        "type": "object"
+      },
+      "SecurityFindingView": {
+        "description": "Owner-scoped view of one redacted security finding (monitored MCP\nconnections, Phase B/C). ``redacted_detail`` holds redacted metadata only\n(labels, counts, hostnames, added/removed tool names) — never a raw value.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "finding_id": {
+            "title": "Finding Id",
+            "type": "string"
+          },
+          "redacted_detail": {
+            "additionalProperties": true,
+            "title": "Redacted Detail",
+            "type": "object"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "subject_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Id"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "finding_id",
+          "source",
+          "severity",
+          "code",
+          "summary",
+          "redacted_detail",
+          "subject_id",
+          "state",
+          "created_at"
+        ],
+        "title": "SecurityFindingView",
         "type": "object"
       },
       "SelectCodeRepoRequest": {
@@ -4287,6 +5500,71 @@
         "title": "SurfaceModelDefaultRequest",
         "type": "object"
       },
+      "TaskAttemptView": {
+        "description": "One run of a task, from where it started to how it settled.",
+        "properties": {
+          "approval_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Id"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/TaskEventView"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "kind",
+          "started_at",
+          "ended_at",
+          "outcome",
+          "summary",
+          "approval_id"
+        ],
+        "title": "TaskAttemptView",
+        "type": "object"
+      },
       "TaskCreateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4418,12 +5696,109 @@
         "title": "TaskCreateRequest",
         "type": "object"
       },
+      "TaskDetailView": {
+        "description": "One task at its own address, with the attempts behind its status.\n\nBUG-299 / UX-TASK-04. The board says what a task *is* doing; this says what\nit *has* done — every cycle in order, the decision each waited on, the\ncontinuation that followed and the conversation it produced. It exists\nbecause two shipped changes promised it: a deduplicated Home row that links\nto \"the canonical Tasks detail\", and a stop control that can honestly report\n``outcome_unknown`` and tell the owner to refresh to see the run's state.\n\nNothing here is stored separately. The attempts are derived from the\ngoverned events the task's own lifecycle already writes, so this view can\nnever disagree with the audit log — it *is* the audit log, grouped.",
+        "properties": {
+          "approvals": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalView"
+            },
+            "title": "Approvals",
+            "type": "array"
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/TaskAttemptView"
+            },
+            "title": "Attempts",
+            "type": "array"
+          },
+          "task": {
+            "$ref": "#/components/schemas/TaskView"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "task",
+          "attempts"
+        ],
+        "title": "TaskDetailView",
+        "type": "object"
+      },
+      "TaskEventView": {
+        "description": "One recorded transition, as the timeline draws it.",
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Id"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Turn Id"
+          }
+        },
+        "required": [
+          "event_id",
+          "event_type",
+          "timestamp",
+          "actor",
+          "detail"
+        ],
+        "title": "TaskEventView",
+        "type": "object"
+      },
       "TaskView": {
         "properties": {
           "attachments": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PathAttachment"
+                },
+                {
+                  "$ref": "#/components/schemas/UploadAttachment"
+                }
+              ]
             },
             "title": "Attachments",
             "type": "array"
@@ -4662,6 +6037,171 @@
           "secret"
         ],
         "title": "TraySessionRequest",
+        "type": "object"
+      },
+      "TurnDetailView": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventView"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "turn": {
+            "$ref": "#/components/schemas/TurnView"
+          }
+        },
+        "required": [
+          "turn",
+          "events"
+        ],
+        "title": "TurnDetailView",
+        "type": "object"
+      },
+      "TurnView": {
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "content_parts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ContentPartView"
+            },
+            "title": "Content Parts",
+            "type": "array"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "prompt_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Text"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reasoning"
+          },
+          "reasoning_chars": {
+            "default": 0,
+            "title": "Reasoning Chars",
+            "type": "integer"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "tool_rows": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Tool Rows",
+            "type": "array"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "turn_type": {
+            "title": "Turn Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "session_id",
+          "turn_type",
+          "status",
+          "prompt_text",
+          "created_at",
+          "completed_at",
+          "summary"
+        ],
+        "title": "TurnView",
+        "type": "object"
+      },
+      "UnsupportedFeature": {
+        "description": "Something a server offers that Raiker does not use, in one sentence.",
+        "properties": {
+          "feature": {
+            "title": "Feature",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "feature",
+          "note"
+        ],
+        "title": "UnsupportedFeature",
+        "type": "object"
+      },
+      "UploadAttachment": {
+        "description": "An image or document uploaded through ``POST /api/attachments``.",
+        "properties": {
+          "attachment_id": {
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "image",
+              "document"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "attachment_id"
+        ],
+        "title": "UploadAttachment",
         "type": "object"
       },
       "UploadAttachmentRequest": {
@@ -5142,9 +6682,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Approval Api Approvals  Approval Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ApprovalDetailView"
                 }
               }
             },
@@ -6615,9 +8153,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Capability Gate Api Capability Gates  Capability  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CapabilityGateView"
                 }
               }
             },
@@ -7559,10 +9095,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/SessionView"
                   },
-                  "title": "Response Search Chat History Api Chat Search Get",
                   "type": "array"
                 }
               }
@@ -7677,9 +9211,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Checkpoint Api Checkpoints  Checkpoint Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CheckpointView"
                 }
               }
             },
@@ -8963,9 +10495,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Diagnostics Api Diagnostics Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DiagnosticsView"
                 }
               }
             },
@@ -10865,10 +12395,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/SecurityFindingView"
                   },
-                  "title": "Response List Mcp Findings Api Mcp Servers  Server Id  Findings Get",
                   "type": "array"
                 }
               }
@@ -11974,9 +13502,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Memory Settings Api Memory Settings Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemorySettingsView"
                 }
               }
             },
@@ -14135,10 +15661,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/NotificationView"
                   },
-                  "title": "Response List Notifications Api Notifications Get",
                   "type": "array"
                 }
               }
@@ -14458,9 +15982,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Project Api Projects  Project Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectDetailView"
                 }
               }
             },
@@ -15327,10 +16849,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/SecurityFindingView"
                   },
-                  "title": "Response Check Password Breach Api Security Breach Check Post",
                   "type": "array"
                 }
               }
@@ -15441,10 +16961,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/CredentialLifecycleView"
                   },
-                  "title": "Response List Security Credentials Api Security Credentials Get",
                   "type": "array"
                 }
               }
@@ -15474,9 +16992,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Verify Security Credential Api Security Credentials  Provider  Verify Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CredentialLifecycleView"
                 }
               }
             },
@@ -15505,10 +17021,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/SecurityFindingView"
                   },
-                  "title": "Response List Security Findings Api Security Findings Get",
                   "type": "array"
                 }
               }
@@ -15574,10 +17088,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/SecurityFindingView"
                   },
-                  "title": "Response Scan Security Api Security Scan Post",
                   "type": "array"
                 }
               }
@@ -16343,9 +17855,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Session Context Usage Api Sessions  Session Id  Context Usage Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ContextUsageView"
                 }
               }
             },
@@ -17981,9 +19491,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Task Api Tasks Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TaskView"
                 }
               }
             },
@@ -18023,9 +19531,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Task Detail Api Tasks  Task Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TaskDetailView"
                 }
               }
             },
@@ -18107,9 +19613,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Run Task Api Tasks  Task Id  Run Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TaskView"
                 }
               }
             },
@@ -18385,9 +19889,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Turn Api Turns  Turn Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TurnDetailView"
                 }
               }
             },

@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 from raiker.approval_previews import redact_secret_like_text
 from raiker.checkpoints.capture import MAX_PRE_IMAGE_BYTES
 from raiker.contracts.ids import utc_now
-from raiker.control.views.approvals import ApprovalDetailView, ApprovalView
+from raiker.control.views.approvals import ApprovalDetailView, ApprovalView, PreviewKind
 from raiker.control.views.security import IdentityView
 from raiker.execution.code_placement import (
     COMMAND_CAPABILITIES,
@@ -465,7 +465,7 @@ class ApprovalService:
 
     def _build_preview(
         self: DashboardService, tool_name: str, args: dict[str, Any], *, principal_id: str | None = None
-    ) -> tuple[str | None, str | None, str]:
+    ) -> tuple[str | None, str | None, PreviewKind]:
         """Return (diff, path, preview_kind). File mutations get a unified diff; never executes."""
         if tool_name == "checkpoint_restore":
             # BUG-230 — the approval carries the same preflight the Checkpoints

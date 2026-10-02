@@ -15,7 +15,7 @@ import os
 import re
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from raiker.contracts.ids import new_id
 from raiker.control.dtos import ControlResult
@@ -26,6 +26,7 @@ from raiker.control.project_paths import project_root_parts as _project_root_par
 from raiker.control.project_roots import resolve_project_root
 from raiker.control.views.projects import (
     ProjectAttachmentView,
+    ProjectContext,
     ProjectDeletionPreviewView,
     ProjectDetailView,
     ProjectsListView,
@@ -80,7 +81,7 @@ class ProjectService:
             project=self._project_view(row, active),
             sessions=sessions,
             checkpoints=checkpoints,
-            context=context,
+            context=cast(ProjectContext, context),
             attachments=self._project_attachments(context.get("attachment_ids", []), owner_principal_id),
         )
 

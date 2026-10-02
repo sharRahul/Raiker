@@ -11,10 +11,16 @@ turns off.
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from raiker.contracts.ids import new_id, utc_now
-from raiker.control.views.tasks import TASK_RECURRENCES, TaskDetailView, TaskView
+from raiker.control.views.tasks import (
+    TASK_RECURRENCES,
+    PathAttachment,
+    TaskDetailView,
+    TaskView,
+    UploadAttachment,
+)
 from raiker.events.writer import EventLogWriter
 from raiker.models.registry import ModelProfileRegistry
 from raiker.tasks.history import derive_attempts
@@ -321,5 +327,5 @@ class TaskService:
             surface=str(d.get("surface") or "chat"),
             thread_session_id=d.get("thread_session_id"),
             thread_turns=thread_turns,
-            attachments=list(d.get("attachments") or []),
+            attachments=[cast(PathAttachment | UploadAttachment, item) for item in d.get("attachments") or []],
         )

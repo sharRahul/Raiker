@@ -14,8 +14,9 @@ import { fireEvent, render, screen, within } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
 import AnswerParts from "./AnswerParts.svelte";
 import type { ContentPart } from "../apiTypes";
+import { part } from "../test-helpers";
 
-const TABLE: ContentPart = {
+const TABLE: ContentPart = part({
   type: "table",
   data: {
     caption: "Spend by provider",
@@ -25,9 +26,9 @@ const TABLE: ContentPart = {
       ["Anthropic", "4.10"],
     ],
   },
-};
+});
 
-const CHART: ContentPart = {
+const CHART: ContentPart = part({
   type: "chart",
   data: {
     kind: "bar",
@@ -36,7 +37,7 @@ const CHART: ContentPart = {
     labels: ["Mon", "Tue"],
     series: [{ name: "Chat", values: [3, 5] }],
   },
-};
+});
 
 describe("an answer with no declared parts", () => {
   it("renders through the markdown renderer, exactly as before", () => {
@@ -48,7 +49,7 @@ describe("an answer with no declared parts", () => {
   it("does the same when the runtime only split it into prose", () => {
     render(AnswerParts, {
       text: "Just prose.",
-      parts: [{ type: "text", text: "Just prose." }],
+      parts: [part({ type: "text", text: "Just prose." })],
     });
     expect(screen.getByText("Just prose.")).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
@@ -114,7 +115,7 @@ describe("a block Raiker would not accept", () => {
     // failure than a message the owner can see.
     render(AnswerParts, {
       text: "",
-      parts: [{ type: "refused", reason_code: "table_row_width_mismatch" }],
+      parts: [part({ type: "refused", reason_code: "table_row_width_mismatch" })],
     });
     const note = screen.getByRole("note");
     expect(note).toHaveTextContent(/did not guess at the missing cells/i);
@@ -122,7 +123,7 @@ describe("a block Raiker would not accept", () => {
   });
 
   it("still says something useful for a reason code it does not know", () => {
-    render(AnswerParts, { text: "", parts: [{ type: "refused", reason_code: "future_reason" }] });
+    render(AnswerParts, { text: "", parts: [part({ type: "refused", reason_code: "future_reason" })] });
     expect(screen.getByRole("note")).toHaveTextContent(/did not accept this part/i);
   });
 
@@ -130,9 +131,9 @@ describe("a block Raiker would not accept", () => {
     render(AnswerParts, {
       text: "",
       parts: [
-        { type: "text", text: "Before." },
-        { type: "refused", reason_code: "chart_not_json" },
-        { type: "text", text: "After." },
+        part({ type: "text", text: "Before." }),
+        part({ type: "refused", reason_code: "chart_not_json" }),
+        part({ type: "text", text: "After." }),
       ],
     });
     expect(screen.getByText("Before.")).toBeInTheDocument();

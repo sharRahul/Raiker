@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from raiker.contracts.ids import utc_now
 from raiker.contracts.views import View
@@ -19,7 +20,7 @@ class CredentialLifecycleView(View):
     provider: str
     verified_at: str | None
     due_at: str
-    status: str
+    status: Literal["current", "warning", "overdue"]
 
 
 def _parse(value: str) -> datetime:
@@ -56,7 +57,7 @@ class CredentialLifecycle:
     def _view(self, row: dict[str, object]) -> CredentialLifecycleView:
         verified_at = str(row["verified_at"] or row["rotated_at"])
         age_days = (_parse(self._clock()) - _parse(verified_at)).days
-        status = "overdue" if age_days >= OVERDUE_DAYS else "warning" if age_days >= WARNING_DAYS else "current"
+        status: Literal["current", "warning", "overdue"] = "overdue" if age_days >= OVERDUE_DAYS else "warning" if age_days >= WARNING_DAYS else "current"
         return CredentialLifecycleView(
             credential_id=str(row["credential_id"]),
             provider=str(row["provider"]),

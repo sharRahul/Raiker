@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
+
+from typing_extensions import TypedDict
 
 from raiker.contracts.views import View
 from raiker.control.views.approvals import ApprovalView
@@ -22,6 +24,20 @@ TASK_RECURRENCES = frozenset({"background", *RECURRING_INTERVALS})
 # on, or what it is parked against. In those states `current_step` is the step
 # the run last reached, which is not what the owner needs to be told (BUG-09).
 TASK_OUTCOME_STATES = frozenset({"completed", "failed", "cancelled", "waiting_for_approval"})
+
+
+class PathAttachment(TypedDict):
+    """A workspace path a task reads."""
+
+    type: Literal["path"]
+    path: str
+
+
+class UploadAttachment(TypedDict):
+    """An image or document uploaded through ``POST /api/attachments``."""
+
+    type: Literal["image", "document"]
+    attachment_id: str
 
 
 @dataclass(frozen=True)
@@ -60,7 +76,7 @@ class TaskView(View):
     # worth pressing and one that opens an empty page, so the card can say so
     # instead of the owner discovering it.
     thread_turns: int = 0
-    attachments: list[dict[str, Any]] = field(default_factory=list)
+    attachments: list[PathAttachment | UploadAttachment] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

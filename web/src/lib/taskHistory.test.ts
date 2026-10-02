@@ -9,6 +9,7 @@ import {
   taskDetailHref,
 } from "./taskHistory";
 import type { TaskAttemptView, TaskView } from "./apiTypes";
+import { taskView } from "./test-helpers";
 
 function attempt(over: Partial<TaskAttemptView> = {}): TaskAttemptView {
   return {
@@ -25,21 +26,13 @@ function attempt(over: Partial<TaskAttemptView> = {}): TaskAttemptView {
 }
 
 function task(over: Partial<TaskView> = {}): TaskView {
-  return {
-    task_id: "task_1",
-    session_id: "sess_inbox_owner",
+  return taskView({
     status: "completed",
     title: "Nightly digest",
     objective: "Summarise the day",
-    current_step: null,
-    progress_percent: null,
-    created_at: "2026-09-15T08:00:00Z",
     updated_at: "2026-09-15T09:05:00Z",
-    completed_at: null,
-    summary: null,
-    project_id: null,
     ...over,
-  };
+  });
 }
 
 describe("taskDetailHref", () => {

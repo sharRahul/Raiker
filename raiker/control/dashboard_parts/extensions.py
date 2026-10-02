@@ -11,10 +11,11 @@ turns off.
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from raiker.control.dtos import ControlResult
 from raiker.control.views.extensions import (
+    UnsupportedFeature,
     McpServerView,
     _declaration_summaries,
     _env_requirements,
@@ -84,11 +85,14 @@ class ExtensionService:
                 tool_count=int(row.get("tool_count", 0) or 0),
                 tool_declarations=_declaration_summaries(row.get("tool_schemas")),
                 unsupported_features=tuple(
-                    unsupported_feature_notes(row.get("server_features"))
+                    cast(UnsupportedFeature, note)
+                    for note in unsupported_feature_notes(row.get("server_features"))
                 ),
                 endpoint_url=row.get("endpoint_url"),
                 auth_ref=row.get("auth_ref"),
-                monitor_state=str(row.get("monitor_state") or "active"),
+                monitor_state=cast(
+                    Literal["active", "paused", "killed"], str(row.get("monitor_state") or "active")
+                ),
                 paused_reason=row.get("paused_reason"),
                 paused_at=row.get("paused_at"),
                 protocol_version=row.get("protocol_version"),

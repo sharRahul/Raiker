@@ -22,6 +22,15 @@ function usage(overrides: Partial<ContextUsage> = {}): ContextUsage {
     session_turns: 1,
     session_input_tokens: 2900,
     session_output_tokens: 12,
+    price_input_per_mtok: null,
+    price_output_per_mtok: null,
+    price_cache_write_per_mtok: null,
+    price_cache_read_per_mtok: null,
+    price_effective_from: null,
+    price_unknown: false,
+    latest_compaction: null,
+    tools_projected: 0,
+    tools_deferred: 0,
     ...overrides,
   };
 }
@@ -82,7 +91,13 @@ describe("ContextMeterPopover", () => {
   it("states that a price is missing rather than rendering a zero cost", () => {
     // The whole point: "$0.00" must mean free, never "we could not price this".
     render(ContextMeterPopover, {
-      usage: usage({ session_cost: null, provider_total_cost: null, price_source: null, price_as_of: null }),
+      usage: usage({
+        session_cost: null,
+        provider_total_cost: null,
+        price_source: null,
+        price_as_of: null,
+        price_unknown: true,
+      }),
     });
     expect(screen.getByText(/No rate is recorded/)).toBeInTheDocument();
     expect(screen.getByText("Unknown")).toBeInTheDocument();

@@ -13,11 +13,17 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import asdict
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dtos import ControlResult
-from raiker.control.views.memory import MemoryControlView, MemorySettingsView, ObservationView
+from raiker.control.views.memory import (
+    EmbeddingProviderView,
+    EmbeddingSpaceView,
+    MemoryControlView,
+    MemorySettingsView,
+    ObservationView,
+)
 from raiker.memory.store import get_memory, list_memory
 from raiker.runtime.authority.models import PrincipalType
 from raiker.storage.internal_paths import display_path, internal_io_path
@@ -1056,15 +1062,18 @@ class MemoryService:
             # space, so the vector leg is dropped and matching is still lexical.
             # The card has to say which it has, or it repeats the exact defect
             # MEM-03 was raised to remove.
-            retrieval={
-                **active.describe(),
-                "query_embeddable": query_embedding_available(self.store, owner, active),
-            },
+            retrieval=cast(
+                EmbeddingSpaceView,
+                {
+                    **active.describe(),
+                    "query_embeddable": query_embedding_available(self.store, owner, active),
+                },
+            ),
             # `auto` is always offered and always resolvable; the rest are the
             # spaces that really hold vectors, so a selection can never name a
             # corpus that would answer with nothing.
             spaces=tuple(
-                space.describe()
+                cast(EmbeddingSpaceView, space.describe())
                 for space in list_embedding_spaces(self.store, owner_principal_id=owner)
             ),
             # Pending counts belong to a vector space, not to the current
@@ -1072,7 +1081,7 @@ class MemoryService:
             # newly added memory or file remains indexable after semantic
             # recall is already active, and changing the target cannot show a
             # count for the wrong model.
-            embedding_providers=tuple(providers),
+            embedding_providers=tuple(cast(EmbeddingProviderView, item) for item in providers),
             # The cache rebuilds on a durable SQLite eligibility revision. This
             # names the strategy, not a live cache hit, so a fresh process never
             # presents a warm-cache performance claim it has not earned yet.

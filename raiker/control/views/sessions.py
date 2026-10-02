@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal, cast
+
+from typing_extensions import TypedDict
 
 from raiker.contracts.views import View
 from raiker.control.views.security import IdentityView
@@ -47,7 +49,16 @@ class SessionView(View):
     origin: str = "chat"
 
 
-def _stored_content_parts(summary: Any) -> tuple[dict[str, Any], ...]:
+class ContentPartView(TypedDict):
+    """One declared piece of a turn's answer, as ``raiker.runtime.typed_parts`` serialises it."""
+
+    type: Literal["text", "table", "chart", "refused"]
+    text: str
+    data: dict[str, Any]
+    reason_code: str
+
+
+def _stored_content_parts(summary: Any) -> tuple[ContentPartView, ...]:
     """A stored answer's declared parts, or nothing when it declared none.
 
     BUG-300. A live turn carries ``content_parts`` because the response object
@@ -67,7 +78,7 @@ def _stored_content_parts(summary: Any) -> tuple[dict[str, Any], ...]:
     parts = content_parts(summary)
     if not renders_as_parts(parts):
         return ()
-    return tuple(part.to_dict() for part in parts)
+    return tuple(cast(ContentPartView, part.to_dict()) for part in parts)
 
 
 @dataclass(frozen=True)
@@ -98,7 +109,7 @@ class TurnView(View):
     # rows above are: the split is part of what the runtime decided the answer
     # was, and two implementations of it would eventually disagree. Empty for
     # every answer that declared nothing, which is nearly all of them.
-    content_parts: tuple[dict[str, Any], ...] = ()
+    content_parts: tuple[ContentPartView, ...] = ()
 
 
 @dataclass(frozen=True)

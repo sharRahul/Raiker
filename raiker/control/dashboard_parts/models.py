@@ -16,7 +16,7 @@ import os
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from raiker.approval_previews import redact_secret_like_text
 from raiker.build_identity import version as raiker_version
@@ -25,6 +25,7 @@ from raiker.control.dtos import ControlResult
 from raiker.control.views.extensions import ConnectionsView, ConnectorView
 from raiker.control.views.models import (
     _DISABLED_STATES,
+    ContextCompaction,
     ContextUsageView,
     ModelPricingEntryView,
     ModelPricingView,
@@ -35,7 +36,12 @@ from raiker.control.views.models import (
     _names_an_available_model,
     _runs_on_this_platform,
 )
-from raiker.control.views.security import DiagnosticsView, ProviderHealthView
+from raiker.control.views.security import (
+    BackgroundWorkerHealth,
+    DiagnosticsView,
+    ModelProfileSource,
+    ProviderHealthView,
+)
 from raiker.events.writer import EventLogWriter
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
 from raiker.models.exceptions import (
@@ -832,14 +838,14 @@ class ModelService:
             registered = PriceRegistry(self.store).resolve(
                 acting_principal_id, profile.provider, model
             )
-        latest_compaction = None
+        latest_compaction: ContextCompaction | None = None
         if acting_principal_id:
             from raiker.runtime.conversation_compaction import ContextCompactionStore
 
             compacted = ContextCompactionStore(self.store).latest(acting_principal_id, session_id)
             if compacted is not None:
                 latest_compaction = {
-                    "status": compacted.status,
+                    "status": cast(Literal["completed", "failed"], compacted.status),
                     "created_at": compacted.created_at,
                     "source_turn_count": compacted.source_turn_count,
                     "estimated_input_tokens_before": (compacted.estimated_input_tokens_before),
@@ -1643,10 +1649,12 @@ class ModelService:
             readiness=readiness_summary,
             missing_config=missing_config,
             provider_health=provider_health,
-            background_workers=tuple(self.store.list_background_worker_health()),
-            model_profile_source=resolve_builtin_config(
-                "config/model-profiles.json"
-            ).as_dict(),
+            background_workers=tuple(
+                cast(BackgroundWorkerHealth, row) for row in self.store.list_background_worker_health()
+            ),
+            model_profile_source=cast(
+                ModelProfileSource, resolve_builtin_config("config/model-profiles.json").as_dict()
+            ),
         )
 
     @staticmethod

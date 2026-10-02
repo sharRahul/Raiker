@@ -44,6 +44,7 @@ import re
 import sys
 import tempfile
 import textwrap
+import types
 import typing
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -53,6 +54,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from pydantic import TypeAdapter
+from typing_extensions import is_typeddict
 
 from raiker.contracts.views import View
 
@@ -84,6 +86,25 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/api/tasks"),
         ("GET", "/api/work-threads"),
         ("GET", "/api/work-threads/page"),
+        ("GET", "/api/approvals/{approval_id}"),
+        ("GET", "/api/capability-gates/{capability}"),
+        ("GET", "/api/chat-search"),
+        ("GET", "/api/checkpoints/{checkpoint_id}"),
+        ("GET", "/api/diagnostics"),
+        ("GET", "/api/mcp/servers/{server_id}/findings"),
+        ("GET", "/api/memory/settings"),
+        ("GET", "/api/notifications"),
+        ("GET", "/api/projects/{project_id}"),
+        ("POST", "/api/security/breach-check"),
+        ("GET", "/api/security/credentials"),
+        ("POST", "/api/security/credentials/{provider}/verify"),
+        ("GET", "/api/security/findings"),
+        ("POST", "/api/security/scan"),
+        ("GET", "/api/sessions/{session_id}/context-usage"),
+        ("POST", "/api/tasks"),
+        ("GET", "/api/tasks/{task_id}"),
+        ("POST", "/api/tasks/{task_id}/run"),
+        ("GET", "/api/turns/{turn_id}"),
     }
 )
 
@@ -102,6 +123,7 @@ class RouteContract:
     response: Any  # the annotated view type, for eligible routes
     status: str  # verified | eligible | deferred | special
     reason: str
+    code: str = "200"  # the success status the route answers with
 
 
 def _wire_is_fields(view: Any, seen: set[Any] | None = None) -> bool:
@@ -131,8 +153,15 @@ def _wire_is_fields(view: Any, seen: set[Any] | None = None) -> bool:
 
 
 def _view_of(annotation: Any) -> Any | None:
-    """The annotation itself when it is a fields-only view or a list/tuple of one."""
+    """The annotation when it is a fields-only view, a list/tuple of one, or ``X | None``.
+
+    ``X | None`` is a lookup the route turns into a 404 before it serialises, so
+    the 200 answer is ``X``.
+    """
     origin = typing.get_origin(annotation)
+    if origin in (typing.Union, types.UnionType):
+        members = [arg for arg in typing.get_args(annotation) if arg is not type(None)]
+        return _view_of(members[0]) if len(members) == 1 else None
     if origin in (list, tuple):
         args = [arg for arg in typing.get_args(annotation) if arg is not Ellipsis]
         if len(args) == 1 and _wire_is_fields(args[0]):
@@ -141,52 +170,131 @@ def _view_of(annotation: Any) -> Any | None:
     return annotation if _wire_is_fields(annotation) else None
 
 
-def _returned_call(function: Callable[..., Any]) -> tuple[str, str, str] | None:
-    """``(helper, method, receiver)`` of ``return serialize_dto(helper(request).method(...))``.
+def _own_nodes(function: ast.AST) -> list[ast.AST]:
+    """The handler's own nodes — not those of a function or lambda nested in it."""
+    found: list[ast.AST] = []
+    stack = list(ast.iter_child_nodes(function))
+    while stack:
+        node = stack.pop()
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            continue
+        found.append(node)
+        stack.extend(ast.iter_child_nodes(node))
+    return found
 
-    Follows one local assignment of the argument and one of the receiver, so
-    ``view = service.m(...); return serialize_dto(view)`` with
-    ``service = _service(request)`` resolves as well.
+
+class _Resolver:
+    """What one handler's ``serialize_dto(...)`` argument is, read from its source.
+
+    Accepted, because each makes the wire the model's fields by construction:
+
+    * ``View(...)`` — the route builds the view itself;
+    * ``helper(...)`` — a module function annotated to return a view;
+    * ``factory(request).method(...)`` or ``Service(...).method(...)`` — a
+      service method annotated to return a view (Stage A's case);
+    * ``[<any of these> for ...]`` — a list of one;
+    * a local name assigned once from any of these.
     """
+
+    def __init__(self, endpoint: Callable[..., Any], body: ast.AST) -> None:
+        self.module = sys.modules[endpoint.__module__]
+        self.assigned: dict[str, ast.expr] = {}
+        for node in _own_nodes(body):
+            if isinstance(node, ast.Assign) and len(node.targets) == 1:
+                target = node.targets[0]
+                if isinstance(target, ast.Name):
+                    self.assigned[target.id] = node.value
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value:
+                self.assigned[node.target.id] = node.value
+
+    def _deref(self, node: ast.expr) -> ast.expr:
+        seen: set[str] = set()
+        while isinstance(node, ast.Name) and node.id in self.assigned and node.id not in seen:
+            seen.add(node.id)
+            node = self.assigned[node.id]
+        return node
+
+    def _global(self, name: str) -> Any:
+        return getattr(self.module, name, None)
+
+    def _service_type(self, receiver: ast.expr) -> Any | None:
+        receiver = self._deref(receiver)
+        if not (isinstance(receiver, ast.Call) and isinstance(receiver.func, ast.Name)):
+            return None
+        target = self._global(receiver.func.id)
+        if isinstance(target, type):
+            return target
+        if callable(target):
+            return _hints(target).get("return")
+        return None
+
+    def resolve(self, node: ast.expr) -> tuple[Any | None, str]:
+        node = self._deref(node)
+        if isinstance(node, ast.ListComp):
+            inner, how = self.resolve(node.elt)
+            if inner is None or typing.get_origin(inner) is list:
+                return None, how
+            return list[inner], how  # type: ignore[valid-type]
+        if not isinstance(node, ast.Call):
+            return None, "body assembled in the route"
+        func = node.func
+        if isinstance(func, ast.Name):
+            target = self._global(func.id)
+            if isinstance(target, type):
+                view = _view_of(target)
+                if view is None:
+                    return None, f"{func.id} is not a fields-only view"
+                return view, f"built as {func.id}"
+            if callable(target):
+                annotation = _hints(target).get("return")
+                view = _view_of(annotation)
+                if view is None:
+                    return None, f"{func.id} returns {_type_name(annotation)}, not a fields-only view"
+                return view, f"{func.id}"
+            return None, f"{func.id} not found"
+        if isinstance(func, ast.Attribute):
+            service_type = self._service_type(func.value)
+            if service_type is None:
+                return None, "body assembled in the route"
+            target = getattr(service_type, func.attr, None)
+            if target is None:
+                return None, f"{getattr(service_type, '__name__', service_type)}.{func.attr} not found"
+            annotation = _hints(target).get("return")
+            view = _view_of(annotation)
+            if view is None:
+                return None, f"{func.attr} returns {_type_name(annotation)}, not a fields-only view"
+            return view, f"{getattr(service_type, '__name__', '')}.{func.attr}"
+        return None, "body assembled in the route"
+
+
+def _handler_view(endpoint: Callable[..., Any]) -> tuple[Any | None, str]:
+    """The one view every ``return`` of the handler serialises, or why there is none."""
     try:
-        tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
+        tree = ast.parse(textwrap.dedent(inspect.getsource(endpoint)))
     except (OSError, TypeError, SyntaxError):
-        return None
+        return None, "source unavailable"
     body = tree.body[0]
-    assigned: dict[str, ast.expr] = {}
-    for node in ast.walk(body):
-        if isinstance(node, ast.Assign) and len(node.targets) == 1:
-            target = node.targets[0]
-            if isinstance(target, ast.Name):
-                assigned[target.id] = node.value
-    returns = [node for node in ast.walk(body) if isinstance(node, ast.Return)]
-    if len(returns) != 1 or returns[0].value is None:
-        return None
-    value = returns[0].value
-    if not (
-        isinstance(value, ast.Call)
-        and isinstance(value.func, ast.Name)
-        and value.func.id == "serialize_dto"
-        and len(value.args) == 1
-    ):
-        return None
-    argument = value.args[0]
-    if isinstance(argument, ast.Name):
-        argument = assigned.get(argument.id, argument)
-    if not (isinstance(argument, ast.Call) and isinstance(argument.func, ast.Attribute)):
-        return None
-    receiver = argument.func.value
-    if isinstance(receiver, ast.Name):
-        receiver = assigned.get(receiver.id, receiver)
-    if not (
-        isinstance(receiver, ast.Call)
-        and isinstance(receiver.func, ast.Name)
-        and len(receiver.args) == 1
-        and isinstance(receiver.args[0], ast.Name)
-        and receiver.args[0].id == "request"
-    ):
-        return None
-    return receiver.func.id, argument.func.attr, ast.unparse(receiver)
+    resolver = _Resolver(endpoint, body)
+    returns = [node for node in _own_nodes(body) if isinstance(node, ast.Return)]
+    if not returns:
+        return None, "body assembled in the route"
+    found: list[tuple[Any, str]] = []
+    for node in returns:
+        value = node.value
+        if not (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Name)
+            and value.func.id == "serialize_dto"
+            and len(value.args) == 1
+        ):
+            return None, "body assembled in the route"
+        view, how = resolver.resolve(value.args[0])
+        if view is None:
+            return None, how
+        found.append((view, how))
+    if len({view for view, _ in found}) != 1:
+        return None, "returns more than one shape"
+    return found[0]
 
 
 def _namespace() -> dict[str, Any]:
@@ -217,23 +325,7 @@ def _response_annotation(route: APIRoute) -> tuple[Any | None, str]:
         source = ""
     if any(marker in source for marker in _SPECIAL_MARKERS):
         return None, "special"
-    found = _returned_call(endpoint)
-    if found is None:
-        return None, "body assembled in the route"
-    helper_name, method, _ = found
-    module = sys.modules[endpoint.__module__]
-    helper = getattr(module, helper_name, None)
-    if helper is None:
-        return None, f"helper {helper_name} not found"
-    service_type = _hints(helper).get("return")
-    target = getattr(service_type, method, None)
-    if target is None:
-        return None, f"{getattr(service_type, '__name__', service_type)}.{method} not found"
-    annotation = _hints(target).get("return")
-    view = _view_of(annotation)
-    if view is None:
-        return None, f"{method} returns {getattr(annotation, '__name__', annotation)}, not a fields-only view"
-    return view, f"{getattr(service_type, '__name__', '')}.{method}"
+    return _handler_view(endpoint)
 
 
 def _request_model(route: APIRoute) -> str | None:
@@ -288,6 +380,7 @@ def contracts(app: FastAPI) -> list[RouteContract]:
                     response=view,
                     status=status,
                     reason=reason,
+                    code=str(route.status_code or 200),
                 )
             )
     return found
@@ -317,7 +410,10 @@ def openapi_document(app: FastAPI) -> dict[str, Any]:
         for item, mode in _keys:
             schema = _keys[(item, mode)]
             operation = document["paths"][item.path][item.method.lower()]
-            operation.setdefault("responses", {})["200"] = {
+            responses = operation.setdefault("responses", {})
+            if item.code != "200":
+                responses.pop("200", None)
+            responses[item.code] = {
                 "description": "Successful Response",
                 "content": {"application/json": {"schema": schema}},
             }
@@ -408,27 +504,34 @@ def _camel(name: str) -> str:
     return head + "".join(part[:1].upper() + part[1:] for part in rest)
 
 
+def _dataclass_names(annotation: Any, seen: set[Any] | None = None) -> set[str]:
+    """The names of every dataclass reachable from ``annotation``."""
+    seen = set() if seen is None else seen
+    names: set[str] = set()
+    stack = [annotation]
+    while stack:
+        item = stack.pop()
+        if item in seen:
+            continue
+        seen.add(item)
+        stack.extend(typing.get_args(item))
+        if isinstance(item, type) and dataclasses.is_dataclass(item):
+            names.add(item.__name__)
+            stack.extend(typing.get_type_hints(item).values())
+        elif is_typeddict(item):
+            stack.extend(typing.get_type_hints(item).values())
+    return names
+
+
 def render_typescript(document: dict[str, Any], app: FastAPI) -> str:
     schemas: dict[str, Any] = document.get("components", {}).get("schemas", {})
-    # Views serialise every declared field; request models list their own
-    # required fields. A schema reached from a verified response is a view.
+    # A dataclass view serialises every declared field, defaults included, so
+    # each is required on the wire; a TypedDict and a request model say for
+    # themselves which keys are required.
     view_names: set[str] = set()
     for item in contracts(app):
-        if item.status != "verified":
-            continue
-        response = document["paths"][item.path][item.method.lower()]["responses"]["200"]
-        stack = [response["content"]["application/json"]["schema"]]
-        while stack:
-            node = stack.pop()
-            if isinstance(node, dict):
-                if "$ref" in node:
-                    name = _ref_name(node["$ref"])
-                    if name not in view_names:
-                        view_names.add(name)
-                        stack.append(schemas.get(name, {}))
-                stack.extend(node.values())
-            elif isinstance(node, list):
-                stack.extend(node)
+        if item.status == "verified":
+            view_names |= _dataclass_names(item.response)
     chunks = [_HEADER, ""]
     for name in sorted(schemas):
         if name in {"HTTPValidationError", "ValidationError"}:
@@ -438,8 +541,11 @@ def render_typescript(document: dict[str, Any], app: FastAPI) -> str:
         if doc:
             chunks.append(_comment(" ".join(str(doc).strip().split("\n\n")[0].split())))
         if schema.get("type") == "object" and "properties" in schema:
+            # An object type rather than an interface: a type literal is
+            # assignable to `Record<string, unknown>`, which a request model's
+            # open field (`list[dict[str, Any]]`) is generated as.
             body = _object(schema, indent="", all_required=name in view_names)
-            chunks.append(f"export interface {name} {body}\n")
+            chunks.append(f"export type {name} = {body};\n")
         else:
             expression = _ts(schema)
             if len(expression) > 80 and " | " in expression:
@@ -456,7 +562,7 @@ def render_typescript(document: dict[str, Any], app: FastAPI) -> str:
         if item.status != "verified":
             continue
         operation = document["paths"][item.path][item.method.lower()]
-        response = _ts(operation["responses"]["200"]["content"]["application/json"]["schema"])
+        response = _ts(operation["responses"][item.code]["content"]["application/json"]["schema"])
         parameters = operation.get("parameters", [])
         path_params = [p for p in parameters if p.get("in") == "path"]
         query_params = [p for p in parameters if p.get("in") == "query"]
@@ -467,20 +573,34 @@ def render_typescript(document: dict[str, Any], app: FastAPI) -> str:
         target = f"`{path}`" if path_params else json.dumps(path)
         if query_params:
             fields = "; ".join(
-                f"{p['name']}?: {_ts(p.get('schema', {})).replace(' | null', '')}"
+                f"{p['name']}{'' if p.get('required') else '?'}: "
+                f"{_ts(p.get('schema', {})).replace(' | null', '')}"
                 for p in query_params
             )
-            args.append(f"query: {{ {fields} }} = {{}}")
+            required = any(p.get("required") for p in query_params)
+            args.append(f"query: {{ {fields} }}" + ("" if required else " = {}"))
             target = f"withQuery({target}, query)"
             used.add("withQuery")
         key = _camel(item.name)
+        body = operation.get("requestBody", {}).get("content", {}).get("application/json", {})
+        if body:
+            args.append(f"body: {_ts(body.get('schema', {}))}")
         if item.method == "GET":
             used.add("request")
-            chunks.append(f"  {key}: ({', '.join(args)}) =>\n    request<{response}>({target}),")
-        else:
+            call = f"request<{response}>({target})"
+        elif item.method == "POST" and not body:
             used.add("postJson")
-            args.append("body: unknown = {}")
-            chunks.append(f"  {key}: ({', '.join(args)}) =>\n    postJson<{response}>({target}, body),")
+            call = f"postJson<{response}>({target}, {{}})"
+        elif item.method == "POST":
+            used.add("postJson")
+            call = f"postJson<{response}>({target}, body)"
+        elif body:
+            used.add("sendJson")
+            call = f'sendJson<{response}>("{item.method}", {target}, body)'
+        else:
+            used.add("request")
+            call = f'request<{response}>({target}, {{ method: "{item.method}" }})'
+        chunks.append(f"  {key}: ({', '.join(args)}) =>\n    {call},")
     chunks.append("} as const;\n")
     chunks[1] = "import { " + ", ".join(sorted(used)) + ' } from "../api/core";\n'
     return "\n".join(chunks).rstrip() + "\n"

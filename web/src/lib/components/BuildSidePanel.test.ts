@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import { api } from "../api";
 import BuildSidePanel from "./BuildSidePanel.svelte";
+import { taskView } from "../test-helpers";
 
 describe("BuildSidePanel", () => {
   it("keeps an unavailable background-work error visible instead of claiming nothing is running", async () => {
@@ -15,7 +16,7 @@ describe("BuildSidePanel", () => {
 
   it("offers a direct approval review link for a waiting task", async () => {
     vi.spyOn(api, "tasks").mockResolvedValue([
-      {
+      taskView({
         task_id: "task-1",
         session_id: "session-1",
         status: "waiting_for_approval",
@@ -28,7 +29,7 @@ describe("BuildSidePanel", () => {
         completed_at: null,
         summary: null,
         project_id: null,
-      },
+      }),
     ]);
 
     render(BuildSidePanel, { onclose: vi.fn() });

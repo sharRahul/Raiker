@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Literal
+
+from typing_extensions import TypedDict
 
 from raiker.contracts.views import View
 from raiker.control.views.sessions import CheckpointView, SessionView
@@ -94,10 +96,19 @@ class ProjectsListView(View):
     active_project_id: str | None
 
 
+class ProjectContext(TypedDict):
+    """What a project gives every chat filed in it."""
+
+    instructions: str
+    attachment_ids: list[str]
+    memory_enabled: bool
+    memory_mode: Literal["inherit", "enabled", "disabled"]
+
+
 @dataclass(frozen=True)
 class ProjectDetailView(View):
     project: ProjectView
     sessions: tuple[SessionView, ...]
     checkpoints: tuple[CheckpointView, ...]
-    context: dict[str, Any]
+    context: ProjectContext
     attachments: tuple[ProjectAttachmentView, ...] = ()

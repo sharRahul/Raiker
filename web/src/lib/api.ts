@@ -12,9 +12,7 @@ import type {
   BrainView,
   CapabilityContainmentView,
   CapabilityDecisionMode,
-  CapabilityGate,
   ChannelsView,
-  Checkpoint,
   CodeMapPaths,
   CodeMapStatus,
   CodeRepoBrowseView,
@@ -28,17 +26,13 @@ import type {
   ComposerApprovalModeSettings,
   ConnectorStoreView,
   ContainedSubject,
-  ContextUsage,
   ConversationBranch,
   ConversationBranchOrigin,
   ConversationBranchPlan,
   ConversationCompaction,
   CredentialDeltaView,
-  CredentialLifecycle,
-  Diagnostics,
   DiagnosticsExport,
   EnvironmentContext,
-  EventEntry,
   ExecutionEnvironment,
   ExecutionEnvironmentsView,
   GitCredentialStatus,
@@ -63,7 +57,6 @@ import type {
   ManagedFileScope,
   ManagedFileUpload,
   McpAgentAccess,
-  McpFinding,
   McpOffer,
   McpServer,
   McpSession,
@@ -74,7 +67,6 @@ import type {
   MemoryIntegrity,
   MemoryProposal,
   MemoryRelationshipProposal,
-  MemorySettingsView,
   ModelCapacitiesView,
   ModelConversionPreview,
   ModelDecision,
@@ -84,19 +76,16 @@ import type {
   ModelReadinessView,
   ModelSetupState,
   ModelsView,
-  Notification,
   ObservationsView,
   OwnerQuestionAnswered,
   PartialFiles,
   PluginsView,
   ProjectBrowseView,
   ProjectDeletionPreview,
-  ProjectDetail,
   ProjectFilesView,
   ProjectRootIndexResult,
   ProjectRootStatus,
   ProjectTreeNode,
-  PromptAttachment,
   PromptRequestBody,
   ProviderCatalogueRefresh,
   ProviderModelList,
@@ -123,11 +112,8 @@ import type {
   SpeechRuntimeView,
   StandingGrant,
   StopAllResult,
-  TaskDetailView,
-  TaskView,
   TelemetryDestination,
   TranscriptExportManifest,
-  TurnDetail,
   TurnSourceExcerptView,
   TurnSourcesView,
   UpdateApplyResult,
@@ -144,6 +130,7 @@ import { postJson, request, requestBlob, withQuery } from "./api/core";
 // OPT-02 Stage A — operations whose response a contract test verified are
 // generated (scripts/api_contract.py); the rest stay written here.
 import { contract } from "./generated/apiContract";
+import type { TaskCreateRequest } from "./generated/apiContract";
 
 // The endpoint catalogue. Transport, sign-in and streaming live under ./api/;
 // what they export is re-exported here, so a caller imports from one place.
@@ -240,10 +227,7 @@ export const api = {
     }),
 
   // ── Read-only governed views ──
-  sessionContextUsage: (sessionId: string) =>
-    request<ContextUsage>(
-      `/api/sessions/${encodeURIComponent(sessionId)}/context-usage`,
-    ),
+  sessionContextUsage: (sessionId: string) => contract.getSessionContextUsage(sessionId),
   // B6 — the agent's standing plan for one conversation, so a reload or a
   // second tab picks the checklist back up instead of starting blank.
   sessionPlan: (sessionId: string) =>
@@ -257,10 +241,7 @@ export const api = {
   // The same bundle a model turn is given. Read rather than
   // recomputed, so a page and a turn cannot disagree about what time it is.
   environment: () => request<EnvironmentContext>("/api/environment"),
-  capabilityGate: (capability: string) =>
-    request<CapabilityGate>(
-      `/api/capability-gates/${encodeURIComponent(capability)}`,
-    ),
+  capabilityGate: (capability: string) => contract.getCapabilityGate(capability),
   runtimeMode: () => contract.getRuntimeMode(),
   // ── Host lifecycle (BUG-40) ──
   // The menu-bar control's contract: what state the host is in, what background
@@ -291,7 +272,7 @@ export const api = {
   applyHostUpdate: (confirm = false) =>
     postJson<UpdateApplyResult>("/api/host/update/apply", { confirm }),
   runtimeReadiness: () => contract.getRuntimeReadiness(),
-  diagnostics: () => request<Diagnostics>("/api/diagnostics"),
+  diagnostics: () => contract.getDiagnostics(),
   // MEM-09 — the memory integrity report, and its one stated repair. The scan
   // is read-only and starts when the owner asks for it; the rebuild is a
   // separate, named action over a projection that can lose nothing.
@@ -647,10 +628,7 @@ export const api = {
     request<McpSession[]>(
       `/api/mcp/servers/${encodeURIComponent(serverId)}/sessions`,
     ),
-  mcpFindings: (serverId: string) =>
-    request<McpFinding[]>(
-      `/api/mcp/servers/${encodeURIComponent(serverId)}/findings`,
-    ),
+  mcpFindings: (serverId: string) => contract.listMcpFindings(serverId),
   pauseMcpServer: (serverId: string) =>
     postJson<{ ok: boolean; monitor_state: string }>(
       `/api/mcp/servers/${encodeURIComponent(serverId)}/pause`,
@@ -661,7 +639,7 @@ export const api = {
       `/api/mcp/servers/${encodeURIComponent(serverId)}/resume`,
       {},
     ),
-  notifications: () => request<Notification[]>("/api/notifications"),
+  notifications: () => contract.listNotifications(),
   markNotificationRead: (id: string) =>
     postJson<{ ok: boolean }>(
       `/api/notifications/${encodeURIComponent(id)}/read`,
@@ -688,9 +666,8 @@ export const api = {
       `/api/standing-grants/${encodeURIComponent(grantId)}/revoke`,
       {},
     ),
-  securityCredentials: () =>
-    request<CredentialLifecycle[]>("/api/security/credentials"),
-  securityFindings: () => request<McpFinding[]>("/api/security/findings"),
+  securityCredentials: () => contract.listSecurityCredentials(),
+  securityFindings: () => contract.listSecurityFindings(),
   securityHealth: () => request<SecurityHealth[]>("/api/security/health"),
   capabilityContainment: () =>
     request<CapabilityContainmentView>("/api/security/containment"),
@@ -708,16 +685,12 @@ export const api = {
   // Read-only. The hook config files are the owner's own text on disk; this
   // reports what the runtime loaded from them, including one it could not read.
   hooks: () => request<HooksView>("/api/hooks"),
-  verifySecurityCredential: (provider: string) =>
-    postJson<CredentialLifecycle>(
-      `/api/security/credentials/${encodeURIComponent(provider)}/verify`,
-      {},
-    ),
-  scanSecurity: () => postJson<McpFinding[]>("/api/security/scan", {}),
+  verifySecurityCredential: (provider: string) => contract.verifySecurityCredential(provider),
+  scanSecurity: () => contract.scanSecurity(),
   checkSecurityHealth: () =>
     postJson<SecurityHealth[]>("/api/security/health-check", {}),
   checkPasswordBreach: (password: string, enabled: boolean) =>
-    postJson<McpFinding[]>("/api/security/breach-check", { password, enabled }),
+    contract.checkPasswordBreach({ password, enabled }),
   connectorStore: () => request<ConnectorStoreView>("/api/connector-store"),
   installConnector: (connectorId: string) =>
     postJson<{ ok: boolean; installed: boolean }>(
@@ -1063,13 +1036,8 @@ export const api = {
       `/api/memory/${encodeURIComponent(memoryId)}/source`,
     ),
   events: (
-    params: {
-      session_id?: string;
-      turn_id?: string;
-      event_type?: string;
-      limit?: number;
-    } = {},
-  ) => request<EventEntry[]>(withQuery("/api/events", params)),
+    params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {},
+  ) => contract.listEvents(params),
   brain: () => request<BrainView>("/api/brain"),
   /**
    * BUG-305 — everything Raiker may read, both kinds, from one route. The two
@@ -1206,8 +1174,7 @@ export const api = {
     ),
   checkpoints: (sessionId?: string, projectId?: string) =>
     contract.listCheckpoints({ session_id: sessionId, project_id: projectId }),
-  checkpoint: (id: string) =>
-    request<Checkpoint>(`/api/checkpoints/${encodeURIComponent(id)}`),
+  checkpoint: (id: string) => contract.getCheckpoint(id),
   // Preflight only. Reading a plan performs no restore; executing one still
   // goes through the governed approval path.
   checkpointRestorePlan: (id: string) =>
@@ -1367,8 +1334,7 @@ export const api = {
       limit: options.limit ?? undefined,
       archived: options.archived ? true : undefined,
     }),
-  searchChats: (q: string) =>
-    request<SessionSummary[]>(withQuery("/api/chat-search", { q })),
+  searchChats: (q: string) => contract.searchChatHistory({ q }),
 
   // ── Web access (RAIKER-2021) ─────────────────────────────────────────
   // What web reads may not reach. The address guard that refuses private and
@@ -1567,7 +1533,7 @@ export const api = {
       `/api/memory/${encodeURIComponent(id)}`,
       { method: "DELETE" },
     ),
-  memorySettings: () => request<MemorySettingsView>("/api/memory/settings"),
+  memorySettings: () => contract.getMemorySettings(),
   setMemoryIncognito: (incognito: boolean) =>
     request<{ ok: boolean; incognito: boolean }>("/api/memory/incognito", {
       method: "PUT",
@@ -1704,8 +1670,7 @@ export const api = {
 
   // ── Projects (organizing scopes; creating/selecting one grants nothing) ──
   projects: () => contract.listProjects(),
-  project: (id: string) =>
-    request<ProjectDetail>(`/api/projects/${encodeURIComponent(id)}`),
+  project: (id: string) => contract.getProject(id),
   exportProject: async (id: string): Promise<void> => {
     const path = `/api/projects/${encodeURIComponent(id)}/export`;
     const blob = await requestBlob(path, { method: "POST" });
@@ -1925,37 +1890,19 @@ export const api = {
         body: JSON.stringify({ project_id }),
       },
     ),
-  turn: (id: string) =>
-    request<TurnDetail>(`/api/turns/${encodeURIComponent(id)}`),
+  turn: (id: string) => contract.getTurn(id),
   // `project_id` scopes the list to one project's schedules (project-scoped
   // schedules); omitting it lists every task visible to the account.
-  tasks: (
-    params: { session_id?: string; status?: string; project_id?: string } = {},
-  ) => request<TaskView[]>(withQuery("/api/tasks", params)),
+  tasks: (params: { session_id?: string; task_status?: string; project_id?: string } = {}) =>
+    contract.listTasks(params),
   // BUG-299 — one task at its own address, with the attempts behind its status.
   // Home's deduplicated rows, Build's task panel and the Stop control's honest
   // "refresh to see the run's current state" all point here.
-  taskDetail: (taskId: string) =>
-    request<TaskDetailView>(`/api/tasks/${encodeURIComponent(taskId)}`),
-  createTask: (body: {
-    title: string;
-    description: string;
-    priority?: string;
-    scheduled_at?: string;
-    recurrence?: string;
-    parent_task_id?: string;
-    // Create the task under a specific project. Omitted → the active project.
-    project_id?: string | null;
-    model_profile?: string;
-    model?: string;
-    /** "chat" (the default) or "build". A build task needs a project. */
-    surface?: string;
-    attachments?: PromptAttachment[];
-  }) => postJson<TaskView>("/api/tasks", body),
+  taskDetail: (taskId: string) => contract.getTaskDetail(taskId),
+  createTask: (body: TaskCreateRequest) => contract.createTask(body),
   // BUG-64 — creation alone does not execute model-proposed work. This is the
   // owner's separate, explicit intent to make one parked task due now.
-  runTask: (taskId: string) =>
-    postJson<TaskView>(`/api/tasks/${encodeURIComponent(taskId)}/run`, {}),
+  runTask: (taskId: string) => contract.runTask(taskId),
   // BUG-25 — ask the host to continue one parked scheduled run now. The
   // scheduler does this on its own tick; this is the owner's retry for when
   // automatic continuation could not proceed, and it runs the same path.
@@ -1993,8 +1940,7 @@ export const api = {
         body: JSON.stringify({ models }),
       },
     ),
-  approval: (id: string) =>
-    request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(id)}`),
+  approval: (id: string): Promise<ApprovalDetailView> => contract.getApproval(id),
   // B14 — `accepted_hunks` carries the reviewer's own narrowing: hunk positions
   // in the approved diff, validated server-side against that same diff. Omitted
   // means the whole change set, which is what a decision has always meant.

@@ -2,7 +2,7 @@
 // prefix (query strings ignored), so tests declare only the endpoints they use;
 // anything unrouted rejects loudly instead of fabricating data.
 import { vi } from "vitest";
-import type { CapabilityGate, Diagnostics, RuntimeMode } from "./apiTypes";
+import type { CapabilityGate, ContentPart, Diagnostics, RuntimeMode, TaskView } from "./apiTypes";
 
 /** A fetch that never settles — for asserting route-level loading states. */
 export function stubFetchPending(): ReturnType<typeof vi.fn> {
@@ -182,4 +182,39 @@ export async function openComposerProject(): Promise<void> {
 /** Choose an item from the composer's Tools menu. */
 export async function chooseComposerTool(label: string): Promise<void> {
   await composerMenuItem("Tools", label);
+}
+
+/** A declared answer part with the keys the server always sends filled in. */
+export function part(over: Partial<ContentPart> & Pick<ContentPart, "type">): ContentPart {
+  return { text: "", data: {}, reason_code: "", ...over };
+}
+
+/** A task row as the server sends it, with the fields a test does not care about defaulted. */
+export function taskView(over: Partial<TaskView> = {}): TaskView {
+  return {
+    task_id: "task_1",
+    session_id: "sess_inbox_owner",
+    status: "queued",
+    title: "Task",
+    objective: "",
+    current_step: null,
+    progress_percent: null,
+    created_at: "2026-09-15T08:00:00Z",
+    updated_at: "2026-09-15T08:00:00Z",
+    completed_at: null,
+    summary: null,
+    priority: null,
+    scheduled_at: null,
+    recurrence: null,
+    reminder_at: null,
+    parent_task_id: null,
+    project_id: null,
+    model_profile: null,
+    model: null,
+    surface: "chat",
+    thread_session_id: null,
+    thread_turns: 0,
+    attachments: [],
+    ...over,
+  };
 }

@@ -16,13 +16,13 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Final, Literal
 
 from raiker.control.project_paths import contained_project_root
 from raiker.tools.path_authority import WORKSPACE_ROOT_ID, AuthorityRoot, PathAuthority
 
-MANAGED_ROOT_KIND = "managed"
-ATTACHED_ROOT_KIND = "attached"
+MANAGED_ROOT_KIND: Final = "managed"
+ATTACHED_ROOT_KIND: Final = "attached"
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class ProjectRoot:
     handling.
     """
 
-    kind: str
+    kind: Literal["managed", "attached"]
     path: Path | None
     writable: bool
     root_id: str

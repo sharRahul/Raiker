@@ -2,12 +2,33 @@
 // Do not edit: run `python -m scripts.api_contract`. CI fails when this file
 // differs from what the backend produces.
 
-import { postJson, request, withQuery } from "../api/core";
+import { call, request, withQuery } from "../api/core";
 
 export type ActivateRuntimeModeRequest = {
   mode_name: string;
   reason?: string;
   as_principal?: string | null;
+};
+
+/** The agent's standing plan for one conversation (B6); only ``steps`` when there is none. */
+export type AgentPlan = {
+  session_id: string;
+  steps: AgentPlanStep[];
+  turn_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  total?: number;
+  completed?: number;
+  in_progress?: number;
+  pending?: number;
+  blocked?: number;
+  current_step?: string;
+};
+
+export type AgentPlanStep = {
+  title: string;
+  status: "pending" | "in_progress" | "completed" | "blocked";
+  note?: string;
 };
 
 /** The owner's answer to a mid-turn question (ADD-22). */
@@ -53,6 +74,46 @@ export type ApprovalView = {
   resolved_by: string | null;
   queue_position: number;
   queue_total: number;
+};
+
+/** A folder of the owner's to put behind a project, and whether Raiker may write to it. */
+export type AttachProjectFolderRequest = {
+  path: string;
+  writable?: boolean;
+};
+
+/** One file's safe preview representation. Metadata plus inert content. */
+export type AttachmentPreview = {
+  attachment_id: string;
+  session_id: string;
+  filename: string;
+  media_type: string;
+  kind: "text" | "markdown" | "table" | "pdf" | "image" | "unavailable";
+  byte_size: number;
+  text: string;
+  rows: string[][];
+  truncated: boolean;
+  pdf_url: string | null;
+  image_url: string | null;
+  unavailable_reason: string | null;
+};
+
+/** Which exchange produced a generated file, and the passage that asked for it (BUG-27). */
+export type AttachmentProvenance = {
+  status: "resolved" | "no_provenance" | "source_deleted" | "source_changed" | "unsupported_source" | "not_authorized";
+  kind: string;
+  title: string;
+  excerpt: string;
+  highlight_start: number;
+  highlight_length: number;
+  session_id: string;
+  turn_id: string;
+  attachment_id: string;
+  truncated: boolean;
+  resolution_method: "stored_coordinates" | "matching_text" | "answer_quote" | "recorded_passage" | "whole_source" | "";
+  anchors?: SourceAnchorView[];
+  ok: boolean;
+  filename: string;
 };
 
 export type AuthSessionRequest = {
@@ -227,6 +288,19 @@ export type CodeReposView = {
   note: string;
 };
 
+/** Owner-defined, expiry-bound command prefixes for one conversation. */
+export type CommandGrant = {
+  session_id: string;
+  commands: string[][];
+  expires_at: string;
+  revocable: boolean;
+};
+
+export type CommandGrantRevoked = {
+  session_id: string;
+  revoked: boolean;
+};
+
 export type CompactConversationRequest = {
   through_turn_id: string;
 };
@@ -273,6 +347,14 @@ export type ConnectorView = {
 
 export type ContainMcpServerRequest = {
   reason?: string | null;
+};
+
+/** One declared piece of a turn's answer. */
+export type ContentPart = {
+  type: "text" | "table" | "chart" | "refused";
+  text: string;
+  data: Record<string, unknown>;
+  reason_code: string;
 };
 
 /** One declared piece of a turn's answer, as ``raiker.runtime.typed_parts`` serialises it. */
@@ -323,9 +405,55 @@ export type ContextUsageView = {
   tools_deferred: number;
 };
 
+/** A second conversation, seeded from a checkpoint; the first is untouched (C14). */
+export type ConversationBranch = {
+  status: "forked";
+  checkpoint_id: string;
+  source_session_id: string;
+  session_id: string;
+  title: string;
+  summary: string;
+  memory_candidate_count: number;
+  seed_manifest_path: string;
+};
+
+/** Where a branched conversation came from; the source is null for a root one. */
+export type ConversationBranchOrigin = {
+  session_id: string;
+  source_session_id: string | null;
+  source_title: string | null;
+  forked_from_checkpoint_id: string | null;
+  summary: string;
+  created_at: string;
+};
+
+/** What branching from a checkpoint would seed (C14), without doing it. */
+export type ConversationBranchPlan = {
+  status: "fork_plan";
+  checkpoint_id: string;
+  source_session_id: string;
+  summary: string;
+  memory_candidate_count: number;
+  can_execute: boolean;
+  requires_approval: boolean;
+};
+
 /** A title for the branch, and nothing else (GAP-CHAT C14). */
 export type ConversationBranchRequest = {
   title?: string;
+};
+
+/** A compaction, or why there was nothing to compact (``compacted: false``). */
+export type ConversationCompaction = {
+  session_id: string;
+  compacted: boolean;
+  reason_code?: string;
+  through_turn_id?: string | null;
+  source_turn_count?: number;
+  estimated_summary_tokens?: number;
+  provider?: string;
+  model?: string;
+  created_at?: string;
 };
 
 export type CreateMcpServerRequest = {
@@ -493,6 +621,19 @@ export type ExtensionsOverviewView = {
   deferred: Record<string, string>[];
 };
 
+/** One governed write that touched a file, as recorded by checkpoint capture. */
+export type FileProvenanceEntryView = {
+  turn_id: string | null;
+  action_id: string | null;
+  session_id: string;
+  capability: string;
+  principal_id: string;
+  capture_status: string;
+  existed_before: boolean;
+  pre_image_size: number;
+  created_at: string;
+};
+
 export type GenerateImageRequest = {
   profile_id: string;
   prompt: string;
@@ -535,6 +676,28 @@ export type IdentityView = {
   issued_at: string | null;
   expires_at: string | null;
   state: string;
+};
+
+/** One file of a batch that was not stored, and why — its siblings still were. */
+export type ImportRefused = {
+  ok: false;
+  relative_path: string;
+  reason_code: string;
+};
+
+export type ImportedFile = {
+  file_id: string;
+  scope_kind: "memory" | "project";
+  project_id: string | null;
+  relative_path: string;
+  media_type: string;
+  size_bytes: number;
+  content_hash: string;
+  index_state: "queued" | "indexing" | "ready" | "metadata_only" | "failed" | "retired";
+  index_error: string | null;
+  created_at: string;
+  updated_at: string;
+  ok: true;
 };
 
 export type InboundChannelMessage = {
@@ -589,6 +752,50 @@ export type LoginResultView = {
   token: string | null;
   ticket: string | null;
   csrf_token: string | null;
+};
+
+/** A file in Raiker's catalogue, and how far its index has got. */
+export type ManagedFile = {
+  file_id: string;
+  scope_kind: "memory" | "project";
+  project_id: string | null;
+  relative_path: string;
+  media_type: string;
+  size_bytes: number;
+  content_hash: string;
+  index_state: "queued" | "indexing" | "ready" | "metadata_only" | "failed" | "retired";
+  index_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ManagedFileChanged = {
+  file_id: string;
+  scope_kind: "memory" | "project";
+  project_id: string | null;
+  relative_path: string;
+  media_type: string;
+  size_bytes: number;
+  content_hash: string;
+  index_state: "queued" | "indexing" | "ready" | "metadata_only" | "failed" | "retired";
+  index_error: string | null;
+  created_at: string;
+  updated_at: string;
+  ok: boolean;
+};
+
+export type ManagedFileImport = {
+  ok: boolean;
+  scope_kind: "memory" | "project";
+  project_id: string | null;
+  results: (ImportedFile | ImportRefused)[];
+};
+
+export type ManagedFileList = {
+  ok: boolean;
+  scope_kind: "memory" | "project";
+  project_id: string | null;
+  files: ManagedFile[];
 };
 
 export type ManifestRequest = {
@@ -810,6 +1017,14 @@ export type PairChannelRequest = {
   senders?: string[] | null;
 };
 
+/** An unresolved approval a parked turn is waiting on (BUG-34) — metadata only. */
+export type ParkedApproval = {
+  approval_id: string;
+  turn_id: string;
+  tool_name: string;
+  created_at: string;
+};
+
 export type PasswordRecoveryBeginRequest = {
   username: string;
 };
@@ -836,6 +1051,12 @@ export type PauseHostRequest = {
   reason?: string | null;
 };
 
+export type ProjectArchived = {
+  ok: boolean;
+  project_id: string;
+  archived: boolean;
+};
+
 /** UX-PROJ-04 — a file shared with every chat in a project, as a person names it. */
 export type ProjectAttachmentView = {
   attachment_id: string;
@@ -843,6 +1064,29 @@ export type ProjectAttachmentView = {
   media_type: string;
   byte_size: number;
   available: boolean;
+};
+
+/**
+ * One child of the folder being browsed; ``index_state`` is null for a file Raiker cannot read.
+ */
+export type ProjectBrowseEntry = {
+  name: string;
+  relative_path: string;
+  is_directory: boolean;
+  size_bytes: number;
+  media_type: string;
+  index_state: "queued" | "indexing" | "ready" | "metadata_only" | "failed" | "retired" | null;
+};
+
+/** One directory of a project's folder; ``root_missing`` when there is no folder to show. */
+export type ProjectBrowseView = {
+  path: string;
+  parent: string | null;
+  entries: ProjectBrowseEntry[];
+  truncated: boolean;
+  root_kind: "managed" | "attached";
+  root_label: string;
+  root_missing: boolean;
 };
 
 /** What a project gives every chat filed in it. */
@@ -853,12 +1097,134 @@ export type ProjectContext = {
   memory_mode: "inherit" | "enabled" | "disabled";
 };
 
+export type ProjectContextSaved = {
+  ok: boolean;
+  instructions: string;
+  attachment_ids: string[];
+  memory_enabled: boolean;
+  memory_mode: "inherit" | "enabled" | "disabled";
+};
+
+/** A new project; an attached one also names its root and the grant behind it. */
+export type ProjectCreated = {
+  ok: boolean;
+  project_id: string;
+  name: string;
+  root_subpath: string;
+  parent_id: string | null;
+  root_kind?: "attached";
+  root_id?: string | null;
+};
+
+export type ProjectDeleted = {
+  ok: boolean;
+  project_id: string;
+  root_kind: "managed" | "attached";
+};
+
+/** UX-PROJ-07 — everything a delete removes, counted before it runs. */
+export type ProjectDeletionPreviewView = {
+  project_id: string;
+  name: string;
+  root_kind: "managed" | "attached";
+  root_label: string;
+  sessions: number;
+  turns: number;
+  tasks: number;
+  checkpoints: number;
+  managed_files: number;
+  descendants: number;
+  folder_files: number;
+  folder_bytes: number;
+  folder_truncated: boolean;
+  requires_step_up: boolean;
+};
+
 export type ProjectDetailView = {
   project: ProjectView;
   sessions: SessionView[];
   checkpoints: CheckpointView[];
   context: ProjectContext;
   attachments: ProjectAttachmentView[];
+};
+
+/** Metadata for one project file. Never carries file content. */
+export type ProjectFileView = {
+  workspace_path: string;
+  name: string;
+  is_directory: boolean;
+  size_bytes: number;
+  modified_at: string;
+  depth: number;
+};
+
+export type ProjectFilesView = {
+  project_id: string;
+  root_subpath: string;
+  root_exists: boolean;
+  files: ProjectFileView[];
+  truncated: boolean;
+  provenance: Record<string, FileProvenanceEntryView[]>;
+  note: string;
+};
+
+export type ProjectFolderAttached = {
+  ok: boolean;
+  project_id: string;
+  root_id: string;
+};
+
+export type ProjectFolderDetached = {
+  ok: boolean;
+  project_id: string;
+};
+
+export type ProjectMoved = {
+  ok: boolean;
+  project_id: string;
+  new_parent_id: string | null;
+};
+
+/** One reconcile of an attached folder against the index. */
+export type ProjectRootIndexResult = {
+  ok: boolean;
+  project_id: string;
+  indexed: number;
+  updated: number;
+  retired: number;
+  skipped: number;
+  truncated: boolean;
+  scanned_at: string;
+};
+
+/** Where a project's files are, and whether Raiker is watching them. */
+export type ProjectRootStatus = {
+  ok: boolean;
+  project_id: string;
+  root_kind: "managed" | "attached";
+  root_label: string;
+  root_path: string | null;
+  root_missing: boolean;
+  writable: boolean;
+  watching: boolean;
+  watch_reason: string;
+  last_scanned_at: string;
+  indexed_files: number;
+};
+
+export type ProjectSelected = {
+  ok: boolean;
+  active_project_id: string | null;
+};
+
+/** One active project and the active projects filed under it. */
+export type ProjectTreeNode = {
+  project_id: string;
+  name: string;
+  parent_id: string | null;
+  root_subpath: string;
+  created_at: string;
+  children: ProjectTreeNode[];
 };
 
 export type ProjectView = {
@@ -911,6 +1277,15 @@ export type ProviderHealthView = {
   detail: string;
 };
 
+/** An approved memory a turn of this conversation was given, as Raiker knows it now. */
+export type RecalledMemory = {
+  memory_id: string;
+  turn_id: string;
+  text: string;
+  scope: string;
+  pinned: boolean;
+};
+
 export type RecordThreatModelAckRequest = {
   reason?: string;
   as_principal?: string | null;
@@ -943,6 +1318,46 @@ export type ResolveApprovalRequest = {
   approve: boolean;
   reason: string;
   accepted_hunks?: string[] | null;
+};
+
+/** What restoring to a checkpoint would rewrite, delete or skip — computed, not performed. */
+export type RestorePlan = {
+  status: "restore_plan";
+  checkpoint_id: string;
+  session_id: string;
+  checkpoint_created_at: string;
+  can_execute: boolean;
+  requires_approval: boolean;
+  files: RestorePlanFile[];
+  restore_content_count: number;
+  delete_count: number;
+  skip_count: number;
+  changed_count: number;
+  touches_other_principal: boolean;
+};
+
+export type RestorePlanFile = {
+  workspace_path: string;
+  op: string;
+  pre_image_sha256: string | null;
+  pre_image_size: number;
+  current_sha256: string | null;
+  current_size: number;
+  changed: boolean;
+  changed_by_other_principal: boolean;
+};
+
+/** The approval a checkpoint restore raised (BUG-230); nothing has been restored. */
+export type RestoreRequested = {
+  status: "approval_required";
+  approval_id: string;
+  action_id: string;
+  checkpoint_id: string;
+  critical: boolean;
+  executes_action: boolean;
+  restore_content_count: number;
+  delete_count: number;
+  skip_count: number;
 };
 
 export type RuntimeModeView = {
@@ -993,10 +1408,70 @@ export type SelectProjectRequest = {
   project_id?: string | null;
 };
 
+export type SessionArchived = {
+  ok: boolean;
+  session_id: string;
+  archived: boolean;
+};
+
+/** One file a conversation carries — metadata only, so a reload can redraw its chip. */
+export type SessionAttachment = {
+  attachment_id: string;
+  turn_id: string;
+  kind: string;
+  filename: string;
+  media_type: string;
+  byte_size: number;
+  previewable: boolean;
+  source: "uploaded" | "generated";
+  created_at: string;
+};
+
+export type SessionAttachments = {
+  session_id: string;
+  files: SessionAttachment[];
+};
+
 export type SessionCommandGrantRequest = {
   commands: string[][];
   timeout_seconds?: number;
   ttl_minutes?: number;
+};
+
+export type SessionDeleted = {
+  ok: boolean;
+  session_id: string;
+};
+
+/** One conversation's transcript, with the approvals its parked turns wait on. */
+export type SessionDetail = {
+  session: SessionView;
+  turns: TurnView[];
+  parked_approvals: ParkedApproval[];
+};
+
+export type SessionPinned = {
+  ok: boolean;
+  session_id: string;
+  pinned: boolean;
+};
+
+export type SessionProjectSet = {
+  ok: boolean;
+  session_id: string;
+  project_id: string | null;
+};
+
+export type SessionRecall = {
+  ok: boolean;
+  session_id: string;
+  memories: RecalledMemory[];
+};
+
+export type SessionRenamed = {
+  ok: boolean;
+  session_id: string;
+  title: string;
 };
 
 /** Who this browser is — all three null when nobody is (BUG-267). */
@@ -1004,6 +1479,12 @@ export type SessionStateView = {
   principal_id: string | null;
   display_name: string | null;
   scope: string | null;
+};
+
+export type SessionTagsSet = {
+  ok: boolean;
+  session_id: string;
+  tags: string[];
 };
 
 export type SessionView = {
@@ -1021,6 +1502,11 @@ export type SessionView = {
   archived: boolean;
   archived_at: string | null;
   origin: string;
+};
+
+export type SessionsDeleted = {
+  ok: boolean;
+  session_ids: string[];
 };
 
 export type SetCapabilityDecisionModeRequest = {
@@ -1093,6 +1579,15 @@ export type SkillUrlRequest = {
   url: string;
 };
 
+/** One exchange a cited search returned. */
+export type SourceAnchorView = {
+  session_id: string;
+  turn_id: string;
+  title: string;
+  created_at: string;
+  origin: string;
+};
+
 /** The local transcription runtime dictation should use, if any (BUG-256). */
 export type SpeechRuntimeRequest = {
   endpoint?: string | null;
@@ -1156,6 +1651,14 @@ export type TaskEventView = {
   session_id: string | null;
 };
 
+/** The owner's retry of a parked run (BUG-25); ``task_status`` and ``summary`` once it ran. */
+export type TaskResumed = {
+  ok: boolean;
+  reason_code: string | null;
+  task_status?: string;
+  summary?: string;
+};
+
 export type TaskView = {
   task_id: string;
   session_id: string;
@@ -1186,6 +1689,46 @@ export type TelemetryCadenceRequest = {
   cadence: string;
 };
 
+export type TranscriptFile = {
+  filename: string;
+  media_type: string;
+  byte_size: number;
+  source: string;
+};
+
+/** What an export of one conversation would contain, reviewed before a format is chosen. */
+export type TranscriptManifest = {
+  session_id: string;
+  title: string;
+  created_at: string | null;
+  message_count: number;
+  file_count: number;
+  files: TranscriptFile[];
+  redaction_policy: string;
+  formats: string[];
+  messages: TranscriptMessage[];
+  unresolved_citation_count: number;
+  typed_part_count: number;
+};
+
+export type TranscriptMessage = {
+  role: string;
+  text: string;
+  timestamp: string | null;
+  status: string | null;
+  sources: TranscriptSource[];
+  unresolved_citation_count: number;
+  parts: ContentPart[];
+};
+
+export type TranscriptSource = {
+  source_id: string;
+  title: string;
+  locator: string;
+  kind: string;
+  tool_name: string;
+};
+
 export type TraySessionRequest = {
   secret: string;
 };
@@ -1193,6 +1736,48 @@ export type TraySessionRequest = {
 export type TurnDetailView = {
   turn: TurnView;
   events: EventView[];
+};
+
+/** One cited source, opened at the passage the turn used (C4). */
+export type TurnSourceExcerpt = {
+  source_id: string;
+  ordinal: number;
+  kind: string;
+  title: string;
+  locator: string;
+  tool_name: string;
+  detail: string;
+  attachment_id: string;
+  turn_id: string;
+  openable: boolean;
+  status: "resolved" | "no_provenance" | "source_deleted" | "source_changed" | "unsupported_source" | "not_authorized";
+  excerpt: string;
+  highlight_start: number;
+  highlight_length: number;
+  session_id: string;
+  truncated: boolean;
+  resolution_method: "stored_coordinates" | "matching_text" | "answer_quote" | "recorded_passage" | "whole_source" | "";
+  anchors?: SourceAnchorView[];
+  ok: boolean;
+};
+
+/** What one turn read: a label and a locator, never the passage itself (C6). */
+export type TurnSourceView = {
+  source_id: string;
+  ordinal: number;
+  kind: string;
+  title: string;
+  locator: string;
+  tool_name: string;
+  detail: string;
+  attachment_id: string;
+  turn_id: string;
+  openable: boolean;
+};
+
+export type TurnSources = {
+  session_id: string;
+  sources: TurnSourceView[];
 };
 
 export type TurnView = {
@@ -1245,6 +1830,14 @@ export type WhoamiView = {
   scope: string;
 };
 
+/** What the stop switch would reach. ``commands`` is null when it could not be read. */
+export type WorkInFlight = {
+  tasks: number;
+  turns: number;
+  commands: number | null;
+  turn_sessions: string[];
+};
+
 /** One filter choice, with how many threads it would select. */
 export type WorkThreadFacet = {
   value: string;
@@ -1287,7 +1880,7 @@ export type WorkThreadView = {
 /** One typed wrapper per verified operation, on the shared transport core. */
 export const contract = {
   deleteAccount: () =>
-    request<Ok>("/api/account", { method: "DELETE" }),
+    call<Ok>("DELETE", "/api/account"),
   listApprovals: (query: { status_filter?: string } = {}) =>
     request<ApprovalView[]>(withQuery("/api/approvals", query)),
   getApproval: (approvalId: string) =>
@@ -1295,35 +1888,35 @@ export const contract = {
   bootstrapStatus: () =>
     request<BootstrapStatusView>("/api/auth/bootstrap-status"),
   elevate: (body: ElevateRequest) =>
-    postJson<ElevatedTokenView>("/api/auth/elevate", body),
+    call<ElevatedTokenView>("POST", "/api/auth/elevate", { body }),
   login: (body: LoginRequest) =>
-    postJson<LoginResultView>("/api/auth/login", body),
+    call<LoginResultView>("POST", "/api/auth/login", { body }),
   logout: () =>
-    postJson<Ok>("/api/auth/logout", {}),
+    call<Ok>("POST", "/api/auth/logout"),
   mfaActivate: (body: MfaCodeRequest) =>
-    postJson<Ok>("/api/auth/mfa/activate", body),
+    call<Ok>("POST", "/api/auth/mfa/activate", { body }),
   mfaDisable: () =>
-    postJson<Ok>("/api/auth/mfa/disable", {}),
+    call<Ok>("POST", "/api/auth/mfa/disable"),
   mfaEnroll: () =>
-    postJson<MfaEnrollmentView>("/api/auth/mfa/enroll", {}),
+    call<MfaEnrollmentView>("POST", "/api/auth/mfa/enroll"),
   mfaVerify: (body: MfaVerifyRequest) =>
-    postJson<LoginResultView>("/api/auth/mfa/verify", body),
+    call<LoginResultView>("POST", "/api/auth/mfa/verify", { body }),
   changePassword: (body: ChangePasswordRequest) =>
-    postJson<Ok>("/api/auth/password", body),
+    call<Ok>("POST", "/api/auth/password", { body }),
   beginPasswordRecovery: (body: PasswordRecoveryBeginRequest) =>
-    postJson<PasswordRecoveryBeginView>("/api/auth/password-recovery/begin", body),
+    call<PasswordRecoveryBeginView>("POST", "/api/auth/password-recovery/begin", { body }),
   completePasswordRecovery: (body: PasswordRecoveryCompleteRequest) =>
-    postJson<Ok>("/api/auth/password-recovery/complete", body),
+    call<Ok>("POST", "/api/auth/password-recovery/complete", { body }),
   register: (body: RegisterRequest) =>
-    postJson<LoginResultView>("/api/auth/register", body),
+    call<LoginResultView>("POST", "/api/auth/register", { body }),
   mintSession: (body: AuthSessionRequest) =>
-    postJson<IssuedSessionView>("/api/auth/session", body),
+    call<IssuedSessionView>("POST", "/api/auth/session", { body }),
   sessionState: () =>
     request<SessionStateView>("/api/auth/session-state"),
   listDeviceSessions: () =>
     request<DeviceSessionView[]>("/api/auth/sessions"),
   revokeDeviceSession: (sessionId: string) =>
-    postJson<Ok>(`/api/auth/sessions/${encodeURIComponent(sessionId)}/revoke`, {}),
+    call<Ok>("POST", `/api/auth/sessions/${encodeURIComponent(sessionId)}/revoke`),
   whoami: () =>
     request<WhoamiView>("/api/auth/whoami"),
   listCapabilityGates: () =>
@@ -1336,6 +1929,14 @@ export const contract = {
     request<CheckpointView[]>(withQuery("/api/checkpoints", query)),
   getCheckpoint: (checkpointId: string) =>
     request<CheckpointView>(`/api/checkpoints/${encodeURIComponent(checkpointId)}`),
+  branchConversation: (checkpointId: string, body: ConversationBranchRequest) =>
+    call<ConversationBranch>("POST", `/api/checkpoints/${encodeURIComponent(checkpointId)}/branch`, { body }),
+  getConversationBranchPlan: (checkpointId: string) =>
+    request<ConversationBranchPlan>(`/api/checkpoints/${encodeURIComponent(checkpointId)}/branch-plan`),
+  requestCheckpointRestore: (checkpointId: string) =>
+    call<RestoreRequested>("POST", `/api/checkpoints/${encodeURIComponent(checkpointId)}/restore`),
+  getCheckpointRestorePlan: (checkpointId: string) =>
+    request<RestorePlan>(`/api/checkpoints/${encodeURIComponent(checkpointId)}/restore-plan`),
   listCodeRepos: () =>
     request<CodeReposView>("/api/code/repos"),
   getConnections: () =>
@@ -1346,6 +1947,10 @@ export const contract = {
     request<EventView[]>(withQuery("/api/events", query)),
   getExtensions: () =>
     request<ExtensionsOverviewView>("/api/extensions"),
+  deleteManagedFile: (fileId: string) =>
+    call<ManagedFileChanged>("DELETE", `/api/managed-files/${encodeURIComponent(fileId)}`),
+  retryManagedFile: (fileId: string) =>
+    call<ManagedFileChanged>("POST", `/api/managed-files/${encodeURIComponent(fileId)}/retry`),
   listMcpServers: () =>
     request<McpServerView[]>("/api/mcp/servers"),
   listMcpFindings: (serverId: string) =>
@@ -1354,42 +1959,126 @@ export const contract = {
     request<McpSessionView[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/sessions`),
   listMemories: (query: { scope?: string } = {}) =>
     request<MemoryControlView[]>(withQuery("/api/memory", query)),
+  listMemoryFiles: () =>
+    request<ManagedFileList>("/api/memory/files"),
+  importMemoryFiles: (body: Record<string, unknown>) =>
+    call<ManagedFileImport>("POST", "/api/memory/files", { body }),
   getMemorySettings: () =>
     request<MemorySettingsView>("/api/memory/settings"),
   listNotifications: (query: { unread_only?: boolean } = {}) =>
     request<NotificationView[]>(withQuery("/api/notifications", query)),
   listProjects: () =>
     request<ProjectsListView>("/api/projects"),
+  createProject: (body: CreateProjectRequest) =>
+    call<ProjectCreated>("POST", "/api/projects", { body }),
+  selectProject: (body: SelectProjectRequest) =>
+    call<ProjectSelected>("PUT", "/api/projects/selection", { body }),
+  listProjectTree: () =>
+    request<ProjectTreeNode[]>("/api/projects/tree"),
+  deleteProject: (projectId: string, xProjectDeleteConfirm?: string) =>
+    call<ProjectDeleted>("DELETE", `/api/projects/${encodeURIComponent(projectId)}`, { headers: { "x-project-delete-confirm": xProjectDeleteConfirm } }),
   getProject: (projectId: string) =>
     request<ProjectDetailView>(`/api/projects/${encodeURIComponent(projectId)}`),
+  archiveProject: (projectId: string) =>
+    call<ProjectArchived>("PUT", `/api/projects/${encodeURIComponent(projectId)}/archive`),
+  browseProject: (projectId: string, query: { path?: string } = {}) =>
+    request<ProjectBrowseView>(withQuery(`/api/projects/${encodeURIComponent(projectId)}/browse`, query)),
+  saveProjectContext: (projectId: string, body: SaveProjectContextRequest) =>
+    call<ProjectContextSaved>("PUT", `/api/projects/${encodeURIComponent(projectId)}/context`, { body }),
+  projectDeletionPreview: (projectId: string) =>
+    request<ProjectDeletionPreviewView>(`/api/projects/${encodeURIComponent(projectId)}/deletion-preview`),
+  getProjectFiles: (projectId: string) =>
+    request<ProjectFilesView>(`/api/projects/${encodeURIComponent(projectId)}/files`),
+  listProjectFiles: (projectId: string) =>
+    request<ManagedFileList>(`/api/projects/${encodeURIComponent(projectId)}/managed-files`),
+  importProjectFiles: (projectId: string, body: Record<string, unknown>) =>
+    call<ManagedFileImport>("POST", `/api/projects/${encodeURIComponent(projectId)}/managed-files`, { body }),
+  moveProject: (projectId: string, body: MoveProjectRequest) =>
+    call<ProjectMoved>("PUT", `/api/projects/${encodeURIComponent(projectId)}/move`, { body }),
+  restoreProject: (projectId: string) =>
+    call<ProjectArchived>("PUT", `/api/projects/${encodeURIComponent(projectId)}/restore`),
+  detachProjectRoot: (projectId: string) =>
+    call<ProjectFolderDetached>("DELETE", `/api/projects/${encodeURIComponent(projectId)}/root`),
+  attachProjectRoot: (projectId: string, body: AttachProjectFolderRequest) =>
+    call<ProjectFolderAttached>("POST", `/api/projects/${encodeURIComponent(projectId)}/root/attach`, { body }),
+  indexProjectRoot: (projectId: string) =>
+    call<ProjectRootIndexResult>("POST", `/api/projects/${encodeURIComponent(projectId)}/root/index`),
+  projectRootStatus: (projectId: string) =>
+    request<ProjectRootStatus>(`/api/projects/${encodeURIComponent(projectId)}/root/status`),
   getRuntimeMode: () =>
     request<RuntimeModeView>("/api/runtime-mode"),
   getRuntimeReadiness: () =>
     request<RuntimeReadinessView>("/api/runtime-readiness"),
   checkPasswordBreach: (body: BreachCheckRequest) =>
-    postJson<SecurityFindingView[]>("/api/security/breach-check", body),
+    call<SecurityFindingView[]>("POST", "/api/security/breach-check", { body }),
   listSecurityCredentials: () =>
     request<CredentialLifecycleView[]>("/api/security/credentials"),
   verifySecurityCredential: (provider: string) =>
-    postJson<CredentialLifecycleView>(`/api/security/credentials/${encodeURIComponent(provider)}/verify`, {}),
+    call<CredentialLifecycleView>("POST", `/api/security/credentials/${encodeURIComponent(provider)}/verify`),
   listSecurityFindings: () =>
     request<SecurityFindingView[]>("/api/security/findings"),
   scanSecurity: () =>
-    postJson<SecurityFindingView[]>("/api/security/scan", {}),
+    call<SecurityFindingView[]>("POST", "/api/security/scan"),
   listSessions: (query: { limit?: number; project_id?: string; include_archived?: boolean; origin?: string } = {}) =>
     request<SessionView[]>(withQuery("/api/sessions", query)),
+  deleteSessions: (body: BulkDeleteSessionsRequest) =>
+    call<SessionsDeleted>("DELETE", "/api/sessions/bulk", { body }),
+  deleteSession: (sessionId: string, xSessionDeleteConfirm?: string) =>
+    call<SessionDeleted>("DELETE", `/api/sessions/${encodeURIComponent(sessionId)}`, { headers: { "x-session-delete-confirm": xSessionDeleteConfirm } }),
+  getSession: (sessionId: string) =>
+    request<SessionDetail>(`/api/sessions/${encodeURIComponent(sessionId)}`),
+  archiveSession: (sessionId: string) =>
+    call<SessionArchived>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/archive`),
+  listSessionAttachments: (sessionId: string) =>
+    request<SessionAttachments>(`/api/sessions/${encodeURIComponent(sessionId)}/attachments`),
+  getAttachmentPreview: (sessionId: string, attachmentId: string) =>
+    request<AttachmentPreview>(`/api/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}/preview`),
+  getAttachmentProvenance: (sessionId: string, attachmentId: string) =>
+    request<AttachmentProvenance>(`/api/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}/provenance`),
+  getConversationBranchOrigin: (sessionId: string) =>
+    request<ConversationBranchOrigin>(`/api/sessions/${encodeURIComponent(sessionId)}/branch-origin`),
+  revokeSessionCommandGrant: (sessionId: string) =>
+    call<CommandGrantRevoked>("DELETE", `/api/sessions/${encodeURIComponent(sessionId)}/command-grant`),
+  putSessionCommandGrant: (sessionId: string, body: SessionCommandGrantRequest) =>
+    call<CommandGrant>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/command-grant`, { body }),
+  compactConversation: (sessionId: string, body: CompactConversationRequest) =>
+    call<ConversationCompaction>("POST", `/api/sessions/${encodeURIComponent(sessionId)}/compact`, { body }),
   getSessionContextUsage: (sessionId: string) =>
     request<ContextUsageView>(`/api/sessions/${encodeURIComponent(sessionId)}/context-usage`),
+  getSessionExportManifest: (sessionId: string) =>
+    request<TranscriptManifest>(`/api/sessions/${encodeURIComponent(sessionId)}/export/manifest`),
+  setSessionPinned: (sessionId: string, body: SetSessionPinnedRequest) =>
+    call<SessionPinned>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/pin`, { body }),
+  getSessionPlan: (sessionId: string) =>
+    request<AgentPlan>(`/api/sessions/${encodeURIComponent(sessionId)}/plan`),
+  setSessionProject: (sessionId: string, body: SetSessionProjectRequest) =>
+    call<SessionProjectSet>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/project`, { body }),
+  listSessionRecall: (sessionId: string, query: { turn_id?: string } = {}) =>
+    request<SessionRecall>(withQuery(`/api/sessions/${encodeURIComponent(sessionId)}/recall`, query)),
+  renameSession: (sessionId: string, body: RenameSessionRequest) =>
+    call<SessionRenamed>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/rename`, { body }),
+  listSessionSources: (sessionId: string, query: { turn_id?: string } = {}) =>
+    request<TurnSources>(withQuery(`/api/sessions/${encodeURIComponent(sessionId)}/sources`, query)),
+  setSessionTags: (sessionId: string, body: SetSessionTagsRequest) =>
+    call<SessionTagsSet>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/tags`, { body }),
+  getTurnSourceExcerpt: (sessionId: string, turnId: string, sourceId: string, query: { quote?: string } = {}) =>
+    request<TurnSourceExcerpt>(withQuery(`/api/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}/sources/${encodeURIComponent(sourceId)}/excerpt`, query)),
+  unarchiveSession: (sessionId: string) =>
+    call<SessionArchived>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/unarchive`),
   listTasks: (query: { session_id?: string; task_status?: string; project_id?: string } = {}) =>
     request<TaskView[]>(withQuery("/api/tasks", query)),
   createTask: (body: TaskCreateRequest) =>
-    postJson<TaskView>("/api/tasks", body),
+    call<TaskView>("POST", "/api/tasks", { body }),
   getTaskDetail: (taskId: string) =>
     request<TaskDetailView>(`/api/tasks/${encodeURIComponent(taskId)}`),
+  resumeTask: (taskId: string) =>
+    call<TaskResumed>("POST", `/api/tasks/${encodeURIComponent(taskId)}/resume`),
   runTask: (taskId: string) =>
-    postJson<TaskView>(`/api/tasks/${encodeURIComponent(taskId)}/run`, {}),
+    call<TaskView>("POST", `/api/tasks/${encodeURIComponent(taskId)}/run`),
   getTurn: (turnId: string) =>
     request<TurnDetailView>(`/api/turns/${encodeURIComponent(turnId)}`),
+  workInFlight: () =>
+    request<WorkInFlight>("/api/work-in-flight"),
   listWorkThreads: (query: { limit?: number } = {}) =>
     request<WorkThreadView[]>(withQuery("/api/work-threads", query)),
   workThreadPage: (query: { project_id?: string; kind?: string; query?: string; cursor?: string; limit?: number; archived?: boolean } = {}) =>

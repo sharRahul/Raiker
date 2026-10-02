@@ -40,7 +40,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Final, Literal
 
 from raiker.contracts.views import View
 from raiker.storage.sqlite import SQLiteStore
@@ -53,19 +53,27 @@ MAX_EXCERPT_CHARS = 4_000
 CONTEXT_CHARS = 600
 
 # Resolution outcomes. Each one is a state the inspector renders in words.
-STATUS_RESOLVED = "resolved"
-STATUS_NO_PROVENANCE = "no_provenance"
-STATUS_SOURCE_DELETED = "source_deleted"
-STATUS_SOURCE_CHANGED = "source_changed"
-STATUS_UNSUPPORTED_SOURCE = "unsupported_source"
-STATUS_NOT_AUTHORIZED = "not_authorized"
+STATUS_RESOLVED: Final = "resolved"
+STATUS_NO_PROVENANCE: Final = "no_provenance"
+STATUS_SOURCE_DELETED: Final = "source_deleted"
+STATUS_SOURCE_CHANGED: Final = "source_changed"
+STATUS_UNSUPPORTED_SOURCE: Final = "unsupported_source"
+STATUS_NOT_AUTHORIZED: Final = "not_authorized"
+
+
+ExcerptStatus = Literal[
+    "resolved", "no_provenance", "source_deleted", "source_changed", "unsupported_source", "not_authorized"
+]
+ResolutionMethod = Literal[
+    "stored_coordinates", "matching_text", "answer_quote", "recorded_passage", "whole_source", ""
+]
 
 
 @dataclass(frozen=True)
 class SourceExcerpt(View):
     """One resolved source passage, or the stated reason there is not one."""
 
-    status: str
+    status: ExcerptStatus
     kind: str = ""
     title: str = ""
     excerpt: str = ""
@@ -78,7 +86,7 @@ class SourceExcerpt(View):
     turn_id: str = ""
     attachment_id: str = ""
     truncated: bool = False
-    resolution_method: str = ""
+    resolution_method: ResolutionMethod = ""
 
 
 def normalise_whitespace(text: str) -> str:
@@ -293,6 +301,7 @@ class SourceProvenanceService:
         attachment_id: str = "",
     ) -> SourceExcerpt:
         coordinates = _coordinate_passage(source, provenance)
+        method: ResolutionMethod
         if coordinates is not None:
             excerpt, start, length, truncated = build_excerpt_at(source, *coordinates)
             method = "stored_coordinates"

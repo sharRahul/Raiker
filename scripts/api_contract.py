@@ -54,6 +54,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from pydantic import TypeAdapter
+from starlette.responses import Response as StarletteResponse
 from typing_extensions import is_typeddict
 
 from raiker.contracts.views import View
@@ -69,6 +70,54 @@ INVENTORY_MD = REPO_ROOT / "docs" / "architecture" / "API_CONTRACT_INVENTORY.md"
 #: this set is where the evidence for each claim is recorded.
 VERIFIED: frozenset[tuple[str, str]] = frozenset(
     {
+        ("DELETE", "/api/managed-files/{file_id}"),
+        ("DELETE", "/api/projects/{project_id}"),
+        ("DELETE", "/api/projects/{project_id}/root"),
+        ("GET", "/api/memory/files"),
+        ("GET", "/api/projects/tree"),
+        ("GET", "/api/projects/{project_id}/browse"),
+        ("GET", "/api/projects/{project_id}/deletion-preview"),
+        ("GET", "/api/projects/{project_id}/files"),
+        ("GET", "/api/projects/{project_id}/managed-files"),
+        ("GET", "/api/projects/{project_id}/root/status"),
+        ("POST", "/api/managed-files/{file_id}/retry"),
+        ("POST", "/api/memory/files"),
+        ("POST", "/api/projects"),
+        ("POST", "/api/projects/{project_id}/managed-files"),
+        ("POST", "/api/projects/{project_id}/root/attach"),
+        ("POST", "/api/projects/{project_id}/root/index"),
+        ("PUT", "/api/projects/selection"),
+        ("PUT", "/api/projects/{project_id}/archive"),
+        ("PUT", "/api/projects/{project_id}/context"),
+        ("PUT", "/api/projects/{project_id}/move"),
+        ("PUT", "/api/projects/{project_id}/restore"),
+        ("DELETE", "/api/sessions/bulk"),
+        ("DELETE", "/api/sessions/{session_id}"),
+        ("DELETE", "/api/sessions/{session_id}/command-grant"),
+        ("GET", "/api/checkpoints/{checkpoint_id}/branch-plan"),
+        ("GET", "/api/checkpoints/{checkpoint_id}/restore-plan"),
+        ("GET", "/api/sessions/{session_id}"),
+        ("GET", "/api/sessions/{session_id}/attachments"),
+        ("GET", "/api/sessions/{session_id}/attachments/{attachment_id}/preview"),
+        ("GET", "/api/sessions/{session_id}/attachments/{attachment_id}/provenance"),
+        ("GET", "/api/sessions/{session_id}/branch-origin"),
+        ("GET", "/api/sessions/{session_id}/export/manifest"),
+        ("GET", "/api/sessions/{session_id}/plan"),
+        ("GET", "/api/sessions/{session_id}/recall"),
+        ("GET", "/api/sessions/{session_id}/sources"),
+        ("GET", "/api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt"),
+        ("GET", "/api/work-in-flight"),
+        ("POST", "/api/checkpoints/{checkpoint_id}/branch"),
+        ("POST", "/api/checkpoints/{checkpoint_id}/restore"),
+        ("POST", "/api/sessions/{session_id}/compact"),
+        ("POST", "/api/tasks/{task_id}/resume"),
+        ("PUT", "/api/sessions/{session_id}/archive"),
+        ("PUT", "/api/sessions/{session_id}/command-grant"),
+        ("PUT", "/api/sessions/{session_id}/pin"),
+        ("PUT", "/api/sessions/{session_id}/project"),
+        ("PUT", "/api/sessions/{session_id}/rename"),
+        ("PUT", "/api/sessions/{session_id}/tags"),
+        ("PUT", "/api/sessions/{session_id}/unarchive"),
         ("POST", "/api/auth/register"),
         ("POST", "/api/auth/login"),
         ("POST", "/api/auth/session"),
@@ -145,27 +194,33 @@ class RouteContract:
 
 
 def _wire_is_fields(view: Any, seen: set[Any] | None = None) -> bool:
-    """True when ``view``'s JSON is exactly its declared fields, all the way down."""
+    """True when ``view``'s JSON is exactly what its declaration says, all the way down.
+
+    A fields-only :class:`View` serialises its declared fields; a ``TypedDict``
+    is the dict itself, its keys checked by ``mypy`` where it is built. Anything
+    nested must be one of those, or a plain value.
+    """
     seen = set() if seen is None else seen
     if view in seen:
         return True
     seen.add(view)
-    if not (isinstance(view, type) and dataclasses.is_dataclass(view) and issubclass(view, View)):
+    if is_typeddict(view):
+        hints = typing.get_type_hints(view)
+    elif isinstance(view, type) and dataclasses.is_dataclass(view) and issubclass(view, View):
+        if view.to_dict is not View.to_dict:
+            return False
+        hints = typing.get_type_hints(view)
+    else:
         return False
-    if view.to_dict is not View.to_dict:
-        return False
-    hints = typing.get_type_hints(view)
-    for field in dataclasses.fields(view):
-        stack = [hints[field.name]]
+    for annotation in hints.values():
+        stack = [annotation]
         while stack:
             item = stack.pop()
             stack.extend(typing.get_args(item))
-            if not isinstance(item, type):
-                continue
-            if dataclasses.is_dataclass(item):
+            if is_typeddict(item) or (isinstance(item, type) and dataclasses.is_dataclass(item)):
                 if not _wire_is_fields(item, seen):
                     return False
-            elif hasattr(item, "to_dict"):
+            elif isinstance(item, type) and hasattr(item, "to_dict"):
                 return False
     return True
 
@@ -217,13 +272,14 @@ class _Resolver:
     def __init__(self, endpoint: Callable[..., Any], body: ast.AST) -> None:
         self.module = sys.modules[endpoint.__module__]
         self.assigned: dict[str, ast.expr] = {}
+        self.annotated: dict[str, ast.expr] = {}
         for node in _own_nodes(body):
             if isinstance(node, ast.Assign) and len(node.targets) == 1:
                 target = node.targets[0]
                 if isinstance(target, ast.Name):
                     self.assigned[target.id] = node.value
-            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value:
-                self.assigned[node.target.id] = node.value
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                self.annotated[node.target.id] = node.annotation
 
     def _deref(self, node: ast.expr) -> ast.expr:
         seen: set[str] = set()
@@ -246,8 +302,25 @@ class _Resolver:
             return _hints(target).get("return")
         return None
 
+    def _annotation(self, node: ast.expr) -> Any:
+        """Evaluate a local's annotation in the handler's module."""
+        return eval(compile(ast.Expression(node), "<annotation>", "eval"), vars(self.module))  # noqa: S307
+
     def resolve(self, node: ast.expr) -> tuple[Any | None, str]:
+        if isinstance(node, ast.Name) and node.id in self.annotated:
+            # `answer: View = ...` — the declared type, which mypy holds the
+            # assigned value to.
+            try:
+                annotation = self._annotation(self.annotated[node.id])
+            except Exception:  # noqa: BLE001 - an unresolvable annotation is "deferred"
+                return None, f"annotation of {node.id} does not resolve"
+            view = _view_of(annotation)
+            if view is None:
+                return None, f"{node.id} is declared {_type_name(annotation)}, not a fields-only view"
+            return view, f"declared {_type_name(view)}"
         node = self._deref(node)
+        if isinstance(node, ast.Await):
+            node = self._deref(node.value)
         if isinstance(node, ast.ListComp):
             inner, how = self.resolve(node.elt)
             if inner is None or typing.get_origin(inner) is list:
@@ -256,9 +329,16 @@ class _Resolver:
         if not isinstance(node, ast.Call):
             return None, "body assembled in the route"
         func = node.func
+        if isinstance(func, ast.Name) and func.id == "cast" and node.args:
+            # `cast(View, value)` — the type the route declares its body to be.
+            try:
+                view = _view_of(self._annotation(node.args[0]))
+            except Exception:  # noqa: BLE001 - an unresolvable annotation is "deferred"
+                view = None
+            return (view, "declared by cast") if view is not None else (None, "cast to a non-view")
         if isinstance(func, ast.Name):
             target = self._global(func.id)
-            if isinstance(target, type):
+            if isinstance(target, type) and not is_typeddict(target):
                 view = _view_of(target)
                 if view is None:
                     return None, f"{func.id} is not a fields-only view"
@@ -342,6 +422,9 @@ def _response_annotation(route: APIRoute) -> tuple[Any | None, str]:
     except (OSError, TypeError):
         source = ""
     if any(marker in source for marker in _SPECIAL_MARKERS):
+        return None, "special"
+    returned = _hints(endpoint).get("return")
+    if isinstance(returned, type) and issubclass(returned, StarletteResponse):
         return None, "special"
     return _handler_view(endpoint)
 
@@ -603,21 +686,22 @@ def render_typescript(document: dict[str, Any], app: FastAPI) -> str:
         body = operation.get("requestBody", {}).get("content", {}).get("application/json", {})
         if body:
             args.append(f"body: {_ts(body.get('schema', {}))}")
-        if item.method == "GET":
+        header_params = [p for p in parameters if p.get("in") == "header"]
+        headers = ", ".join(f'"{p["name"]}": {_camel(p["name"])}' for p in header_params)
+        args += [f"{_camel(p['name'])}{'' if p.get('required') else '?'}: string" for p in header_params]
+        options = ", ".join(
+            part for part in (
+                "body" if body else "",
+                f"headers: {{ {headers} }}" if header_params else "",
+            ) if part
+        )
+        if item.method == "GET" and not options:
             used.add("request")
             call = f"request<{response}>({target})"
-        elif item.method == "POST" and not body:
-            used.add("postJson")
-            call = f"postJson<{response}>({target}, {{}})"
-        elif item.method == "POST":
-            used.add("postJson")
-            call = f"postJson<{response}>({target}, body)"
-        elif body:
-            used.add("sendJson")
-            call = f'sendJson<{response}>("{item.method}", {target}, body)'
         else:
-            used.add("request")
-            call = f'request<{response}>({target}, {{ method: "{item.method}" }})'
+            used.add("call")
+            suffix = f", {{ {options} }}" if options else ""
+            call = f'call<{response}>("{item.method}", {target}{suffix})'
         chunks.append(f"  {key}: ({', '.join(args)}) =>\n    {call},")
     chunks.append("} as const;\n")
     chunks[1] = "import { " + ", ".join(sorted(used)) + ' } from "../api/core";\n'

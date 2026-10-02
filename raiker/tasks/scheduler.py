@@ -24,6 +24,9 @@ from collections.abc import Mapping
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import NotRequired
+
+from typing_extensions import TypedDict
 
 from raiker.app.host import HostControl
 from raiker.contracts.ids import new_id, utc_now
@@ -55,6 +58,15 @@ NON_RESUMABLE_TASK_STATES = frozenset({"cancelled", "cancelling", "completed", "
 #: own kind so the notification centre can group it and an owner can tell it from
 #: a task that finished or an approval that needs a decision.
 TELEMETRY_DELIVERY_KIND = "telemetry_delivery"
+
+
+class TaskResumed(TypedDict):
+    """The owner's retry of a parked run (BUG-25); ``task_status`` and ``summary`` once it ran."""
+
+    ok: bool
+    reason_code: str | None
+    task_status: NotRequired[str]
+    summary: NotRequired[str]
 
 
 class TaskScheduler:
@@ -211,7 +223,7 @@ class TaskScheduler:
             resumed += await self._resume_task(task)
         return resumed
 
-    async def resume_task(self, task_id: str, owner_principal_id: str) -> dict[str, object]:
+    async def resume_task(self, task_id: str, owner_principal_id: str) -> TaskResumed:
         """Continue one parked task on the owner's explicit request (the retry).
 
         Automatic continuation is best-effort by nature: a browser tab may have

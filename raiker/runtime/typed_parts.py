@@ -44,22 +44,23 @@ import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Final, Literal
 
 from raiker.contracts.views import View
 
 # ── Part types ──────────────────────────────────────────────────────────────
 
 #: Ordinary prose. Rendered by the Markdown renderer, exactly as before.
-PART_TEXT = "text"
+PART_TEXT: Final = "text"
 #: A table the product knows is a table: sortable, and announced as one.
-PART_TABLE = "table"
+PART_TABLE: Final = "table"
 #: A series to plot. Bounded and validated like any other model-proposed payload.
-PART_CHART = "chart"
+PART_CHART: Final = "chart"
 #: A declared block the runtime would not accept, with the reason it refused.
-PART_REFUSED = "refused"
+PART_REFUSED: Final = "refused"
 
 PART_TYPES = frozenset({PART_TEXT, PART_TABLE, PART_CHART, PART_REFUSED})
+PartType = Literal["text", "table", "chart", "refused"]
 
 #: The chart shapes Raiker draws. Deliberately three: each is a different claim
 #: about the data, and a shape nobody can read is not a fourth feature.
@@ -89,7 +90,7 @@ _FENCE = re.compile(
 class ContentPart(View):
     """One declared piece of a turn's answer."""
 
-    type: str
+    type: PartType
     #: `text` only: the Markdown run.
     text: str = ""
     #: `table` and `chart`: the validated payload. Never the model's raw object.
@@ -267,7 +268,7 @@ def content_parts(message: str) -> list[ContentPart]:
         if data is None:
             parts.append(ContentPart(PART_REFUSED, reason_code=reason))
             continue
-        parts.append(ContentPart(kind, data=data))
+        parts.append(ContentPart(PART_TABLE if kind == PART_TABLE else PART_CHART, data=data))
 
     tail = _text(message[cursor:])
     if tail is not None:

@@ -13,7 +13,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
   `to_dict`; it needs a dedicated response model first (Stage B).
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**350 operations: 54 verified, 0 eligible, 288 deferred, 8 special.**
+**350 operations: 102 verified, 1 eligible, 237 deferred, 10 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -82,10 +82,10 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/chat-search` |  | SessionView[] | verified | DashboardService.search_sessions |
 | GET | `/api/checkpoints` |  | CheckpointView[] | verified | DashboardService.list_checkpoints |
 | GET | `/api/checkpoints/{checkpoint_id}` |  | CheckpointView | verified | DashboardService.get_checkpoint |
-| POST | `/api/checkpoints/{checkpoint_id}/branch` | ConversationBranchRequest |  | deferred | body assembled in the route |
-| GET | `/api/checkpoints/{checkpoint_id}/branch-plan` |  |  | deferred | body assembled in the route |
-| POST | `/api/checkpoints/{checkpoint_id}/restore` |  |  | deferred | body assembled in the route |
-| GET | `/api/checkpoints/{checkpoint_id}/restore-plan` |  |  | deferred | body assembled in the route |
+| POST | `/api/checkpoints/{checkpoint_id}/branch` | ConversationBranchRequest | ConversationBranch | verified | declared ConversationBranch |
+| GET | `/api/checkpoints/{checkpoint_id}/branch-plan` |  | ConversationBranchPlan | verified | declared ConversationBranchPlan |
+| POST | `/api/checkpoints/{checkpoint_id}/restore` |  | RestoreRequested | verified | declared RestoreRequested |
+| GET | `/api/checkpoints/{checkpoint_id}/restore-plan` |  | RestorePlan | verified | declared RestorePlan |
 | GET | `/api/code/map` |  |  | deferred | body assembled in the route |
 | GET | `/api/code/map/paths` |  |  | deferred | body assembled in the route |
 | POST | `/api/code/map/rebuild` |  |  | deferred | body assembled in the route |
@@ -156,8 +156,8 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/language/check` | LanguageCheckRequest |  | deferred | body assembled in the route |
 | GET | `/api/local-runtimes` |  |  | deferred | body assembled in the route |
 | POST | `/api/local-runtimes/detect` |  |  | deferred | body assembled in the route |
-| DELETE | `/api/managed-files/{file_id}` |  |  | deferred | body assembled in the route |
-| POST | `/api/managed-files/{file_id}/retry` |  |  | deferred | body assembled in the route |
+| DELETE | `/api/managed-files/{file_id}` |  | ManagedFileChanged | verified | declared by cast |
+| POST | `/api/managed-files/{file_id}/retry` |  | ManagedFileChanged | verified | declared by cast |
 | GET | `/api/mcp/agent-access` |  |  | deferred | body assembled in the route |
 | GET | `/api/mcp/offers` |  |  | deferred | body assembled in the route |
 | GET | `/api/mcp/servers` |  | McpServerView[] | verified | DashboardService.list_mcp_servers |
@@ -181,8 +181,8 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/memory/entity-proposals/{candidate_id}/decision` | dict |  | deferred | body assembled in the route |
 | POST | `/api/memory/entity-relationships/{relationship_id}/reject` | dict |  | deferred | body assembled in the route |
 | GET | `/api/memory/export` |  |  | deferred | body assembled in the route |
-| GET | `/api/memory/files` |  |  | deferred | body assembled in the route |
-| POST | `/api/memory/files` | dict |  | deferred | body assembled in the route |
+| GET | `/api/memory/files` |  | ManagedFileList | verified | _list |
+| POST | `/api/memory/files` | dict | ManagedFileImport | verified | _import |
 | POST | `/api/memory/gists/{gist_id}/discard` |  |  | deferred | body assembled in the route |
 | POST | `/api/memory/import` | dict |  | deferred | body assembled in the route |
 | POST | `/api/memory/import/preview` | dict |  | deferred | body assembled in the route |
@@ -249,32 +249,32 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | PUT | `/api/models/{profile_id}/capacity` | dict |  | deferred | body assembled in the route |
 | PUT | `/api/models/{profile_id}/connection` | ModelConnectionRequest |  | deferred | body assembled in the route |
 | PUT | `/api/models/{profile_id}/price` | ModelPriceRequest |  | deferred | body assembled in the route |
-| GET | `/api/models/{profile_id}/provider-models` |  |  | deferred | body assembled in the route |
+| GET | `/api/models/{profile_id}/provider-models` |  | ProviderModelListView | eligible | DashboardService.list_provider_models |
 | PUT | `/api/models/{profile_id}/weekly-budget` | ModelWeeklyBudgetRequest |  | deferred | body assembled in the route |
 | GET | `/api/notifications` |  | NotificationView[] | verified | DashboardService.list_notifications |
 | POST | `/api/notifications/{notification_id}/read` |  |  | deferred | body assembled in the route |
 | POST | `/api/ollama/pull` | OllamaPullRequestBody |  | deferred | body assembled in the route |
 | GET | `/api/plugins` |  |  | deferred | body assembled in the route |
 | GET | `/api/projects` |  | ProjectsListView | verified | DashboardService.list_projects |
-| POST | `/api/projects` | CreateProjectRequest |  | deferred | body assembled in the route |
-| PUT | `/api/projects/selection` | SelectProjectRequest |  | deferred | body assembled in the route |
-| GET | `/api/projects/tree` |  |  | deferred | body assembled in the route |
-| DELETE | `/api/projects/{project_id}` |  |  | deferred | body assembled in the route |
+| POST | `/api/projects` | CreateProjectRequest | ProjectCreated | verified | declared ProjectCreated |
+| PUT | `/api/projects/selection` | SelectProjectRequest | ProjectSelected | verified | declared ProjectSelected |
+| GET | `/api/projects/tree` |  | ProjectTreeNode[] | verified | declared ProjectTreeNode[] |
+| DELETE | `/api/projects/{project_id}` |  | ProjectDeleted | verified | declared ProjectDeleted |
 | GET | `/api/projects/{project_id}` |  | ProjectDetailView | verified | DashboardService.get_project |
-| PUT | `/api/projects/{project_id}/archive` |  |  | deferred | body assembled in the route |
-| GET | `/api/projects/{project_id}/browse` |  |  | deferred | body assembled in the route |
-| PUT | `/api/projects/{project_id}/context` | SaveProjectContextRequest |  | deferred | body assembled in the route |
-| GET | `/api/projects/{project_id}/deletion-preview` |  |  | deferred | body assembled in the route |
+| PUT | `/api/projects/{project_id}/archive` |  | ProjectArchived | verified | declared ProjectArchived |
+| GET | `/api/projects/{project_id}/browse` |  | ProjectBrowseView | verified | declared ProjectBrowseView |
+| PUT | `/api/projects/{project_id}/context` | SaveProjectContextRequest | ProjectContextSaved | verified | declared ProjectContextSaved |
+| GET | `/api/projects/{project_id}/deletion-preview` |  | ProjectDeletionPreviewView | verified | declared ProjectDeletionPreviewView |
 | POST | `/api/projects/{project_id}/export` |  |  | special | special |
-| GET | `/api/projects/{project_id}/files` |  |  | deferred | project_files returns raiker.control.web_read_models.ProjectFilesView \| None, not a fields-only view |
-| GET | `/api/projects/{project_id}/managed-files` |  |  | deferred | body assembled in the route |
-| POST | `/api/projects/{project_id}/managed-files` | dict |  | deferred | body assembled in the route |
-| PUT | `/api/projects/{project_id}/move` | MoveProjectRequest |  | deferred | body assembled in the route |
-| PUT | `/api/projects/{project_id}/restore` |  |  | deferred | body assembled in the route |
-| DELETE | `/api/projects/{project_id}/root` |  |  | deferred | body assembled in the route |
-| POST | `/api/projects/{project_id}/root/attach` |  |  | deferred | body assembled in the route |
-| POST | `/api/projects/{project_id}/root/index` |  |  | deferred | body assembled in the route |
-| GET | `/api/projects/{project_id}/root/status` |  |  | deferred | body assembled in the route |
+| GET | `/api/projects/{project_id}/files` |  | ProjectFilesView | verified | WebReadModels.project_files |
+| GET | `/api/projects/{project_id}/managed-files` |  | ManagedFileList | verified | _list |
+| POST | `/api/projects/{project_id}/managed-files` | dict | ManagedFileImport | verified | _import |
+| PUT | `/api/projects/{project_id}/move` | MoveProjectRequest | ProjectMoved | verified | declared ProjectMoved |
+| PUT | `/api/projects/{project_id}/restore` |  | ProjectArchived | verified | declared ProjectArchived |
+| DELETE | `/api/projects/{project_id}/root` |  | ProjectFolderDetached | verified | declared ProjectFolderDetached |
+| POST | `/api/projects/{project_id}/root/attach` | AttachProjectFolderRequest | ProjectFolderAttached | verified | declared ProjectFolderAttached |
+| POST | `/api/projects/{project_id}/root/index` |  | ProjectRootIndexResult | verified | declared ProjectRootIndexResult |
+| GET | `/api/projects/{project_id}/root/status` |  | ProjectRootStatus | verified | declared ProjectRootStatus |
 | POST | `/api/prompts` | PromptRequest |  | deferred | body assembled in the route |
 | POST | `/api/prompts/stream` | PromptRequest |  | special | special |
 | GET | `/api/read-capabilities` |  |  | deferred | body assembled in the route |
@@ -292,32 +292,32 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/security/health-check` |  |  | deferred | body assembled in the route |
 | POST | `/api/security/scan` |  | SecurityFindingView[] | verified | DashboardService.scan_security |
 | GET | `/api/sessions` |  | SessionView[] | verified | DashboardService.list_sessions |
-| DELETE | `/api/sessions/bulk` | BulkDeleteSessionsRequest |  | deferred | body assembled in the route |
-| DELETE | `/api/sessions/{session_id}` |  |  | deferred | body assembled in the route |
-| GET | `/api/sessions/{session_id}` |  |  | deferred | body assembled in the route |
-| PUT | `/api/sessions/{session_id}/archive` |  |  | deferred | body assembled in the route |
-| GET | `/api/sessions/{session_id}/attachments` |  |  | deferred | body assembled in the route |
+| DELETE | `/api/sessions/bulk` | BulkDeleteSessionsRequest | SessionsDeleted | verified | declared SessionsDeleted |
+| DELETE | `/api/sessions/{session_id}` |  | SessionDeleted | verified | declared SessionDeleted |
+| GET | `/api/sessions/{session_id}` |  | SessionDetail | verified | built as SessionDetail |
+| PUT | `/api/sessions/{session_id}/archive` |  | SessionArchived | verified | declared SessionArchived |
+| GET | `/api/sessions/{session_id}/attachments` |  | SessionAttachments | verified | declared SessionAttachments |
 | GET | `/api/sessions/{session_id}/attachments/{attachment_id}/download` |  |  | special | special |
-| GET | `/api/sessions/{session_id}/attachments/{attachment_id}/preview` |  |  | deferred | body assembled in the route |
-| GET | `/api/sessions/{session_id}/attachments/{attachment_id}/preview/image` |  |  | deferred | body assembled in the route |
-| GET | `/api/sessions/{session_id}/attachments/{attachment_id}/preview/pdf` |  |  | deferred | body assembled in the route |
-| GET | `/api/sessions/{session_id}/attachments/{attachment_id}/provenance` |  |  | deferred | body assembled in the route |
-| GET | `/api/sessions/{session_id}/branch-origin` |  |  | deferred | body assembled in the route |
-| DELETE | `/api/sessions/{session_id}/command-grant` |  |  | deferred | body assembled in the route |
-| PUT | `/api/sessions/{session_id}/command-grant` | SessionCommandGrantRequest |  | deferred | body assembled in the route |
-| POST | `/api/sessions/{session_id}/compact` | CompactConversationRequest |  | deferred | body assembled in the route |
+| GET | `/api/sessions/{session_id}/attachments/{attachment_id}/preview` |  | AttachmentPreview | verified | AttachmentPreviewService.get |
+| GET | `/api/sessions/{session_id}/attachments/{attachment_id}/preview/image` |  |  | special | special |
+| GET | `/api/sessions/{session_id}/attachments/{attachment_id}/preview/pdf` |  |  | special | special |
+| GET | `/api/sessions/{session_id}/attachments/{attachment_id}/provenance` |  | AttachmentProvenance | verified | declared AttachmentProvenance |
+| GET | `/api/sessions/{session_id}/branch-origin` |  | ConversationBranchOrigin | verified | declared ConversationBranchOrigin |
+| DELETE | `/api/sessions/{session_id}/command-grant` |  | CommandGrantRevoked | verified | declared CommandGrantRevoked |
+| PUT | `/api/sessions/{session_id}/command-grant` | SessionCommandGrantRequest | CommandGrant | verified | declared CommandGrant |
+| POST | `/api/sessions/{session_id}/compact` | CompactConversationRequest | ConversationCompaction | verified | declared ConversationCompaction |
 | GET | `/api/sessions/{session_id}/context-usage` |  | ContextUsageView | verified | DashboardService.get_context_usage |
 | POST | `/api/sessions/{session_id}/export` | ExportSessionRequest |  | special | special |
-| GET | `/api/sessions/{session_id}/export/manifest` |  |  | deferred | body assembled in the route |
-| PUT | `/api/sessions/{session_id}/pin` | SetSessionPinnedRequest |  | deferred | body assembled in the route |
-| GET | `/api/sessions/{session_id}/plan` |  |  | deferred | body assembled in the route |
-| PUT | `/api/sessions/{session_id}/project` | SetSessionProjectRequest |  | deferred | body assembled in the route |
-| GET | `/api/sessions/{session_id}/recall` |  |  | deferred | body assembled in the route |
-| PUT | `/api/sessions/{session_id}/rename` | RenameSessionRequest |  | deferred | body assembled in the route |
-| GET | `/api/sessions/{session_id}/sources` |  |  | deferred | body assembled in the route |
-| PUT | `/api/sessions/{session_id}/tags` | SetSessionTagsRequest |  | deferred | body assembled in the route |
-| GET | `/api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt` |  |  | deferred | body assembled in the route |
-| PUT | `/api/sessions/{session_id}/unarchive` |  |  | deferred | body assembled in the route |
+| GET | `/api/sessions/{session_id}/export/manifest` |  | TranscriptManifest | verified | declared TranscriptManifest |
+| PUT | `/api/sessions/{session_id}/pin` | SetSessionPinnedRequest | SessionPinned | verified | declared SessionPinned |
+| GET | `/api/sessions/{session_id}/plan` |  | AgentPlan | verified | declared AgentPlan |
+| PUT | `/api/sessions/{session_id}/project` | SetSessionProjectRequest | SessionProjectSet | verified | declared SessionProjectSet |
+| GET | `/api/sessions/{session_id}/recall` |  | SessionRecall | verified | declared SessionRecall |
+| PUT | `/api/sessions/{session_id}/rename` | RenameSessionRequest | SessionRenamed | verified | declared SessionRenamed |
+| GET | `/api/sessions/{session_id}/sources` |  | TurnSources | verified | declared TurnSources |
+| PUT | `/api/sessions/{session_id}/tags` | SetSessionTagsRequest | SessionTagsSet | verified | declared SessionTagsSet |
+| GET | `/api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt` |  | TurnSourceExcerpt | verified | declared TurnSourceExcerpt |
+| PUT | `/api/sessions/{session_id}/unarchive` |  | SessionArchived | verified | declared SessionArchived |
 | GET | `/api/settings` |  |  | deferred | body assembled in the route |
 | PUT | `/api/settings` | SettingsRequest |  | deferred | body assembled in the route |
 | GET | `/api/settings/composer-approval-mode` |  |  | deferred | body assembled in the route |
@@ -348,7 +348,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/tasks` |  | TaskView[] | verified | DashboardService.list_tasks |
 | POST | `/api/tasks` | TaskCreateRequest | TaskView | verified | DashboardService.create_task |
 | GET | `/api/tasks/{task_id}` |  | TaskDetailView | verified | DashboardService.get_task_detail |
-| POST | `/api/tasks/{task_id}/resume` |  |  | deferred | body assembled in the route |
+| POST | `/api/tasks/{task_id}/resume` |  | TaskResumed | verified | declared TaskResumed |
 | POST | `/api/tasks/{task_id}/run` |  | TaskView | verified | DashboardService.run_task_now |
 | GET | `/api/telemetry/destinations` |  |  | deferred | body assembled in the route |
 | POST | `/api/telemetry/destinations` | CreateTelemetryDestinationRequest |  | deferred | body assembled in the route |
@@ -364,6 +364,6 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/web-access/blocklist` | BlocklistRuleRequest |  | deferred | body assembled in the route |
 | POST | `/api/web-access/blocklist/test` | BlocklistTestRequest |  | deferred | body assembled in the route |
 | DELETE | `/api/web-access/blocklist/{rule_id}` |  |  | deferred | body assembled in the route |
-| GET | `/api/work-in-flight` |  |  | deferred | body assembled in the route |
+| GET | `/api/work-in-flight` |  | WorkInFlight | verified | declared WorkInFlight |
 | GET | `/api/work-threads` |  | WorkThreadView[] | verified | DashboardService.list_work_threads |
 | GET | `/api/work-threads/page` |  | WorkThreadPage | verified | DashboardService.work_thread_page |

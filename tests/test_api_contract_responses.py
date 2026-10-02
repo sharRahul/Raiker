@@ -16,7 +16,7 @@ import dataclasses
 import types
 import typing
 from pathlib import Path
-from typing import Any
+from typing import Any, NotRequired, Required
 
 import pytest
 from fastapi.testclient import TestClient
@@ -54,7 +54,14 @@ def _check(annotation: Any, value: Any, where: str) -> None:
     if is_typeddict(annotation):
         assert isinstance(value, dict), f"{where}: expected an object"
         hints = typing.get_type_hints(annotation)
-        required = set(annotation.__required_keys__)
+        # Evaluated hints, not `__required_keys__`: under postponed annotations
+        # the class cannot see `NotRequired[...]` inside a string.
+        extras = typing.get_type_hints(annotation, include_extras=True)
+        required = {
+            name for name, hint in extras.items()
+            if typing.get_origin(hint) is not NotRequired
+            and (annotation.__total__ or typing.get_origin(hint) is Required)
+        }
         assert required <= set(value) <= set(hints), (
             f"{where}: keys differ — missing {sorted(required - set(value))}, "
             f"extra {sorted(set(value) - set(hints))}"

@@ -1,8 +1,6 @@
 import type {
-  AgentPlan,
   AgentResponse,
   ApprovalDetailView,
-  AttachmentPreview,
   AuditExportResult,
   AuditExportView,
   BrainSourceBrowse,
@@ -26,10 +24,6 @@ import type {
   ComposerApprovalModeSettings,
   ConnectorStoreView,
   ContainedSubject,
-  ConversationBranch,
-  ConversationBranchOrigin,
-  ConversationBranchPlan,
-  ConversationCompaction,
   CredentialDeltaView,
   DiagnosticsExport,
   EnvironmentContext,
@@ -51,9 +45,6 @@ import type {
   InterruptResult,
   KnowledgeSourceKind,
   KnowledgeSourcesView,
-  ManagedFile,
-  ManagedFileImportResponse,
-  ManagedFileList,
   ManagedFileScope,
   ManagedFileUpload,
   McpAgentAccess,
@@ -80,12 +71,7 @@ import type {
   OwnerQuestionAnswered,
   PartialFiles,
   PluginsView,
-  ProjectBrowseView,
-  ProjectDeletionPreview,
-  ProjectFilesView,
-  ProjectRootIndexResult,
-  ProjectRootStatus,
-  ProjectTreeNode,
+  ProjectContext,
   PromptRequestBody,
   ProviderCatalogueRefresh,
   ProviderModelList,
@@ -93,14 +79,9 @@ import type {
   ReadCapabilities,
   ResolveApprovalResult,
   ResolveCriticalApprovalResult,
-  RestorePlan,
-  RestoreRequestResult,
   ResumableTurnsView,
   RuntimeInstallPlan,
   SecurityHealth,
-  SessionAttachmentsView,
-  SessionDetail,
-  SessionRecallView,
   SessionSummary,
   SetupState,
   SkillMutationResult,
@@ -113,16 +94,12 @@ import type {
   StandingGrant,
   StopAllResult,
   TelemetryDestination,
-  TranscriptExportManifest,
-  TurnSourceExcerptView,
-  TurnSourcesView,
   UpdateApplyResult,
   UpdateCheckResult,
   UpdateStatusView,
   UploadedAttachment,
   WebBlocklist,
   WebBlocklistProbe,
-  WorkInFlight,
 } from "./apiTypes";
 import type { ApprovalMode } from "./approvalMode";
 import { restoreSession } from "./api/auth";
@@ -230,8 +207,7 @@ export const api = {
   sessionContextUsage: (sessionId: string) => contract.getSessionContextUsage(sessionId),
   // B6 — the agent's standing plan for one conversation, so a reload or a
   // second tab picks the checklist back up instead of starting blank.
-  sessionPlan: (sessionId: string) =>
-    request<AgentPlan>(`/api/sessions/${encodeURIComponent(sessionId)}/plan`),
+  sessionPlan: (sessionId: string) => contract.getSessionPlan(sessionId),
   capabilityGates: () => contract.listCapabilityGates(),
   // One read for the whole contract: the catalogue, its
   // per-surface parity, and typed readiness. Every composer answers from this
@@ -839,10 +815,7 @@ export const api = {
   // machine — which messages, which files, and the redaction policy — before a
   // format is chosen. The export itself returns the document; scope comes from
   // the authenticated session and the session id, never from the request body.
-  sessionExportManifest: (sessionId: string) =>
-    request<TranscriptExportManifest>(
-      `/api/sessions/${encodeURIComponent(sessionId)}/export/manifest`,
-    ),
+  sessionExportManifest: (sessionId: string) => contract.getSessionExportManifest(sessionId),
   exportSession: async (
     sessionId: string,
     format: "html" | "markdown" | "pdf",
@@ -964,14 +937,9 @@ export const api = {
         body: JSON.stringify(body),
       },
     ),
-  sessionAttachments: (sessionId: string) =>
-    request<SessionAttachmentsView>(
-      `/api/sessions/${encodeURIComponent(sessionId)}/attachments`,
-    ),
+  sessionAttachments: (sessionId: string) => contract.listSessionAttachments(sessionId),
   attachmentPreview: (sessionId: string, attachmentId: string) =>
-    request<AttachmentPreview>(
-      `/api/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}/preview`,
-    ),
+    contract.getAttachmentPreview(sessionId, attachmentId),
   // PDFs and images are displayed by the browser itself. Their bytes are
   // fetched with the in-memory bearer token (an <object> or <img> tag cannot
   // send one) and handed over as a same-origin blob URL; the caller revokes it
@@ -995,40 +963,21 @@ export const api = {
   // BUG-27 — which exchange produced a generated file, resolved the same way
   // memory provenance is, so both surfaces give the same honest answers.
   attachmentProvenance: (sessionId: string, attachmentId: string) =>
-    request<SourceExcerptView>(
-      `/api/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}/provenance`,
-    ),
+    contract.getAttachmentProvenance(sessionId, attachmentId),
   // C6 — what the turns in this conversation actually read. Labels and
   // locators only; the material behind a chip is fetched when it is opened.
-  sessionSources: (sessionId: string) =>
-    request<TurnSourcesView>(
-      `/api/sessions/${encodeURIComponent(sessionId)}/sources`,
-    ),
+  sessionSources: (sessionId: string) => contract.listSessionSources(sessionId),
   // C17 — which approved memories this conversation's turns were given.
   // Read live, so a memory corrected or forgotten since the turn ran reads as
   // it is now rather than as a stale copy.
-  sessionRecall: (sessionId: string) =>
-    request<SessionRecallView>(
-      `/api/sessions/${encodeURIComponent(sessionId)}/recall`,
-    ),
+  sessionRecall: (sessionId: string) => contract.listSessionRecall(sessionId),
   // C4 — one cited source, opened at the passage the turn used. Resolution is
   // re-run now, so a changed or unreadable source says so instead of showing a
   // passage that is no longer there.
   // `quote` is the answer sentence an inline marker terminated, when there is
   // one: it locates the run inside a source the turn read whole.
-  turnSourceExcerpt: (
-    sessionId: string,
-    turnId: string,
-    sourceId: string,
-    quote = "",
-  ) =>
-    request<TurnSourceExcerptView>(
-      withQuery(
-        `/api/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}` +
-          `/sources/${encodeURIComponent(sourceId)}/excerpt`,
-        quote === "" ? {} : { quote },
-      ),
-    ),
+  turnSourceExcerpt: (sessionId: string, turnId: string, sourceId: string, quote = "") =>
+    contract.getTurnSourceExcerpt(sessionId, turnId, sourceId, quote === "" ? {} : { quote }),
   // BUG-27 — the passage a memory was drawn from. Every non-resolvable case
   // comes back as a named status rather than an error.
   memorySource: (memoryId: string) =>
@@ -1177,33 +1126,20 @@ export const api = {
   checkpoint: (id: string) => contract.getCheckpoint(id),
   // Preflight only. Reading a plan performs no restore; executing one still
   // goes through the governed approval path.
-  checkpointRestorePlan: (id: string) =>
-    request<RestorePlan>(
-      `/api/checkpoints/${encodeURIComponent(id)}/restore-plan`,
-    ),
+  checkpointRestorePlan: (id: string) => contract.getCheckpointRestorePlan(id),
   // BUG-230 — the rewind. This asks for it; it never performs one. The server
   // recomputes the preflight, records the proposal and returns an approval id,
   // and the workspace changes only when a human approves it in Approvals.
-  requestCheckpointRestore: (id: string) =>
-    postJson<RestoreRequestResult>(
-      `/api/checkpoints/${encodeURIComponent(id)}/restore`,
-      {},
-    ),
+  requestCheckpointRestore: (id: string) => contract.requestCheckpointRestore(id),
   // ── Branch from here (GAP-CHAT C14) ──────────────────────────────────
   // A branch is a *second* conversation seeded from a checkpoint's state summary
   // and memory candidates. It rewrites nothing: the original conversation keeps
   // every turn it had, which is why — unlike a restore — it writes no workspace
   // file and needs no approval. `branchOrigin` answers "is this a branch, and of
   // what", and reports a root conversation as such rather than as an error.
-  conversationBranchPlan: (checkpointId: string) =>
-    request<ConversationBranchPlan>(
-      `/api/checkpoints/${encodeURIComponent(checkpointId)}/branch-plan`,
-    ),
+  conversationBranchPlan: (checkpointId: string) => contract.getConversationBranchPlan(checkpointId),
   branchConversation: (checkpointId: string, title = "") =>
-    postJson<ConversationBranch>(
-      `/api/checkpoints/${encodeURIComponent(checkpointId)}/branch`,
-      { title },
-    ),
+    contract.branchConversation(checkpointId, { title }),
   answerOwnerQuestion: (
     approvalId: string,
     body: { answers?: Record<string, string | string[]>; response?: string },
@@ -1213,14 +1149,8 @@ export const api = {
       body,
     ),
   compactConversation: (sessionId: string, throughTurnId: string) =>
-    postJson<ConversationCompaction>(
-      `/api/sessions/${encodeURIComponent(sessionId)}/compact`,
-      { through_turn_id: throughTurnId },
-    ),
-  conversationBranchOrigin: (sessionId: string) =>
-    request<ConversationBranchOrigin>(
-      `/api/sessions/${encodeURIComponent(sessionId)}/branch-origin`,
-    ),
+    contract.compactConversation(sessionId, { through_turn_id: throughTurnId }),
+  conversationBranchOrigin: (sessionId: string) => contract.getConversationBranchOrigin(sessionId),
   // ── Installed skills (Extensions → Skills) ───────────────────────────
   // A skill is instruction text the owner installs; it grants no capability and
   // runs nothing. `verifySkillUrl` reads a linked document and reports what it
@@ -1295,8 +1225,7 @@ export const api = {
     ),
 
   extensions: () => contract.getExtensions(),
-  projectFiles: (id: string) =>
-    request<ProjectFilesView>(`/api/projects/${encodeURIComponent(id)}/files`),
+  projectFiles: (id: string) => contract.getProjectFiles(id),
   diagnosticsExport: () =>
     request<DiagnosticsExport>("/api/diagnostics/export"),
   // `origin: "chat"` narrows the list to conversations the owner typed. Task
@@ -1685,46 +1614,27 @@ export const api = {
   // Memory and Projects share one contract, differing only in which managed
   // root the file lands in. Every file type is accepted; whether its text can
   // be indexed is reported back per file, never assumed by the client.
-  deleteManagedFile: (fileId: string) =>
-    request<{ ok: boolean } & ManagedFile>(
-      `/api/managed-files/${encodeURIComponent(fileId)}`,
-      { method: "DELETE" },
-    ),
-  retryManagedFile: (fileId: string) =>
-    postJson<{ ok: boolean } & ManagedFile>(
-      `/api/managed-files/${encodeURIComponent(fileId)}/retry`,
-      {},
-    ),
+  deleteManagedFile: (fileId: string) => contract.deleteManagedFile(fileId),
+  retryManagedFile: (fileId: string) => contract.retryManagedFile(fileId),
   managedFiles: (scope: ManagedFileScope, projectId: string | null) =>
     scope === "memory"
-      ? request<ManagedFileList>("/api/memory/files")
-      : request<ManagedFileList>(
-          `/api/projects/${encodeURIComponent(projectId ?? "")}/managed-files`,
-        ),
+      ? contract.listMemoryFiles()
+      : contract.listProjectFiles(projectId ?? ""),
   importManagedFiles: (
     scope: ManagedFileScope,
     projectId: string | null,
     files: ManagedFileUpload[],
   ) =>
     scope === "memory"
-      ? postJson<ManagedFileImportResponse>("/api/memory/files", { files })
-      : postJson<ManagedFileImportResponse>(
-          `/api/projects/${encodeURIComponent(projectId ?? "")}/managed-files`,
-          { files },
-        ),
+      ? contract.importMemoryFiles({ files })
+      : contract.importProjectFiles(projectId ?? "", { files }),
   // Create a named project for the authenticated local human.
   // The root subpath is derived and contained server-side — no path is sent.
   // `attachPath` is the exception and the only path the client ever sends: the
   // owner is naming a folder they already have, which the server validates and
   // records as a grant before it becomes a root.
   createProject: (name: string, attachPath: string | null = null, attachWritable = true) =>
-    postJson<{
-      ok: boolean;
-      project_id: string;
-      name: string;
-      root_subpath: string;
-    }>(
-      "/api/projects",
+    contract.createProject(
       attachPath === null
         ? { name }
         : { name, attach_path: attachPath, attach_writable: attachWritable },
@@ -1734,162 +1644,48 @@ export const api = {
   // can be arbitrarily large, and walking it eagerly would stall the page on a
   // repository the owner only wanted to glance at.
   browseProject: (projectId: string, path = "") =>
-    request<ProjectBrowseView>(
-      `/api/projects/${encodeURIComponent(projectId)}/browse` +
-        (path === "" ? "" : `?path=${encodeURIComponent(path)}`),
-    ),
-  projectRootStatus: (projectId: string) =>
-    request<ProjectRootStatus>(
-      `/api/projects/${encodeURIComponent(projectId)}/root/status`,
-    ),
-  indexProjectRoot: (projectId: string) =>
-    postJson<ProjectRootIndexResult>(
-      `/api/projects/${encodeURIComponent(projectId)}/root/index`,
-      {},
-    ),
+    contract.browseProject(projectId, path === "" ? {} : { path }),
+  projectRootStatus: (projectId: string) => contract.projectRootStatus(projectId),
+  indexProjectRoot: (projectId: string) => contract.indexProjectRoot(projectId),
   attachProjectFolder: (projectId: string, path: string, writable: boolean) =>
-    postJson<{ ok: boolean; project_id: string; root_id: string }>(
-      `/api/projects/${encodeURIComponent(projectId)}/root/attach`,
-      { path, writable },
-    ),
-  detachProjectFolder: (projectId: string) =>
-    request<{ ok: boolean; project_id: string }>(
-      `/api/projects/${encodeURIComponent(projectId)}/root`,
-      { method: "DELETE" },
-    ),
+    contract.attachProjectRoot(projectId, { path, writable }),
+  detachProjectFolder: (projectId: string) => contract.detachProjectRoot(projectId),
   // Set (or clear, with null) the active project; new sessions are stamped with it.
-  selectProject: (project_id: string | null) =>
-    request<{ ok: boolean; active_project_id: string | null }>(
-      "/api/projects/selection",
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id }),
-      },
-    ),
+  selectProject: (project_id: string | null) => contract.selectProject({ project_id }),
   deleteProject: (id: string, confirmed = false) =>
-    request<{ ok: boolean }>(`/api/projects/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      headers: confirmed ? { "X-Project-Delete-Confirm": id } : undefined,
-    }),
-  saveProjectContext: (
-    id: string,
-    context: {
-      instructions: string;
-      attachment_ids: string[];
-      memory_enabled: boolean;
-      memory_mode: "inherit" | "enabled" | "disabled";
-    },
-  ) =>
-    request<{ ok: boolean }>(
-      `/api/projects/${encodeURIComponent(id)}/context`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(context),
-      },
-    ),
+    contract.deleteProject(id, confirmed ? id : undefined),
+  saveProjectContext: (id: string, context: ProjectContext) =>
+    contract.saveProjectContext(id, context),
   // Nested projects/folders: tree, move, archive
-  projectTree: () => request<ProjectTreeNode[]>("/api/projects/tree"),
-  moveProject: (id: string, parent_id: string | null) =>
-    request<{ ok: boolean; project_id: string; new_parent_id: string | null }>(
-      `/api/projects/${encodeURIComponent(id)}/move`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ parent_id }),
-      },
-    ),
-  archiveProject: (id: string) =>
-    request<{ ok: boolean; project_id: string }>(
-      `/api/projects/${encodeURIComponent(id)}/archive`,
-      { method: "PUT" },
-    ),
+  projectTree: () => contract.listProjectTree(),
+  moveProject: (id: string, parent_id: string | null) => contract.moveProject(id, { parent_id }),
+  archiveProject: (id: string) => contract.archiveProject(id),
   // UX-PROJ-05 — undo an archive: the project and what was archived with it.
-  restoreProject: (id: string) =>
-    request<{ ok: boolean; project_id: string; archived: boolean }>(
-      `/api/projects/${encodeURIComponent(id)}/restore`,
-      { method: "PUT" },
-    ),
+  restoreProject: (id: string) => contract.restoreProject(id),
   // UX-PROJ-07 — what a delete would remove, counted before it is asked for.
-  projectDeletionPreview: (id: string) =>
-    request<ProjectDeletionPreview>(
-      `/api/projects/${encodeURIComponent(id)}/deletion-preview`,
-    ),
-  session: (id: string) =>
-    request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
-  renameSession: (id: string, title: string) =>
-    request<{ ok: boolean; session_id: string; title: string }>(
-      `/api/sessions/${encodeURIComponent(id)}/rename`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      },
-    ),
-  archiveSession: (id: string) =>
-    request<{ ok: boolean; session_id: string; archived: boolean }>(
-      `/api/sessions/${encodeURIComponent(id)}/archive`,
-      { method: "PUT" },
-    ),
-  unarchiveSession: (id: string) =>
-    request<{ ok: boolean; session_id: string; archived: boolean }>(
-      `/api/sessions/${encodeURIComponent(id)}/unarchive`,
-      { method: "PUT" },
-    ),
+  projectDeletionPreview: (id: string) => contract.projectDeletionPreview(id),
+  session: (id: string) => contract.getSession(id),
+  renameSession: (id: string, title: string) => contract.renameSession(id, { title }),
+  archiveSession: (id: string) => contract.archiveSession(id),
+  unarchiveSession: (id: string) => contract.unarchiveSession(id),
   // Pin (or unpin) a session. Organizing label only — grants nothing.
-  setSessionPinned: (id: string, pinned: boolean) =>
-    request<{ ok: boolean; session_id: string; pinned: boolean }>(
-      `/api/sessions/${encodeURIComponent(id)}/pin`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pinned }),
-      },
-    ),
+  setSessionPinned: (id: string, pinned: boolean) => contract.setSessionPinned(id, { pinned }),
   // Permanently delete one session and its cascaded rows. Requires the explicit
   // confirmation header (mirrors project deletion). Human-only; an account
   // cannot delete another account's session.
-  deleteSession: (id: string) =>
-    request<{ ok: boolean; session_id: string }>(
-      `/api/sessions/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE",
-        headers: { "X-Session-Delete-Confirm": id },
-      },
-    ),
-  deleteSessions: (session_ids: string[]) =>
-    request<{ ok: boolean; session_ids: string[] }>("/api/sessions/bulk", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_ids }),
-    }),
+  deleteSession: (id: string) => contract.deleteSession(id, id),
+  deleteSessions: (session_ids: string[]) => contract.deleteSessions({ session_ids }),
   // Replace the tag set for one session. Tags are organizing labels only —
   // they grant nothing. The server normalizes (trim, lowercase, dedupe,
   // length/count caps). Human-only; an account cannot retag another account's
   // session.
-  setSessionTags: (id: string, tags: string[]) =>
-    request<{ ok: boolean; session_id: string; tags: string[] }>(
-      `/api/sessions/${encodeURIComponent(id)}/tags`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tags }),
-      },
-    ),
+  setSessionTags: (id: string, tags: string[]) => contract.setSessionTags(id, { tags }),
   // Move one chat into a project, or out of every project with a null
   // project_id. A project is an organizing scope — the move grants nothing and
   // only changes the bounded context the chat receives on its next turn.
   // Human-only; an account cannot move another account's chat.
   setSessionProject: (id: string, project_id: string | null) =>
-    request<{ ok: boolean; session_id: string; project_id: string | null }>(
-      `/api/sessions/${encodeURIComponent(id)}/project`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id }),
-      },
-    ),
+    contract.setSessionProject(id, { project_id }),
   turn: (id: string) => contract.getTurn(id),
   // `project_id` scopes the list to one project's schedules (project-scoped
   // schedules); omitting it lists every task visible to the account.
@@ -1906,14 +1702,7 @@ export const api = {
   // BUG-25 — ask the host to continue one parked scheduled run now. The
   // scheduler does this on its own tick; this is the owner's retry for when
   // automatic continuation could not proceed, and it runs the same path.
-  resumeTask: (taskId: string) =>
-    postJson<{
-      ok: boolean;
-      reason_code: string | null;
-      task_status: string;
-      summary: string;
-    }>(`/api/tasks/${encodeURIComponent(taskId)}/resume`, {}),
-
+  resumeTask: (taskId: string) => contract.resumeTask(taskId),
   // ── Prompts / interrupts ──
   // Non-streaming prompt submit; returns the final governed AgentResponse.
   submitPrompt: (body: PromptRequestBody) =>
@@ -1923,7 +1712,7 @@ export const api = {
     postJson<InterruptResult>("/api/interrupts", body),
   // GEP-02 — what the stop switch would reach beyond the task list: the turns
   // writing an answer right now and the commands still running.
-  workInFlight: () => request<WorkInFlight>("/api/work-in-flight"),
+  workInFlight: () => contract.workInFlight(),
   stopAll: () => postJson<StopAllResult>("/api/stop-all", {}),
 
   // ── Approvals (resolution is metadata-only: records a decision, never executes) ──

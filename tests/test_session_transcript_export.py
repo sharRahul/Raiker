@@ -90,7 +90,7 @@ class TestRendering:
 
         assert transcript.messages[1].text == "The setting changed [s1]. An invented claim."
         assert [source.source_id for source in transcript.messages[1].sources] == ["s1"]
-        assert transcript.manifest()["unresolved_citation_count"] == 1
+        assert transcript.manifest().to_dict()["unresolved_citation_count"] == 1
         markdown = render_markdown(transcript)
         html = render_html(transcript)
         pdf = render_pdf(transcript).decode("latin-1")
@@ -190,7 +190,7 @@ class TestRendering:
         )
         markdown = render_markdown(transcript)
         assert "budget.xlsx" in markdown and "20480 bytes" in markdown
-        assert transcript.manifest()["file_count"] == 1
+        assert transcript.manifest().to_dict()["file_count"] == 1
 
     def test_the_download_name_is_reduced_to_a_safe_slug(self) -> None:
         assert safe_filename('../../etc/pa"sswd', "sess_abc", "html") == "etc-pa-sswd.html"
@@ -435,7 +435,7 @@ class TestDeclaredPartsAreExportedAsWhatTheyAre:
         assert "Just prose, with a **bold** word." in render_markdown(transcript)
 
     def test_the_review_says_how_many_tables_and_charts_will_be_rendered(self) -> None:
-        manifest = self._transcript().manifest()
+        manifest = self._transcript().manifest().to_dict()
         assert manifest["typed_part_count"] == 2
         assert "Tables and charts" in manifest["redaction_policy"]
 

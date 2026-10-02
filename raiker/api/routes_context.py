@@ -27,8 +27,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from raiker.api.dependencies import authenticate as _auth
-from raiker.api.schemas import CompactConversationRequest
+from raiker.api.schemas import CompactConversationRequest, serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.sessions import ConversationCompaction
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.hooks.factory import dispatcher_for_workspace
@@ -133,12 +134,14 @@ async def compact_conversation(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=exc.reason
         ) from exc
+    answer: ConversationCompaction
     if not plan.should_compact:
-        return {
+        answer = {
             "session_id": session_id,
             "compacted": False,
             "reason_code": "nothing_to_summarise",
         }
+        return serialize_dto(answer)
 
     outcome = await ConversationCompactor(
         store,
@@ -164,12 +167,13 @@ async def compact_conversation(
     if outcome.record is None:
         # The reason is the owner's to see: a hook refused, or the model did not
         # answer. Both are recorded as a failed compaction either way.
-        return {
+        answer = {
             "session_id": session_id,
             "compacted": False,
             "reason_code": outcome.reason_code or "compaction_unavailable",
         }
-    return {
+        return serialize_dto(answer)
+    answer = {
         "session_id": session_id,
         "compacted": True,
         "through_turn_id": outcome.record.through_turn_id,
@@ -179,6 +183,7 @@ async def compact_conversation(
         "model": outcome.record.model,
         "created_at": outcome.record.created_at,
     }
+    return serialize_dto(answer)
 
 
 __all__ = ["router"]

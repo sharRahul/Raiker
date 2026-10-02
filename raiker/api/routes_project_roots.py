@@ -14,14 +14,24 @@ is the wrong half to get wrong.
 from __future__ import annotations
 
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
 from raiker.api.dependencies import workspace_path as _ws
+from raiker.api.schemas import AttachProjectFolderRequest, serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.projects import (
+    ManagedFileIndexState,
+    ProjectBrowseEntry,
+    ProjectBrowseView,
+    ProjectFolderAttached,
+    ProjectFolderDetached,
+    ProjectRootIndexResult,
+    ProjectRootStatus,
+)
 from raiker.control.dashboard import DashboardService
 from raiker.control.project_roots import authority_for_project, resolve_project_root
 from raiker.knowledge.extractors import resolve_extractable_media_type
@@ -101,7 +111,7 @@ async def browse_project(
     if root.path is None or root.missing:
         # A revoked grant, a detached project, or a folder the owner moved. The
         # explorer has to say so; an empty tree would read as "no files".
-        return {
+        missing: ProjectBrowseView = {
             "path": "",
             "parent": None,
             "entries": [],
@@ -110,6 +120,7 @@ async def browse_project(
             "root_label": _label(root),
             "root_missing": True,
         }
+        return serialize_dto(missing)
     supplied = (path or "").strip().replace("\\", "/")
     relative = supplied.strip("/")
     if _names_its_own_root(supplied) or ".." in PurePosixPath(relative).parts:
@@ -138,7 +149,7 @@ async def browse_project(
         if child.name not in IGNORED_DIRECTORY_NAMES
     ]
     entries = [_entry(child, root.path, indexed) for child in children[:MAX_BROWSE_ENTRIES]]
-    return {
+    answer: ProjectBrowseView = {
         "path": relative,
         "parent": Path(relative).parent.as_posix().replace(".", "") if relative else None,
         "entries": entries,
@@ -147,9 +158,10 @@ async def browse_project(
         "root_label": _label(root),
         "root_missing": False,
     }
+    return serialize_dto(answer)
 
 
-def _entry(child: Path, root: Path, indexed: dict[str, str]) -> dict[str, Any]:
+def _entry(child: Path, root: Path, indexed: dict[str, str]) -> ProjectBrowseEntry:
     relative = child.relative_to(root).as_posix()
     is_directory = child.is_dir()
     return {
@@ -160,7 +172,7 @@ def _entry(child: Path, root: Path, indexed: dict[str, str]) -> dict[str, Any]:
         "media_type": "" if is_directory else (resolve_extractable_media_type(relative, "") or ""),
         # Absent rather than "not indexed": a file Raiker cannot read has no
         # index state to report, and inventing one would suggest a failure.
-        "index_state": indexed.get(relative),
+        "index_state": cast("ManagedFileIndexState | None", indexed.get(relative)),
     }
 
 
@@ -189,7 +201,7 @@ async def project_root_status(
     owner = auth_data[0].principal_id
     root = resolve_project_root(project, store.list_brain_source_grants(owner), workspace)
     state = _watch_state(request, project_id)
-    return {
+    answer: ProjectRootStatus = {
         "ok": True,
         "project_id": project_id,
         "root_kind": root.kind,
@@ -204,6 +216,7 @@ async def project_root_status(
             store.list_managed_files(owner, scope_kind="project", project_id=project_id)
         ),
     }
+    return serialize_dto(answer)
 
 
 @router.post("/api/projects/{project_id}/root/index")
@@ -224,7 +237,7 @@ async def index_project_root(
     if root.path is None or root.missing:
         raise _bad_request("project_root_missing")
     report = reconcile_attached_root(workspace, store, project, owner)
-    return {
+    answer: ProjectRootIndexResult = {
         "ok": True,
         "project_id": project_id,
         "indexed": report.indexed,
@@ -234,25 +247,28 @@ async def index_project_root(
         "truncated": report.truncated,
         "scanned_at": report.scanned_at,
     }
+    return serialize_dto(answer)
 
 
 @router.post("/api/projects/{project_id}/root/attach")
 async def attach_project_root(
     project_id: str,
+    body: AttachProjectFolderRequest,
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    body = await _body(request)
     _owned_project(request, project_id, auth_data)
     result = DashboardService(_ws(request)).attach_project_folder(
-        project_id,
-        str(body.get("path", "")),
-        auth_data[0].principal_id,
-        writable=bool(body.get("writable", True)),
+        project_id, body.path, auth_data[0].principal_id, writable=body.writable
     )
     if not result.ok:
         raise _bad_request(str(result.reason_code))
-    return {"ok": True, **result.data}
+    attached: ProjectFolderAttached = {
+        "ok": True,
+        "project_id": result.data["project_id"],
+        "root_id": result.data["root_id"],
+    }
+    return serialize_dto(attached)
 
 
 @router.delete("/api/projects/{project_id}/root")
@@ -267,14 +283,5 @@ async def detach_project_root(
     )
     if not result.ok:
         raise _bad_request(str(result.reason_code))
-    return {"ok": True, **result.data}
-
-
-async def _body(request: Request) -> dict[str, Any]:
-    try:
-        payload = await request.json()
-    except Exception as exc:  # noqa: BLE001 - any malformed body is one refusal
-        raise _bad_request("invalid_body") from exc
-    if not isinstance(payload, dict):
-        raise _bad_request("invalid_body")
-    return payload
+    detached: ProjectFolderDetached = {"ok": True, "project_id": result.data["project_id"]}
+    return serialize_dto(detached)

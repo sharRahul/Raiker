@@ -18,14 +18,25 @@ from __future__ import annotations
 import base64
 import binascii
 import contextlib
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
 from raiker.api.dependencies import workspace_root as _ws
+from raiker.api.schemas import serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.projects import (
+    ImportedFile,
+    ImportRefused,
+    ManagedFile,
+    ManagedFileChanged,
+    ManagedFileImport,
+    ManagedFileIndexState,
+    ManagedFileList,
+)
+from raiker.api.wire.projects import ManagedFileScope as ManagedFileScopeKind
 from raiker.knowledge.files import (
     ManagedFileError,
     ManagedFileRecord,
@@ -56,16 +67,16 @@ def _not_found(reason_code: str) -> HTTPException:
     return refusal(status.HTTP_404_NOT_FOUND, reason_code)
 
 
-def _serialize(record: ManagedFileRecord) -> dict[str, Any]:
+def _serialize(record: ManagedFileRecord) -> ManagedFile:
     return {
         "file_id": record.file_id,
-        "scope_kind": record.scope_kind,
+        "scope_kind": cast(ManagedFileScopeKind, record.scope_kind),
         "project_id": record.project_id,
         "relative_path": record.relative_path,
         "media_type": record.media_type,
         "size_bytes": record.size_bytes,
         "content_hash": record.content_hash,
-        "index_state": record.index_state,
+        "index_state": cast(ManagedFileIndexState, record.index_state),
         "index_error": record.index_error,
         "created_at": record.created_at,
         "updated_at": record.updated_at,
@@ -81,14 +92,14 @@ def _owned_project_scope(
     return ManagedFileScope("project", project_id)
 
 
-def _list(request: Request, scope: ManagedFileScope, principal_id: str) -> dict[str, Any]:
+def _list(request: Request, scope: ManagedFileScope, principal_id: str) -> ManagedFileList:
     store = SQLiteStore(_ws(request))
     rows = store.list_managed_files(
         principal_id, scope_kind=scope.kind, project_id=scope.project_id
     )
     return {
         "ok": True,
-        "scope_kind": scope.kind,
+        "scope_kind": cast(ManagedFileScopeKind, scope.kind),
         "project_id": scope.project_id,
         "files": [_serialize(ManagedFileRecord.from_row(row)) for row in rows],
     }
@@ -109,7 +120,7 @@ def _decode(entry: dict[str, Any]) -> bytes:
 
 def _import(
     request: Request, scope: ManagedFileScope, principal_id: str, body: dict[str, Any]
-) -> dict[str, Any]:
+) -> ManagedFileImport:
     """Store each file in the request independently, then index what can be read.
 
     One file's failure is that file's result, never the batch's: a folder import
@@ -124,7 +135,7 @@ def _import(
     store = SQLiteStore(_ws(request))
     service = ManagedFileService(_ws(request), store)
     indexer = ManagedFileIndexer(_ws(request), store)
-    results: list[dict[str, Any]] = []
+    results: list[ImportedFile | ImportRefused] = []
     for entry in raw:
         if not isinstance(entry, dict):
             results.append({"ok": False, "relative_path": "", "reason_code": "invalid_entry"})
@@ -144,10 +155,10 @@ def _import(
         # affordance for that. Losing the import over it would be worse.
         with contextlib.suppress(ManagedFileError):
             record = indexer.index(record.file_id, principal_id)
-        results.append({"ok": True, **_serialize(record)})
+        results.append(cast(ImportedFile, {"ok": True, **_serialize(record)}))
     return {
         "ok": all(result["ok"] for result in results),
-        "scope_kind": scope.kind,
+        "scope_kind": cast(ManagedFileScopeKind, scope.kind),
         "project_id": scope.project_id,
         "results": results,
     }
@@ -157,7 +168,7 @@ def _import(
 async def list_memory_files(
     request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
 ) -> dict[str, Any]:
-    return _list(request, ManagedFileScope("memory"), auth_data[0].principal_id)
+    return serialize_dto(_list(request, ManagedFileScope("memory"), auth_data[0].principal_id))
 
 
 @router.post("/api/memory/files")
@@ -166,7 +177,9 @@ async def import_memory_files(
     body: dict[str, Any],
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _import(request, ManagedFileScope("memory"), auth_data[0].principal_id, body)
+    return serialize_dto(
+        _import(request, ManagedFileScope("memory"), auth_data[0].principal_id, body)
+    )
 
 
 @router.get("/api/projects/{project_id}/managed-files")
@@ -176,7 +189,7 @@ async def list_project_files(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     scope = _owned_project_scope(request, project_id, auth_data[1])
-    return _list(request, scope, auth_data[0].principal_id)
+    return serialize_dto(_list(request, scope, auth_data[0].principal_id))
 
 
 @router.post("/api/projects/{project_id}/managed-files")
@@ -187,7 +200,7 @@ async def import_project_files(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     scope = _owned_project_scope(request, project_id, auth_data[1])
-    return _import(request, scope, auth_data[0].principal_id, body)
+    return serialize_dto(_import(request, scope, auth_data[0].principal_id, body))
 
 
 @router.delete("/api/managed-files/{file_id}")
@@ -202,7 +215,8 @@ async def delete_managed_file(
         record = indexer.retire(file_id, auth_data[0].principal_id)
     except ManagedFileError as exc:
         raise _not_found(str(exc)) from exc
-    return {"ok": True, **_serialize(record)}
+    answer = cast(ManagedFileChanged, {"ok": True, **_serialize(record)})
+    return serialize_dto(answer)
 
 
 @router.post("/api/managed-files/{file_id}/retry")
@@ -217,4 +231,5 @@ async def retry_managed_file(
         record = indexer.index(file_id, auth_data[0].principal_id)
     except ManagedFileError as exc:
         raise _not_found(str(exc)) from exc
-    return {"ok": True, **_serialize(record)}
+    answer = cast(ManagedFileChanged, {"ok": True, **_serialize(record)})
+    return serialize_dto(answer)

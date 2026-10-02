@@ -138,7 +138,7 @@ def test_kept_working_never_leaves_in_an_exported_transcript(tmp_path: Path) -> 
         turns=store.list_turns(session_id),
     )
 
-    rendered = json.dumps(transcript.manifest())
+    rendered = json.dumps(transcript.manifest().to_dict())
     assert "Internal working" not in rendered
     assert "Here is the plan." in rendered
 

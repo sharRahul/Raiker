@@ -15,8 +15,9 @@ from raiker.api.dependencies import refusal, require_human
 from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.redaction import redact_response_body
 from raiker.api.routes_settings import load_composer_approval_mode
-from raiker.api.schemas import InterruptRequest, PromptRequest
+from raiker.api.schemas import InterruptRequest, PromptRequest, serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.sessions import WorkInFlight
 from raiker.build_identity import version as raiker_version
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import (
@@ -696,7 +697,7 @@ async def work_in_flight(
     turn_ids = {turn.turn_id for turn in found["turns"]} | {
         str(task.parent_turn_id) for task in found["turn_tasks"]
     }
-    return {
+    answer: WorkInFlight = {
         "tasks": len(found["tasks"]),
         "turns": len(turn_ids),
         # `None` when the command store could not be read: unknown, not zero.
@@ -706,6 +707,7 @@ async def work_in_flight(
             | {task.session_id for task in found["turn_tasks"]}
         ),
     }
+    return serialize_dto(answer)
 
 
 @router.post("/api/stop-all")

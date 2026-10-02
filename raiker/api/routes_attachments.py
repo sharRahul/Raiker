@@ -23,15 +23,24 @@ from __future__ import annotations
 
 import base64
 import binascii
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
 from raiker.api.dependencies import workspace_root as _ws
-from raiker.api.schemas import UploadAttachmentRequest
+from raiker.api.schemas import UploadAttachmentRequest, serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.sessions import (
+    AttachmentProvenance,
+    SessionAttachment,
+    SessionAttachments,
+    SessionRecall,
+    TurnSourceExcerpt,
+    TurnSources,
+    TurnSourceView,
+)
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.attachment_preview import AttachmentPreviewService
@@ -125,7 +134,11 @@ def list_session_attachments(
     turn; this is how the transcript redraws its attachment chips.
     """
     files = _preview_service(request).list_session_files(session_id, auth_data[0].principal_id)
-    return {"session_id": session_id, "files": files}
+    answer: SessionAttachments = {
+        "session_id": session_id,
+        "files": [cast(SessionAttachment, item) for item in files],
+    }
+    return serialize_dto(answer)
 
 
 @router.get("/api/sessions/{session_id}/attachments/{attachment_id}/preview")
@@ -143,7 +156,7 @@ def get_attachment_preview(
     preview = _preview_service(request).get(session_id, attachment_id, auth_data[0].principal_id)
     if preview is None:
         raise _not_found("attachment_preview_not_found")
-    return preview.to_dict()
+    return serialize_dto(preview)
 
 
 def _inline_filename(filename: str) -> str:
@@ -238,7 +251,11 @@ def get_attachment_provenance(
         filename,
         owner_id,
     )
-    return {"ok": True, "attachment_id": attachment_id, "filename": filename, **excerpt.to_dict()}
+    answer: AttachmentProvenance = cast(
+        AttachmentProvenance,
+        {"ok": True, "attachment_id": attachment_id, "filename": filename, **excerpt.to_dict()},
+    )
+    return serialize_dto(answer)
 
 
 @router.get("/api/sessions/{session_id}/attachments/{attachment_id}/download")
@@ -327,10 +344,11 @@ def list_session_sources(
     sources = load_sources(
         store, session_id, auth_data[0].principal_id, turn_id or None
     )
-    return {
+    answer: TurnSources = {
         "session_id": session_id,
-        "sources": [source.to_view() for source in sources],
+        "sources": [cast(TurnSourceView, source.to_view()) for source in sources],
     }
+    return serialize_dto(answer)
 
 
 @router.get("/api/sessions/{session_id}/recall")
@@ -356,7 +374,12 @@ def list_session_recall(
     )
     if not result.ok:
         raise _not_found("session_recall_not_found")
-    return {"ok": True, **result.data}
+    answer: SessionRecall = {
+        "ok": True,
+        "session_id": result.data["session_id"],
+        "memories": result.data["memories"],
+    }
+    return serialize_dto(answer)
 
 
 @router.get("/api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt")
@@ -396,7 +419,8 @@ def get_turn_source_excerpt(
         owner_principal_id=owner_id,
         quote=quote,
     )
-    return {"ok": True, **source.to_view(), **excerpt}
+    answer: TurnSourceExcerpt = cast(TurnSourceExcerpt, {"ok": True, **source.to_view(), **excerpt})
+    return serialize_dto(answer)
 
 
 def _download_filename(filename: str) -> str:

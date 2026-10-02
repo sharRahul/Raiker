@@ -30,6 +30,92 @@
         "title": "ActivateRuntimeModeRequest",
         "type": "object"
       },
+      "AgentPlan": {
+        "description": "The agent's standing plan for one conversation (B6); only ``steps`` when there is none.",
+        "properties": {
+          "blocked": {
+            "title": "Blocked",
+            "type": "integer"
+          },
+          "completed": {
+            "title": "Completed",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_step": {
+            "title": "Current Step",
+            "type": "string"
+          },
+          "in_progress": {
+            "title": "In Progress",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/AgentPlanStep"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "steps"
+        ],
+        "title": "AgentPlan",
+        "type": "object"
+      },
+      "AgentPlanStep": {
+        "properties": {
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed",
+              "blocked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "status"
+        ],
+        "title": "AgentPlanStep",
+        "type": "object"
+      },
       "AnswerOwnerQuestionRequest": {
         "additionalProperties": false,
         "description": "The owner's answer to a mid-turn question (ADD-22).\n\n`answers` is keyed by the exact question text and each value is the chosen\noption label, or a list of them for a multi-select. `response` is the owner\nreplying in their own words instead of picking; when it is set the answers\nmap is ignored, because they said something the options did not offer.",
@@ -287,6 +373,227 @@
           "machine_identity"
         ],
         "title": "ApprovalView",
+        "type": "object"
+      },
+      "AttachProjectFolderRequest": {
+        "additionalProperties": false,
+        "description": "A folder of the owner's to put behind a project, and whether Raiker may write to it.",
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "writable": {
+            "default": true,
+            "title": "Writable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "AttachProjectFolderRequest",
+        "type": "object"
+      },
+      "AttachmentPreview": {
+        "description": "One file's safe preview representation. Metadata plus inert content.",
+        "properties": {
+          "attachment_id": {
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Image Url"
+          },
+          "kind": {
+            "enum": [
+              "text",
+              "markdown",
+              "table",
+              "pdf",
+              "image",
+              "unavailable"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "pdf_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Pdf Url"
+          },
+          "rows": {
+            "default": [],
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Unavailable Reason"
+          }
+        },
+        "required": [
+          "attachment_id",
+          "session_id",
+          "filename",
+          "media_type",
+          "kind",
+          "byte_size"
+        ],
+        "title": "AttachmentPreview",
+        "type": "object"
+      },
+      "AttachmentProvenance": {
+        "description": "Which exchange produced a generated file, and the passage that asked for it (BUG-27).",
+        "properties": {
+          "anchors": {
+            "items": {
+              "$ref": "#/components/schemas/SourceAnchorView"
+            },
+            "title": "Anchors",
+            "type": "array"
+          },
+          "attachment_id": {
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "excerpt": {
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "highlight_length": {
+            "title": "Highlight Length",
+            "type": "integer"
+          },
+          "highlight_start": {
+            "title": "Highlight Start",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "resolution_method": {
+            "enum": [
+              "stored_coordinates",
+              "matching_text",
+              "answer_quote",
+              "recorded_passage",
+              "whole_source",
+              ""
+            ],
+            "title": "Resolution Method",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "resolved",
+              "no_provenance",
+              "source_deleted",
+              "source_changed",
+              "unsupported_source",
+              "not_authorized"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "kind",
+          "title",
+          "excerpt",
+          "highlight_start",
+          "highlight_length",
+          "session_id",
+          "turn_id",
+          "attachment_id",
+          "truncated",
+          "resolution_method",
+          "ok",
+          "filename"
+        ],
+        "title": "AttachmentProvenance",
         "type": "object"
       },
       "AuthSessionRequest": {
@@ -1117,6 +1424,59 @@
         "title": "CodeReposView",
         "type": "object"
       },
+      "CommandGrant": {
+        "description": "Owner-defined, expiry-bound command prefixes for one conversation.",
+        "properties": {
+          "commands": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Commands",
+            "type": "array"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "revocable": {
+            "title": "Revocable",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "commands",
+          "expires_at",
+          "revocable"
+        ],
+        "title": "CommandGrant",
+        "type": "object"
+      },
+      "CommandGrantRevoked": {
+        "properties": {
+          "revoked": {
+            "title": "Revoked",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "revoked"
+        ],
+        "title": "CommandGrantRevoked",
+        "type": "object"
+      },
       "CompactConversationRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1344,6 +1704,41 @@
           }
         },
         "title": "ContainMcpServerRequest",
+        "type": "object"
+      },
+      "ContentPart": {
+        "description": "One declared piece of a turn's answer.",
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "reason_code": {
+            "default": "",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "text",
+              "table",
+              "chart",
+              "refused"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "ContentPart",
         "type": "object"
       },
       "ContentPartView": {
@@ -1689,6 +2084,161 @@
         "title": "ContextUsageView",
         "type": "object"
       },
+      "ConversationBranch": {
+        "description": "A second conversation, seeded from a checkpoint; the first is untouched (C14).",
+        "properties": {
+          "checkpoint_id": {
+            "title": "Checkpoint Id",
+            "type": "string"
+          },
+          "memory_candidate_count": {
+            "title": "Memory Candidate Count",
+            "type": "integer"
+          },
+          "seed_manifest_path": {
+            "title": "Seed Manifest Path",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "source_session_id": {
+            "title": "Source Session Id",
+            "type": "string"
+          },
+          "status": {
+            "const": "forked",
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "checkpoint_id",
+          "source_session_id",
+          "session_id",
+          "title",
+          "summary",
+          "memory_candidate_count",
+          "seed_manifest_path"
+        ],
+        "title": "ConversationBranch",
+        "type": "object"
+      },
+      "ConversationBranchOrigin": {
+        "description": "Where a branched conversation came from; the source is null for a root one.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "forked_from_checkpoint_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forked From Checkpoint Id"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "source_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Session Id"
+          },
+          "source_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Title"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "source_session_id",
+          "source_title",
+          "forked_from_checkpoint_id",
+          "summary",
+          "created_at"
+        ],
+        "title": "ConversationBranchOrigin",
+        "type": "object"
+      },
+      "ConversationBranchPlan": {
+        "description": "What branching from a checkpoint would seed (C14), without doing it.",
+        "properties": {
+          "can_execute": {
+            "title": "Can Execute",
+            "type": "boolean"
+          },
+          "checkpoint_id": {
+            "title": "Checkpoint Id",
+            "type": "string"
+          },
+          "memory_candidate_count": {
+            "title": "Memory Candidate Count",
+            "type": "integer"
+          },
+          "requires_approval": {
+            "title": "Requires Approval",
+            "type": "boolean"
+          },
+          "source_session_id": {
+            "title": "Source Session Id",
+            "type": "string"
+          },
+          "status": {
+            "const": "fork_plan",
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "checkpoint_id",
+          "source_session_id",
+          "summary",
+          "memory_candidate_count",
+          "can_execute",
+          "requires_approval"
+        ],
+        "title": "ConversationBranchPlan",
+        "type": "object"
+      },
       "ConversationBranchRequest": {
         "additionalProperties": false,
         "description": "A title for the branch, and nothing else (GAP-CHAT C14).\n\nThe checkpoint is in the path and the owner comes from the authenticated\nsession, so the only thing a caller may supply is what to call the new\nconversation. An empty title lets the service derive one from the\ncheckpoint's own summary rather than accepting a caller-chosen default.",
@@ -1700,6 +2250,60 @@
           }
         },
         "title": "ConversationBranchRequest",
+        "type": "object"
+      },
+      "ConversationCompaction": {
+        "description": "A compaction, or why there was nothing to compact (``compacted: false``).",
+        "properties": {
+          "compacted": {
+            "title": "Compacted",
+            "type": "boolean"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "estimated_summary_tokens": {
+            "title": "Estimated Summary Tokens",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "source_turn_count": {
+            "title": "Source Turn Count",
+            "type": "integer"
+          },
+          "through_turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Through Turn Id"
+          }
+        },
+        "required": [
+          "session_id",
+          "compacted"
+        ],
+        "title": "ConversationCompaction",
         "type": "object"
       },
       "CreateMcpServerRequest": {
@@ -2610,6 +3214,74 @@
         "title": "ExtensionsOverviewView",
         "type": "object"
       },
+      "FileProvenanceEntryView": {
+        "description": "One governed write that touched a file, as recorded by checkpoint capture.\n\nContent addresses and sizes only — the pre-image bytes are never returned.\n``turn_id`` and ``action_id`` let the interface link back to the turn and the\napproval that produced the change.",
+        "properties": {
+          "action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Id"
+          },
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "capture_status": {
+            "title": "Capture Status",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "existed_before": {
+            "title": "Existed Before",
+            "type": "boolean"
+          },
+          "pre_image_size": {
+            "title": "Pre Image Size",
+            "type": "integer"
+          },
+          "principal_id": {
+            "title": "Principal Id",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          }
+        },
+        "required": [
+          "turn_id",
+          "action_id",
+          "session_id",
+          "capability",
+          "principal_id",
+          "capture_status",
+          "existed_before",
+          "pre_image_size",
+          "created_at"
+        ],
+        "title": "FileProvenanceEntryView",
+        "type": "object"
+      },
       "GenerateImageRequest": {
         "properties": {
           "model": {
@@ -2854,6 +3526,126 @@
           "display_name"
         ],
         "title": "IdentityView",
+        "type": "object"
+      },
+      "ImportRefused": {
+        "description": "One file of a batch that was not stored, and why — its siblings still were.",
+        "properties": {
+          "ok": {
+            "const": false,
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "relative_path",
+          "reason_code"
+        ],
+        "title": "ImportRefused",
+        "type": "object"
+      },
+      "ImportedFile": {
+        "properties": {
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          },
+          "index_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Error"
+          },
+          "index_state": {
+            "enum": [
+              "queued",
+              "indexing",
+              "ready",
+              "metadata_only",
+              "failed",
+              "retired"
+            ],
+            "title": "Index State",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "ok": {
+            "const": true,
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "scope_kind": {
+            "enum": [
+              "memory",
+              "project"
+            ],
+            "title": "Scope Kind",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_id",
+          "scope_kind",
+          "project_id",
+          "relative_path",
+          "media_type",
+          "size_bytes",
+          "content_hash",
+          "index_state",
+          "index_error",
+          "created_at",
+          "updated_at",
+          "ok"
+        ],
+        "title": "ImportedFile",
         "type": "object"
       },
       "InboundChannelMessage": {
@@ -3136,6 +3928,281 @@
           "csrf_token"
         ],
         "title": "LoginResultView",
+        "type": "object"
+      },
+      "ManagedFile": {
+        "description": "A file in Raiker's catalogue, and how far its index has got.",
+        "properties": {
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          },
+          "index_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Error"
+          },
+          "index_state": {
+            "enum": [
+              "queued",
+              "indexing",
+              "ready",
+              "metadata_only",
+              "failed",
+              "retired"
+            ],
+            "title": "Index State",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "scope_kind": {
+            "enum": [
+              "memory",
+              "project"
+            ],
+            "title": "Scope Kind",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_id",
+          "scope_kind",
+          "project_id",
+          "relative_path",
+          "media_type",
+          "size_bytes",
+          "content_hash",
+          "index_state",
+          "index_error",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ManagedFile",
+        "type": "object"
+      },
+      "ManagedFileChanged": {
+        "properties": {
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          },
+          "index_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Error"
+          },
+          "index_state": {
+            "enum": [
+              "queued",
+              "indexing",
+              "ready",
+              "metadata_only",
+              "failed",
+              "retired"
+            ],
+            "title": "Index State",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "scope_kind": {
+            "enum": [
+              "memory",
+              "project"
+            ],
+            "title": "Scope Kind",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_id",
+          "scope_kind",
+          "project_id",
+          "relative_path",
+          "media_type",
+          "size_bytes",
+          "content_hash",
+          "index_state",
+          "index_error",
+          "created_at",
+          "updated_at",
+          "ok"
+        ],
+        "title": "ManagedFileChanged",
+        "type": "object"
+      },
+      "ManagedFileImport": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "results": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ImportedFile"
+                },
+                {
+                  "$ref": "#/components/schemas/ImportRefused"
+                }
+              ]
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "scope_kind": {
+            "enum": [
+              "memory",
+              "project"
+            ],
+            "title": "Scope Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "scope_kind",
+          "project_id",
+          "results"
+        ],
+        "title": "ManagedFileImport",
+        "type": "object"
+      },
+      "ManagedFileList": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ManagedFile"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "scope_kind": {
+            "enum": [
+              "memory",
+              "project"
+            ],
+            "title": "Scope Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "scope_kind",
+          "project_id",
+          "files"
+        ],
+        "title": "ManagedFileList",
         "type": "object"
       },
       "ManifestRequest": {
@@ -4320,6 +5387,35 @@
         "title": "PairChannelRequest",
         "type": "object"
       },
+      "ParkedApproval": {
+        "description": "An unresolved approval a parked turn is waiting on (BUG-34) — metadata only.",
+        "properties": {
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval_id",
+          "turn_id",
+          "tool_name",
+          "created_at"
+        ],
+        "title": "ParkedApproval",
+        "type": "object"
+      },
       "PasswordRecoveryBeginRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4416,6 +5512,29 @@
         "title": "PauseHostRequest",
         "type": "object"
       },
+      "ProjectArchived": {
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "project_id",
+          "archived"
+        ],
+        "title": "ProjectArchived",
+        "type": "object"
+      },
       "ProjectAttachmentView": {
         "description": "UX-PROJ-04 — a file shared with every chat in a project, as a person names it.\n\n``available`` is false when the id no longer resolves to a file this owner\nholds; the row says so rather than disappearing, because the context still\nnames it and the owner can only remove what they can see.",
         "properties": {
@@ -4448,6 +5567,118 @@
           "available"
         ],
         "title": "ProjectAttachmentView",
+        "type": "object"
+      },
+      "ProjectBrowseEntry": {
+        "description": "One child of the folder being browsed; ``index_state`` is null for a file Raiker cannot read.",
+        "properties": {
+          "index_state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "queued",
+                  "indexing",
+                  "ready",
+                  "metadata_only",
+                  "failed",
+                  "retired"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index State"
+          },
+          "is_directory": {
+            "title": "Is Directory",
+            "type": "boolean"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "relative_path",
+          "is_directory",
+          "size_bytes",
+          "media_type",
+          "index_state"
+        ],
+        "title": "ProjectBrowseEntry",
+        "type": "object"
+      },
+      "ProjectBrowseView": {
+        "description": "One directory of a project's folder; ``root_missing`` when there is no folder to show.",
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectBrowseEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "root_kind": {
+            "enum": [
+              "managed",
+              "attached"
+            ],
+            "title": "Root Kind",
+            "type": "string"
+          },
+          "root_label": {
+            "title": "Root Label",
+            "type": "string"
+          },
+          "root_missing": {
+            "title": "Root Missing",
+            "type": "boolean"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "parent",
+          "entries",
+          "truncated",
+          "root_kind",
+          "root_label",
+          "root_missing"
+        ],
+        "title": "ProjectBrowseView",
         "type": "object"
       },
       "ProjectContext": {
@@ -4485,6 +5716,214 @@
           "memory_mode"
         ],
         "title": "ProjectContext",
+        "type": "object"
+      },
+      "ProjectContextSaved": {
+        "properties": {
+          "attachment_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Attachment Ids",
+            "type": "array"
+          },
+          "instructions": {
+            "title": "Instructions",
+            "type": "string"
+          },
+          "memory_enabled": {
+            "title": "Memory Enabled",
+            "type": "boolean"
+          },
+          "memory_mode": {
+            "enum": [
+              "inherit",
+              "enabled",
+              "disabled"
+            ],
+            "title": "Memory Mode",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "instructions",
+          "attachment_ids",
+          "memory_enabled",
+          "memory_mode"
+        ],
+        "title": "ProjectContextSaved",
+        "type": "object"
+      },
+      "ProjectCreated": {
+        "description": "A new project; an attached one also names its root and the grant behind it.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "root_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Id"
+          },
+          "root_kind": {
+            "const": "attached",
+            "title": "Root Kind",
+            "type": "string"
+          },
+          "root_subpath": {
+            "title": "Root Subpath",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "project_id",
+          "name",
+          "root_subpath",
+          "parent_id"
+        ],
+        "title": "ProjectCreated",
+        "type": "object"
+      },
+      "ProjectDeleted": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "root_kind": {
+            "enum": [
+              "managed",
+              "attached"
+            ],
+            "title": "Root Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "project_id",
+          "root_kind"
+        ],
+        "title": "ProjectDeleted",
+        "type": "object"
+      },
+      "ProjectDeletionPreviewView": {
+        "description": "UX-PROJ-07 — everything a delete removes, counted before it runs.\n\n``folder_files`` and ``folder_bytes`` describe the managed folder Raiker\nremoves from disk; an attached folder is the owner's and is never counted,\nbecause nothing in it is touched. ``folder_truncated`` is true when the\ncount stopped at its ceiling, so the preview reads \"at least\".",
+        "properties": {
+          "checkpoints": {
+            "title": "Checkpoints",
+            "type": "integer"
+          },
+          "descendants": {
+            "title": "Descendants",
+            "type": "integer"
+          },
+          "folder_bytes": {
+            "title": "Folder Bytes",
+            "type": "integer"
+          },
+          "folder_files": {
+            "title": "Folder Files",
+            "type": "integer"
+          },
+          "folder_truncated": {
+            "title": "Folder Truncated",
+            "type": "boolean"
+          },
+          "managed_files": {
+            "title": "Managed Files",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "requires_step_up": {
+            "title": "Requires Step Up",
+            "type": "boolean"
+          },
+          "root_kind": {
+            "enum": [
+              "managed",
+              "attached"
+            ],
+            "title": "Root Kind",
+            "type": "string"
+          },
+          "root_label": {
+            "title": "Root Label",
+            "type": "string"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "tasks": {
+            "title": "Tasks",
+            "type": "integer"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "project_id",
+          "name",
+          "root_kind",
+          "root_label",
+          "sessions",
+          "turns",
+          "tasks",
+          "checkpoints",
+          "managed_files",
+          "descendants",
+          "folder_files",
+          "folder_bytes",
+          "folder_truncated",
+          "requires_step_up"
+        ],
+        "title": "ProjectDeletionPreviewView",
         "type": "object"
       },
       "ProjectDetailView": {
@@ -4525,6 +5964,365 @@
           "context"
         ],
         "title": "ProjectDetailView",
+        "type": "object"
+      },
+      "ProjectFileView": {
+        "description": "Metadata for one project file. Never carries file content.",
+        "properties": {
+          "depth": {
+            "title": "Depth",
+            "type": "integer"
+          },
+          "is_directory": {
+            "title": "Is Directory",
+            "type": "boolean"
+          },
+          "modified_at": {
+            "title": "Modified At",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "workspace_path": {
+            "title": "Workspace Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_path",
+          "name",
+          "is_directory",
+          "size_bytes",
+          "modified_at",
+          "depth"
+        ],
+        "title": "ProjectFileView",
+        "type": "object"
+      },
+      "ProjectFilesView": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectFileView"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "note": {
+            "default": "Metadata only. Raiker never serves workspace file content to the browser; changes are made through the governed approval path.",
+            "title": "Note",
+            "type": "string"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "provenance": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/FileProvenanceEntryView"
+              },
+              "type": "array"
+            },
+            "title": "Provenance",
+            "type": "object"
+          },
+          "root_exists": {
+            "title": "Root Exists",
+            "type": "boolean"
+          },
+          "root_subpath": {
+            "title": "Root Subpath",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "project_id",
+          "root_subpath",
+          "root_exists",
+          "files",
+          "truncated"
+        ],
+        "title": "ProjectFilesView",
+        "type": "object"
+      },
+      "ProjectFolderAttached": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "root_id": {
+            "title": "Root Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "project_id",
+          "root_id"
+        ],
+        "title": "ProjectFolderAttached",
+        "type": "object"
+      },
+      "ProjectFolderDetached": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "project_id"
+        ],
+        "title": "ProjectFolderDetached",
+        "type": "object"
+      },
+      "ProjectMoved": {
+        "properties": {
+          "new_parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Parent Id"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "project_id",
+          "new_parent_id"
+        ],
+        "title": "ProjectMoved",
+        "type": "object"
+      },
+      "ProjectRootIndexResult": {
+        "description": "One reconcile of an attached folder against the index.",
+        "properties": {
+          "indexed": {
+            "title": "Indexed",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "retired": {
+            "title": "Retired",
+            "type": "integer"
+          },
+          "scanned_at": {
+            "title": "Scanned At",
+            "type": "string"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "project_id",
+          "indexed",
+          "updated",
+          "retired",
+          "skipped",
+          "truncated",
+          "scanned_at"
+        ],
+        "title": "ProjectRootIndexResult",
+        "type": "object"
+      },
+      "ProjectRootStatus": {
+        "description": "Where a project's files are, and whether Raiker is watching them.",
+        "properties": {
+          "indexed_files": {
+            "title": "Indexed Files",
+            "type": "integer"
+          },
+          "last_scanned_at": {
+            "title": "Last Scanned At",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "root_kind": {
+            "enum": [
+              "managed",
+              "attached"
+            ],
+            "title": "Root Kind",
+            "type": "string"
+          },
+          "root_label": {
+            "title": "Root Label",
+            "type": "string"
+          },
+          "root_missing": {
+            "title": "Root Missing",
+            "type": "boolean"
+          },
+          "root_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Path"
+          },
+          "watch_reason": {
+            "title": "Watch Reason",
+            "type": "string"
+          },
+          "watching": {
+            "title": "Watching",
+            "type": "boolean"
+          },
+          "writable": {
+            "title": "Writable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "project_id",
+          "root_kind",
+          "root_label",
+          "root_path",
+          "root_missing",
+          "writable",
+          "watching",
+          "watch_reason",
+          "last_scanned_at",
+          "indexed_files"
+        ],
+        "title": "ProjectRootStatus",
+        "type": "object"
+      },
+      "ProjectSelected": {
+        "properties": {
+          "active_project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Project Id"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "active_project_id"
+        ],
+        "title": "ProjectSelected",
+        "type": "object"
+      },
+      "ProjectTreeNode": {
+        "description": "One active project and the active projects filed under it.",
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectTreeNode"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "root_subpath": {
+            "title": "Root Subpath",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "name",
+          "parent_id",
+          "root_subpath",
+          "created_at",
+          "children"
+        ],
+        "title": "ProjectTreeNode",
         "type": "object"
       },
       "ProjectView": {
@@ -4866,6 +6664,40 @@
         "title": "ProviderHealthView",
         "type": "object"
       },
+      "RecalledMemory": {
+        "description": "An approved memory a turn of this conversation was given, as Raiker knows it now.",
+        "properties": {
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "pinned": {
+            "title": "Pinned",
+            "type": "boolean"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "memory_id",
+          "turn_id",
+          "text",
+          "scope",
+          "pinned"
+        ],
+        "title": "RecalledMemory",
+        "type": "object"
+      },
       "RecordThreatModelAckRequest": {
         "properties": {
           "as_principal": {
@@ -5000,6 +6832,196 @@
           "reason"
         ],
         "title": "ResolveApprovalRequest",
+        "type": "object"
+      },
+      "RestorePlan": {
+        "description": "What restoring to a checkpoint would rewrite, delete or skip — computed, not performed.",
+        "properties": {
+          "can_execute": {
+            "title": "Can Execute",
+            "type": "boolean"
+          },
+          "changed_count": {
+            "title": "Changed Count",
+            "type": "integer"
+          },
+          "checkpoint_created_at": {
+            "title": "Checkpoint Created At",
+            "type": "string"
+          },
+          "checkpoint_id": {
+            "title": "Checkpoint Id",
+            "type": "string"
+          },
+          "delete_count": {
+            "title": "Delete Count",
+            "type": "integer"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/RestorePlanFile"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "requires_approval": {
+            "title": "Requires Approval",
+            "type": "boolean"
+          },
+          "restore_content_count": {
+            "title": "Restore Content Count",
+            "type": "integer"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "skip_count": {
+            "title": "Skip Count",
+            "type": "integer"
+          },
+          "status": {
+            "const": "restore_plan",
+            "title": "Status",
+            "type": "string"
+          },
+          "touches_other_principal": {
+            "title": "Touches Other Principal",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status",
+          "checkpoint_id",
+          "session_id",
+          "checkpoint_created_at",
+          "can_execute",
+          "requires_approval",
+          "files",
+          "restore_content_count",
+          "delete_count",
+          "skip_count",
+          "changed_count",
+          "touches_other_principal"
+        ],
+        "title": "RestorePlan",
+        "type": "object"
+      },
+      "RestorePlanFile": {
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "changed_by_other_principal": {
+            "title": "Changed By Other Principal",
+            "type": "boolean"
+          },
+          "current_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Sha256"
+          },
+          "current_size": {
+            "title": "Current Size",
+            "type": "integer"
+          },
+          "op": {
+            "title": "Op",
+            "type": "string"
+          },
+          "pre_image_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pre Image Sha256"
+          },
+          "pre_image_size": {
+            "title": "Pre Image Size",
+            "type": "integer"
+          },
+          "workspace_path": {
+            "title": "Workspace Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_path",
+          "op",
+          "pre_image_sha256",
+          "pre_image_size",
+          "current_sha256",
+          "current_size",
+          "changed",
+          "changed_by_other_principal"
+        ],
+        "title": "RestorePlanFile",
+        "type": "object"
+      },
+      "RestoreRequested": {
+        "description": "The approval a checkpoint restore raised (BUG-230); nothing has been restored.",
+        "properties": {
+          "action_id": {
+            "title": "Action Id",
+            "type": "string"
+          },
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "checkpoint_id": {
+            "title": "Checkpoint Id",
+            "type": "string"
+          },
+          "critical": {
+            "title": "Critical",
+            "type": "boolean"
+          },
+          "delete_count": {
+            "title": "Delete Count",
+            "type": "integer"
+          },
+          "executes_action": {
+            "title": "Executes Action",
+            "type": "boolean"
+          },
+          "restore_content_count": {
+            "title": "Restore Content Count",
+            "type": "integer"
+          },
+          "skip_count": {
+            "title": "Skip Count",
+            "type": "integer"
+          },
+          "status": {
+            "const": "approval_required",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "approval_id",
+          "action_id",
+          "checkpoint_id",
+          "critical",
+          "executes_action",
+          "restore_content_count",
+          "delete_count",
+          "skip_count"
+        ],
+        "title": "RestoreRequested",
         "type": "object"
       },
       "RuntimeModeView": {
@@ -5214,6 +7236,108 @@
         "title": "SelectProjectRequest",
         "type": "object"
       },
+      "SessionArchived": {
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "session_id",
+          "archived"
+        ],
+        "title": "SessionArchived",
+        "type": "object"
+      },
+      "SessionAttachment": {
+        "description": "One file a conversation carries — metadata only, so a reload can redraw its chip.",
+        "properties": {
+          "attachment_id": {
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "previewable": {
+            "title": "Previewable",
+            "type": "boolean"
+          },
+          "source": {
+            "enum": [
+              "uploaded",
+              "generated"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attachment_id",
+          "turn_id",
+          "kind",
+          "filename",
+          "media_type",
+          "byte_size",
+          "previewable",
+          "source",
+          "created_at"
+        ],
+        "title": "SessionAttachment",
+        "type": "object"
+      },
+      "SessionAttachments": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/SessionAttachment"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "files"
+        ],
+        "title": "SessionAttachments",
+        "type": "object"
+      },
       "SessionCommandGrantRequest": {
         "additionalProperties": false,
         "properties": {
@@ -5242,6 +7366,154 @@
           "commands"
         ],
         "title": "SessionCommandGrantRequest",
+        "type": "object"
+      },
+      "SessionDeleted": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "session_id"
+        ],
+        "title": "SessionDeleted",
+        "type": "object"
+      },
+      "SessionDetail": {
+        "description": "One conversation's transcript, with the approvals its parked turns wait on.",
+        "properties": {
+          "parked_approvals": {
+            "items": {
+              "$ref": "#/components/schemas/ParkedApproval"
+            },
+            "title": "Parked Approvals",
+            "type": "array"
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionView"
+          },
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/TurnView"
+            },
+            "title": "Turns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "session",
+          "turns"
+        ],
+        "title": "SessionDetail",
+        "type": "object"
+      },
+      "SessionPinned": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pinned": {
+            "title": "Pinned",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "session_id",
+          "pinned"
+        ],
+        "title": "SessionPinned",
+        "type": "object"
+      },
+      "SessionProjectSet": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "session_id",
+          "project_id"
+        ],
+        "title": "SessionProjectSet",
+        "type": "object"
+      },
+      "SessionRecall": {
+        "properties": {
+          "memories": {
+            "items": {
+              "$ref": "#/components/schemas/RecalledMemory"
+            },
+            "title": "Memories",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "session_id",
+          "memories"
+        ],
+        "title": "SessionRecall",
+        "type": "object"
+      },
+      "SessionRenamed": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "session_id",
+          "title"
+        ],
+        "title": "SessionRenamed",
         "type": "object"
       },
       "SessionStateView": {
@@ -5287,6 +7559,32 @@
           "scope"
         ],
         "title": "SessionStateView",
+        "type": "object"
+      },
+      "SessionTagsSet": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "session_id",
+          "tags"
+        ],
+        "title": "SessionTagsSet",
         "type": "object"
       },
       "SessionView": {
@@ -5389,6 +7687,27 @@
           "turn_count"
         ],
         "title": "SessionView",
+        "type": "object"
+      },
+      "SessionsDeleted": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "session_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Session Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "session_ids"
+        ],
+        "title": "SessionsDeleted",
         "type": "object"
       },
       "SetCapabilityDecisionModeRequest": {
@@ -5736,6 +8055,40 @@
           "url"
         ],
         "title": "SkillUrlRequest",
+        "type": "object"
+      },
+      "SourceAnchorView": {
+        "description": "One exchange a cited search returned.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "turn_id",
+          "title",
+          "created_at",
+          "origin"
+        ],
+        "title": "SourceAnchorView",
         "type": "object"
       },
       "SpeechRuntimeRequest": {
@@ -6092,6 +8445,40 @@
         "title": "TaskEventView",
         "type": "object"
       },
+      "TaskResumed": {
+        "description": "The owner's retry of a parked run (BUG-25); ``task_status`` and ``summary`` once it ran.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "task_status": {
+            "title": "Task Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "reason_code"
+        ],
+        "title": "TaskResumed",
+        "type": "object"
+      },
       "TaskView": {
         "properties": {
           "attachments": {
@@ -6328,6 +8715,210 @@
         "title": "TelemetryCadenceRequest",
         "type": "object"
       },
+      "TranscriptFile": {
+        "properties": {
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "filename",
+          "media_type",
+          "byte_size",
+          "source"
+        ],
+        "title": "TranscriptFile",
+        "type": "object"
+      },
+      "TranscriptManifest": {
+        "description": "What an export of one conversation would contain, reviewed before a format is chosen.",
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "file_count": {
+            "title": "File Count",
+            "type": "integer"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/TranscriptFile"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "formats": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Formats",
+            "type": "array"
+          },
+          "message_count": {
+            "title": "Message Count",
+            "type": "integer"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/TranscriptMessage"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "redaction_policy": {
+            "title": "Redaction Policy",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "typed_part_count": {
+            "title": "Typed Part Count",
+            "type": "integer"
+          },
+          "unresolved_citation_count": {
+            "title": "Unresolved Citation Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "session_id",
+          "title",
+          "created_at",
+          "message_count",
+          "file_count",
+          "files",
+          "redaction_policy",
+          "formats",
+          "messages",
+          "unresolved_citation_count",
+          "typed_part_count"
+        ],
+        "title": "TranscriptManifest",
+        "type": "object"
+      },
+      "TranscriptMessage": {
+        "properties": {
+          "parts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ContentPart"
+            },
+            "title": "Parts",
+            "type": "array"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "sources": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TranscriptSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          },
+          "unresolved_citation_count": {
+            "default": 0,
+            "title": "Unresolved Citation Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "role",
+          "text",
+          "timestamp"
+        ],
+        "title": "TranscriptMessage",
+        "type": "object"
+      },
+      "TranscriptSource": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "locator": {
+            "title": "Locator",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "title",
+          "locator",
+          "kind",
+          "tool_name"
+        ],
+        "title": "TranscriptSource",
+        "type": "object"
+      },
       "TraySessionRequest": {
         "additionalProperties": false,
         "properties": {
@@ -6362,6 +8953,208 @@
           "events"
         ],
         "title": "TurnDetailView",
+        "type": "object"
+      },
+      "TurnSourceExcerpt": {
+        "description": "One cited source, opened at the passage the turn used (C4).",
+        "properties": {
+          "anchors": {
+            "items": {
+              "$ref": "#/components/schemas/SourceAnchorView"
+            },
+            "title": "Anchors",
+            "type": "array"
+          },
+          "attachment_id": {
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "excerpt": {
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "highlight_length": {
+            "title": "Highlight Length",
+            "type": "integer"
+          },
+          "highlight_start": {
+            "title": "Highlight Start",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "locator": {
+            "title": "Locator",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "openable": {
+            "title": "Openable",
+            "type": "boolean"
+          },
+          "ordinal": {
+            "title": "Ordinal",
+            "type": "integer"
+          },
+          "resolution_method": {
+            "enum": [
+              "stored_coordinates",
+              "matching_text",
+              "answer_quote",
+              "recorded_passage",
+              "whole_source",
+              ""
+            ],
+            "title": "Resolution Method",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "resolved",
+              "no_provenance",
+              "source_deleted",
+              "source_changed",
+              "unsupported_source",
+              "not_authorized"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "ordinal",
+          "kind",
+          "title",
+          "locator",
+          "tool_name",
+          "detail",
+          "attachment_id",
+          "turn_id",
+          "openable",
+          "status",
+          "excerpt",
+          "highlight_start",
+          "highlight_length",
+          "session_id",
+          "truncated",
+          "resolution_method",
+          "ok"
+        ],
+        "title": "TurnSourceExcerpt",
+        "type": "object"
+      },
+      "TurnSourceView": {
+        "description": "What one turn read: a label and a locator, never the passage itself (C6).",
+        "properties": {
+          "attachment_id": {
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "locator": {
+            "title": "Locator",
+            "type": "string"
+          },
+          "openable": {
+            "title": "Openable",
+            "type": "boolean"
+          },
+          "ordinal": {
+            "title": "Ordinal",
+            "type": "integer"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "ordinal",
+          "kind",
+          "title",
+          "locator",
+          "tool_name",
+          "detail",
+          "attachment_id",
+          "turn_id",
+          "openable"
+        ],
+        "title": "TurnSourceView",
+        "type": "object"
+      },
+      "TurnSources": {
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/TurnSourceView"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "session_id",
+          "sources"
+        ],
+        "title": "TurnSources",
         "type": "object"
       },
       "TurnView": {
@@ -6639,6 +9432,45 @@
           "scope"
         ],
         "title": "WhoamiView",
+        "type": "object"
+      },
+      "WorkInFlight": {
+        "description": "What the stop switch would reach. ``commands`` is null when it could not be read.",
+        "properties": {
+          "commands": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commands"
+          },
+          "tasks": {
+            "title": "Tasks",
+            "type": "integer"
+          },
+          "turn_sessions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Turn Sessions",
+            "type": "array"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tasks",
+          "turns",
+          "commands",
+          "turn_sessions"
+        ],
+        "title": "WorkInFlight",
         "type": "object"
       },
       "WorkThreadFacet": {
@@ -9549,9 +12381,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Branch Conversation Api Checkpoints  Checkpoint Id  Branch Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversationBranch"
                 }
               }
             },
@@ -9591,9 +12421,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Conversation Branch Plan Api Checkpoints  Checkpoint Id  Branch Plan Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversationBranchPlan"
                 }
               }
             },
@@ -9633,9 +12461,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Request Checkpoint Restore Api Checkpoints  Checkpoint Id  Restore Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RestoreRequested"
                 }
               }
             },
@@ -9675,9 +12501,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Checkpoint Restore Plan Api Checkpoints  Checkpoint Id  Restore Plan Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RestorePlan"
                 }
               }
             },
@@ -12318,9 +15142,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Managed File Api Managed Files  File Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ManagedFileChanged"
                 }
               }
             },
@@ -12359,9 +15181,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Retry Managed File Api Managed Files  File Id  Retry Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ManagedFileChanged"
                 }
               }
             },
@@ -13284,9 +16104,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Memory Files Api Memory Files Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ManagedFileList"
                 }
               }
             },
@@ -13314,9 +16132,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Import Memory Files Api Memory Files Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ManagedFileImport"
                 }
               }
             },
@@ -16109,9 +18925,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Project Api Projects Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectCreated"
                 }
               }
             },
@@ -16150,9 +18964,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Select Project Api Projects Selection Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectSelected"
                 }
               }
             },
@@ -16182,10 +18994,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/ProjectTreeNode"
                   },
-                  "title": "Response List Project Tree Api Projects Tree Get",
                   "type": "array"
                 }
               }
@@ -16231,9 +19041,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Project Api Projects  Project Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectDeleted"
                 }
               }
             },
@@ -16310,9 +19118,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Archive Project Api Projects  Project Id  Archive Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectArchived"
                 }
               }
             },
@@ -16361,9 +19167,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Browse Project Api Projects  Project Id  Browse Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectBrowseView"
                 }
               }
             },
@@ -16412,9 +19216,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Save Project Context Api Projects  Project Id  Context Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectContextSaved"
                 }
               }
             },
@@ -16454,9 +19256,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Project Deletion Preview Api Projects  Project Id  Deletion Preview Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectDeletionPreviewView"
                 }
               }
             },
@@ -16533,9 +19333,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Project Files Api Projects  Project Id  Files Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectFilesView"
                 }
               }
             },
@@ -16574,9 +19372,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Project Files Api Projects  Project Id  Managed Files Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ManagedFileList"
                 }
               }
             },
@@ -16625,9 +19421,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Import Project Files Api Projects  Project Id  Managed Files Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ManagedFileImport"
                 }
               }
             },
@@ -16677,9 +19471,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Move Project Api Projects  Project Id  Move Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectMoved"
                 }
               }
             },
@@ -16719,9 +19511,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Restore Project Api Projects  Project Id  Restore Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectArchived"
                 }
               }
             },
@@ -16760,9 +19550,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Detach Project Root Api Projects  Project Id  Root Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectFolderDetached"
                 }
               }
             },
@@ -16796,14 +19584,22 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachProjectFolderRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Attach Project Root Api Projects  Project Id  Root Attach Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectFolderAttached"
                 }
               }
             },
@@ -16842,9 +19638,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Index Project Root Api Projects  Project Id  Root Index Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectRootIndexResult"
                 }
               }
             },
@@ -16883,9 +19677,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Project Root Status Api Projects  Project Id  Root Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectRootStatus"
                 }
               }
             },
@@ -17492,9 +20284,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Sessions Api Sessions Bulk Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SessionsDeleted"
                 }
               }
             },
@@ -17550,9 +20340,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Session Api Sessions  Session Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SessionDeleted"
                 }
               }
             },
@@ -17589,9 +20377,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Session Api Sessions  Session Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SessionDetail"
                 }
               }
             },
@@ -17631,9 +20417,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Archive Session Api Sessions  Session Id  Archive Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SessionArchived"
                 }
               }
             },
@@ -17673,9 +20457,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Session Attachments Api Sessions  Session Id  Attachments Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SessionAttachments"
                 }
               }
             },
@@ -17771,9 +20553,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Attachment Preview Api Sessions  Session Id  Attachments  Attachment Id  Preview Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AttachmentPreview"
                 }
               }
             },
@@ -17916,9 +20696,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Attachment Provenance Api Sessions  Session Id  Attachments  Attachment Id  Provenance Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AttachmentProvenance"
                 }
               }
             },
@@ -17958,9 +20736,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Conversation Branch Origin Api Sessions  Session Id  Branch Origin Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversationBranchOrigin"
                 }
               }
             },
@@ -17999,9 +20775,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Revoke Session Command Grant Api Sessions  Session Id  Command Grant Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandGrantRevoked"
                 }
               }
             },
@@ -18049,9 +20823,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Put Session Command Grant Api Sessions  Session Id  Command Grant Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandGrant"
                 }
               }
             },
@@ -18101,9 +20873,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Compact Conversation Api Sessions  Session Id  Compact Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversationCompaction"
                 }
               }
             },
@@ -18231,9 +21001,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Session Export Manifest Api Sessions  Session Id  Export Manifest Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TranscriptManifest"
                 }
               }
             },
@@ -18283,9 +21051,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Session Pinned Api Sessions  Session Id  Pin Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SessionPinned"
                 }
               }
             },
@@ -18325,9 +21091,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Session Plan Api Sessions  Session Id  Plan Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AgentPlan"
                 }
               }
             },
@@ -18377,9 +21141,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Session Project Api Sessions  Session Id  Project Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SessionProjectSet"
                 }
               }
             },
@@ -18429,9 +21191,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Session Recall Api Sessions  Session Id  Recall Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SessionRecall"
                 }
               }
             },
@@ -18481,9 +21241,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Rename Session Api Sessions  Session Id  Rename Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SessionRenamed"
                 }
               }
             },
@@ -18533,9 +21291,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Session Sources Api Sessions  Session Id  Sources Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TurnSources"
                 }
               }
             },
@@ -18585,9 +21341,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Session Tags Api Sessions  Session Id  Tags Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SessionTagsSet"
                 }
               }
             },
@@ -18655,9 +21409,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Turn Source Excerpt Api Sessions  Session Id  Turns  Turn Id  Sources  Source Id  Excerpt Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TurnSourceExcerpt"
                 }
               }
             },
@@ -18697,9 +21449,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Unarchive Session Api Sessions  Session Id  Unarchive Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SessionArchived"
                 }
               }
             },
@@ -19859,9 +22609,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Resume Task Api Tasks  Task Id  Resume Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TaskResumed"
                 }
               }
             },
@@ -20456,9 +23204,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Work In Flight Api Work In Flight Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/WorkInFlight"
                 }
               }
             },

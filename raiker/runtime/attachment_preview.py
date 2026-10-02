@@ -30,7 +30,7 @@ and deliberately the narrowest one that works:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Final, Literal
 
 from raiker.contracts.views import View
 from raiker.runtime.attachments import (
@@ -57,12 +57,15 @@ MAX_PREVIEW_ROWS = 200
 MAX_PREVIEW_COLUMNS = 30
 
 # Preview kinds the client renders. ``unavailable`` is always a valid answer.
-KIND_TEXT = "text"
-KIND_MARKDOWN = "markdown"
-KIND_TABLE = "table"
-KIND_PDF = "pdf"
-KIND_IMAGE = "image"
-KIND_UNAVAILABLE = "unavailable"
+KIND_TEXT: Final = "text"
+KIND_MARKDOWN: Final = "markdown"
+KIND_TABLE: Final = "table"
+KIND_PDF: Final = "pdf"
+KIND_IMAGE: Final = "image"
+KIND_UNAVAILABLE: Final = "unavailable"
+
+
+PreviewKind = Literal["text", "markdown", "table", "pdf", "image", "unavailable"]
 
 
 @dataclass(frozen=True)
@@ -73,7 +76,7 @@ class AttachmentPreview(View):
     session_id: str
     filename: str
     media_type: str
-    kind: str
+    kind: PreviewKind
     byte_size: int
     text: str = ""
     rows: tuple[tuple[str, ...], ...] = ()
@@ -256,7 +259,7 @@ class AttachmentPreviewService:
         byte_size = int(record.get("byte_size", len(data)) or 0)
 
         def build(
-            kind: str,
+            kind: PreviewKind,
             *,
             text: str = "",
             rows: tuple[tuple[str, ...], ...] = (),
@@ -310,7 +313,7 @@ class AttachmentPreviewService:
             reason = exc.reason if isinstance(exc, AttachmentValidationError) else "unreadable"
             return build(KIND_UNAVAILABLE, unavailable_reason=reason)
         bounded = text[:MAX_PREVIEW_TEXT_CHARS]
-        kind = KIND_MARKDOWN if media_type == "text/markdown" else KIND_TEXT
+        kind: PreviewKind = KIND_MARKDOWN if media_type == "text/markdown" else KIND_TEXT
         return build(kind, text=bounded, truncated=len(text) > len(bounded))
 
     @staticmethod

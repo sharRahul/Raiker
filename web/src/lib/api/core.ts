@@ -157,11 +157,24 @@ export function postJson<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
-/** A JSON body sent with a method other than POST (PUT, PATCH, DELETE). */
-export function sendJson<T>(method: string, path: string, body: unknown): Promise<T> {
+
+/**
+ * One generated operation: its method, its JSON body when it declares one, and
+ * the header parameters it declares — an absent one is not sent.
+ */
+export function call<T>(
+  method: string,
+  path: string,
+  options: { body?: unknown; headers?: Record<string, string | undefined> } = {},
+): Promise<T> {
+  const headers: Record<string, string> = {};
+  for (const [name, value] of Object.entries(options.headers ?? {})) {
+    if (value !== undefined) headers[name] = value;
+  }
+  if (options.body !== undefined) headers["Content-Type"] = "application/json";
   return request<T>(path, {
     method,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
 }

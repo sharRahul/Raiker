@@ -136,6 +136,23 @@ class TranscriptFile(View):
 
 
 @dataclass(frozen=True)
+class TranscriptManifest(View):
+    """What an export of one conversation would contain, reviewed before a format is chosen."""
+
+    session_id: str
+    title: str
+    created_at: str | None
+    message_count: int
+    file_count: int
+    files: tuple[TranscriptFile, ...]
+    redaction_policy: str
+    formats: tuple[str, ...]
+    messages: tuple[TranscriptMessage, ...]
+    unresolved_citation_count: int
+    typed_part_count: int
+
+
+@dataclass(frozen=True)
 class Transcript:
     """One conversation, ready to render. Already redacted, already scoped."""
 
@@ -159,26 +176,26 @@ class Transcript:
         """How many declared tables and charts this export will render."""
         return sum(message.typed_part_count for message in self.messages)
 
-    def manifest(self) -> dict[str, Any]:
+    def manifest(self) -> TranscriptManifest:
         """What the owner reviews before choosing a format.
 
         Deliberately complete: counts, the exact files, the redaction policy in
         words, and the formats on offer. A review that says "3 messages" without
         saying what happens to the attached spreadsheet is not a review.
         """
-        return {
-            "session_id": self.session_id,
-            "title": self.title,
-            "created_at": self.created_at,
-            "message_count": self.message_count,
-            "file_count": len(self.files),
-            "files": [file.to_dict() for file in self.files],
-            "redaction_policy": REDACTION_POLICY,
-            "formats": list(EXPORT_FORMATS),
-            "messages": [message.to_dict() for message in self.messages],
-            "unresolved_citation_count": self.unresolved_citation_count,
-            "typed_part_count": self.typed_part_count,
-        }
+        return TranscriptManifest(
+            session_id=self.session_id,
+            title=self.title,
+            created_at=self.created_at,
+            message_count=self.message_count,
+            file_count=len(self.files),
+            files=self.files,
+            redaction_policy=REDACTION_POLICY,
+            formats=tuple(EXPORT_FORMATS),
+            messages=self.messages,
+            unresolved_citation_count=self.unresolved_citation_count,
+            typed_part_count=self.typed_part_count,
+        )
 
 
 def build_transcript(

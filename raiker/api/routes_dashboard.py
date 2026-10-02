@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import FileResponse, Response
@@ -48,8 +48,37 @@ from raiker.api.schemas import (
 from raiker.api.session_cookie import issue as issue_session_cookie
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.auth import IssuedSessionView
+from raiker.api.wire.projects import (
+    ProjectArchived,
+    ProjectContextSaved,
+    ProjectCreated,
+    ProjectDeleted,
+    ProjectMoved,
+    ProjectSelected,
+    ProjectTreeNode,
+    project_tree,
+)
+from raiker.api.wire.sessions import (
+    AgentPlan,
+    CommandGrant,
+    CommandGrantRevoked,
+    ConversationBranch,
+    ConversationBranchOrigin,
+    ConversationBranchPlan,
+    RestorePlan,
+    RestoreRequested,
+    SessionArchived,
+    SessionDeleted,
+    SessionDetail,
+    SessionPinned,
+    SessionProjectSet,
+    SessionRenamed,
+    SessionsDeleted,
+    SessionTagsSet,
+)
 from raiker.auth.vault_key_file import ensure_vault_key
 from raiker.control.dashboard import DashboardService
+from raiker.control.views.projects import ProjectDeletionPreviewView
 from raiker.control.views.security import AuthSessionView
 from raiker.control.views.tasks import TASK_RECURRENCES
 from raiker.control.web_read_models import WebReadModels
@@ -75,8 +104,10 @@ from raiker.models.readiness import (
 )
 from raiker.models.registry import ModelProfileRegistry
 from raiker.runtime.authority.models import Principal
+from raiker.sessions.transcript import TranscriptManifest
 from raiker.storage.internal_paths import internal_io_path
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tasks.scheduler import TaskResumed
 
 router = APIRouter()
 
@@ -129,12 +160,13 @@ def put_session_command_grant(
         timeout_seconds=body.timeout_seconds,
         expires_at=expires_at,
     )
-    return {
+    answer: CommandGrant = {
         "session_id": session_id,
         "commands": commands,
         "expires_at": expires_at,
         "revocable": True,
     }
+    return serialize_dto(answer)
 
 
 @router.delete("/api/sessions/{session_id}/command-grant")
@@ -152,7 +184,8 @@ def revoke_session_command_grant(
     store.revoke_session_command_grant(
         session_id=session_id, principal_id=session.principal_id
     )
-    return {"session_id": session_id, "revoked": True}
+    answer: CommandGrantRevoked = {"session_id": session_id, "revoked": True}
+    return serialize_dto(answer)
 
 
 # ── Auth: first-run local token mint ──────────────────────────────────────────
@@ -345,7 +378,10 @@ async def get_session_plan(
 
     principal_id = auth_data[0].principal_id
     plan = load_plan(SQLiteStore(_ws(request)), session_id, principal_id)
-    return plan if plan is not None else {"session_id": session_id, "steps": []}
+    answer: AgentPlan = (
+        cast(AgentPlan, plan) if plan is not None else {"session_id": session_id, "steps": []}
+    )
+    return serialize_dto(answer)
 
 
 def _mcp_result(result: Any) -> dict[str, Any]:
@@ -656,22 +692,25 @@ async def get_session(
     view = _service(request).get_session(session_id, user_id=auth_data[1].delegated_by_user_id)
     if view is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown session: {session_id}")
-    body = serialize_dto(view)
     # BUG-34: transcript restoration carries the metadata-only approval link
     # for unresolved parked turns. Conversation/model state remains encrypted
     # server-side; the projection is scoped to the authenticated principal.
-    body["parked_approvals"] = [
-        {
-            "approval_id": str(row["approval_id"]),
-            "turn_id": str(row["turn_id"]),
-            "tool_name": str(row["tool_name"]),
-            "created_at": str(row["created_at"]),
-        }
-        for row in _service(request).store.list_pending_suspended_turns(
-            auth_data[0].principal_id, session_id
-        )
-    ]
-    return body
+    answer = SessionDetail(
+        session=view.session,
+        turns=view.turns,
+        parked_approvals=[
+            {
+                "approval_id": str(row["approval_id"]),
+                "turn_id": str(row["turn_id"]),
+                "tool_name": str(row["tool_name"]),
+                "created_at": str(row["created_at"]),
+            }
+            for row in _service(request).store.list_pending_suspended_turns(
+                auth_data[0].principal_id, session_id
+            )
+        ],
+    )
+    return serialize_dto(answer)
 
 
 @router.get("/api/sessions/{session_id}/export/manifest")
@@ -694,7 +733,8 @@ async def get_session_export_manifest(
     )
     if transcript is None:
         raise refusal(status.HTTP_404_NOT_FOUND, "session_not_found")
-    return dict(transcript.manifest())
+    answer: TranscriptManifest = transcript.manifest()
+    return serialize_dto(answer)
 
 
 @router.post("/api/sessions/{session_id}/export")
@@ -759,7 +799,12 @@ async def set_session_pinned(
     )
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: SessionPinned = {
+        "ok": True,
+        "session_id": result.data["session_id"],
+        "pinned": result.data["pinned"],
+    }
+    return serialize_dto(answer)
 
 
 @router.put("/api/sessions/{session_id}/rename")
@@ -784,7 +829,12 @@ async def rename_session(
         if reason.startswith("invalid_title"):
             raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, result.reason_code)
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: SessionRenamed = {
+        "ok": True,
+        "session_id": result.data["session_id"],
+        "title": result.data["title"],
+    }
+    return serialize_dto(answer)
 
 
 @router.put("/api/sessions/{session_id}/archive")
@@ -804,7 +854,12 @@ async def archive_session(
     )
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: SessionArchived = {
+        "ok": True,
+        "session_id": result.data["session_id"],
+        "archived": result.data["archived"],
+    }
+    return serialize_dto(answer)
 
 
 @router.put("/api/sessions/{session_id}/unarchive")
@@ -822,7 +877,12 @@ async def unarchive_session(
     )
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: SessionArchived = {
+        "ok": True,
+        "session_id": result.data["session_id"],
+        "archived": result.data["archived"],
+    }
+    return serialize_dto(answer)
 
 
 @router.delete("/api/sessions/bulk")
@@ -834,7 +894,8 @@ async def delete_sessions(
     result = _service(request).delete_sessions(body.session_ids, auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: SessionsDeleted = {"ok": True, "session_ids": result.data["session_ids"]}
+    return serialize_dto(answer)
 
 
 @router.delete("/api/sessions/{session_id}")
@@ -855,7 +916,8 @@ async def delete_session(
     result = _service(request).delete_session(session_id, auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: SessionDeleted = {"ok": True, "session_id": result.data["session_id"]}
+    return serialize_dto(answer)
 
 
 @router.put("/api/sessions/{session_id}/project")
@@ -879,7 +941,12 @@ async def set_session_project(
     )
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: SessionProjectSet = {
+        "ok": True,
+        "session_id": result.data["session_id"],
+        "project_id": result.data["project_id"],
+    }
+    return serialize_dto(answer)
 
 
 @router.put("/api/sessions/{session_id}/tags")
@@ -904,7 +971,12 @@ async def set_session_tags(
         if reason.startswith("invalid_tag"):
             raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, result.reason_code)
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: SessionTagsSet = {
+        "ok": True,
+        "session_id": result.data["session_id"],
+        "tags": result.data["tags"],
+    }
+    return serialize_dto(answer)
 
 
 @router.get("/api/turns/{turn_id}")
@@ -1406,7 +1478,8 @@ async def create_project(
         raise refusal(status.HTTP_400_BAD_REQUEST
                 if body.attach_path is not None
                 else status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: ProjectCreated = cast(ProjectCreated, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.put("/api/projects/selection")
@@ -1423,7 +1496,8 @@ async def select_project(
     result = _service(request).select_project(body.project_id, session.principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: ProjectSelected = {"ok": True, "active_project_id": result.data["active_project_id"]}
+    return serialize_dto(answer)
 
 
 @router.get("/api/projects/tree")
@@ -1432,7 +1506,10 @@ async def list_project_tree(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict]:
     """Return the full project tree (active, non-archived only)."""
-    return _service(request).list_project_tree(auth_data[1].delegated_by_user_id)
+    answer: list[ProjectTreeNode] = project_tree(
+        _service(request).list_project_tree(auth_data[1].delegated_by_user_id)
+    )
+    return serialize_dto(answer)
 
 
 @router.get("/api/projects/{project_id}")
@@ -1498,7 +1575,8 @@ async def save_project_context(
     )
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer: ProjectContextSaved = cast(ProjectContextSaved, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.get("/api/projects/{project_id}/deletion-preview")
@@ -1511,7 +1589,8 @@ async def project_deletion_preview(
     result = _service(request).project_deletion_preview(project_id, auth_data[0].principal_id)
     if not result.ok:
         raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
-    return serialize_dto(result.data["preview"])
+    answer: ProjectDeletionPreviewView = result.data["preview"]
+    return serialize_dto(answer)
 
 
 @router.delete("/api/projects/{project_id}")
@@ -1536,7 +1615,12 @@ async def delete_project(
     result = service.delete_project(project_id, auth_data[0].principal_id, confirm=True)
     if not result.ok:
         raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
-    return {"ok": True, **result.data}
+    answer: ProjectDeleted = {
+        "ok": True,
+        "project_id": result.data["project_id"],
+        "root_kind": result.data["root_kind"],
+    }
+    return serialize_dto(answer)
 
 
 #: Refusals that describe the request's target rather than the caller's right.
@@ -1576,7 +1660,12 @@ async def move_project(
     result = _service(request).move_project(project_id, body.parent_id, auth_data[0].principal_id)
     if not result.ok:
         raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
-    return {"ok": True, **result.data}
+    answer: ProjectMoved = {
+        "ok": True,
+        "project_id": result.data["project_id"],
+        "new_parent_id": result.data["new_parent_id"],
+    }
+    return serialize_dto(answer)
 
 
 @router.put("/api/projects/{project_id}/archive")
@@ -1589,7 +1678,12 @@ async def archive_project(
     result = _service(request).archive_project(project_id, auth_data[0].principal_id)
     if not result.ok:
         raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
-    return {"ok": True, **result.data}
+    answer: ProjectArchived = {
+        "ok": True,
+        "project_id": result.data["project_id"],
+        "archived": result.data["archived"],
+    }
+    return serialize_dto(answer)
 
 
 @router.put("/api/projects/{project_id}/restore")
@@ -1602,7 +1696,12 @@ async def restore_project(
     result = _service(request).restore_project(project_id, auth_data[0].principal_id)
     if not result.ok:
         raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
-    return {"ok": True, **result.data}
+    answer: ProjectArchived = {
+        "ok": True,
+        "project_id": result.data["project_id"],
+        "archived": result.data["archived"],
+    }
+    return serialize_dto(answer)
 
 
 @router.get("/api/checkpoints/{checkpoint_id}")
@@ -1771,10 +1870,10 @@ async def resume_task(
 
     session, _principal = auth_data
     workspace: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
-    result = await TaskScheduler(workspace).resume_task(task_id, session.principal_id)
+    result: TaskResumed = await TaskScheduler(workspace).resume_task(task_id, session.principal_id)
     if result.get("reason_code") == "task_not_found":
         raise refusal(status.HTTP_404_NOT_FOUND, "task_not_found")
-    return result
+    return serialize_dto(result)
 
 
 @router.get("/api/models")
@@ -2398,7 +2497,8 @@ async def get_checkpoint_restore_plan(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown checkpoint: {checkpoint_id}"
         )
-    return plan
+    answer: RestorePlan = cast(RestorePlan, plan)
+    return serialize_dto(answer)
 
 
 @router.post("/api/checkpoints/{checkpoint_id}/restore")
@@ -2448,17 +2548,18 @@ async def request_checkpoint_restore(
     store = SQLiteStore(_ws(request))
     store.insert_tool_action(action, str(plan.get("session_id") or ""), None, "approval_required")
     store.insert_approval(approval_id, action, critical=cross_principal)
-    return {
+    answer: RestoreRequested = {
         "status": "approval_required",
         "approval_id": approval_id,
         "action_id": action.action_id,
         "checkpoint_id": checkpoint_id,
         "critical": cross_principal,
         "executes_action": False,
-        "restore_content_count": plan.get("restore_content_count", 0),
-        "delete_count": plan.get("delete_count", 0),
-        "skip_count": plan.get("skip_count", 0),
+        "restore_content_count": int(plan.get("restore_content_count", 0)),
+        "delete_count": int(plan.get("delete_count", 0)),
+        "skip_count": int(plan.get("skip_count", 0)),
     }
+    return serialize_dto(answer)
 
 
 @router.get("/api/checkpoints/{checkpoint_id}/branch-plan")
@@ -2481,7 +2582,8 @@ async def get_conversation_branch_plan(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown checkpoint: {checkpoint_id}"
         )
-    return plan
+    answer: ConversationBranchPlan = cast(ConversationBranchPlan, plan)
+    return serialize_dto(answer)
 
 
 @router.post("/api/checkpoints/{checkpoint_id}/branch")
@@ -2508,7 +2610,8 @@ async def branch_conversation(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown checkpoint: {checkpoint_id}"
         )
-    return result
+    answer: ConversationBranch = cast(ConversationBranch, result)
+    return serialize_dto(answer)
 
 
 @router.get("/api/sessions/{session_id}/branch-origin")
@@ -2527,8 +2630,10 @@ async def get_conversation_branch_origin(
     origin = _read_models(request).conversation_branch_origin(
         session_id, user_id=principal.delegated_by_user_id
     )
-    if origin is None:
-        return {
+    answer: ConversationBranchOrigin = (
+        cast(ConversationBranchOrigin, origin)
+        if origin is not None
+        else {
             "session_id": session_id,
             "source_session_id": None,
             "source_title": None,
@@ -2536,7 +2641,8 @@ async def get_conversation_branch_origin(
             "summary": "",
             "created_at": "",
         }
-    return origin
+    )
+    return serialize_dto(answer)
 
 
 @router.get("/api/projects/{project_id}/files")

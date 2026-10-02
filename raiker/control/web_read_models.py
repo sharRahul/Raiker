@@ -150,28 +150,17 @@ class FileProvenanceEntryView(View):
 
 
 @dataclass(frozen=True)
-class ProjectFilesView:
+class ProjectFilesView(View):
     project_id: str
     root_subpath: str
     root_exists: bool
     files: tuple[ProjectFileView, ...]
     truncated: bool
-    provenance: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    provenance: dict[str, list[FileProvenanceEntryView]] = field(default_factory=dict)
     note: str = (
         "Metadata only. Raiker never serves workspace file content to the browser; "
         "changes are made through the governed approval path."
     )
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "project_id": self.project_id,
-            "root_subpath": self.root_subpath,
-            "root_exists": self.root_exists,
-            "files": [f.to_dict() for f in self.files],
-            "truncated": self.truncated,
-            "provenance": {k: list(v) for k, v in self.provenance.items()},
-            "note": self.note,
-        }
 
 
 class WebReadModels:
@@ -538,9 +527,9 @@ class WebReadModels:
 
     def _provenance_for(
         self, project_id: str, known_paths: set[str]
-    ) -> dict[str, list[dict[str, Any]]]:
+    ) -> dict[str, list[FileProvenanceEntryView]]:
         """Map each listed file to the governed writes recorded against it."""
-        provenance: dict[str, list[dict[str, Any]]] = {}
+        provenance: dict[str, list[FileProvenanceEntryView]] = {}
         sessions = self.store.list_sessions(limit=200, project_id=project_id)
         for session in sessions:
             entries = self.store.list_checkpoint_capture_entries(
@@ -561,10 +550,10 @@ class WebReadModels:
                         existed_before=bool(entry.get("existed_before")),
                         pre_image_size=int(entry.get("pre_image_size") or 0),
                         created_at=str(entry.get("created_at") or ""),
-                    ).to_dict()
+                    )
                 )
         for path in provenance:
-            provenance[path].sort(key=lambda item: str(item["created_at"]), reverse=True)
+            provenance[path].sort(key=lambda item: item.created_at, reverse=True)
             del provenance[path][8:]
         return provenance
 

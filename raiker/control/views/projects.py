@@ -66,7 +66,7 @@ class ProjectDeletionPreviewView(View):
 
     project_id: str
     name: str
-    root_kind: str
+    root_kind: Literal["managed", "attached"]
     root_label: str
     sessions: int
     turns: int

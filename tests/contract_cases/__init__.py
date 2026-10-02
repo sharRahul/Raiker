@@ -2,6 +2,8 @@
 
 from tests.contract_cases.auth import CASES as AUTH
 from tests.contract_cases.base import merge
+from tests.contract_cases.projects import CASES as PROJECTS
 from tests.contract_cases.read_models import CASES as READ_MODELS
+from tests.contract_cases.sessions import CASES as SESSIONS
 
-CASES = merge(READ_MODELS, AUTH)
+CASES = merge(READ_MODELS, AUTH, SESSIONS, PROJECTS)

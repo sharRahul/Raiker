@@ -1,6 +1,9 @@
 import type { ApprovalMode } from "./approvalMode";
 import type {
+  AgentPlan,
+  AgentPlanStep,
   ApprovalView,
+  AttachmentPreview,
   BackgroundWorkerHealth,
   CapabilityGateView,
   CheckpointCaptureHealth,
@@ -11,6 +14,10 @@ import type {
   ConnectorView,
   ContentPartView,
   ContextUsageView,
+  ConversationBranch,
+  ConversationBranchOrigin,
+  ConversationBranchPlan,
+  ConversationCompaction,
   CredentialLifecycleView,
   DiagnosticsView,
   EmbeddingProviderView,
@@ -18,8 +25,14 @@ import type {
   EventView,
   ExtensionsOverviewView,
   ExtensionView,
+  FileProvenanceEntryView,
   IdentityView,
+  ImportedFile,
+  ImportRefused,
   IssuedSessionView,
+  ManagedFile,
+  ManagedFileImport,
+  ManagedFileList,
   McpServerView,
   McpSessionView,
   McpToolDeclaration,
@@ -29,20 +42,44 @@ import type {
   PasswordRecoveryBeginView,
   PathAttachment,
   ProjectAttachmentView,
+  ProjectBrowseEntry,
+  ProjectBrowseView,
   ProjectContext,
+  ProjectDeletionPreviewView,
   ProjectDetailView,
+  ProjectFilesView,
+  ProjectFileView,
+  ProjectRootIndexResult,
+  ProjectRootStatus,
   ProjectsListView,
+  ProjectTreeNode,
   ProjectView,
   ProviderHealthView,
+  RecalledMemory,
+  RestorePlan,
+  RestorePlanFile,
+  RestoreRequested,
   RuntimeModeView,
   RuntimeReadinessView,
   SecurityFindingView,
+  SessionAttachment,
+  SessionAttachments,
+  SessionDetail,
+  SessionRecall,
   SessionView,
+  SourceAnchorView,
   TaskDetailView,
   TaskView,
+  TranscriptFile,
+  TranscriptManifest,
+  TranscriptMessage,
   TurnDetailView,
+  TurnSourceExcerpt,
+  TurnSources,
+  TurnSourceView,
   TurnView,
   UploadAttachment,
+  WorkInFlight,
   WorkThreadFacet,
   WorkThreadPage,
   WorkThreadView,
@@ -142,29 +179,9 @@ export interface McpAgentAccess {
   connected_servers: number;
 }
 
-/**
- * One step of the agent's plan for a conversation (B6). Written by the model
- * through the governed `update_plan` tool; at most one step is `in_progress`.
- */
-export interface AgentPlanStep {
-  title: string;
-  status: "pending" | "in_progress" | "completed" | "blocked";
-  note?: string;
-}
+export type { AgentPlanStep };
 
-export interface AgentPlan {
-  session_id: string;
-  steps: AgentPlanStep[];
-  turn_id?: string;
-  created_at?: string;
-  updated_at?: string;
-  total?: number;
-  completed?: number;
-  in_progress?: number;
-  pending?: number;
-  blocked?: number;
-  current_step?: string;
-}
+export type { AgentPlan };
 
 export type { McpToolDeclaration };
 
@@ -807,38 +824,11 @@ export interface ModelPricingView {
   can_override: boolean;
 }
 
-/** BUG-22 — what an export of one conversation would contain, reviewed first. */
-export interface TranscriptExportMessage {
-  role: string;
-  text: string;
-  timestamp: string | null;
-  status: string | null;
-  /** BUG-300 — the parts this answer declared. Empty when it declared none. */
-  parts?: ContentPart[];
-}
+export type TranscriptExportMessage = TranscriptMessage;
 
-export interface TranscriptExportFile {
-  filename: string;
-  media_type: string;
-  byte_size: number;
-  source: string;
-}
+export type TranscriptExportFile = TranscriptFile;
 
-export interface TranscriptExportManifest {
-  session_id: string;
-  title: string;
-  created_at: string | null;
-  message_count: number;
-  file_count: number;
-  files: TranscriptExportFile[];
-  redaction_policy: string;
-  formats: string[];
-  messages: TranscriptExportMessage[];
-  /** BUG-300 — declared tables and charts across the conversation, so the
-   *  review says they will be rendered rather than leaving the owner to find
-   *  out from the file. */
-  typed_part_count?: number;
-}
+export type TranscriptExportManifest = TranscriptManifest;
 
 /** BUG-24 — parked turns this account may continue, ids only. */
 export interface ResumableTurn {
@@ -1053,25 +1043,7 @@ export type { ProjectView };
 
 export type ProjectAttachment = ProjectAttachmentView;
 
-/** UX-PROJ-07 — everything a delete removes, counted before it runs. */
-export interface ProjectDeletionPreview {
-  project_id: string;
-  name: string;
-  root_kind: "managed" | "attached";
-  root_label: string;
-  sessions: number;
-  turns: number;
-  tasks: number;
-  checkpoints: number;
-  managed_files: number;
-  descendants: number;
-  /** Files and bytes in the managed folder Raiker removes; 0 for an attached one. */
-  folder_files: number;
-  folder_bytes: number;
-  folder_truncated: boolean;
-  /** A managed project's folder goes with it, so its delete takes a step-up. */
-  requires_step_up: boolean;
-}
+export type ProjectDeletionPreview = ProjectDeletionPreviewView;
 
 export type ProjectsList = ProjectsListView;
 
@@ -1129,47 +1101,15 @@ export type ProjectDetail = ProjectDetailView;
 
 export type { ProjectContext };
 
-/** A node in the project tree hierarchy. Recursive — each node may have
- * children. Represents an active (non-archived) project/folder. */
-export interface ProjectTreeNode {
-  project_id: string;
-  name: string;
-  root_subpath: string;
-  created_at: string;
-  session_count: number;
-  children: ProjectTreeNode[];
-}
+export type { ProjectTreeNode };
 
 export type EventEntry = EventView;
 
 export type Checkpoint = CheckpointView;
 
-/**
- * What branching a conversation from one checkpoint would seed (GAP-CHAT C14).
- * `requires_approval` is always false: a branch writes no workspace file, which
- * is the property that separates it from a restore.
- */
-export interface ConversationBranchPlan {
-  status: string;
-  checkpoint_id: string;
-  source_session_id: string;
-  summary: string;
-  memory_candidate_count: number;
-  can_execute: boolean;
-  requires_approval: boolean;
-}
+export type { ConversationBranchPlan };
 
-/** The branch that was created. The source conversation is unchanged. */
-export interface ConversationBranch {
-  status: string;
-  checkpoint_id: string;
-  source_session_id: string;
-  session_id: string;
-  title: string;
-  summary: string;
-  memory_candidate_count: number;
-  seed_manifest_path: string;
-}
+export type { ConversationBranch };
 
 /** Where a conversation came from. `source_session_id` is null for a root. */
 /**
@@ -1195,75 +1135,15 @@ export interface OwnerQuestionAnswered {
   resume?: { resumable?: boolean; session_id?: string | null; turn_id?: string | null };
 }
 
-export interface ConversationCompaction {
-  session_id: string;
-  compacted: boolean;
-  reason_code?: string;
-  through_turn_id?: string | null;
-  source_turn_count?: number;
-  estimated_summary_tokens?: number;
-  provider?: string;
-  model?: string;
-  created_at?: string;
-}
+export type { ConversationCompaction };
 
-export interface ConversationBranchOrigin {
-  session_id: string;
-  source_session_id: string | null;
-  source_title: string | null;
-  forked_from_checkpoint_id: string | null;
-  summary: string;
-  created_at: string;
-}
+export type { ConversationBranchOrigin };
 
-/**
- * Metadata-only preflight for a checkpoint restore. `files` carries content
- * addresses and sizes; the server never sends file content to the browser, and
- * computing a plan performs no restore.
- */
-export interface RestorePlanFile {
-  workspace_path: string;
-  op: string;
-  pre_image_sha256: string | null;
-  pre_image_size: number;
-  current_sha256: string | null;
-  current_size: number;
-  changed: boolean;
-  changed_by_other_principal: boolean;
-}
+export type { RestorePlanFile };
 
-export interface RestorePlan {
-  status: string;
-  checkpoint_id: string;
-  session_id: string;
-  checkpoint_created_at: string;
-  can_execute: boolean;
-  requires_approval: boolean;
-  files: RestorePlanFile[];
-  restore_content_count: number;
-  delete_count: number;
-  skip_count: number;
-  changed_count: number;
-  touches_other_principal: boolean;
-}
+export type { RestorePlan };
 
-/**
- * POST /api/checkpoints/{id}/restore — the governed request, not the restore.
- * The server raises an approval and performs nothing; `executes_action` is
- * always false, and `critical` is true when the rewind would overwrite work
- * last changed by a different principal (human-only, step-up lifecycle).
- */
-export interface RestoreRequestResult {
-  status: string;
-  approval_id: string;
-  action_id: string;
-  checkpoint_id: string;
-  critical: boolean;
-  executes_action: boolean;
-  restore_content_count: number;
-  delete_count: number;
-  skip_count: number;
-}
+export type RestoreRequestResult = RestoreRequested;
 
 /**
  * BUG-231 — one redacted audit export. Metadata only: the manifest hash is
@@ -1301,36 +1181,11 @@ export type { ExtensionView };
 
 export type ExtensionsOverview = ExtensionsOverviewView;
 
-export interface ProjectFile {
-  workspace_path: string;
-  name: string;
-  is_directory: boolean;
-  size_bytes: number;
-  modified_at: string;
-  depth: number;
-}
+export type ProjectFile = ProjectFileView;
 
-export interface FileProvenanceEntry {
-  turn_id: string | null;
-  action_id: string | null;
-  session_id: string;
-  capability: string;
-  principal_id: string;
-  capture_status: string;
-  existed_before: boolean;
-  pre_image_size: number;
-  created_at: string;
-}
+export type FileProvenanceEntry = FileProvenanceEntryView;
 
-export interface ProjectFilesView {
-  project_id: string;
-  root_subpath: string;
-  root_exists: boolean;
-  files: ProjectFile[];
-  truncated: boolean;
-  provenance: Record<string, FileProvenanceEntry[]>;
-  note: string;
-}
+export type { ProjectFilesView };
 
 /** Redacted, copyable support bundle. Shape is intentionally loose: the server
  *  owns which readiness facts it includes, and the UI renders it verbatim. */
@@ -1376,17 +1231,7 @@ export type SessionSummary = SessionView;
 
 export type TurnSummary = TurnView;
 
-// GET /api/sessions/{id} — raiker/control/dashboard.py SessionDetailView.to_dict()
-export interface SessionDetail {
-  session: SessionSummary;
-  turns: TurnSummary[];
-  parked_approvals?: Array<{
-    approval_id: string;
-    turn_id: string;
-    tool_name: string;
-    created_at: string;
-  }>;
-}
+export type { SessionDetail };
 
 export type TurnDetail = TurnDetailView;
 
@@ -1715,26 +1560,7 @@ export interface UploadedAttachment {
   sha256: string;
 }
 
-// GET /api/sessions/{id}/attachments/{id}/preview — raiker/runtime/attachment_preview.py
-// AttachmentPreview.to_dict(). View-only and inert: `text` is source text (the
-// client's escape-first renderer turns Markdown into markup, never the server),
-// `rows` are spreadsheet cell values, and `pdf_url` / `image_url` are
-// same-origin authorized paths fetched with the session bearer token — never an
-// external URL, and never the bytes themselves.
-export interface AttachmentPreview {
-  attachment_id: string;
-  session_id: string;
-  filename: string;
-  media_type: string;
-  kind: "text" | "markdown" | "table" | "pdf" | "image" | "unavailable";
-  byte_size: number;
-  text: string;
-  rows: string[][];
-  truncated: boolean;
-  pdf_url: string | null;
-  image_url: string | null;
-  unavailable_reason: string | null;
-}
+export type { AttachmentPreview };
 
 /**
  * BUG-27 — one resolved source passage, or the stated reason there is not one.
@@ -1792,94 +1618,23 @@ export interface SourceExcerptView {
   anchors?: SourceAnchorView[];
 }
 
-// One exchange a cited search returned. Four coordinates and no text: the
-// passage already carries what was read, and this carries only where from.
-export interface SourceAnchorView {
-  session_id: string;
-  turn_id: string;
-  title: string;
-  created_at: string;
-  /** Which surface it happened on, so the link opens where the work is. */
-  origin: string;
-}
+export type { SourceAnchorView };
 
-// C6/C4 — raiker/runtime/turn_sources.py TurnSource.to_view(). One thing a turn
-// actually read: a governed tool result, or a file the owner attached. Labels
-// and locators only — the passage behind a source is fetched on open, so a
-// history load never carries a transcript's worth of read material.
-export interface TurnSourceView {
-  source_id: string; // "s1", "s2", … — the marker the model was handed
-  ordinal: number;
-  kind: string; // file | attachment | email | calendar | web | memory | …
-  title: string;
-  locator: string;
-  tool_name: string;
-  detail: string;
-  attachment_id: string;
-  turn_id: string;
-  openable: boolean;
-}
+export type { TurnSourceView };
 
-/**
- * C17 — GET /api/sessions/{id}/recall. Which approved memories the turns of
- * this conversation were actually given. Ambient recall leaves no citation to
- * click, so this is the only way the transcript can say what was remembered —
- * and the only place the owner can correct or forget it at the moment it
- * mattered.
- */
-export interface RecalledMemory {
-  memory_id: string;
-  turn_id: string;
-  text: string;
-  scope: string;
-  pinned: boolean;
-}
+export type { RecalledMemory };
 
-export interface SessionRecallView {
-  ok: boolean;
-  session_id: string;
-  memories: RecalledMemory[];
-}
+export type SessionRecallView = SessionRecall;
 
-// GET /api/sessions/{id}/sources
-export interface TurnSourcesView {
-  session_id: string;
-  sources: TurnSourceView[];
-}
+export type TurnSourcesView = TurnSources;
 
-// GET /api/sessions/{id}/turns/{turn}/sources/{source}/excerpt — the source view
-// above plus the resolved passage, in the same shape (and with the same honest
-// statuses) as SourceExcerptView.
-export type TurnSourceExcerptView = TurnSourceView &
-  SourceExcerptView & { ok: boolean };
+export type TurnSourceExcerptView = TurnSourceExcerpt;
 
-// GET /api/sessions/{id}/attachments — metadata only, so a reloaded chat can
-// redraw the attachment chips its transcript does not persist.
-export interface SessionAttachment {
-  attachment_id: string;
-  turn_id: string;
-  kind: string;
-  filename: string;
-  media_type: string;
-  byte_size: number;
-  previewable: boolean;
-  source: "uploaded" | "generated";
-  created_at: string;
-}
+export type { SessionAttachment };
 
-export interface SessionAttachmentsView {
-  session_id: string;
-  files: SessionAttachment[];
-}
+export type SessionAttachmentsView = SessionAttachments;
 
-/** GEP-02 — everything the stop switch would reach, counted server-side. */
-export interface WorkInFlight {
-  tasks: number;
-  turns: number;
-  /** `null` when the command store could not be read: unknown, never zero. */
-  commands: number | null;
-  turn_sessions: string[];
-}
+export type { WorkInFlight };
 
 export interface StopAllResult {
   tasks: { task_id: string; result: string }[];
@@ -2487,38 +2242,14 @@ export type ManagedFileIndexState =
   | "failed"
   | "retired";
 
-export interface ManagedFile {
-  file_id: string;
-  scope_kind: ManagedFileScope;
-  project_id: string | null;
-  relative_path: string;
-  media_type: string;
-  size_bytes: number;
-  content_hash: string;
-  index_state: ManagedFileIndexState;
-  index_error: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type { ManagedFile };
 
-export interface ManagedFileList {
-  ok: boolean;
-  scope_kind: ManagedFileScope;
-  project_id: string | null;
-  files: ManagedFile[];
-}
+export type { ManagedFileList };
 
 /** One file's outcome inside a batch. A failure names the file, not the batch. */
-export type ManagedFileImportResult =
-  | ({ ok: true } & ManagedFile)
-  | { ok: false; relative_path: string; reason_code: string };
+export type ManagedFileImportResult = ImportedFile | ImportRefused;
 
-export interface ManagedFileImportResponse {
-  ok: boolean;
-  scope_kind: ManagedFileScope;
-  project_id: string | null;
-  results: ManagedFileImportResult[];
-}
+export type ManagedFileImportResponse = ManagedFileImport;
 
 export interface ManagedFileUpload {
   relative_path: string;
@@ -2533,28 +2264,9 @@ export interface ManagedFileUpload {
 // only what the answer says.
 export type ProjectRootKind = "managed" | "attached";
 
-export interface ProjectBrowseEntry {
-  name: string;
-  relative_path: string;
-  is_directory: boolean;
-  size_bytes: number;
-  media_type: string;
-  /** Absent when the file has no catalogue row: a file Raiker cannot read has
-   *  no index state, and inventing one would suggest a failure. */
-  index_state: ManagedFileIndexState | null;
-}
+export type { ProjectBrowseEntry };
 
-export interface ProjectBrowseView {
-  path: string;
-  parent: string | null;
-  entries: ProjectBrowseEntry[];
-  truncated: boolean;
-  root_kind: ProjectRootKind;
-  root_label: string;
-  /** The grant was revoked, the project detached, or the folder moved. The
-   *  explorer must say so; an empty tree would read as "no files". */
-  root_missing: boolean;
-}
+export type { ProjectBrowseView };
 
 // B13 — the repository Build is pointed at, browsed one directory at a time.
 // Deliberately the same entry shape as a project's tree so one explorer serves
@@ -2640,30 +2352,9 @@ export interface CodeRepoFileView {
   reason_code: string;
 }
 
-export interface ProjectRootStatus {
-  ok: boolean;
-  project_id: string;
-  root_kind: ProjectRootKind;
-  root_label: string;
-  root_path: string | null;
-  root_missing: boolean;
-  writable: boolean;
-  watching: boolean;
-  watch_reason: string;
-  last_scanned_at: string;
-  indexed_files: number;
-}
+export type { ProjectRootStatus };
 
-export interface ProjectRootIndexResult {
-  ok: boolean;
-  project_id: string;
-  indexed: number;
-  updated: number;
-  retired: number;
-  skipped: number;
-  truncated: boolean;
-  scanned_at: string;
-}
+export type { ProjectRootIndexResult };
 
 /** One entry the host path browser offers (BUG-251). */
 export interface HostPathEntry {

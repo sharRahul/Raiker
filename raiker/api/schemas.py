@@ -574,6 +574,13 @@ class SetSessionPinnedRequest(StrictRequest):
     pinned: bool
 
 
+class AttachProjectFolderRequest(StrictRequest):
+    """A folder of the owner's to put behind a project, and whether Raiker may write to it."""
+
+    path: str
+    writable: bool = True
+
+
 class BulkDeleteSessionsRequest(StrictRequest):
     session_ids: list[str]
 

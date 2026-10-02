@@ -32,7 +32,9 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, cast
+
+from typing_extensions import TypedDict
 
 from raiker.graph.codemap import (
     SCHEMA_VERSION,
@@ -77,6 +79,68 @@ MAX_CONTEXT_FILES = 10
 MAX_REFERENCE_FILES = 1500
 MAX_REFERENCE_FILE_BYTES = 512_000
 MAX_REFERENCE_LINE_CHARS = 240
+
+
+class CodeMapError(TypedDict):
+    type: str
+    message: str
+
+
+class CodeMapFailure(TypedDict):
+    """A named refusal: the gate or decision mode said no, or nothing could be read."""
+
+    status: Literal["denied", "failed"]
+    error: CodeMapError
+
+
+class CodeMapSummary(TypedDict):
+    """A scan's result: counts and what was skipped, never a file's content."""
+
+    status: Literal["indexed", "partial"]
+    repository: str
+    file_count: int
+    symbol_count: int
+    edge_count: int
+    languages: dict[str, int]
+    skipped: dict[str, int]
+    limits_hit: list[str]
+    schema_version: str
+
+
+class CodeMapStatus(TypedDict):
+    """What the owner is shown: the gate, the repository, and the index state."""
+
+    capability: str
+    gate_state: str
+    decision_mode: str
+    enabled: bool
+    repository: str
+    repo_id: str
+    status: Literal["indexed", "partial", "not_indexed", "failed"]
+    reason_code: str
+    file_count: int
+    symbol_count: int
+    edge_count: int
+    languages: dict[str, int]
+    skipped: dict[str, int]
+    limits_hit: list[str]
+    built_at: str | None
+    updated_at: str | None
+
+
+class CodeMapPath(TypedDict):
+    path: str
+    language: str
+
+
+class CodeMapPaths(TypedDict):
+    """Paths and languages only — an autocomplete must not be a disclosure surface."""
+
+    status: Literal["success"]
+    repository: str
+    fragment: str
+    count: int
+    paths: list[CodeMapPath]
 
 
 def _denied(reason: str, message: str) -> dict[str, Any]:
@@ -179,7 +243,7 @@ class CodeMapService:
 
     # ── build ────────────────────────────────────────────────────────────────
 
-    def build(self, *, target: CodeMapTarget | None = None) -> dict[str, Any]:
+    def build(self, *, target: CodeMapTarget | None = None) -> CodeMapSummary | CodeMapFailure:
         """Scan the repository from scratch and swap in the result.
 
         Returns a metadata-only summary: counts, what was skipped, and which
@@ -187,14 +251,16 @@ class CodeMapService:
         """
         refusal = self.governance_refusal("Code map indexing")
         if refusal is not None:
-            return refusal
+            return cast(CodeMapFailure, refusal)
         chosen = target or self.target()
         if not chosen.root.is_dir():
-            return self._record_unindexable(chosen, "repository_folder_missing")
+            return cast(CodeMapFailure, self._record_unindexable(chosen, "repository_folder_missing"))
         try:
             scan = CodeMapBuilder(chosen.root, limits=self.limits).scan()
         except (OSError, PermissionError) as exc:
-            return self._record_unindexable(chosen, f"scan_failed:{type(exc).__name__}")
+            return cast(
+                CodeMapFailure, self._record_unindexable(chosen, f"scan_failed:{type(exc).__name__}")
+            )
         self.store.replace_code_map(
             owner_principal_id=self.owner,
             repo_path=chosen.repo_path,
@@ -255,11 +321,11 @@ class CodeMapService:
 
     # ── the index's own state row ────────────────────────────────────────────
 
-    def _record_scan(self, target: CodeMapTarget, scan: CodeMapScan) -> dict[str, Any]:
+    def _record_scan(self, target: CodeMapTarget, scan: CodeMapScan) -> CodeMapSummary:
         languages: dict[str, int] = {}
         for file in scan.files:
             languages[file.language] = languages.get(file.language, 0) + 1
-        status = STATUS_INDEXED if scan.complete else STATUS_PARTIAL
+        status: Literal["indexed", "partial"] = "indexed" if scan.complete else "partial"
         self.store.record_code_map_index(
             owner_principal_id=self.owner,
             repo_path=target.repo_path,
@@ -336,7 +402,7 @@ class CodeMapService:
         """
         return self.store.load_code_map_index(self.owner, repo_path)
 
-    def status(self) -> dict[str, Any]:
+    def status(self) -> CodeMapStatus:
         """What the owner is shown: the gate, the repository, and the index state."""
         target = self.target()
         index = self.store.load_code_map_index(self.owner, target.repo_path)
@@ -348,7 +414,10 @@ class CodeMapService:
             "enabled": gate in ENABLED_GATE_STATES,
             "repository": target.label,
             "repo_id": target.repo_id,
-            "status": str(index["status"]) if index else STATUS_NOT_INDEXED,
+            "status": cast(
+                Literal["indexed", "partial", "not_indexed", "failed"],
+                str(index["status"]) if index else STATUS_NOT_INDEXED,
+            ),
             "reason_code": str(index["reason_code"]) if index else "",
             "file_count": int(index["file_count"]) if index else 0,
             "symbol_count": int(index["symbol_count"]) if index else 0,
@@ -360,7 +429,7 @@ class CodeMapService:
             "updated_at": str(index["updated_at"]) if index else None,
         }
 
-    def complete_paths(self, fragment: str, *, limit: int = 12) -> dict[str, Any]:
+    def complete_paths(self, fragment: str, *, limit: int = 12) -> CodeMapPaths | CodeMapFailure:
         """Paths in the built map that match *fragment*, for `@`-mention completion.
 
         B19 — attaching a file to a Build prompt meant typing its path exactly.
@@ -382,18 +451,18 @@ class CodeMapService:
         """
         refusal = self.governance_refusal("Workspace file mentions")
         if refusal is not None:
-            return refusal
+            return cast(CodeMapFailure, refusal)
         target = self.target()
         index = self.store.load_code_map_index(self.owner, target.repo_path)
         if index is None or int(index.get("file_count") or 0) == 0:
-            return _failed(
+            return cast(CodeMapFailure, _failed(
                 "code_map_not_built",
                 f"No code map for {target.label} yet. Build one from Build → Repositories.",
-            )
+            ))
         needle = (fragment or "").strip().casefold()
         bounded = max(1, min(int(limit or 12), 50))
         rows = self.store.list_code_map_files(self.owner, target.repo_path)
-        matches: list[dict[str, Any]] = []
+        matches: list[CodeMapPath] = []
         for row in rows:
             path = str(row.get("path") or "")
             if not path:

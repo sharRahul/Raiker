@@ -2,13 +2,27 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 from fastapi import APIRouter, Depends, Query, Request, status
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
+from raiker.api.schemas import serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.commands import (
+    CommandOutput,
+    CommandReceiptAnswer,
+    CommandReceiptView,
+    CommandRunDetail,
+    CommandRunList,
+    CommandRunState,
+    CommandRunView,
+    CommandStopped,
+    CredentialDeltaDiscarded,
+    CredentialDeltaList,
+    CredentialDeltaView,
+)
 from raiker.execution.commands.models import CommandReceipt, StoredCommandRun
 from raiker.execution.commands.service import CommandService, CommandServiceError
 from raiker.execution.commands.store import ReceiptImmutable
@@ -25,19 +39,19 @@ def _service(request: Request) -> CommandService:
     return service
 
 
-def _run_view(run: StoredCommandRun) -> dict[str, Any]:
+def _run_view(run: StoredCommandRun) -> CommandRunView:
     value = asdict(run)
     value["state"] = run.state.value
     value.pop("owner_principal_id", None)
     value.pop("acting_principal_id", None)
     value.pop("template_digest", None)
-    return value
+    return cast(CommandRunView, value)
 
 
-def _receipt_view(receipt: CommandReceipt) -> dict[str, Any]:
+def _receipt_view(receipt: CommandReceipt) -> CommandReceiptView:
     return {
         "run_id": receipt.run_id,
-        "state": receipt.state.value,
+        "state": cast(CommandRunState, receipt.state.value),
         "exit_code": receipt.exit_code,
         "termination_reason": receipt.termination_reason,
         "completed_at": receipt.completed_at,
@@ -61,7 +75,8 @@ def list_commands(
     service = _service(request)
     service.recover_owner(session.principal_id)
     runs = service.store.list_runs(session.principal_id, session_id=session_id)
-    return {"runs": [_run_view(run) for run in runs]}
+    listed: CommandRunList = {"runs": [_run_view(run) for run in runs]}
+    return serialize_dto(listed)
 
 
 @router.get("/api/command-runs/{run_id}")
@@ -73,7 +88,8 @@ def get_command(
     run = _service(request).store.load(auth_data[0].principal_id, run_id)
     if run is None:
         _raise_service(CommandServiceError("command_run_not_found"))
-    return {"run": _run_view(run)}
+    detail: CommandRunDetail = {"run": _run_view(run)}
+    return serialize_dto(detail)
 
 
 @router.get("/api/command-runs/{run_id}/output")
@@ -88,7 +104,11 @@ def get_command_output(
     if service.store.load(owner, run_id) is None:
         _raise_service(CommandServiceError("command_run_not_found"))
     chunks = [asdict(chunk) for chunk in service.store.read_output(owner, run_id, after=after)]
-    return {"chunks": chunks, "next_after": chunks[-1]["sequence"] if chunks else after}
+    output = cast(
+        CommandOutput,
+        {"chunks": chunks, "next_after": chunks[-1]["sequence"] if chunks else after},
+    )
+    return serialize_dto(output)
 
 
 @router.get("/api/command-runs/{run_id}/receipt")
@@ -102,7 +122,8 @@ def get_command_receipt(
     if service.store.load(owner, run_id) is None:
         _raise_service(CommandServiceError("command_run_not_found"))
     receipt = service.store.get_receipt(owner, run_id)
-    return {"receipt": _receipt_view(receipt) if receipt else None}
+    answer: CommandReceiptAnswer = {"receipt": _receipt_view(receipt) if receipt else None}
+    return serialize_dto(answer)
 
 
 @router.post("/api/command-runs/{run_id}/stop")
@@ -115,7 +136,8 @@ def stop_command(
         run = _service(request).stop(auth_data[0].principal_id, run_id)
     except CommandServiceError as exc:
         _raise_service(exc)
-    return {"ok": True, "run": _run_view(run)}
+    stopped: CommandStopped = {"ok": True, "run": _run_view(run)}
+    return serialize_dto(stopped)
 
 
 @router.get("/api/credential-deltas")
@@ -128,14 +150,14 @@ def list_credential_deltas(
     rows = _service(request).store.list_unresolved_deltas(
         auth_data[0].principal_id, environment_profile_id
     )
-    deltas: list[dict[str, Any]] = []
+    deltas: list[CredentialDeltaView] = []
     for row in rows:
         try:
             manifest = json.loads(str(row["safe_manifest_json"]))
         except (TypeError, ValueError):
             manifest = {"files": []}
         deltas.append(
-            {
+            {  # type: ignore[typeddict-item]
                 "run_id": row["run_id"],
                 "environment_profile_id": row["environment_profile_id"],
                 "state": row["state"],
@@ -148,7 +170,8 @@ def list_credential_deltas(
                 "recipient_boundary": "disposable_container_tcb",
             }
         )
-    return {"deltas": deltas}
+    listed: CredentialDeltaList = {"deltas": deltas}
+    return serialize_dto(listed)
 
 
 @router.post("/api/credential-deltas/{run_id}/discard")
@@ -172,4 +195,8 @@ def discard_credential_delta(
         raise refusal(status.HTTP_409_CONFLICT, str(exc)) from exc
     if not changed:
         raise refusal(status.HTTP_404_NOT_FOUND, "credential_delta_not_found")
-    return {"ok": True, "receipt": _service(request).store.get_delta_receipt(auth_data[0].principal_id, run_id)}
+    discarded: CredentialDeltaDiscarded = {
+        "ok": True,
+        "receipt": _service(request).store.get_delta_receipt(auth_data[0].principal_id, run_id),
+    }
+    return serialize_dto(discarded)

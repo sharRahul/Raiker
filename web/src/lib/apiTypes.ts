@@ -8,6 +8,7 @@ import type {
   AuditExportResult,
   AuditExportView,
   BackgroundWorkerHealth,
+  BlocklistProbe,
   BrainSourceBrowse,
   BrainSourceResult,
   BrainSourceReview,
@@ -16,12 +17,26 @@ import type {
   CapabilityContainmentView,
   CapabilityDecisionMode,
   CapabilityGateView,
+  ChannelEnvRequirement,
+  ChannelProfile,
+  ChannelsView,
   CheckpointCaptureHealth,
   CheckpointView,
+  CodeMapStatus,
+  CodeRepoBrowseView,
+  CodeRepoChangeEntry,
+  CodeRepoChangesView,
+  CodeRepoDiagnosticsView,
+  CodeRepoFileView,
   CodeReposView,
   CodeRepoView,
   CodexStatus,
+  CommandChunkView,
+  CommandReceiptView,
+  CommandRunView,
+  ConformanceFindingView,
   ConnectionsView,
+  ConnectorStoreView,
   ConnectorView,
   ContainedSubject,
   ContentPartView,
@@ -31,8 +46,10 @@ import type {
   ConversationBranchPlan,
   ConversationCompaction,
   ConversionPreview,
+  CredentialDeltaView,
   CredentialLifecycleView,
   CriticalApprovalResolved,
+  Diagnostic,
   DiagnosticsView,
   EmbeddingProviderView,
   EmbeddingSpaceView,
@@ -41,15 +58,25 @@ import type {
   ExtensionsOverviewView,
   ExtensionView,
   FileProvenanceEntryView,
+  GitCredentialGrant,
+  GitCredentialStatus,
   HfDownloadPreview,
   HfSearchResult,
   HfVariant,
+  HookActivityView,
+  HookEventView,
+  HookHandlerView,
+  HookRuleView,
+  HookSourceView,
+  HooksView,
   HuggingFaceDownloadResult,
   IdentityView,
   ImageGallery,
   ImageGeneration,
   ImportedFile,
   ImportRefused,
+  InstalledPlugin,
+  InstalledSkill,
   InstallPlan,
   IssuedSessionView,
   KnowledgeSource,
@@ -58,6 +85,8 @@ import type {
   ManagedFile,
   ManagedFileImport,
   ManagedFileList,
+  McpAgentAccess,
+  McpOffer,
   McpServerView,
   McpSessionView,
   McpToolDeclaration,
@@ -88,6 +117,10 @@ import type {
   OwnerQuestionAnswered,
   PasswordRecoveryBeginView,
   PathAttachment,
+  PluginContributionKind,
+  PluginContributions,
+  PluginSignatureView,
+  PluginsView,
   PricingHistoryEntry,
   PricingSyncState,
   ProjectAttachmentView,
@@ -123,11 +156,15 @@ import type {
   SessionRecall,
   SessionView,
   SetupState,
+  SkillConformance,
+  SkillInstalled,
+  SkillVerification,
   SourceAnchorView,
   SpeechProbe,
   SpeechRuntime,
   SpeechRuntimeView,
   StandingGrantView,
+  StoreConnector,
   TaskDetailView,
   TaskView,
   TelemetryDestinationView,
@@ -141,6 +178,8 @@ import type {
   TurnSourceView,
   TurnView,
   UploadAttachment,
+  WebBlocklist,
+  WebBlocklistRule,
   WeeklyUsage,
   WorkInFlight,
   WorkThreadFacet,
@@ -148,6 +187,7 @@ import type {
   WorkThreadView,
 } from "./generated/apiContract";
 import type { ApprovalDetailView as GeneratedApprovalDetailView } from "./generated/apiContract";
+import type { CodeMapFailure, CodeMapPaths as GeneratedCodeMapPaths } from "./generated/apiContract";
 
 // Response shapes from the governed read API (see raiker/control/dashboard.py and
 // raiker/control/dtos.py). These mirror the backend DTOs; the backend remains the source of truth.
@@ -177,27 +217,7 @@ export type RuntimeMode = RuntimeModeView;
 
 export type RuntimeReadiness = RuntimeReadinessView;
 
-// GET /api/mcp/servers — one owner-scoped local stdio or remote HTTP MCP profile
-// (see raiker/control/dashboard.py::McpServerView). `command` is argv for a
-// local server; remote credentials are represented only by `auth_ref`.
-// `tools` are the names discovered by the last successful handshake.
-/**
- * Whether this owner's connected MCP tools can actually be called in a turn.
- *
- * Two owner controls stand between a connected server and the model — the
- * capability gate and the per-capability decision mode — so `connected` on a
- * server card is not the same claim as "the agent can use this".
- */
-export interface McpAgentAccess {
-  gate_enabled: boolean;
-  decision_mode: string;
-  /** True only when a projected MCP tool would really run this turn. */
-  callable: boolean;
-  /** Empty when callable; otherwise the exact runtime reason it is not. */
-  reason_code: string;
-  projected_tools: number;
-  connected_servers: number;
-}
+export type { McpAgentAccess };
 
 export type { AgentPlanStep };
 
@@ -207,71 +227,15 @@ export type { McpToolDeclaration };
 
 export type McpServer = McpServerView;
 
-/**
- * One installed skill. `active` is the owner's own switch: an inactive skill
- * stays stored and is withheld from every turn. The stored document is never
- * carried in a list — it is read on an explicit download or by the runtime.
- */
-/** One way an installed skill differs from the Agent Skills standard. */
-export interface SkillConformanceFinding {
-  field: string;
-  code: string;
-  // "error" — would not validate elsewhere; "warning" — portable but untidy;
-  // "refused" — Raiker read the field and deliberately does not honour it.
-  severity: "error" | "warning" | "refused";
-  message: string;
-}
+export type SkillConformanceFinding = ConformanceFindingView;
 
-/** How an installed skill measures against https://agentskills.io/specification. */
-export interface SkillConformance {
-  conformant: boolean;
-  spec_url: string;
-  findings: SkillConformanceFinding[];
-  license: string;
-  compatibility: string;
-  metadata: Record<string, string>;
-  refused_allowed_tools: string[];
-}
+export type { SkillConformance };
 
-export interface SkillView {
-  skill_id: string;
-  name: string;
-  description: string;
-  version: string | null;
-  source: "upload" | "url" | "builtin" | "built" | "plugin";
-  source_ref: string | null;
-  checksum: string;
-  active: boolean;
-  files: string[];
-  file_count: number;
-  byte_size: number;
-  created_at: string;
-  updated_at: string;
-  /** Optional owner-authored slash handle. It loads this skill and grants nothing. */
-  command_trigger?: string | null;
-  // Optional so older payloads and existing test fixtures stay valid; absent is
-  // read as "not measured", which renders nothing rather than a false pass.
-  conformance?: SkillConformance;
-}
+export type SkillView = InstalledSkill;
 
-/** What a linked skill turned out to be, reported before anything is stored. */
-export interface SkillVerification {
-  ok: boolean;
-  verified: boolean;
-  name: string;
-  description: string;
-  version: string | null;
-  checksum: string;
-  byte_size: number;
-  source_url: string;
-  already_installed: boolean;
-}
+export type { SkillVerification };
 
-export interface SkillMutationResult {
-  ok: boolean;
-  skill_id: string;
-  skill?: SkillView;
-}
+export type SkillMutationResult = SkillInstalled;
 
 export type McpSession = McpSessionView;
 
@@ -321,147 +285,23 @@ export type { ContainedSubject };
 
 export type { CapabilityContainmentView };
 
-/** What a plugin manifest's signature actually proved (BUG-79). */
-export interface PluginSignature {
-  level: "verified" | "present_only" | "unsigned";
-  label: string;
-  reason: string;
-  method: string;
-  verified: boolean;
-  explanation: string;
-  remediation: string;
-}
+export type PluginSignature = PluginSignatureView;
 
-/** What a plugin actually provides, read from the files the runtime loads
- *  rather than from the manifest that described them (BUG-221). */
-/** One connector profile, and what is actually true of it right now (BUG-225). */
-/** One environment variable a channel transport declares that it needs. */
-export interface ChannelEnvRequirement {
-  name: string;
-  description: string;
-  url: string | null;
-  secret: boolean;
-  required: boolean;
-  /** Whether it is set. Never what it is set to. */
-  present: boolean;
-}
+export type { ChannelEnvRequirement };
 
-export interface ChannelProfile {
-  connector_id: string;
-  channel_type: string;
-  display_name: string;
-  transport: string;
-  auth_method: string;
-  default_state: string;
-  requires_pairing: boolean;
-  requires_sender_allowlist: boolean;
-  requires_network: boolean;
-  /** Is there a pairing at all. */
-  linked: boolean;
-  /** Is that pairing switched on. Linked is not enabled. */
-  enabled: boolean;
-  pairing_id: string | null;
-  display_label: string | null;
-  sender_count: number;
-  senders: string[];
-  routing_mode: "record_only" | "new_turn" | "side_question" | "interrupt";
-  target_session_id: string | null;
-  owner_sender_id: string | null;
-  approval_relay_enabled: boolean;
-  supports_side_questions: boolean;
-  supports_interrupts: boolean;
-  supports_approvals: boolean;
-  env_requirements?: ChannelEnvRequirement[];
-}
+export type { ChannelProfile };
 
-export interface ChannelsView {
-  profiles: ChannelProfile[];
-  error: string | null;
-  outbound: {
-    capability?: string;
-    gate_state?: string;
-    runtime_enabled?: boolean;
-    /** RAIKER_CHANNEL_EGRESS_ALLOWLIST names at least one host. Fail-closed. */
-    egress_configured?: boolean;
-    egress_host_count?: number;
-    /** RAIKER_CHANNEL_OUTBOUND_SECRET is set, so deliveries carry an HMAC. */
-    signing_configured?: boolean;
-  };
-  inbound: {
-    /** RAIKER_CHANNEL_INBOUND_SECRET is set. Without it the receiver refuses. */
-    secret_configured?: boolean;
-    /** Messages per sender per minute. Allowlisting says who; this says how often. */
-    rate_limit_per_minute?: number;
-    quarantined?: boolean;
-    instructions_inert?: boolean;
-  };
-}
+export type { ChannelsView };
 
-/** An MCP server an installed plugin offers. Inert until the owner adds it. */
-export interface McpOffer {
-  plugin_id: string;
-  name: string;
-  transport: "http" | "stdio";
-  description: string;
-  endpoint_url?: string;
-  auth_ref?: string | null;
-  template?: string;
-  already_added: boolean;
-}
+export type { McpOffer };
 
-export interface PluginContributions {
-  hooks: number;
-  events: string[];
-  /** Skills the plugin ships. They install switched off and are credited to it. */
-  skills: number;
-  skill_names: string[];
-  /** MCP servers it offers. Offers are inert until the owner adds them. */
-  mcp_servers: number;
-  mcp_server_names: string[];
-  /** "unreadable" when the contributed file exists and could not be parsed. */
-  error: string | null;
-}
+export type { PluginContributions };
 
-export interface InstalledPlugin {
-  record_id: string;
-  plugin_id: string;
-  version: string;
-  trust_level: string;
-  status: string;
-  source_url: string | null;
-  installed_at: string;
-  installed_by: string;
-  checksum_present: boolean;
-  signature: PluginSignature;
-  contributions: PluginContributions;
-  /** BUG-308 — where this plugin's own code would run on this machine: not
-   *  at all, in a container with no network, or with this machine's network.
-   *  Optional so older payloads and fixtures stay valid. */
-  code_runtime?: {
-    where: "not_enabled" | "isolated" | "host_network";
-    summary: string;
-  };
-}
+export type { InstalledPlugin };
 
-/** A kind of contribution, and whether this build accepts it yet — so
- *  "provides nothing" and "may not provide anything" stay distinguishable. */
-export interface PluginContributionKind {
-  kind: string;
-  available: boolean;
-  summary: string;
-}
+export type { PluginContributionKind };
 
-export interface PluginsView {
-  plugins: InstalledPlugin[];
-  signing: {
-    configured: boolean;
-    hmac_key_set: boolean;
-    publisher_key_set: boolean;
-    summary: string;
-    remediation: string;
-  };
-  contribution_kinds: PluginContributionKind[];
-}
+export type { PluginsView };
 
 export type RuntimeInstallPlan = InstallPlan;
 
@@ -544,34 +384,9 @@ export type { ConnectorView };
 
 export type { ConnectionsView };
 
-export interface StoreConnector {
-  connector_id: string;
-  display_name: string;
-  category: string;
-  description: string;
-  auth_type: "oauth2" | "api_key";
-  host: string;
-  installed: boolean;
-  enabled: boolean;
-  auth_status: "connected" | "reauth_required" | "not_connected";
-  vault_configured: boolean;
-  activity_status: "idle" | "processing" | "completed" | "failed";
-  active_operation: string | null;
-  last_invoked_at: string | null;
-  operations: Array<{
-    operation_id: string;
-    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-    path: string;
-    description: string;
-    requires_confirmation: boolean;
-  }>;
-}
+export type { StoreConnector };
 
-export interface ConnectorStoreView {
-  connectors: StoreConnector[];
-  count: number;
-  vault_configured: boolean;
-}
+export type { ConnectorStoreView };
 
 export type ProviderModelList = ProviderModelListView;
 
@@ -608,27 +423,7 @@ export type CodeRepo = CodeRepoView;
 
 export type { CodeReposView };
 
-// B9 — the repository code map's own state. Counts and governance only: this
-// shape deliberately carries no path and no symbol, so the status call cannot
-// become a listing of the owner's tree.
-export interface CodeMapStatus {
-  capability: string;
-  gate_state: string;
-  decision_mode: string;
-  enabled: boolean;
-  repository: string;
-  repo_id: string;
-  status: "indexed" | "partial" | "not_indexed" | "failed";
-  reason_code: string;
-  file_count: number;
-  symbol_count: number;
-  edge_count: number;
-  languages: Record<string, number>;
-  skipped: Record<string, number>;
-  limits_hit: string[];
-  built_at: string | null;
-  updated_at: string | null;
-}
+export type { CodeMapStatus };
 
 /**
  * GET /api/code/map/paths — completion for an `@`-mention (B19).
@@ -639,14 +434,7 @@ export interface CodeMapStatus {
  * shows the reason rather than an empty list, because "nothing matched" and
  * "nothing could match" send the owner to different places.
  */
-export interface CodeMapPaths {
-  status: string;
-  repository?: string;
-  fragment?: string;
-  count?: number;
-  paths?: Array<{ path: string; language: string }>;
-  error?: { type?: string; message?: string } | null;
-}
+export type CodeMapPaths = GeneratedCodeMapPaths | CodeMapFailure;
 
 export type ProjectDetail = ProjectDetailView;
 
@@ -943,85 +731,17 @@ export interface PromptRequestBody {
   attachments?: PromptAttachment[];
 }
 
-// GET /api/hooks (raiker/control/dashboard.py → list_hooks).
-//
-// Hooks are the one extension surface whose backend really enforces something —
-// a `PreToolUse` deny short-circuits to a denied policy decision — so the view
-// has to be exact about the three ways a configured hook can still do nothing:
-// its file did not parse, its event is never dispatched by this build, or its
-// event carries no decision the runtime honours.
-export interface HookHandlerView {
-  id: string;
-  type: string;
-  /** The argv or builtin name, already joined for display. */
-  target: string;
-  timeout_ms: number;
-  decision_authority: boolean;
-  /** False for a builtin this build does not ship, and for an `http` destination
-   *  the owner's egress grant does not cover: the rule matches, the handler
-   *  refuses, and nothing is enforced. */
-  available: boolean;
-  /** Why an unavailable handler is unavailable — "egress_not_granted" or
-   *  "builtin_not_in_this_build". Empty when the handler is available. */
-  unavailable_reason: string;
-}
+export type { HookHandlerView };
 
-export interface HookRuleView {
-  rule_id: string;
-  event: string;
-  event_summary: string;
-  matcher: string;
-  if_guard: string | null;
-  scope: string;
-  source: string | null;
-  /** False when this build never emits the event, so the rule cannot fire. */
-  dispatched: boolean;
-  /** True only when the event is one whose decision the runtime honours *and* a
-   *  handler on it holds decision authority. */
-  can_decide: boolean;
-  handlers: HookHandlerView[];
-}
+export type { HookRuleView };
 
-export interface HookSourceView {
-  path: string;
-  scope: string;
-  exists: boolean;
-  loaded: boolean;
-  rule_count: number;
-  /** Why the file contributed nothing. Null when it loaded or is absent. */
-  error: string | null;
-}
+export type { HookSourceView };
 
-export interface HookEventView {
-  event: string;
-  summary: string;
-  dispatched: boolean;
-  can_decide: boolean;
-}
+export type { HookEventView };
 
-export interface HookActivityView {
-  event_id: string;
-  event_type: string;
-  session_id: string;
-  timestamp: string;
-  summary: string | null;
-}
+export type { HookActivityView };
 
-export interface HooksView {
-  /** False when nothing is configured **or** the owner turned hooks off. */
-  active: boolean;
-  /** The owner's off switch. Rules stay listed while it is on. */
-  disabled: boolean;
-  rule_count: number;
-  rules: HookRuleView[];
-  sources: HookSourceView[];
-  failed_sources: HookSourceView[];
-  events: HookEventView[];
-  /** The builtin handler names this build actually has. */
-  builtins: string[];
-  activity: HookActivityView[];
-  activity_counts: Record<string, number>;
-}
+export type { HooksView };
 
 // POST /api/attachments response (raiker/api/routes_attachments.py) —
 // metadata only; the stored bytes are never echoed back.
@@ -1240,63 +960,13 @@ export type CommandRunState =
   | "contained"
   | "lost";
 
-export interface CommandRunView {
-  run_id: string;
-  session_id: string;
-  turn_id: string;
-  action_id: string;
-  authority_kind: string;
-  authority_id: string;
-  state: CommandRunState;
-  profile_id: string;
-  backend: string;
-  safe_display: string;
-  started_at: string | null;
-  completed_at: string | null;
-  exit_code: number | null;
-  termination_reason: string | null;
-  stdout_bytes: number;
-  stderr_bytes: number;
-  truncated: boolean;
-  redaction_count: number;
-  receipt_digest: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type { CommandRunView };
 
-export interface CommandChunkView {
-  run_id: string;
-  sequence: number;
-  stream: "stdout" | "stderr" | "system";
-  text: string;
-  byte_count: number;
-  emitted_at: string;
-  start_byte_offset: number;
-  end_byte_offset: number;
-}
+export type { CommandChunkView };
 
-export interface CommandReceiptView {
-  run_id: string;
-  state: CommandRunState;
-  exit_code: number | null;
-  termination_reason: string;
-  completed_at: string;
-  evidence: Record<string, unknown>;
-  digest: string;
-}
+export type { CommandReceiptView };
 
-export interface CredentialDeltaView {
-  run_id: string;
-  environment_profile_id: string;
-  state: "scanning" | "clean" | "quarantined" | "resolving" | "cleanup_failed";
-  manifest: { files: Array<{ path: string; kind: string; size?: number }> };
-  delta_digest: string;
-  scan_digest: string;
-  scan_rule_version: string;
-  cleanup_status: string;
-  created_at: string;
-  recipient_boundary: "disposable_container_tcb";
-}
+export type { CredentialDeltaView };
 
 export type { ModelCapacityEntry };
 
@@ -1434,61 +1104,15 @@ export interface UpdateApplyResult extends UpdateStatusView {
 }
 
 
-// ── Web access blocklist (RAIKER-2021) ──────────────────────────────────────
-// Three sources with different affordances: `stored` the owner can delete here,
-// `environment` and `builtin` they cannot. `address_guard` is reported rather
-// than listed because it is not a rule and cannot be switched off.
-export interface WebBlocklistRule {
-  rule_id: string;
-  rule: string;
-  kind: string;
-  note: string;
-  created_at: string;
-}
+export type { WebBlocklistRule };
 
-export interface WebBlocklist {
-  stored: WebBlocklistRule[];
-  environment: string[];
-  environment_variable: string;
-  builtin: string[];
-  effective_count: number;
-  address_guard: { enforced: boolean; editable: boolean; description: string };
-}
+export type { WebBlocklist };
 
-export interface WebBlocklistProbe {
-  host: string;
-  allowed: boolean;
-  reason: string;
-  addresses: string[];
-}
+export type WebBlocklistProbe = BlocklistProbe;
 
-// ── Git credential (RAIKER-2022) ────────────────────────────────────────────
-// Never carries the token. `token_configured` says one exists, `token_source`
-// says where it came from, and `grant` is the owner's current decision.
-export interface GitCredentialGrant {
-  grant_id: string;
-  scope: string;
-  status: string;
-  granted_at: string;
-  expires_at: string;
-  session_id: string | null;
-  uses: number;
-}
+export type { GitCredentialGrant };
 
-export interface GitCredentialStatus {
-  credential_configured: boolean;
-  credential_source: string;
-  grant: GitCredentialGrant | null;
-  scopes: string[];
-  grant_seconds: Record<string, number>;
-  // The boundary the runtime issues the credential inside — the hosts its
-  // credential helper will answer, and everything a loan is used for. The page
-  // states the scope before it asks for the secret, and states the runtime's
-  // answer rather than its own.
-  hosts: string[];
-  operations: string[];
-  checked_at: string;
-}
+export type { GitCredentialStatus };
 
 // ── BUG-305 — one answer to "what can Raiker read" ─────────────────────────
 // Two controllers, one inventory. `held` is the whole distinction and decides
@@ -1541,89 +1165,17 @@ export type { ProjectBrowseEntry };
 
 export type { ProjectBrowseView };
 
-// B13 — the repository Build is pointed at, browsed one directory at a time.
-// Deliberately the same entry shape as a project's tree so one explorer serves
-// both roots; `index_state` is always null here because a repository is files on
-// disk rather than a catalogue of managed documents.
-export interface CodeRepoBrowseView {
-  path: string;
-  parent: string | null;
-  entries: ProjectBrowseEntry[];
-  truncated: boolean;
-  root_kind: "local" | "github";
-  root_label: string;
-  /** A GitHub coordinate with no checkout, or a local folder that has moved. */
-  root_missing: boolean;
-  /** Which of those two, so the interface can say which; "" when present. */
-  reason_code?: string;
-}
+export type { CodeRepoBrowseView };
 
-// B10 — parse-level problems for one open file, from the same service and the
-// same `language_intelligence` gate the agent's own `diagnostics` tool uses.
-//
-// `checked` is the field that carries the honesty contract: false means this
-// runtime has no parser for the file's language and it was NOT looked at. A
-// surface must say "not checked" for it, never "no problems".
-export interface CodeRepoDiagnostic {
-  path: string;
-  line: number;
-  column: number;
-  severity: string;
-  message: string;
-  source: string;
-}
+export type CodeRepoDiagnostic = Diagnostic;
 
-export interface CodeRepoDiagnosticsView {
-  path: string;
-  checked: boolean;
-  available: boolean;
-  reason_code: string;
-  reason: string;
-  diagnostics: CodeRepoDiagnostic[];
-}
+export type { CodeRepoDiagnosticsView };
 
-// B13 — one bounded text file for the read-only viewer. A file that cannot be
-// shown says why rather than rendering as empty: `readable` false with the
-// reason the server gave (`binary_file`, `file_too_large`, `not_found`).
-/** one uncommitted change in the repository's working tree. */
-export interface CodeRepoChangeEntry {
-  path: string;
-  /** The old name of a rename; "" otherwise. Both ends of a rename matter. */
-  previous_path: string;
-  /** Git's own word for it: modified, added, deleted, renamed, untracked. */
-  state: string;
-  /** Whether the working tree still differs from the index for this path. */
-  unstaged: boolean;
-}
+export type { CodeRepoChangeEntry };
 
-/**
- * The working tree's uncommitted state, as Build's `Changes` tab reads it.
- *
- * Built from the same two helpers the commit proposal is assembled from, so
- * what the pane shows and what a commit would record are one change set. The
- * two absences are kept apart on purpose: a repository with no checkout and a
- * folder under no version control are different answers, and "no changes" must
- * not stand in for either.
- */
-export interface CodeRepoChangesView {
-  entries: CodeRepoChangeEntry[];
-  diff: string;
-  /** More changed files than the read carries. */
-  truncated: boolean;
-  /** The diff was longer than the pane will render. */
-  diff_truncated: boolean;
-  root_missing: boolean;
-  reason_code: string | null;
-}
+export type { CodeRepoChangesView };
 
-export interface CodeRepoFileView {
-  path: string;
-  text: string;
-  truncated: boolean;
-  size_bytes: number;
-  readable: boolean;
-  reason_code: string;
-}
+export type { CodeRepoFileView };
 
 export type { ProjectRootStatus };
 

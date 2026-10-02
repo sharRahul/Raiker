@@ -30,7 +30,9 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Literal, cast
+
+from typing_extensions import TypedDict
 
 #: Where the rules below come from, quoted anywhere a finding is rendered.
 SPEC_URL = "https://agentskills.io/specification"
@@ -75,6 +77,27 @@ class ConformanceFinding:
     message: str
 
 
+class ConformanceFindingView(TypedDict):
+    field: str
+    code: str
+    #: ``error`` would not validate elsewhere; ``warning`` is portable but
+    #: untidy; ``refused`` was read and deliberately not honoured.
+    severity: Literal["error", "warning", "refused"]
+    message: str
+
+
+class SkillConformance(TypedDict):
+    """How an installed skill measures against the Agent Skills standard."""
+
+    conformant: bool
+    spec_url: str
+    findings: list[ConformanceFindingView]
+    license: str
+    compatibility: str
+    metadata: dict[str, str]
+    refused_allowed_tools: list[str]
+
+
 @dataclass(frozen=True)
 class ConformanceReport:
     """What an owner is told about one skill's portability."""
@@ -93,7 +116,7 @@ class ConformanceReport:
     #: them; never consulted by anything that grants.
     refused_allowed_tools: tuple[str, ...] = ()
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> SkillConformance:
         return {
             "conformant": self.conformant,
             "spec_url": SPEC_URL,
@@ -101,7 +124,7 @@ class ConformanceReport:
                 {
                     "field": f.field,
                     "code": f.code,
-                    "severity": f.severity,
+                    "severity": cast(Literal["error", "warning", "refused"], f.severity),
                     "message": f.message,
                 }
                 for f in self.findings

@@ -16,8 +16,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 from urllib.parse import urlparse
+
+from typing_extensions import TypedDict
 
 from raiker.cli.principal_resolver import resolve_local_principal
 from raiker.contracts.ids import new_id
@@ -25,7 +27,7 @@ from raiker.control.dtos import ControlResult
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority.models import PrincipalType
-from raiker.skills.conformance import ConformanceReport, report_for_document
+from raiker.skills.conformance import ConformanceReport, SkillConformance, report_for_document
 from raiker.skills.package import (
     SkillPackage,
     SkillValidationError,
@@ -48,6 +50,30 @@ IMPORT_HOSTS: frozenset[str] = frozenset(
 
 MAX_IMPORT_BYTES = 512 * 1024
 _COMMAND_RE = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
+
+
+SkillSource = Literal["upload", "url", "builtin", "built", "plugin"]
+
+
+class InstalledSkill(TypedDict):
+    """One installed skill as the Skills tab reads it: metadata, never the bundle."""
+
+    skill_id: str
+    name: str
+    description: str
+    version: str | None
+    source: SkillSource
+    source_ref: str | None
+    checksum: str
+    active: bool
+    files: list[str]
+    file_count: int
+    byte_size: int
+    created_at: str
+    updated_at: str
+    #: An owner-authored slash handle. It loads this skill and grants nothing.
+    command_trigger: str | None
+    conformance: SkillConformance
 
 
 @dataclass(frozen=True)
@@ -73,13 +99,13 @@ class SkillView:
     # tightening a rule re-measures what is already installed.
     conformance: ConformanceReport = field(default_factory=lambda: ConformanceReport(True))
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> InstalledSkill:
         return {
             "skill_id": self.skill_id,
             "name": self.name,
             "description": self.description,
             "version": self.version,
-            "source": self.source,
+            "source": cast(SkillSource, self.source),
             "source_ref": self.source_ref,
             "checksum": self.checksum,
             "active": self.active,

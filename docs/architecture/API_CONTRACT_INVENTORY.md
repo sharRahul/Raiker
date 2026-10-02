@@ -13,7 +13,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
   `to_dict`; it needs a dedicated response model first (Stage B).
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**350 operations: 247 verified, 0 eligible, 92 deferred, 11 special.**
+**350 operations: 310 verified, 0 eligible, 29 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -69,16 +69,16 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/capability-modes/{capability}/ask` | SetCapabilityDecisionModeRequest | CapabilityDecisionModeSet | verified | _set_capability_decision_mode |
 | POST | `/api/capability-modes/{capability}/auto` | SetCapabilityDecisionModeRequest | CapabilityDecisionModeSet | verified | _set_capability_decision_mode |
 | POST | `/api/capability-modes/{capability}/deny` | SetCapabilityDecisionModeRequest | CapabilityDecisionModeSet | verified | _set_capability_decision_mode |
-| GET | `/api/channels` |  |  | deferred | body assembled in the route |
-| POST | `/api/channels/deliver-test` | ChannelTestDeliveryRequest |  | deferred | body assembled in the route |
-| POST | `/api/channels/pairings` | PairChannelRequest |  | deferred | body assembled in the route |
-| DELETE | `/api/channels/pairings/{pairing_id}` |  |  | deferred | body assembled in the route |
-| PUT | `/api/channels/pairings/{pairing_id}/enabled` | ChannelEnabledRequest |  | deferred | body assembled in the route |
-| PUT | `/api/channels/pairings/{pairing_id}/routing` | ChannelRoutingRequest |  | deferred | body assembled in the route |
-| PUT | `/api/channels/pairings/{pairing_id}/senders` | ChannelSendersRequest |  | deferred | body assembled in the route |
-| POST | `/api/channels/{connector_id}/approval-response` | ChannelApprovalResponse |  | deferred | body assembled in the route |
-| POST | `/api/channels/{connector_id}/inbound` | InboundChannelMessage |  | deferred | body assembled in the route |
-| POST | `/api/channels/{connector_id}/telegram` | dict |  | deferred | body assembled in the route |
+| GET | `/api/channels` |  | ChannelsView | verified | declared ChannelsView |
+| POST | `/api/channels/deliver-test` | ChannelTestDeliveryRequest | ChannelTestDelivered | verified | declared by cast |
+| POST | `/api/channels/pairings` | PairChannelRequest | ChannelPaired | verified | declared by cast |
+| DELETE | `/api/channels/pairings/{pairing_id}` |  | ChannelUnpaired | verified | declared by cast |
+| PUT | `/api/channels/pairings/{pairing_id}/enabled` | ChannelEnabledRequest | ChannelEnabledSet | verified | declared by cast |
+| PUT | `/api/channels/pairings/{pairing_id}/routing` | ChannelRoutingRequest | ChannelRoutingSet | verified | declared by cast |
+| PUT | `/api/channels/pairings/{pairing_id}/senders` | ChannelSendersRequest | ChannelSendersSet | verified | declared by cast |
+| POST | `/api/channels/{connector_id}/approval-response` | ChannelApprovalResponse | ApprovalRelayAnswered | verified | declared ApprovalRelayAnswered |
+| POST | `/api/channels/{connector_id}/inbound` | InboundChannelMessage | ChannelInboundAccepted | verified | _handle_inbound |
+| POST | `/api/channels/{connector_id}/telegram` | dict | ChannelInboundAccepted \| ChannelUpdateIgnored | verified | _handle_inbound \| declared ChannelUpdateIgnored |
 | GET | `/api/chat-search` |  | SessionView[] | verified | DashboardService.search_sessions |
 | GET | `/api/checkpoints` |  | CheckpointView[] | verified | DashboardService.list_checkpoints |
 | GET | `/api/checkpoints/{checkpoint_id}` |  | CheckpointView | verified | DashboardService.get_checkpoint |
@@ -86,32 +86,32 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/checkpoints/{checkpoint_id}/branch-plan` |  | ConversationBranchPlan | verified | declared ConversationBranchPlan |
 | POST | `/api/checkpoints/{checkpoint_id}/restore` |  | RestoreRequested | verified | declared RestoreRequested |
 | GET | `/api/checkpoints/{checkpoint_id}/restore-plan` |  | RestorePlan | verified | declared RestorePlan |
-| GET | `/api/code/map` |  |  | deferred | body assembled in the route |
-| GET | `/api/code/map/paths` |  |  | deferred | body assembled in the route |
-| POST | `/api/code/map/rebuild` |  |  | deferred | body assembled in the route |
+| GET | `/api/code/map` |  | CodeMapStatus | verified | DashboardService.code_map_status |
+| GET | `/api/code/map/paths` |  | CodeMapPaths \| CodeMapFailure | verified | DashboardService.code_map_paths |
+| POST | `/api/code/map/rebuild` |  | CodeMapRebuilt | verified | declared by cast |
 | GET | `/api/code/repos` |  | CodeReposView | verified | DashboardService.list_code_repos |
-| POST | `/api/code/repos` | ConnectCodeRepoRequest |  | deferred | body assembled in the route |
-| PUT | `/api/code/repos/selection` | SelectCodeRepoRequest |  | deferred | body assembled in the route |
-| DELETE | `/api/code/repos/{repo_id}` |  |  | deferred | body assembled in the route |
-| GET | `/api/code/repos/{repo_id}/browse` |  |  | deferred | body assembled in the route |
-| GET | `/api/code/repos/{repo_id}/changes` |  |  | deferred | body assembled in the route |
-| GET | `/api/code/repos/{repo_id}/diagnostics` |  |  | deferred | body assembled in the route |
-| GET | `/api/code/repos/{repo_id}/file` |  |  | deferred | body assembled in the route |
-| GET | `/api/command-runs` |  |  | deferred | body assembled in the route |
-| GET | `/api/command-runs/{run_id}` |  |  | deferred | body assembled in the route |
-| GET | `/api/command-runs/{run_id}/output` |  |  | deferred | body assembled in the route |
-| GET | `/api/command-runs/{run_id}/receipt` |  |  | deferred | body assembled in the route |
-| POST | `/api/command-runs/{run_id}/stop` |  |  | deferred | body assembled in the route |
+| POST | `/api/code/repos` | ConnectCodeRepoRequest | LocalRepoConnected \| GithubRepoConnected | verified | declared by cast |
+| PUT | `/api/code/repos/selection` | SelectCodeRepoRequest | CodeRepoSelected | verified | declared by cast |
+| DELETE | `/api/code/repos/{repo_id}` |  | CodeRepoDisconnected | verified | declared by cast |
+| GET | `/api/code/repos/{repo_id}/browse` |  | CodeRepoBrowseView | verified | declared CodeRepoBrowseView |
+| GET | `/api/code/repos/{repo_id}/changes` |  | CodeRepoChangesView | verified | declared CodeRepoChangesView |
+| GET | `/api/code/repos/{repo_id}/diagnostics` |  | CodeRepoDiagnosticsView | verified | declared CodeRepoDiagnosticsView |
+| GET | `/api/code/repos/{repo_id}/file` |  | CodeRepoFileView | verified | declared CodeRepoFileView |
+| GET | `/api/command-runs` |  | CommandRunList | verified | declared CommandRunList |
+| GET | `/api/command-runs/{run_id}` |  | CommandRunDetail | verified | declared CommandRunDetail |
+| GET | `/api/command-runs/{run_id}/output` |  | CommandOutput | verified | declared by cast |
+| GET | `/api/command-runs/{run_id}/receipt` |  | CommandReceiptAnswer | verified | declared CommandReceiptAnswer |
+| POST | `/api/command-runs/{run_id}/stop` |  | CommandStopped | verified | declared CommandStopped |
 | GET | `/api/connections` |  | ConnectionsView | verified | DashboardService.get_connections |
-| GET | `/api/connector-store` |  |  | deferred | body assembled in the route |
-| DELETE | `/api/connector-store/{connector_id}` |  |  | deferred | body assembled in the route |
+| GET | `/api/connector-store` |  | ConnectorStoreView | verified | declared ConnectorStoreView |
+| DELETE | `/api/connector-store/{connector_id}` |  | ConnectorUninstalled | verified | declared ConnectorUninstalled |
 | POST | `/api/connector-store/{connector_id}/actions` | ConnectorActionRequest |  | deferred | body assembled in the route |
-| PUT | `/api/connector-store/{connector_id}/credentials` | CredentialRequest |  | deferred | body assembled in the route |
-| PUT | `/api/connector-store/{connector_id}/enabled` |  |  | deferred | body assembled in the route |
-| POST | `/api/connector-store/{connector_id}/install` |  |  | deferred | body assembled in the route |
-| POST | `/api/connector-store/{connector_id}/manifest` | ManifestRequest |  | deferred | body assembled in the route |
-| GET | `/api/credential-deltas` |  |  | deferred | body assembled in the route |
-| POST | `/api/credential-deltas/{run_id}/discard` | dict |  | deferred | body assembled in the route |
+| PUT | `/api/connector-store/{connector_id}/credentials` | CredentialRequest | ConnectorCredentialsSet | verified | declared ConnectorCredentialsSet |
+| PUT | `/api/connector-store/{connector_id}/enabled` |  | ConnectorEnabledSet | verified | declared ConnectorEnabledSet |
+| POST | `/api/connector-store/{connector_id}/install` |  | ConnectorInstalled | verified | declared ConnectorInstalled |
+| POST | `/api/connector-store/{connector_id}/manifest` | ManifestRequest | ManifestRegistered | verified | declared by cast |
+| GET | `/api/credential-deltas` |  | CredentialDeltaList | verified | declared CredentialDeltaList |
+| POST | `/api/credential-deltas/{run_id}/discard` | dict | CredentialDeltaDiscarded | verified | declared CredentialDeltaDiscarded |
 | GET | `/api/diagnostics` |  | DiagnosticsView | verified | DashboardService.get_diagnostics |
 | GET | `/api/diagnostics/export` |  |  | deferred | body assembled in the route |
 | GET | `/api/environment` |  | EnvironmentContextView | verified | declared by cast |
@@ -122,15 +122,15 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/execution-environments/{profile_id}/probe` |  |  | deferred | body assembled in the route |
 | POST | `/api/execution-environments/{profile_id}/reset` | dict |  | deferred | body assembled in the route |
 | GET | `/api/extensions` |  | ExtensionsOverviewView | verified | WebReadModels.extensions_overview |
-| DELETE | `/api/git-credential` |  |  | deferred | body assembled in the route |
-| GET | `/api/git-credential` |  |  | deferred | body assembled in the route |
-| PUT | `/api/git-credential` | GitTokenRequest |  | deferred | body assembled in the route |
-| DELETE | `/api/git-credential/grant` |  |  | deferred | body assembled in the route |
-| POST | `/api/git-credential/grant` | GitGrantRequest |  | deferred | body assembled in the route |
+| DELETE | `/api/git-credential` |  | GitCredentialStatus | verified | GitCredentialBroker.status |
+| GET | `/api/git-credential` |  | GitCredentialStatus | verified | GitCredentialBroker.status |
+| PUT | `/api/git-credential` | GitTokenRequest | GitCredentialStatus | verified | GitCredentialBroker.status |
+| DELETE | `/api/git-credential/grant` |  | GitCredentialStatus | verified | GitCredentialBroker.status |
+| POST | `/api/git-credential/grant` | GitGrantRequest | GitCredentialStatus | verified | GitCredentialBroker.status |
 | GET | `/api/guide` |  |  | deferred | body assembled in the route |
 | GET | `/api/guide/{slug}` |  |  | deferred | body assembled in the route |
 | GET | `/api/health` |  | HealthView | verified | declared by cast |
-| GET | `/api/hooks` |  |  | deferred | body assembled in the route |
+| GET | `/api/hooks` |  | HooksView | verified | DashboardService.list_hooks |
 | GET | `/api/host` |  |  | deferred | body assembled in the route |
 | GET | `/api/host/paths` |  |  | deferred | body assembled in the route |
 | POST | `/api/host/pause` | PauseHostRequest |  | deferred | body assembled in the route |
@@ -158,18 +158,18 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/local-runtimes/detect` |  | LocalRuntimes | verified | declared LocalRuntimes |
 | DELETE | `/api/managed-files/{file_id}` |  | ManagedFileChanged | verified | declared by cast |
 | POST | `/api/managed-files/{file_id}/retry` |  | ManagedFileChanged | verified | declared by cast |
-| GET | `/api/mcp/agent-access` |  |  | deferred | body assembled in the route |
-| GET | `/api/mcp/offers` |  |  | deferred | body assembled in the route |
+| GET | `/api/mcp/agent-access` |  | McpAgentAccess | verified | mcp_agent_access |
+| GET | `/api/mcp/offers` |  | McpOffer[] | verified | DashboardService.list_mcp_offers |
 | GET | `/api/mcp/servers` |  | McpServerView[] | verified | DashboardService.list_mcp_servers |
-| POST | `/api/mcp/servers` | CreateMcpServerRequest |  | deferred | body assembled in the route |
-| POST | `/api/mcp/servers/remote` | CreateRemoteMcpServerRequest |  | deferred | body assembled in the route |
-| DELETE | `/api/mcp/servers/{server_id}` |  |  | deferred | body assembled in the route |
-| PUT | `/api/mcp/servers/{server_id}` | RenameMcpServerRequest |  | deferred | body assembled in the route |
-| POST | `/api/mcp/servers/{server_id}/connect` |  |  | deferred | body assembled in the route |
+| POST | `/api/mcp/servers` | CreateMcpServerRequest | McpServerCreated | verified | declared by cast |
+| POST | `/api/mcp/servers/remote` | CreateRemoteMcpServerRequest | RemoteMcpServerCreated | verified | declared by cast |
+| DELETE | `/api/mcp/servers/{server_id}` |  | McpServerDeleted | verified | declared by cast |
+| PUT | `/api/mcp/servers/{server_id}` | RenameMcpServerRequest | McpServerRenamed | verified | declared by cast |
+| POST | `/api/mcp/servers/{server_id}/connect` |  | McpServerConnected | verified | declared by cast |
 | GET | `/api/mcp/servers/{server_id}/findings` |  | SecurityFindingView[] | verified | DashboardService.list_mcp_findings |
-| POST | `/api/mcp/servers/{server_id}/kill` |  |  | deferred | body assembled in the route |
-| POST | `/api/mcp/servers/{server_id}/pause` |  |  | deferred | body assembled in the route |
-| POST | `/api/mcp/servers/{server_id}/resume` |  |  | deferred | body assembled in the route |
+| POST | `/api/mcp/servers/{server_id}/kill` |  | McpContainment | verified | declared by cast |
+| POST | `/api/mcp/servers/{server_id}/pause` |  | McpContainment | verified | declared by cast |
+| POST | `/api/mcp/servers/{server_id}/resume` |  | McpContainment | verified | declared by cast |
 | GET | `/api/mcp/servers/{server_id}/sessions` |  | McpSessionView[] | verified | DashboardService.list_mcp_sessions |
 | GET | `/api/memory` |  | MemoryControlView[] | verified | DashboardService.list_memories |
 | POST | `/api/memory/conversation-index/rebuild` |  | ConversationIndexRebuilt | verified | declared by cast |
@@ -254,7 +254,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/notifications` |  | NotificationView[] | verified | DashboardService.list_notifications |
 | POST | `/api/notifications/{notification_id}/read` |  | Ok | verified | built as Ok |
 | POST | `/api/ollama/pull` | OllamaPullRequestBody | ModelOperationView | verified | ModelOperationService.start |
-| GET | `/api/plugins` |  |  | deferred | body assembled in the route |
+| GET | `/api/plugins` |  | PluginsView | verified | DashboardService.list_plugins |
 | GET | `/api/projects` |  | ProjectsListView | verified | DashboardService.list_projects |
 | POST | `/api/projects` | CreateProjectRequest | ProjectCreated | verified | declared ProjectCreated |
 | PUT | `/api/projects/selection` | SelectProjectRequest | ProjectSelected | verified | declared ProjectSelected |
@@ -325,15 +325,15 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/setup` |  | SetupState | verified | SQLiteStore.load_setup_state |
 | PUT | `/api/setup` | SetupUpdateRequest | SetupState | verified | SQLiteStore.save_setup_state |
 | POST | `/api/setup/backup/create` | SetupBackupRequest | SetupBackupCreated | verified | declared SetupBackupCreated |
-| GET | `/api/skills` |  |  | deferred | body assembled in the route |
-| POST | `/api/skills` | UploadSkillRequest |  | deferred | body assembled in the route |
-| POST | `/api/skills/build` | BuildSkillRequest |  | deferred | body assembled in the route |
-| POST | `/api/skills/import` | SkillUrlRequest |  | deferred | body assembled in the route |
-| POST | `/api/skills/verify` | SkillUrlRequest |  | deferred | body assembled in the route |
-| DELETE | `/api/skills/{skill_id}` |  |  | deferred | body assembled in the route |
-| PUT | `/api/skills/{skill_id}` | RenameSkillRequest |  | deferred | body assembled in the route |
-| PUT | `/api/skills/{skill_id}/active` | SetSkillActiveRequest |  | deferred | body assembled in the route |
-| PUT | `/api/skills/{skill_id}/command` | SetSkillCommandRequest |  | deferred | body assembled in the route |
+| GET | `/api/skills` |  | SkillList | verified | declared SkillList |
+| POST | `/api/skills` | UploadSkillRequest | SkillInstalled | verified | declared by cast |
+| POST | `/api/skills/build` | BuildSkillRequest | SkillInstalled | verified | declared by cast |
+| POST | `/api/skills/import` | SkillUrlRequest | SkillInstalled | verified | declared by cast |
+| POST | `/api/skills/verify` | SkillUrlRequest | SkillVerification | verified | declared by cast |
+| DELETE | `/api/skills/{skill_id}` |  | SkillDeleted | verified | declared by cast |
+| PUT | `/api/skills/{skill_id}` | RenameSkillRequest | SkillRenamed | verified | declared by cast |
+| PUT | `/api/skills/{skill_id}/active` | SetSkillActiveRequest | SkillActiveSet | verified | declared by cast |
+| PUT | `/api/skills/{skill_id}/command` | SetSkillCommandRequest | SkillCommandSet | verified | declared by cast |
 | GET | `/api/skills/{skill_id}/download` |  |  | special | special |
 | GET | `/api/speech/runtime` |  | SpeechRuntime | verified | declared SpeechRuntime |
 | PUT | `/api/speech/runtime` | SpeechRuntimeRequest | SpeechRuntime | verified | declared SpeechRuntime |
@@ -360,10 +360,10 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | DELETE | `/api/vault/key` |  | VaultStatus | verified | _status |
 | PUT | `/api/vault/key` | VaultKeyRequest | VaultStatus | verified | _status |
 | GET | `/api/vault/status` |  | VaultStatus | verified | _status |
-| GET | `/api/web-access/blocklist` |  |  | deferred | body assembled in the route |
-| POST | `/api/web-access/blocklist` | BlocklistRuleRequest |  | deferred | body assembled in the route |
-| POST | `/api/web-access/blocklist/test` | BlocklistTestRequest |  | deferred | body assembled in the route |
-| DELETE | `/api/web-access/blocklist/{rule_id}` |  |  | deferred | body assembled in the route |
+| GET | `/api/web-access/blocklist` |  | WebBlocklist | verified | declared WebBlocklist |
+| POST | `/api/web-access/blocklist` | BlocklistRuleRequest | BlocklistRuleAdded | verified | declared BlocklistRuleAdded |
+| POST | `/api/web-access/blocklist/test` | BlocklistTestRequest | BlocklistProbe | verified | declared BlocklistProbe |
+| DELETE | `/api/web-access/blocklist/{rule_id}` |  | BlocklistRuleDeleted | verified | declared BlocklistRuleDeleted |
 | GET | `/api/work-in-flight` |  | WorkInFlight | verified | declared WorkInFlight |
 | GET | `/api/work-threads` |  | WorkThreadView[] | verified | DashboardService.list_work_threads |
 | GET | `/api/work-threads/page` |  | WorkThreadPage | verified | DashboardService.work_thread_page |

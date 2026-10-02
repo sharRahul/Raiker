@@ -49,6 +49,21 @@ from raiker.api.session_cookie import issue as issue_session_cookie
 from raiker.api.sessions import ApiSession
 from raiker.api.wire import Ok
 from raiker.api.wire.auth import IssuedSessionView
+from raiker.api.wire.code import (
+    CodeMapRebuilt,
+    CodeRepoDisconnected,
+    CodeRepoSelected,
+    GithubRepoConnected,
+    LocalRepoConnected,
+)
+from raiker.api.wire.mcp import (
+    McpContainment,
+    McpServerConnected,
+    McpServerCreated,
+    McpServerDeleted,
+    McpServerRenamed,
+    RemoteMcpServerCreated,
+)
 from raiker.api.wire.models import (
     AdvisorSet,
     AvailableModelsSet,
@@ -127,6 +142,7 @@ from raiker.sessions.transcript import TranscriptManifest
 from raiker.storage.internal_paths import internal_io_path
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.scheduler import TaskResumed
+from raiker.tools.mcp_tools import mcp_agent_access
 
 router = APIRouter()
 
@@ -360,7 +376,7 @@ async def list_mcp_offers(
     decision mode and the audit event all apply exactly as they would if the
     owner had typed the same fields in themselves (BUG-221).
     """
-    return _service(request).list_mcp_offers(auth_data[0].principal_id)
+    return serialize_dto(_service(request).list_mcp_offers(auth_data[0].principal_id))
 
 
 @router.get("/api/mcp/agent-access")
@@ -375,10 +391,9 @@ async def get_mcp_agent_access(
     only the handshake. A server could read `connected · 2 tool(s)` while every
     call was withheld, which is a claim the product could not keep.
     """
-    from raiker.tools.mcp_tools import mcp_agent_access
 
     principal_id = auth_data[0].principal_id
-    return mcp_agent_access(_ws(request), SQLiteStore(_ws(request)), principal_id)
+    return serialize_dto(mcp_agent_access(_ws(request), SQLiteStore(_ws(request)), principal_id))
 
 
 @router.get("/api/sessions/{session_id}/plan")
@@ -443,9 +458,13 @@ async def create_mcp_server(
     403 with ``disabled_by_capability_gate`` so the client can point the owner
     at Capabilities rather than silently failing.
     """
-    return _mcp_result(
-        _service(request).create_mcp_server(auth_data[0].principal_id, body.name, body.template)
+    answer = cast(
+        McpServerCreated,
+        _mcp_result(
+            _service(request).create_mcp_server(auth_data[0].principal_id, body.name, body.template)
+        ),
     )
+    return serialize_dto(answer)
 
 
 @router.post("/api/mcp/servers/remote")
@@ -457,11 +476,15 @@ async def create_remote_mcp_server(
     """Add a remote (HTTP) MCP connection (owner-added, monitored — not
     allowlist-blocked). The owner token is never stored; ``auth_ref`` names the
     env var that holds it. Test-connect (governed) makes the actual reach."""
-    return _mcp_result(
-        _service(request).create_remote_mcp_server(
-            auth_data[0].principal_id, body.name, body.endpoint_url, body.auth_ref
-        )
+    answer = cast(
+        RemoteMcpServerCreated,
+        _mcp_result(
+            _service(request).create_remote_mcp_server(
+                auth_data[0].principal_id, body.name, body.endpoint_url, body.auth_ref
+            )
+        ),
     )
+    return serialize_dto(answer)
 
 
 @router.post("/api/mcp/servers/{server_id}/connect")
@@ -472,9 +495,13 @@ async def connect_mcp_server(
 ) -> dict[str, Any]:
     """Test-connect one stored server: run the governed stdio handshake and
     persist the discovered tool names. Owner-scoped."""
-    return _mcp_result(
-        _service(request).connect_mcp_server(auth_data[0].principal_id, server_id)
+    answer = cast(
+        McpServerConnected,
+        _mcp_result(
+            _service(request).connect_mcp_server(auth_data[0].principal_id, server_id)
+        ),
     )
+    return serialize_dto(answer)
 
 
 @router.put("/api/mcp/servers/{server_id}")
@@ -485,9 +512,13 @@ async def rename_mcp_server(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Rename one owner-scoped MCP server profile (human-only)."""
-    return _mcp_result(
-        _service(request).rename_mcp_server(auth_data[0].principal_id, server_id, body.name)
+    answer = cast(
+        McpServerRenamed,
+        _mcp_result(
+            _service(request).rename_mcp_server(auth_data[0].principal_id, server_id, body.name)
+        ),
     )
+    return serialize_dto(answer)
 
 
 @router.delete("/api/mcp/servers/{server_id}")
@@ -498,9 +529,13 @@ async def delete_mcp_server(
 ) -> dict[str, Any]:
     """Delete one owner-scoped MCP server profile and its generated template
     file (human-only)."""
-    return _mcp_result(
-        _service(request).delete_mcp_server(auth_data[0].principal_id, server_id)
+    answer = cast(
+        McpServerDeleted,
+        _mcp_result(
+            _service(request).delete_mcp_server(auth_data[0].principal_id, server_id)
+        ),
     )
+    return serialize_dto(answer)
 
 
 # ── Containment: kill switch + revocable pause + findings/notifications ───────
@@ -514,9 +549,13 @@ async def pause_mcp_server(
     """Owner's one-call stop: pause a monitored connection (revocable). Refuses
     further sessions until resumed. Human-only, owner-scoped."""
     reason = body.reason if body is not None else None
-    return _mcp_result(
-        _service(request).pause_mcp_server(auth_data[0].principal_id, server_id, reason)
+    answer = cast(
+        McpContainment,
+        _mcp_result(
+            _service(request).pause_mcp_server(auth_data[0].principal_id, server_id, reason)
+        ),
     )
+    return serialize_dto(answer)
 
 
 @router.post("/api/mcp/servers/{server_id}/resume")
@@ -527,9 +566,13 @@ async def resume_mcp_server(
 ) -> dict[str, Any]:
     """Revoke containment: resume a paused/killed connection back to active.
     Human-only, owner-scoped."""
-    return _mcp_result(
-        _service(request).resume_mcp_server(auth_data[0].principal_id, server_id)
+    answer = cast(
+        McpContainment,
+        _mcp_result(
+            _service(request).resume_mcp_server(auth_data[0].principal_id, server_id)
+        ),
     )
+    return serialize_dto(answer)
 
 
 @router.post("/api/mcp/servers/{server_id}/kill")
@@ -542,9 +585,13 @@ async def kill_mcp_server(
     """Instant kill switch: refuse all sessions for a connection (revocable via
     resume). Human-only, owner-scoped."""
     reason = body.reason if body is not None else None
-    return _mcp_result(
-        _service(request).kill_mcp_server(auth_data[0].principal_id, server_id, reason)
+    answer = cast(
+        McpContainment,
+        _mcp_result(
+            _service(request).kill_mcp_server(auth_data[0].principal_id, server_id, reason)
+        ),
     )
+    return serialize_dto(answer)
 
 
 @router.get("/api/mcp/servers/{server_id}/findings")
@@ -659,7 +706,7 @@ async def list_hooks(
     Read-only. The config files are the owner's own text on disk; this route
     reports what the runtime loaded from them, including a file it could not read.
     """
-    return _service(request).list_hooks(auth_data[0].principal_id)
+    return serialize_dto(_service(request).list_hooks(auth_data[0].principal_id))
 
 
 @router.get("/api/plugins")
@@ -667,7 +714,7 @@ async def list_plugins(
     request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
 ) -> dict[str, Any]:
     """Installed plugins with the signature verification level each one earned (BUG-79)."""
-    return _service(request).list_plugins()
+    return serialize_dto(_service(request).list_plugins())
 
 
 @router.post("/api/security/scan")
@@ -1371,7 +1418,10 @@ async def connect_code_repo(
         )
     if not result.ok:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(
+        LocalRepoConnected | GithubRepoConnected, {"ok": True, **result.data}
+    )
+    return serialize_dto(answer)
 
 
 @router.put("/api/code/repos/selection")
@@ -1386,7 +1436,10 @@ async def select_code_repo(
     )
     if not result.ok:
         raise refusal(status.HTTP_404_NOT_FOUND, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(
+        CodeRepoSelected, {"ok": True, **result.data}
+    )
+    return serialize_dto(answer)
 
 
 @router.get("/api/code/map")
@@ -1400,7 +1453,9 @@ async def get_code_map_status(
     Never a path, never a symbol, so the status call cannot become a listing of
     the owner's tree over a route meant to describe an index.
     """
-    return _service(request).code_map_status(owner_principal_id=auth_data[0].principal_id)
+    return serialize_dto(
+        _service(request).code_map_status(owner_principal_id=auth_data[0].principal_id)
+    )
 
 
 @router.get("/api/code/map/paths")
@@ -1418,8 +1473,10 @@ async def get_code_map_paths(
     that was never built answers with a named reason and the control that fixes
     it rather than an empty menu.
     """
-    return _service(request).code_map_paths(
-        owner_principal_id=auth_data[0].principal_id, fragment=q, limit=limit
+    return serialize_dto(
+        _service(request).code_map_paths(
+            owner_principal_id=auth_data[0].principal_id, fragment=q, limit=limit
+        )
     )
 
 
@@ -1436,7 +1493,10 @@ async def rebuild_code_map(
     )
     if not result.ok:
         raise refusal(status.HTTP_409_CONFLICT, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(
+        CodeMapRebuilt, {"ok": True, **result.data}
+    )
+    return serialize_dto(answer)
 
 
 @router.delete("/api/code/repos/{repo_id}")
@@ -1454,7 +1514,10 @@ async def disconnect_code_repo(
     )
     if not result.ok:
         raise refusal(status.HTTP_404_NOT_FOUND, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(
+        CodeRepoDisconnected, {"ok": True, **result.data}
+    )
+    return serialize_dto(answer)
 
 
 @router.get("/api/checkpoints")

@@ -30,6 +30,30 @@
         "title": "ActivateRuntimeModeRequest",
         "type": "object"
       },
+      "AddressGuard": {
+        "description": "The private-address refusal: always on, and not a setting.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "enforced": {
+            "title": "Enforced",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enforced",
+          "editable",
+          "description"
+        ],
+        "title": "AddressGuard",
+        "type": "object"
+      },
       "AdvisorSet": {
         "properties": {
           "advisor_profile_id": {
@@ -246,6 +270,39 @@
           "preview_kind"
         ],
         "title": "ApprovalDetailView",
+        "type": "object"
+      },
+      "ApprovalRelayAnswered": {
+        "properties": {
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "relay_id": {
+            "title": "Relay Id",
+            "type": "string"
+          },
+          "resumable": {
+            "title": "Resumable",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "relay_id",
+          "approval_id",
+          "status",
+          "resumable"
+        ],
+        "title": "ApprovalRelayAnswered",
         "type": "object"
       },
       "ApprovalReplaced": {
@@ -1033,6 +1090,74 @@
           "updated_at"
         ],
         "title": "BackgroundWorkerHealth",
+        "type": "object"
+      },
+      "BlocklistProbe": {
+        "description": "Would this host be reachable, said without fetching it.",
+        "properties": {
+          "addresses": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Addresses",
+            "type": "array"
+          },
+          "allowed": {
+            "title": "Allowed",
+            "type": "boolean"
+          },
+          "host": {
+            "title": "Host",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host",
+          "allowed",
+          "reason",
+          "addresses"
+        ],
+        "title": "BlocklistProbe",
+        "type": "object"
+      },
+      "BlocklistRuleAdded": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_id",
+          "rule",
+          "kind"
+        ],
+        "title": "BlocklistRuleAdded",
+        "type": "object"
+      },
+      "BlocklistRuleDeleted": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "BlocklistRuleDeleted",
         "type": "object"
       },
       "BlocklistRuleRequest": {
@@ -2239,6 +2364,334 @@
         "title": "ChannelEnabledRequest",
         "type": "object"
       },
+      "ChannelEnabledSet": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pairing_id": {
+            "title": "Pairing Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "pairing_id",
+          "enabled"
+        ],
+        "title": "ChannelEnabledSet",
+        "type": "object"
+      },
+      "ChannelEnvRequirement": {
+        "description": "One environment variable a channel transport declares that it needs.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "present": {
+            "title": "Present",
+            "type": "boolean"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          },
+          "secret": {
+            "title": "Secret",
+            "type": "boolean"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "url",
+          "secret",
+          "required",
+          "present"
+        ],
+        "title": "ChannelEnvRequirement",
+        "type": "object"
+      },
+      "ChannelInboundAccepted": {
+        "description": "An inbound message recorded; quarantined unless the route carried it somewhere.",
+        "properties": {
+          "action": {
+            "enum": [
+              "stop",
+              "steer"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "channel_message_id": {
+            "title": "Channel Message Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "quarantined": {
+            "title": "Quarantined",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "reply": {
+            "title": "Reply",
+            "type": "string"
+          },
+          "routed": {
+            "title": "Routed",
+            "type": "boolean"
+          },
+          "routing_mode": {
+            "title": "Routing Mode",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "trust_level": {
+            "enum": [
+              "owner",
+              "untrusted"
+            ],
+            "title": "Trust Level",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "routed",
+          "routing_mode",
+          "ok",
+          "channel_message_id",
+          "trust_level",
+          "quarantined"
+        ],
+        "title": "ChannelInboundAccepted",
+        "type": "object"
+      },
+      "ChannelPaired": {
+        "description": "Paired is not enabled: that is a second decision.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pairing_id": {
+            "title": "Pairing Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "pairing_id",
+          "enabled"
+        ],
+        "title": "ChannelPaired",
+        "type": "object"
+      },
+      "ChannelProfile": {
+        "description": "One connector profile, and each separate fact about it (BUG-225).",
+        "properties": {
+          "approval_relay_enabled": {
+            "title": "Approval Relay Enabled",
+            "type": "boolean"
+          },
+          "auth_method": {
+            "title": "Auth Method",
+            "type": "string"
+          },
+          "channel_type": {
+            "title": "Channel Type",
+            "type": "string"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "default_state": {
+            "title": "Default State",
+            "type": "string"
+          },
+          "display_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Label"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "env_requirements": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelEnvRequirement"
+            },
+            "title": "Env Requirements",
+            "type": "array"
+          },
+          "linked": {
+            "title": "Linked",
+            "type": "boolean"
+          },
+          "owner_sender_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Sender Id"
+          },
+          "pairing_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pairing Id"
+          },
+          "requires_network": {
+            "title": "Requires Network",
+            "type": "boolean"
+          },
+          "requires_pairing": {
+            "title": "Requires Pairing",
+            "type": "boolean"
+          },
+          "requires_sender_allowlist": {
+            "title": "Requires Sender Allowlist",
+            "type": "boolean"
+          },
+          "routing_mode": {
+            "enum": [
+              "record_only",
+              "new_turn",
+              "side_question",
+              "interrupt"
+            ],
+            "title": "Routing Mode",
+            "type": "string"
+          },
+          "sender_count": {
+            "title": "Sender Count",
+            "type": "integer"
+          },
+          "senders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Senders",
+            "type": "array"
+          },
+          "supports_approvals": {
+            "title": "Supports Approvals",
+            "type": "boolean"
+          },
+          "supports_interrupts": {
+            "title": "Supports Interrupts",
+            "type": "boolean"
+          },
+          "supports_side_questions": {
+            "title": "Supports Side Questions",
+            "type": "boolean"
+          },
+          "target_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Session Id"
+          },
+          "transport": {
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connector_id",
+          "channel_type",
+          "display_name",
+          "transport",
+          "auth_method",
+          "default_state",
+          "requires_pairing",
+          "requires_sender_allowlist",
+          "requires_network",
+          "linked",
+          "enabled",
+          "pairing_id",
+          "display_label",
+          "sender_count",
+          "senders",
+          "routing_mode",
+          "target_session_id",
+          "owner_sender_id",
+          "approval_relay_enabled",
+          "supports_side_questions",
+          "supports_interrupts",
+          "supports_approvals",
+          "env_requirements"
+        ],
+        "title": "ChannelProfile",
+        "type": "object"
+      },
       "ChannelRoutingRequest": {
         "additionalProperties": false,
         "description": "Owner-selected route. An inbound payload cannot override these fields.",
@@ -2287,6 +2740,35 @@
         "title": "ChannelRoutingRequest",
         "type": "object"
       },
+      "ChannelRoutingSet": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pairing_id": {
+            "title": "Pairing Id",
+            "type": "string"
+          },
+          "routing_mode": {
+            "enum": [
+              "record_only",
+              "new_turn",
+              "side_question",
+              "interrupt"
+            ],
+            "title": "Routing Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "pairing_id",
+          "routing_mode"
+        ],
+        "title": "ChannelRoutingSet",
+        "type": "object"
+      },
       "ChannelSendersRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2302,6 +2784,73 @@
           "senders"
         ],
         "title": "ChannelSendersRequest",
+        "type": "object"
+      },
+      "ChannelSendersSet": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pairing_id": {
+            "title": "Pairing Id",
+            "type": "string"
+          },
+          "sender_count": {
+            "title": "Sender Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "pairing_id",
+          "sender_count"
+        ],
+        "title": "ChannelSendersSet",
+        "type": "object"
+      },
+      "ChannelTestDelivered": {
+        "description": "One governed test delivery: sizes and status, never the text sent.",
+        "properties": {
+          "channel_type": {
+            "title": "Channel Type",
+            "type": "string"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "delivered": {
+            "title": "Delivered",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "sent_bytes": {
+            "title": "Sent Bytes",
+            "type": "integer"
+          },
+          "signed": {
+            "title": "Signed",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "delivered",
+          "connector_id",
+          "channel_type",
+          "sent_bytes",
+          "status",
+          "signed"
+        ],
+        "title": "ChannelTestDelivered",
         "type": "object"
       },
       "ChannelTestDeliveryRequest": {
@@ -2327,6 +2876,138 @@
           "url"
         ],
         "title": "ChannelTestDeliveryRequest",
+        "type": "object"
+      },
+      "ChannelUnpaired": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pairing_id": {
+            "title": "Pairing Id",
+            "type": "string"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "pairing_id",
+          "removed"
+        ],
+        "title": "ChannelUnpaired",
+        "type": "object"
+      },
+      "ChannelUpdateIgnored": {
+        "description": "A transport update that is not a message: acknowledged so it is not retried.",
+        "properties": {
+          "ignored": {
+            "title": "Ignored",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "ignored"
+        ],
+        "title": "ChannelUpdateIgnored",
+        "type": "object"
+      },
+      "ChannelsInbound": {
+        "description": "Empty when the connector registry could not be read.",
+        "properties": {
+          "instructions_inert": {
+            "title": "Instructions Inert",
+            "type": "boolean"
+          },
+          "quarantined": {
+            "title": "Quarantined",
+            "type": "boolean"
+          },
+          "rate_limit_per_minute": {
+            "title": "Rate Limit Per Minute",
+            "type": "integer"
+          },
+          "secret_configured": {
+            "title": "Secret Configured",
+            "type": "boolean"
+          }
+        },
+        "title": "ChannelsInbound",
+        "type": "object"
+      },
+      "ChannelsOutbound": {
+        "description": "Empty when the connector registry could not be read.",
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "egress_configured": {
+            "title": "Egress Configured",
+            "type": "boolean"
+          },
+          "egress_host_count": {
+            "title": "Egress Host Count",
+            "type": "integer"
+          },
+          "gate_state": {
+            "title": "Gate State",
+            "type": "string"
+          },
+          "runtime_enabled": {
+            "title": "Runtime Enabled",
+            "type": "boolean"
+          },
+          "signing_configured": {
+            "title": "Signing Configured",
+            "type": "boolean"
+          }
+        },
+        "title": "ChannelsOutbound",
+        "type": "object"
+      },
+      "ChannelsView": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "inbound": {
+            "$ref": "#/components/schemas/ChannelsInbound"
+          },
+          "outbound": {
+            "$ref": "#/components/schemas/ChannelsOutbound"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelProfile"
+            },
+            "title": "Profiles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "profiles",
+          "error",
+          "outbound",
+          "inbound"
+        ],
+        "title": "ChannelsView",
         "type": "object"
       },
       "CheckpointCaptureHealth": {
@@ -2465,6 +3146,632 @@
           "can_restore_files"
         ],
         "title": "CheckpointView",
+        "type": "object"
+      },
+      "CodeMapError": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "title": "CodeMapError",
+        "type": "object"
+      },
+      "CodeMapFailure": {
+        "description": "A named refusal: the gate or decision mode said no, or nothing could be read.",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/CodeMapError"
+          },
+          "status": {
+            "enum": [
+              "denied",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "error"
+        ],
+        "title": "CodeMapFailure",
+        "type": "object"
+      },
+      "CodeMapPath": {
+        "properties": {
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "language"
+        ],
+        "title": "CodeMapPath",
+        "type": "object"
+      },
+      "CodeMapPaths": {
+        "description": "Paths and languages only — an autocomplete must not be a disclosure surface.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "fragment": {
+            "title": "Fragment",
+            "type": "string"
+          },
+          "paths": {
+            "items": {
+              "$ref": "#/components/schemas/CodeMapPath"
+            },
+            "title": "Paths",
+            "type": "array"
+          },
+          "repository": {
+            "title": "Repository",
+            "type": "string"
+          },
+          "status": {
+            "const": "success",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "repository",
+          "fragment",
+          "count",
+          "paths"
+        ],
+        "title": "CodeMapPaths",
+        "type": "object"
+      },
+      "CodeMapRebuilt": {
+        "properties": {
+          "edge_count": {
+            "title": "Edge Count",
+            "type": "integer"
+          },
+          "file_count": {
+            "title": "File Count",
+            "type": "integer"
+          },
+          "languages": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Languages",
+            "type": "object"
+          },
+          "limits_hit": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limits Hit",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "repository": {
+            "title": "Repository",
+            "type": "string"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "skipped": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Skipped",
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "indexed",
+              "partial"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol_count": {
+            "title": "Symbol Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "repository",
+          "file_count",
+          "symbol_count",
+          "edge_count",
+          "languages",
+          "skipped",
+          "limits_hit",
+          "schema_version",
+          "ok"
+        ],
+        "title": "CodeMapRebuilt",
+        "type": "object"
+      },
+      "CodeMapStatus": {
+        "description": "What the owner is shown: the gate, the repository, and the index state.",
+        "properties": {
+          "built_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Built At"
+          },
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "decision_mode": {
+            "title": "Decision Mode",
+            "type": "string"
+          },
+          "edge_count": {
+            "title": "Edge Count",
+            "type": "integer"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "file_count": {
+            "title": "File Count",
+            "type": "integer"
+          },
+          "gate_state": {
+            "title": "Gate State",
+            "type": "string"
+          },
+          "languages": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Languages",
+            "type": "object"
+          },
+          "limits_hit": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limits Hit",
+            "type": "array"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "repo_id": {
+            "title": "Repo Id",
+            "type": "string"
+          },
+          "repository": {
+            "title": "Repository",
+            "type": "string"
+          },
+          "skipped": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Skipped",
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "indexed",
+              "partial",
+              "not_indexed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol_count": {
+            "title": "Symbol Count",
+            "type": "integer"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "capability",
+          "gate_state",
+          "decision_mode",
+          "enabled",
+          "repository",
+          "repo_id",
+          "status",
+          "reason_code",
+          "file_count",
+          "symbol_count",
+          "edge_count",
+          "languages",
+          "skipped",
+          "limits_hit",
+          "built_at",
+          "updated_at"
+        ],
+        "title": "CodeMapStatus",
+        "type": "object"
+      },
+      "CodeMapSummary": {
+        "description": "A scan's result: counts and what was skipped, never a file's content.",
+        "properties": {
+          "edge_count": {
+            "title": "Edge Count",
+            "type": "integer"
+          },
+          "file_count": {
+            "title": "File Count",
+            "type": "integer"
+          },
+          "languages": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Languages",
+            "type": "object"
+          },
+          "limits_hit": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limits Hit",
+            "type": "array"
+          },
+          "repository": {
+            "title": "Repository",
+            "type": "string"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "skipped": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Skipped",
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "indexed",
+              "partial"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol_count": {
+            "title": "Symbol Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "repository",
+          "file_count",
+          "symbol_count",
+          "edge_count",
+          "languages",
+          "skipped",
+          "limits_hit",
+          "schema_version"
+        ],
+        "title": "CodeMapSummary",
+        "type": "object"
+      },
+      "CodeRepoBrowseView": {
+        "description": "B13 — one directory of the repository Build is pointed at.\n\nThe same entry shape as a project's tree, so one explorer serves both;\n``index_state`` is always null here. ``reason_code`` says why there is\nnothing to show when ``root_missing``.",
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectBrowseEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "root_kind": {
+            "enum": [
+              "local",
+              "github"
+            ],
+            "title": "Root Kind",
+            "type": "string"
+          },
+          "root_label": {
+            "title": "Root Label",
+            "type": "string"
+          },
+          "root_missing": {
+            "title": "Root Missing",
+            "type": "boolean"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "parent",
+          "entries",
+          "truncated",
+          "root_kind",
+          "root_label",
+          "root_missing"
+        ],
+        "title": "CodeRepoBrowseView",
+        "type": "object"
+      },
+      "CodeRepoChangeEntry": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "previous_path": {
+            "title": "Previous Path",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "unstaged": {
+            "title": "Unstaged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "previous_path",
+          "state",
+          "unstaged"
+        ],
+        "title": "CodeRepoChangeEntry",
+        "type": "object"
+      },
+      "CodeRepoChangesView": {
+        "description": "The working tree's uncommitted state, from the helpers a commit is built from.",
+        "properties": {
+          "diff": {
+            "title": "Diff",
+            "type": "string"
+          },
+          "diff_truncated": {
+            "title": "Diff Truncated",
+            "type": "boolean"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/CodeRepoChangeEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "root_missing": {
+            "title": "Root Missing",
+            "type": "boolean"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "entries",
+          "diff",
+          "truncated",
+          "diff_truncated",
+          "root_missing",
+          "reason_code"
+        ],
+        "title": "CodeRepoChangesView",
+        "type": "object"
+      },
+      "CodeRepoDiagnosticsView": {
+        "description": "B10 — parse-level problems for one file; ``checked`` false means not looked at.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "checked": {
+            "title": "Checked",
+            "type": "boolean"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/Diagnostic"
+            },
+            "title": "Diagnostics",
+            "type": "array"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "checked",
+          "available",
+          "reason_code",
+          "reason",
+          "diagnostics"
+        ],
+        "title": "CodeRepoDiagnosticsView",
+        "type": "object"
+      },
+      "CodeRepoDisconnected": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "repo_id": {
+            "title": "Repo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "repo_id"
+        ],
+        "title": "CodeRepoDisconnected",
+        "type": "object"
+      },
+      "CodeRepoFileView": {
+        "description": "One bounded text file, or the reason it cannot be shown.",
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "readable": {
+            "title": "Readable",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "text",
+          "truncated",
+          "size_bytes",
+          "readable",
+          "reason_code"
+        ],
+        "title": "CodeRepoFileView",
+        "type": "object"
+      },
+      "CodeRepoSelected": {
+        "properties": {
+          "code_map": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodeMapSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "selected_repo_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Repo Id"
+          }
+        },
+        "required": [
+          "ok",
+          "selected_repo_id",
+          "code_map"
+        ],
+        "title": "CodeRepoSelected",
         "type": "object"
       },
       "CodeRepoView": {
@@ -2690,6 +3997,59 @@
         "title": "CodexStatus",
         "type": "object"
       },
+      "CommandChunkView": {
+        "properties": {
+          "byte_count": {
+            "title": "Byte Count",
+            "type": "integer"
+          },
+          "emitted_at": {
+            "title": "Emitted At",
+            "type": "string"
+          },
+          "end_byte_offset": {
+            "title": "End Byte Offset",
+            "type": "integer"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "start_byte_offset": {
+            "title": "Start Byte Offset",
+            "type": "integer"
+          },
+          "stream": {
+            "enum": [
+              "stdout",
+              "stderr",
+              "system"
+            ],
+            "title": "Stream",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "sequence",
+          "stream",
+          "text",
+          "byte_count",
+          "emitted_at",
+          "start_byte_offset",
+          "end_byte_offset"
+        ],
+        "title": "CommandChunkView",
+        "type": "object"
+      },
       "CommandGrant": {
         "description": "Owner-defined, expiry-bound command prefixes for one conversation.",
         "properties": {
@@ -2743,6 +4103,328 @@
         "title": "CommandGrantRevoked",
         "type": "object"
       },
+      "CommandOutput": {
+        "description": "Output after a sequence number; ``next_after`` is where the next read starts.",
+        "properties": {
+          "chunks": {
+            "items": {
+              "$ref": "#/components/schemas/CommandChunkView"
+            },
+            "title": "Chunks",
+            "type": "array"
+          },
+          "next_after": {
+            "title": "Next After",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chunks",
+          "next_after"
+        ],
+        "title": "CommandOutput",
+        "type": "object"
+      },
+      "CommandReceiptAnswer": {
+        "properties": {
+          "receipt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandReceiptView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "receipt"
+        ],
+        "title": "CommandReceiptAnswer",
+        "type": "object"
+      },
+      "CommandReceiptView": {
+        "properties": {
+          "completed_at": {
+            "title": "Completed At",
+            "type": "string"
+          },
+          "digest": {
+            "title": "Digest",
+            "type": "string"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Code"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "starting",
+              "running",
+              "finalizing",
+              "succeeded",
+              "failed",
+              "timed_out",
+              "cancelled",
+              "contained",
+              "lost"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "termination_reason": {
+            "title": "Termination Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "state",
+          "exit_code",
+          "termination_reason",
+          "completed_at",
+          "evidence",
+          "digest"
+        ],
+        "title": "CommandReceiptView",
+        "type": "object"
+      },
+      "CommandRunDetail": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/CommandRunView"
+          }
+        },
+        "required": [
+          "run"
+        ],
+        "title": "CommandRunDetail",
+        "type": "object"
+      },
+      "CommandRunList": {
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/CommandRunView"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "runs"
+        ],
+        "title": "CommandRunList",
+        "type": "object"
+      },
+      "CommandRunView": {
+        "description": "A run as its owner sees it: never the template or the principals behind it.",
+        "properties": {
+          "action_id": {
+            "title": "Action Id",
+            "type": "string"
+          },
+          "authority_id": {
+            "title": "Authority Id",
+            "type": "string"
+          },
+          "authority_kind": {
+            "title": "Authority Kind",
+            "type": "string"
+          },
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Code"
+          },
+          "lease_expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lease Expires At"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "receipt_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Digest"
+          },
+          "redaction_count": {
+            "title": "Redaction Count",
+            "type": "integer"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "safe_display": {
+            "title": "Safe Display",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "starting",
+              "running",
+              "finalizing",
+              "succeeded",
+              "failed",
+              "timed_out",
+              "cancelled",
+              "contained",
+              "lost"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "stderr_bytes": {
+            "title": "Stderr Bytes",
+            "type": "integer"
+          },
+          "stdout_bytes": {
+            "title": "Stdout Bytes",
+            "type": "integer"
+          },
+          "termination_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Termination Reason"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "session_id",
+          "turn_id",
+          "action_id",
+          "authority_kind",
+          "authority_id",
+          "state",
+          "profile_id",
+          "backend",
+          "safe_display",
+          "started_at",
+          "completed_at",
+          "lease_expires_at",
+          "exit_code",
+          "termination_reason",
+          "stdout_bytes",
+          "stderr_bytes",
+          "truncated",
+          "redaction_count",
+          "receipt_digest",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CommandRunView",
+        "type": "object"
+      },
+      "CommandStopped": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "run": {
+            "$ref": "#/components/schemas/CommandRunView"
+          }
+        },
+        "required": [
+          "ok",
+          "run"
+        ],
+        "title": "CommandStopped",
+        "type": "object"
+      },
       "CompactConversationRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2769,6 +4451,39 @@
           "approval_mode"
         ],
         "title": "ComposerApprovalModeRequest",
+        "type": "object"
+      },
+      "ConformanceFindingView": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning",
+              "refused"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "ConformanceFindingView",
         "type": "object"
       },
       "ConnectCodeRepoRequest": {
@@ -2898,6 +4613,204 @@
           "operation_id"
         ],
         "title": "ConnectorActionRequest",
+        "type": "object"
+      },
+      "ConnectorCompensation": {
+        "description": "The operation that undoes a write, and how long it stays possible.",
+        "properties": {
+          "argument_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Argument Map",
+            "type": "object"
+          },
+          "deadline_seconds": {
+            "title": "Deadline Seconds",
+            "type": "integer"
+          },
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation_id",
+          "argument_map",
+          "deadline_seconds"
+        ],
+        "title": "ConnectorCompensation",
+        "type": "object"
+      },
+      "ConnectorCredentialsSet": {
+        "properties": {
+          "auth_status": {
+            "enum": [
+              "connected",
+              "reauth_required",
+              "not_connected"
+            ],
+            "title": "Auth Status",
+            "type": "string"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "connector_id",
+          "auth_status"
+        ],
+        "title": "ConnectorCredentialsSet",
+        "type": "object"
+      },
+      "ConnectorEnabledSet": {
+        "properties": {
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "connector_id",
+          "enabled"
+        ],
+        "title": "ConnectorEnabledSet",
+        "type": "object"
+      },
+      "ConnectorInstalled": {
+        "properties": {
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "installed": {
+            "title": "Installed",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "connector_id",
+          "installed",
+          "enabled"
+        ],
+        "title": "ConnectorInstalled",
+        "type": "object"
+      },
+      "ConnectorOperation": {
+        "properties": {
+          "compensation": {
+            "$ref": "#/components/schemas/ConnectorCompensation"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "requires_confirmation": {
+            "title": "Requires Confirmation",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "operation_id",
+          "method",
+          "path",
+          "description",
+          "requires_confirmation"
+        ],
+        "title": "ConnectorOperation",
+        "type": "object"
+      },
+      "ConnectorStoreView": {
+        "properties": {
+          "connectors": {
+            "items": {
+              "$ref": "#/components/schemas/StoreConnector"
+            },
+            "title": "Connectors",
+            "type": "array"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "vault_configured": {
+            "title": "Vault Configured",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "connectors",
+          "count",
+          "vault_configured"
+        ],
+        "title": "ConnectorStoreView",
+        "type": "object"
+      },
+      "ConnectorUninstalled": {
+        "properties": {
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "installed": {
+            "title": "Installed",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "connector_id",
+          "installed"
+        ],
+        "title": "ConnectorUninstalled",
         "type": "object"
       },
       "ConnectorView": {
@@ -4019,6 +5932,152 @@
         "title": "CreateTelemetryDestinationRequest",
         "type": "object"
       },
+      "CredentialDeltaDiscarded": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "receipt": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt"
+          }
+        },
+        "required": [
+          "ok",
+          "receipt"
+        ],
+        "title": "CredentialDeltaDiscarded",
+        "type": "object"
+      },
+      "CredentialDeltaFile": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path",
+          "kind"
+        ],
+        "title": "CredentialDeltaFile",
+        "type": "object"
+      },
+      "CredentialDeltaList": {
+        "properties": {
+          "deltas": {
+            "items": {
+              "$ref": "#/components/schemas/CredentialDeltaView"
+            },
+            "title": "Deltas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "deltas"
+        ],
+        "title": "CredentialDeltaList",
+        "type": "object"
+      },
+      "CredentialDeltaManifest": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/CredentialDeltaFile"
+            },
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "CredentialDeltaManifest",
+        "type": "object"
+      },
+      "CredentialDeltaView": {
+        "description": "Safe metadata only; encrypted handles and matcher material stay internal.",
+        "properties": {
+          "cleanup_status": {
+            "title": "Cleanup Status",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "delta_digest": {
+            "title": "Delta Digest",
+            "type": "string"
+          },
+          "environment_profile_id": {
+            "title": "Environment Profile Id",
+            "type": "string"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/CredentialDeltaManifest"
+          },
+          "recipient_boundary": {
+            "const": "disposable_container_tcb",
+            "title": "Recipient Boundary",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "scan_digest": {
+            "title": "Scan Digest",
+            "type": "string"
+          },
+          "scan_rule_version": {
+            "title": "Scan Rule Version",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "scanning",
+              "clean",
+              "quarantined",
+              "resolving",
+              "cleanup_failed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "environment_profile_id",
+          "state",
+          "manifest",
+          "delta_digest",
+          "scan_digest",
+          "scan_rule_version",
+          "cleanup_status",
+          "created_at",
+          "recipient_boundary"
+        ],
+        "title": "CredentialDeltaView",
+        "type": "object"
+      },
       "CredentialLifecycleView": {
         "properties": {
           "credential_id": {
@@ -4243,6 +6302,45 @@
           "current"
         ],
         "title": "DeviceSessionView",
+        "type": "object"
+      },
+      "Diagnostic": {
+        "description": "One problem, at a coordinate the agent can open.",
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "integer"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "line",
+          "column",
+          "severity",
+          "message",
+          "source"
+        ],
+        "title": "Diagnostic",
         "type": "object"
       },
       "DiagnosticsView": {
@@ -5282,6 +7380,123 @@
         "title": "GistDiscarded",
         "type": "object"
       },
+      "GitCredentialGrant": {
+        "properties": {
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "grant_id": {
+            "title": "Grant Id",
+            "type": "string"
+          },
+          "granted_at": {
+            "title": "Granted At",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "uses": {
+            "title": "Uses",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "grant_id",
+          "scope",
+          "status",
+          "granted_at",
+          "expires_at",
+          "session_id",
+          "uses"
+        ],
+        "title": "GitCredentialGrant",
+        "type": "object"
+      },
+      "GitCredentialStatus": {
+        "description": "What a surface needs to render the control. Never the token.\n\n``credential_*`` rather than ``token_*``: the API redactor masks any key\ncontaining \"token\", which is the right blunt instrument to keep.",
+        "properties": {
+          "checked_at": {
+            "title": "Checked At",
+            "type": "string"
+          },
+          "credential_configured": {
+            "title": "Credential Configured",
+            "type": "boolean"
+          },
+          "credential_source": {
+            "title": "Credential Source",
+            "type": "string"
+          },
+          "grant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GitCredentialGrant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "grant_seconds": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Grant Seconds",
+            "type": "object"
+          },
+          "hosts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hosts",
+            "type": "array"
+          },
+          "operations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Operations",
+            "type": "array"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "credential_configured",
+          "credential_source",
+          "grant",
+          "scopes",
+          "grant_seconds",
+          "hosts",
+          "operations",
+          "checked_at"
+        ],
+        "title": "GitCredentialStatus",
+        "type": "object"
+      },
       "GitGrantRequest": {
         "additionalProperties": false,
         "properties": {
@@ -5325,6 +7540,48 @@
           "token"
         ],
         "title": "GitTokenRequest",
+        "type": "object"
+      },
+      "GithubRepoConnected": {
+        "description": "A GitHub coordinate recorded. Nothing was fetched.",
+        "properties": {
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "kind": {
+            "const": "github",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "repo_id": {
+            "title": "Repo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "repo_id",
+          "kind",
+          "label",
+          "branch"
+        ],
+        "title": "GithubRepoConnected",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -5623,6 +7880,317 @@
           "complete"
         ],
         "title": "HfVariant",
+        "type": "object"
+      },
+      "HookActivityView": {
+        "properties": {
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "event_type",
+          "session_id",
+          "timestamp",
+          "summary"
+        ],
+        "title": "HookActivityView",
+        "type": "object"
+      },
+      "HookEventView": {
+        "properties": {
+          "can_decide": {
+            "title": "Can Decide",
+            "type": "boolean"
+          },
+          "dispatched": {
+            "title": "Dispatched",
+            "type": "boolean"
+          },
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event",
+          "summary",
+          "dispatched",
+          "can_decide"
+        ],
+        "title": "HookEventView",
+        "type": "object"
+      },
+      "HookHandlerView": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "decision_authority": {
+            "title": "Decision Authority",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "timeout_ms": {
+            "title": "Timeout Ms",
+            "type": "integer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "unavailable_reason": {
+            "title": "Unavailable Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "target",
+          "timeout_ms",
+          "decision_authority",
+          "available",
+          "unavailable_reason"
+        ],
+        "title": "HookHandlerView",
+        "type": "object"
+      },
+      "HookRuleView": {
+        "properties": {
+          "can_decide": {
+            "title": "Can Decide",
+            "type": "boolean"
+          },
+          "dispatched": {
+            "title": "Dispatched",
+            "type": "boolean"
+          },
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "event_summary": {
+            "title": "Event Summary",
+            "type": "string"
+          },
+          "handlers": {
+            "items": {
+              "$ref": "#/components/schemas/HookHandlerView"
+            },
+            "title": "Handlers",
+            "type": "array"
+          },
+          "if_guard": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "If Guard"
+          },
+          "matcher": {
+            "title": "Matcher",
+            "type": "string"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": [
+          "rule_id",
+          "event",
+          "event_summary",
+          "matcher",
+          "if_guard",
+          "scope",
+          "source",
+          "dispatched",
+          "can_decide",
+          "handlers"
+        ],
+        "title": "HookRuleView",
+        "type": "object"
+      },
+      "HookSourceView": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "loaded": {
+            "title": "Loaded",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "rule_count": {
+            "title": "Rule Count",
+            "type": "integer"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "scope",
+          "exists",
+          "loaded",
+          "rule_count",
+          "error"
+        ],
+        "title": "HookSourceView",
+        "type": "object"
+      },
+      "HooksView": {
+        "description": "Configured hooks, whether each can fire or decide, and what they have done.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "activity": {
+            "items": {
+              "$ref": "#/components/schemas/HookActivityView"
+            },
+            "title": "Activity",
+            "type": "array"
+          },
+          "activity_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Activity Counts",
+            "type": "object"
+          },
+          "builtins": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Builtins",
+            "type": "array"
+          },
+          "disabled": {
+            "title": "Disabled",
+            "type": "boolean"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/HookEventView"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "failed_sources": {
+            "items": {
+              "$ref": "#/components/schemas/HookSourceView"
+            },
+            "title": "Failed Sources",
+            "type": "array"
+          },
+          "rule_count": {
+            "title": "Rule Count",
+            "type": "integer"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/HookRuleView"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/HookSourceView"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "active",
+          "disabled",
+          "rule_count",
+          "rules",
+          "sources",
+          "failed_sources",
+          "events",
+          "builtins",
+          "activity",
+          "activity_counts"
+        ],
+        "title": "HooksView",
         "type": "object"
       },
       "HuggingFaceCredentialRequest": {
@@ -6449,6 +9017,192 @@
         "title": "InstallPlan",
         "type": "object"
       },
+      "InstalledPlugin": {
+        "properties": {
+          "checksum_present": {
+            "title": "Checksum Present",
+            "type": "boolean"
+          },
+          "code_runtime": {
+            "$ref": "#/components/schemas/PluginCodeRuntime"
+          },
+          "contributions": {
+            "$ref": "#/components/schemas/PluginContributions"
+          },
+          "installed_at": {
+            "title": "Installed At",
+            "type": "string"
+          },
+          "installed_by": {
+            "title": "Installed By",
+            "type": "string"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "record_id": {
+            "title": "Record Id",
+            "type": "string"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/PluginSignatureView"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "trust_level": {
+            "title": "Trust Level",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "record_id",
+          "plugin_id",
+          "version",
+          "trust_level",
+          "status",
+          "source_url",
+          "installed_at",
+          "installed_by",
+          "checksum_present",
+          "code_runtime",
+          "signature",
+          "contributions"
+        ],
+        "title": "InstalledPlugin",
+        "type": "object"
+      },
+      "InstalledSkill": {
+        "description": "One installed skill as the Skills tab reads it: metadata, never the bundle.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "checksum": {
+            "title": "Checksum",
+            "type": "string"
+          },
+          "command_trigger": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Trigger"
+          },
+          "conformance": {
+            "$ref": "#/components/schemas/SkillConformance"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "file_count": {
+            "title": "File Count",
+            "type": "integer"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "skill_id": {
+            "title": "Skill Id",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "upload",
+              "url",
+              "builtin",
+              "built",
+              "plugin"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "skill_id",
+          "name",
+          "description",
+          "version",
+          "source",
+          "source_ref",
+          "checksum",
+          "active",
+          "files",
+          "file_count",
+          "byte_size",
+          "created_at",
+          "updated_at",
+          "command_trigger",
+          "conformance"
+        ],
+        "title": "InstalledSkill",
+        "type": "object"
+      },
       "InstanceCreateRequest": {
         "additionalProperties": false,
         "description": "Name and optional first account for a locally isolated Raiker instance.",
@@ -6981,6 +9735,47 @@
         "title": "LocalModelView",
         "type": "object"
       },
+      "LocalRepoConnected": {
+        "description": "A workspace folder referenced as a repository, and its map if one was built.",
+        "properties": {
+          "code_map": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodeMapSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "const": "local",
+            "title": "Kind",
+            "type": "string"
+          },
+          "local_subpath": {
+            "title": "Local Subpath",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "repo_id": {
+            "title": "Repo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "repo_id",
+          "kind",
+          "local_subpath",
+          "code_map"
+        ],
+        "title": "LocalRepoConnected",
+        "type": "object"
+      },
       "LocalRuntime": {
         "description": "A local model runtime found (or not) on this machine by a PATH lookup.",
         "properties": {
@@ -7397,6 +10192,55 @@
         "title": "ManagedFileList",
         "type": "object"
       },
+      "ManifestRegistered": {
+        "description": "The manifest as compiled: its digest and the operations it indexes.",
+        "properties": {
+          "api_url": {
+            "title": "Api Url",
+            "type": "string"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "openapi",
+              "ai_plugin"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "title": "Manifest Sha256",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectorOperation"
+            },
+            "title": "Operations",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "connector_id",
+          "manifest_sha256",
+          "kind",
+          "operations"
+        ],
+        "title": "ManifestRegistered",
+        "type": "object"
+      },
       "ManifestRequest": {
         "additionalProperties": false,
         "properties": {
@@ -7410,6 +10254,234 @@
           "manifest"
         ],
         "title": "ManifestRequest",
+        "type": "object"
+      },
+      "McpAgentAccess": {
+        "description": "Whether a connected server's tools would really run this turn.",
+        "properties": {
+          "callable": {
+            "title": "Callable",
+            "type": "boolean"
+          },
+          "connected_servers": {
+            "title": "Connected Servers",
+            "type": "integer"
+          },
+          "decision_mode": {
+            "title": "Decision Mode",
+            "type": "string"
+          },
+          "gate_enabled": {
+            "title": "Gate Enabled",
+            "type": "boolean"
+          },
+          "projected_tools": {
+            "title": "Projected Tools",
+            "type": "integer"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gate_enabled",
+          "decision_mode",
+          "callable",
+          "reason_code",
+          "projected_tools",
+          "connected_servers"
+        ],
+        "title": "McpAgentAccess",
+        "type": "object"
+      },
+      "McpContainment": {
+        "description": "A pause, kill or resume, and the monitor state it left the connection in.",
+        "properties": {
+          "monitor_state": {
+            "enum": [
+              "active",
+              "paused",
+              "killed"
+            ],
+            "title": "Monitor State",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "server_id",
+          "monitor_state"
+        ],
+        "title": "McpContainment",
+        "type": "object"
+      },
+      "McpOffer": {
+        "description": "An MCP server an installed plugin offers. Inert until the owner adds it (BUG-221).",
+        "properties": {
+          "already_added": {
+            "title": "Already Added",
+            "type": "boolean"
+          },
+          "auth_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auth Ref"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "endpoint_url": {
+            "title": "Endpoint Url",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "template": {
+            "title": "Template",
+            "type": "string"
+          },
+          "transport": {
+            "enum": [
+              "http",
+              "stdio"
+            ],
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plugin_id",
+          "name",
+          "transport",
+          "description",
+          "already_added"
+        ],
+        "title": "McpOffer",
+        "type": "object"
+      },
+      "McpServerConnected": {
+        "description": "The handshake's result: the status and the tool names it discovered.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "server_id",
+          "status",
+          "tools"
+        ],
+        "title": "McpServerConnected",
+        "type": "object"
+      },
+      "McpServerCreated": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "server_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Id"
+          }
+        },
+        "required": [
+          "ok",
+          "server_id",
+          "name"
+        ],
+        "title": "McpServerCreated",
+        "type": "object"
+      },
+      "McpServerDeleted": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "server_id"
+        ],
+        "title": "McpServerDeleted",
+        "type": "object"
+      },
+      "McpServerRenamed": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "server_id",
+          "name"
+        ],
+        "title": "McpServerRenamed",
         "type": "object"
       },
       "McpServerView": {
@@ -11430,6 +14502,224 @@
         "title": "PauseHostRequest",
         "type": "object"
       },
+      "PluginCodeRuntime": {
+        "description": "BUG-308 — where this plugin's own code would run on this machine.",
+        "properties": {
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "where": {
+            "enum": [
+              "not_enabled",
+              "isolated",
+              "host_network"
+            ],
+            "title": "Where",
+            "type": "string"
+          }
+        },
+        "required": [
+          "where",
+          "summary"
+        ],
+        "title": "PluginCodeRuntime",
+        "type": "object"
+      },
+      "PluginContributionKind": {
+        "description": "A kind of contribution, and whether this build accepts it yet.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "available",
+          "summary"
+        ],
+        "title": "PluginContributionKind",
+        "type": "object"
+      },
+      "PluginContributions": {
+        "description": "What a plugin provides, read from the files the runtime loads (BUG-221).",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "events": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "hooks": {
+            "title": "Hooks",
+            "type": "integer"
+          },
+          "mcp_server_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Mcp Server Names",
+            "type": "array"
+          },
+          "mcp_servers": {
+            "title": "Mcp Servers",
+            "type": "integer"
+          },
+          "skill_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skill Names",
+            "type": "array"
+          },
+          "skills": {
+            "title": "Skills",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hooks",
+          "events",
+          "skills",
+          "skill_names",
+          "mcp_servers",
+          "mcp_server_names",
+          "error"
+        ],
+        "title": "PluginContributions",
+        "type": "object"
+      },
+      "PluginSignatureView": {
+        "description": "What a plugin manifest's signature actually proved (BUG-79).",
+        "properties": {
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "verified",
+              "present_only",
+              "unsigned"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "remediation": {
+            "title": "Remediation",
+            "type": "string"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "level",
+          "label",
+          "reason",
+          "method",
+          "verified",
+          "explanation",
+          "remediation"
+        ],
+        "title": "PluginSignatureView",
+        "type": "object"
+      },
+      "PluginSigning": {
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "hmac_key_set": {
+            "title": "Hmac Key Set",
+            "type": "boolean"
+          },
+          "publisher_key_set": {
+            "title": "Publisher Key Set",
+            "type": "boolean"
+          },
+          "remediation": {
+            "title": "Remediation",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "configured",
+          "hmac_key_set",
+          "publisher_key_set",
+          "summary",
+          "remediation"
+        ],
+        "title": "PluginSigning",
+        "type": "object"
+      },
+      "PluginsView": {
+        "properties": {
+          "contribution_kinds": {
+            "items": {
+              "$ref": "#/components/schemas/PluginContributionKind"
+            },
+            "title": "Contribution Kinds",
+            "type": "array"
+          },
+          "plugins": {
+            "items": {
+              "$ref": "#/components/schemas/InstalledPlugin"
+            },
+            "title": "Plugins",
+            "type": "array"
+          },
+          "signing": {
+            "$ref": "#/components/schemas/PluginSigning"
+          }
+        },
+        "required": [
+          "plugins",
+          "signing",
+          "contribution_kinds"
+        ],
+        "title": "PluginsView",
+        "type": "object"
+      },
       "PriceSet": {
         "description": "An owner price recorded, or cleared (``cleared``) back to the published one.",
         "properties": {
@@ -13279,6 +16569,35 @@
         "title": "RelationshipScan",
         "type": "object"
       },
+      "RemoteMcpServerCreated": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "string"
+          },
+          "transport": {
+            "const": "http",
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "server_id",
+          "name",
+          "transport"
+        ],
+        "title": "RemoteMcpServerCreated",
+        "type": "object"
+      },
       "RenameMcpServerRequest": {
         "additionalProperties": false,
         "properties": {
@@ -14964,6 +18283,204 @@
         "title": "SetupUpdateRequest",
         "type": "object"
       },
+      "SkillActiveSet": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "skill_id": {
+            "title": "Skill Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "skill_id",
+          "active"
+        ],
+        "title": "SkillActiveSet",
+        "type": "object"
+      },
+      "SkillCommandSet": {
+        "properties": {
+          "command_trigger": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Trigger"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "skill_id": {
+            "title": "Skill Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "skill_id",
+          "command_trigger"
+        ],
+        "title": "SkillCommandSet",
+        "type": "object"
+      },
+      "SkillConformance": {
+        "description": "How an installed skill measures against the Agent Skills standard.",
+        "properties": {
+          "compatibility": {
+            "title": "Compatibility",
+            "type": "string"
+          },
+          "conformant": {
+            "title": "Conformant",
+            "type": "boolean"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/ConformanceFindingView"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "license": {
+            "title": "License",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "refused_allowed_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Refused Allowed Tools",
+            "type": "array"
+          },
+          "spec_url": {
+            "title": "Spec Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conformant",
+          "spec_url",
+          "findings",
+          "license",
+          "compatibility",
+          "metadata",
+          "refused_allowed_tools"
+        ],
+        "title": "SkillConformance",
+        "type": "object"
+      },
+      "SkillDeleted": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "skill_id": {
+            "title": "Skill Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "skill_id",
+          "deleted"
+        ],
+        "title": "SkillDeleted",
+        "type": "object"
+      },
+      "SkillInstalled": {
+        "description": "An upload, import or build that stored a skill, and the skill as stored.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "skill": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstalledSkill"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "skill_id": {
+            "title": "Skill Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "skill_id",
+          "skill"
+        ],
+        "title": "SkillInstalled",
+        "type": "object"
+      },
+      "SkillList": {
+        "properties": {
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/InstalledSkill"
+            },
+            "title": "Skills",
+            "type": "array"
+          }
+        },
+        "required": [
+          "skills"
+        ],
+        "title": "SkillList",
+        "type": "object"
+      },
+      "SkillRenamed": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "skill_id": {
+            "title": "Skill Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "skill_id",
+          "name"
+        ],
+        "title": "SkillRenamed",
+        "type": "object"
+      },
       "SkillUrlRequest": {
         "additionalProperties": false,
         "description": "A published skill's URL, to verify or to import.",
@@ -14977,6 +18494,67 @@
           "url"
         ],
         "title": "SkillUrlRequest",
+        "type": "object"
+      },
+      "SkillVerification": {
+        "description": "What a linked skill turned out to be, reported before anything is stored.",
+        "properties": {
+          "already_installed": {
+            "title": "Already Installed",
+            "type": "boolean"
+          },
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "checksum": {
+            "title": "Checksum",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "ok",
+          "verified",
+          "name",
+          "description",
+          "version",
+          "checksum",
+          "byte_size",
+          "source_url",
+          "already_installed"
+        ],
+        "title": "SkillVerification",
         "type": "object"
       },
       "SourceAnchorView": {
@@ -15282,6 +18860,117 @@
           }
         },
         "title": "StopHostRequest",
+        "type": "object"
+      },
+      "StoreConnector": {
+        "description": "One catalogue connector, as this owner has it. Never a credential value.",
+        "properties": {
+          "active_operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Operation"
+          },
+          "activity_status": {
+            "enum": [
+              "idle",
+              "processing",
+              "completed",
+              "failed"
+            ],
+            "title": "Activity Status",
+            "type": "string"
+          },
+          "auth_status": {
+            "enum": [
+              "connected",
+              "reauth_required",
+              "not_connected"
+            ],
+            "title": "Auth Status",
+            "type": "string"
+          },
+          "auth_type": {
+            "enum": [
+              "oauth2",
+              "api_key"
+            ],
+            "title": "Auth Type",
+            "type": "string"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "host": {
+            "title": "Host",
+            "type": "string"
+          },
+          "installed": {
+            "title": "Installed",
+            "type": "boolean"
+          },
+          "last_invoked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Invoked At"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectorOperation"
+            },
+            "title": "Operations",
+            "type": "array"
+          },
+          "vault_configured": {
+            "title": "Vault Configured",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "connector_id",
+          "display_name",
+          "category",
+          "description",
+          "auth_type",
+          "host",
+          "installed",
+          "enabled",
+          "auth_status",
+          "vault_configured",
+          "activity_status",
+          "active_operation",
+          "last_invoked_at",
+          "operations"
+        ],
+        "title": "StoreConnector",
         "type": "object"
       },
       "SubscriptionLimitsView": {
@@ -17014,6 +20703,86 @@
           "state"
         ],
         "title": "VaultStatus",
+        "type": "object"
+      },
+      "WebBlocklist": {
+        "description": "The rules in force, by source, so the page knows which it may delete.",
+        "properties": {
+          "address_guard": {
+            "$ref": "#/components/schemas/AddressGuard"
+          },
+          "builtin": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Builtin",
+            "type": "array"
+          },
+          "effective_count": {
+            "title": "Effective Count",
+            "type": "integer"
+          },
+          "environment": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Environment",
+            "type": "array"
+          },
+          "environment_variable": {
+            "title": "Environment Variable",
+            "type": "string"
+          },
+          "stored": {
+            "items": {
+              "$ref": "#/components/schemas/WebBlocklistRule"
+            },
+            "title": "Stored",
+            "type": "array"
+          }
+        },
+        "required": [
+          "stored",
+          "environment",
+          "environment_variable",
+          "builtin",
+          "effective_count",
+          "address_guard"
+        ],
+        "title": "WebBlocklist",
+        "type": "object"
+      },
+      "WebBlocklistRule": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_id",
+          "rule",
+          "kind",
+          "note",
+          "created_at"
+        ],
+        "title": "WebBlocklistRule",
         "type": "object"
       },
       "WeeklyBudgetSet": {
@@ -19294,9 +23063,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Channels Api Channels Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ChannelsView"
                 }
               }
             },
@@ -19325,9 +23092,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Deliver Channel Test Api Channels Deliver Test Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ChannelTestDelivered"
                 }
               }
             },
@@ -19366,9 +23131,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Pair Channel Api Channels Pairings Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ChannelPaired"
                 }
               }
             },
@@ -19407,9 +23170,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Unpair Channel Api Channels Pairings  Pairing Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ChannelUnpaired"
                 }
               }
             },
@@ -19458,9 +23219,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Channel Enabled Api Channels Pairings  Pairing Id  Enabled Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ChannelEnabledSet"
                 }
               }
             },
@@ -19509,9 +23268,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Channel Routing Api Channels Pairings  Pairing Id  Routing Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ChannelRoutingSet"
                 }
               }
             },
@@ -19561,9 +23318,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Channel Senders Api Channels Pairings  Pairing Id  Senders Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ChannelSendersSet"
                 }
               }
             },
@@ -19629,9 +23384,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Receive Approval Response Api Channels  Connector Id  Approval Response Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ApprovalRelayAnswered"
                 }
               }
             },
@@ -19696,9 +23449,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Receive Inbound Api Channels  Connector Id  Inbound Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ChannelInboundAccepted"
                 }
               }
             },
@@ -19766,9 +23517,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Receive Telegram Api Channels  Connector Id  Telegram Post",
-                  "type": "object"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ChannelInboundAccepted"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ChannelUpdateIgnored"
+                    }
+                  ]
                 }
               }
             },
@@ -20123,9 +23879,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Code Map Status Api Code Map Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CodeMapStatus"
                 }
               }
             },
@@ -20166,9 +23920,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Code Map Paths Api Code Map Paths Get",
-                  "type": "object"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CodeMapPaths"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CodeMapFailure"
+                    }
+                  ]
                 }
               }
             },
@@ -20197,9 +23956,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Rebuild Code Map Api Code Map Rebuild Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CodeMapRebuilt"
                 }
               }
             },
@@ -20245,9 +24002,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Connect Code Repo Api Code Repos Post",
-                  "type": "object"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/LocalRepoConnected"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GithubRepoConnected"
+                    }
+                  ]
                 }
               }
             },
@@ -20286,9 +24048,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Select Code Repo Api Code Repos Selection Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CodeRepoSelected"
                 }
               }
             },
@@ -20328,9 +24088,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Disconnect Code Repo Api Code Repos  Repo Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CodeRepoDisconnected"
                 }
               }
             },
@@ -20379,9 +24137,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Browse Code Repo Api Code Repos  Repo Id  Browse Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CodeRepoBrowseView"
                 }
               }
             },
@@ -20421,9 +24177,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Read Code Repo Changes Api Code Repos  Repo Id  Changes Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CodeRepoChangesView"
                 }
               }
             },
@@ -20473,9 +24227,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Read Code Repo Diagnostics Api Code Repos  Repo Id  Diagnostics Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CodeRepoDiagnosticsView"
                 }
               }
             },
@@ -20525,9 +24277,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Read Code Repo File Api Code Repos  Repo Id  File Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CodeRepoFileView"
                 }
               }
             },
@@ -20574,9 +24324,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Commands Api Command Runs Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandRunList"
                 }
               }
             },
@@ -20615,9 +24363,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Command Api Command Runs  Run Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandRunDetail"
                 }
               }
             },
@@ -20667,9 +24413,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Command Output Api Command Runs  Run Id  Output Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandOutput"
                 }
               }
             },
@@ -20708,9 +24452,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Command Receipt Api Command Runs  Run Id  Receipt Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandReceiptAnswer"
                 }
               }
             },
@@ -20749,9 +24491,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Stop Command Api Command Runs  Run Id  Stop Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandStopped"
                 }
               }
             },
@@ -20798,9 +24538,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Connector Store Api Connector Store Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConnectorStoreView"
                 }
               }
             },
@@ -20829,9 +24567,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Uninstall Connector Api Connector Store  Connector Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConnectorUninstalled"
                 }
               }
             },
@@ -20931,9 +24667,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Connector Credentials Api Connector Store  Connector Id  Credentials Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConnectorCredentialsSet"
                 }
               }
             },
@@ -20981,9 +24715,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Connector Enabled Api Connector Store  Connector Id  Enabled Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConnectorEnabledSet"
                 }
               }
             },
@@ -21022,9 +24754,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Install Connector Api Connector Store  Connector Id  Install Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConnectorInstalled"
                 }
               }
             },
@@ -21073,9 +24803,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Register Connector Manifest Api Connector Store  Connector Id  Manifest Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ManifestRegistered"
                 }
               }
             },
@@ -21117,9 +24845,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Credential Deltas Api Credential Deltas Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CredentialDeltaList"
                 }
               }
             },
@@ -21170,9 +24896,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Discard Credential Delta Api Credential Deltas  Run Id  Discard Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CredentialDeltaDiscarded"
                 }
               }
             },
@@ -21569,9 +25293,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Git Credential Api Git Credential Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/GitCredentialStatus"
                 }
               }
             },
@@ -21606,9 +25328,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Git Credential Api Git Credential Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/GitCredentialStatus"
                 }
               }
             },
@@ -21645,9 +25365,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Put Git Credential Api Git Credential Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/GitCredentialStatus"
                 }
               }
             },
@@ -21676,9 +25394,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Revoke Git Credential Api Git Credential Grant Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/GitCredentialStatus"
                 }
               }
             },
@@ -21705,9 +25421,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Grant Git Credential Api Git Credential Grant Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/GitCredentialStatus"
                 }
               }
             },
@@ -21818,9 +25532,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Hooks Api Hooks Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HooksView"
                 }
               }
             },
@@ -22771,9 +26483,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Mcp Agent Access Api Mcp Agent Access Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/McpAgentAccess"
                 }
               }
             },
@@ -22793,10 +26503,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/McpOffer"
                   },
-                  "title": "Response List Mcp Offers Api Mcp Offers Get",
                   "type": "array"
                 }
               }
@@ -22846,9 +26554,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Mcp Server Api Mcp Servers Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/McpServerCreated"
                 }
               }
             },
@@ -22887,9 +26593,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Remote Mcp Server Api Mcp Servers Remote Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RemoteMcpServerCreated"
                 }
               }
             },
@@ -22929,9 +26633,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Mcp Server Api Mcp Servers  Server Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/McpServerDeleted"
                 }
               }
             },
@@ -22979,9 +26681,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Rename Mcp Server Api Mcp Servers  Server Id  Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/McpServerRenamed"
                 }
               }
             },
@@ -23021,9 +26721,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Connect Mcp Server Api Mcp Servers  Server Id  Connect Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/McpServerConnected"
                 }
               }
             },
@@ -23123,9 +26821,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Kill Mcp Server Api Mcp Servers  Server Id  Kill Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/McpContainment"
                 }
               }
             },
@@ -23182,9 +26878,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Pause Mcp Server Api Mcp Servers  Server Id  Pause Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/McpContainment"
                 }
               }
             },
@@ -23224,9 +26918,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Resume Mcp Server Api Mcp Servers  Server Id  Resume Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/McpContainment"
                 }
               }
             },
@@ -26297,9 +29989,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Plugins Api Plugins Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PluginsView"
                 }
               }
             },
@@ -29095,9 +32785,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Skills Api Skills Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SkillList"
                 }
               }
             },
@@ -29123,9 +32811,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Upload Skill Api Skills Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SkillInstalled"
                 }
               }
             },
@@ -29164,9 +32850,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Build Skill Api Skills Build Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SkillInstalled"
                 }
               }
             },
@@ -29204,9 +32888,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Import Skill Url Api Skills Import Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SkillInstalled"
                 }
               }
             },
@@ -29245,9 +32927,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Verify Skill Url Api Skills Verify Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SkillVerification"
                 }
               }
             },
@@ -29286,9 +32966,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Skill Api Skills  Skill Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SkillDeleted"
                 }
               }
             },
@@ -29335,9 +33013,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Rename Skill Api Skills  Skill Id  Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SkillRenamed"
                 }
               }
             },
@@ -29387,9 +33063,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Skill Active Api Skills  Skill Id  Active Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SkillActiveSet"
                 }
               }
             },
@@ -29438,9 +33112,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Skill Command Api Skills  Skill Id  Command Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SkillCommandSet"
                 }
               }
             },
@@ -30427,9 +34099,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Blocklist Api Web Access Blocklist Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/WebBlocklist"
                 }
               }
             },
@@ -30456,9 +34126,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Add Blocklist Rule Api Web Access Blocklist Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BlocklistRuleAdded"
                 }
               }
             },
@@ -30497,9 +34165,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Test Blocklist Api Web Access Blocklist Test Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BlocklistProbe"
                 }
               }
             },
@@ -30538,11 +34204,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "boolean"
-                  },
-                  "title": "Response Delete Blocklist Rule Api Web Access Blocklist  Rule Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BlocklistRuleDeleted"
                 }
               }
             },

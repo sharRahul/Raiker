@@ -15,8 +15,15 @@ from pydantic import Field
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import workspace_root as _ws
-from raiker.api.schemas import StrictRequest
+from raiker.api.schemas import StrictRequest, serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.egress import (
+    BlocklistProbe,
+    BlocklistRuleAdded,
+    BlocklistRuleDeleted,
+    WebBlocklist,
+    blocklist_rule,
+)
 from raiker.runtime.authority.models import Principal
 from raiker.runtime.git_credential import GitCredentialBroker, GitCredentialError
 from raiker.runtime.web_policy import (
@@ -71,8 +78,10 @@ async def get_blocklist(
     """
     session, _principal = auth_data
     store = _store(request)
-    return {
-        "stored": store.list_web_blocklist(principal_id=session.principal_id),
+    answer: WebBlocklist = {
+        "stored": [
+            blocklist_rule(row) for row in store.list_web_blocklist(principal_id=session.principal_id)
+        ],
         "environment": [rule.raw for rule in env_blocklist()],
         "environment_variable": BLOCKLIST_ENV,
         "builtin": list(DEFAULT_BLOCKED_NAMES),
@@ -90,6 +99,7 @@ async def get_blocklist(
             ),
         },
     }
+    return serialize_dto(answer)
 
 
 @router.post("/api/web-access/blocklist", status_code=status.HTTP_201_CREATED)
@@ -110,7 +120,8 @@ async def add_blocklist_rule(
         rule.raw, rule.kind,
         principal_id=session.principal_id, note=body.note, created_by=session.principal_id,
     )
-    return {"rule_id": rule_id, "rule": rule.raw, "kind": rule.kind}
+    added: BlocklistRuleAdded = {"rule_id": rule_id, "rule": rule.raw, "kind": rule.kind}
+    return serialize_dto(added)
 
 
 @router.delete("/api/web-access/blocklist/{rule_id}")
@@ -118,14 +129,15 @@ async def delete_blocklist_rule(
     rule_id: str,
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
-) -> dict[str, bool]:
+) -> dict[str, Any]:
     session, _principal = auth_data
     removed = _store(request).delete_web_blocklist_rule(
         rule_id, principal_id=session.principal_id
     )
     if not removed:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="unknown_rule")
-    return {"deleted": True}
+    deleted: BlocklistRuleDeleted = {"deleted": True}
+    return serialize_dto(deleted)
 
 
 @router.post("/api/web-access/blocklist/test")
@@ -142,7 +154,7 @@ async def test_blocklist(
     """
     session, _principal = auth_data
     decision = evaluate_host(body.host, load_blocklist(_store(request), session.principal_id))
-    return {
+    probe: BlocklistProbe = {
         "host": body.host,
         "allowed": decision.allowed,
         "reason": decision.reason_code,
@@ -150,6 +162,7 @@ async def test_blocklist(
         # own DNS answer, not content from the host.
         "addresses": list(decision.addresses),
     }
+    return serialize_dto(probe)
 
 
 # ── Git credential and grants ────────────────────────────────────────────────
@@ -167,7 +180,7 @@ async def get_git_credential(
 ) -> dict[str, Any]:
     """Whether a token is stored and what is currently approved. Never the token."""
     session, _principal = auth_data
-    return _broker(request, session).status(session_id=session_id)
+    return serialize_dto(_broker(request, session).status(session_id=session_id))
 
 
 @router.put("/api/git-credential")
@@ -185,7 +198,7 @@ async def put_git_credential(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.reason
         ) from None
-    return broker.status()
+    return serialize_dto(broker.status())
 
 
 @router.delete("/api/git-credential")
@@ -196,7 +209,7 @@ async def delete_git_credential(
     session, _principal = auth_data
     broker = _broker(request, session)
     broker.forget_token()
-    return broker.status()
+    return serialize_dto(broker.status())
 
 
 @router.post("/api/git-credential/grant")
@@ -214,7 +227,7 @@ async def grant_git_credential(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=exc.reason
         ) from None
-    return broker.status(session_id=body.session_id)
+    return serialize_dto(broker.status(session_id=body.session_id))
 
 
 @router.delete("/api/git-credential/grant")
@@ -225,4 +238,4 @@ async def revoke_git_credential(
     session, _principal = auth_data
     broker = _broker(request, session)
     broker.revoke()
-    return broker.status()
+    return serialize_dto(broker.status())

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, NotRequired
 
 from typing_extensions import TypedDict
 
@@ -181,12 +181,24 @@ class ConnectionsView(View):
     connector_egress_allowlist_configured: bool
 
 
-def _env_requirements(raw: dict[str, Any]) -> list[dict[str, Any]]:
+class ChannelEnvRequirement(TypedDict):
+    """One environment variable a channel transport declares that it needs."""
+
+    name: str
+    description: str
+    url: str | None
+    secret: bool
+    required: bool
+    #: Whether it is set. Never what it is set to.
+    present: bool
+
+
+def _env_requirements(raw: dict[str, Any]) -> list[ChannelEnvRequirement]:
     """The environment variables a channel transport declares, and whether each
     is set — never what it is set to."""
     import os as _os
 
-    out: list[dict[str, Any]] = []
+    out: list[ChannelEnvRequirement] = []
     for key, required in (("requires_env", True), ("optional_env", False)):
         for entry in raw.get(key) or []:
             if not isinstance(entry, dict) or not entry.get("name"):
@@ -203,3 +215,220 @@ def _env_requirements(raw: dict[str, Any]) -> list[dict[str, Any]]:
                 }
             )
     return out
+
+
+class McpOffer(TypedDict):
+    """An MCP server an installed plugin offers. Inert until the owner adds it (BUG-221)."""
+
+    plugin_id: str
+    name: str
+    transport: Literal["http", "stdio"]
+    description: str
+    endpoint_url: NotRequired[str]
+    auth_ref: NotRequired[str | None]
+    template: NotRequired[str]
+    already_added: bool
+
+
+class HookHandlerView(TypedDict):
+    id: str
+    type: str
+    #: The argv or builtin name, already joined for display.
+    target: str
+    timeout_ms: int
+    decision_authority: bool
+    #: False for a builtin this build does not ship, or an ``http`` destination
+    #: the owner's egress grant does not cover: the rule matches, nothing runs.
+    available: bool
+    #: ``egress_not_granted`` or ``builtin_not_in_this_build``; empty when available.
+    unavailable_reason: str
+
+
+class HookRuleView(TypedDict):
+    rule_id: str
+    event: str
+    event_summary: str
+    matcher: str
+    if_guard: str | None
+    scope: str
+    source: str | None
+    #: False when this build never emits the event, so the rule cannot fire.
+    dispatched: bool
+    #: True only when the runtime honours the event's decision and a handler holds authority.
+    can_decide: bool
+    handlers: list[HookHandlerView]
+
+
+class HookEventView(TypedDict):
+    event: str
+    summary: str
+    dispatched: bool
+    can_decide: bool
+
+
+class HookActivityView(TypedDict):
+    event_id: str
+    event_type: str
+    session_id: str
+    timestamp: str
+    summary: str | None
+
+
+class HookSourceView(TypedDict):
+    path: str
+    scope: str
+    exists: bool
+    loaded: bool
+    rule_count: int
+    #: Why the file contributed nothing. Null when it loaded or is absent.
+    error: str | None
+
+
+class HooksView(TypedDict):
+    """Configured hooks, whether each can fire or decide, and what they have done."""
+
+    #: False when nothing is configured or the owner turned hooks off.
+    active: bool
+    disabled: bool
+    rule_count: int
+    rules: list[HookRuleView]
+    sources: list[HookSourceView]
+    failed_sources: list[HookSourceView]
+    events: list[HookEventView]
+    builtins: list[str]
+    activity: list[HookActivityView]
+    activity_counts: dict[str, int]
+
+
+class PluginSignatureView(TypedDict):
+    """What a plugin manifest's signature actually proved (BUG-79)."""
+
+    level: Literal["verified", "present_only", "unsigned"]
+    label: str
+    reason: str
+    method: str
+    verified: bool
+    explanation: str
+    remediation: str
+
+
+class PluginContributions(TypedDict):
+    """What a plugin provides, read from the files the runtime loads (BUG-221)."""
+
+    hooks: int
+    events: list[str]
+    skills: int
+    skill_names: list[str]
+    mcp_servers: int
+    mcp_server_names: list[str]
+    #: ``unreadable`` when a contributed file exists and could not be parsed.
+    error: str | None
+
+
+class PluginCodeRuntime(TypedDict):
+    """BUG-308 — where this plugin's own code would run on this machine."""
+
+    where: Literal["not_enabled", "isolated", "host_network"]
+    summary: str
+
+
+class InstalledPlugin(TypedDict):
+    record_id: str
+    plugin_id: str
+    version: str
+    trust_level: str
+    status: str
+    source_url: str | None
+    installed_at: str
+    installed_by: str
+    checksum_present: bool
+    code_runtime: PluginCodeRuntime
+    signature: PluginSignatureView
+    contributions: PluginContributions
+
+
+class PluginSigning(TypedDict):
+    configured: bool
+    hmac_key_set: bool
+    publisher_key_set: bool
+    summary: str
+    remediation: str
+
+
+class PluginContributionKind(TypedDict):
+    """A kind of contribution, and whether this build accepts it yet."""
+
+    kind: str
+    available: bool
+    summary: str
+
+
+class PluginsView(TypedDict):
+    plugins: list[InstalledPlugin]
+    signing: PluginSigning
+    contribution_kinds: list[PluginContributionKind]
+
+
+ChannelRoutingMode = Literal["record_only", "new_turn", "side_question", "interrupt"]
+
+
+class ChannelProfile(TypedDict):
+    """One connector profile, and each separate fact about it (BUG-225)."""
+
+    connector_id: str
+    channel_type: str
+    display_name: str
+    transport: str
+    auth_method: str
+    default_state: str
+    requires_pairing: bool
+    requires_sender_allowlist: bool
+    requires_network: bool
+    #: Is there a pairing at all.
+    linked: bool
+    #: Is that pairing switched on. Linked is not enabled.
+    enabled: bool
+    pairing_id: str | None
+    display_label: str | None
+    sender_count: int
+    #: The owner's own allowlist, returned to the owner so routing can name one.
+    senders: list[str]
+    routing_mode: ChannelRoutingMode
+    target_session_id: str | None
+    owner_sender_id: str | None
+    approval_relay_enabled: bool
+    supports_side_questions: bool
+    supports_interrupts: bool
+    supports_approvals: bool
+    env_requirements: list[ChannelEnvRequirement]
+
+
+class ChannelsOutbound(TypedDict):
+    """Empty when the connector registry could not be read."""
+
+    capability: NotRequired[str]
+    gate_state: NotRequired[str]
+    runtime_enabled: NotRequired[bool]
+    #: RAIKER_CHANNEL_EGRESS_ALLOWLIST names at least one host. Fail-closed.
+    egress_configured: NotRequired[bool]
+    egress_host_count: NotRequired[int]
+    #: RAIKER_CHANNEL_OUTBOUND_SECRET is set, so deliveries carry an HMAC.
+    signing_configured: NotRequired[bool]
+
+
+class ChannelsInbound(TypedDict):
+    """Empty when the connector registry could not be read."""
+
+    #: RAIKER_CHANNEL_INBOUND_SECRET is set. Without it the receiver refuses.
+    secret_configured: NotRequired[bool]
+    #: Messages per sender per minute.
+    rate_limit_per_minute: NotRequired[int]
+    quarantined: NotRequired[bool]
+    instructions_inert: NotRequired[bool]
+
+
+class ChannelsView(TypedDict):
+    profiles: list[ChannelProfile]
+    error: str | None
+    outbound: ChannelsOutbound
+    inbound: ChannelsInbound

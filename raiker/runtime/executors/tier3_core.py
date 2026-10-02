@@ -312,7 +312,7 @@ class CodeMapIndexExecutor:
                 reason_code=f"unknown_operation:{operation}",
                 summary="Code map executor supports 'build' and 'refresh'.",
             )
-        result = service.build()
+        result = dict(service.build())
         status = str(result.get("status", ""))
         if status in ("indexed", "partial"):
             return ExecutionResult(

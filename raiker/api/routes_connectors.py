@@ -2,21 +2,31 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import Field
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import workspace_root as _ws
-from raiker.api.schemas import StrictRequest
+from raiker.api.schemas import StrictRequest, serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.connectors import (
+    ConnectorCredentialsSet,
+    ConnectorEnabledSet,
+    ConnectorInstalled,
+    ConnectorStoreView,
+    ConnectorUninstalled,
+    ManifestRegistered,
+    StoreConnector,
+)
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ToolAction
 from raiker.runtime.authority.models import Principal
 from raiker.runtime.connector_ecosystem import (
     ConnectorCatalog,
     ConnectorInvoker,
+    ConnectorOperation,
     ConnectorVault,
     compile_manifest,
     credential_status,
@@ -66,7 +76,7 @@ async def connector_store(
 ) -> dict[str, Any]:
     session, _principal = _auth_data
     store = SQLiteStore(_ws(request))
-    items: list[dict[str, Any]] = []
+    items: list[StoreConnector] = []
     for definition in ConnectorCatalog().list():
         installed = _installation(store, session.principal_id, definition.connector_id)
         credential = _credential_meta(store, session.principal_id, definition.connector_id)
@@ -81,14 +91,14 @@ async def connector_store(
                 "SELECT manifest_json FROM connector_manifests WHERE connector_id=?",
                 (definition.connector_id,),
             ).fetchone()
-        operations: list[dict[str, Any]] = []
+        operations: list[ConnectorOperation] = []
         if manifest_row:
             try:
                 operations = compile_manifest(json.loads(manifest_row["manifest_json"]))["operations"]
             except (ValueError, json.JSONDecodeError):
                 operations = []
         items.append(
-            {
+            cast(StoreConnector, {
                 "connector_id": definition.connector_id,
                 "display_name": definition.name,
                 "category": definition.category,
@@ -103,9 +113,12 @@ async def connector_store(
                 "active_operation": activity["operation_id"] if activity else None,
                 "last_invoked_at": activity["started_at"] if activity else None,
                 "operations": operations,
-            }
+            })
         )
-    return {"connectors": items, "count": len(items), "vault_configured": ConnectorVault(store).configured()}
+    answer: ConnectorStoreView = {
+        "connectors": items, "count": len(items), "vault_configured": ConnectorVault(store).configured()
+    }
+    return serialize_dto(answer)
 
 
 @router.post("/api/connector-store/{connector_id}/install")
@@ -129,7 +142,10 @@ async def install_connector(
                ON CONFLICT(principal_id, connector_id) DO UPDATE SET updated_at=excluded.updated_at""",
             (session.principal_id, connector_id, now, now),
         )
-    return {"ok": True, "connector_id": connector_id, "installed": True, "enabled": False}
+    installed: ConnectorInstalled = {
+        "ok": True, "connector_id": connector_id, "installed": True, "enabled": False
+    }
+    return serialize_dto(installed)
 
 
 @router.delete("/api/connector-store/{connector_id}")
@@ -151,7 +167,8 @@ async def uninstall_connector(
         )
     if cursor.rowcount == 0:
         raise HTTPException(status_code=404, detail={"reason_code": "connector_not_installed"})
-    return {"ok": True, "connector_id": connector_id, "installed": False}
+    removed: ConnectorUninstalled = {"ok": True, "connector_id": connector_id, "installed": False}
+    return serialize_dto(removed)
 
 
 @router.put("/api/connector-store/{connector_id}/enabled")
@@ -173,7 +190,8 @@ async def set_connector_enabled(
         )
     if cursor.rowcount == 0:
         raise HTTPException(status_code=404, detail={"reason_code": "connector_not_installed"})
-    return {"ok": True, "connector_id": connector_id, "enabled": enabled}
+    toggled: ConnectorEnabledSet = {"ok": True, "connector_id": connector_id, "enabled": enabled}
+    return serialize_dto(toggled)
 
 
 @router.put("/api/connector-store/{connector_id}/credentials")
@@ -197,7 +215,10 @@ async def set_connector_credentials(
             "UPDATE connector_installations SET auth_status='connected', updated_at=? WHERE principal_id=? AND connector_id=?",
             (utc_now(), session.principal_id, connector_id),
         )
-    return {"ok": True, "connector_id": connector_id, "auth_status": "connected"}
+    credited: ConnectorCredentialsSet = {
+        "ok": True, "connector_id": connector_id, "auth_status": "connected"
+    }
+    return serialize_dto(credited)
 
 
 @router.post("/api/connector-store/{connector_id}/manifest")
@@ -225,7 +246,11 @@ async def register_connector_manifest(
                installed_at=excluded.installed_at""",
             (connector_id, raw, digest, session.principal_id, utc_now()),
         )
-    return {"ok": True, "connector_id": connector_id, "manifest_sha256": digest, **compiled}
+    registered = cast(
+        ManifestRegistered,
+        {"ok": True, "connector_id": connector_id, "manifest_sha256": digest, **compiled},
+    )
+    return serialize_dto(registered)
 
 
 @router.post("/api/connector-store/{connector_id}/actions")

@@ -2079,13 +2079,15 @@ class ToolBroker:
                     ):
                         from raiker.runtime.connector_ecosystem import ConnectorInvoker
 
+                        method: str | None
                         try:
                             operation, _base = ConnectorInvoker(self.store)._operation(
                                 connector_id, operation_id
                             )
+                            method = operation["method"]
                         except ValueError:
-                            operation = {}
-                        if operation.get("method") in {"POST", "PUT", "PATCH", "DELETE"}:
+                            method = None
+                        if method in {"POST", "PUT", "PATCH", "DELETE"}:
                             with self.store.connect() as connection:
                                 connection.execute(
                                 """INSERT INTO connector_write_intents

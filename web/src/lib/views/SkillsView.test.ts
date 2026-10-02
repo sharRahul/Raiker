@@ -27,6 +27,16 @@ function skill(partial: Partial<SkillView> = {}): SkillView {
     byte_size: 4096,
     created_at: "2026-08-01T00:00:00Z",
     updated_at: "2026-08-01T00:00:00Z",
+    command_trigger: null,
+    conformance: {
+      conformant: true,
+      spec_url: "https://agentskills.io/specification",
+      findings: [],
+      license: "",
+      compatibility: "",
+      metadata: {},
+      refused_allowed_tools: [],
+    },
     ...partial,
   };
 }
@@ -356,7 +366,9 @@ describe("SkillsView — Agent Skills standard conformance", () => {
   });
 
   it("renders nothing about the standard when the payload did not measure", async () => {
-    stubFetch({ "GET /api/skills": { skills: [skill()] } });
+    // The server always measures now; the client still reads a payload that did
+    // not (an older host) as "not measured" rather than as a pass.
+    stubFetch({ "GET /api/skills": { skills: [{ ...skill(), conformance: undefined }] } });
     render(SkillsView);
     await screen.findByText("algorithm-creator");
     expect(screen.queryByText("standard")).toBeNull();

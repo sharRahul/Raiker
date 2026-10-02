@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import base64
 import binascii
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
@@ -35,6 +35,15 @@ from raiker.api.schemas import (
     serialize_dto,
 )
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.skills import (
+    SkillActiveSet,
+    SkillCommandSet,
+    SkillDeleted,
+    SkillInstalled,
+    SkillList,
+    SkillRenamed,
+    SkillVerification,
+)
 from raiker.runtime.authority.models import Principal
 from raiker.skills.package import MAX_BUNDLE_BYTES
 from raiker.skills.service import SkillsService
@@ -96,7 +105,10 @@ async def list_skills(
     The response carries metadata and the owner's active choice — never the
     stored archive, which is only read on an explicit download.
     """
-    return {"skills": serialize_dto(_service(request).list_skills(auth_data[0].principal_id))}
+    answer: SkillList = {
+        "skills": [skill.to_dict() for skill in _service(request).list_skills(auth_data[0].principal_id)]
+    }
+    return serialize_dto(answer)
 
 
 @router.post("/api/skills")
@@ -111,9 +123,11 @@ async def upload_skill(
         data = base64.b64decode(body.data_base64, validate=True)
     except (binascii.Error, ValueError) as exc:
         raise refusal(status.HTTP_400_BAD_REQUEST, "invalid_base64") from exc
-    return _result(
-        _service(request).install_upload(auth_data[0].principal_id, body.filename, data)
+    installed = cast(
+        SkillInstalled,
+        _result(_service(request).install_upload(auth_data[0].principal_id, body.filename, data)),
     )
+    return serialize_dto(installed)
 
 
 @router.post("/api/skills/verify")
@@ -127,7 +141,10 @@ async def verify_skill_url(
     This is what Chat and Build call when a skill link is pasted, so the owner
     installs against the document's own name and description rather than a URL.
     """
-    return _result(_service(request).verify_url(auth_data[0].principal_id, body.url))
+    verified = cast(
+        SkillVerification, _result(_service(request).verify_url(auth_data[0].principal_id, body.url))
+    )
+    return serialize_dto(verified)
 
 
 @router.post("/api/skills/import")
@@ -136,7 +153,11 @@ async def import_skill_url(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _result(_service(request).import_from_url(auth_data[0].principal_id, body.url))
+    imported = cast(
+        SkillInstalled,
+        _result(_service(request).import_from_url(auth_data[0].principal_id, body.url)),
+    )
+    return serialize_dto(imported)
 
 
 @router.post("/api/skills/build")
@@ -146,15 +167,19 @@ async def build_skill(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Install a skill Raiker authored. Held to the same contract as an upload."""
-    return _result(
-        _service(request).build_skill(
-            auth_data[0].principal_id,
-            body.name,
-            body.description,
-            body.body,
-            body.command_trigger,
-        )
+    built = cast(
+        SkillInstalled,
+        _result(
+            _service(request).build_skill(
+                auth_data[0].principal_id,
+                body.name,
+                body.description,
+                body.body,
+                body.command_trigger,
+            )
+        ),
     )
+    return serialize_dto(built)
 
 
 @router.get("/api/skills/{skill_id}/download")
@@ -186,7 +211,10 @@ async def rename_skill(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _result(_service(request).rename(auth_data[0].principal_id, skill_id, body.name))
+    renamed = cast(
+        SkillRenamed, _result(_service(request).rename(auth_data[0].principal_id, skill_id, body.name))
+    )
+    return serialize_dto(renamed)
 
 
 @router.put("/api/skills/{skill_id}/active")
@@ -198,9 +226,11 @@ async def set_skill_active(
 ) -> dict[str, Any]:
     """Turn one skill on or off. A deactivated skill stays stored and is
     withheld from every turn until the owner turns it back on."""
-    return _result(
-        _service(request).set_active(auth_data[0].principal_id, skill_id, body.active)
+    toggled = cast(
+        SkillActiveSet,
+        _result(_service(request).set_active(auth_data[0].principal_id, skill_id, body.active)),
     )
+    return serialize_dto(toggled)
 
 
 @router.put("/api/skills/{skill_id}/command")
@@ -210,11 +240,15 @@ async def set_skill_command(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _result(
-        _service(request).set_command(
-            auth_data[0].principal_id, skill_id, body.command_trigger
-        )
+    commanded = cast(
+        SkillCommandSet,
+        _result(
+            _service(request).set_command(
+                auth_data[0].principal_id, skill_id, body.command_trigger
+            )
+        ),
     )
+    return serialize_dto(commanded)
 
 
 @router.delete("/api/skills/{skill_id}")
@@ -223,4 +257,5 @@ async def delete_skill(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _result(_service(request).delete(auth_data[0].principal_id, skill_id))
+    deleted = cast(SkillDeleted, _result(_service(request).delete(auth_data[0].principal_id, skill_id)))
+    return serialize_dto(deleted)

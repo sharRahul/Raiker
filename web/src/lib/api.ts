@@ -2,26 +2,12 @@ import type {
   ConversionQuantization,
   AgentResponse,
   ApprovalDetailView,
-  ChannelsView,
-  CodeMapPaths,
-  CodeMapStatus,
-  CodeRepoBrowseView,
-  CodeRepoChangesView,
-  CodeRepoDiagnosticsView,
-  CodeRepoFileView,
-  CommandChunkView,
-  CommandReceiptView,
-  CommandRunView,
   ComposerApprovalModeSettings,
-  ConnectorStoreView,
-  CredentialDeltaView,
   DiagnosticsExport,
   ExecutionEnvironment,
   ExecutionEnvironmentsView,
-  GitCredentialStatus,
   GuideIndex,
   GuideSection,
-  HooksView,
   HostActionResult,
   HostPathListing,
   HostStatusView,
@@ -31,29 +17,19 @@ import type {
   KnowledgeSourceKind,
   ManagedFileScope,
   ManagedFileUpload,
-  McpAgentAccess,
-  McpOffer,
-  McpServer,
-  McpSession,
   MemoryControlView,
   ModelOperation,
   ModelSetupState,
-  PluginsView,
   ProjectContext,
   PromptRequestBody,
   SessionSummary,
   SetupState,
-  SkillMutationResult,
-  SkillVerification,
-  SkillView,
   SpeechRuntimeChange,
   StopAllResult,
   UpdateApplyResult,
   UpdateCheckResult,
   UpdateStatusView,
   UploadedAttachment,
-  WebBlocklist,
-  WebBlocklistProbe,
 } from "./apiTypes";
 import type { ApprovalMode } from "./approvalMode";
 import { restoreSession } from "./api/auth";
@@ -154,7 +130,6 @@ export const api = {
   clearVaultKey: (mfaCode?: string) => contract.deleteVaultKey(mfaCode || undefined),
 
   // ── Read-only governed views ──
-  // ── Read-only governed views ──
   sessionContextUsage: (sessionId: string) => contract.getSessionContextUsage(sessionId),
   // B6 — the agent's standing plan for one conversation, so a reload or a
   // second tab picks the checklist back up instead of starting blank.
@@ -165,8 +140,6 @@ export const api = {
   // rather than deriving a list of its own, which is the drift the contract
   // exists to remove.
   readCapabilities: () => contract.listReadCapabilities(),
-  // The same bundle a model turn is given. Read rather than
-  // recomputed, so a page and a turn cannot disagree about what time it is.
   // The same bundle a model turn is given. Read rather than
   // recomputed, so a page and a turn cannot disagree about what time it is.
   environment: () => contract.getEnvironment(),
@@ -218,12 +191,7 @@ export const api = {
   // BUG-270 — which local model runtimes are installed on this machine.
   // Detection is a PATH lookup cached in a row, so the read is free and this
   // POST is the owner saying "I just installed one, look again".
-  // BUG-270 — which local model runtimes are installed on this machine.
-  // Detection is a PATH lookup cached in a row, so the read is free and this
-  // POST is the owner saying "I just installed one, look again".
   detectLocalRuntimes: () => contract.detectLocalRuntimes(),
-  // Where each work surface's model picker starts. A preference only: the turn
-  // still names its exact profile and model, and readiness judges that pair.
   // Where each work surface's model picker starts. A preference only: the turn
   // still names its exact profile and model, and readiness judges that pair.
   surfaceModels: () => contract.getSurfaceModels(),
@@ -237,22 +205,8 @@ export const api = {
    * from the selection store, the surface defaults, readiness and the fallback
    * sequence — five correct facts that could not be made to agree.
    */
-  /**
-   * Which model is selected here, and which one will actually run.
-   *
-   * Read by every surface that names a model. Before this, the Models page, the
-   * composer picker, Chat, Build and Design each assembled their own answer
-   * from the selection store, the surface defaults, readiness and the fallback
-   * sequence — five correct facts that could not be made to agree.
-   */
   modelDecision: (surface: string, projectId?: string) =>
     contract.getModelDecision({ surface, ...(projectId ? { project_id: projectId } : {}) }),
-  /**
-   * Every surface's decision in one read. The Models Overview answers "what
-   * powers Chat, Build and Design" as its first fact; asking per surface would
-   * be five separately-timed answers and a page that can show one row from
-   * before a change beside one from after it.
-   */
   /**
    * Every surface's decision in one read. The Models Overview answers "what
    * powers Chat, Build and Design" as its first fact; asking per surface would
@@ -291,10 +245,6 @@ export const api = {
     contract.deletePartialFiles(operationId, { confirmed: true }),
   cleanupModelOperation: (operationId: string) => contract.cleanupModelOperation(operationId),
   saveHuggingFaceCredential: (token: string) => contract.saveHuggingFaceCredential({ token }),
-  // BUG-296 — this probe answers 200 even when the Hub is unreachable, and
-  // names the reason in the body. A 503 here was an uncaught console error on
-  // every Models visit for a host with no route to huggingface.co, which is the
-  // budget that exists to catch real ones.
   // BUG-296 — this probe answers 200 even when the Hub is unreachable, and
   // names the reason in the body. A 503 here was an uncaught console error on
   // every Models visit for a host with no route to huggingface.co, which is the
@@ -365,9 +315,6 @@ export const api = {
   // Read-only status of governed service connectors (never reaches the network;
   // never exposes a credential value). Enabling one is done via the capability
   // gate + decision-mode control plane, not here.
-  // Read-only status of governed service connectors (never reaches the network;
-  // never exposes a credential value). Enabling one is done via the capability
-  // gate + decision-mode control plane, not here.
   connections: () => contract.getConnections(),
   // ── Local MCP servers (Control Deck task 4b) ────────────────────────────
   // Owner-scoped. Create and test-connect run through the governed capability
@@ -377,98 +324,37 @@ export const api = {
   // Read-only listing plus the owner's pairing controls. A test delivery goes
   // through the governed `external_channel_runtime` capability, so a closed gate
   // refuses it exactly as it would refuse a real one.
-  channels: () => request<ChannelsView>("/api/channels"),
+  channels: () => contract.listChannels(),
   pairChannel: (connector_id: string, display_name: string, senders: string[]) =>
-    postJson<{ ok: boolean; pairing_id: string; enabled: boolean }>("/api/channels/pairings", {
-      connector_id,
-      display_name,
-      senders,
-    }),
+    contract.pairChannel({ connector_id, display_name, senders }),
   setChannelEnabled: (pairingId: string, enabled: boolean) =>
-    request<{ ok: boolean; enabled: boolean }>(
-      `/api/channels/pairings/${encodeURIComponent(pairingId)}/enabled`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled }),
-      },
-    ),
+    contract.setChannelEnabled(pairingId, { enabled }),
   setChannelSenders: (pairingId: string, senders: string[]) =>
-    request<{ ok: boolean; sender_count: number }>(
-      `/api/channels/pairings/${encodeURIComponent(pairingId)}/senders`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ senders }),
-      },
-    ),
-  unpairChannel: (pairingId: string) =>
-    request<{ ok: boolean; removed: boolean }>(
-      `/api/channels/pairings/${encodeURIComponent(pairingId)}`,
-      { method: "DELETE" },
-    ),
+    contract.setChannelSenders(pairingId, { senders }),
+  unpairChannel: (pairingId: string) => contract.unpairChannel(pairingId),
   deliverChannelTest: (connector_id: string, url: string, text: string) =>
-    postJson<{ ok: boolean; delivered: boolean }>("/api/channels/deliver-test", {
-      connector_id,
-      url,
-      text,
-    }),
-  mcpServers: () => request<McpServer[]>("/api/mcp/servers"),
+    contract.deliverChannelTest({ connector_id, url, text }),
+  mcpServers: () => contract.listMcpServers(),
   // BUG-221 — servers installed plugins *offer*. An offer is a description, not
   // a connection: adding one posts to the ordinary create routes above, so the
   // capability gate and the audit event apply exactly as they would by hand.
-  mcpOffers: () => request<McpOffer[]>("/api/mcp/offers"),
+  mcpOffers: () => contract.listMcpOffers(),
   // Whether a connected server's tools can actually be called in a turn. The
   // handshake and the agent's reach are separate facts, so the page states both.
-  mcpAgentAccess: () => request<McpAgentAccess>("/api/mcp/agent-access"),
-  createMcpServer: (name: string, template: string) =>
-    postJson<{ ok: boolean; server_id: string | null; name: string | null }>(
-      "/api/mcp/servers",
-      { name, template },
-    ),
-  connectMcpServer: (serverId: string) =>
-    postJson<{ ok: boolean; status: string; tools: string[] }>(
-      `/api/mcp/servers/${encodeURIComponent(serverId)}/connect`,
-      {},
-    ),
-  renameMcpServer: (serverId: string, name: string) =>
-    request<{ ok: boolean; name: string }>(
-      `/api/mcp/servers/${encodeURIComponent(serverId)}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      },
-    ),
-  deleteMcpServer: (serverId: string) =>
-    request<{ ok: boolean; server_id: string }>(
-      `/api/mcp/servers/${encodeURIComponent(serverId)}`,
-      { method: "DELETE" },
-    ),
+  mcpAgentAccess: () => contract.getMcpAgentAccess(),
+  createMcpServer: (name: string, template: string) => contract.createMcpServer({ name, template }),
+  connectMcpServer: (serverId: string) => contract.connectMcpServer(serverId),
+  renameMcpServer: (serverId: string, name: string) => contract.renameMcpServer(serverId, { name }),
+  deleteMcpServer: (serverId: string) => contract.deleteMcpServer(serverId),
   createRemoteMcpServer: (
     name: string,
     endpoint_url: string,
     auth_ref: string | null,
-  ) =>
-    postJson<{ ok: boolean; server_id: string | null; name: string | null }>(
-      "/api/mcp/servers/remote",
-      { name, endpoint_url, auth_ref },
-    ),
-  mcpSessions: (serverId: string) =>
-    request<McpSession[]>(
-      `/api/mcp/servers/${encodeURIComponent(serverId)}/sessions`,
-    ),
+  ) => contract.createRemoteMcpServer({ name, endpoint_url, auth_ref }),
+  mcpSessions: (serverId: string) => contract.listMcpSessions(serverId),
   mcpFindings: (serverId: string) => contract.listMcpFindings(serverId),
-  pauseMcpServer: (serverId: string) =>
-    postJson<{ ok: boolean; monitor_state: string }>(
-      `/api/mcp/servers/${encodeURIComponent(serverId)}/pause`,
-      {},
-    ),
-  resumeMcpServer: (serverId: string) =>
-    postJson<{ ok: boolean; monitor_state: string }>(
-      `/api/mcp/servers/${encodeURIComponent(serverId)}/resume`,
-      {},
-    ),
+  pauseMcpServer: (serverId: string) => contract.pauseMcpServer(serverId),
+  resumeMcpServer: (serverId: string) => contract.resumeMcpServer(serverId),
   notifications: () => contract.listNotifications(),
   markNotificationRead: (id: string) => contract.markNotificationRead(id),
   standingGrants: (includeInactive = true) =>
@@ -484,55 +370,30 @@ export const api = {
     subjectId: string,
     action: "pause" | "kill" | "resume",
   ) => contract.setCapabilityContainment(capability, subjectId, action),
-  plugins: () => request<PluginsView>("/api/plugins"),
+  plugins: () => contract.listPlugins(),
   // Read-only. The hook config files are the owner's own text on disk; this
   // reports what the runtime loaded from them, including one it could not read.
-  hooks: () => request<HooksView>("/api/hooks"),
+  hooks: () => contract.listHooks(),
   verifySecurityCredential: (provider: string) => contract.verifySecurityCredential(provider),
   scanSecurity: () => contract.scanSecurity(),
   checkSecurityHealth: () => contract.checkSecurityHealth(),
   checkPasswordBreach: (password: string, enabled: boolean) =>
     contract.checkPasswordBreach({ password, enabled }),
-  connectorStore: () => request<ConnectorStoreView>("/api/connector-store"),
-  installConnector: (connectorId: string) =>
-    postJson<{ ok: boolean; installed: boolean }>(
-      `/api/connector-store/${encodeURIComponent(connectorId)}/install`,
-      {},
-    ),
-  uninstallConnector: (connectorId: string) =>
-    request<{ ok: boolean; installed: boolean }>(
-      `/api/connector-store/${encodeURIComponent(connectorId)}`,
-      { method: "DELETE" },
-    ),
+  connectorStore: () => contract.connectorStore(),
+  installConnector: (connectorId: string) => contract.installConnector(connectorId),
+  uninstallConnector: (connectorId: string) => contract.uninstallConnector(connectorId),
   setConnectorCredentials: (
     connectorId: string,
     values: Record<string, string>,
     expiresAt?: string,
-  ) =>
-    request<{ ok: boolean; auth_status: string }>(
-      `/api/connector-store/${encodeURIComponent(connectorId)}/credentials`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ values, expires_at: expiresAt || null }),
-      },
-    ),
+  ) => contract.setConnectorCredentials(connectorId, { values, expires_at: expiresAt || null }),
   setConnectorEnabled: (connectorId: string, enabled: boolean) =>
-    request<{ ok: boolean; enabled: boolean }>(
-      `/api/connector-store/${encodeURIComponent(connectorId)}/enabled?enabled=${enabled}`,
-      { method: "PUT" },
-    ),
+    contract.setConnectorEnabled(connectorId, { enabled }),
   registerConnectorManifest: (
     connectorId: string,
     manifest: Record<string, unknown>,
-  ) =>
-    postJson<{ ok: boolean; operations: unknown[] }>(
-      `/api/connector-store/${encodeURIComponent(connectorId)}/manifest`,
-      { manifest },
-    ),
+  ) => contract.registerConnectorManifest(connectorId, { manifest }),
   checkLanguage: (text: string) => contract.checkLanguage({ text, language: "en-US" }),
-  // On-demand listing of the models a provider serves (user-initiated; provider
-  // policy is enforced server-side before any network contact).
   // On-demand listing of the models a provider serves (user-initiated; provider
   // policy is enforced server-side before any network contact).
   providerModels: (profileId: string) => contract.listProviderModels(profileId),
@@ -543,27 +404,16 @@ export const api = {
   // BUG-259 — adopting the subscription is its own act. Reading the status no
   // longer connects anything, so this is the only way a ChatGPT account becomes
   // one of this owner's providers.
-  // BUG-259 — adopting the subscription is its own act. Reading the status no
-  // longer connects anything, so this is the only way a ChatGPT account becomes
-  // one of this owner's providers.
   connectCodexSubscription: () => contract.connectChatgptCodex(),
   disconnectCodexSubscription: () => contract.disconnectChatgptCodex(),
-  // Persist (or clear, with null) the user-owned advisor model profile — the
-  // model a local model may consult through the governed consult_advisor tool.
-  // Gate-manager only, enforced server-side; selecting an advisor grants nothing.
   // Persist (or clear, with null) the user-owned advisor model profile — the
   // model a local model may consult through the governed consult_advisor tool.
   // Gate-manager only, enforced server-side; selecting an advisor grants nothing.
   setModelAdvisor: (profile_id: string | null) => contract.setModelAdvisor({ profile_id }),
   // Persist the operator's model selection (human gate-manager only, enforced
   // server-side; placeholder profiles require a concrete model).
-  // Persist the operator's model selection (human gate-manager only, enforced
-  // server-side; placeholder profiles require a concrete model).
   selectModel: (profile_id: string, model?: string) =>
     contract.setModelSelection({ profile_id, model: model || null }),
-  // `workspaceId` names where an identity-linked key acts (BUG-274). It is not
-  // a credential and is sent as an ordinary field; the server refuses a value
-  // that could not safely become a header before it stores anything.
   // `workspaceId` names where an identity-linked key acts (BUG-274). It is not
   // a credential and is sent as an ordinary field; the server refuses a value
   // that could not safely become a header before it stores anything.
@@ -582,12 +432,7 @@ export const api = {
     }),
   // Persist the user-owned ordered model fallback sequence (human gate-manager only,
   // enforced server-side). Returns the cleaned/de-duplicated sequence.
-  // Persist the user-owned ordered model fallback sequence (human gate-manager only,
-  // enforced server-side). Returns the cleaned/de-duplicated sequence.
   setModelFallback: (profile_ids: string[]) => contract.setModelFallback({ profile_ids }),
-  // Upload one image (base64) into the governed attachment store. Validation
-  // is fail-closed server-side (media-type allowlist, 5 MB cap, magic-byte
-  // sniff); the response is metadata only.
   // Upload one image (base64) into the governed attachment store. Validation
   // is fail-closed server-side (media-type allowlist, 5 MB cap, magic-byte
   // sniff); the response is metadata only.
@@ -656,7 +501,6 @@ export const api = {
   deleteTelemetryDestination: (destinationId: string) =>
     contract.deleteTelemetryDestination(destinationId),
   runTelemetryExport: (destinationId: string) => contract.runTelemetryExport(destinationId),
-  // BUG-276 — put a destination on a cadence the host runs, or take it off one.
   // BUG-276 — put a destination on a cadence the host runs, or take it off one.
   setTelemetryCadence: (destinationId: string, cadence: string) =>
     contract.setTelemetryCadence(destinationId, { cadence }),
@@ -794,33 +638,15 @@ export const api = {
       },
     ),
   commandRuns: (sessionId?: string) =>
-    request<{ runs: CommandRunView[] }>(
-      withQuery("/api/command-runs", { session_id: sessionId }),
-    ),
-  commandRun: (runId: string) =>
-    request<{ run: CommandRunView }>(`/api/command-runs/${encodeURIComponent(runId)}`),
-  commandOutput: (runId: string, after = 0) =>
-    request<{ chunks: CommandChunkView[]; next_after: number }>(
-      withQuery(`/api/command-runs/${encodeURIComponent(runId)}/output`, { after }),
-    ),
-  commandReceipt: (runId: string) =>
-    request<{ receipt: CommandReceiptView | null }>(
-      `/api/command-runs/${encodeURIComponent(runId)}/receipt`,
-    ),
-  stopCommand: (runId: string) =>
-    postJson<{ ok: boolean; run: CommandRunView }>(
-      `/api/command-runs/${encodeURIComponent(runId)}/stop`,
-      {},
-    ),
+    contract.listCommands(sessionId ? { session_id: sessionId } : {}),
+  commandRun: (runId: string) => contract.getCommand(runId),
+  commandOutput: (runId: string, after = 0) => contract.getCommandOutput(runId, { after }),
+  commandReceipt: (runId: string) => contract.getCommandReceipt(runId),
+  stopCommand: (runId: string) => contract.stopCommand(runId),
   credentialDeltas: (profileId: string) =>
-    request<{ deltas: CredentialDeltaView[] }>(
-      withQuery("/api/credential-deltas", { environment_profile_id: profileId }),
-    ),
+    contract.listCredentialDeltas({ environment_profile_id: profileId }),
   discardCredentialDelta: (runId: string, decisionId: string) =>
-    postJson<{ ok: boolean; receipt: Record<string, unknown> }>(
-      `/api/credential-deltas/${encodeURIComponent(runId)}/discard`,
-      { decision_id: decisionId },
-    ),
+    contract.discardCredentialDelta(runId, { decision_id: decisionId }),
   checkpoints: (sessionId?: string, projectId?: string) =>
     contract.listCheckpoints({ session_id: sessionId, project_id: projectId }),
   checkpoint: (id: string) => contract.getCheckpoint(id),
@@ -851,39 +677,15 @@ export const api = {
   // A skill is instruction text the owner installs; it grants no capability and
   // runs nothing. `verifySkillUrl` reads a linked document and reports what it
   // is without storing it, so Chat and Build can offer an informed import.
-  skills: () =>
-    request<{ skills: SkillView[] }>("/api/skills").then((body) => body.skills),
+  skills: () => contract.listSkills().then((body) => body.skills),
   uploadSkill: (filename: string, data_base64: string) =>
-    postJson<SkillMutationResult>("/api/skills", { filename, data_base64 }),
-  verifySkillUrl: (url: string) =>
-    postJson<SkillVerification>("/api/skills/verify", { url }),
-  importSkillUrl: (url: string) =>
-    postJson<SkillMutationResult>("/api/skills/import", { url }),
+    contract.uploadSkill({ filename, data_base64 }),
+  verifySkillUrl: (url: string) => contract.verifySkillUrl({ url }),
+  importSkillUrl: (url: string) => contract.importSkillUrl({ url }),
   buildSkill: (name: string, description: string, body: string, command_trigger?: string) =>
-    postJson<SkillMutationResult>("/api/skills/build", {
-      name,
-      description,
-      body,
-      command_trigger: command_trigger || null,
-    }),
-  renameSkill: (id: string, name: string) =>
-    request<{ ok: boolean; skill_id: string; name: string }>(
-      `/api/skills/${encodeURIComponent(id)}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      },
-    ),
-  setSkillActive: (id: string, active: boolean) =>
-    request<{ ok: boolean; skill_id: string; active: boolean }>(
-      `/api/skills/${encodeURIComponent(id)}/active`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ active }),
-      },
-    ),
+    contract.buildSkill({ name, description, body, command_trigger: command_trigger || null }),
+  renameSkill: (id: string, name: string) => contract.renameSkill(id, { name }),
+  setSkillActive: (id: string, active: boolean) => contract.setSkillActive(id, { active }),
   setChannelRouting: (
     pairingId: string,
     settings: {
@@ -892,34 +694,12 @@ export const api = {
       owner_sender_id: string | null;
       approval_relay_enabled: boolean;
     },
-  ) =>
-    request<{ ok: boolean; pairing_id: string; routing_mode: string }>(
-      `/api/channels/pairings/${encodeURIComponent(pairingId)}/routing`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      },
-    ),
+  ) => contract.setChannelRouting(pairingId, settings),
   setSkillCommand: (id: string, command_trigger: string | null) =>
-    request<{ ok: boolean; skill_id: string; command_trigger: string | null }>(
-      `/api/skills/${encodeURIComponent(id)}/command`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command_trigger }),
-      },
-    ),
+    contract.setSkillCommand(id, { command_trigger }),
   downloadSkill: (id: string) =>
     requestBlob(`/api/skills/${encodeURIComponent(id)}/download`),
-  deleteSkill: (id: string) =>
-    request<{ ok: boolean; skill_id: string }>(
-      `/api/skills/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE",
-      },
-    ),
-
+  deleteSkill: (id: string) => contract.deleteSkill(id),
   extensions: () => contract.getExtensions(),
   projectFiles: (id: string) => contract.getProjectFiles(id),
   diagnosticsExport: () =>
@@ -965,48 +745,20 @@ export const api = {
   // What web reads may not reach. The address guard that refuses private and
   // loopback destinations is not represented here because it is not editable —
   // the read below reports it so the page can say so.
-  webBlocklist: () => request<WebBlocklist>("/api/web-access/blocklist"),
-  addWebBlocklistRule: (rule: string, note = "") =>
-    request<{ rule_id: string; rule: string; kind: string }>("/api/web-access/blocklist", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rule, note }),
-    }),
-  deleteWebBlocklistRule: (ruleId: string) =>
-    request<{ deleted: boolean }>(`/api/web-access/blocklist/${encodeURIComponent(ruleId)}`, {
-      method: "DELETE",
-    }),
-  testWebBlocklist: (host: string) =>
-    request<WebBlocklistProbe>("/api/web-access/blocklist/test", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ host }),
-    }),
-
+  webBlocklist: () => contract.getBlocklist(),
+  addWebBlocklistRule: (rule: string, note = "") => contract.addBlocklistRule({ rule, note }),
+  deleteWebBlocklistRule: (ruleId: string) => contract.deleteBlocklistRule(ruleId),
+  testWebBlocklist: (host: string) => contract.testBlocklist({ host }),
   // ── Git credential (RAIKER-2022) ─────────────────────────────────────
   // The token is write-only across this boundary: it goes up, and no read ever
   // returns it.
   gitCredential: (sessionId?: string) =>
-    request<GitCredentialStatus>(
-      withQuery("/api/git-credential", sessionId ? { session_id: sessionId } : {}),
-    ),
-  putGitCredential: (token: string) =>
-    request<GitCredentialStatus>("/api/git-credential", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    }),
-  deleteGitCredential: () =>
-    request<GitCredentialStatus>("/api/git-credential", { method: "DELETE" }),
+    contract.getGitCredential(sessionId ? { session_id: sessionId } : {}),
+  putGitCredential: (token: string) => contract.putGitCredential({ token }),
+  deleteGitCredential: () => contract.deleteGitCredential(),
   grantGitCredential: (scope: string, sessionId?: string) =>
-    request<GitCredentialStatus>("/api/git-credential/grant", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scope, session_id: sessionId ?? null }),
-    }),
-  revokeGitCredential: () =>
-    request<GitCredentialStatus>("/api/git-credential/grant", { method: "DELETE" }),
-
+    contract.grantGitCredential({ scope, session_id: sessionId ?? null }),
+  revokeGitCredential: () => contract.revokeGitCredential(),
   // ── Reliable memory controls (backlog item 3) ────────────────────────
   // User-facing surface over the existing governed memory store. List carries
   // provenance/scope/sensitivity/confidence/retention + pin; forget reuses
@@ -1096,79 +848,28 @@ export const api = {
   // file at a time. Both are reads through the same path authority a turn
   // writes through, so the explorer can never reach further than the agent can.
   browseCodeRepo: (repoId: string, path = "") =>
-    request<CodeRepoBrowseView>(
-      `/api/code/repos/${encodeURIComponent(repoId)}/browse` +
-        (path === "" ? "" : `?path=${encodeURIComponent(path)}`),
-    ),
-  readCodeRepoFile: (repoId: string, path: string) =>
-    request<CodeRepoFileView>(
-      `/api/code/repos/${encodeURIComponent(repoId)}/file?path=${encodeURIComponent(path)}`,
-    ),
+    contract.browseCodeRepo(repoId, path === "" ? {} : { path }),
+  readCodeRepoFile: (repoId: string, path: string) => contract.readCodeRepoFile(repoId, { path }),
   // What has changed in the working tree and not yet been committed.
   // The `Changes` tab of Build's artifact pane reads this; it is the same change
   // set a commit would record, because it comes from the same two helpers.
-  readCodeRepoChanges: (repoId: string) =>
-    request<CodeRepoChangesView>(
-      `/api/code/repos/${encodeURIComponent(repoId)}/changes`,
-    ),
+  readCodeRepoChanges: (repoId: string) => contract.readCodeRepoChanges(repoId),
   // B10 — what a parser sees in the file the owner just opened.
   readCodeRepoDiagnostics: (repoId: string, path: string) =>
-    request<CodeRepoDiagnosticsView>(
-      `/api/code/repos/${encodeURIComponent(repoId)}/diagnostics?path=${encodeURIComponent(path)}`,
-    ),
-  connectLocalRepo: (path: string) =>
-    postJson<{ ok: boolean; repo_id: string; local_subpath: string }>(
-      "/api/code/repos",
-      {
-        kind: "local",
-        path,
-      },
-    ),
+    contract.readCodeRepoDiagnostics(repoId, { path }),
+  connectLocalRepo: (path: string) => contract.connectCodeRepo({ kind: "local", path }),
   connectGithubRepo: (owner: string, repo: string, branch?: string) =>
-    postJson<{
-      ok: boolean;
-      repo_id: string;
-      label: string;
-      branch: string | null;
-    }>("/api/code/repos", {
-      kind: "github",
-      owner,
-      repo,
-      branch: branch || null,
-    }),
-  selectCodeRepo: (repo_id: string | null) =>
-    request<{ ok: boolean; selected_repo_id: string | null }>(
-      "/api/code/repos/selection",
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repo_id }),
-      },
-    ),
-  disconnectCodeRepo: (repoId: string) =>
-    request<{ ok: boolean; repo_id: string }>(
-      `/api/code/repos/${encodeURIComponent(repoId)}`,
-      { method: "DELETE" },
-    ),
-
+    contract.connectCodeRepo({ kind: "github", owner, repo, branch: branch || null }),
+  selectCodeRepo: (repo_id: string | null) => contract.selectCodeRepo({ repo_id }),
+  disconnectCodeRepo: (repoId: string) => contract.disconnectCodeRepo(repoId),
   // B9 — the code map over the selected repository. Reading its state is
   // metadata only; rebuilding fails closed with a reason when the owner has the
   // `code_map_indexing` capability turned off.
-  codeMap: () => request<CodeMapStatus>("/api/code/map"),
+  codeMap: () => contract.getCodeMapStatus(),
   // B19 — completion behind an `@`-mention in the composer. Paths and languages
   // only, out of the index the owner built, behind the same capability gate.
-  codeMapPaths: (fragment: string, limit = 12) =>
-    request<CodeMapPaths>(
-      withQuery("/api/code/map/paths", { q: fragment, limit: String(limit) }),
-    ),
-  rebuildCodeMap: () =>
-    postJson<{
-      ok: boolean;
-      status: string;
-      file_count: number;
-      symbol_count: number;
-    }>("/api/code/map/rebuild", {}),
-
+  codeMapPaths: (fragment: string, limit = 12) => contract.getCodeMapPaths({ q: fragment, limit }),
+  rebuildCodeMap: () => contract.rebuildCodeMap(),
   // ── Projects (organizing scopes; creating/selecting one grants nothing) ──
   projects: () => contract.listProjects(),
   project: (id: string) => contract.getProject(id),
@@ -1306,13 +1007,8 @@ export const api = {
   // An edit is a *different action*, so this is not a field on the decision: it
   // denies the proposal in front of the owner and raises theirs in its place,
   // with its own preview, its own hash and its own approval. Nothing executes.
-  // BUG-271 — the reviewer corrected a line rather than narrowing the change.
-  // An edit is a *different action*, so this is not a field on the decision: it
-  // denies the proposal in front of the owner and raises theirs in its place,
-  // with its own preview, its own hash and its own approval. Nothing executes.
   replaceApproval: (id: string, body: { patch: string; reason?: string }) =>
     contract.replaceApprovalWithEdit(id, body),
-  // B2 — non-streaming continuation of a turn that was parked for this approval.
   // B2 — non-streaming continuation of a turn that was parked for this approval.
   resumeAfterApproval: (id: string) =>
     postJson<AgentResponse>(
@@ -1331,8 +1027,6 @@ export const api = {
 
   // ── Runtime mutations. These reuse the existing governed control routes; the UI adds no
   // authority. Every call is enforced server-side by RuntimeAuthority. ──
-  // ── Runtime mutations. These reuse the existing governed control routes; the UI adds no
-  // authority. Every call is enforced server-side by RuntimeAuthority. ──
   activateRuntimeMode: (mode_name: string, reason: string) =>
     contract.activateRuntimeMode({ mode_name, reason }),
   disableRuntimeMode: (reason: string) => contract.disableRuntimeMode({ reason }),
@@ -1345,13 +1039,9 @@ export const api = {
   // Record a human threat-model acknowledgement (owner/gate-manager only). This
   // is the in-app equivalent of the operator/CLI ack step and only satisfies the
   // acknowledgement precondition — the capability transition still runs after it.
-  // Record a human threat-model acknowledgement (owner/gate-manager only). This
-  // is the in-app equivalent of the operator/CLI ack step and only satisfies the
-  // acknowledgement precondition — the capability transition still runs after it.
   recordThreatModelAck: (capability: string, reason: string) =>
     contract.recordThreatModelAck(capability, { reason }),
 
-  // ── Per-capability decision modes (ask | allow | auto | deny) ──
   // ── Per-capability decision modes (ask | allow | auto | deny) ──
   capabilityDecisionMode: (capability: string) => contract.getCapabilityDecisionMode(capability),
   setCapabilityDecisionMode: (

@@ -19,6 +19,7 @@ const run: CommandRunView = {
   safe_display: "git status --short",
   started_at: "2026-08-14T10:00:00Z",
   completed_at: "2026-08-14T10:00:01Z",
+  lease_expires_at: null,
   exit_code: 0,
   termination_reason: "succeeded",
   stdout_bytes: 6,

@@ -10,6 +10,13 @@ export type ActivateRuntimeModeRequest = {
   as_principal?: string | null;
 };
 
+/** The private-address refusal: always on, and not a setting. */
+export type AddressGuard = {
+  enforced: boolean;
+  editable: boolean;
+  description: string;
+};
+
 export type AdvisorSet = {
   ok: boolean;
   advisor_profile_id: string | null;
@@ -55,6 +62,14 @@ export type ApprovalDetailView = {
   metadata_only_notice: string;
   executes_on_approval: boolean;
   execution_evidence: Record<string, unknown>;
+};
+
+export type ApprovalRelayAnswered = {
+  ok: boolean;
+  relay_id: string;
+  approval_id: string;
+  status: string;
+  resumable: boolean;
 };
 
 /** BUG-271 — the proposal denied, and the reviewer's own edit raised in its place. */
@@ -200,6 +215,24 @@ export type BackgroundWorkerHealth = {
   total_failures: number;
   healthy: boolean;
   updated_at: string;
+};
+
+/** Would this host be reachable, said without fetching it. */
+export type BlocklistProbe = {
+  host: string;
+  allowed: boolean;
+  reason: string;
+  addresses: string[];
+};
+
+export type BlocklistRuleAdded = {
+  rule_id: string;
+  rule: string;
+  kind: string;
+};
+
+export type BlocklistRuleDeleted = {
+  deleted: boolean;
 };
 
 export type BlocklistRuleRequest = {
@@ -467,6 +500,72 @@ export type ChannelEnabledRequest = {
   enabled: boolean;
 };
 
+export type ChannelEnabledSet = {
+  ok: boolean;
+  pairing_id: string;
+  enabled: boolean;
+};
+
+/** One environment variable a channel transport declares that it needs. */
+export type ChannelEnvRequirement = {
+  name: string;
+  description: string;
+  url: string | null;
+  secret: boolean;
+  required: boolean;
+  present: boolean;
+};
+
+/** An inbound message recorded; quarantined unless the route carried it somewhere. */
+export type ChannelInboundAccepted = {
+  routed: boolean;
+  routing_mode: string;
+  reason_code?: string;
+  action?: "stop" | "steer";
+  session_id?: string;
+  turn_id?: string;
+  status?: string;
+  reply?: string;
+  ok: boolean;
+  channel_message_id: string;
+  trust_level: "owner" | "untrusted";
+  quarantined: boolean;
+};
+
+/** Paired is not enabled: that is a second decision. */
+export type ChannelPaired = {
+  ok: boolean;
+  pairing_id: string;
+  enabled: boolean;
+};
+
+/** One connector profile, and each separate fact about it (BUG-225). */
+export type ChannelProfile = {
+  connector_id: string;
+  channel_type: string;
+  display_name: string;
+  transport: string;
+  auth_method: string;
+  default_state: string;
+  requires_pairing: boolean;
+  requires_sender_allowlist: boolean;
+  requires_network: boolean;
+  linked: boolean;
+  enabled: boolean;
+  pairing_id: string | null;
+  display_label: string | null;
+  sender_count: number;
+  senders: string[];
+  routing_mode: "record_only" | "new_turn" | "side_question" | "interrupt";
+  target_session_id: string | null;
+  owner_sender_id: string | null;
+  approval_relay_enabled: boolean;
+  supports_side_questions: boolean;
+  supports_interrupts: boolean;
+  supports_approvals: boolean;
+  env_requirements: ChannelEnvRequirement[];
+};
+
 /** Owner-selected route. An inbound payload cannot override these fields. */
 export type ChannelRoutingRequest = {
   routing_mode: "record_only" | "new_turn" | "side_question" | "interrupt";
@@ -475,8 +574,31 @@ export type ChannelRoutingRequest = {
   approval_relay_enabled?: boolean;
 };
 
+export type ChannelRoutingSet = {
+  ok: boolean;
+  pairing_id: string;
+  routing_mode: "record_only" | "new_turn" | "side_question" | "interrupt";
+};
+
 export type ChannelSendersRequest = {
   senders: string[];
+};
+
+export type ChannelSendersSet = {
+  ok: boolean;
+  pairing_id: string;
+  sender_count: number;
+};
+
+/** One governed test delivery: sizes and status, never the text sent. */
+export type ChannelTestDelivered = {
+  ok: boolean;
+  delivered: boolean;
+  connector_id: string;
+  channel_type: string;
+  sent_bytes: number;
+  status: number;
+  signed: boolean;
 };
 
 /** One test delivery through the governed outbound path. */
@@ -484,6 +606,43 @@ export type ChannelTestDeliveryRequest = {
   connector_id: string;
   url: string;
   text?: string;
+};
+
+export type ChannelUnpaired = {
+  ok: boolean;
+  pairing_id: string;
+  removed: boolean;
+};
+
+/** A transport update that is not a message: acknowledged so it is not retried. */
+export type ChannelUpdateIgnored = {
+  ok: boolean;
+  ignored: string;
+};
+
+/** Empty when the connector registry could not be read. */
+export type ChannelsInbound = {
+  secret_configured?: boolean;
+  rate_limit_per_minute?: number;
+  quarantined?: boolean;
+  instructions_inert?: boolean;
+};
+
+/** Empty when the connector registry could not be read. */
+export type ChannelsOutbound = {
+  capability?: string;
+  gate_state?: string;
+  runtime_enabled?: boolean;
+  egress_configured?: boolean;
+  egress_host_count?: number;
+  signing_configured?: boolean;
+};
+
+export type ChannelsView = {
+  profiles: ChannelProfile[];
+  error: string | null;
+  outbound: ChannelsOutbound;
+  inbound: ChannelsInbound;
 };
 
 /** The last checkpoint capture's outcome, as the store records it. */
@@ -507,6 +666,137 @@ export type CheckpointView = {
   last_event_id: string | null;
   can_restore_state: boolean;
   can_restore_files: boolean;
+};
+
+export type CodeMapError = {
+  type: string;
+  message: string;
+};
+
+/** A named refusal: the gate or decision mode said no, or nothing could be read. */
+export type CodeMapFailure = {
+  status: "denied" | "failed";
+  error: CodeMapError;
+};
+
+export type CodeMapPath = {
+  path: string;
+  language: string;
+};
+
+/** Paths and languages only — an autocomplete must not be a disclosure surface. */
+export type CodeMapPaths = {
+  status: "success";
+  repository: string;
+  fragment: string;
+  count: number;
+  paths: CodeMapPath[];
+};
+
+export type CodeMapRebuilt = {
+  status: "indexed" | "partial";
+  repository: string;
+  file_count: number;
+  symbol_count: number;
+  edge_count: number;
+  languages: Record<string, number>;
+  skipped: Record<string, number>;
+  limits_hit: string[];
+  schema_version: string;
+  ok: boolean;
+};
+
+/** What the owner is shown: the gate, the repository, and the index state. */
+export type CodeMapStatus = {
+  capability: string;
+  gate_state: string;
+  decision_mode: string;
+  enabled: boolean;
+  repository: string;
+  repo_id: string;
+  status: "indexed" | "partial" | "not_indexed" | "failed";
+  reason_code: string;
+  file_count: number;
+  symbol_count: number;
+  edge_count: number;
+  languages: Record<string, number>;
+  skipped: Record<string, number>;
+  limits_hit: string[];
+  built_at: string | null;
+  updated_at: string | null;
+};
+
+/** A scan's result: counts and what was skipped, never a file's content. */
+export type CodeMapSummary = {
+  status: "indexed" | "partial";
+  repository: string;
+  file_count: number;
+  symbol_count: number;
+  edge_count: number;
+  languages: Record<string, number>;
+  skipped: Record<string, number>;
+  limits_hit: string[];
+  schema_version: string;
+};
+
+/** B13 — one directory of the repository Build is pointed at. */
+export type CodeRepoBrowseView = {
+  path: string;
+  parent: string | null;
+  entries: ProjectBrowseEntry[];
+  truncated: boolean;
+  root_kind: "local" | "github";
+  root_label: string;
+  root_missing: boolean;
+  reason_code?: string;
+};
+
+export type CodeRepoChangeEntry = {
+  path: string;
+  previous_path: string;
+  state: string;
+  unstaged: boolean;
+};
+
+/** The working tree's uncommitted state, from the helpers a commit is built from. */
+export type CodeRepoChangesView = {
+  entries: CodeRepoChangeEntry[];
+  diff: string;
+  truncated: boolean;
+  diff_truncated: boolean;
+  root_missing: boolean;
+  reason_code: string | null;
+};
+
+/** B10 — parse-level problems for one file; ``checked`` false means not looked at. */
+export type CodeRepoDiagnosticsView = {
+  path: string;
+  checked: boolean;
+  available: boolean;
+  reason_code: string;
+  reason: string;
+  diagnostics: Diagnostic[];
+};
+
+export type CodeRepoDisconnected = {
+  ok: boolean;
+  repo_id: string;
+};
+
+/** One bounded text file, or the reason it cannot be shown. */
+export type CodeRepoFileView = {
+  path: string;
+  text: string;
+  truncated: boolean;
+  size_bytes: number;
+  readable: boolean;
+  reason_code: string;
+};
+
+export type CodeRepoSelected = {
+  ok: boolean;
+  selected_repo_id: string | null;
+  code_map: CodeMapSummary | null;
 };
 
 /** One repository a coding chat can be pointed at. */
@@ -551,6 +841,17 @@ export type CodexStatus = {
   plan_type: string | null;
 };
 
+export type CommandChunkView = {
+  run_id: string;
+  sequence: number;
+  stream: "stdout" | "stderr" | "system";
+  text: string;
+  byte_count: number;
+  emitted_at: string;
+  start_byte_offset: number;
+  end_byte_offset: number;
+};
+
 /** Owner-defined, expiry-bound command prefixes for one conversation. */
 export type CommandGrant = {
   session_id: string;
@@ -564,12 +865,78 @@ export type CommandGrantRevoked = {
   revoked: boolean;
 };
 
+/** Output after a sequence number; ``next_after`` is where the next read starts. */
+export type CommandOutput = {
+  chunks: CommandChunkView[];
+  next_after: number;
+};
+
+export type CommandReceiptAnswer = {
+  receipt: CommandReceiptView | null;
+};
+
+export type CommandReceiptView = {
+  run_id: string;
+  state: "queued" | "starting" | "running" | "finalizing" | "succeeded" | "failed" | "timed_out" | "cancelled" | "contained" | "lost";
+  exit_code: number | null;
+  termination_reason: string;
+  completed_at: string;
+  evidence: Record<string, unknown>;
+  digest: string;
+};
+
+export type CommandRunDetail = {
+  run: CommandRunView;
+};
+
+export type CommandRunList = {
+  runs: CommandRunView[];
+};
+
+/** A run as its owner sees it: never the template or the principals behind it. */
+export type CommandRunView = {
+  run_id: string;
+  session_id: string;
+  turn_id: string;
+  action_id: string;
+  authority_kind: string;
+  authority_id: string;
+  state: "queued" | "starting" | "running" | "finalizing" | "succeeded" | "failed" | "timed_out" | "cancelled" | "contained" | "lost";
+  profile_id: string;
+  backend: string;
+  safe_display: string;
+  started_at: string | null;
+  completed_at: string | null;
+  lease_expires_at: string | null;
+  exit_code: number | null;
+  termination_reason: string | null;
+  stdout_bytes: number;
+  stderr_bytes: number;
+  truncated: boolean;
+  redaction_count: number;
+  receipt_digest: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CommandStopped = {
+  ok: boolean;
+  run: CommandRunView;
+};
+
 export type CompactConversationRequest = {
   through_turn_id: string;
 };
 
 export type ComposerApprovalModeRequest = {
   approval_mode: string;
+};
+
+export type ConformanceFindingView = {
+  field: string;
+  code: string;
+  severity: "error" | "warning" | "refused";
+  message: string;
 };
 
 /** Reference a repository from the Build workspace. */
@@ -595,6 +962,53 @@ export type ConnectorActionRequest = {
   operation_id: string;
   arguments?: Record<string, unknown>;
   session_id?: string;
+};
+
+/** The operation that undoes a write, and how long it stays possible. */
+export type ConnectorCompensation = {
+  operation_id: string;
+  argument_map: Record<string, string>;
+  deadline_seconds: number;
+};
+
+export type ConnectorCredentialsSet = {
+  ok: boolean;
+  connector_id: string;
+  auth_status: "connected" | "reauth_required" | "not_connected";
+};
+
+export type ConnectorEnabledSet = {
+  ok: boolean;
+  connector_id: string;
+  enabled: boolean;
+};
+
+export type ConnectorInstalled = {
+  ok: boolean;
+  connector_id: string;
+  installed: boolean;
+  enabled: boolean;
+};
+
+export type ConnectorOperation = {
+  operation_id: string;
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  path: string;
+  description: string;
+  requires_confirmation: boolean;
+  compensation?: ConnectorCompensation;
+};
+
+export type ConnectorStoreView = {
+  connectors: StoreConnector[];
+  count: number;
+  vault_configured: boolean;
+};
+
+export type ConnectorUninstalled = {
+  ok: boolean;
+  connector_id: string;
+  installed: boolean;
 };
 
 /** Read-only status of one governed service connector (web-app task 4). */
@@ -811,6 +1225,39 @@ export type CreateTelemetryDestinationRequest = {
   include_content?: boolean;
 };
 
+export type CredentialDeltaDiscarded = {
+  ok: boolean;
+  receipt: Record<string, unknown> | null;
+};
+
+export type CredentialDeltaFile = {
+  path: string;
+  kind: string;
+  size?: number;
+};
+
+export type CredentialDeltaList = {
+  deltas: CredentialDeltaView[];
+};
+
+export type CredentialDeltaManifest = {
+  files: CredentialDeltaFile[];
+};
+
+/** Safe metadata only; encrypted handles and matcher material stay internal. */
+export type CredentialDeltaView = {
+  run_id: string;
+  environment_profile_id: string;
+  state: "scanning" | "clean" | "quarantined" | "resolving" | "cleanup_failed";
+  manifest: CredentialDeltaManifest;
+  delta_digest: string;
+  scan_digest: string;
+  scan_rule_version: string;
+  cleanup_status: string;
+  created_at: string;
+  recipient_boundary: "disposable_container_tcb";
+};
+
 export type CredentialLifecycleView = {
   credential_id: string;
   provider: string;
@@ -853,6 +1300,16 @@ export type DeviceSessionView = {
   expires_at: string | null;
   scope: string;
   current: boolean;
+};
+
+/** One problem, at a coordinate the agent can open. */
+export type Diagnostic = {
+  path: string;
+  line: number;
+  column: number;
+  severity: string;
+  message: string;
+  source: string;
 };
 
 export type DiagnosticsView = {
@@ -1062,6 +1519,28 @@ export type GistDiscarded = {
   discarded: boolean;
 };
 
+export type GitCredentialGrant = {
+  grant_id: string;
+  scope: string;
+  status: string;
+  granted_at: string;
+  expires_at: string;
+  session_id: string | null;
+  uses: number;
+};
+
+/** What a surface needs to render the control. Never the token. */
+export type GitCredentialStatus = {
+  credential_configured: boolean;
+  credential_source: string;
+  grant: GitCredentialGrant | null;
+  scopes: string[];
+  grant_seconds: Record<string, number>;
+  hosts: string[];
+  operations: string[];
+  checked_at: string;
+};
+
 export type GitGrantRequest = {
   scope?: string;
   session_id?: string | null;
@@ -1070,6 +1549,15 @@ export type GitGrantRequest = {
 
 export type GitTokenRequest = {
   token: string;
+};
+
+/** A GitHub coordinate recorded. Nothing was fetched. */
+export type GithubRepoConnected = {
+  ok: boolean;
+  repo_id: string;
+  kind: "github";
+  label: string;
+  branch: string | null;
 };
 
 /** Liveness, and whether the encrypted store opens (BUG-86). */
@@ -1119,6 +1607,67 @@ export type HfVariant = {
   gated: boolean;
   license_id: string | null;
   complete: boolean;
+};
+
+export type HookActivityView = {
+  event_id: string;
+  event_type: string;
+  session_id: string;
+  timestamp: string;
+  summary: string | null;
+};
+
+export type HookEventView = {
+  event: string;
+  summary: string;
+  dispatched: boolean;
+  can_decide: boolean;
+};
+
+export type HookHandlerView = {
+  id: string;
+  type: string;
+  target: string;
+  timeout_ms: number;
+  decision_authority: boolean;
+  available: boolean;
+  unavailable_reason: string;
+};
+
+export type HookRuleView = {
+  rule_id: string;
+  event: string;
+  event_summary: string;
+  matcher: string;
+  if_guard: string | null;
+  scope: string;
+  source: string | null;
+  dispatched: boolean;
+  can_decide: boolean;
+  handlers: HookHandlerView[];
+};
+
+export type HookSourceView = {
+  path: string;
+  scope: string;
+  exists: boolean;
+  loaded: boolean;
+  rule_count: number;
+  error: string | null;
+};
+
+/** Configured hooks, whether each can fire or decide, and what they have done. */
+export type HooksView = {
+  active: boolean;
+  disabled: boolean;
+  rule_count: number;
+  rules: HookRuleView[];
+  sources: HookSourceView[];
+  failed_sources: HookSourceView[];
+  events: HookEventView[];
+  builtins: string[];
+  activity: HookActivityView[];
+  activity_counts: Record<string, number>;
 };
 
 export type HuggingFaceCredentialRequest = {
@@ -1271,6 +1820,40 @@ export type InstallPlan = {
   redistribution: boolean;
 };
 
+export type InstalledPlugin = {
+  record_id: string;
+  plugin_id: string;
+  version: string;
+  trust_level: string;
+  status: string;
+  source_url: string | null;
+  installed_at: string;
+  installed_by: string;
+  checksum_present: boolean;
+  code_runtime: PluginCodeRuntime;
+  signature: PluginSignatureView;
+  contributions: PluginContributions;
+};
+
+/** One installed skill as the Skills tab reads it: metadata, never the bundle. */
+export type InstalledSkill = {
+  skill_id: string;
+  name: string;
+  description: string;
+  version: string | null;
+  source: "upload" | "url" | "builtin" | "built" | "plugin";
+  source_ref: string | null;
+  checksum: string;
+  active: boolean;
+  files: string[];
+  file_count: number;
+  byte_size: number;
+  created_at: string;
+  updated_at: string;
+  command_trigger: string | null;
+  conformance: SkillConformance;
+};
+
 /** Name and optional first account for a locally isolated Raiker instance. */
 export type InstanceCreateRequest = {
   name: string;
@@ -1385,6 +1968,15 @@ export type LocalModelView = {
   format: "gguf" | "mlx";
 };
 
+/** A workspace folder referenced as a repository, and its map if one was built. */
+export type LocalRepoConnected = {
+  ok: boolean;
+  repo_id: string;
+  kind: "local";
+  local_subpath: string;
+  code_map: CodeMapSummary | null;
+};
+
 /** A local model runtime found (or not) on this machine by a PATH lookup. */
 export type LocalRuntime = {
   runtime: string;
@@ -1456,8 +2048,73 @@ export type ManagedFileList = {
   files: ManagedFile[];
 };
 
+/** The manifest as compiled: its digest and the operations it indexes. */
+export type ManifestRegistered = {
+  ok: boolean;
+  connector_id: string;
+  manifest_sha256: string;
+  kind: "openapi" | "ai_plugin";
+  version?: string;
+  api_url?: string;
+  operations: ConnectorOperation[];
+};
+
 export type ManifestRequest = {
   manifest: Record<string, unknown>;
+};
+
+/** Whether a connected server's tools would really run this turn. */
+export type McpAgentAccess = {
+  gate_enabled: boolean;
+  decision_mode: string;
+  callable: boolean;
+  reason_code: string;
+  projected_tools: number;
+  connected_servers: number;
+};
+
+/** A pause, kill or resume, and the monitor state it left the connection in. */
+export type McpContainment = {
+  ok: boolean;
+  server_id: string;
+  monitor_state: "active" | "paused" | "killed";
+};
+
+/** An MCP server an installed plugin offers. Inert until the owner adds it (BUG-221). */
+export type McpOffer = {
+  plugin_id: string;
+  name: string;
+  transport: "http" | "stdio";
+  description: string;
+  endpoint_url?: string;
+  auth_ref?: string | null;
+  template?: string;
+  already_added: boolean;
+};
+
+/** The handshake's result: the status and the tool names it discovered. */
+export type McpServerConnected = {
+  ok: boolean;
+  server_id: string;
+  status: string;
+  tools: string[];
+};
+
+export type McpServerCreated = {
+  ok: boolean;
+  server_id: string | null;
+  name: string;
+};
+
+export type McpServerDeleted = {
+  ok: boolean;
+  server_id: string;
+};
+
+export type McpServerRenamed = {
+  ok: boolean;
+  server_id: string;
+  name: string;
 };
 
 /**
@@ -2203,6 +2860,55 @@ export type PauseHostRequest = {
   reason?: string | null;
 };
 
+/** BUG-308 — where this plugin's own code would run on this machine. */
+export type PluginCodeRuntime = {
+  where: "not_enabled" | "isolated" | "host_network";
+  summary: string;
+};
+
+/** A kind of contribution, and whether this build accepts it yet. */
+export type PluginContributionKind = {
+  kind: string;
+  available: boolean;
+  summary: string;
+};
+
+/** What a plugin provides, read from the files the runtime loads (BUG-221). */
+export type PluginContributions = {
+  hooks: number;
+  events: string[];
+  skills: number;
+  skill_names: string[];
+  mcp_servers: number;
+  mcp_server_names: string[];
+  error: string | null;
+};
+
+/** What a plugin manifest's signature actually proved (BUG-79). */
+export type PluginSignatureView = {
+  level: "verified" | "present_only" | "unsigned";
+  label: string;
+  reason: string;
+  method: string;
+  verified: boolean;
+  explanation: string;
+  remediation: string;
+};
+
+export type PluginSigning = {
+  configured: boolean;
+  hmac_key_set: boolean;
+  publisher_key_set: boolean;
+  summary: string;
+  remediation: string;
+};
+
+export type PluginsView = {
+  plugins: InstalledPlugin[];
+  signing: PluginSigning;
+  contribution_kinds: PluginContributionKind[];
+};
+
 /** An owner price recorded, or cleared (``cleared``) back to the published one. */
 export type PriceSet = {
   ok: boolean;
@@ -2566,6 +3272,13 @@ export type RelationshipScan = {
   already_present: number;
 };
 
+export type RemoteMcpServerCreated = {
+  ok: boolean;
+  server_id: string;
+  name: string;
+  transport: "http";
+};
+
 export type RenameMcpServerRequest = {
   name: string;
 };
@@ -2916,9 +3629,68 @@ export type SetupUpdateRequest = {
   background_service_enabled?: boolean;
 };
 
+export type SkillActiveSet = {
+  ok: boolean;
+  skill_id: string;
+  active: boolean;
+};
+
+export type SkillCommandSet = {
+  ok: boolean;
+  skill_id: string;
+  command_trigger: string | null;
+};
+
+/** How an installed skill measures against the Agent Skills standard. */
+export type SkillConformance = {
+  conformant: boolean;
+  spec_url: string;
+  findings: ConformanceFindingView[];
+  license: string;
+  compatibility: string;
+  metadata: Record<string, string>;
+  refused_allowed_tools: string[];
+};
+
+export type SkillDeleted = {
+  ok: boolean;
+  skill_id: string;
+  deleted: boolean;
+};
+
+/** An upload, import or build that stored a skill, and the skill as stored. */
+export type SkillInstalled = {
+  ok: boolean;
+  skill_id: string;
+  skill: InstalledSkill | null;
+};
+
+export type SkillList = {
+  skills: InstalledSkill[];
+};
+
+export type SkillRenamed = {
+  ok: boolean;
+  skill_id: string;
+  name: string;
+};
+
 /** A published skill's URL, to verify or to import. */
 export type SkillUrlRequest = {
   url: string;
+};
+
+/** What a linked skill turned out to be, reported before anything is stored. */
+export type SkillVerification = {
+  ok: boolean;
+  verified: boolean;
+  name: string;
+  description: string;
+  version: string | null;
+  checksum: string;
+  byte_size: number;
+  source_url: string;
+  already_installed: boolean;
 };
 
 /** One exchange a cited search returned. */
@@ -2990,6 +3762,24 @@ export type StandingGrantView = {
 
 export type StopHostRequest = {
   confirm?: boolean;
+};
+
+/** One catalogue connector, as this owner has it. Never a credential value. */
+export type StoreConnector = {
+  connector_id: string;
+  display_name: string;
+  category: string;
+  description: string;
+  auth_type: "oauth2" | "api_key";
+  host: string;
+  installed: boolean;
+  enabled: boolean;
+  auth_status: "connected" | "reauth_required" | "not_connected";
+  vault_configured: boolean;
+  activity_status: "idle" | "processing" | "completed" | "failed";
+  active_operation: string | null;
+  last_invoked_at: string | null;
+  operations: ConnectorOperation[];
 };
 
 /** What a provider volunteered with a turn about its own limits — never fetched. */
@@ -3318,6 +4108,24 @@ export type VaultStatus = {
   state: "configured_valid" | "missing" | "invalid";
 };
 
+/** The rules in force, by source, so the page knows which it may delete. */
+export type WebBlocklist = {
+  stored: WebBlocklistRule[];
+  environment: string[];
+  environment_variable: string;
+  builtin: string[];
+  effective_count: number;
+  address_guard: AddressGuard;
+};
+
+export type WebBlocklistRule = {
+  rule_id: string;
+  rule: string;
+  kind: string;
+  note: string;
+  created_at: string;
+};
+
 export type WeeklyBudgetSet = {
   ok: boolean;
   profile_id: string;
@@ -3479,6 +4287,26 @@ export const contract = {
     call<CapabilityDecisionModeSet>("POST", `/api/capability-modes/${encodeURIComponent(capability)}/auto`, { body }),
   denyCapability: (capability: string, body: SetCapabilityDecisionModeRequest) =>
     call<CapabilityDecisionModeSet>("POST", `/api/capability-modes/${encodeURIComponent(capability)}/deny`, { body }),
+  listChannels: () =>
+    request<ChannelsView>("/api/channels"),
+  deliverChannelTest: (body: ChannelTestDeliveryRequest) =>
+    call<ChannelTestDelivered>("POST", "/api/channels/deliver-test", { body }),
+  pairChannel: (body: PairChannelRequest) =>
+    call<ChannelPaired>("POST", "/api/channels/pairings", { body }),
+  unpairChannel: (pairingId: string) =>
+    call<ChannelUnpaired>("DELETE", `/api/channels/pairings/${encodeURIComponent(pairingId)}`),
+  setChannelEnabled: (pairingId: string, body: ChannelEnabledRequest) =>
+    call<ChannelEnabledSet>("PUT", `/api/channels/pairings/${encodeURIComponent(pairingId)}/enabled`, { body }),
+  setChannelRouting: (pairingId: string, body: ChannelRoutingRequest) =>
+    call<ChannelRoutingSet>("PUT", `/api/channels/pairings/${encodeURIComponent(pairingId)}/routing`, { body }),
+  setChannelSenders: (pairingId: string, body: ChannelSendersRequest) =>
+    call<ChannelSendersSet>("PUT", `/api/channels/pairings/${encodeURIComponent(pairingId)}/senders`, { body }),
+  receiveApprovalResponse: (connectorId: string, body: ChannelApprovalResponse, xRaikerChannelSecret?: string) =>
+    call<ApprovalRelayAnswered>("POST", `/api/channels/${encodeURIComponent(connectorId)}/approval-response`, { body, headers: { "x-raiker-channel-secret": xRaikerChannelSecret } }),
+  receiveInbound: (connectorId: string, body: InboundChannelMessage, xRaikerChannelSecret?: string) =>
+    call<ChannelInboundAccepted>("POST", `/api/channels/${encodeURIComponent(connectorId)}/inbound`, { body, headers: { "x-raiker-channel-secret": xRaikerChannelSecret } }),
+  receiveTelegram: (connectorId: string, body: Record<string, unknown>, xTelegramBotApiSecretToken?: string) =>
+    call<ChannelInboundAccepted | ChannelUpdateIgnored>("POST", `/api/channels/${encodeURIComponent(connectorId)}/telegram`, { body, headers: { "x-telegram-bot-api-secret-token": xTelegramBotApiSecretToken } }),
   searchChatHistory: (query: { q: string }) =>
     request<SessionView[]>(withQuery("/api/chat-search", query)),
   listCheckpoints: (query: { session_id?: string; limit?: number; project_id?: string } = {}) =>
@@ -3493,10 +4321,56 @@ export const contract = {
     call<RestoreRequested>("POST", `/api/checkpoints/${encodeURIComponent(checkpointId)}/restore`),
   getCheckpointRestorePlan: (checkpointId: string) =>
     request<RestorePlan>(`/api/checkpoints/${encodeURIComponent(checkpointId)}/restore-plan`),
+  getCodeMapStatus: () =>
+    request<CodeMapStatus>("/api/code/map"),
+  getCodeMapPaths: (query: { q?: string; limit?: number } = {}) =>
+    request<CodeMapPaths | CodeMapFailure>(withQuery("/api/code/map/paths", query)),
+  rebuildCodeMap: () =>
+    call<CodeMapRebuilt>("POST", "/api/code/map/rebuild"),
   listCodeRepos: () =>
     request<CodeReposView>("/api/code/repos"),
+  connectCodeRepo: (body: ConnectCodeRepoRequest) =>
+    call<LocalRepoConnected | GithubRepoConnected>("POST", "/api/code/repos", { body }),
+  selectCodeRepo: (body: SelectCodeRepoRequest) =>
+    call<CodeRepoSelected>("PUT", "/api/code/repos/selection", { body }),
+  disconnectCodeRepo: (repoId: string) =>
+    call<CodeRepoDisconnected>("DELETE", `/api/code/repos/${encodeURIComponent(repoId)}`),
+  browseCodeRepo: (repoId: string, query: { path?: string } = {}) =>
+    request<CodeRepoBrowseView>(withQuery(`/api/code/repos/${encodeURIComponent(repoId)}/browse`, query)),
+  readCodeRepoChanges: (repoId: string) =>
+    request<CodeRepoChangesView>(`/api/code/repos/${encodeURIComponent(repoId)}/changes`),
+  readCodeRepoDiagnostics: (repoId: string, query: { path?: string } = {}) =>
+    request<CodeRepoDiagnosticsView>(withQuery(`/api/code/repos/${encodeURIComponent(repoId)}/diagnostics`, query)),
+  readCodeRepoFile: (repoId: string, query: { path?: string } = {}) =>
+    request<CodeRepoFileView>(withQuery(`/api/code/repos/${encodeURIComponent(repoId)}/file`, query)),
+  listCommands: (query: { session_id?: string } = {}) =>
+    request<CommandRunList>(withQuery("/api/command-runs", query)),
+  getCommand: (runId: string) =>
+    request<CommandRunDetail>(`/api/command-runs/${encodeURIComponent(runId)}`),
+  getCommandOutput: (runId: string, query: { after?: number } = {}) =>
+    request<CommandOutput>(withQuery(`/api/command-runs/${encodeURIComponent(runId)}/output`, query)),
+  getCommandReceipt: (runId: string) =>
+    request<CommandReceiptAnswer>(`/api/command-runs/${encodeURIComponent(runId)}/receipt`),
+  stopCommand: (runId: string) =>
+    call<CommandStopped>("POST", `/api/command-runs/${encodeURIComponent(runId)}/stop`),
   getConnections: () =>
     request<ConnectionsView>("/api/connections"),
+  connectorStore: () =>
+    request<ConnectorStoreView>("/api/connector-store"),
+  uninstallConnector: (connectorId: string) =>
+    call<ConnectorUninstalled>("DELETE", `/api/connector-store/${encodeURIComponent(connectorId)}`),
+  setConnectorCredentials: (connectorId: string, body: CredentialRequest) =>
+    call<ConnectorCredentialsSet>("PUT", `/api/connector-store/${encodeURIComponent(connectorId)}/credentials`, { body }),
+  setConnectorEnabled: (connectorId: string, query: { enabled: boolean }) =>
+    call<ConnectorEnabledSet>("PUT", withQuery(`/api/connector-store/${encodeURIComponent(connectorId)}/enabled`, query)),
+  installConnector: (connectorId: string) =>
+    call<ConnectorInstalled>("POST", `/api/connector-store/${encodeURIComponent(connectorId)}/install`),
+  registerConnectorManifest: (connectorId: string, body: ManifestRequest) =>
+    call<ManifestRegistered>("POST", `/api/connector-store/${encodeURIComponent(connectorId)}/manifest`, { body }),
+  listCredentialDeltas: (query: { environment_profile_id: string }) =>
+    request<CredentialDeltaList>(withQuery("/api/credential-deltas", query)),
+  discardCredentialDelta: (runId: string, body: Record<string, unknown>) =>
+    call<CredentialDeltaDiscarded>("POST", `/api/credential-deltas/${encodeURIComponent(runId)}/discard`, { body }),
   getDiagnostics: () =>
     request<DiagnosticsView>("/api/diagnostics"),
   getEnvironment: () =>
@@ -3505,8 +4379,20 @@ export const contract = {
     request<EventView[]>(withQuery("/api/events", query)),
   getExtensions: () =>
     request<ExtensionsOverviewView>("/api/extensions"),
+  deleteGitCredential: () =>
+    call<GitCredentialStatus>("DELETE", "/api/git-credential"),
+  getGitCredential: (query: { session_id?: string } = {}) =>
+    request<GitCredentialStatus>(withQuery("/api/git-credential", query)),
+  putGitCredential: (body: GitTokenRequest) =>
+    call<GitCredentialStatus>("PUT", "/api/git-credential", { body }),
+  revokeGitCredential: () =>
+    call<GitCredentialStatus>("DELETE", "/api/git-credential/grant"),
+  grantGitCredential: (body: GitGrantRequest) =>
+    call<GitCredentialStatus>("POST", "/api/git-credential/grant", { body }),
   health: () =>
     request<HealthView>("/api/health"),
+  listHooks: () =>
+    request<HooksView>("/api/hooks"),
   saveHuggingFaceCredential: (body: HuggingFaceCredentialRequest) =>
     call<HuggingFaceCredentialSaved>("PUT", "/api/hugging-face/credential", { body }),
   downloadHuggingFaceModel: (body: HuggingFaceSelectionRequest) =>
@@ -3537,10 +4423,30 @@ export const contract = {
     call<ManagedFileChanged>("DELETE", `/api/managed-files/${encodeURIComponent(fileId)}`),
   retryManagedFile: (fileId: string) =>
     call<ManagedFileChanged>("POST", `/api/managed-files/${encodeURIComponent(fileId)}/retry`),
+  getMcpAgentAccess: () =>
+    request<McpAgentAccess>("/api/mcp/agent-access"),
+  listMcpOffers: () =>
+    request<McpOffer[]>("/api/mcp/offers"),
   listMcpServers: () =>
     request<McpServerView[]>("/api/mcp/servers"),
+  createMcpServer: (body: CreateMcpServerRequest) =>
+    call<McpServerCreated>("POST", "/api/mcp/servers", { body }),
+  createRemoteMcpServer: (body: CreateRemoteMcpServerRequest) =>
+    call<RemoteMcpServerCreated>("POST", "/api/mcp/servers/remote", { body }),
+  deleteMcpServer: (serverId: string) =>
+    call<McpServerDeleted>("DELETE", `/api/mcp/servers/${encodeURIComponent(serverId)}`),
+  renameMcpServer: (serverId: string, body: RenameMcpServerRequest) =>
+    call<McpServerRenamed>("PUT", `/api/mcp/servers/${encodeURIComponent(serverId)}`, { body }),
+  connectMcpServer: (serverId: string) =>
+    call<McpServerConnected>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/connect`),
   listMcpFindings: (serverId: string) =>
     request<SecurityFindingView[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/findings`),
+  killMcpServer: (serverId: string, body?: ContainMcpServerRequest | null) =>
+    call<McpContainment>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/kill`, { body }),
+  pauseMcpServer: (serverId: string, body?: ContainMcpServerRequest | null) =>
+    call<McpContainment>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/pause`, { body }),
+  resumeMcpServer: (serverId: string) =>
+    call<McpContainment>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/resume`),
   listMcpSessions: (serverId: string) =>
     request<McpSessionView[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/sessions`),
   listMemories: (query: { scope?: string } = {}) =>
@@ -3709,6 +4615,8 @@ export const contract = {
     call<Ok>("POST", `/api/notifications/${encodeURIComponent(notificationId)}/read`),
   pullOllamaModel: (body: OllamaPullRequestBody) =>
     call<ModelOperationView>("POST", "/api/ollama/pull", { body }),
+  listPlugins: () =>
+    request<PluginsView>("/api/plugins"),
   listProjects: () =>
     request<ProjectsListView>("/api/projects"),
   createProject: (body: CreateProjectRequest) =>
@@ -3827,6 +4735,24 @@ export const contract = {
     call<SetupState>("PUT", "/api/setup", { body }),
   createSetupBackup: (body: SetupBackupRequest) =>
     call<SetupBackupCreated>("POST", "/api/setup/backup/create", { body }),
+  listSkills: () =>
+    request<SkillList>("/api/skills"),
+  uploadSkill: (body: UploadSkillRequest) =>
+    call<SkillInstalled>("POST", "/api/skills", { body }),
+  buildSkill: (body: BuildSkillRequest) =>
+    call<SkillInstalled>("POST", "/api/skills/build", { body }),
+  importSkillUrl: (body: SkillUrlRequest) =>
+    call<SkillInstalled>("POST", "/api/skills/import", { body }),
+  verifySkillUrl: (body: SkillUrlRequest) =>
+    call<SkillVerification>("POST", "/api/skills/verify", { body }),
+  deleteSkill: (skillId: string) =>
+    call<SkillDeleted>("DELETE", `/api/skills/${encodeURIComponent(skillId)}`),
+  renameSkill: (skillId: string, body: RenameSkillRequest) =>
+    call<SkillRenamed>("PUT", `/api/skills/${encodeURIComponent(skillId)}`, { body }),
+  setSkillActive: (skillId: string, body: SetSkillActiveRequest) =>
+    call<SkillActiveSet>("PUT", `/api/skills/${encodeURIComponent(skillId)}/active`, { body }),
+  setSkillCommand: (skillId: string, body: SetSkillCommandRequest) =>
+    call<SkillCommandSet>("PUT", `/api/skills/${encodeURIComponent(skillId)}/command`, { body }),
   readSpeechRuntime: () =>
     request<SpeechRuntime>("/api/speech/runtime"),
   writeSpeechRuntime: (body: SpeechRuntimeRequest) =>
@@ -3871,6 +4797,14 @@ export const contract = {
     call<VaultStatus>("PUT", "/api/vault/key", { body }),
   getVaultStatus: () =>
     request<VaultStatus>("/api/vault/status"),
+  getBlocklist: () =>
+    request<WebBlocklist>("/api/web-access/blocklist"),
+  addBlocklistRule: (body: BlocklistRuleRequest) =>
+    call<BlocklistRuleAdded>("POST", "/api/web-access/blocklist", { body }),
+  testBlocklist: (body: BlocklistTestRequest) =>
+    call<BlocklistProbe>("POST", "/api/web-access/blocklist/test", { body }),
+  deleteBlocklistRule: (ruleId: string) =>
+    call<BlocklistRuleDeleted>("DELETE", `/api/web-access/blocklist/${encodeURIComponent(ruleId)}`),
   workInFlight: () =>
     request<WorkInFlight>("/api/work-in-flight"),
   listWorkThreads: (query: { limit?: number } = {}) =>

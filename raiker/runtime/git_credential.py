@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import TypedDict
+
 from raiker.contracts.ids import utc_now
 
 if TYPE_CHECKING:
@@ -99,6 +101,33 @@ def credential_config(token_var: str, hosts: Sequence[str] = CREDENTIAL_HOSTS) -
 CREDENTIAL_HELPER = credential_helper(RUNTIME_TOKEN_VAR)
 
 
+class GitCredentialGrant(TypedDict):
+    grant_id: str
+    scope: str
+    status: str
+    granted_at: str
+    expires_at: str
+    session_id: str | None
+    uses: int
+
+
+class GitCredentialStatus(TypedDict):
+    """What a surface needs to render the control. Never the token.
+
+    ``credential_*`` rather than ``token_*``: the API redactor masks any key
+    containing "token", which is the right blunt instrument to keep.
+    """
+
+    credential_configured: bool
+    credential_source: str
+    grant: GitCredentialGrant | None
+    scopes: list[str]
+    grant_seconds: dict[str, int]
+    hosts: list[str]
+    operations: list[str]
+    checked_at: str
+
+
 class GitCredentialError(Exception):
     """The credential cannot be lent, and the reason is safe to show."""
 
@@ -120,7 +149,7 @@ class GrantView:
     session_id: str | None
     uses: int
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> GitCredentialGrant:
         return {
             "grant_id": self.grant_id,
             "scope": self.scope,
@@ -242,7 +271,7 @@ class GitCredentialBroker:
             row.get("session_id"), int(row.get("uses") or 0),
         )
 
-    def status(self, *, session_id: str | None = None) -> dict[str, Any]:
+    def status(self, *, session_id: str | None = None) -> GitCredentialStatus:
         """What a surface needs to render the control. Never the token."""
         grant = self.active_grant(session_id=session_id)
         # `credential_*` rather than `token_*`: the API redactor masks any field

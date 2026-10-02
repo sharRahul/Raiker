@@ -41,6 +41,8 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import TypedDict
+
 from raiker.models.contracts import ToolSpec
 from raiker.models.tool_registry import mcp_tool_risk_band
 from raiker.tools.mcp_schema import McpToolDeclaration, decode_declarations
@@ -399,9 +401,22 @@ def mcp_tool_specs(
         return []
 
 
+class McpAgentAccess(TypedDict):
+    """Whether a connected server's tools would really run this turn."""
+
+    gate_enabled: bool
+    decision_mode: str
+    #: True only when a projected MCP tool would really run this turn.
+    callable: bool
+    #: Empty when callable; otherwise the exact runtime reason it is not.
+    reason_code: str
+    projected_tools: int
+    connected_servers: int
+
+
 def mcp_agent_access(
     workspace_root: str | Path, store: SQLiteStore | None, principal_id: str | None
-) -> dict[str, Any]:
+) -> McpAgentAccess:
     """Whether this owner's connected MCP tools are reachable by the agent.
 
     BUG-12 made MCP tools callable; it left the owner with no way to *see* that

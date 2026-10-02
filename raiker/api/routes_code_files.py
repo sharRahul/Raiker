@@ -32,14 +32,22 @@ machine to walk, and saying so is the honest answer rather than an empty tree.
 from __future__ import annotations
 
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import Any
+from typing import Any, Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
 from raiker.api.dependencies import workspace_path as _ws
+from raiker.api.schemas import serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.code import (
+    CodeRepoBrowseView,
+    CodeRepoChangesView,
+    CodeRepoDiagnosticsView,
+    CodeRepoFileView,
+)
+from raiker.api.wire.projects import ProjectBrowseEntry
 from raiker.knowledge.extractors import resolve_extractable_media_type
 from raiker.knowledge.reconcile import IGNORED_DIRECTORY_NAMES
 from raiker.runtime.authority.models import Principal
@@ -135,9 +143,9 @@ def _resolved_target(
     return resolved.path
 
 
-def _missing_view(repo: dict[str, Any]) -> dict[str, Any]:
-    kind = str(repo.get("kind", "local"))
-    return {
+def _missing_view(repo: dict[str, Any]) -> CodeRepoBrowseView:
+    kind = cast(Literal["local", "github"], str(repo.get("kind", "local")))
+    answer: CodeRepoBrowseView = {
         "path": "",
         "parent": None,
         "entries": [],
@@ -149,6 +157,7 @@ def _missing_view(repo: dict[str, Any]) -> dict[str, Any]:
         # never on this machine; a folder that was is a problem to fix.
         "reason_code": "repo_not_checked_out" if kind == "github" else "repo_folder_missing",
     }
+    return answer
 
 
 @router.get("/api/code/repos/{repo_id}/browse")
@@ -161,7 +170,7 @@ async def browse_code_repo(
     repo = _owned_repo(request, repo_id, auth_data[0].principal_id)
     root = _repo_root(request, repo)
     if root is None:
-        return _missing_view(repo)
+        return serialize_dto(_missing_view(repo))
     target = _resolved_target(request, root, path)
     if not target.is_dir():
         raise _not_found("directory_not_found")
@@ -173,22 +182,23 @@ async def browse_code_repo(
         if child.name not in IGNORED_DIRECTORY_NAMES
     ]
     relative = target.relative_to(root).as_posix() if target != root else ""
-    return {
+    answer: CodeRepoBrowseView = {
         "path": relative,
         "parent": (
             Path(relative).parent.as_posix().replace(".", "") if relative else None
         ),
         "entries": [_entry(child, root) for child in children[:MAX_BROWSE_ENTRIES]],
         "truncated": len(children) > MAX_BROWSE_ENTRIES,
-        "root_kind": str(repo.get("kind", "local")),
+        "root_kind": cast(Literal["local", "github"], str(repo.get("kind", "local"))),
         "root_label": str(repo.get("label", "")),
         "root_missing": False,
     }
+    return serialize_dto(answer)
 
 
-def _entry(child: Path, root: Path) -> dict[str, Any]:
+def _entry(child: Path, root: Path) -> ProjectBrowseEntry:
     is_directory = child.is_dir()
-    return {
+    answer: ProjectBrowseEntry = {
         "name": child.name,
         "relative_path": child.relative_to(root).as_posix(),
         "is_directory": is_directory,
@@ -203,6 +213,7 @@ def _entry(child: Path, root: Path) -> dict[str, Any]:
         # describe a projection that does not exist.
         "index_state": None,
     }
+    return answer
 
 
 def _size(child: Path) -> int:
@@ -240,7 +251,7 @@ async def read_code_repo_file(
     if size > MAX_VIEW_BYTES:
         # Refused with the number in it. "Too large" without the size is a dead
         # end; the size is what tells the owner whether to open it elsewhere.
-        return {
+        answer_0: CodeRepoFileView = {
             "path": relative,
             "text": "",
             "truncated": True,
@@ -248,10 +259,11 @@ async def read_code_repo_file(
             "readable": False,
             "reason_code": "file_too_large",
         }
+        return serialize_dto(answer_0)
     result = read_file(_ws(request), target, max_bytes=MAX_VIEW_BYTES)
     if result.get("status") != "success":
         error = result.get("error") or {}
-        return {
+        answer_1: CodeRepoFileView = {
             "path": relative,
             "text": "",
             "truncated": False,
@@ -259,7 +271,8 @@ async def read_code_repo_file(
             "readable": False,
             "reason_code": str(error.get("type") or "unreadable"),
         }
-    return {
+        return serialize_dto(answer_1)
+    answer_2: CodeRepoFileView = {
         "path": relative,
         "text": str(result.get("text", "")),
         "truncated": bool(result.get("truncated")),
@@ -267,6 +280,7 @@ async def read_code_repo_file(
         "readable": True,
         "reason_code": "",
     }
+    return serialize_dto(answer_2)
 
 
 @router.get("/api/code/repos/{repo_id}/changes")
@@ -300,7 +314,7 @@ async def read_code_repo_changes(
     repo = _owned_repo(request, repo_id, auth_data[0].principal_id)
     root = _repo_root(request, repo)
     if root is None:
-        return {
+        answer_0: CodeRepoChangesView = {
             "entries": [],
             "diff": "",
             "truncated": False,
@@ -312,11 +326,12 @@ async def read_code_repo_changes(
                 else "repo_folder_missing"
             ),
         }
+        return serialize_dto(answer_0)
     if not (root / ".git").exists():
         # Not a failure: a plain folder is a perfectly good place to work, it
         # just has no history to compare against. Saying which of the two it is
         # keeps "no changes" from meaning "no version control".
-        return {
+        answer_1: CodeRepoChangesView = {
             "entries": [],
             "diff": "",
             "truncated": False,
@@ -324,13 +339,14 @@ async def read_code_repo_changes(
             "root_missing": False,
             "reason_code": "not_a_git_repository",
         }
+        return serialize_dto(answer_1)
 
     entries = working_tree_changes(root)
     truncated = len(entries) > MAX_CHANGED_FILES
     entries = entries[:MAX_CHANGED_FILES]
     diff = working_tree_diff(root, entries) if entries else ""
     diff_truncated = len(diff) > MAX_CHANGES_DIFF_CHARS
-    return {
+    answer_2: CodeRepoChangesView = {
         "entries": [
             {
                 "path": entry["path"],
@@ -346,6 +362,7 @@ async def read_code_repo_changes(
         "root_missing": False,
         "reason_code": None,
     }
+    return serialize_dto(answer_2)
 
 
 @router.get("/api/code/repos/{repo_id}/diagnostics")
@@ -400,7 +417,7 @@ async def read_code_repo_diagnostics(
     result = service.diagnostics([relative])
     if result.get("status") != "success":
         error = result.get("error") or {}
-        return {
+        answer_0: CodeRepoDiagnosticsView = {
             "path": relative,
             "checked": False,
             "available": False,
@@ -408,9 +425,10 @@ async def read_code_repo_diagnostics(
             "reason": str(error.get("message") or ""),
             "diagnostics": [],
         }
+        return serialize_dto(answer_0)
     checked = relative in (result.get("checked") or [])
     unsupported = result.get("unsupported") or []
-    return {
+    answer_1: CodeRepoDiagnosticsView = {
         "path": relative,
         "checked": checked,
         "available": True,
@@ -422,3 +440,4 @@ async def read_code_repo_diagnostics(
         ),
         "diagnostics": result.get("diagnostics") or [],
     }
+    return serialize_dto(answer_1)

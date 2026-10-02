@@ -7,11 +7,12 @@ import weakref
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from importlib.resources import files
-from typing import Any
+from typing import Any, Literal, NotRequired, cast
 from urllib.parse import quote, urlencode, urlparse
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
+from typing_extensions import TypedDict
 
 from raiker.auth.vault_key_file import effective_vault_key, ensure_vault_key
 from raiker.contracts.ids import new_id, utc_now
@@ -242,7 +243,34 @@ class ConnectorVault:
         return dict(row) if row else None
 
 
-def compile_manifest(raw: dict[str, Any]) -> dict[str, Any]:
+class ConnectorCompensation(TypedDict):
+    """The operation that undoes a write, and how long it stays possible."""
+
+    operation_id: str
+    argument_map: dict[str, str]
+    deadline_seconds: int
+
+
+class ConnectorOperation(TypedDict):
+    operation_id: str
+    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"]
+    path: str
+    description: str
+    #: Anything but a read waits for the owner's approval before it runs.
+    requires_confirmation: bool
+    compensation: NotRequired[ConnectorCompensation]
+
+
+class CompiledManifest(TypedDict):
+    """A bounded operation index: OpenAPI operations, or an ai-plugin's API URL."""
+
+    kind: Literal["openapi", "ai_plugin"]
+    version: NotRequired[str]
+    api_url: NotRequired[str]
+    operations: list[ConnectorOperation]
+
+
+def compile_manifest(raw: dict[str, Any]) -> CompiledManifest:
     """Compile OpenAPI 2/3 or ai-plugin metadata into a bounded operation index."""
     if "api" in raw and isinstance(raw.get("api"), dict):
         url = raw["api"].get("url")
@@ -255,7 +283,7 @@ def compile_manifest(raw: dict[str, Any]) -> dict[str, Any]:
     paths = raw.get("paths")
     if not isinstance(paths, dict):
         raise ValueError("manifest_paths_missing")
-    operations: list[dict[str, Any]] = []
+    operations: list[ConnectorOperation] = []
     for path, item in paths.items():
         if not isinstance(path, str) or not path.startswith("/") or not isinstance(item, dict):
             continue
@@ -295,7 +323,7 @@ def compile_manifest(raw: dict[str, Any]) -> dict[str, Any]:
                     "argument_map": dict(sorted(argument_map.items())),
                     "deadline_seconds": deadline_seconds,
                 }
-            operations.append(compiled_operation)
+            operations.append(cast(ConnectorOperation, compiled_operation))
             if len(operations) > 500:
                 raise ValueError("manifest_operation_limit_exceeded")
     if not operations:
@@ -353,7 +381,7 @@ class ConnectorInvoker:
     def __init__(self, store: SQLiteStore) -> None:
         self.store = store
 
-    def _operation(self, connector_id: str, operation_id: str) -> tuple[dict[str, Any], str]:
+    def _operation(self, connector_id: str, operation_id: str) -> tuple[ConnectorOperation, str]:
         with self.store.connect() as connection:
             row = connection.execute(
                 "SELECT manifest_json FROM connector_manifests WHERE connector_id=?",

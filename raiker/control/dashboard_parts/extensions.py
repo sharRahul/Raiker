@@ -15,7 +15,18 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 from raiker.control.dtos import ControlResult
 from raiker.control.views.extensions import (
+    ChannelProfile,
+    ChannelRoutingMode,
+    ChannelsView,
+    HookActivityView,
+    HookRuleView,
+    HookSourceView,
+    HooksView,
+    InstalledPlugin,
+    McpOffer,
     McpServerView,
+    PluginSigning,
+    PluginsView,
     UnsupportedFeature,
     _declaration_summaries,
     _env_requirements,
@@ -100,7 +111,7 @@ class ExtensionService:
             for row in self.store.list_mcp_servers(principal_id)
         ]
 
-    def list_mcp_offers(self: DashboardService, principal_id: str) -> list[dict[str, Any]]:
+    def list_mcp_offers(self: DashboardService, principal_id: str) -> list[McpOffer]:
         """MCP servers installed plugins *offer*, and whether each is already added.
 
         An offer is inert (BUG-221). It is a description of a server, read from
@@ -118,7 +129,7 @@ class ExtensionService:
 
         taken = {str(row.get("name")) for row in self.store.list_mcp_servers(principal_id)}
         return [
-            {**offer, "plugin_id": plugin_id, "already_added": offer["name"] in taken}
+            cast(McpOffer, {**offer, "plugin_id": plugin_id, "already_added": offer["name"] in taken})
             for plugin_id, offer in contributed_mcp_servers(self.workspace_root)
         ]
 
@@ -176,7 +187,7 @@ class ExtensionService:
         "hook_failed",
     )
 
-    def list_hooks(self: DashboardService, principal_id: str | None = None) -> dict[str, Any]:
+    def list_hooks(self: DashboardService, principal_id: str | None = None) -> HooksView:
         """What hooks are configured, whether they can fire, and what they did.
 
         Hooks were the one extension surface with a real, enforcing backend and no
@@ -210,7 +221,7 @@ class ExtensionService:
         from raiker.hooks.registry import HooksRegistry
 
         registry = HooksRegistry.load(self.workspace_root)
-        rules: list[dict[str, Any]] = []
+        rules: list[HookRuleView] = []
         for index, rule in enumerate(
             sorted(registry.rules, key=lambda r: (HOOK_SCOPES.index(r.scope), r.event, r.matcher))
         ):
@@ -241,7 +252,7 @@ class ExtensionService:
                 for handler in rule.handlers
             )
             rules.append(
-                {
+                cast(HookRuleView, {
                     # Stable within one read, which is all a list key needs; hook
                     # rules have no identity of their own in the config format.
                     "rule_id": f"{rule.scope}:{rule.event}:{index}",
@@ -288,10 +299,10 @@ class ExtensionService:
                         }
                         for handler in rule.handlers
                     ],
-                }
+                })
             )
 
-        activity: list[dict[str, Any]] = []
+        activity: list[HookActivityView] = []
         counts: dict[str, int] = {}
         for event_type in self._HOOK_EVENT_TYPES:
             rows = self.store.list_event_index(event_type=event_type, limit=50)
@@ -318,8 +329,10 @@ class ExtensionService:
             "disabled": disabled,
             "rule_count": len(rules),
             "rules": rules,
-            "sources": [entry.to_dict() for entry in registry.sources],
-            "failed_sources": [entry.to_dict() for entry in registry.failed_sources()],
+            "sources": [cast(HookSourceView, entry.to_dict()) for entry in registry.sources],
+            "failed_sources": [
+                cast(HookSourceView, entry.to_dict()) for entry in registry.failed_sources()
+            ],
             "events": [
                 {
                     "event": event,
@@ -334,7 +347,7 @@ class ExtensionService:
             "activity_counts": counts,
         }
 
-    def list_plugins(self: DashboardService) -> dict[str, Any]:
+    def list_plugins(self: DashboardService) -> PluginsView:
         """Installed plugin records, what each one provides, and the signing posture.
 
         A plugin's signature is reported at the level it actually earned —
@@ -358,7 +371,7 @@ class ExtensionService:
 
         posture = signing_posture()
         contributions = installed_contributions(self.workspace_root)
-        plugins: list[dict[str, Any]] = []
+        plugins: list[InstalledPlugin] = []
         for row in self.store.list_plugin_install_records():
             signature = str(row.get("signature") or "")
             manifest = {
@@ -379,7 +392,7 @@ class ExtensionService:
                 else (LEVEL_PRESENT_ONLY if signature else LEVEL_UNSIGNED)
             )
             plugins.append(
-                {
+                cast(InstalledPlugin, {
                     "record_id": row.get("record_id"),
                     "plugin_id": row.get("plugin_id"),
                     "version": row.get("version"),
@@ -407,11 +420,11 @@ class ExtensionService:
                             "error": None,
                         },
                     ),
-                }
+                })
             )
         return {
             "plugins": plugins,
-            "signing": posture,
+            "signing": cast(PluginSigning, posture),
             # What a plugin is allowed to contribute on this build, so the tab can
             # say what the surface *is* rather than only what is installed.
             "contribution_kinds": [
@@ -452,7 +465,7 @@ class ExtensionService:
             ],
         }
 
-    def list_channels(self: DashboardService, principal_id: str) -> dict[str, Any]:
+    def list_channels(self: DashboardService, principal_id: str) -> ChannelsView:
         """Every connector profile, what it needs, and what is actually true today.
 
         The Channels tab said channels did not exist. The outbound executor, the
@@ -479,8 +492,9 @@ class ExtensionService:
           it the receiver refuses every message, which is the right default and a
           confusing one to meet without being told.
 
-        Never returns a secret, a host, or a sender identifier — a count and a
-        boolean answer every question this page asks.
+        Never returns a secret or a host. Sender identifiers go back only to the
+        owner who allowlisted them, so routing can name which of them is the
+        owner; everything else this page asks is answered by a count or a boolean.
         """
         import json as _json
 
@@ -500,7 +514,7 @@ class ExtensionService:
         pairings = {str(row.get("connector_id")): row for row in self.store.list_channel_pairings()}
         gate = self.control.get_capability_gate("external_channel_runtime", principal_id)
         allowlist = channel_egress_allowlist()
-        rows: list[dict[str, Any]] = []
+        rows: list[ChannelProfile] = []
         for profile in profiles:
             pairing = pairings.get(profile.connector_id)
             senders: list[str] = []
@@ -525,10 +539,13 @@ class ExtensionService:
                     "pairing_id": pairing.get("pairing_id") if pairing else None,
                     "display_label": pairing.get("display_name") if pairing else None,
                     "sender_count": len(senders),
-                    # The identifiers themselves are the owner's contact list and
-                    # never leave the store; the count answers the page's question.
+                    # The owner's own contact list, sent only to the owner: the
+                    # routing control picks which sender is the owner from it.
                     "senders": senders,
-                    "routing_mode": str(pairing.get("routing_mode") or "record_only") if pairing else "record_only",
+                    "routing_mode": cast(
+                        ChannelRoutingMode,
+                        str(pairing.get("routing_mode") or "record_only") if pairing else "record_only",
+                    ),
                     "target_session_id": pairing.get("target_session_id") if pairing else None,
                     "owner_sender_id": pairing.get("owner_sender_id") if pairing else None,
                     "approval_relay_enabled": bool(pairing.get("approval_relay_enabled")) if pairing else False,

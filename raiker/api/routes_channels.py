@@ -6,7 +6,7 @@ import json
 import os
 import time
 from collections import defaultdict, deque
-from typing import Any
+from typing import Any, Literal, cast
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
@@ -21,8 +21,21 @@ from raiker.api.schemas import (
     ChannelTestDeliveryRequest,
     InboundChannelMessage,
     PairChannelRequest,
+    serialize_dto,
 )
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.channels import (
+    ApprovalRelayAnswered,
+    ChannelEnabledSet,
+    ChannelInboundAccepted,
+    ChannelPaired,
+    ChannelRoutingSet,
+    ChannelSendersSet,
+    ChannelTestDelivered,
+    ChannelUnpaired,
+    ChannelUpdateIgnored,
+    InboundRoute,
+)
 from raiker.channels.adapters import adapter_for
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id
@@ -32,6 +45,7 @@ from raiker.contracts.models import (
     PromptOptions,
     PromptPayload,
 )
+from raiker.control.views.extensions import ChannelsView
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority.models import Principal
@@ -160,7 +174,8 @@ async def list_channels(
     different remedy and collapsing them into one "ready" flag is what made this
     surface unable to say anything useful in the first place.
     """
-    return _service(request).list_channels(auth_data[0].principal_id)
+    answer: ChannelsView = _service(request).list_channels(auth_data[0].principal_id)
+    return serialize_dto(answer)
 
 
 @router.post("/api/channels/pairings")
@@ -170,14 +185,18 @@ async def pair_channel(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Pair a connector. Paired is **not** enabled — that is a second decision."""
-    return _channel_result(
-        _service(request).pair_channel(
-            auth_data[0].principal_id,
-            body.connector_id,
-            body.display_name or "",
-            list(body.senders or []),
-        )
+    answer = cast(
+        ChannelPaired,
+        _channel_result(
+            _service(request).pair_channel(
+                auth_data[0].principal_id,
+                body.connector_id,
+                body.display_name or "",
+                list(body.senders or []),
+            )
+        ),
     )
+    return serialize_dto(answer)
 
 
 @router.put("/api/channels/pairings/{pairing_id}/enabled")
@@ -187,9 +206,13 @@ async def set_channel_enabled(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _channel_result(
-        _service(request).set_channel_enabled(auth_data[0].principal_id, pairing_id, body.enabled)
+    answer = cast(
+        ChannelEnabledSet,
+        _channel_result(
+            _service(request).set_channel_enabled(auth_data[0].principal_id, pairing_id, body.enabled)
+        ),
     )
+    return serialize_dto(answer)
 
 
 @router.put("/api/channels/pairings/{pairing_id}/senders")
@@ -200,11 +223,15 @@ async def set_channel_senders(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Replace the sender allowlist. This is what the inbound receiver enforces."""
-    return _channel_result(
-        _service(request).set_channel_senders(
-            auth_data[0].principal_id, pairing_id, list(body.senders or [])
-        )
+    answer = cast(
+        ChannelSendersSet,
+        _channel_result(
+            _service(request).set_channel_senders(
+                auth_data[0].principal_id, pairing_id, list(body.senders or [])
+            )
+        ),
     )
+    return serialize_dto(answer)
 
 
 @router.put("/api/channels/pairings/{pairing_id}/routing")
@@ -214,16 +241,20 @@ async def set_channel_routing(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _channel_result(
-        _service(request).set_channel_routing(
-            auth_data[0].principal_id,
-            pairing_id,
-            routing_mode=body.routing_mode,
-            target_session_id=body.target_session_id,
-            owner_sender_id=body.owner_sender_id,
-            approval_relay_enabled=body.approval_relay_enabled,
-        )
+    answer = cast(
+        ChannelRoutingSet,
+        _channel_result(
+            _service(request).set_channel_routing(
+                auth_data[0].principal_id,
+                pairing_id,
+                routing_mode=body.routing_mode,
+                target_session_id=body.target_session_id,
+                owner_sender_id=body.owner_sender_id,
+                approval_relay_enabled=body.approval_relay_enabled,
+            )
+        ),
     )
+    return serialize_dto(answer)
 
 
 @router.delete("/api/channels/pairings/{pairing_id}")
@@ -232,9 +263,13 @@ async def unpair_channel(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _channel_result(
-        _service(request).unpair_channel(auth_data[0].principal_id, pairing_id)
+    answer = cast(
+        ChannelUnpaired,
+        _channel_result(
+            _service(request).unpair_channel(auth_data[0].principal_id, pairing_id)
+        ),
     )
+    return serialize_dto(answer)
 
 
 @router.post("/api/channels/deliver-test")
@@ -250,11 +285,15 @@ async def deliver_channel_test(
     with `disabled_by_capability_gate` and an unallowlisted host refuses it at
     the egress boundary — exactly as a real delivery would.
     """
-    return _channel_result(
-        _service(request).deliver_channel_test(
-            auth_data[0].principal_id, body.connector_id, body.url, body.text
-        )
+    answer = cast(
+        ChannelTestDelivered,
+        _channel_result(
+            _service(request).deliver_channel_test(
+                auth_data[0].principal_id, body.connector_id, body.url, body.text
+            )
+        ),
     )
+    return serialize_dto(answer)
 
 
 def _require_channel_secret(presented: str | None) -> None:
@@ -280,9 +319,9 @@ async def receive_inbound(
     x_raiker_channel_secret: str | None = Header(default=None),
 ) -> dict[str, Any]:
     _require_channel_secret(x_raiker_channel_secret)
-    return await _handle_inbound(
+    return serialize_dto(await _handle_inbound(
         connector_id, sender_id=body.sender_id, text=body.text, request=request
-    )
+    ))
 
 
 @router.post("/api/channels/{connector_id}/telegram")
@@ -309,10 +348,11 @@ async def receive_telegram(
     adapter = adapter_for("telegram")
     parsed = adapter.parse_inbound(update) if adapter is not None else None
     if parsed is None:
-        return {"ok": True, "ignored": "unsupported_update"}
-    return await _handle_inbound(
+        answer: ChannelUpdateIgnored = {"ok": True, "ignored": "unsupported_update"}
+        return serialize_dto(answer)
+    return serialize_dto(await _handle_inbound(
         connector_id, sender_id=parsed.sender_id, text=parsed.text, request=request
-    )
+    ))
 
 
 
@@ -322,7 +362,7 @@ async def _handle_inbound(
     sender_id: str,
     text: str,
     request: Request,
-) -> dict[str, Any]:
+) -> ChannelInboundAccepted:
     store = SQLiteStore(_ws(request))
     writer = EventLogWriter(store)
     pairing = _enabled_pairing(store, connector_id)
@@ -417,13 +457,14 @@ async def _handle_inbound(
         text=text,
         is_owner=is_owner,
     )
-    return {
+    answer = cast(ChannelInboundAccepted, {
         "ok": True,
         "channel_message_id": channel_message_id,
         "trust_level": "owner" if is_owner else "untrusted",
         "quarantined": not bool(routed.get("routed")),
         **routed,
-    }
+    })
+    return answer
 
 
 @router.post("/api/channels/{connector_id}/approval-response")
@@ -575,13 +616,14 @@ async def receive_approval_response(
         actor="channel_approval_relay",
         payload={"relay_id": body.relay_id, "approval_id": approval_id, "executed": executed},
     ))
-    return {
+    answer: ApprovalRelayAnswered = {
         "ok": True,
         "relay_id": body.relay_id,
         "approval_id": approval_id,
         "status": "executed" if executed else relay_status,
         "resumable": suspended is not None,
     }
+    return serialize_dto(answer)
 
 
 async def _route_inbound_message(
@@ -593,22 +635,26 @@ async def _route_inbound_message(
     sender_id: str,
     text: str,
     is_owner: bool,
-) -> dict[str, Any]:
+) -> InboundRoute:
     """Apply only the route stored on the pairing; message fields grant nothing."""
     mode = str(pairing.get("routing_mode") or "record_only")
     if mode == "record_only":
-        return {"routed": False, "routing_mode": mode}
+        answer_0: InboundRoute = {"routed": False, "routing_mode": mode}
+        return answer_0
     principal_id = str(pairing.get("paired_by") or "")
     target = str(pairing.get("target_session_id") or "") or None
     if mode in {"new_turn", "interrupt"} and not is_owner:
-        return {
+        answer_1: InboundRoute = {
             "routed": False,
             "routing_mode": mode,
             "reason_code": "channel_owner_sender_required",
         }
+        return answer_1
     if mode == "interrupt":
         if target is None:
-            return {"routed": False, "routing_mode": mode, "reason_code": "channel_target_session_required"}
+            answer_2: InboundRoute = {"routed": False, "routing_mode": mode, "reason_code": "channel_target_session_required"}
+            return answer_2
+        action: Literal["stop", "steer"]
         if text.strip().lower() in {"stop", "cancel", "pause"}:
             store.request_turn_stop(target, principal_id, reason="owner requested stop over paired channel")
             action = "stop"
@@ -622,12 +668,15 @@ async def _route_inbound_message(
             actor="channel_router",
             payload={"channel_message_id": channel_message_id, "routing_mode": mode, "action": action},
         ))
-        return {"routed": True, "routing_mode": mode, "action": action, "session_id": target}
+        answer_3: InboundRoute = {"routed": True, "routing_mode": mode, "action": action, "session_id": target}
+        return answer_3
 
     if mode not in {"new_turn", "side_question"}:
-        return {"routed": False, "routing_mode": mode, "reason_code": "channel_routing_mode_unsupported"}
+        answer_4: InboundRoute = {"routed": False, "routing_mode": mode, "reason_code": "channel_routing_mode_unsupported"}
+        return answer_4
     if mode == "side_question" and target is None:
-        return {"routed": False, "routing_mode": mode, "reason_code": "channel_target_session_required"}
+        answer_5: InboundRoute = {"routed": False, "routing_mode": mode, "reason_code": "channel_target_session_required"}
+        return answer_5
 
     from raiker.gateway.agent_gateway import AgentGateway
 
@@ -675,7 +724,7 @@ async def _route_inbound_message(
             "tool_budget": envelope.options.max_tool_calls,
         },
     ))
-    return {
+    answer_6: InboundRoute = {
         "routed": True,
         "routing_mode": mode,
         "session_id": session_id,
@@ -683,3 +732,4 @@ async def _route_inbound_message(
         "status": response.status,
         "reply": response.message,
     }
+    return answer_6

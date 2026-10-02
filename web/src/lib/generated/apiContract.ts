@@ -85,6 +85,10 @@ export type BlocklistTestRequest = {
   host: string;
 };
 
+export type BootstrapStatusView = {
+  can_register: boolean;
+};
+
 /** One location inside the Knowledge Map's boundary. */
 export type BrainSourceRequest = {
   path: string;
@@ -372,6 +376,18 @@ export type CredentialRequest = {
   expires_at?: string | null;
 };
 
+/** One sign-in of this account, without its token. */
+export type DeviceSessionView = {
+  session_id: string;
+  created_at: string;
+  last_seen_at: string | null;
+  device_label: string | null;
+  revoked: boolean;
+  expires_at: string | null;
+  scope: string;
+  current: boolean;
+};
+
 export type DiagnosticsView = {
   runtime_mode: string;
   production_ready_local_single_user_runtime: boolean;
@@ -399,6 +415,10 @@ export type DisableRuntimeModeRequest = {
 export type ElevateRequest = {
   password?: string | null;
   mfa_code?: string | null;
+};
+
+export type ElevatedTokenView = {
+  token: string;
 };
 
 /** An embedding model this install could call, and what is waiting to be embedded by it. */
@@ -538,6 +558,15 @@ export type InterruptRequest = {
   steer_text?: string | null;
 };
 
+/** The first-run owner session, with the CSRF token for its cookie. */
+export type IssuedSessionView = {
+  token: string;
+  session_id: string;
+  principal_id: string;
+  expires_at: string | null;
+  csrf_token: string | null;
+};
+
 export type LanguageCheckRequest = {
   text: string;
   language?: string;
@@ -551,6 +580,15 @@ export type LoginRequest = {
   username: string;
   password: string;
   device_label?: string | null;
+};
+
+/** A sign-in step: a full session, or a ticket that MFA must upgrade. */
+export type LoginResultView = {
+  stage: "session" | "mfa_required";
+  principal_id: string;
+  token: string | null;
+  ticket: string | null;
+  csrf_token: string | null;
 };
 
 export type ManifestRequest = {
@@ -656,6 +694,12 @@ export type MfaCodeRequest = {
   code: string;
 };
 
+export type MfaEnrollmentView = {
+  secret: string;
+  provisioning_uri: string;
+  backup_codes: string[];
+};
+
 export type MfaVerifyRequest = {
   ticket: string;
   code: string;
@@ -749,6 +793,11 @@ export type NotificationView = {
   created_at: string;
 };
 
+/** The acknowledgement a route gives when the change it was asked for is done. */
+export type Ok = {
+  ok: boolean;
+};
+
 export type OllamaPullRequestBody = {
   model: string;
   confirmed?: boolean;
@@ -763,6 +812,12 @@ export type PairChannelRequest = {
 
 export type PasswordRecoveryBeginRequest = {
   username: string;
+};
+
+/** The same shape for a known and an unknown user; only a real ticket completes. */
+export type PasswordRecoveryBeginView = {
+  ok: boolean;
+  ticket: string;
 };
 
 export type PasswordRecoveryCompleteRequest = {
@@ -942,6 +997,13 @@ export type SessionCommandGrantRequest = {
   commands: string[][];
   timeout_seconds?: number;
   ttl_minutes?: number;
+};
+
+/** Who this browser is — all three null when nobody is (BUG-267). */
+export type SessionStateView = {
+  principal_id: string | null;
+  display_name: string | null;
+  scope: string | null;
 };
 
 export type SessionView = {
@@ -1177,6 +1239,12 @@ export type VaultKeyRequest = {
   mfa_code?: string | null;
 };
 
+export type WhoamiView = {
+  principal_id: string;
+  display_name: string;
+  scope: string;
+};
+
 /** One filter choice, with how many threads it would select. */
 export type WorkThreadFacet = {
   value: string;
@@ -1218,10 +1286,46 @@ export type WorkThreadView = {
 
 /** One typed wrapper per verified operation, on the shared transport core. */
 export const contract = {
+  deleteAccount: () =>
+    request<Ok>("/api/account", { method: "DELETE" }),
   listApprovals: (query: { status_filter?: string } = {}) =>
     request<ApprovalView[]>(withQuery("/api/approvals", query)),
   getApproval: (approvalId: string) =>
     request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(approvalId)}`),
+  bootstrapStatus: () =>
+    request<BootstrapStatusView>("/api/auth/bootstrap-status"),
+  elevate: (body: ElevateRequest) =>
+    postJson<ElevatedTokenView>("/api/auth/elevate", body),
+  login: (body: LoginRequest) =>
+    postJson<LoginResultView>("/api/auth/login", body),
+  logout: () =>
+    postJson<Ok>("/api/auth/logout", {}),
+  mfaActivate: (body: MfaCodeRequest) =>
+    postJson<Ok>("/api/auth/mfa/activate", body),
+  mfaDisable: () =>
+    postJson<Ok>("/api/auth/mfa/disable", {}),
+  mfaEnroll: () =>
+    postJson<MfaEnrollmentView>("/api/auth/mfa/enroll", {}),
+  mfaVerify: (body: MfaVerifyRequest) =>
+    postJson<LoginResultView>("/api/auth/mfa/verify", body),
+  changePassword: (body: ChangePasswordRequest) =>
+    postJson<Ok>("/api/auth/password", body),
+  beginPasswordRecovery: (body: PasswordRecoveryBeginRequest) =>
+    postJson<PasswordRecoveryBeginView>("/api/auth/password-recovery/begin", body),
+  completePasswordRecovery: (body: PasswordRecoveryCompleteRequest) =>
+    postJson<Ok>("/api/auth/password-recovery/complete", body),
+  register: (body: RegisterRequest) =>
+    postJson<LoginResultView>("/api/auth/register", body),
+  mintSession: (body: AuthSessionRequest) =>
+    postJson<IssuedSessionView>("/api/auth/session", body),
+  sessionState: () =>
+    request<SessionStateView>("/api/auth/session-state"),
+  listDeviceSessions: () =>
+    request<DeviceSessionView[]>("/api/auth/sessions"),
+  revokeDeviceSession: (sessionId: string) =>
+    postJson<Ok>(`/api/auth/sessions/${encodeURIComponent(sessionId)}/revoke`, {}),
+  whoami: () =>
+    request<WhoamiView>("/api/auth/whoami"),
   listCapabilityGates: () =>
     request<CapabilityGateView[]>("/api/capability-gates"),
   getCapabilityGate: (capability: string) =>

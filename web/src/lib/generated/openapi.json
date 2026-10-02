@@ -432,6 +432,19 @@
         "title": "BlocklistTestRequest",
         "type": "object"
       },
+      "BootstrapStatusView": {
+        "properties": {
+          "can_register": {
+            "title": "Can Register",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "can_register"
+        ],
+        "title": "BootstrapStatusView",
+        "type": "object"
+      },
       "BrainSourceRequest": {
         "additionalProperties": false,
         "description": "One location inside the Knowledge Map's boundary.\n\nEither a scoped source path (``<root_id>/<relative>``) for the source\nendpoints, or an absolute folder path for the grant endpoint.",
@@ -1937,6 +1950,76 @@
         "title": "CredentialRequest",
         "type": "object"
       },
+      "DeviceSessionView": {
+        "description": "One sign-in of this account, without its token.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "device_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Label"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "revoked": {
+            "title": "Revoked",
+            "type": "boolean"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "created_at",
+          "last_seen_at",
+          "device_label",
+          "revoked",
+          "expires_at",
+          "scope",
+          "current"
+        ],
+        "title": "DeviceSessionView",
+        "type": "object"
+      },
       "DiagnosticsView": {
         "properties": {
           "background_workers": {
@@ -2094,6 +2177,19 @@
           }
         },
         "title": "ElevateRequest",
+        "type": "object"
+      },
+      "ElevatedTokenView": {
+        "properties": {
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "ElevatedTokenView",
         "type": "object"
       },
       "EmbeddingProviderView": {
@@ -2866,6 +2962,54 @@
         "title": "InterruptRequest",
         "type": "object"
       },
+      "IssuedSessionView": {
+        "description": "The first-run owner session, with the CSRF token for its cookie.",
+        "properties": {
+          "csrf_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Csrf Token"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "principal_id": {
+            "title": "Principal Id",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "session_id",
+          "principal_id",
+          "expires_at",
+          "csrf_token"
+        ],
+        "title": "IssuedSessionView",
+        "type": "object"
+      },
       "LanguageCheckRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2933,6 +3077,65 @@
           "password"
         ],
         "title": "LoginRequest",
+        "type": "object"
+      },
+      "LoginResultView": {
+        "description": "A sign-in step: a full session, or a ticket that MFA must upgrade.\n\n``csrf_token`` pairs with the reload-surviving session cookie and is set\nonly on a full session (BUG-253).",
+        "properties": {
+          "csrf_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Csrf Token"
+          },
+          "principal_id": {
+            "title": "Principal Id",
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "session",
+              "mfa_required"
+            ],
+            "title": "Stage",
+            "type": "string"
+          },
+          "ticket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          }
+        },
+        "required": [
+          "stage",
+          "principal_id",
+          "token",
+          "ticket",
+          "csrf_token"
+        ],
+        "title": "LoginResultView",
         "type": "object"
       },
       "ManifestRequest": {
@@ -3518,6 +3721,32 @@
         "title": "MfaCodeRequest",
         "type": "object"
       },
+      "MfaEnrollmentView": {
+        "properties": {
+          "backup_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Backup Codes",
+            "type": "array"
+          },
+          "provisioning_uri": {
+            "title": "Provisioning Uri",
+            "type": "string"
+          },
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret",
+          "provisioning_uri",
+          "backup_codes"
+        ],
+        "title": "MfaEnrollmentView",
+        "type": "object"
+      },
       "MfaVerifyRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4020,6 +4249,18 @@
         "title": "NotificationView",
         "type": "object"
       },
+      "Ok": {
+        "description": "The acknowledgement a route gives when the change it was asked for is done.",
+        "properties": {
+          "ok": {
+            "default": true,
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "title": "Ok",
+        "type": "object"
+      },
       "OllamaPullRequestBody": {
         "additionalProperties": false,
         "properties": {
@@ -4091,6 +4332,25 @@
           "username"
         ],
         "title": "PasswordRecoveryBeginRequest",
+        "type": "object"
+      },
+      "PasswordRecoveryBeginView": {
+        "description": "The same shape for a known and an unknown user; only a real ticket completes.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "ticket": {
+            "title": "Ticket",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "ticket"
+        ],
+        "title": "PasswordRecoveryBeginView",
         "type": "object"
       },
       "PasswordRecoveryCompleteRequest": {
@@ -4982,6 +5242,51 @@
           "commands"
         ],
         "title": "SessionCommandGrantRequest",
+        "type": "object"
+      },
+      "SessionStateView": {
+        "description": "Who this browser is — all three null when nobody is (BUG-267).",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "principal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Principal Id"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          }
+        },
+        "required": [
+          "principal_id",
+          "display_name",
+          "scope"
+        ],
+        "title": "SessionStateView",
         "type": "object"
       },
       "SessionView": {
@@ -6313,6 +6618,29 @@
         "title": "VaultKeyRequest",
         "type": "object"
       },
+      "WhoamiView": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "principal_id": {
+            "title": "Principal Id",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "principal_id",
+          "display_name",
+          "scope"
+        ],
+        "title": "WhoamiView",
+        "type": "object"
+      },
       "WorkThreadFacet": {
         "description": "One filter choice, with how many threads it would select.",
         "properties": {
@@ -6559,9 +6887,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Account Api Account Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Ok"
                 }
               }
             },
@@ -7186,11 +7512,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "boolean"
-                  },
-                  "title": "Response Bootstrap Status Api Auth Bootstrap Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BootstrapStatusView"
                 }
               }
             },
@@ -7218,9 +7540,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Elevate Api Auth Elevate Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ElevatedTokenView"
                 }
               }
             },
@@ -7258,9 +7578,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Login Api Auth Login Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/LoginResultView"
                 }
               }
             },
@@ -7288,9 +7606,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Logout Api Auth Logout Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Ok"
                 }
               }
             },
@@ -7318,9 +7634,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Mfa Activate Api Auth Mfa Activate Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Ok"
                 }
               }
             },
@@ -7348,9 +7662,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Mfa Disable Api Auth Mfa Disable Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Ok"
                 }
               }
             },
@@ -7368,9 +7680,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Mfa Enroll Api Auth Mfa Enroll Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MfaEnrollmentView"
                 }
               }
             },
@@ -7398,9 +7708,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Mfa Verify Api Auth Mfa Verify Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/LoginResultView"
                 }
               }
             },
@@ -7438,9 +7746,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Change Password Api Auth Password Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Ok"
                 }
               }
             },
@@ -7478,9 +7784,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Begin Password Recovery Api Auth Password Recovery Begin Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PasswordRecoveryBeginView"
                 }
               }
             },
@@ -7518,11 +7822,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "boolean"
-                  },
-                  "title": "Response Complete Password Recovery Api Auth Password Recovery Complete Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Ok"
                 }
               }
             },
@@ -7560,9 +7860,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Register Api Auth Register Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/LoginResultView"
                 }
               }
             },
@@ -7600,9 +7898,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Mint Session Api Auth Session Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/IssuedSessionView"
                 }
               }
             },
@@ -7631,9 +7927,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Session State Api Auth Session State Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SessionStateView"
                 }
               }
             },
@@ -7652,10 +7946,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/DeviceSessionView"
                   },
-                  "title": "Response List Device Sessions Api Auth Sessions Get",
                   "type": "array"
                 }
               }
@@ -7685,9 +7977,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Revoke Device Session Api Auth Sessions  Session Id  Revoke Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Ok"
                 }
               }
             },
@@ -7716,9 +8006,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Whoami Api Auth Whoami Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/WhoamiView"
                 }
               }
             },

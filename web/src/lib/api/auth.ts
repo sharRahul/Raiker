@@ -1,20 +1,15 @@
 // Signing in, restoring a session after a reload, and the account routes that
 // adopt or drop the session they answer with (OPT-02).
-import type {
-  AuthSession,
-  InstanceLaunchResult,
-  PasswordRecoveryBeginResult,
-} from "../apiTypes";
+import type { InstanceLaunchResult } from "../apiTypes";
+import { contract } from "../generated/apiContract";
+import type { IssuedSessionView, LoginResultView } from "../generated/apiContract";
 import { csrfFromCookie, hasToken, postJson, request, setCsrfToken, setToken } from "./core";
 
 /** Mint a bearer token for the local owner principal and hold it in memory. */
-export async function connect(): Promise<AuthSession> {
-  const session = await postJson<AuthSession & { csrf_token?: string | null }>(
-    "/api/auth/session",
-    { as_principal: null },
-  );
+export async function connect(): Promise<IssuedSessionView> {
+  const session = await contract.mintSession({ as_principal: null });
   setToken(session.token);
-  setCsrfToken(session.csrf_token ?? null);
+  setCsrfToken(session.csrf_token);
   return session;
 }
 
@@ -59,14 +54,7 @@ export function createInstance(
   });
 }
 
-export interface LoginResult {
-  stage: "session" | "mfa_required";
-  principal_id: string;
-  token: string | null;
-  ticket: string | null;
-  /** Pairs with the session cookie on every write (BUG-253). */
-  csrf_token?: string | null;
-}
+export type LoginResult = LoginResultView;
 
 /**
  * On a full 'session' result the bearer token is stored in memory, and the CSRF
@@ -75,7 +63,7 @@ export interface LoginResult {
 function adoptSession(result: LoginResult): LoginResult {
   if (result.stage === "session" && result.token) {
     setToken(result.token);
-    setCsrfToken(result.csrf_token ?? null);
+    setCsrfToken(result.csrf_token);
   }
   return result;
 }
@@ -96,7 +84,7 @@ function adoptSession(result: LoginResult): LoginResult {
 export async function restoreSession(): Promise<string | null> {
   if (!hasToken()) return null;
   try {
-    const who = await request<{ principal_id: string | null }>("/api/auth/session-state");
+    const who = await contract.sessionState();
     if (who.principal_id === null) {
       // The server has already cleared the cookie that said otherwise; drop the
       // half this page was holding so the next load has nothing to ask with.
@@ -117,76 +105,30 @@ export async function restoreSession(): Promise<string | null> {
 
 export const auth = {
   register: (username: string, password: string) =>
-    postJson<LoginResult>("/api/auth/register", { username, password }).then(
-      adoptSession,
-    ),
+    contract.register({ username, password }).then(adoptSession),
   login: (username: string, password: string) =>
-    postJson<LoginResult>("/api/auth/login", { username, password }).then(
-      adoptSession,
-    ),
+    contract.login({ username, password }).then(adoptSession),
   verifyMfa: (ticket: string, code: string) =>
-    postJson<LoginResult>("/api/auth/mfa/verify", { ticket, code }).then(
-      adoptSession,
-    ),
-  bootstrapStatus: () =>
-    request<{ can_register: boolean }>("/api/auth/bootstrap-status"),
-  beginPasswordRecovery: (username: string) =>
-    postJson<PasswordRecoveryBeginResult>("/api/auth/password-recovery/begin", {
-      username,
-    }),
-  completePasswordRecovery: (
-    ticket: string,
-    code: string,
-    newPassword: string,
-  ) =>
-    postJson<{ ok: boolean }>("/api/auth/password-recovery/complete", {
-      ticket,
-      code,
-      new_password: newPassword,
-    }),
+    contract.mfaVerify({ ticket, code }).then(adoptSession),
+  bootstrapStatus: () => contract.bootstrapStatus(),
+  beginPasswordRecovery: (username: string) => contract.beginPasswordRecovery({ username }),
+  completePasswordRecovery: (ticket: string, code: string, newPassword: string) =>
+    contract.completePasswordRecovery({ ticket, code, new_password: newPassword }),
   logout: async () => {
     try {
-      await postJson<{ ok: boolean }>("/api/auth/logout", {});
+      await contract.logout();
     } finally {
       setToken(null);
       setCsrfToken(null);
     }
   },
   elevate: (password?: string, mfaCode?: string) =>
-    postJson<{ token: string }>("/api/auth/elevate", {
-      password,
-      mfa_code: mfaCode,
-    }),
-  enrollMfa: () =>
-    postJson<{
-      secret: string;
-      provisioning_uri: string;
-      backup_codes: string[];
-    }>("/api/auth/mfa/enroll", {}),
-  activateMfa: (code: string) =>
-    postJson<{ ok: boolean }>("/api/auth/mfa/activate", { code }),
+    contract.elevate({ password, mfa_code: mfaCode }),
+  enrollMfa: () => contract.mfaEnroll(),
+  activateMfa: (code: string) => contract.mfaActivate({ code }),
   changePassword: (oldPassword: string, newPassword: string) =>
-    postJson<{ ok: boolean }>("/api/auth/password", {
-      old_password: oldPassword,
-      new_password: newPassword,
-    }),
-  listDeviceSessions: () =>
-    request<
-      Array<{
-        session_id: string;
-        created_at: string;
-        last_seen_at: string | null;
-        device_label: string | null;
-        revoked: boolean;
-        scope: string;
-        current: boolean;
-      }>
-    >("/api/auth/sessions"),
-  revokeDeviceSession: (sessionId: string) =>
-    postJson<{ ok: boolean }>(
-      `/api/auth/sessions/${encodeURIComponent(sessionId)}/revoke`,
-      {},
-    ),
-  deleteAccount: () =>
-    request<{ ok: boolean }>("/api/account", { method: "DELETE" }),
+    contract.changePassword({ old_password: oldPassword, new_password: newPassword }),
+  listDeviceSessions: () => contract.listDeviceSessions(),
+  revokeDeviceSession: (sessionId: string) => contract.revokeDeviceSession(sessionId),
+  deleteAccount: () => contract.deleteAccount(),
 };

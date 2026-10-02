@@ -108,6 +108,29 @@ def test_password_recovery_acknowledges_unknown_user_without_ticket(client: Test
     assert response.json()["ticket"]
 
 
+def test_password_recovery_completes_through_the_api(client: TestClient) -> None:
+    """The ticket `begin` hands back is the one `complete` accepts.
+
+    The response redactor read the 64-hex ticket as a secret and replaced it, so
+    the lock screen's recovery could never finish.
+    """
+    token = _register(client)["token"]
+    enrolled = client.post("/api/auth/mfa/enroll", headers=_headers(token)).json()
+    secret = enrolled["secret"]
+    client.post(
+        "/api/auth/mfa/activate", json={"code": pyotp.TOTP(secret).now()}, headers=_headers(token)
+    )
+    ticket = client.post("/api/auth/password-recovery/begin", json={"username": "alice"}).json()["ticket"]
+    assert "REDACTED" not in ticket
+    done = client.post(
+        "/api/auth/password-recovery/complete",
+        json={"ticket": ticket, "code": enrolled["backup_codes"][0], "new_password": "new-pass-456"},
+    )
+    assert done.status_code == 200, done.text
+    login = client.post("/api/auth/login", json={"username": "alice", "password": "new-pass-456"})
+    assert login.json()["stage"] == "mfa_required"
+
+
 def test_registration_and_bootstrap_mint_are_loopback_only(tmp_path) -> None:  # type: ignore[no-untyped-def]
     app = create_app(tmp_path)
     request = Request({"type": "http", "client": ("203.0.113.10", 50000), "app": app})

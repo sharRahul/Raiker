@@ -1,8 +1,6 @@
 import type { ApprovalMode } from "./approvalMode";
 import type {
   ApprovalView,
-  PathAttachment,
-  UploadAttachment,
   BackgroundWorkerHealth,
   CapabilityGateView,
   CheckpointCaptureHealth,
@@ -21,12 +19,15 @@ import type {
   ExtensionsOverviewView,
   ExtensionView,
   IdentityView,
+  IssuedSessionView,
   McpServerView,
   McpSessionView,
   McpToolDeclaration,
   MemoryControlView,
   MemorySettingsView,
   NotificationView,
+  PasswordRecoveryBeginView,
+  PathAttachment,
   ProjectAttachmentView,
   ProjectContext,
   ProjectDetailView,
@@ -41,6 +42,7 @@ import type {
   TaskView,
   TurnDetailView,
   TurnView,
+  UploadAttachment,
   WorkThreadFacet,
   WorkThreadPage,
   WorkThreadView,
@@ -1388,12 +1390,7 @@ export interface SessionDetail {
 
 export type TurnDetail = TurnDetailView;
 
-export interface AuthSession {
-  token: string;
-  session_id: string;
-  principal_id: string;
-  expires_at: string | null;
-}
+export type AuthSession = IssuedSessionView;
 
 // Raiker/control/dashboard.py ApprovalView.to_dict()
 export type { IdentityView };
@@ -2267,13 +2264,7 @@ export interface InstanceLaunchResult {
   url: string;
 }
 
-/** Local-only password recovery acknowledgement. The opaque ticket is issued
- * for known and unknown usernames alike; only a valid short-lived ticket plus
- * TOTP/backup code can complete a reset. */
-export interface PasswordRecoveryBeginResult {
-  ok: boolean;
-  ticket: string;
-}
+export type PasswordRecoveryBeginResult = PasswordRecoveryBeginView;
 
 /** BUG-40 — the tray/menu-bar control's view of the host it is controlling.
  * `state` is one of running / paused / needs attention / stopped, and `waiting`

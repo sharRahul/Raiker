@@ -13,11 +13,11 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
   `to_dict`; it needs a dedicated response model first (Stage B).
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**350 operations: 36 verified, 0 eligible, 306 deferred, 8 special.**
+**350 operations: 54 verified, 0 eligible, 288 deferred, 8 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
-| DELETE | `/api/account` |  |  | deferred | body assembled in the route |
+| DELETE | `/api/account` |  | Ok | verified | built as Ok |
 | GET | `/api/approvals` |  | ApprovalView[] | verified | DashboardService.list_approvals |
 | GET | `/api/approvals/resumable` |  |  | deferred | body assembled in the route |
 | GET | `/api/approvals/{approval_id}` |  | ApprovalDetailView | verified | DashboardService.get_approval |
@@ -31,23 +31,23 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/audit/export` |  |  | deferred | body assembled in the route |
 | GET | `/api/audit/exports` |  |  | deferred | body assembled in the route |
 | GET | `/api/audit/exports/{export_id}/download` |  |  | special | special |
-| GET | `/api/auth/bootstrap-status` |  |  | deferred | body assembled in the route |
-| POST | `/api/auth/elevate` | ElevateRequest |  | deferred | body assembled in the route |
-| POST | `/api/auth/login` | LoginRequest |  | deferred | body assembled in the route |
-| POST | `/api/auth/logout` |  |  | deferred | body assembled in the route |
-| POST | `/api/auth/mfa/activate` | MfaCodeRequest |  | deferred | body assembled in the route |
-| POST | `/api/auth/mfa/disable` |  |  | deferred | body assembled in the route |
-| POST | `/api/auth/mfa/enroll` |  |  | deferred | body assembled in the route |
-| POST | `/api/auth/mfa/verify` | MfaVerifyRequest |  | deferred | body assembled in the route |
-| POST | `/api/auth/password` | ChangePasswordRequest |  | deferred | body assembled in the route |
-| POST | `/api/auth/password-recovery/begin` | PasswordRecoveryBeginRequest |  | deferred | body assembled in the route |
-| POST | `/api/auth/password-recovery/complete` | PasswordRecoveryCompleteRequest |  | deferred | body assembled in the route |
-| POST | `/api/auth/register` | RegisterRequest |  | deferred | body assembled in the route |
-| POST | `/api/auth/session` | AuthSessionRequest |  | deferred | body assembled in the route |
-| GET | `/api/auth/session-state` |  |  | deferred | body assembled in the route |
-| GET | `/api/auth/sessions` |  |  | deferred | body assembled in the route |
-| POST | `/api/auth/sessions/{session_id}/revoke` |  |  | deferred | body assembled in the route |
-| GET | `/api/auth/whoami` |  |  | deferred | body assembled in the route |
+| GET | `/api/auth/bootstrap-status` |  | BootstrapStatusView | verified | built as BootstrapStatusView |
+| POST | `/api/auth/elevate` | ElevateRequest | ElevatedTokenView | verified | built as ElevatedTokenView |
+| POST | `/api/auth/login` | LoginRequest | LoginResultView | verified | _result_body |
+| POST | `/api/auth/logout` |  | Ok | verified | built as Ok |
+| POST | `/api/auth/mfa/activate` | MfaCodeRequest | Ok | verified | built as Ok |
+| POST | `/api/auth/mfa/disable` |  | Ok | verified | built as Ok |
+| POST | `/api/auth/mfa/enroll` |  | MfaEnrollmentView | verified | built as MfaEnrollmentView |
+| POST | `/api/auth/mfa/verify` | MfaVerifyRequest | LoginResultView | verified | _result_body |
+| POST | `/api/auth/password` | ChangePasswordRequest | Ok | verified | built as Ok |
+| POST | `/api/auth/password-recovery/begin` | PasswordRecoveryBeginRequest | PasswordRecoveryBeginView | verified | built as PasswordRecoveryBeginView |
+| POST | `/api/auth/password-recovery/complete` | PasswordRecoveryCompleteRequest | Ok | verified | built as Ok |
+| POST | `/api/auth/register` | RegisterRequest | LoginResultView | verified | _result_body |
+| POST | `/api/auth/session` | AuthSessionRequest | IssuedSessionView | verified | built as IssuedSessionView |
+| GET | `/api/auth/session-state` |  | SessionStateView | verified | built as SessionStateView |
+| GET | `/api/auth/sessions` |  | DeviceSessionView[] | verified | built as DeviceSessionView |
+| POST | `/api/auth/sessions/{session_id}/revoke` |  | Ok | verified | built as Ok |
+| GET | `/api/auth/whoami` |  | WhoamiView | verified | built as WhoamiView |
 | GET | `/api/brain` |  |  | deferred | brain_view returns BrainView, not a fields-only view |
 | GET | `/api/brain/settings` |  |  | deferred | body assembled in the route |
 | PUT | `/api/brain/settings` | dict |  | deferred | body assembled in the route |

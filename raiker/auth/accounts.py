@@ -18,6 +18,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Literal
 
 from raiker.api.sessions import ApiSessionStore
 from raiker.auth import mfa, passwords
@@ -46,7 +47,7 @@ class AuthError(Exception):
 
 @dataclass(frozen=True)
 class LoginResult:
-    stage: str  # "session" | "mfa_required"
+    stage: Literal["session", "mfa_required"]
     principal_id: str
     token: str | None = None
     ticket: str | None = None

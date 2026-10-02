@@ -86,6 +86,9 @@ _REDACTION_EXEMPT_PATHS = frozenset(
         "/api/auth/mfa/verify",
         "/api/auth/mfa/enroll",
         "/api/auth/elevate",
+        # The recovery ticket is the credential the next step presents; redacted,
+        # it came back as `[REDACTED_SECRET]` and no recovery could complete.
+        "/api/auth/password-recovery/begin",
         "/api/prompts/stream",
         "/api/tray/session",
         # BUG-268 — the folder picker's listing. A path segment is a

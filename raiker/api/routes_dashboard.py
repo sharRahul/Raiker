@@ -47,6 +47,7 @@ from raiker.api.schemas import (
 )
 from raiker.api.session_cookie import issue as issue_session_cookie
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.auth import IssuedSessionView
 from raiker.auth.vault_key_file import ensure_vault_key
 from raiker.control.dashboard import DashboardService
 from raiker.control.views.security import AuthSessionView
@@ -173,14 +174,19 @@ async def mint_session(
     result = service.mint_owner_session(body.as_principal)
     if not isinstance(result, AuthSessionView):
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    body_out = dict(serialize_dto(result))
     # BUG-253 — the bootstrap path gets the same reload-surviving session the
     # lock screen does. Without this, the one install that has no account yet is
     # the one install where a refresh still loses the session.
-    token = body_out.get("token")
-    if isinstance(token, str) and token:
-        body_out["csrf_token"] = issue_session_cookie(request, response, token)
-    return body_out
+    csrf_token = issue_session_cookie(request, response, result.token) if result.token else None
+    return serialize_dto(
+        IssuedSessionView(
+            token=result.token,
+            session_id=result.session_id,
+            principal_id=result.principal_id,
+            expires_at=result.expires_at,
+            csrf_token=csrf_token,
+        )
+    )
 
 
 # ── Read-only governed views (Bearer required) ────────────────────────────────

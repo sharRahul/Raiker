@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from typing_extensions import NotRequired, TypedDict
+from typing_extensions import TypedDict
 
 from raiker.contracts.views import View
 

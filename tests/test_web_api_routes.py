@@ -19,7 +19,14 @@ import pytest
 from raiker.api.app import create_app
 
 WEB_LIB = Path(__file__).resolve().parents[1] / "web" / "src" / "lib"
-CLIENT_FILES = [WEB_LIB / "api.ts", *sorted((WEB_LIB / "api").glob("*.ts"))]
+#: The generated wrappers are derived from the OpenAPI document, so they match it
+#: by construction; they are read too so the parser's floor below still counts
+#: the whole client as the hand-written catalogue shrinks (OPT-02 Stage B).
+CLIENT_FILES = [
+    WEB_LIB / "api.ts",
+    *sorted((WEB_LIB / "api").glob("*.ts")),
+    WEB_LIB / "generated" / "apiContract.ts",
+]
 
 _LITERAL = re.compile(r"""(["'`])((?:(?!\1).)*)\1""", re.S)
 # A `//` comment, not the `//` inside a URL literal: it follows whitespace.

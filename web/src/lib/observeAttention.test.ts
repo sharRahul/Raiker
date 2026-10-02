@@ -26,6 +26,7 @@ function signal(overrides: Partial<SecurityHealth>): SecurityHealth {
     subject_id: "web_fetch",
     code: "rate_exceeded",
     state: "idle",
+    finding_id: null,
     updated_at: "2026-09-18T10:00:00Z",
     ...overrides,
   };

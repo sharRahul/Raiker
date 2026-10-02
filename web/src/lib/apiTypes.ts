@@ -2,14 +2,19 @@ import type { ApprovalMode } from "./approvalMode";
 import type {
   AgentPlan,
   AgentPlanStep,
+  ApprovalResolved,
   ApprovalView,
   AttachmentPreview,
+  AuditExportResult,
+  AuditExportView,
   BackgroundWorkerHealth,
   BrainSourceBrowse,
   BrainSourceResult,
   BrainSourceReview,
   BrainSourceRoot,
   BrainView,
+  CapabilityContainmentView,
+  CapabilityDecisionMode,
   CapabilityGateView,
   CheckpointCaptureHealth,
   CheckpointView,
@@ -18,6 +23,7 @@ import type {
   CodexStatus,
   ConnectionsView,
   ConnectorView,
+  ContainedSubject,
   ContentPartView,
   ContextUsageView,
   ConversationBranch,
@@ -26,9 +32,11 @@ import type {
   ConversationCompaction,
   ConversionPreview,
   CredentialLifecycleView,
+  CriticalApprovalResolved,
   DiagnosticsView,
   EmbeddingProviderView,
   EmbeddingSpaceView,
+  EnvironmentContextView,
   EventView,
   ExtensionsOverviewView,
   ExtensionView,
@@ -64,6 +72,7 @@ import type {
   MemorySource,
   ModelCapacities,
   ModelCapacityEntry,
+  ModelConversionRequestBody,
   ModelDecisionView,
   ModelLibraryView,
   ModelOperationView,
@@ -76,6 +85,7 @@ import type {
   NativeUsageMetricView,
   NotificationView,
   ObservationsView,
+  OwnerQuestionAnswered,
   PasswordRecoveryBeginView,
   PathAttachment,
   PricingHistoryEntry,
@@ -96,14 +106,17 @@ import type {
   ProviderHealthView,
   ProviderModelListView,
   ProviderWeeklyUsage,
-  ModelConversionRequestBody,
+  ReadCapabilities,
   RecalledMemory,
   RestorePlan,
   RestorePlanFile,
   RestoreRequested,
+  ResumableTurn,
+  ResumableTurns,
   RuntimeModeView,
   RuntimeReadinessView,
   SecurityFindingView,
+  SecurityHealthView,
   SessionAttachment,
   SessionAttachments,
   SessionDetail,
@@ -114,8 +127,11 @@ import type {
   SpeechProbe,
   SpeechRuntime,
   SpeechRuntimeView,
+  StandingGrantView,
   TaskDetailView,
   TaskView,
+  TelemetryDestinationView,
+  ToolReadinessView,
   TranscriptFile,
   TranscriptManifest,
   TranscriptMessage,
@@ -145,54 +161,11 @@ import type { ApprovalDetailView as GeneratedApprovalDetailView } from "./genera
 //     required here must be one that DTO sends. It covers the shapes nobody transcribed.
 // A required field added here without its backend field fails the second one.
 
-/**
- * Whether a read capability can answer *now*, said separately from
- * whether the owner has permitted it.
- *
- * `available` is projection — the build has the tool and every agentic surface
- * lists it. `ready` is operational — a provider is configured and the request
- * would reach something. `state` says which one failed, so a menu can offer the
- * setup path for `needs_provider` and the Permissions route for `blocked`
- * instead of one grey row that could mean either.
- */
-export interface ToolReadiness {
-  tool: string;
-  available: boolean;
-  ready: boolean;
-  state: "ready" | "needs_provider" | "blocked" | "unavailable" | "transient_failure";
-  reason_code?: string;
-  reason_text?: string;
-  provider?: string;
-  remediation_route?: string;
-  checked_at: string;
-}
+export type ToolReadiness = ToolReadinessView;
 
-/** The one global read catalogue every agentic surface derives from. */
-export interface ReadCapabilities {
-  capabilities: string[];
-  external: string[];
-  interactive: string[];
-  surfaces: Record<string, string[]>;
-  administrative_surfaces: string[];
-  readiness: ToolReadiness[];
-}
+export type { ReadCapabilities };
 
-/** The runtime clock bundle a model turn receives, as the UI reads it. */
-export interface EnvironmentContext {
-  generated_at_utc: string;
-  timezone: string;
-  timezone_source: string;
-  local_datetime: string;
-  local_date: string;
-  local_time: string;
-  day_of_week: string;
-  utc_offset: string;
-  display_date: string;
-  freshness: string;
-  locale?: string;
-  location?: string;
-  timezone_error?: string;
-}
+export type EnvironmentContext = EnvironmentContextView;
 
 export type CapabilityGate = CapabilityGateView;
 
@@ -306,39 +279,13 @@ export type McpFinding = SecurityFindingView;
 
 export type Notification = NotificationView;
 
-export interface StandingGrant {
-  grant_id: string;
-  principal_id: string;
-  granted_by: string;
-  action_type: string;
-  tool_name: string;
-  scope_pattern: string;
-  risk_ceiling: string;
-  reason: string;
-  created_at: string;
-  expires_at: string;
-  revoked: number;
-  use_count: number;
-  last_used_at: string | null;
-}
+export type StandingGrant = StandingGrantView;
 
 export type CredentialLifecycle = CredentialLifecycleView;
 
-export interface SecurityHealth {
-  source: string;
-  subject_id: string;
-  code: string;
-  state: string;
-  updated_at: string;
-}
+export type SecurityHealth = SecurityHealthView;
 
-// GET /api/capability-modes/{capability} — the per-capability decision mode
-// (ask | allow | auto | deny) governing AI-proposed actions for that capability.
-export interface CapabilityDecisionMode {
-  ok: boolean;
-  capability: string;
-  decision_mode: string;
-}
+export type { CapabilityDecisionMode };
 
 export type ProviderHealth = ProviderHealthView;
 
@@ -370,28 +317,9 @@ export interface PartialFiles {
 
 export type { BackgroundWorkerHealth };
 
-/** One monitored subject's containment state (BUG-76, BUG-77). */
-export interface ContainedSubject {
-  capability: string;
-  capability_label: string;
-  subject_id: string;
-  label: string;
-  state: "active" | "paused" | "killed";
-  reason: string;
-  source: string;
-  finding_id: string | null;
-  failure_streak: number;
-  last_failure_code: string;
-  contained_at: string | null;
-  probe_after: string | null;
-  updated_at: string;
-}
+export type { ContainedSubject };
 
-export interface CapabilityContainmentView {
-  subjects: ContainedSubject[];
-  contained: number;
-  capabilities: { id: string; label: string }[];
-}
+export type { CapabilityContainmentView };
 
 /** What a plugin manifest's signature actually proved (BUG-79). */
 export interface PluginSignature {
@@ -576,20 +504,9 @@ export type TranscriptExportFile = TranscriptFile;
 
 export type TranscriptExportManifest = TranscriptManifest;
 
-/** BUG-24 — parked turns this account may continue, ids only. */
-export interface ResumableTurn {
-  approval_id: string;
-  session_id: string;
-  turn_id: string;
-  tool_name: string;
-  outcome_status: string;
-  created_at: string;
-}
+export type { ResumableTurn };
 
-export interface ResumableTurnsView {
-  session_id: string | null;
-  turns: ResumableTurn[];
-}
+export type ResumableTurnsView = ResumableTurns;
 
 export type { ModelsView };
 
@@ -761,13 +678,7 @@ export interface OwnerQuestion {
   multiSelect?: boolean;
 }
 
-/** The result of answering one. Nothing was granted, so nothing was executed. */
-export interface OwnerQuestionAnswered {
-  approval_id: string;
-  status: string;
-  answered: number;
-  resume?: { resumable?: boolean; session_id?: string | null; turn_id?: string | null };
-}
+export type { OwnerQuestionAnswered };
 
 export type { ConversationCompaction };
 
@@ -779,32 +690,9 @@ export type { RestorePlan };
 
 export type RestoreRequestResult = RestoreRequested;
 
-/**
- * BUG-231 — one redacted audit export. Metadata only: the manifest hash is
- * taken over the exact event ids and scope, which is what lets someone outside
- * Raiker say whether the file they were handed is the one it produced.
- */
-export interface AuditExportView {
-  export_id: string;
-  manifest_hash: string;
-  event_count: number;
-  redacted: boolean;
-  first_timestamp: string | null;
-  last_timestamp: string | null;
-  exported_by: string | null;
-  created_at: string;
-}
+export type { AuditExportView };
 
-export interface AuditExportResult {
-  ok: boolean;
-  export_id: string;
-  manifest_hash: string;
-  event_count: number;
-  redacted: boolean;
-  first_event_id: string | null;
-  last_event_id: string | null;
-  export_path: string | null;
-}
+export type { AuditExportResult };
 
 /**
  * One extension's lifecycle, as four independent server-derived facts. `usable`
@@ -896,56 +784,9 @@ export type ApprovalDetailView = Omit<GeneratedApprovalDetailView, "execution_ev
   execution_evidence: ExecutionEvidence;
 };
 
-// POST /api/approvals/{id}/resolve response.
-export interface ResolveApprovalResult {
-  approval_id: string;
-  action_id: string;
-  status: string;
-  executes_action: boolean;
-  reason: string;
-  proposed_by?: IdentityView | null;
-  approved_by?: IdentityView | null;
-  machine_identity?: IdentityView | null;
-  connector_result?: Record<string, unknown>;
-  // Present when an approved mutation was carried out by the execution relay.
-  execution?: {
-    capability: string;
-    path: string | null;
-    returncode?: number;
-    stdout_bytes?: number;
-    stderr_bytes?: number;
-    stdout?: string;
-    stderr?: string;
-    truncated?: boolean;
-    output_redacted?: boolean;
-    // BUG-62 — where the executed action landed, for capabilities whose result
-    // is a row rather than a file: the task that now exists, the project a
-    // conversation was moved into.
-    receipt?: { kind: string; title: string; href: string; label: string };
-    // B11 — one sentence naming what the execution did, for a capability whose
-    // result is neither a file nor a row (the branch created, the commit made).
-    summary?: string;
-    checkpoint_capture?: CheckpointCaptureHealth;
-  };
-  // B2 — whether a turn was parked on this approval and can now pick up again.
-  // ADD-02 adds the batch counters and how many calls the resume still owes.
-  resume?: {
-    resumable: boolean;
-    session_id?: string;
-    turn_id?: string;
-    queue_position?: number;
-    queue_total?: number;
-    queued_calls?: number;
-  };
-}
+export type ResolveApprovalResult = ApprovalResolved;
 
-export interface ResolveCriticalApprovalResult {
-  approval_id: string;
-  status: string;
-  decision: string;
-  message: string;
-  executes_action: boolean;
-}
+export type ResolveCriticalApprovalResult = CriticalApprovalResolved;
 
 // Approval proposal carried on an AgentResponse when status === "needs_approval".
 // Mirrors the `approval` dict built in raiker/runtime/orchestrator.py. Nothing has
@@ -1828,27 +1669,6 @@ export type { ImageGeneration };
 
 export type ImageGenerationsView = ImageGallery;
 
-export interface TelemetryDestination {
-  destination_id: string;
-  name: string;
-  endpoint_url: string;
-  header_ref: string | null;
-  include_content: boolean;
-  enabled: boolean;
-  cursor_timestamp: string | null;
-  cursor_event_id: string | null;
-  last_status: string | null;
-  last_attempt_at: string | null;
-  exported_count: number;
-  created_at: string;
-  /**
-   * BUG-276 — how often this destination is delivered to. `off` means on
-   * demand only, and is what every destination created before this field
-   * existed reads as. Every other value is a cadence the task scheduler
-   * honours, so the card can never claim one the host will not run.
-   */
-  delivery_cadence: string;
-  next_delivery_at: string | null;
-}
+export type TelemetryDestination = TelemetryDestinationView;
 
 export type ModelDecision = ModelDecisionView;

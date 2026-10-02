@@ -57,6 +57,37 @@ export type ApprovalDetailView = {
   execution_evidence: Record<string, unknown>;
 };
 
+/** BUG-271 — the proposal denied, and the reviewer's own edit raised in its place. */
+export type ApprovalReplaced = {
+  ok: boolean;
+  approval_id: string;
+  status: "denied";
+  replacement_approval_id: string;
+  action_id: string;
+  executes_action: boolean;
+  resumable: boolean;
+  session_id?: string;
+  turn_id?: string;
+  queue_position?: number;
+  queue_total?: number;
+  queued_calls?: number;
+};
+
+/** A decision, who proposed and decided it, and what it set in motion. */
+export type ApprovalResolved = {
+  approval_id: string;
+  action_id: string;
+  status: string;
+  executes_action: boolean;
+  reason: string;
+  proposed_by: IdentityView | null;
+  approved_by: IdentityView | null;
+  machine_identity: IdentityView | null;
+  execution?: ExecutionSummary;
+  connector_result?: Record<string, unknown>;
+  resume: ResumeHandle;
+};
+
 export type ApprovalView = {
   approval_id: string;
   action_id: string;
@@ -119,6 +150,29 @@ export type AttachmentProvenance = {
   anchors?: SourceAnchorView[];
   ok: boolean;
   filename: string;
+};
+
+/** The manifest of an export just produced; never its events. */
+export type AuditExportResult = {
+  ok: boolean;
+  export_id: string;
+  manifest_hash: string;
+  event_count: number;
+  redacted: boolean;
+  first_event_id: string | null;
+  last_event_id: string | null;
+  export_path: string | null;
+};
+
+export type AuditExportView = {
+  export_id: string;
+  manifest_hash: string;
+  event_count: number;
+  redacted: boolean;
+  first_timestamp: string | null;
+  last_timestamp: string | null;
+  exported_by: string | null;
+  created_at: string;
 };
 
 export type AuthSessionRequest = {
@@ -296,6 +350,31 @@ export type BulkDeleteSessionsRequest = {
   session_ids: string[];
 };
 
+/** Every monitored capability's containment, in one owner-facing shape (BUG-77). */
+export type CapabilityContainmentView = {
+  subjects: ContainedSubject[];
+  contained: number;
+  capabilities: ContainmentCapability[];
+};
+
+/** ``ok`` is false, and the mode absent, when the capability is unknown. */
+export type CapabilityDecisionMode = {
+  ok: boolean;
+  capability?: string;
+  decision_mode?: "ask" | "allow" | "auto" | "deny";
+};
+
+export type CapabilityDecisionModeSet = {
+  ok: boolean;
+  capability: string;
+  decision_mode: "ask" | "allow" | "auto" | "deny";
+};
+
+export type CapabilityDisabled = {
+  ok: boolean;
+  capability: string;
+};
+
 export type CapabilityGateView = {
   capability: string;
   phase: number;
@@ -319,6 +398,12 @@ export type CapabilityGateView = {
   ungoverned_consequence: string;
   authority_requirement: string;
   network_boundary: string;
+};
+
+export type CapabilityStateSet = {
+  ok: boolean;
+  capability: string;
+  target_state: string;
 };
 
 export type CapacitiesRefreshed = {
@@ -532,6 +617,28 @@ export type ContainMcpServerRequest = {
   reason?: string | null;
 };
 
+/** One monitored subject's containment, as the owner's Security page reads it. */
+export type ContainedSubject = {
+  capability: string;
+  capability_label: string;
+  subject_id: string;
+  label: string;
+  state: "active" | "paused" | "killed";
+  reason: string;
+  source: string;
+  finding_id: string | null;
+  failure_streak: number;
+  last_failure_code: string;
+  contained_at: string | null;
+  probe_after: string | null;
+  updated_at: string;
+};
+
+export type ContainmentCapability = {
+  id: string;
+  label: string;
+};
+
 /** One declared piece of a turn's answer. */
 export type ContentPart = {
   type: "text" | "table" | "chart" | "refused";
@@ -717,6 +824,14 @@ export type CredentialRequest = {
   expires_at?: string | null;
 };
 
+export type CriticalApprovalResolved = {
+  approval_id: string;
+  status: string;
+  decision: string;
+  message: string;
+  executes_action: boolean;
+};
+
 export type DecisionProblem = {
   reason_code: string;
   summary: string;
@@ -824,6 +939,23 @@ export type EmbeddingSpaceView = {
   query_embeddable?: boolean;
 };
 
+/** The environment bundle a model turn receives, read by Settings. */
+export type EnvironmentContextView = {
+  generated_at_utc: string;
+  timezone: string;
+  timezone_source: string;
+  local_datetime: string;
+  local_date: string;
+  local_time: string;
+  day_of_week: string;
+  utc_offset: string;
+  display_date: string;
+  freshness: string;
+  locale?: string;
+  location?: string;
+  timezone_error?: string;
+};
+
 export type EventView = {
   event_id: string;
   session_id: string;
@@ -834,6 +966,30 @@ export type EventView = {
   risk_level: string | null;
   summary: string | null;
   machine_identity: IdentityView | null;
+};
+
+/** BUG-62 — where an executed action's result now lives. */
+export type ExecutionReceipt = {
+  kind: string;
+  title: string;
+  href: string;
+  label: string;
+};
+
+/** What the relay reports of an approved action it carried out. */
+export type ExecutionSummary = {
+  capability: string;
+  path: string | null;
+  returncode?: number | null;
+  stdout_bytes?: number;
+  stderr_bytes?: number;
+  stdout?: string;
+  stderr?: string;
+  truncated?: boolean;
+  output_redacted?: boolean;
+  receipt?: ExecutionReceipt;
+  summary?: string;
+  checkpoint_capture?: CheckpointCaptureHealth;
 };
 
 /** Which rendering of a conversation transcript to produce (BUG-22). */
@@ -914,6 +1070,26 @@ export type GitGrantRequest = {
 
 export type GitTokenRequest = {
   token: string;
+};
+
+/** Liveness, and whether the encrypted store opens (BUG-86). */
+export type HealthView = {
+  status: "ok" | "degraded";
+  store: "ok" | "unavailable";
+  reason: string;
+  detail: string;
+  cipher_memory_security: "on" | "off";
+  memory_security_in_force: "on" | "off";
+  memory_security_reason: string;
+  memory_security_mode: "auto" | "on" | "off";
+  memory_security_probe: "supported" | "failed" | "not_run";
+  memory_security_checked_at: string | null;
+  sqlcipher_version: string | null;
+  memlock_allowance_bytes: number | null;
+  connection_ceiling: number;
+  text_search_engine?: string;
+  text_search_ranking?: "bm25_relevance" | "recency";
+  text_search_reason?: string;
 };
 
 export type HfDownloadPreview = {
@@ -1951,6 +2127,13 @@ export type OperationReview = {
   confirmed: boolean;
 };
 
+export type OwnerQuestionAnswered = {
+  approval_id: string;
+  status: "answered";
+  answered: number;
+  resume: ResumeHandle;
+};
+
 /** Pair one connector profile. Paired is not enabled and not trusted. */
 export type PairChannelRequest = {
   connector_id: string;
@@ -2334,6 +2517,15 @@ export type ProviderWeeklyUsage = {
   subscription?: SubscriptionLimitsView | null;
 };
 
+export type ReadCapabilities = {
+  capabilities: string[];
+  external: string[];
+  interactive: string[];
+  surfaces: Record<string, string[]>;
+  administrative_surfaces: string[];
+  readiness: ToolReadinessView[];
+};
+
 /** An approved memory a turn of this conversation was given, as Raiker knows it now. */
 export type RecalledMemory = {
   memory_id: string;
@@ -2438,6 +2630,38 @@ export type RestoreRequested = {
   skip_count: number;
 };
 
+/** A parked turn another tab may continue: ids and the decision, never the conversation. */
+export type ResumableTurn = {
+  approval_id: string;
+  session_id: string;
+  turn_id: string;
+  tool_name: string;
+  outcome_status: string;
+  created_at: string;
+  queue_position: number;
+  queue_total: number;
+};
+
+export type ResumableTurns = {
+  session_id: string | null;
+  turns: ResumableTurn[];
+};
+
+/** Whether a turn was parked on this decision, and where it continues (B2). */
+export type ResumeHandle = {
+  resumable: boolean;
+  session_id?: string;
+  turn_id?: string;
+  queue_position?: number;
+  queue_total?: number;
+  queued_calls?: number;
+};
+
+export type RuntimeModeActivated = {
+  ok: boolean;
+  mode_name: string;
+};
+
 export type RuntimeModeView = {
   mode_name: string;
   status: string;
@@ -2475,6 +2699,16 @@ export type SecurityFindingView = {
   subject_id: string | null;
   state: string;
   created_at: string;
+};
+
+/** The last state a security monitor recorded for one subject; no check is run. */
+export type SecurityHealthView = {
+  source: string;
+  subject_id: string;
+  code: string;
+  state: string;
+  finding_id: string | null;
+  updated_at: string;
 };
 
 /** Point the Build workspace at one repository, or at none with ``null``. */
@@ -2721,6 +2955,39 @@ export type SpeechRuntimeView = {
   effective: "local" | "browser";
 };
 
+export type StandingGrantCreated = {
+  ok: boolean;
+  grant: StandingGrantView;
+};
+
+export type StandingGrantList = {
+  ok: boolean;
+  grants: StandingGrantView[];
+};
+
+export type StandingGrantRevoked = {
+  ok: boolean;
+  grant_id: string;
+};
+
+/** One standing grant. ``revoked`` is a boolean on the wire, not the stored 0/1. */
+export type StandingGrantView = {
+  grant_id: string;
+  principal_id: string;
+  granted_by: string;
+  action_type: string;
+  tool_name: string;
+  scope_pattern: string;
+  risk_ceiling: string;
+  reason: string;
+  created_at: string;
+  expires_at: string;
+  revoked: boolean;
+  revoked_at: string | null;
+  use_count: number;
+  last_used_at: string | null;
+};
+
 export type StopHostRequest = {
   confirm?: boolean;
 };
@@ -2847,6 +3114,68 @@ export type TaskView = {
 
 export type TelemetryCadenceRequest = {
   cadence: string;
+};
+
+export type TelemetryCadenceSet = {
+  ok: boolean;
+  delivery_cadence: string;
+  next_delivery_at: string | null;
+};
+
+export type TelemetryDestinationCreated = {
+  ok: boolean;
+  destination_id: string;
+};
+
+export type TelemetryDestinationDeleted = {
+  ok: boolean;
+  deleted: boolean;
+};
+
+/** One OTLP destination. ``header_ref`` names an environment variable, never a value. */
+export type TelemetryDestinationView = {
+  destination_id: string;
+  name: string;
+  endpoint_url: string;
+  header_ref: string | null;
+  include_content: boolean;
+  enabled: boolean;
+  cursor_timestamp: string | null;
+  cursor_event_id: string | null;
+  last_status: string | null;
+  last_attempt_at: string | null;
+  exported_count: number;
+  created_at: string;
+  delivery_cadence: string;
+  next_delivery_at: string | null;
+};
+
+/** A delivery: how many events went, never what they said. */
+export type TelemetryExportRun = {
+  ok: boolean;
+  exported: number;
+  destination: string;
+  include_content?: boolean;
+  cursor_event_id?: string;
+};
+
+export type ThreatModelAcknowledged = {
+  ok: boolean;
+  capability: string;
+  acknowledged: boolean;
+};
+
+/** Whether a read tool can answer now, said apart from whether it may. */
+export type ToolReadinessView = {
+  tool: string;
+  available: boolean;
+  ready: boolean;
+  state: "ready" | "needs_provider" | "blocked" | "unavailable" | "transient_failure";
+  checked_at: string;
+  reason_code?: string;
+  reason_text?: string;
+  provider?: string;
+  remediation_route?: string;
 };
 
 export type TranscriptFile = {
@@ -2984,6 +3313,11 @@ export type VaultKeyRequest = {
   mfa_code?: string | null;
 };
 
+/** Whether the connector vault has a usable key; never the key. */
+export type VaultStatus = {
+  state: "configured_valid" | "missing" | "invalid";
+};
+
 export type WeeklyBudgetSet = {
   ok: boolean;
   profile_id: string;
@@ -3053,8 +3387,22 @@ export const contract = {
     call<Ok>("DELETE", "/api/account"),
   listApprovals: (query: { status_filter?: string } = {}) =>
     request<ApprovalView[]>(withQuery("/api/approvals", query)),
+  listResumableTurns: (query: { session_id?: string } = {}) =>
+    request<ResumableTurns>(withQuery("/api/approvals/resumable", query)),
   getApproval: (approvalId: string) =>
     request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(approvalId)}`),
+  answerOwnerQuestion: (approvalId: string, body: AnswerOwnerQuestionRequest) =>
+    call<OwnerQuestionAnswered>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/answer`, { body }),
+  replaceApprovalWithEdit: (approvalId: string, body: ReplaceApprovalRequest) =>
+    call<ApprovalReplaced>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/replace`, { body }),
+  resolveApproval: (approvalId: string, body: ResolveApprovalRequest) =>
+    call<ApprovalResolved>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/resolve`, { body }),
+  resolveCriticalApproval: (approvalId: string, body: ResolveApprovalRequest) =>
+    call<CriticalApprovalResolved>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/resolve-critical`, { body }),
+  createAuditExport: (query: { session_id?: string; project_id?: string } = {}) =>
+    call<AuditExportResult>("POST", withQuery("/api/audit/export", query)),
+  listAuditExports: (query: { limit?: number } = {}) =>
+    request<AuditExportView[]>(withQuery("/api/audit/exports", query)),
   bootstrapStatus: () =>
     request<BootstrapStatusView>("/api/auth/bootstrap-status"),
   elevate: (body: ElevateRequest) =>
@@ -3115,6 +3463,22 @@ export const contract = {
     request<CapabilityGateView[]>("/api/capability-gates"),
   getCapabilityGate: (capability: string) =>
     request<CapabilityGateView>(`/api/capability-gates/${encodeURIComponent(capability)}`),
+  disableCapability: (capability: string, body: DisableCapabilityRequest) =>
+    call<CapabilityDisabled>("POST", `/api/capability-gates/${encodeURIComponent(capability)}/disable`, { body }),
+  setCapabilityState: (capability: string, body: SetCapabilityStateRequest) =>
+    call<CapabilityStateSet>("POST", `/api/capability-gates/${encodeURIComponent(capability)}/set`, { body }),
+  recordThreatModelAck: (capability: string, body: RecordThreatModelAckRequest) =>
+    call<ThreatModelAcknowledged>("POST", `/api/capability-gates/${encodeURIComponent(capability)}/threat-ack`, { body }),
+  getCapabilityDecisionMode: (capability: string) =>
+    request<CapabilityDecisionMode>(`/api/capability-modes/${encodeURIComponent(capability)}`),
+  allowCapability: (capability: string, body: SetCapabilityDecisionModeRequest) =>
+    call<CapabilityDecisionModeSet>("POST", `/api/capability-modes/${encodeURIComponent(capability)}/allow`, { body }),
+  askForCapability: (capability: string, body: SetCapabilityDecisionModeRequest) =>
+    call<CapabilityDecisionModeSet>("POST", `/api/capability-modes/${encodeURIComponent(capability)}/ask`, { body }),
+  autoCapability: (capability: string, body: SetCapabilityDecisionModeRequest) =>
+    call<CapabilityDecisionModeSet>("POST", `/api/capability-modes/${encodeURIComponent(capability)}/auto`, { body }),
+  denyCapability: (capability: string, body: SetCapabilityDecisionModeRequest) =>
+    call<CapabilityDecisionModeSet>("POST", `/api/capability-modes/${encodeURIComponent(capability)}/deny`, { body }),
   searchChatHistory: (query: { q: string }) =>
     request<SessionView[]>(withQuery("/api/chat-search", query)),
   listCheckpoints: (query: { session_id?: string; limit?: number; project_id?: string } = {}) =>
@@ -3135,10 +3499,14 @@ export const contract = {
     request<ConnectionsView>("/api/connections"),
   getDiagnostics: () =>
     request<DiagnosticsView>("/api/diagnostics"),
+  getEnvironment: () =>
+    request<EnvironmentContextView>("/api/environment"),
   listEvents: (query: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
     request<EventView[]>(withQuery("/api/events", query)),
   getExtensions: () =>
     request<ExtensionsOverviewView>("/api/extensions"),
+  health: () =>
+    request<HealthView>("/api/health"),
   saveHuggingFaceCredential: (body: HuggingFaceCredentialRequest) =>
     call<HuggingFaceCredentialSaved>("PUT", "/api/hugging-face/credential", { body }),
   downloadHuggingFaceModel: (body: HuggingFaceSelectionRequest) =>
@@ -3337,6 +3705,8 @@ export const contract = {
     call<WeeklyBudgetSet>("PUT", `/api/models/${encodeURIComponent(profileId)}/weekly-budget`, { body }),
   listNotifications: (query: { unread_only?: boolean } = {}) =>
     request<NotificationView[]>(withQuery("/api/notifications", query)),
+  markNotificationRead: (notificationId: string) =>
+    call<Ok>("POST", `/api/notifications/${encodeURIComponent(notificationId)}/read`),
   pullOllamaModel: (body: OllamaPullRequestBody) =>
     call<ModelOperationView>("POST", "/api/ollama/pull", { body }),
   listProjects: () =>
@@ -3377,18 +3747,32 @@ export const contract = {
     call<ProjectRootIndexResult>("POST", `/api/projects/${encodeURIComponent(projectId)}/root/index`),
   projectRootStatus: (projectId: string) =>
     request<ProjectRootStatus>(`/api/projects/${encodeURIComponent(projectId)}/root/status`),
+  listReadCapabilities: () =>
+    request<ReadCapabilities>("/api/read-capabilities"),
   getRuntimeMode: () =>
     request<RuntimeModeView>("/api/runtime-mode"),
+  activateRuntimeMode: (body: ActivateRuntimeModeRequest) =>
+    call<RuntimeModeActivated>("POST", "/api/runtime-mode/activate", { body }),
+  disableRuntimeMode: (body: DisableRuntimeModeRequest) =>
+    call<Ok>("POST", "/api/runtime-mode/disable", { body }),
   getRuntimeReadiness: () =>
     request<RuntimeReadinessView>("/api/runtime-readiness"),
   checkPasswordBreach: (body: BreachCheckRequest) =>
     call<SecurityFindingView[]>("POST", "/api/security/breach-check", { body }),
+  listCapabilityContainment: () =>
+    request<CapabilityContainmentView>("/api/security/containment"),
+  setCapabilityContainment: (capability: string, subjectId: string, action: string) =>
+    call<ContainedSubject>("POST", `/api/security/containment/${encodeURIComponent(capability)}/${encodeURIComponent(subjectId)}/${encodeURIComponent(action)}`),
   listSecurityCredentials: () =>
     request<CredentialLifecycleView[]>("/api/security/credentials"),
   verifySecurityCredential: (provider: string) =>
     call<CredentialLifecycleView>("POST", `/api/security/credentials/${encodeURIComponent(provider)}/verify`),
   listSecurityFindings: () =>
     request<SecurityFindingView[]>("/api/security/findings"),
+  listSecurityHealth: () =>
+    request<SecurityHealthView[]>("/api/security/health"),
+  checkSecurityHealth: () =>
+    call<SecurityHealthView[]>("POST", "/api/security/health-check"),
   scanSecurity: () =>
     call<SecurityFindingView[]>("POST", "/api/security/scan"),
   listSessions: (query: { limit?: number; project_id?: string; include_archived?: boolean; origin?: string } = {}) =>
@@ -3449,6 +3833,12 @@ export const contract = {
     call<SpeechRuntime>("PUT", "/api/speech/runtime", { body }),
   probeSpeechRuntime: (body?: SpeechRuntimeRequest | null) =>
     call<SpeechProbe>("POST", "/api/speech/runtime/probe", { body }),
+  listStandingGrants: (query: { include_inactive?: boolean } = {}) =>
+    request<StandingGrantList>(withQuery("/api/standing-grants", query)),
+  createStandingGrant: (body: CreateStandingGrantRequest) =>
+    call<StandingGrantCreated>("POST", "/api/standing-grants", { body }),
+  revokeStandingGrant: (grantId: string) =>
+    call<StandingGrantRevoked>("POST", `/api/standing-grants/${encodeURIComponent(grantId)}/revoke`),
   getSurfaceModels: () =>
     request<SurfaceModels>("/api/surface-models"),
   setSurfaceModel: (body: SurfaceModelDefaultRequest) =>
@@ -3463,8 +3853,24 @@ export const contract = {
     call<TaskResumed>("POST", `/api/tasks/${encodeURIComponent(taskId)}/resume`),
   runTask: (taskId: string) =>
     call<TaskView>("POST", `/api/tasks/${encodeURIComponent(taskId)}/run`),
+  listTelemetryDestinations: () =>
+    request<TelemetryDestinationView[]>("/api/telemetry/destinations"),
+  createTelemetryDestination: (body: CreateTelemetryDestinationRequest) =>
+    call<TelemetryDestinationCreated>("POST", "/api/telemetry/destinations", { body }),
+  deleteTelemetryDestination: (destinationId: string) =>
+    call<TelemetryDestinationDeleted>("DELETE", `/api/telemetry/destinations/${encodeURIComponent(destinationId)}`),
+  setTelemetryCadence: (destinationId: string, body: TelemetryCadenceRequest) =>
+    call<TelemetryCadenceSet>("PUT", `/api/telemetry/destinations/${encodeURIComponent(destinationId)}/cadence`, { body }),
+  runTelemetryExport: (destinationId: string) =>
+    call<TelemetryExportRun>("POST", `/api/telemetry/destinations/${encodeURIComponent(destinationId)}/export`),
   getTurn: (turnId: string) =>
     request<TurnDetailView>(`/api/turns/${encodeURIComponent(turnId)}`),
+  deleteVaultKey: (xMfaCode?: string) =>
+    call<VaultStatus>("DELETE", "/api/vault/key", { headers: { "x-mfa-code": xMfaCode } }),
+  setVaultKey: (body: VaultKeyRequest) =>
+    call<VaultStatus>("PUT", "/api/vault/key", { body }),
+  getVaultStatus: () =>
+    request<VaultStatus>("/api/vault/status"),
   workInFlight: () =>
     request<WorkInFlight>("/api/work-in-flight"),
   listWorkThreads: (query: { limit?: number } = {}) =>

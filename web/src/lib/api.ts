@@ -2,10 +2,6 @@ import type {
   ConversionQuantization,
   AgentResponse,
   ApprovalDetailView,
-  AuditExportResult,
-  AuditExportView,
-  CapabilityContainmentView,
-  CapabilityDecisionMode,
   ChannelsView,
   CodeMapPaths,
   CodeMapStatus,
@@ -18,10 +14,8 @@ import type {
   CommandRunView,
   ComposerApprovalModeSettings,
   ConnectorStoreView,
-  ContainedSubject,
   CredentialDeltaView,
   DiagnosticsExport,
-  EnvironmentContext,
   ExecutionEnvironment,
   ExecutionEnvironmentsView,
   GitCredentialStatus,
@@ -44,24 +38,16 @@ import type {
   MemoryControlView,
   ModelOperation,
   ModelSetupState,
-  OwnerQuestionAnswered,
   PluginsView,
   ProjectContext,
   PromptRequestBody,
-  ReadCapabilities,
-  ResolveApprovalResult,
-  ResolveCriticalApprovalResult,
-  ResumableTurnsView,
-  SecurityHealth,
   SessionSummary,
   SetupState,
   SkillMutationResult,
   SkillVerification,
   SkillView,
   SpeechRuntimeChange,
-  StandingGrant,
   StopAllResult,
-  TelemetryDestination,
   UpdateApplyResult,
   UpdateCheckResult,
   UpdateStatusView,
@@ -76,6 +62,8 @@ import { postJson, request, requestBlob, withQuery } from "./api/core";
 // generated (scripts/api_contract.py); the rest stay written here.
 import { contract } from "./generated/apiContract";
 import type {
+  CreateStandingGrantRequest,
+  CreateTelemetryDestinationRequest,
   GenerateImageRequest,
   ModelPriceRequest,
   TaskCreateRequest,
@@ -104,6 +92,14 @@ export interface SettingsView {
     display_name?: string;
   };
 }
+
+/** One generated setter per decision mode; the route names the mode, not the body. */
+const SET_DECISION_MODE = {
+  ask: contract.askForCapability,
+  allow: contract.allowCapability,
+  auto: contract.autoCapability,
+  deny: contract.denyCapability,
+} as const;
 
 export const api = {
   restoreSession,
@@ -152,19 +148,12 @@ export const api = {
       },
     ),
 
-  vaultStatus: () => request<{ state: string }>("/api/vault/status"),
+  vaultStatus: () => contract.getVaultStatus(),
   setVaultKey: (key: string, mfaCode?: string) =>
-    request<{ state: string }>("/api/vault/key", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key, mfa_code: mfaCode }),
-    }),
-  clearVaultKey: (mfaCode?: string) =>
-    request<{ state: string }>("/api/vault/key", {
-      method: "DELETE",
-      headers: mfaCode ? { "X-MFA-Code": mfaCode } : undefined,
-    }),
+    contract.setVaultKey({ key, mfa_code: mfaCode }),
+  clearVaultKey: (mfaCode?: string) => contract.deleteVaultKey(mfaCode || undefined),
 
+  // ── Read-only governed views ──
   // ── Read-only governed views ──
   sessionContextUsage: (sessionId: string) => contract.getSessionContextUsage(sessionId),
   // B6 — the agent's standing plan for one conversation, so a reload or a
@@ -175,10 +164,12 @@ export const api = {
   // per-surface parity, and typed readiness. Every composer answers from this
   // rather than deriving a list of its own, which is the drift the contract
   // exists to remove.
-  readCapabilities: () => request<ReadCapabilities>("/api/read-capabilities"),
+  readCapabilities: () => contract.listReadCapabilities(),
   // The same bundle a model turn is given. Read rather than
   // recomputed, so a page and a turn cannot disagree about what time it is.
-  environment: () => request<EnvironmentContext>("/api/environment"),
+  // The same bundle a model turn is given. Read rather than
+  // recomputed, so a page and a turn cannot disagree about what time it is.
+  environment: () => contract.getEnvironment(),
   capabilityGate: (capability: string) => contract.getCapabilityGate(capability),
   runtimeMode: () => contract.getRuntimeMode(),
   // ── Host lifecycle (BUG-40) ──
@@ -479,55 +470,27 @@ export const api = {
       {},
     ),
   notifications: () => contract.listNotifications(),
-  markNotificationRead: (id: string) =>
-    postJson<{ ok: boolean }>(
-      `/api/notifications/${encodeURIComponent(id)}/read`,
-      {},
-    ),
+  markNotificationRead: (id: string) => contract.markNotificationRead(id),
   standingGrants: (includeInactive = true) =>
-    request<{ ok: boolean; grants: StandingGrant[] }>(
-      `/api/standing-grants?include_inactive=${includeInactive ? "true" : "false"}`,
-    ),
-  createStandingGrant: (body: {
-    action_type: string;
-    risk_ceiling: string;
-    tool_name?: string;
-    scope_pattern?: string;
-    reason?: string;
-    ttl_days?: number;
-  }) =>
-    postJson<{ ok: boolean; grant: StandingGrant }>(
-      "/api/standing-grants",
-      body,
-    ),
-  revokeStandingGrant: (grantId: string) =>
-    postJson<{ ok: boolean; grant_id: string }>(
-      `/api/standing-grants/${encodeURIComponent(grantId)}/revoke`,
-      {},
-    ),
+    contract.listStandingGrants({ include_inactive: includeInactive }),
+  createStandingGrant: (body: CreateStandingGrantRequest) => contract.createStandingGrant(body),
+  revokeStandingGrant: (grantId: string) => contract.revokeStandingGrant(grantId),
   securityCredentials: () => contract.listSecurityCredentials(),
   securityFindings: () => contract.listSecurityFindings(),
-  securityHealth: () => request<SecurityHealth[]>("/api/security/health"),
-  capabilityContainment: () =>
-    request<CapabilityContainmentView>("/api/security/containment"),
+  securityHealth: () => contract.listSecurityHealth(),
+  capabilityContainment: () => contract.listCapabilityContainment(),
   setCapabilityContainment: (
     capability: string,
     subjectId: string,
     action: "pause" | "kill" | "resume",
-  ) =>
-    postJson<ContainedSubject>(
-      `/api/security/containment/${encodeURIComponent(capability)}/` +
-        `${encodeURIComponent(subjectId)}/${action}`,
-      {},
-    ),
+  ) => contract.setCapabilityContainment(capability, subjectId, action),
   plugins: () => request<PluginsView>("/api/plugins"),
   // Read-only. The hook config files are the owner's own text on disk; this
   // reports what the runtime loaded from them, including one it could not read.
   hooks: () => request<HooksView>("/api/hooks"),
   verifySecurityCredential: (provider: string) => contract.verifySecurityCredential(provider),
   scanSecurity: () => contract.scanSecurity(),
-  checkSecurityHealth: () =>
-    postJson<SecurityHealth[]>("/api/security/health-check", {}),
+  checkSecurityHealth: () => contract.checkSecurityHealth(),
   checkPasswordBreach: (password: string, enabled: boolean) =>
     contract.checkPasswordBreach({ password, enabled }),
   connectorStore: () => request<ConnectorStoreView>("/api/connector-store"),
@@ -669,12 +632,9 @@ export const api = {
   // exported. Scope is the signed-in account, resolved server-side; the browser
   // names nothing. `downloadAuditExport` fetches with the session credential —
   // a bare <a download> cannot send one — and hands over a blob URL.
-  auditExports: () => request<AuditExportView[]>("/api/audit/exports"),
+  auditExports: () => contract.listAuditExports(),
   createAuditExport: (sessionId?: string) =>
-    postJson<AuditExportResult>(
-      withQuery("/api/audit/export", { session_id: sessionId }),
-      {},
-    ),
+    contract.createAuditExport(sessionId ? { session_id: sessionId } : {}),
   downloadAuditExport: async (exportId: string): Promise<void> => {
     const blob = await requestBlob(
       `/api/audit/exports/${encodeURIComponent(exportId)}/download`,
@@ -690,34 +650,16 @@ export const api = {
   // The record Raiker keeps, on a wire to somewhere the owner already looks.
   // A destination holds an endpoint and the *name* of the environment variable
   // an auth header lives in — never a credential.
-  telemetryDestinations: () =>
-    request<TelemetryDestination[]>("/api/telemetry/destinations"),
-  createTelemetryDestination: (body: {
-    name: string;
-    endpoint_url: string;
-    header_ref?: string;
-    include_content?: boolean;
-  }) => postJson<{ ok: boolean; destination_id: string }>("/api/telemetry/destinations", body),
+  telemetryDestinations: () => contract.listTelemetryDestinations(),
+  createTelemetryDestination: (body: CreateTelemetryDestinationRequest) =>
+    contract.createTelemetryDestination(body),
   deleteTelemetryDestination: (destinationId: string) =>
-    request<{ ok: boolean }>(
-      `/api/telemetry/destinations/${encodeURIComponent(destinationId)}`,
-      { method: "DELETE" },
-    ),
-  runTelemetryExport: (destinationId: string) =>
-    postJson<{ ok: boolean; exported: number; destination: string }>(
-      `/api/telemetry/destinations/${encodeURIComponent(destinationId)}/export`,
-      {},
-    ),
+    contract.deleteTelemetryDestination(destinationId),
+  runTelemetryExport: (destinationId: string) => contract.runTelemetryExport(destinationId),
+  // BUG-276 — put a destination on a cadence the host runs, or take it off one.
   // BUG-276 — put a destination on a cadence the host runs, or take it off one.
   setTelemetryCadence: (destinationId: string, cadence: string) =>
-    request<{ ok: boolean; delivery_cadence: string; next_delivery_at: string | null }>(
-      `/api/telemetry/destinations/${encodeURIComponent(destinationId)}/cadence`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cadence }),
-      },
-    ),
+    contract.setTelemetryCadence(destinationId, { cadence }),
   // ── The Design surface ──
   // The list is metadata only; the bytes are a separate, owner-scoped request
   // that names one generation, so a gallery cannot accidentally ship megabytes.
@@ -901,11 +843,7 @@ export const api = {
   answerOwnerQuestion: (
     approvalId: string,
     body: { answers?: Record<string, string | string[]>; response?: string },
-  ) =>
-    postJson<OwnerQuestionAnswered>(
-      `/api/approvals/${encodeURIComponent(approvalId)}/answer`,
-      body,
-    ),
+  ) => contract.answerOwnerQuestion(approvalId, body),
   compactConversation: (sessionId: string, throughTurnId: string) =>
     contract.compactConversation(sessionId, { through_turn_id: throughTurnId }),
   conversationBranchOrigin: (sessionId: string) => contract.getConversationBranchOrigin(sessionId),
@@ -1363,24 +1301,18 @@ export const api = {
   resolveApproval: (
     id: string,
     body: { approve: boolean; reason: string; accepted_hunks?: string[] },
-  ) =>
-    postJson<ResolveApprovalResult>(
-      `/api/approvals/${encodeURIComponent(id)}/resolve`,
-      body,
-    ),
+  ) => contract.resolveApproval(id, body),
+  // BUG-271 — the reviewer corrected a line rather than narrowing the change.
+  // An edit is a *different action*, so this is not a field on the decision: it
+  // denies the proposal in front of the owner and raises theirs in its place,
+  // with its own preview, its own hash and its own approval. Nothing executes.
   // BUG-271 — the reviewer corrected a line rather than narrowing the change.
   // An edit is a *different action*, so this is not a field on the decision: it
   // denies the proposal in front of the owner and raises theirs in its place,
   // with its own preview, its own hash and its own approval. Nothing executes.
   replaceApproval: (id: string, body: { patch: string; reason?: string }) =>
-    postJson<{
-      ok: boolean;
-      approval_id: string;
-      status: string;
-      replacement_approval_id: string;
-      action_id: string;
-      executes_action: boolean;
-    }>(`/api/approvals/${encodeURIComponent(id)}/replace`, body),
+    contract.replaceApprovalWithEdit(id, body),
+  // B2 — non-streaming continuation of a turn that was parked for this approval.
   // B2 — non-streaming continuation of a turn that was parked for this approval.
   resumeAfterApproval: (id: string) =>
     postJson<AgentResponse>(
@@ -1391,61 +1323,40 @@ export const api = {
   // the approval and wherever they resolved it. Ids only; polling changes
   // nothing, and the server still enforces exactly-once resumption.
   resumableTurns: (sessionId?: string) =>
-    request<ResumableTurnsView>(
-      withQuery("/api/approvals/resumable", { session_id: sessionId }),
-    ),
+    contract.listResumableTurns(sessionId ? { session_id: sessionId } : {}),
   resolveCriticalApproval: (
     id: string,
     body: { approve: boolean; reason: string },
-  ) =>
-    postJson<ResolveCriticalApprovalResult>(
-      `/api/approvals/${encodeURIComponent(id)}/resolve-critical`,
-      body,
-    ),
+  ) => contract.resolveCriticalApproval(id, body),
 
   // ── Runtime mutations. These reuse the existing governed control routes; the UI adds no
   // authority. Every call is enforced server-side by RuntimeAuthority. ──
+  // ── Runtime mutations. These reuse the existing governed control routes; the UI adds no
+  // authority. Every call is enforced server-side by RuntimeAuthority. ──
   activateRuntimeMode: (mode_name: string, reason: string) =>
-    postJson<{ ok: boolean }>("/api/runtime-mode/activate", {
-      mode_name,
-      reason,
-    }),
-  disableRuntimeMode: (reason: string) =>
-    postJson<{ ok: boolean }>("/api/runtime-mode/disable", { reason }),
+    contract.activateRuntimeMode({ mode_name, reason }),
+  disableRuntimeMode: (reason: string) => contract.disableRuntimeMode({ reason }),
   setCapabilityState: (
     capability: string,
     body: { target_state: string; reason: string; confirmation_token?: string },
-  ) =>
-    postJson<{ ok: boolean; capability: string; target_state: string }>(
-      `/api/capability-gates/${encodeURIComponent(capability)}/set`,
-      body,
-    ),
+  ) => contract.setCapabilityState(capability, body),
   disableCapability: (capability: string, reason: string) =>
-    postJson<{ ok: boolean; capability: string }>(
-      `/api/capability-gates/${encodeURIComponent(capability)}/disable`,
-      { reason },
-    ),
+    contract.disableCapability(capability, { reason }),
+  // Record a human threat-model acknowledgement (owner/gate-manager only). This
+  // is the in-app equivalent of the operator/CLI ack step and only satisfies the
+  // acknowledgement precondition — the capability transition still runs after it.
   // Record a human threat-model acknowledgement (owner/gate-manager only). This
   // is the in-app equivalent of the operator/CLI ack step and only satisfies the
   // acknowledgement precondition — the capability transition still runs after it.
   recordThreatModelAck: (capability: string, reason: string) =>
-    postJson<{ ok: boolean; capability: string; acknowledged: boolean }>(
-      `/api/capability-gates/${encodeURIComponent(capability)}/threat-ack`,
-      { reason },
-    ),
+    contract.recordThreatModelAck(capability, { reason }),
 
   // ── Per-capability decision modes (ask | allow | auto | deny) ──
-  capabilityDecisionMode: (capability: string) =>
-    request<CapabilityDecisionMode>(
-      `/api/capability-modes/${encodeURIComponent(capability)}`,
-    ),
+  // ── Per-capability decision modes (ask | allow | auto | deny) ──
+  capabilityDecisionMode: (capability: string) => contract.getCapabilityDecisionMode(capability),
   setCapabilityDecisionMode: (
     capability: string,
     mode: "ask" | "allow" | "auto" | "deny",
     reason: string,
-  ) =>
-    postJson<{ ok: boolean; capability: string; decision_mode: string }>(
-      `/api/capability-modes/${encodeURIComponent(capability)}/${mode}`,
-      { reason },
-    ),
+  ) => SET_DECISION_MODE[mode](capability, { reason }),
 };

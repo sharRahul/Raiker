@@ -2,8 +2,8 @@
 // adopt or drop the session they answer with (OPT-02).
 import type { InstanceLaunchResult } from "../apiTypes";
 import { contract } from "../generated/apiContract";
-import type { IssuedSessionView, LoginResultView } from "../generated/apiContract";
-import { csrfFromCookie, hasToken, postJson, request, setCsrfToken, setToken } from "./core";
+import type { HealthView, IssuedSessionView, LoginResultView } from "../generated/apiContract";
+import { csrfFromCookie, hasToken, postJson, setCsrfToken, setToken } from "./core";
 
 /** Mint a bearer token for the local owner principal and hold it in memory. */
 export async function connect(): Promise<IssuedSessionView> {
@@ -15,20 +15,7 @@ export async function connect(): Promise<IssuedSessionView> {
 
 // ── Lock screen: local-account auth ─────────────────────────────────────────
 
-export type HealthView = {
-  status: string;
-  /** "ok" when the encrypted store opens and reads; "unavailable" otherwise. */
-  store?: string;
-  /** Stable code for an unavailable store, e.g. store_memory_lock_unavailable. */
-  reason?: string;
-  detail?: string;
-  cipher_memory_security?: string;
-  memory_security_mode?: "auto" | "on" | "off";
-  memory_security_probe?: "supported" | "failed" | "not_run";
-  memory_security_reason?: string;
-  memory_security_checked_at?: string | null;
-  sqlcipher_version?: string | null;
-};
+export type { HealthView };
 
 /**
  * Privacy-safe pre-auth reachability probe. `/api/health` is the only
@@ -39,7 +26,7 @@ export type HealthView = {
  * screen call the runtime operational while refusing every attempt.
  */
 export function health(): Promise<HealthView> {
-  return request<HealthView>("/api/health");
+  return contract.health();
 }
 
 export function createInstance(

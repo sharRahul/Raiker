@@ -248,6 +248,150 @@
         "title": "ApprovalDetailView",
         "type": "object"
       },
+      "ApprovalReplaced": {
+        "description": "BUG-271 — the proposal denied, and the reviewer's own edit raised in its place.\n\nThe resume handle's keys sit beside these, not under them.",
+        "properties": {
+          "action_id": {
+            "title": "Action Id",
+            "type": "string"
+          },
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "executes_action": {
+            "title": "Executes Action",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "queue_position": {
+            "title": "Queue Position",
+            "type": "integer"
+          },
+          "queue_total": {
+            "title": "Queue Total",
+            "type": "integer"
+          },
+          "queued_calls": {
+            "title": "Queued Calls",
+            "type": "integer"
+          },
+          "replacement_approval_id": {
+            "title": "Replacement Approval Id",
+            "type": "string"
+          },
+          "resumable": {
+            "title": "Resumable",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "const": "denied",
+            "title": "Status",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "approval_id",
+          "status",
+          "replacement_approval_id",
+          "action_id",
+          "executes_action",
+          "resumable"
+        ],
+        "title": "ApprovalReplaced",
+        "type": "object"
+      },
+      "ApprovalResolved": {
+        "description": "A decision, who proposed and decided it, and what it set in motion.\n\n``execution`` is present when approving carried the action out through\nthe relay, ``connector_result`` when it ran a connector write intent.",
+        "properties": {
+          "action_id": {
+            "title": "Action Id",
+            "type": "string"
+          },
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "approved_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdentityView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "connector_result": {
+            "additionalProperties": true,
+            "title": "Connector Result",
+            "type": "object"
+          },
+          "executes_action": {
+            "title": "Executes Action",
+            "type": "boolean"
+          },
+          "execution": {
+            "$ref": "#/components/schemas/ExecutionSummary"
+          },
+          "machine_identity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdentityView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposed_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdentityView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "resume": {
+            "$ref": "#/components/schemas/ResumeHandle"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval_id",
+          "action_id",
+          "status",
+          "executes_action",
+          "reason",
+          "proposed_by",
+          "approved_by",
+          "machine_identity",
+          "resume"
+        ],
+        "title": "ApprovalResolved",
+        "type": "object"
+      },
       "ApprovalView": {
         "properties": {
           "action_id": {
@@ -619,6 +763,145 @@
           "filename"
         ],
         "title": "AttachmentProvenance",
+        "type": "object"
+      },
+      "AuditExportResult": {
+        "description": "The manifest of an export just produced; never its events.",
+        "properties": {
+          "event_count": {
+            "title": "Event Count",
+            "type": "integer"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "export_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Export Path"
+          },
+          "first_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Event Id"
+          },
+          "last_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Event Id"
+          },
+          "manifest_hash": {
+            "title": "Manifest Hash",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "redacted": {
+            "title": "Redacted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "export_id",
+          "manifest_hash",
+          "event_count",
+          "redacted",
+          "first_event_id",
+          "last_event_id",
+          "export_path"
+        ],
+        "title": "AuditExportResult",
+        "type": "object"
+      },
+      "AuditExportView": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "event_count": {
+            "title": "Event Count",
+            "type": "integer"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "exported_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exported By"
+          },
+          "first_timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Timestamp"
+          },
+          "last_timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Timestamp"
+          },
+          "manifest_hash": {
+            "title": "Manifest Hash",
+            "type": "string"
+          },
+          "redacted": {
+            "title": "Redacted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "export_id",
+          "manifest_hash",
+          "event_count",
+          "redacted",
+          "first_timestamp",
+          "last_timestamp",
+          "exported_by",
+          "created_at"
+        ],
+        "title": "AuditExportView",
         "type": "object"
       },
       "AuthSessionRequest": {
@@ -1423,6 +1706,111 @@
         "title": "BulkDeleteSessionsRequest",
         "type": "object"
       },
+      "CapabilityContainmentView": {
+        "description": "Every monitored capability's containment, in one owner-facing shape (BUG-77).",
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/ContainmentCapability"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "contained": {
+            "title": "Contained",
+            "type": "integer"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/ContainedSubject"
+            },
+            "title": "Subjects",
+            "type": "array"
+          }
+        },
+        "required": [
+          "subjects",
+          "contained",
+          "capabilities"
+        ],
+        "title": "CapabilityContainmentView",
+        "type": "object"
+      },
+      "CapabilityDecisionMode": {
+        "description": "``ok`` is false, and the mode absent, when the capability is unknown.",
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "decision_mode": {
+            "enum": [
+              "ask",
+              "allow",
+              "auto",
+              "deny"
+            ],
+            "title": "Decision Mode",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "CapabilityDecisionMode",
+        "type": "object"
+      },
+      "CapabilityDecisionModeSet": {
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "decision_mode": {
+            "enum": [
+              "ask",
+              "allow",
+              "auto",
+              "deny"
+            ],
+            "title": "Decision Mode",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "capability",
+          "decision_mode"
+        ],
+        "title": "CapabilityDecisionModeSet",
+        "type": "object"
+      },
+      "CapabilityDisabled": {
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "capability"
+        ],
+        "title": "CapabilityDisabled",
+        "type": "object"
+      },
       "CapabilityGateView": {
         "properties": {
           "allowed_transitions": {
@@ -1549,6 +1937,29 @@
           "default_state"
         ],
         "title": "CapabilityGateView",
+        "type": "object"
+      },
+      "CapabilityStateSet": {
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "target_state": {
+            "title": "Target State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "capability",
+          "target_state"
+        ],
+        "title": "CapabilityStateSet",
         "type": "object"
       },
       "CapacitiesRefreshed": {
@@ -2579,6 +2990,124 @@
         "title": "ContainMcpServerRequest",
         "type": "object"
       },
+      "ContainedSubject": {
+        "description": "One monitored subject's containment, as the owner's Security page reads it.",
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "capability_label": {
+            "title": "Capability Label",
+            "type": "string"
+          },
+          "contained_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contained At"
+          },
+          "failure_streak": {
+            "title": "Failure Streak",
+            "type": "integer"
+          },
+          "finding_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_failure_code": {
+            "title": "Last Failure Code",
+            "type": "string"
+          },
+          "probe_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe After"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "active",
+              "paused",
+              "killed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability",
+          "capability_label",
+          "subject_id",
+          "label",
+          "state",
+          "reason",
+          "source",
+          "finding_id",
+          "failure_streak",
+          "last_failure_code",
+          "contained_at",
+          "probe_after",
+          "updated_at"
+        ],
+        "title": "ContainedSubject",
+        "type": "object"
+      },
+      "ContainmentCapability": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "ContainmentCapability",
+        "type": "object"
+      },
       "ContentPart": {
         "description": "One declared piece of a turn's answer.",
         "properties": {
@@ -3565,6 +4094,39 @@
         "title": "CredentialRequest",
         "type": "object"
       },
+      "CriticalApprovalResolved": {
+        "properties": {
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "executes_action": {
+            "title": "Executes Action",
+            "type": "boolean"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval_id",
+          "status",
+          "decision",
+          "message",
+          "executes_action"
+        ],
+        "title": "CriticalApprovalResolved",
+        "type": "object"
+      },
       "DecisionProblem": {
         "properties": {
           "reason_code": {
@@ -4078,6 +4640,77 @@
         "title": "EmbeddingSpaceView",
         "type": "object"
       },
+      "EnvironmentContextView": {
+        "description": "The environment bundle a model turn receives, read by Settings.",
+        "properties": {
+          "day_of_week": {
+            "title": "Day Of Week",
+            "type": "string"
+          },
+          "display_date": {
+            "title": "Display Date",
+            "type": "string"
+          },
+          "freshness": {
+            "title": "Freshness",
+            "type": "string"
+          },
+          "generated_at_utc": {
+            "title": "Generated At Utc",
+            "type": "string"
+          },
+          "local_date": {
+            "title": "Local Date",
+            "type": "string"
+          },
+          "local_datetime": {
+            "title": "Local Datetime",
+            "type": "string"
+          },
+          "local_time": {
+            "title": "Local Time",
+            "type": "string"
+          },
+          "locale": {
+            "title": "Locale",
+            "type": "string"
+          },
+          "location": {
+            "title": "Location",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "timezone_error": {
+            "title": "Timezone Error",
+            "type": "string"
+          },
+          "timezone_source": {
+            "title": "Timezone Source",
+            "type": "string"
+          },
+          "utc_offset": {
+            "title": "Utc Offset",
+            "type": "string"
+          }
+        },
+        "required": [
+          "generated_at_utc",
+          "timezone",
+          "timezone_source",
+          "local_datetime",
+          "local_date",
+          "local_time",
+          "day_of_week",
+          "utc_offset",
+          "display_date",
+          "freshness"
+        ],
+        "title": "EnvironmentContextView",
+        "type": "object"
+      },
       "EventView": {
         "properties": {
           "actor": {
@@ -4156,6 +4789,106 @@
           "summary"
         ],
         "title": "EventView",
+        "type": "object"
+      },
+      "ExecutionReceipt": {
+        "description": "BUG-62 — where an executed action's result now lives.",
+        "properties": {
+          "href": {
+            "title": "Href",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "href",
+          "label"
+        ],
+        "title": "ExecutionReceipt",
+        "type": "object"
+      },
+      "ExecutionSummary": {
+        "description": "What the relay reports of an approved action it carried out.\n\nOnly the keys the executor produced are present; a file write has a path\nand nothing else, a command has its exit code and output.",
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "checkpoint_capture": {
+            "$ref": "#/components/schemas/CheckpointCaptureHealth"
+          },
+          "output_redacted": {
+            "title": "Output Redacted",
+            "type": "boolean"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/ExecutionReceipt"
+          },
+          "returncode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returncode"
+          },
+          "stderr": {
+            "title": "Stderr",
+            "type": "string"
+          },
+          "stderr_bytes": {
+            "title": "Stderr Bytes",
+            "type": "integer"
+          },
+          "stdout": {
+            "title": "Stdout",
+            "type": "string"
+          },
+          "stdout_bytes": {
+            "title": "Stdout Bytes",
+            "type": "integer"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "capability",
+          "path"
+        ],
+        "title": "ExecutionSummary",
         "type": "object"
       },
       "ExportSessionRequest": {
@@ -4605,6 +5338,143 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthView": {
+        "description": "Liveness, and whether the encrypted store opens (BUG-86).\n\nThe text-search keys are present only when the store opened, because they\nare read from it.",
+        "properties": {
+          "cipher_memory_security": {
+            "enum": [
+              "on",
+              "off"
+            ],
+            "title": "Cipher Memory Security",
+            "type": "string"
+          },
+          "connection_ceiling": {
+            "title": "Connection Ceiling",
+            "type": "integer"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "memlock_allowance_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memlock Allowance Bytes"
+          },
+          "memory_security_checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Security Checked At"
+          },
+          "memory_security_in_force": {
+            "enum": [
+              "on",
+              "off"
+            ],
+            "title": "Memory Security In Force",
+            "type": "string"
+          },
+          "memory_security_mode": {
+            "enum": [
+              "auto",
+              "on",
+              "off"
+            ],
+            "title": "Memory Security Mode",
+            "type": "string"
+          },
+          "memory_security_probe": {
+            "enum": [
+              "supported",
+              "failed",
+              "not_run"
+            ],
+            "title": "Memory Security Probe",
+            "type": "string"
+          },
+          "memory_security_reason": {
+            "title": "Memory Security Reason",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "sqlcipher_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sqlcipher Version"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "store": {
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Store",
+            "type": "string"
+          },
+          "text_search_engine": {
+            "title": "Text Search Engine",
+            "type": "string"
+          },
+          "text_search_ranking": {
+            "enum": [
+              "bm25_relevance",
+              "recency"
+            ],
+            "title": "Text Search Ranking",
+            "type": "string"
+          },
+          "text_search_reason": {
+            "title": "Text Search Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "store",
+          "reason",
+          "detail",
+          "cipher_memory_security",
+          "memory_security_in_force",
+          "memory_security_reason",
+          "memory_security_mode",
+          "memory_security_probe",
+          "memory_security_checked_at",
+          "sqlcipher_version",
+          "memlock_allowance_bytes",
+          "connection_ceiling"
+        ],
+        "title": "HealthView",
         "type": "object"
       },
       "HfDownloadPreview": {
@@ -10221,6 +11091,34 @@
         "title": "OperationReview",
         "type": "object"
       },
+      "OwnerQuestionAnswered": {
+        "properties": {
+          "answered": {
+            "title": "Answered",
+            "type": "integer"
+          },
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "resume": {
+            "$ref": "#/components/schemas/ResumeHandle"
+          },
+          "status": {
+            "const": "answered",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval_id",
+          "status",
+          "answered",
+          "resume"
+        ],
+        "title": "OwnerQuestionAnswered",
+        "type": "object"
+      },
       "PairChannelRequest": {
         "additionalProperties": false,
         "description": "Pair one connector profile. Paired is not enabled and not trusted.",
@@ -12156,6 +13054,65 @@
         "title": "ProviderWeeklyUsage",
         "type": "object"
       },
+      "ReadCapabilities": {
+        "properties": {
+          "administrative_surfaces": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Administrative Surfaces",
+            "type": "array"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "external": {
+            "items": {
+              "type": "string"
+            },
+            "title": "External",
+            "type": "array"
+          },
+          "interactive": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Interactive",
+            "type": "array"
+          },
+          "readiness": {
+            "items": {
+              "$ref": "#/components/schemas/ToolReadinessView"
+            },
+            "title": "Readiness",
+            "type": "array"
+          },
+          "surfaces": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Surfaces",
+            "type": "object"
+          }
+        },
+        "required": [
+          "capabilities",
+          "external",
+          "interactive",
+          "surfaces",
+          "administrative_surfaces",
+          "readiness"
+        ],
+        "title": "ReadCapabilities",
+        "type": "object"
+      },
       "RecalledMemory": {
         "description": "An approved memory a turn of this conversation was given, as Raiker knows it now.",
         "properties": {
@@ -12607,6 +13564,135 @@
         "title": "RestoreRequested",
         "type": "object"
       },
+      "ResumableTurn": {
+        "description": "A parked turn another tab may continue: ids and the decision, never the conversation.",
+        "properties": {
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "outcome_status": {
+            "title": "Outcome Status",
+            "type": "string"
+          },
+          "queue_position": {
+            "title": "Queue Position",
+            "type": "integer"
+          },
+          "queue_total": {
+            "title": "Queue Total",
+            "type": "integer"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval_id",
+          "session_id",
+          "turn_id",
+          "tool_name",
+          "outcome_status",
+          "created_at",
+          "queue_position",
+          "queue_total"
+        ],
+        "title": "ResumableTurn",
+        "type": "object"
+      },
+      "ResumableTurns": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/ResumableTurn"
+            },
+            "title": "Turns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "session_id",
+          "turns"
+        ],
+        "title": "ResumableTurns",
+        "type": "object"
+      },
+      "ResumeHandle": {
+        "description": "Whether a turn was parked on this decision, and where it continues (B2).\n\nThe ids and the ADD-02 batch counters are present only when it was.",
+        "properties": {
+          "queue_position": {
+            "title": "Queue Position",
+            "type": "integer"
+          },
+          "queue_total": {
+            "title": "Queue Total",
+            "type": "integer"
+          },
+          "queued_calls": {
+            "title": "Queued Calls",
+            "type": "integer"
+          },
+          "resumable": {
+            "title": "Resumable",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resumable"
+        ],
+        "title": "ResumeHandle",
+        "type": "object"
+      },
+      "RuntimeModeActivated": {
+        "properties": {
+          "mode_name": {
+            "title": "Mode Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "mode_name"
+        ],
+        "title": "RuntimeModeActivated",
+        "type": "object"
+      },
       "RuntimeModeView": {
         "properties": {
           "activated_at": {
@@ -12780,6 +13866,52 @@
           "created_at"
         ],
         "title": "SecurityFindingView",
+        "type": "object"
+      },
+      "SecurityHealthView": {
+        "description": "The last state a security monitor recorded for one subject; no check is run.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "finding_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Id"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "subject_id",
+          "code",
+          "state",
+          "finding_id",
+          "updated_at"
+        ],
+        "title": "SecurityHealthView",
         "type": "object"
       },
       "SelectCodeRepoRequest": {
@@ -13991,6 +15123,155 @@
         "title": "SpeechRuntimeView",
         "type": "object"
       },
+      "StandingGrantCreated": {
+        "properties": {
+          "grant": {
+            "$ref": "#/components/schemas/StandingGrantView"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "grant"
+        ],
+        "title": "StandingGrantCreated",
+        "type": "object"
+      },
+      "StandingGrantList": {
+        "properties": {
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/StandingGrantView"
+            },
+            "title": "Grants",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "grants"
+        ],
+        "title": "StandingGrantList",
+        "type": "object"
+      },
+      "StandingGrantRevoked": {
+        "properties": {
+          "grant_id": {
+            "title": "Grant Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "grant_id"
+        ],
+        "title": "StandingGrantRevoked",
+        "type": "object"
+      },
+      "StandingGrantView": {
+        "description": "One standing grant. ``revoked`` is a boolean on the wire, not the stored 0/1.",
+        "properties": {
+          "action_type": {
+            "title": "Action Type",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "grant_id": {
+            "title": "Grant Id",
+            "type": "string"
+          },
+          "granted_by": {
+            "title": "Granted By",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "principal_id": {
+            "title": "Principal Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "revoked": {
+            "title": "Revoked",
+            "type": "boolean"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "risk_ceiling": {
+            "title": "Risk Ceiling",
+            "type": "string"
+          },
+          "scope_pattern": {
+            "title": "Scope Pattern",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "use_count": {
+            "title": "Use Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "grant_id",
+          "principal_id",
+          "granted_by",
+          "action_type",
+          "tool_name",
+          "scope_pattern",
+          "risk_ceiling",
+          "reason",
+          "created_at",
+          "expires_at",
+          "revoked",
+          "revoked_at",
+          "use_count",
+          "last_used_at"
+        ],
+        "title": "StandingGrantView",
+        "type": "object"
+      },
       "StopHostRequest": {
         "additionalProperties": false,
         "properties": {
@@ -14721,6 +16002,305 @@
         "title": "TelemetryCadenceRequest",
         "type": "object"
       },
+      "TelemetryCadenceSet": {
+        "properties": {
+          "delivery_cadence": {
+            "title": "Delivery Cadence",
+            "type": "string"
+          },
+          "next_delivery_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Delivery At"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "delivery_cadence",
+          "next_delivery_at"
+        ],
+        "title": "TelemetryCadenceSet",
+        "type": "object"
+      },
+      "TelemetryDestinationCreated": {
+        "properties": {
+          "destination_id": {
+            "title": "Destination Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "destination_id"
+        ],
+        "title": "TelemetryDestinationCreated",
+        "type": "object"
+      },
+      "TelemetryDestinationDeleted": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "deleted"
+        ],
+        "title": "TelemetryDestinationDeleted",
+        "type": "object"
+      },
+      "TelemetryDestinationView": {
+        "description": "One OTLP destination. ``header_ref`` names an environment variable, never a value.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "cursor_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor Event Id"
+          },
+          "cursor_timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor Timestamp"
+          },
+          "delivery_cadence": {
+            "title": "Delivery Cadence",
+            "type": "string"
+          },
+          "destination_id": {
+            "title": "Destination Id",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "endpoint_url": {
+            "title": "Endpoint Url",
+            "type": "string"
+          },
+          "exported_count": {
+            "title": "Exported Count",
+            "type": "integer"
+          },
+          "header_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header Ref"
+          },
+          "include_content": {
+            "title": "Include Content",
+            "type": "boolean"
+          },
+          "last_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Attempt At"
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_delivery_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Delivery At"
+          }
+        },
+        "required": [
+          "destination_id",
+          "name",
+          "endpoint_url",
+          "header_ref",
+          "include_content",
+          "enabled",
+          "cursor_timestamp",
+          "cursor_event_id",
+          "last_status",
+          "last_attempt_at",
+          "exported_count",
+          "created_at",
+          "delivery_cadence",
+          "next_delivery_at"
+        ],
+        "title": "TelemetryDestinationView",
+        "type": "object"
+      },
+      "TelemetryExportRun": {
+        "description": "A delivery: how many events went, never what they said.",
+        "properties": {
+          "cursor_event_id": {
+            "title": "Cursor Event Id",
+            "type": "string"
+          },
+          "destination": {
+            "title": "Destination",
+            "type": "string"
+          },
+          "exported": {
+            "title": "Exported",
+            "type": "integer"
+          },
+          "include_content": {
+            "title": "Include Content",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "exported",
+          "destination"
+        ],
+        "title": "TelemetryExportRun",
+        "type": "object"
+      },
+      "ThreatModelAcknowledged": {
+        "properties": {
+          "acknowledged": {
+            "title": "Acknowledged",
+            "type": "boolean"
+          },
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "capability",
+          "acknowledged"
+        ],
+        "title": "ThreatModelAcknowledged",
+        "type": "object"
+      },
+      "ToolReadinessView": {
+        "description": "Whether a read tool can answer now, said apart from whether it may.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "checked_at": {
+            "title": "Checked At",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "reason_text": {
+            "title": "Reason Text",
+            "type": "string"
+          },
+          "remediation_route": {
+            "title": "Remediation Route",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "needs_provider",
+              "blocked",
+              "unavailable",
+              "transient_failure"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "available",
+          "ready",
+          "state",
+          "checked_at"
+        ],
+        "title": "ToolReadinessView",
+        "type": "object"
+      },
       "TranscriptFile": {
         "properties": {
           "byte_size": {
@@ -15417,6 +16997,25 @@
         "title": "VaultKeyRequest",
         "type": "object"
       },
+      "VaultStatus": {
+        "description": "Whether the connector vault has a usable key; never the key.",
+        "properties": {
+          "state": {
+            "enum": [
+              "configured_valid",
+              "missing",
+              "invalid"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "VaultStatus",
+        "type": "object"
+      },
       "WeeklyBudgetSet": {
         "properties": {
           "ok": {
@@ -15845,9 +17444,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Resumable Turns Api Approvals Resumable Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ResumableTurns"
                 }
               }
             },
@@ -15936,9 +17533,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Answer Owner Question Api Approvals  Approval Id  Answer Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/OwnerQuestionAnswered"
                 }
               }
             },
@@ -15988,9 +17583,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Replace Approval With Edit Api Approvals  Approval Id  Replace Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ApprovalReplaced"
                 }
               }
             },
@@ -16039,9 +17632,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Resolve Approval Api Approvals  Approval Id  Resolve Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ApprovalResolved"
                 }
               }
             },
@@ -16091,9 +17682,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Resolve Critical Approval Api Approvals  Approval Id  Resolve Critical Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CriticalApprovalResolved"
                 }
               }
             },
@@ -16276,9 +17865,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Audit Export Api Audit Export Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AuditExportResult"
                 }
               }
             },
@@ -16320,10 +17907,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/AuditExportView"
                   },
-                  "title": "Response List Audit Exports Api Audit Exports Get",
                   "type": "array"
                 }
               }
@@ -17346,9 +18931,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Disable Capability Api Capability Gates  Capability  Disable Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CapabilityDisabled"
                 }
               }
             },
@@ -17397,9 +18980,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Capability State Api Capability Gates  Capability  Set Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CapabilityStateSet"
                 }
               }
             },
@@ -17449,9 +19030,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Record Threat Model Ack Api Capability Gates  Capability  Threat Ack Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ThreatModelAcknowledged"
                 }
               }
             },
@@ -17490,9 +19069,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Capability Decision Mode Api Capability Modes  Capability  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CapabilityDecisionMode"
                 }
               }
             },
@@ -17541,9 +19118,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Allow Capability Api Capability Modes  Capability  Allow Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CapabilityDecisionModeSet"
                 }
               }
             },
@@ -17592,9 +19167,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Ask For Capability Api Capability Modes  Capability  Ask Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CapabilityDecisionModeSet"
                 }
               }
             },
@@ -17643,9 +19216,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Auto Capability Api Capability Modes  Capability  Auto Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CapabilityDecisionModeSet"
                 }
               }
             },
@@ -17694,9 +19265,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Deny Capability Api Capability Modes  Capability  Deny Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CapabilityDecisionModeSet"
                 }
               }
             },
@@ -19671,9 +21240,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Environment Api Environment Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/EnvironmentContextView"
                 }
               }
             },
@@ -20232,9 +21799,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Health Api Health Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HealthView"
                 }
               }
             },
@@ -24665,9 +26230,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Mark Notification Read Api Notifications  Notification Id  Read Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Ok"
                 }
               }
             },
@@ -25638,9 +27201,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Read Capabilities Api Read Capabilities Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ReadCapabilities"
                 }
               }
             },
@@ -25686,9 +27247,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Activate Runtime Mode Api Runtime Mode Activate Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RuntimeModeActivated"
                 }
               }
             },
@@ -25726,9 +27285,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Disable Runtime Mode Api Runtime Mode Disable Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Ok"
                 }
               }
             },
@@ -25816,9 +27373,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Capability Containment Api Security Containment Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CapabilityContainmentView"
                 }
               }
             },
@@ -25866,9 +27421,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Capability Containment Api Security Containment  Capability   Subject Id   Action  Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ContainedSubject"
                 }
               }
             },
@@ -25978,10 +27531,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/SecurityHealthView"
                   },
-                  "title": "Response List Security Health Api Security Health Get",
                   "type": "array"
                 }
               }
@@ -26001,10 +27552,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/SecurityHealthView"
                   },
-                  "title": "Response Check Security Health Api Security Health Check Post",
                   "type": "array"
                 }
               }
@@ -28093,9 +29642,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Standing Grants Api Standing Grants Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/StandingGrantList"
                 }
               }
             },
@@ -28132,9 +29679,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Standing Grant Api Standing Grants Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/StandingGrantCreated"
                 }
               }
             },
@@ -28174,9 +29719,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Revoke Standing Grant Api Standing Grants  Grant Id  Revoke Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/StandingGrantRevoked"
                 }
               }
             },
@@ -28519,10 +30062,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/TelemetryDestinationView"
                   },
-                  "title": "Response List Telemetry Destinations Api Telemetry Destinations Get",
                   "type": "array"
                 }
               }
@@ -28549,9 +30090,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Telemetry Destination Api Telemetry Destinations Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TelemetryDestinationCreated"
                 }
               }
             },
@@ -28590,9 +30129,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Telemetry Destination Api Telemetry Destinations  Destination Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TelemetryDestinationDeleted"
                 }
               }
             },
@@ -28642,9 +30179,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Telemetry Cadence Api Telemetry Destinations  Destination Id  Cadence Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TelemetryCadenceSet"
                 }
               }
             },
@@ -28684,9 +30219,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Run Telemetry Export Api Telemetry Destinations  Destination Id  Export Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TelemetryExportRun"
                 }
               }
             },
@@ -28811,9 +30344,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Vault Key Api Vault Key Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/VaultStatus"
                 }
               }
             },
@@ -28849,9 +30380,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Vault Key Api Vault Key Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/VaultStatus"
                 }
               }
             },
@@ -28879,9 +30408,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Vault Status Api Vault Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/VaultStatus"
                 }
               }
             },

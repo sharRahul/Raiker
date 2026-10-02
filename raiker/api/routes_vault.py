@@ -13,13 +13,15 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Header, Request, status
+from typing_extensions import TypedDict
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.refusals import refusal
-from raiker.api.schemas import VaultKeyRequest
+from raiker.api.schemas import VaultKeyRequest, serialize_dto
 from raiker.auth.accounts import AccountService
 from raiker.auth.vault_key_file import (
+    VaultState,
     clear_vault_key,
     vault_status,
     write_vault_key,
@@ -29,6 +31,16 @@ from raiker.storage.sqlite import SQLiteStore
 router = APIRouter()
 
 REQUIRE_MFA_KEY = "security.require_mfa_for_vault"
+
+
+class VaultStatus(TypedDict):
+    """Whether the connector vault has a usable key; never the key."""
+
+    state: VaultState
+
+
+def _status(ws: str | Path) -> VaultStatus:
+    return {"state": vault_status(ws)}
 
 
 def _settings(ws: str | Path, principal_id: str) -> dict[str, Any]:
@@ -53,7 +65,7 @@ def _enforce_vault_mfa_policy(ws: str | Path, principal_id: str, mfa_code: str |
 @router.get("/api/vault/status")
 async def get_vault_status(request: Request) -> dict[str, Any]:
     AuthMiddleware(_ws(request)).authenticate(request)
-    return {"state": vault_status(_ws(request))}
+    return serialize_dto(_status(_ws(request)))
 
 
 @router.put("/api/vault/key")
@@ -67,7 +79,7 @@ async def set_vault_key(body: VaultKeyRequest, request: Request) -> dict[str, An
         write_vault_key(ws, body.key)
     except ValueError as exc:
         raise refusal(status.HTTP_400_BAD_REQUEST, "connector_vault_key_invalid") from exc
-    return {"state": vault_status(ws)}
+    return serialize_dto(_status(ws))
 
 
 @router.delete("/api/vault/key")
@@ -83,4 +95,4 @@ async def delete_vault_key(
     ws = _ws(request)
     _enforce_vault_mfa_policy(ws, principal.principal_id, x_mfa_code)
     clear_vault_key(ws)
-    return {"state": vault_status(ws)}
+    return serialize_dto(_status(ws))

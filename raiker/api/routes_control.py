@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
@@ -21,6 +21,32 @@ from raiker.api.schemas import (
     serialize_dto,
 )
 from raiker.api.sessions import ApiSession
+from raiker.api.wire import Ok
+from raiker.api.wire.control import (
+    AuditExportResult,
+    AuditExportView,
+    CapabilityDecisionMode,
+    CapabilityDecisionModeSet,
+    CapabilityDisabled,
+    CapabilityStateSet,
+    DecisionMode,
+    EnvironmentContextView,
+    HealthView,
+    ReadCapabilities,
+    RuntimeModeActivated,
+    StandingGrantCreated,
+    StandingGrantList,
+    StandingGrantRevoked,
+    TelemetryCadenceSet,
+    TelemetryDestinationCreated,
+    TelemetryDestinationDeleted,
+    TelemetryDestinationView,
+    TelemetryExportRun,
+    ThreatModelAcknowledged,
+    ToolReadinessView,
+    standing_grant,
+    telemetry_destination,
+)
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority.models import Principal
@@ -51,11 +77,11 @@ def _deny(result_reason: str | None = None) -> NoReturn:
 
 def _set_capability_decision_mode(
     capability: str,
-    mode: str,
+    mode: DecisionMode,
     body: SetCapabilityDecisionModeRequest,
     request: Request,
     auth_data: tuple[ApiSession, Principal],
-) -> dict[str, Any]:
+) -> CapabilityDecisionModeSet:
     session, _principal = auth_data
     service = _get_service(request)
     result = service.set_capability_decision_mode(
@@ -66,8 +92,12 @@ def _set_capability_decision_mode(
     )
     if not result.ok:
         _deny(result.reason_code)
-    decision_mode = result.data.get("decision_mode", mode)
-    return {"ok": True, "capability": capability, "decision_mode": decision_mode}
+    answer: CapabilityDecisionModeSet = {
+        "ok": True,
+        "capability": capability,
+        "decision_mode": result.data.get("decision_mode", mode),
+    }
+    return answer
 
 
 @router.get("/api/health")
@@ -83,7 +113,11 @@ async def health(request: Request) -> dict[str, Any]:
     """
     ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
     health_view = store_health(ws)
-    return {"status": "ok" if health_view["store"] == "ok" else "degraded", **health_view}
+    answer = cast(
+        HealthView,
+        {"status": "ok" if health_view["store"] == "ok" else "degraded", **health_view},
+    )
+    return serialize_dto(answer)
 
 
 @router.get("/api/runtime-mode")
@@ -106,7 +140,8 @@ async def activate_runtime_mode(
     result = service.activate_runtime_mode(body.mode_name, session.principal_id, body.reason)
     if not result.ok:
         _deny(result.reason_code)
-    return {"ok": True, "mode_name": body.mode_name}
+    activated: RuntimeModeActivated = {"ok": True, "mode_name": body.mode_name}
+    return serialize_dto(activated)
 
 
 @router.post("/api/runtime-mode/disable")
@@ -120,7 +155,7 @@ async def disable_runtime_mode(
     result = service.disable_runtime_mode(session.principal_id, body.reason)
     if not result.ok:
         _deny(result.reason_code)
-    return {"ok": True}
+    return serialize_dto(Ok())
 
 
 @router.get("/api/capability-gates")
@@ -165,7 +200,7 @@ async def list_read_capabilities(
 
     ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
     store = SQLiteStore(ws)
-    return {
+    answer: ReadCapabilities = {
         "capabilities": list(GLOBAL_READ_CAPABILITIES),
         "external": list(EXTERNAL_READ_CAPABILITIES),
         "interactive": list(INTERACTIVE_CAPABILITIES),
@@ -174,10 +209,11 @@ async def list_read_capabilities(
         },
         "administrative_surfaces": list(ADMINISTRATIVE_SURFACES),
         "readiness": [
-            row.to_dict()
+            cast(ToolReadinessView, row.to_dict())
             for row in web_read_readiness(ws, store, principal.principal_id)
         ],
     }
+    return serialize_dto(answer)
 
 
 @router.get("/api/environment")
@@ -197,7 +233,10 @@ async def get_environment(
     from raiker.storage.sqlite import SQLiteStore
 
     ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
-    return environment_context(SQLiteStore(ws), principal.principal_id).to_dict()
+    answer = cast(
+        EnvironmentContextView, environment_context(SQLiteStore(ws), principal.principal_id).to_dict()
+    )
+    return serialize_dto(answer)
 
 
 @router.get("/api/capability-gates/{capability}")
@@ -232,7 +271,10 @@ async def set_capability_state(
     )
     if not result.ok:
         _deny(result.reason_code)
-    return {"ok": True, "capability": capability, "target_state": body.target_state}
+    answer: CapabilityStateSet = {
+        "ok": True, "capability": capability, "target_state": body.target_state
+    }
+    return serialize_dto(answer)
 
 
 @router.post("/api/capability-gates/{capability}/threat-ack")
@@ -253,7 +295,8 @@ async def record_threat_model_ack(
     result = service.record_threat_model_ack(capability, session.principal_id, body.reason)
     if not result.ok:
         _deny(result.reason_code)
-    return {"ok": True, "capability": capability, "acknowledged": True}
+    answer: ThreatModelAcknowledged = {"ok": True, "capability": capability, "acknowledged": True}
+    return serialize_dto(answer)
 
 
 @router.post("/api/capability-gates/{capability}/disable")
@@ -268,7 +311,8 @@ async def disable_capability(
     result = service.disable_capability(capability, session.principal_id, body.reason)
     if not result.ok:
         _deny(result.reason_code)
-    return {"ok": True, "capability": capability}
+    answer: CapabilityDisabled = {"ok": True, "capability": capability}
+    return serialize_dto(answer)
 
 
 @router.get("/api/capability-modes/{capability}")
@@ -279,7 +323,8 @@ async def get_capability_decision_mode(
 ) -> dict[str, Any]:
     service = _get_service(request)
     result = service.get_capability_decision_mode(capability, auth_data[0].principal_id)
-    return {"ok": result.ok, **result.data}
+    answer = cast(CapabilityDecisionMode, {"ok": result.ok, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/capability-modes/{capability}/ask")
@@ -289,7 +334,9 @@ async def ask_for_capability(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _set_capability_decision_mode(capability, "ask", body, request, _auth_data)
+    return serialize_dto(
+        _set_capability_decision_mode(capability, "ask", body, request, _auth_data)
+    )
 
 
 @router.post("/api/capability-modes/{capability}/allow")
@@ -299,7 +346,9 @@ async def allow_capability(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _set_capability_decision_mode(capability, "allow", body, request, _auth_data)
+    return serialize_dto(
+        _set_capability_decision_mode(capability, "allow", body, request, _auth_data)
+    )
 
 
 @router.post("/api/capability-modes/{capability}/auto")
@@ -309,7 +358,9 @@ async def auto_capability(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _set_capability_decision_mode(capability, "auto", body, request, _auth_data)
+    return serialize_dto(
+        _set_capability_decision_mode(capability, "auto", body, request, _auth_data)
+    )
 
 
 @router.post("/api/capability-modes/{capability}/deny")
@@ -319,7 +370,9 @@ async def deny_capability(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _set_capability_decision_mode(capability, "deny", body, request, _auth_data)
+    return serialize_dto(
+        _set_capability_decision_mode(capability, "deny", body, request, _auth_data)
+    )
 
 
 @router.get("/api/runtime-readiness")
@@ -350,7 +403,10 @@ async def list_standing_grants(
     )
     if not result.ok:
         _deny(result.reason_code)
-    return {"ok": True, **result.data}
+    answer: StandingGrantList = {
+        "ok": True, "grants": [standing_grant(row) for row in result.data["grants"]]
+    }
+    return serialize_dto(answer)
 
 
 @router.post("/api/standing-grants")
@@ -373,7 +429,8 @@ async def create_standing_grant(
     )
     if not result.ok:
         _deny(result.reason_code)
-    return {"ok": True, **result.data}
+    created: StandingGrantCreated = {"ok": True, "grant": standing_grant(result.data["grant"])}
+    return serialize_dto(created)
 
 
 @router.post("/api/standing-grants/{grant_id}/revoke")
@@ -388,7 +445,8 @@ async def revoke_standing_grant(
     result = service.revoke_standing_grant(grant_id, session.principal_id)
     if not result.ok:
         _deny(result.reason_code)
-    return {"ok": True, "grant_id": grant_id}
+    revoked: StandingGrantRevoked = {"ok": True, "grant_id": grant_id}
+    return serialize_dto(revoked)
 
 
 # ── Audit export (BUG-231) ───────────────────────────────────────────────────
@@ -420,7 +478,8 @@ async def create_audit_export(
         if result.reason_code == "audit_export_empty":
             raise refusal(status.HTTP_409_CONFLICT, "audit_export_empty")
         _deny(result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(AuditExportResult, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.get("/api/audit/exports")
@@ -438,7 +497,7 @@ async def list_audit_exports(
     from raiker.storage.sqlite import SQLiteStore
 
     rows = SQLiteStore(ws).list_audit_exports(limit=max(1, min(limit, 200)))
-    return [
+    exports: list[AuditExportView] = [
         {
             "export_id": str(row["export_id"]),
             "manifest_hash": str(row["manifest_hash"]),
@@ -451,6 +510,7 @@ async def list_audit_exports(
         }
         for row in rows
     ]
+    return serialize_dto(exports)
 
 
 # ── Telemetry export (compatibility backlog #18) ─────────────────────────────
@@ -474,7 +534,10 @@ async def list_telemetry_destinations(
     result = _get_service(request).list_telemetry_destinations(session.principal_id)
     if not result.ok:
         _deny(result.reason_code)
-    return list(result.data.get("destinations", []))
+    destinations: list[TelemetryDestinationView] = [
+        telemetry_destination(row) for row in result.data.get("destinations", [])
+    ]
+    return serialize_dto(destinations)
 
 
 @router.post("/api/telemetry/destinations")
@@ -493,7 +556,10 @@ async def create_telemetry_destination(
     )
     if not result.ok:
         _deny(result.reason_code)
-    return {"ok": True, **result.data}
+    created: TelemetryDestinationCreated = {
+        "ok": True, "destination_id": str(result.data["destination_id"])
+    }
+    return serialize_dto(created)
 
 
 @router.put("/api/telemetry/destinations/{destination_id}/cadence")
@@ -510,7 +576,12 @@ async def set_telemetry_cadence(
     )
     if not result.ok:
         _deny(result.reason_code)
-    return {"ok": True, **result.data}
+    answer: TelemetryCadenceSet = {
+        "ok": True,
+        "delivery_cadence": str(result.data["delivery_cadence"]),
+        "next_delivery_at": result.data.get("next_delivery_at"),
+    }
+    return serialize_dto(answer)
 
 
 @router.delete("/api/telemetry/destinations/{destination_id}")
@@ -525,7 +596,8 @@ async def delete_telemetry_destination(
     )
     if not result.ok:
         _deny(result.reason_code)
-    return {"ok": True, **result.data}
+    deleted: TelemetryDestinationDeleted = {"ok": True, "deleted": True}
+    return serialize_dto(deleted)
 
 
 @router.post("/api/telemetry/destinations/{destination_id}/export")
@@ -539,7 +611,8 @@ async def run_telemetry_export(
     result = _get_service(request).run_telemetry_export(session.principal_id, destination_id)
     if not result.ok:
         _deny(result.reason_code)
-    return {"ok": True, **result.data}
+    run = cast(TelemetryExportRun, {"ok": True, **result.data})
+    return serialize_dto(run)
 
 
 @router.get("/api/audit/exports/{export_id}/download")

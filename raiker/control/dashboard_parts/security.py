@@ -11,11 +11,17 @@ turns off.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from raiker.control.dtos import ControlResult
 from raiker.control.views.extensions import McpSessionView
-from raiker.control.views.security import NotificationView, SecurityFindingView
+from raiker.control.views.security import (
+    CapabilityContainmentView,
+    ContainedSubject,
+    NotificationView,
+    SecurityFindingView,
+    SecurityHealthView,
+)
 from raiker.security.credentials import CredentialLifecycle, CredentialLifecycleView
 from raiker.security.monitoring import SecurityMonitor
 
@@ -77,13 +83,27 @@ class SecurityService:
         SecurityMonitor(self.store, self.workspace_root).scan_configured_paths(principal_id)
         return self.list_security_findings(principal_id)
 
-    def check_security_health(self: DashboardService, principal_id: str) -> list[dict[str, Any]]:
+    def check_security_health(
+        self: DashboardService, principal_id: str
+    ) -> list[SecurityHealthView]:
         SecurityMonitor(self.store, self.workspace_root).check_vault_health(principal_id)
         return self.list_security_health(principal_id)
 
-    def list_security_health(self: DashboardService, principal_id: str) -> list[dict[str, Any]]:
+    def list_security_health(
+        self: DashboardService, principal_id: str
+    ) -> list[SecurityHealthView]:
         """Return the last recorded monitor state without performing a check."""
-        return self.store.list_security_monitor_state(principal_id)
+        return [
+            {
+                "source": str(row["source"]),
+                "subject_id": str(row["subject_id"]),
+                "code": str(row["code"]),
+                "state": str(row["state"]),
+                "finding_id": row.get("finding_id"),
+                "updated_at": str(row["updated_at"]),
+            }
+            for row in self.store.list_security_monitor_state(principal_id)
+        ]
 
     def check_password_breach(
         self: DashboardService, principal_id: str, password: str, *, enabled: bool
@@ -93,7 +113,9 @@ class SecurityService:
         )
         return self.list_security_findings(principal_id)
 
-    def list_capability_containment(self: DashboardService, principal_id: str) -> dict[str, Any]:
+    def list_capability_containment(
+        self: DashboardService, principal_id: str
+    ) -> CapabilityContainmentView:
         """Every monitored capability's containment state, in one owner-facing shape.
 
         BUG-77 — monitored MCP connections keep their richer per-session view;
@@ -118,7 +140,7 @@ class SecurityService:
 
     def set_capability_containment(
         self: DashboardService, principal_id: str, capability: str, subject_id: str, action: str
-    ) -> dict[str, Any]:
+    ) -> ContainedSubject:
         """Pause, stop or resume one monitored subject. Every state is revocable."""
         from raiker.security.containment import CAPABILITY_LABELS, CapabilityContainment
 

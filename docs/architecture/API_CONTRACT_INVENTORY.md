@@ -13,23 +13,23 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
   `to_dict`; it needs a dedicated response model first (Stage B).
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**350 operations: 211 verified, 0 eligible, 128 deferred, 11 special.**
+**350 operations: 247 verified, 0 eligible, 92 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
 | DELETE | `/api/account` |  | Ok | verified | built as Ok |
 | GET | `/api/approvals` |  | ApprovalView[] | verified | DashboardService.list_approvals |
-| GET | `/api/approvals/resumable` |  |  | deferred | body assembled in the route |
+| GET | `/api/approvals/resumable` |  | ResumableTurns | verified | declared ResumableTurns |
 | GET | `/api/approvals/{approval_id}` |  | ApprovalDetailView | verified | DashboardService.get_approval |
-| POST | `/api/approvals/{approval_id}/answer` | AnswerOwnerQuestionRequest |  | deferred | body assembled in the route |
-| POST | `/api/approvals/{approval_id}/replace` | ReplaceApprovalRequest |  | deferred | body assembled in the route |
-| POST | `/api/approvals/{approval_id}/resolve` | ResolveApprovalRequest |  | deferred | body assembled in the route |
-| POST | `/api/approvals/{approval_id}/resolve-critical` | ResolveApprovalRequest |  | deferred | body assembled in the route |
-| POST | `/api/approvals/{approval_id}/resume` |  |  | deferred | body assembled in the route |
+| POST | `/api/approvals/{approval_id}/answer` | AnswerOwnerQuestionRequest | OwnerQuestionAnswered | verified | declared OwnerQuestionAnswered |
+| POST | `/api/approvals/{approval_id}/replace` | ReplaceApprovalRequest | ApprovalReplaced | verified | declared by cast |
+| POST | `/api/approvals/{approval_id}/resolve` | ResolveApprovalRequest | ApprovalResolved | verified | declared ApprovalResolved |
+| POST | `/api/approvals/{approval_id}/resolve-critical` | ResolveApprovalRequest | CriticalApprovalResolved | verified | declared CriticalApprovalResolved |
+| POST | `/api/approvals/{approval_id}/resume` |  |  | deferred | aresume_after_approval returns AgentResponse, not a fields-only view |
 | POST | `/api/approvals/{approval_id}/resume/stream` |  |  | special | special |
 | POST | `/api/attachments` | UploadAttachmentRequest |  | deferred | body assembled in the route |
-| POST | `/api/audit/export` |  |  | deferred | body assembled in the route |
-| GET | `/api/audit/exports` |  |  | deferred | body assembled in the route |
+| POST | `/api/audit/export` |  | AuditExportResult | verified | declared by cast |
+| GET | `/api/audit/exports` |  | AuditExportView[] | verified | declared AuditExportView[] |
 | GET | `/api/audit/exports/{export_id}/download` |  |  | special | special |
 | GET | `/api/auth/bootstrap-status` |  | BootstrapStatusView | verified | built as BootstrapStatusView |
 | POST | `/api/auth/elevate` | ElevateRequest | ElevatedTokenView | verified | built as ElevatedTokenView |
@@ -61,14 +61,14 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/brain/sources/upload` | BrainSourceUploadRequest | BrainSourceUploaded | verified | DashboardService.upload_brain_source_file |
 | GET | `/api/capability-gates` |  | CapabilityGateView[] | verified | RuntimeControlService.list_capability_gates |
 | GET | `/api/capability-gates/{capability}` |  | CapabilityGateView | verified | RuntimeControlService.get_capability_gate |
-| POST | `/api/capability-gates/{capability}/disable` | DisableCapabilityRequest |  | deferred | body assembled in the route |
-| POST | `/api/capability-gates/{capability}/set` | SetCapabilityStateRequest |  | deferred | body assembled in the route |
-| POST | `/api/capability-gates/{capability}/threat-ack` | RecordThreatModelAckRequest |  | deferred | body assembled in the route |
-| GET | `/api/capability-modes/{capability}` |  |  | deferred | body assembled in the route |
-| POST | `/api/capability-modes/{capability}/allow` | SetCapabilityDecisionModeRequest |  | deferred | body assembled in the route |
-| POST | `/api/capability-modes/{capability}/ask` | SetCapabilityDecisionModeRequest |  | deferred | body assembled in the route |
-| POST | `/api/capability-modes/{capability}/auto` | SetCapabilityDecisionModeRequest |  | deferred | body assembled in the route |
-| POST | `/api/capability-modes/{capability}/deny` | SetCapabilityDecisionModeRequest |  | deferred | body assembled in the route |
+| POST | `/api/capability-gates/{capability}/disable` | DisableCapabilityRequest | CapabilityDisabled | verified | declared CapabilityDisabled |
+| POST | `/api/capability-gates/{capability}/set` | SetCapabilityStateRequest | CapabilityStateSet | verified | declared CapabilityStateSet |
+| POST | `/api/capability-gates/{capability}/threat-ack` | RecordThreatModelAckRequest | ThreatModelAcknowledged | verified | declared ThreatModelAcknowledged |
+| GET | `/api/capability-modes/{capability}` |  | CapabilityDecisionMode | verified | declared by cast |
+| POST | `/api/capability-modes/{capability}/allow` | SetCapabilityDecisionModeRequest | CapabilityDecisionModeSet | verified | _set_capability_decision_mode |
+| POST | `/api/capability-modes/{capability}/ask` | SetCapabilityDecisionModeRequest | CapabilityDecisionModeSet | verified | _set_capability_decision_mode |
+| POST | `/api/capability-modes/{capability}/auto` | SetCapabilityDecisionModeRequest | CapabilityDecisionModeSet | verified | _set_capability_decision_mode |
+| POST | `/api/capability-modes/{capability}/deny` | SetCapabilityDecisionModeRequest | CapabilityDecisionModeSet | verified | _set_capability_decision_mode |
 | GET | `/api/channels` |  |  | deferred | body assembled in the route |
 | POST | `/api/channels/deliver-test` | ChannelTestDeliveryRequest |  | deferred | body assembled in the route |
 | POST | `/api/channels/pairings` | PairChannelRequest |  | deferred | body assembled in the route |
@@ -114,7 +114,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/credential-deltas/{run_id}/discard` | dict |  | deferred | body assembled in the route |
 | GET | `/api/diagnostics` |  | DiagnosticsView | verified | DashboardService.get_diagnostics |
 | GET | `/api/diagnostics/export` |  |  | deferred | body assembled in the route |
-| GET | `/api/environment` |  |  | deferred | body assembled in the route |
+| GET | `/api/environment` |  | EnvironmentContextView | verified | declared by cast |
 | GET | `/api/events` |  | EventView[] | verified | DashboardService.list_events |
 | GET | `/api/execution-environments` |  |  | deferred | body assembled in the route |
 | PUT | `/api/execution-environments/configure` | dict |  | deferred | body assembled in the route |
@@ -129,7 +129,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/git-credential/grant` | GitGrantRequest |  | deferred | body assembled in the route |
 | GET | `/api/guide` |  |  | deferred | body assembled in the route |
 | GET | `/api/guide/{slug}` |  |  | deferred | body assembled in the route |
-| GET | `/api/health` |  |  | deferred | body assembled in the route |
+| GET | `/api/health` |  | HealthView | verified | declared by cast |
 | GET | `/api/hooks` |  |  | deferred | body assembled in the route |
 | GET | `/api/host` |  |  | deferred | body assembled in the route |
 | GET | `/api/host/paths` |  |  | deferred | body assembled in the route |
@@ -252,7 +252,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/models/{profile_id}/provider-models` |  | ProviderModelListView | verified | DashboardService.list_provider_models |
 | PUT | `/api/models/{profile_id}/weekly-budget` | ModelWeeklyBudgetRequest | WeeklyBudgetSet | verified | declared WeeklyBudgetSet |
 | GET | `/api/notifications` |  | NotificationView[] | verified | DashboardService.list_notifications |
-| POST | `/api/notifications/{notification_id}/read` |  |  | deferred | body assembled in the route |
+| POST | `/api/notifications/{notification_id}/read` |  | Ok | verified | built as Ok |
 | POST | `/api/ollama/pull` | OllamaPullRequestBody | ModelOperationView | verified | ModelOperationService.start |
 | GET | `/api/plugins` |  |  | deferred | body assembled in the route |
 | GET | `/api/projects` |  | ProjectsListView | verified | DashboardService.list_projects |
@@ -277,19 +277,19 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/projects/{project_id}/root/status` |  | ProjectRootStatus | verified | declared ProjectRootStatus |
 | POST | `/api/prompts` | PromptRequest |  | deferred | body assembled in the route |
 | POST | `/api/prompts/stream` | PromptRequest |  | special | special |
-| GET | `/api/read-capabilities` |  |  | deferred | body assembled in the route |
+| GET | `/api/read-capabilities` |  | ReadCapabilities | verified | declared ReadCapabilities |
 | GET | `/api/runtime-mode` |  | RuntimeModeView | verified | RuntimeControlService.get_runtime_mode |
-| POST | `/api/runtime-mode/activate` | ActivateRuntimeModeRequest |  | deferred | body assembled in the route |
-| POST | `/api/runtime-mode/disable` | DisableRuntimeModeRequest |  | deferred | body assembled in the route |
+| POST | `/api/runtime-mode/activate` | ActivateRuntimeModeRequest | RuntimeModeActivated | verified | declared RuntimeModeActivated |
+| POST | `/api/runtime-mode/disable` | DisableRuntimeModeRequest | Ok | verified | built as Ok |
 | GET | `/api/runtime-readiness` |  | RuntimeReadinessView | verified | RuntimeControlService.get_runtime_readiness |
 | POST | `/api/security/breach-check` | BreachCheckRequest | SecurityFindingView[] | verified | DashboardService.check_password_breach |
-| GET | `/api/security/containment` |  |  | deferred | body assembled in the route |
-| POST | `/api/security/containment/{capability}/{subject_id}/{action}` |  |  | deferred | body assembled in the route |
+| GET | `/api/security/containment` |  | CapabilityContainmentView | verified | DashboardService.list_capability_containment |
+| POST | `/api/security/containment/{capability}/{subject_id}/{action}` |  | ContainedSubject | verified | DashboardService.set_capability_containment |
 | GET | `/api/security/credentials` |  | CredentialLifecycleView[] | verified | DashboardService.list_security_credentials |
 | POST | `/api/security/credentials/{provider}/verify` |  | CredentialLifecycleView | verified | DashboardService.verify_security_credential |
 | GET | `/api/security/findings` |  | SecurityFindingView[] | verified | DashboardService.list_security_findings |
-| GET | `/api/security/health` |  |  | deferred | body assembled in the route |
-| POST | `/api/security/health-check` |  |  | deferred | body assembled in the route |
+| GET | `/api/security/health` |  | SecurityHealthView[] | verified | DashboardService.list_security_health |
+| POST | `/api/security/health-check` |  | SecurityHealthView[] | verified | DashboardService.check_security_health |
 | POST | `/api/security/scan` |  | SecurityFindingView[] | verified | DashboardService.scan_security |
 | GET | `/api/sessions` |  | SessionView[] | verified | DashboardService.list_sessions |
 | DELETE | `/api/sessions/bulk` | BulkDeleteSessionsRequest | SessionsDeleted | verified | declared SessionsDeleted |
@@ -339,9 +339,9 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | PUT | `/api/speech/runtime` | SpeechRuntimeRequest | SpeechRuntime | verified | declared SpeechRuntime |
 | POST | `/api/speech/runtime/probe` |  | SpeechProbe | verified | declared SpeechProbe |
 | POST | `/api/speech/transcribe` |  |  | special | special |
-| GET | `/api/standing-grants` |  |  | deferred | body assembled in the route |
-| POST | `/api/standing-grants` | CreateStandingGrantRequest |  | deferred | body assembled in the route |
-| POST | `/api/standing-grants/{grant_id}/revoke` |  |  | deferred | body assembled in the route |
+| GET | `/api/standing-grants` |  | StandingGrantList | verified | declared StandingGrantList |
+| POST | `/api/standing-grants` | CreateStandingGrantRequest | StandingGrantCreated | verified | declared StandingGrantCreated |
+| POST | `/api/standing-grants/{grant_id}/revoke` |  | StandingGrantRevoked | verified | declared StandingGrantRevoked |
 | POST | `/api/stop-all` |  |  | deferred | body assembled in the route |
 | GET | `/api/surface-models` |  | SurfaceModels | verified | declared SurfaceModels |
 | PUT | `/api/surface-models` | SurfaceModelDefaultRequest | SurfaceModelSet | verified | declared SurfaceModelSet |
@@ -350,16 +350,16 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/tasks/{task_id}` |  | TaskDetailView | verified | DashboardService.get_task_detail |
 | POST | `/api/tasks/{task_id}/resume` |  | TaskResumed | verified | declared TaskResumed |
 | POST | `/api/tasks/{task_id}/run` |  | TaskView | verified | DashboardService.run_task_now |
-| GET | `/api/telemetry/destinations` |  |  | deferred | body assembled in the route |
-| POST | `/api/telemetry/destinations` | CreateTelemetryDestinationRequest |  | deferred | body assembled in the route |
-| DELETE | `/api/telemetry/destinations/{destination_id}` |  |  | deferred | body assembled in the route |
-| PUT | `/api/telemetry/destinations/{destination_id}/cadence` | TelemetryCadenceRequest |  | deferred | body assembled in the route |
-| POST | `/api/telemetry/destinations/{destination_id}/export` |  |  | deferred | body assembled in the route |
+| GET | `/api/telemetry/destinations` |  | TelemetryDestinationView[] | verified | declared TelemetryDestinationView[] |
+| POST | `/api/telemetry/destinations` | CreateTelemetryDestinationRequest | TelemetryDestinationCreated | verified | declared TelemetryDestinationCreated |
+| DELETE | `/api/telemetry/destinations/{destination_id}` |  | TelemetryDestinationDeleted | verified | declared TelemetryDestinationDeleted |
+| PUT | `/api/telemetry/destinations/{destination_id}/cadence` | TelemetryCadenceRequest | TelemetryCadenceSet | verified | declared TelemetryCadenceSet |
+| POST | `/api/telemetry/destinations/{destination_id}/export` |  | TelemetryExportRun | verified | declared by cast |
 | POST | `/api/tray/session` | TraySessionRequest |  | deferred | body assembled in the route |
 | GET | `/api/turns/{turn_id}` |  | TurnDetailView | verified | DashboardService.get_turn |
-| DELETE | `/api/vault/key` |  |  | deferred | body assembled in the route |
-| PUT | `/api/vault/key` | VaultKeyRequest |  | deferred | body assembled in the route |
-| GET | `/api/vault/status` |  |  | deferred | body assembled in the route |
+| DELETE | `/api/vault/key` |  | VaultStatus | verified | _status |
+| PUT | `/api/vault/key` | VaultKeyRequest | VaultStatus | verified | _status |
+| GET | `/api/vault/status` |  | VaultStatus | verified | _status |
 | GET | `/api/web-access/blocklist` |  |  | deferred | body assembled in the route |
 | POST | `/api/web-access/blocklist` | BlocklistRuleRequest |  | deferred | body assembled in the route |
 | POST | `/api/web-access/blocklist/test` | BlocklistTestRequest |  | deferred | body assembled in the route |

@@ -138,3 +138,45 @@ class AuthError(View):
     ok: bool = False
     reason_code: str = "auth_failed"
     message: str = ""
+
+
+class ContainedSubject(TypedDict):
+    """One monitored subject's containment, as the owner's Security page reads it."""
+
+    capability: str
+    capability_label: str
+    subject_id: str
+    label: str
+    state: Literal["active", "paused", "killed"]
+    reason: str
+    source: str
+    finding_id: str | None
+    failure_streak: int
+    last_failure_code: str
+    contained_at: str | None
+    probe_after: str | None
+    updated_at: str
+
+
+class SecurityHealthView(TypedDict):
+    """The last state a security monitor recorded for one subject; no check is run."""
+
+    source: str
+    subject_id: str
+    code: str
+    state: str
+    finding_id: str | None
+    updated_at: str
+
+
+class ContainmentCapability(TypedDict):
+    id: str
+    label: str
+
+
+class CapabilityContainmentView(TypedDict):
+    """Every monitored capability's containment, in one owner-facing shape (BUG-77)."""
+
+    subjects: list[ContainedSubject]
+    contained: int
+    capabilities: list[ContainmentCapability]

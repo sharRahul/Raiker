@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Literal
 
 from cryptography.fernet import Fernet
 
@@ -20,6 +21,7 @@ from raiker.auth.secure_io import atomic_write_private
 from raiker.storage.internal_paths import internal_io_path
 
 VAULT_KEY_ENV = "RAIKER_CONNECTOR_VAULT_KEY"
+VaultState = Literal["configured_valid", "missing", "invalid"]
 _KEY_DIRNAME = ".raiker"
 _KEY_FILENAME = "vault.key"
 
@@ -100,7 +102,7 @@ def effective_vault_key(workspace_root: str | Path) -> str | None:
     return read_vault_key(workspace_root) or os.environ.get(VAULT_KEY_ENV, "").strip() or None
 
 
-def vault_status(workspace_root: str | Path) -> str:
+def vault_status(workspace_root: str | Path) -> VaultState:
     """Return 'configured_valid' | 'missing' | 'invalid'.
 
     Reflects the effective key: the environment variable wins, then the file.

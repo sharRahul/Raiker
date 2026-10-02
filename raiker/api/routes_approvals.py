@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
@@ -20,6 +20,14 @@ from raiker.api.schemas import (
     serialize_dto,
 )
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.approvals import (
+    ApprovalReplaced,
+    ApprovalResolved,
+    CriticalApprovalResolved,
+    OwnerQuestionAnswered,
+    ResumableTurns,
+    ResumeHandle,
+)
 from raiker.approvals import ApprovalInbox
 from raiker.approvals.execution import (
     ApprovalExecutionBridge,
@@ -29,6 +37,7 @@ from raiker.approvals.execution import (
 from raiker.contracts.ids import utc_now
 from raiker.contracts.models import OWNER_QUESTION_TOOL
 from raiker.control.dashboard import DashboardService
+from raiker.control.views.security import IdentityView
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
@@ -70,7 +79,7 @@ def _service(request: Request) -> DashboardService:
 
 def _record_resume_outcome(
     request: Request, store: SQLiteStore, approval_id: str, outcome: dict[str, Any]
-) -> dict[str, Any]:
+) -> ResumeHandle:
     """Attach the decision's outcome to the turn it unblocked, if there is one (B2).
 
     Returns what the client needs to continue: whether a parked turn exists and,
@@ -107,24 +116,15 @@ def _approval_attribution(
     *,
     user_id: str | None,
     principal_id: str,
-) -> dict[str, Any]:
+) -> tuple[IdentityView | None, IdentityView | None, IdentityView | None]:
+    """Who proposed the action, who decided it, and the machine identity it ran as."""
     detail = _service(request).get_approval(
         approval_id, user_id=user_id, principal_id=principal_id
     )
     if detail is None:
-        return {"proposed_by": None, "approved_by": None, "machine_identity": None}
+        return None, None, None
     approval = detail.approval
-    return {
-        "proposed_by": approval.proposed_by.to_dict(),
-        "approved_by": (
-            approval.approved_by.to_dict() if approval.approved_by is not None else None
-        ),
-        "machine_identity": (
-            approval.machine_identity.to_dict()
-            if approval.machine_identity is not None
-            else None
-        ),
-    }
+    return approval.proposed_by, approval.approved_by, approval.machine_identity
 
 
 def _nudge_scheduler(request: Request, session_id: str) -> None:
@@ -185,7 +185,7 @@ async def list_resumable_turns(
     rows = SQLiteStore(_ws(request)).list_resumable_suspended_turns(
         session.principal_id, session_id
     )
-    return {
+    answer: ResumableTurns = {
         "session_id": session_id,
         "turns": [
             {
@@ -205,6 +205,7 @@ async def list_resumable_turns(
             for row in rows
         ],
     }
+    return serialize_dto(answer)
 
 
 def _outcome_status(outcome_json: Any) -> str:
@@ -351,7 +352,7 @@ async def answer_owner_question(
             },
         )
     )
-    return {
+    answered: OwnerQuestionAnswered = {
         "approval_id": approval_id,
         "status": "answered",
         "answered": len(answers),
@@ -362,6 +363,7 @@ async def answer_owner_question(
             owner_answer_outcome(answers=answers, response=response),
         ),
     }
+    return serialize_dto(answered)
 
 
 # BUG-271 — a reviewer could narrow a change and could not correct one.
@@ -511,15 +513,19 @@ async def replace_approval_with_edit(
         approval_id,
         approval_outcome(approved=False, executed=False, replaced=True),
     )
-    return {
-        "ok": True,
-        "approval_id": approval_id,
-        "status": "denied",
-        "replacement_approval_id": replacement_id,
-        "action_id": action.action_id,
-        "executes_action": False,
-        **outcome,
-    }
+    replaced = cast(
+        ApprovalReplaced,
+        {
+            "ok": True,
+            "approval_id": approval_id,
+            "status": "denied",
+            "replacement_approval_id": replacement_id,
+            "action_id": action.action_id,
+            "executes_action": False,
+            **outcome,
+        },
+    )
+    return serialize_dto(replaced)
 
 
 @router.post("/api/approvals/{approval_id}/resolve")
@@ -619,18 +625,18 @@ async def resolve_approval(
             principal_id=session.principal_id,
         )
         artifacts = {k: v for k, v in execution.artifacts.items() if v is not None}
-        return {
+        proposed_by, approved_by, machine_identity = _approval_attribution(
+            request, approval_id, user_id=owner_user_id, principal_id=session.principal_id
+        )
+        executed: ApprovalResolved = {
             "approval_id": approval_id,
             "action_id": str(approval_row.get("action_id", "")),
             "status": execution.status,
             "executes_action": True,
             "reason": body.reason,
-            **_approval_attribution(
-                request,
-                approval_id,
-                user_id=owner_user_id,
-                principal_id=session.principal_id,
-            ),
+            "proposed_by": proposed_by,
+            "approved_by": approved_by,
+            "machine_identity": machine_identity,
             "execution": {
                 "capability": execution.capability,
                 "path": execution.artifacts.get("path"),
@@ -655,7 +661,7 @@ async def resolve_approval(
                         "checkpoint_capture",
                     )
                     if key in execution.artifacts
-                },
+                },  # type: ignore[typeddict-item]
             },
             "resume": _record_resume_outcome(
                 request,
@@ -669,6 +675,7 @@ async def resolve_approval(
                 ),
             ),
         }
+        return serialize_dto(executed)
 
     try:
         resolution = inbox.resolve(
@@ -719,18 +726,18 @@ async def resolve_approval(
                     "UPDATE connector_write_intents SET status='executed', executed_at=? WHERE intent_id=?",
                     (utc_now(), intent["intent_id"]),
                 )
-            return {
+            proposed_by, approved_by, machine_identity = _approval_attribution(
+                request, approval_id, user_id=owner_user_id, principal_id=session.principal_id
+            )
+            wrote: ApprovalResolved = {
                 "approval_id": resolution.approval_id,
                 "action_id": resolution.action_id,
                 "status": "executed",
                 "executes_action": True,
                 "reason": body.reason,
-                **_approval_attribution(
-                    request,
-                    approval_id,
-                    user_id=owner_user_id,
-                    principal_id=session.principal_id,
-                ),
+                "proposed_by": proposed_by,
+                "approved_by": approved_by,
+                "machine_identity": machine_identity,
                 "connector_result": output,
                 "resume": _record_resume_outcome(
                     request,
@@ -741,18 +748,19 @@ async def resolve_approval(
                     ),
                 ),
             }
-    return {
+            return serialize_dto(wrote)
+    proposed_by, approved_by, machine_identity = _approval_attribution(
+        request, approval_id, user_id=owner_user_id, principal_id=session.principal_id
+    )
+    decided: ApprovalResolved = {
         "approval_id": resolution.approval_id,
         "action_id": resolution.action_id,
         "status": resolution.status,
         "executes_action": resolution.executes_action,
         "reason": body.reason,
-        **_approval_attribution(
-            request,
-            approval_id,
-            user_id=owner_user_id,
-            principal_id=session.principal_id,
-        ),
+        "proposed_by": proposed_by,
+        "approved_by": approved_by,
+        "machine_identity": machine_identity,
         # B2 — the decision closes the tool call the model is still waiting on,
         # so a parked turn can pick up from here. Rejection is carried through as
         # a refusal rather than silence, which is what lets the model react.
@@ -768,6 +776,7 @@ async def resolve_approval(
             ),
         ),
     }
+    return serialize_dto(decided)
 
 
 # B2 — resolving an approval unblocks the turn that proposed the action; these
@@ -799,7 +808,7 @@ async def resume_after_approval(
         response = await gateway.aresume_after_approval(approval_id)
     except TurnSuspensionError as exc:
         raise _resume_error(exc) from exc
-    return response.to_dict()
+    return serialize_dto(response)
 
 
 @router.post("/api/approvals/{approval_id}/resume/stream")
@@ -852,10 +861,11 @@ async def resolve_critical_approval(
         reason=body.reason,
     )
     current = store.load_approval(approval_id, user_id=user_id)
-    return {
+    critical: CriticalApprovalResolved = {
         "approval_id": approval_id,
         "status": str((current or approval).get("status", "pending")),
         "decision": result.decision,
         "message": result.message,
         "executes_action": result.message == "critical_action_executed",
     }
+    return serialize_dto(critical)

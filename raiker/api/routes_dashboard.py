@@ -47,6 +47,7 @@ from raiker.api.schemas import (
 )
 from raiker.api.session_cookie import issue as issue_session_cookie
 from raiker.api.sessions import ApiSession
+from raiker.api.wire import Ok
 from raiker.api.wire.auth import IssuedSessionView
 from raiker.api.wire.models import (
     AdvisorSet,
@@ -402,6 +403,12 @@ async def get_session_plan(
     return serialize_dto(answer)
 
 
+def _refuse_unless_ok(result: Any) -> None:
+    """Raise the refusal a failed ControlResult maps to; return when it succeeded."""
+    if not result.ok:
+        _mcp_result(result)
+
+
 def _mcp_result(result: Any) -> dict[str, Any]:
     """Map a ControlResult onto an HTTP response, translating the governed
     reason into a status: 422 for invalid input, 403 for a disabled gate /
@@ -584,9 +591,10 @@ async def mark_notification_read(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Owner-scoped mark-as-read for one notification."""
-    return _mcp_result(
+    _refuse_unless_ok(
         _service(request).mark_notification_read(notification_id, auth_data[0].principal_id)
     )
+    return serialize_dto(Ok())
 
 
 @router.get("/api/security/credentials")
@@ -618,7 +626,7 @@ async def list_capability_containment(
     request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
 ) -> dict[str, Any]:
     """Containment state for every monitored capability, not only MCP (BUG-77)."""
-    return _service(request).list_capability_containment(auth_data[0].principal_id)
+    return serialize_dto(_service(request).list_capability_containment(auth_data[0].principal_id))
 
 
 @router.post("/api/security/containment/{capability}/{subject_id}/{action}")
@@ -631,8 +639,10 @@ async def set_capability_containment(
 ) -> dict[str, Any]:
     """The owner's one-call pause, stop and resume for any monitored subject."""
     try:
-        return _service(request).set_capability_containment(
-            auth_data[0].principal_id, capability, subject_id, action
+        return serialize_dto(
+            _service(request).set_capability_containment(
+                auth_data[0].principal_id, capability, subject_id, action
+            )
         )
     except ValueError as exc:
         raise HTTPException(
@@ -671,14 +681,14 @@ async def scan_security(
 async def list_security_health(
     request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
 ) -> list[dict[str, Any]]:
-    return _service(request).list_security_health(auth_data[0].principal_id)
+    return serialize_dto(_service(request).list_security_health(auth_data[0].principal_id))
 
 
 @router.post("/api/security/health-check")
 async def check_security_health(
     request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
 ) -> list[dict[str, Any]]:
-    return _service(request).check_security_health(auth_data[0].principal_id)
+    return serialize_dto(_service(request).check_security_health(auth_data[0].principal_id))
 
 
 @router.post("/api/security/breach-check")

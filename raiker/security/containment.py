@@ -41,8 +41,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, cast
 
+from raiker.control.views.security import ContainedSubject
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.security.mcp_monitor import (
@@ -177,13 +178,13 @@ class ContainmentView:
     def contained(self) -> bool:
         return self.state in {STATE_PAUSED, STATE_KILLED}
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> ContainedSubject:
         return {
             "capability": self.capability,
             "capability_label": CAPABILITY_LABELS.get(self.capability, self.capability.title()),
             "subject_id": self.subject_id,
             "label": self.label or self.subject_id,
-            "state": self.state,
+            "state": cast(Literal["active", "paused", "killed"], self.state),
             "reason": self.reason,
             "source": self.source,
             "finding_id": self.finding_id,

@@ -3,11 +3,6 @@ import type {
   ApprovalDetailView,
   AuditExportResult,
   AuditExportView,
-  BrainSourceBrowse,
-  BrainSourceResult,
-  BrainSourceReview,
-  BrainSourceRoot,
-  BrainView,
   CapabilityContainmentView,
   CapabilityDecisionMode,
   ChannelsView,
@@ -44,7 +39,6 @@ import type {
   InterruptRequestBody,
   InterruptResult,
   KnowledgeSourceKind,
-  KnowledgeSourcesView,
   ManagedFileScope,
   ManagedFileUpload,
   McpAgentAccess,
@@ -52,12 +46,6 @@ import type {
   McpServer,
   McpSession,
   MemoryControlView,
-  MemoryHistoryEvent,
-  MemoryImportPreview,
-  MemoryImportResult,
-  MemoryIntegrity,
-  MemoryProposal,
-  MemoryRelationshipProposal,
   ModelCapacitiesView,
   ModelConversionPreview,
   ModelDecision,
@@ -67,7 +55,6 @@ import type {
   ModelReadinessView,
   ModelSetupState,
   ModelsView,
-  ObservationsView,
   OwnerQuestionAnswered,
   PartialFiles,
   PluginsView,
@@ -87,7 +74,6 @@ import type {
   SkillMutationResult,
   SkillVerification,
   SkillView,
-  SourceExcerptView,
   SpeechRuntimeChange,
   SpeechRuntimeProbe,
   SpeechRuntimeView,
@@ -252,12 +238,8 @@ export const api = {
   // MEM-09 — the memory integrity report, and its one stated repair. The scan
   // is read-only and starts when the owner asks for it; the rebuild is a
   // separate, named action over a projection that can lose nothing.
-  memoryIntegrity: () => request<MemoryIntegrity>("/api/memory/integrity"),
-  rebuildConversationIndex: () =>
-    request<{ ok: boolean; indexed_rows: number }>(
-      "/api/memory/conversation-index/rebuild",
-      { method: "POST" },
-    ),
+  memoryIntegrity: () => contract.memoryIntegrity(),
+  rebuildConversationIndex: () => contract.rebuildConversationIndex(),
   models: () => request<ModelsView>("/api/models"),
   weeklyModelUsage: (refreshNative = false) =>
     request<ProviderWeeklyUsageView>(
@@ -980,76 +962,41 @@ export const api = {
     contract.getTurnSourceExcerpt(sessionId, turnId, sourceId, quote === "" ? {} : { quote }),
   // BUG-27 — the passage a memory was drawn from. Every non-resolvable case
   // comes back as a named status rather than an error.
-  memorySource: (memoryId: string) =>
-    request<SourceExcerptView>(
-      `/api/memory/${encodeURIComponent(memoryId)}/source`,
-    ),
+  memorySource: (memoryId: string) => contract.getMemorySource(memoryId),
   events: (
     params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {},
   ) => contract.listEvents(params),
-  brain: () => request<BrainView>("/api/brain"),
+  brain: () => contract.getBrain(),
   /**
    * BUG-305 — everything Raiker may read, both kinds, from one route. The two
    * controllers stay two; the owner's question has one answer.
    */
-  knowledgeSources: () => request<KnowledgeSourcesView>("/api/knowledge-sources"),
+  knowledgeSources: () => contract.listKnowledgeSources(),
   revokeKnowledgeSource: (kind: KnowledgeSourceKind, sourceId: string) =>
-    request<{ ok: boolean }>(
-      withQuery("/api/knowledge-sources", { kind, source_id: sourceId }),
-      { method: "DELETE" },
-    ),
-  addBrainSource: (path: string) =>
-    postJson<BrainSourceResult>("/api/brain/sources", { path }),
+    contract.revokeKnowledgeSource({ kind, source_id: sourceId }),
+  addBrainSource: (path: string) => contract.addBrainSource({ path }),
   /** An empty path answers with the roots themselves, not with a listing. */
-  browseBrainSources: (path = "") =>
-    request<BrainSourceBrowse>(
-      withQuery("/api/brain/sources/browse", { path }),
-    ),
-  brainSourceRoots: () =>
-    request<{ roots: BrainSourceRoot[] }>("/api/brain/sources/roots"),
+  browseBrainSources: (path = "") => contract.browseBrainSources({ path }),
+  brainSourceRoots: () => contract.listBrainSourceRoots(),
   /** Grant one folder on this computer. Read where it is; nothing is copied. */
-  grantBrainSourceFolder: (path: string) =>
-    postJson<{ ok: boolean; root_id: string; path: string }>(
-      "/api/brain/sources/grants",
-      { path },
-    ),
-  revokeBrainSourceFolder: (rootId: string) =>
-    request<{ ok: boolean; root_id: string }>(
-      withQuery("/api/brain/sources/grants", { root_id: rootId }),
-      { method: "DELETE" },
-    ),
+  grantBrainSourceFolder: (path: string) => contract.grantBrainSourceFolder({ path }),
+  revokeBrainSourceFolder: (rootId: string) => contract.revokeBrainSourceFolder({ root_id: rootId }),
   /**
    * Copy one file from the computer into the workspace. `storeCopy` is the
    * owner's permission for the duplication and has no default on the server:
    * choosing a file is not consent to store it.
    */
-  uploadBrainSourceFile: (
-    filename: string,
-    contentBase64: string,
-    storeCopy: boolean,
-  ) =>
-    postJson<{ ok: boolean; path: string; stored_copy: boolean; byte_size: number }>(
-      "/api/brain/sources/upload",
-      { filename, content_base64: contentBase64, store_copy: storeCopy },
-    ),
-  reviewBrainSource: (path: string) =>
-    postJson<BrainSourceReview>("/api/brain/sources/review", { path }),
-  brainPreferences: () =>
-    request<{ settings: Record<string, unknown> }>("/api/brain/settings"),
+  uploadBrainSourceFile: (filename: string, contentBase64: string, storeCopy: boolean) =>
+    contract.uploadBrainSourceFile({
+      filename,
+      content_base64: contentBase64,
+      store_copy: storeCopy,
+    }),
+  reviewBrainSource: (path: string) => contract.reviewBrainSource({ path }),
+  brainPreferences: () => contract.getBrainPreferences(),
   saveBrainPreferences: (settings: Record<string, unknown>) =>
-    request<{
-      ok: boolean;
-      settings: Record<string, unknown>;
-      updated_at: string;
-    }>("/api/brain/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ settings }),
-    }),
-  removeBrainSource: (path: string) =>
-    request<BrainSourceResult>(withQuery("/api/brain/sources", { path }), {
-      method: "DELETE",
-    }),
+    contract.saveBrainPreferences({ settings }),
+  removeBrainSource: (path: string) => contract.removeBrainSource({ path }),
   executionEnvironments: () =>
     request<ExecutionEnvironmentsView>("/api/execution-environments"),
   configureExecutionEnvironment: (body: {
@@ -1317,36 +1264,20 @@ export const api = {
   // the governed forget path (human-only); incognito withholds approved
   // project memory from the turn context.
   memories: (scope?: string) => contract.listMemories({ scope }),
-  memoryProposals: () => request<MemoryProposal[]>("/api/memory/proposals"),
-  memoryRelationshipProposals: () =>
-    request<MemoryRelationshipProposal[]>("/api/memory/relationship-proposals"),
-  scanMemoryRelationships: () =>
-    postJson<{
-      ok: boolean;
-      scanned: number;
-      proposed: number;
-      skipped: number;
-      already_present: number;
-    }>("/api/memory/relationship-proposals/scan", {}),
+  memoryProposals: () => contract.listMemoryProposals(),
+  memoryRelationshipProposals: () => contract.getMemoryRelationshipProposals(),
+  scanMemoryRelationships: () => contract.postMemoryRelationshipProposalsScan(),
   decideMemoryRelationshipProposal: (
     id: string,
     decision: "approved" | "denied",
     expectedDecision = "needs_user_review",
   ) =>
-    postJson<{
-      ok: boolean;
-      candidate_id: string;
-      decision: string;
-      relationship_id: string | null;
-    }>(
-      `/api/memory/relationship-proposals/${encodeURIComponent(id)}/decision`,
-      { decision, expected_decision: expectedDecision },
-    ),
+    contract.postMemoryRelationshipProposalsCandidateIdDecision(id, {
+      decision,
+      expected_decision: expectedDecision,
+    }),
   rejectMemoryRelationship: (id: string, reason: string) =>
-    postJson<{ ok: boolean; relationship_id: string; active: false }>(
-      `/api/memory/entity-relationships/${encodeURIComponent(id)}/reject`,
-      { reason, expected_active: true },
-    ),
+    contract.rejectMemoryRelationship(id, { reason, expected_active: true }),
   decideMemoryProposal: (
     id: string,
     body: {
@@ -1355,165 +1286,57 @@ export const api = {
       reason?: string;
       expected_decision: string;
     },
-  ) =>
-    postJson<{
-      ok: boolean;
-      candidate_id: string;
-      decision: string;
-      memory_id?: string;
-    }>(`/api/memory/proposals/${encodeURIComponent(id)}/decision`, body),
-  memoryHistory: (id: string) =>
-    request<{ ok: boolean; memory_id: string; events: MemoryHistoryEvent[] }>(
-      `/api/memory/${encodeURIComponent(id)}/history`,
-    ),
+  ) => contract.decideMemoryProposal(id, body),
+  memoryHistory: (id: string) => contract.getMemoryHistory(id),
   changeMemoryScope: (
     id: string,
     scope: string,
     expectedUpdatedAt: string | null,
     reason: string,
   ) =>
-    request<{
-      ok: boolean;
-      memory_id: string;
-      scope: string;
-      updated_at: string;
-    }>(`/api/memory/${encodeURIComponent(id)}/scope`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        scope,
-        expected_updated_at: expectedUpdatedAt,
-        reason,
-      }),
-    }),
-  previewMemoryPurge: (id: string) =>
-    request<{
-      ok: boolean;
-      memory_id: string;
-      artifacts: string[];
-      backup_disposition: string;
-      requires_confirmation: string;
-    }>(`/api/memory/${encodeURIComponent(id)}/purge-preview`),
-  purgeMemory: (id: string) =>
-    request<{ ok: boolean; memory_id: string; purged: boolean }>(
-      `/api/memory/${encodeURIComponent(id)}/purge`,
-      { method: "DELETE", headers: { "X-Memory-Purge-Confirm": id } },
-    ),
-  setMemoryPinned: (id: string, pinned: boolean) =>
-    request<{ ok: boolean; memory_id: string; pinned: boolean }>(
-      `/api/memory/${encodeURIComponent(id)}/pin`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pinned }),
-      },
-    ),
-  editMemory: (id: string, text: string) =>
-    request<{ ok: boolean; memory_id: string }>(
-      `/api/memory/${encodeURIComponent(id)}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      },
-    ),
+    contract.changeMemoryScope(id, { scope, expected_updated_at: expectedUpdatedAt, reason }),
+  previewMemoryPurge: (id: string) => contract.previewMemoryPurge(id),
+  purgeMemory: (id: string) => contract.purgeMemory(id, id),
+  setMemoryPinned: (id: string, pinned: boolean) => contract.setMemoryPinned(id, { pinned }),
+  editMemory: (id: string, text: string) => contract.editMemory(id, { text }),
   setMemorySearchEnabled: (id: string, enabled: boolean) =>
-    request<{ ok: boolean; memory_id: string; search_enabled: boolean }>(
-      `/api/memory/${encodeURIComponent(id)}/search`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled }),
-      },
-    ),
+    contract.setMemorySearchEnabled(id, { enabled }),
   setMemoryExpiry: (id: string, expiresAt: string | null) =>
-    request<{ ok: boolean; memory_id: string; expires_at: string | null }>(
-      `/api/memory/${encodeURIComponent(id)}/expiry`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expires_at: expiresAt }),
-      },
-    ),
-  exportMemories: () =>
-    request<{ ok: boolean; memories: MemoryControlView[] }>(
-      "/api/memory/export",
-    ),
+    contract.setMemoryExpiry(id, { expires_at: expiresAt }),
+  exportMemories: () => contract.exportMemories(),
   // BUG-244 — what an import would actually change, before it changes anything.
-  previewMemoryImport: (
-    memories: Array<Partial<MemoryControlView> & { text: string }>,
-  ) =>
-    request<MemoryImportPreview>("/api/memory/import/preview", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memories }),
-    }),
+  previewMemoryImport: (memories: Array<Partial<MemoryControlView> & { text: string }>) =>
+    contract.previewMemoryImport({ memories }),
   importMemories: (
     memories: Array<Partial<MemoryControlView> & { text: string }>,
     skipDuplicates = true,
-  ) =>
-    request<MemoryImportResult>("/api/memory/import", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memories, skip_duplicates: skipDuplicates }),
-    }),
-  forgetMemory: (id: string) =>
-    request<{ ok: boolean; memory_id: string }>(
-      `/api/memory/${encodeURIComponent(id)}`,
-      { method: "DELETE" },
-    ),
+  ) => contract.importMemories({ memories, skip_duplicates: skipDuplicates }),
+  forgetMemory: (id: string) => contract.forgetMemory(id),
   memorySettings: () => contract.getMemorySettings(),
-  setMemoryIncognito: (incognito: boolean) =>
-    request<{ ok: boolean; incognito: boolean }>("/api/memory/incognito", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ incognito }),
-    }),
+  setMemoryIncognito: (incognito: boolean) => contract.setMemoryIncognito({ incognito }),
   // MEM-03 — "auto" resolves to the best space that actually holds vectors;
   // any other value must name one, or the server refuses rather than silently
   // searching a different corpus.
   setMemoryEmbeddingBackend: (backend: string) =>
-    request<{ ok: boolean; embedding_backend: string }>("/api/memory/embedding-backend", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ embedding_backend: backend }),
-    }),
+    contract.setMemoryEmbeddingBackend({ embedding_backend: backend }),
   // MEM-10 — build the space rather than only choose between the ones that
   // happen to exist. The call names the provider and the embedding model and
   // never the memories: which rows are eligible is resolved server-side from
   // the acting principal.
   buildMemoryEmbeddingIndex: (provider: string, model: string) =>
-    postJson<{
-      ok: boolean;
-      embedding_model: string;
-      indexed_count: number;
-      indexed_file_chunk_count: number;
-      skipped_count: number;
-    }>("/api/memory/embedding-index", { provider, model }),
+    contract.buildMemoryEmbeddingIndex({ provider, model }),
   // MEM-04 — what the runtime captured while it worked. The counts come back
   // with the list because a page that can only count what it received cannot
   // tell an owner whether an empty list means nothing ran or everything was
   // refused on sensitivity.
-  observations: () => request<ObservationsView>("/api/memory/observations"),
-  deleteObservations: (ids: string[]) =>
-    postJson<{ ok: boolean; deleted_observation_ids: string[] }>(
-      "/api/memory/observations/delete",
-      { observation_ids: ids },
-    ),
+  observations: () => contract.listObservations(),
+  deleteObservations: (ids: string[]) => contract.deleteObservations({ observation_ids: ids }),
   // MEM-07 — the confirmed retention sweep. The server re-derives what is due
   // and refuses anything the preview did not list, so this is a confirmation
   // rather than an instruction.
   cleanupExpiredObservations: (ids: string[]) =>
-    postJson<{ ok: boolean; deleted_observation_ids: string[] }>(
-      "/api/memory/eidetic/cleanup",
-      { observation_ids: ids },
-    ),
-  discardGist: (id: string) =>
-    postJson<{ ok: boolean; gist_id: string; discarded: boolean }>(
-      `/api/memory/gists/${encodeURIComponent(id)}/discard`,
-      {},
-    ),
-
+    contract.cleanupExpiredObservations({ observation_ids: ids }),
+  discardGist: (id: string) => contract.discardGist(id),
   // ── Build workspace repositories ────────────────────────────────────────
   // References only. A local folder must resolve inside the workspace (fail
   // closed server-side); a GitHub repository records an `owner/repo` coordinate

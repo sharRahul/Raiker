@@ -34,9 +34,10 @@ import hashlib
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from raiker.control.project_paths import contained_project_root
+from raiker.control.views.knowledge import BrainSourceRoot
 from raiker.storage.internal_paths import internal_io_path
 
 # Never walked, wherever they appear: version-control internals, dependency
@@ -90,11 +91,11 @@ class ScopeRoot:
     root_id: str
     label: str
     detail: str
-    kind: str  # "raiker" | "granted" | "database"
+    kind: Literal["raiker", "granted", "database"]
     path: Path | None
     browsable: bool
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> BrainSourceRoot:
         return {
             "root_id": self.root_id,
             "label": self.label,

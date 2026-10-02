@@ -5,6 +5,11 @@ import type {
   ApprovalView,
   AttachmentPreview,
   BackgroundWorkerHealth,
+  BrainSourceBrowse,
+  BrainSourceResult,
+  BrainSourceReview,
+  BrainSourceRoot,
+  BrainView,
   CapabilityGateView,
   CheckpointCaptureHealth,
   CheckpointView,
@@ -30,6 +35,8 @@ import type {
   ImportedFile,
   ImportRefused,
   IssuedSessionView,
+  KnowledgeSource,
+  KnowledgeSources,
   ManagedFile,
   ManagedFileImport,
   ManagedFileList,
@@ -37,8 +44,16 @@ import type {
   McpSessionView,
   McpToolDeclaration,
   MemoryControlView,
+  MemoryHistoryEvent,
+  MemoryImportPreview,
+  MemoryImportResult,
+  MemoryIntegrity,
+  MemoryProposal,
+  MemoryRelationshipProposal,
   MemorySettingsView,
+  MemorySource,
   NotificationView,
+  ObservationsView,
   PasswordRecoveryBeginView,
   PathAttachment,
   ProjectAttachmentView,
@@ -663,30 +678,7 @@ export interface ModelConversionPreview {
 
 export type Diagnostics = DiagnosticsView;
 
-/**
- * MEM-09 — GET /api/memory/integrity. The owner-started scan of every index and
- * projection the memory store depends on, including the conversation index
- * behind Threads. Counts are drift, not errors: each one names rows that
- * disagree with the table that owns them.
- */
-export interface MemoryIntegrity {
-  ok: boolean;
-  clean: boolean;
-  active_memory_count: number;
-  fts_count: number;
-  stale_fts_count: number;
-  missing_markdown_count: number;
-  stale_projection_count: number;
-  stale_graph_edge_count: number;
-  checksum_mismatch_count: number;
-  orphaned_markdown_count: number;
-  failed_purge_location_count: number;
-  project_path_inconsistency_count: number;
-  text_search_engine: string;
-  index_engine_mismatch_count: number;
-  conversation_index_count: number;
-  stale_conversation_index_count: number;
-}
+export type { MemoryIntegrity };
 
 export type { CheckpointCaptureHealth };
 
@@ -1562,61 +1554,8 @@ export interface UploadedAttachment {
 
 export type { AttachmentPreview };
 
-/**
- * BUG-27 — one resolved source passage, or the stated reason there is not one.
- *
- * `status` is the whole contract. Only `resolved` carries a located passage;
- * every other value is a fact the owner is entitled to see instead of an empty
- * pane, and the inspector states each one in words:
- *
- * - `no_provenance` — the record never stored where it came from.
- * - `source_deleted` — the conversation or turn is gone.
- * - `source_changed` — the source is readable, but no longer contains the
- *   passage, so the excerpt is shown without a highlight rather than with a
- *   guessed one.
- * - `unsupported_source` — a real, readable source with no text offset to open
- *   it at (an image, a PDF, a spreadsheet).
- * - `not_authorized` — this account may not read the source.
- *
- * `highlight_start` is `-1` whenever there is no located passage.
- */
-export interface SourceExcerptView {
-  ok?: boolean;
-  status:
-    | "resolved"
-    | "no_provenance"
-    | "source_deleted"
-    | "source_changed"
-    | "unsupported_source"
-    | "not_authorized";
-  kind: string;
-  title: string;
-  excerpt: string;
-  highlight_start: number;
-  highlight_length: number;
-  session_id: string;
-  turn_id: string;
-  attachment_id: string;
-  truncated: boolean;
-  // How the passage was located. C6/C4 adds three: `answer_quote` (the sentence
-  // carrying the citation found verbatim in the source — the narrowest honest
-  // claim available), `recorded_passage` (material Raiker holds no second copy
-  // of, shown as the exact text that reached the model), and `whole_source`
-  // (the turn read all of it, so marking every character would say nothing).
-  resolution_method:
-    | "stored_coordinates"
-    | "matching_text"
-    | "answer_quote"
-    | "recorded_passage"
-    | "whole_source"
-    | "";
-  // BUG-245 — the exchanges this one call returned, as openable coordinates.
-  // Built by the runtime from the tool result it read, never from anything the
-  // model wrote, and served with the passage rather than with the chip: only an
-  // opened source needs them. Absent for every source that is not a set of
-  // conversation hits, and optional so older payloads stay valid.
-  anchors?: SourceAnchorView[];
-}
+/** The passage a source resolved to — the part every excerpt route shares. */
+export type SourceExcerptView = Omit<MemorySource, "ok" | "memory_id">;
 
 export type { SourceAnchorView };
 
@@ -1653,70 +1592,17 @@ export interface InterruptRequestBody {
   steer_text?: string;
 }
 
-// Reliable memory controls (backlog item 3): user-facing view of one approved
-// memory entry — provenance, scope, sensitivity, confidence, retention, pin.
-/**
- * BUG-244 — what an import would change, read before anything is written.
- *
- * A record is a duplicate when the workspace already holds the same sentence
- * *at the same scope*: the same sentence at `project` and at `global` is two
- * records an owner may genuinely want. `memory_id` names the record a duplicate
- * would be a copy of, and is empty when the repeat is inside the file itself.
- */
-export interface MemoryImportPreview {
-  ok: boolean;
-  total: number;
-  new_count: number;
-  duplicate_count: number;
-  duplicates: Array<{ index: number; text: string; scope: string; memory_id: string }>;
-}
+export type { MemoryImportPreview };
 
-/** What the import actually did. `count` is what changed, not what was offered. */
-export interface MemoryImportResult {
-  ok: boolean;
-  count: number;
-  reviewed: number;
-  imported: number;
-  skipped_duplicates: number;
-  relationship_proposals: number;
-}
+export type { MemoryImportResult };
 
 export type { MemoryControlView };
 
-export interface MemoryProposal {
-  candidate_id: string;
-  source_event_id: string;
-  memory_type: string;
-  scope: string;
-  text: string;
-  sensitivity: string;
-  confidence: number;
-  decision: string;
-  created_at: string;
-}
+export type { MemoryProposal };
 
-export interface MemoryRelationshipProposal {
-  candidate_id: string;
-  subject_name: string;
-  subject_type: string;
-  predicate: string;
-  object_name: string;
-  object_type: string;
-  evidence_memory_id: string;
-  evidence_text: string;
-  confidence: number;
-  extractor_version: string;
-  decision: "needs_user_review";
-  created_at: string;
-}
+export type { MemoryRelationshipProposal };
 
-export interface MemoryHistoryEvent {
-  audit_id: string;
-  action: string;
-  actor_id: string;
-  created_at: string;
-  details: Record<string, unknown>;
-}
+export type { MemoryHistoryEvent };
 
 export type { EmbeddingSpaceView };
 
@@ -1751,17 +1637,7 @@ export interface ObservationView {
   gist_id: string;
 }
 
-export interface ObservationsView {
-  ok: boolean;
-  observations: ObservationView[];
-  captured: number;
-  skipped: number;
-  gists_pending: number;
-  // MEM-07 — the observation ids whose retention class already says they are
-  // due. Raiker runs no cleanup daemon on purpose; being shown what is due and
-  // confirming it is the deliberate alternative, and it was never built.
-  due_for_expiry: string[];
-}
+export type { ObservationsView };
 
 // Raiker/control/dashboard.py BrainView.to_dict(). Nodes and edges are stored
 // runtime relationships; the UI may add clearly labelled illustrative motion.
@@ -1785,58 +1661,15 @@ export interface BrainEdge {
   owner_can_reject?: boolean;
 }
 
-export interface BrainView {
-  generated_at: string;
-  nodes: BrainNode[];
-  edges: BrainEdge[];
-  illustrative_motion_notice: string;
-}
+export type { BrainView };
 
-export interface BrainSourceResult {
-  ok: boolean;
-  path: string;
-}
+export type { BrainSourceResult };
 
-/**
- * One place the Knowledge Map may look. There is deliberately no root for "the
- * workspace": Raiker's own document areas and the folders the owner granted are
- * the whole boundary, and the database appears as a root that names what it
- * already holds rather than as a folder to walk.
- */
-export interface BrainSourceRoot {
-  root_id: string;
-  label: string;
-  detail: string;
-  kind: "raiker" | "granted" | "database";
-  browsable: boolean;
-  /** Absolute path — only ever set for a folder the owner granted themselves. */
-  path: string | null;
-}
+export type { BrainSourceRoot };
 
-export interface BrainSourceBrowse {
-  path: string;
-  parent: string | null;
-  roots: BrainSourceRoot[];
-  children: Array<{
-    name: string;
-    path: string;
-    kind: "folder" | "file";
-    size_bytes: number | null;
-  }>;
-  truncated: boolean;
-  resolution_method?: "stored_coordinates" | "matching_text" | "";
-}
+export type { BrainSourceBrowse };
 
-export interface BrainSourceReview {
-  path: string;
-  kind: "folder" | "file";
-  supported_files: number;
-  unsupported_files: number;
-  total_bytes: number;
-  examples: string[];
-  warnings: string[];
-  review_cap: number;
-}
+export type { BrainSourceReview };
 
 export interface ExecutionEnvironment {
   profile_id: string;
@@ -2208,24 +2041,9 @@ export interface GitCredentialStatus {
 // granted folder is the owner's own and is only stopped being read.
 export type KnowledgeSourceKind = "managed_file" | "granted_folder";
 
-export interface KnowledgeSource {
-  source_id: string;
-  kind: KnowledgeSourceKind;
-  label: string;
-  location: string;
-  scope: string;
-  held: boolean;
-  index_state: string;
-  recall: boolean;
-  graph: boolean;
-  added_at: string;
-}
+export type { KnowledgeSource };
 
-export interface KnowledgeSourcesView {
-  sources: KnowledgeSource[];
-  held_count: number;
-  granted_count: number;
-}
+export type KnowledgeSourcesView = KnowledgeSources;
 
 // ── Managed knowledge files ─────────────────────────────────────────────────
 // One catalogue entry per stored original. `index_state` is the honest answer

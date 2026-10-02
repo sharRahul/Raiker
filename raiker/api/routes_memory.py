@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, Header, Request, status
 
@@ -20,6 +20,38 @@ from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
 from raiker.api.schemas import serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.memory import (
+    ConversationIndexRebuilt,
+    EmbeddingBackendSet,
+    EmbeddingIndexBuilt,
+    GistDiscarded,
+    IncognitoSet,
+    MemoryArchived,
+    MemoryCorrected,
+    MemoryExport,
+    MemoryForgotten,
+    MemoryHistory,
+    MemoryImportPreview,
+    MemoryImportResult,
+    MemoryIntegrity,
+    MemoryPinned,
+    MemoryProposal,
+    MemoryPurged,
+    MemoryPurgePreview,
+    MemoryReconciled,
+    MemoryRelationshipProposal,
+    MemoryScopeChanged,
+    MemorySource,
+    MemoryUpdated,
+    ObservationsDeleted,
+    ObservationsView,
+    ProposalDecided,
+    RelationshipDecided,
+    RelationshipRejected,
+    RelationshipScan,
+    memory_proposal,
+    relationship_proposal,
+)
 from raiker.contracts.ids import utc_now
 from raiker.control.dashboard import DashboardService
 from raiker.runtime.authority.models import Principal
@@ -51,7 +83,11 @@ async def list_memory_proposals(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
-    return _service(request).list_memory_proposals(auth_data[0].principal_id)
+    answer: list[MemoryProposal] = [
+        memory_proposal(row)
+        for row in _service(request).list_memory_proposals(auth_data[0].principal_id)
+    ]
+    return serialize_dto(answer)
 
 
 @router.post("/api/memory/proposals/{candidate_id}/decision")
@@ -75,7 +111,8 @@ async def decide_memory_proposal(
             status.HTTP_409_CONFLICT if conflict else status.HTTP_403_FORBIDDEN,
             result.reason_code,
         )
-    return {"ok": True, **result.data}
+    answer = cast(ProposalDecided, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.get("/api/memory/relationship-proposals")
@@ -84,9 +121,12 @@ async def list_memory_relationship_proposals(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
-    return _service(request).list_memory_relationship_proposals(
+    answer: list[MemoryRelationshipProposal] = [
+        relationship_proposal(row) for row in _service(request).list_memory_relationship_proposals(
         auth_data[0].principal_id
     )
+    ]
+    return serialize_dto(answer)
 
 
 @router.post("/api/memory/relationship-proposals/scan")
@@ -98,7 +138,8 @@ async def scan_memory_relationships(
     result = _service(request).scan_memory_relationships(auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(RelationshipScan, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/memory/relationship-proposals/{candidate_id}/decision")
@@ -119,7 +160,8 @@ async def decide_memory_relationship_proposal(
         raise refusal(status.HTTP_409_CONFLICT
                 if result.reason_code == "stale_memory_relationship_proposal"
                 else status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(RelationshipDecided, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/memory/entity-relationships/{relationship_id}/reject")
@@ -139,7 +181,8 @@ async def reject_memory_relationship(
         raise refusal(status.HTTP_409_CONFLICT
                 if result.reason_code == "stale_memory_relationship"
                 else status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(RelationshipRejected, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.put("/api/memory/{memory_id}/pin")
@@ -154,7 +197,8 @@ async def set_memory_pinned(
     result = _service(request).set_memory_pinned(memory_id, pinned, auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryPinned, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.get("/api/memory/export")
@@ -165,7 +209,8 @@ async def export_memories(
     result = _service(request).export_memories(auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryExport, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/memory/import/preview")
@@ -184,7 +229,8 @@ async def preview_memory_import(
     result = _service(request).preview_memory_import(memories, auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryImportPreview, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/memory/import")
@@ -203,7 +249,8 @@ async def import_memories(
     )
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryImportResult, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/memory/reconcile")
@@ -214,7 +261,8 @@ async def reconcile_memory_indexes(
     result = _service(request).reconcile_memory_indexes(auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryReconciled, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.get("/api/memory/integrity")
@@ -229,7 +277,8 @@ async def memory_integrity(
     result = _service(request).memory_integrity(auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryIntegrity, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/memory/conversation-index/rebuild")
@@ -240,7 +289,8 @@ async def rebuild_conversation_index(
     result = _service(request).rebuild_conversation_index(auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(ConversationIndexRebuilt, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.get("/api/memory/observations")
@@ -251,7 +301,8 @@ async def list_observations(
     result = _service(request).list_observations(auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(ObservationsView, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/memory/observations/delete")
@@ -265,7 +316,8 @@ async def delete_observations(
         raise refusal(status.HTTP_404_NOT_FOUND
             if result.reason_code == "unknown_observation"
             else status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(ObservationsDeleted, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/memory/gists/{gist_id}/discard")
@@ -277,7 +329,8 @@ async def discard_gist(
         raise refusal(status.HTTP_404_NOT_FOUND
             if result.reason_code == "unknown_gist"
             else status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(GistDiscarded, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/memory/eidetic/cleanup")
@@ -291,7 +344,8 @@ async def cleanup_expired_observations(
     )
     if not result.ok:
         raise refusal(status.HTTP_409_CONFLICT, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(ObservationsDeleted, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.get("/api/memory/settings")
@@ -317,7 +371,8 @@ async def set_memory_incognito(
     result = _service(request).set_memory_incognito(incognito, auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(IncognitoSet, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.put("/api/memory/embedding-backend")
@@ -338,7 +393,8 @@ async def set_memory_embedding_backend(
         raise refusal(status.HTTP_403_FORBIDDEN
             if result.reason_code != "embedding_backend_unknown"
             else status.HTTP_409_CONFLICT, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(EmbeddingBackendSet, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/memory/embedding-index")
@@ -374,7 +430,8 @@ async def build_memory_embedding_index(
                 "no_memories_to_index",
             }
             else status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(EmbeddingIndexBuilt, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.delete("/api/memory/{memory_id}")
@@ -387,7 +444,8 @@ async def forget_memory(
     result = _service(request).forget_memory_controlled(memory_id, auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryForgotten, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.get("/api/memory/{memory_id}/source")
@@ -423,7 +481,8 @@ async def get_memory_source(
     ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
     service = SourceProvenanceService(SQLiteStore(ws))
     excerpt = service.resolve(dict(memory.provenance), memory.text, principal_id)
-    return {"ok": True, "memory_id": memory_id, **excerpt.to_dict()}
+    answer = cast(MemorySource, {"ok": True, "memory_id": memory_id, **excerpt.to_dict()})
+    return serialize_dto(answer)
 
 
 @router.get("/api/memory/{memory_id}/history")
@@ -435,7 +494,8 @@ async def get_memory_history(
     result = _service(request).memory_history(memory_id, auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_404_NOT_FOUND, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryHistory, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.put("/api/memory/{memory_id}/scope")
@@ -458,7 +518,8 @@ async def change_memory_scope(
             status.HTTP_409_CONFLICT if conflict else status.HTTP_403_FORBIDDEN,
             result.reason_code,
         )
-    return {"ok": True, **result.data}
+    answer = cast(MemoryScopeChanged, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.put("/api/memory/{memory_id}/archive")
@@ -466,7 +527,8 @@ async def set_memory_archived(memory_id: str, request: Request, body: dict[str, 
     result = _service(request).set_memory_archived(memory_id, bool(body.get("archived", True)), auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryArchived, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.get("/api/memory/{memory_id}/purge-preview")
@@ -474,7 +536,8 @@ async def preview_memory_purge(memory_id: str, request: Request, auth_data: tupl
     result = _service(request).preview_memory_purge(memory_id, auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryPurgePreview, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.delete("/api/memory/{memory_id}/purge")
@@ -485,7 +548,8 @@ async def purge_memory(memory_id: str, request: Request, auth_data: tuple[ApiSes
             status.HTTP_409_CONFLICT if result.reason_code == "memory_purge_confirmation_required" else status.HTTP_403_FORBIDDEN,
             result.reason_code,
         )
-    return {"ok": True, **result.data}
+    answer = cast(MemoryPurged, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.put("/api/memory/{memory_id}")
@@ -500,7 +564,8 @@ async def edit_memory(
     )
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryUpdated, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/memory/{memory_id}/correct")
@@ -512,7 +577,8 @@ async def correct_memory(
     )
     if not result.ok:
         raise refusal(status.HTTP_409_CONFLICT, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryCorrected, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.put("/api/memory/{memory_id}/search")
@@ -527,7 +593,8 @@ async def set_memory_search_enabled(
     )
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryUpdated, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.put("/api/memory/{memory_id}/expiry")
@@ -542,4 +609,5 @@ async def set_memory_expiry(
     result = _service(request).set_memory_expiry(memory_id, expires_at, auth_data[0].principal_id)
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(MemoryUpdated, {"ok": True, **result.data})
+    return serialize_dto(answer)

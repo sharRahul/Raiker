@@ -27,7 +27,7 @@ from raiker.api.app import create_app
 from raiker.cli.principal_resolver import bootstrap_owner
 from scripts.api_contract import VERIFIED, build_app, contracts
 from tests.contract_cases import CASES
-from tests.contract_cases.base import is_fresh
+from tests.contract_cases.base import is_fresh, patch_of
 
 
 def _check(annotation: Any, value: Any, where: str) -> None:
@@ -112,9 +112,15 @@ def test_a_verified_route_is_one_the_inventory_found_eligible() -> None:
 
 @pytest.mark.parametrize("operation", sorted(CASES), ids=lambda op: f"{op[0]} {op[1]}")
 def test_the_real_response_is_exactly_the_attached_view(
-    operation: tuple[str, str], workspace: Path, offline_default_model: None
+    operation: tuple[str, str],
+    workspace: Path,
+    offline_default_model: None,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seed = CASES[operation]
+    patch = patch_of(seed)
+    if patch is not None:
+        patch(monkeypatch)
     headers: dict[str, str] = {}
     if not is_fresh(seed):
         bootstrap_owner("owner", "Owner", workspace_root=workspace)

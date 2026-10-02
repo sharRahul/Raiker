@@ -58,6 +58,16 @@ def fresh(seed: Seed) -> Seed:
     return seed
 
 
+def patched(seed: Seed, patch: Callable[[Any], None]) -> Seed:
+    """Run ``patch(monkeypatch)`` before ``seed`` — a provider the case must not reach."""
+    seed.patch = patch  # type: ignore[attr-defined]
+    return seed
+
+
+def patch_of(seed: Seed) -> Callable[[Any], None] | None:
+    return getattr(seed, "patch", None)
+
+
 def is_fresh(seed: Seed) -> bool:
     return bool(getattr(seed, "fresh", False))
 

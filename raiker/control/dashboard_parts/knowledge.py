@@ -42,7 +42,24 @@ from raiker.control.knowledge_scope import (
     resolve,
     scope_path,
 )
-from raiker.control.views.knowledge import BrainEdgeView, BrainNodeView, BrainView
+from raiker.control.views.knowledge import (
+    BrainEdgeView,
+    BrainNodeView,
+    BrainPreferences,
+    BrainPreferencesSaved,
+    BrainSourceChild,
+    BrainSourceBrowse,
+    BrainSourceGranted,
+    BrainSourceResult,
+    BrainSourceReview,
+    BrainSourceRevoked,
+    BrainSourceRoots,
+    BrainSourceUploaded,
+    BrainView,
+    KnowledgeSource,
+    KnowledgeSourceRevoked,
+    KnowledgeSources,
+)
 from raiker.control.views.tasks import _task_detail
 from raiker.events.writer import EventLogWriter
 from raiker.memory.store import list_memory
@@ -315,9 +332,9 @@ class KnowledgeService:
     # door that revokes an entry from it — each still handled by the controller
     # that owns it, so no revocation semantics are re-implemented here.
 
-    def knowledge_sources(self: DashboardService, *, owner_principal_id: str) -> dict[str, Any]:
+    def knowledge_sources(self: DashboardService, *, owner_principal_id: str) -> KnowledgeSources:
         """Everything Raiker may read, both kinds, in the order it was added."""
-        entries: list[dict[str, Any]] = []
+        entries: list[KnowledgeSource] = []
         for row in self.store.list_managed_files(owner_principal_id):
             scope_kind = str(row.get("scope_kind") or "memory")
             project_id = str(row.get("project_id") or "")
@@ -371,7 +388,7 @@ class KnowledgeService:
 
     def revoke_knowledge_source(
         self: DashboardService, kind: str, source_id: str, *, owner_principal_id: str
-    ) -> dict[str, Any]:
+    ) -> KnowledgeSourceRevoked:
         """Stop reading one source, whichever controller owns it.
 
         Neither branch is new behaviour: a managed file goes through the
@@ -384,7 +401,9 @@ class KnowledgeService:
         if not cleaned:
             raise ValueError("knowledge_source_not_named")
         if kind == "granted_folder":
-            return self.revoke_brain_source_folder(cleaned, owner_principal_id=owner_principal_id)
+            # Answered by the id the caller named, like a managed file's revoke.
+            self.revoke_brain_source_folder(cleaned, owner_principal_id=owner_principal_id)
+            return {"ok": True, "source_id": cleaned}
         if kind == "managed_file":
             from raiker.knowledge.files import ManagedFileError
             from raiker.knowledge.indexing import ManagedFileIndexer
@@ -397,17 +416,17 @@ class KnowledgeService:
             return {"ok": True, "source_id": record.file_id}
         raise ValueError("unknown_knowledge_source_kind")
 
-    def brain_source_roots(self: DashboardService, *, owner_principal_id: str) -> dict[str, Any]:
+    def brain_source_roots(self: DashboardService, *, owner_principal_id: str) -> BrainSourceRoots:
         """What the picker opens on: the boundary itself, named."""
         return {"roots": [root.to_dict() for root in self._scope_roots(owner_principal_id)]}
 
-    def add_brain_source(self: DashboardService, raw_path: str, *, owner_principal_id: str) -> dict[str, Any]:
+    def add_brain_source(self: DashboardService, raw_path: str, *, owner_principal_id: str) -> BrainSourceResult:
         root, relative, _path = self._scoped_source(raw_path, owner_principal_id=owner_principal_id)
         stored = scope_path(root, relative)
         self.store.add_brain_source(owner_principal_id, stored)
         return {"ok": True, "path": stored}
 
-    def remove_brain_source(self: DashboardService, raw_path: str, *, owner_principal_id: str) -> dict[str, Any]:
+    def remove_brain_source(self: DashboardService, raw_path: str, *, owner_principal_id: str) -> BrainSourceResult:
         try:
             root, relative, _path = self._scoped_source(
                 raw_path, owner_principal_id=owner_principal_id
@@ -423,7 +442,7 @@ class KnowledgeService:
 
     def grant_brain_source_folder(
         self: DashboardService, raw_path: str, *, owner_principal_id: str
-    ) -> dict[str, Any]:
+    ) -> BrainSourceGranted:
         """Record the owner granting one folder on this machine.
 
         The folder is read where it is. Nothing is copied into the workspace by
@@ -476,7 +495,7 @@ class KnowledgeService:
     # where it is — is offered beside it in the dialog.
     def upload_brain_source_file(
         self: DashboardService, filename: str, content_base64: str, store_copy: bool, *, owner_principal_id: str
-    ) -> dict[str, Any]:
+    ) -> BrainSourceUploaded:
         if not store_copy:
             raise ValueError("brain_upload_copy_not_authorised")
         name = Path((filename or "").strip()).name
@@ -512,7 +531,7 @@ class KnowledgeService:
 
     def revoke_brain_source_folder(
         self: DashboardService, root_id: str, *, owner_principal_id: str
-    ) -> dict[str, Any]:
+    ) -> BrainSourceRevoked:
         cleaned = (root_id or "").strip()
         if not cleaned:
             raise ValueError("invalid_brain_source_path")
@@ -532,7 +551,7 @@ class KnowledgeService:
 
     def browse_brain_sources(
         self: DashboardService, raw_path: str = "", *, owner_principal_id: str | None = None
-    ) -> dict[str, Any]:
+    ) -> BrainSourceBrowse:
         """Browse one contained directory inside one root, and nothing above it."""
         roots = self._scope_roots(owner_principal_id)
         if not (raw_path or "").strip() or raw_path.strip() in {".", "/"}:
@@ -558,7 +577,7 @@ class KnowledgeService:
         except OSError as exc:
             raise ValueError("brain_source_unreadable") from exc
         base = root.path.resolve() if root.path is not None else path
-        children: list[dict[str, Any]] = []
+        children: list[BrainSourceChild] = []
         for child in values[:200]:
             try:
                 if child.name in SKIPPED_DIRECTORY_NAMES or child.name.startswith("."):
@@ -588,7 +607,7 @@ class KnowledgeService:
 
     def review_brain_source(
         self: DashboardService, raw_path: str, *, owner_principal_id: str | None = None
-    ) -> dict[str, Any]:
+    ) -> BrainSourceReview:
         """Build a bounded, read-only indexing plan before a source is selected."""
         root, relative, path = self._scoped_source(raw_path, owner_principal_id=owner_principal_id)
         relative_path = scope_path(root, relative)
@@ -624,12 +643,12 @@ class KnowledgeService:
             "truncated_reason": walk.truncated_reason,
         }
 
-    def get_brain_preferences(self: DashboardService, owner_principal_id: str) -> dict[str, Any]:
+    def get_brain_preferences(self: DashboardService, owner_principal_id: str) -> BrainPreferences:
         return {"settings": self.store.load_brain_preferences(owner_principal_id)}
 
     def save_brain_preferences(
         self: DashboardService, settings: dict[str, Any], *, owner_principal_id: str
-    ) -> dict[str, Any]:
+    ) -> BrainPreferencesSaved:
         # REM-MAP-04 adds `viewMode`: which of the two readings of the
         # workspace the owner chose. The allowlist is why it has to be named
         # here — a key the server does not know is dropped in silence, so a

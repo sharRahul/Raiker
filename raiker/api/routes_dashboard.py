@@ -1036,7 +1036,7 @@ async def add_brain_source(
 ) -> dict[str, Any]:
     """Add one explicit workspace-relative file or folder to the Brain graph."""
     try:
-        return _service(request).add_brain_source(body.path, owner_principal_id=auth_data[0].principal_id)
+        return serialize_dto(_service(request).add_brain_source(body.path, owner_principal_id=auth_data[0].principal_id))
     except ValueError as exc:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
@@ -1054,9 +1054,9 @@ async def browse_brain_sources(
     means "everything in the workspace".
     """
     try:
-        return _service(request).browse_brain_sources(
+        return serialize_dto(_service(request).browse_brain_sources(
             path, owner_principal_id=auth_data[0].principal_id
-        )
+        ))
     except ValueError as exc:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
@@ -1067,7 +1067,7 @@ async def list_knowledge_sources(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """BUG-305 — one answer to "what can Raiker read", over both kinds."""
-    return _service(request).knowledge_sources(owner_principal_id=auth_data[0].principal_id)
+    return serialize_dto(_service(request).knowledge_sources(owner_principal_id=auth_data[0].principal_id))
 
 
 @router.delete("/api/knowledge-sources")
@@ -1079,9 +1079,9 @@ async def revoke_knowledge_source(
 ) -> dict[str, Any]:
     """Stop reading one source. The controller that owns it does the work."""
     try:
-        return _service(request).revoke_knowledge_source(
+        return serialize_dto(_service(request).revoke_knowledge_source(
             kind, source_id, owner_principal_id=auth_data[0].principal_id
-        )
+        ))
     except ValueError as exc:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
@@ -1091,7 +1091,7 @@ async def list_brain_source_roots(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _service(request).brain_source_roots(owner_principal_id=auth_data[0].principal_id)
+    return serialize_dto(_service(request).brain_source_roots(owner_principal_id=auth_data[0].principal_id))
 
 
 @router.post("/api/brain/sources/grants")
@@ -1102,9 +1102,9 @@ async def grant_brain_source_folder(
 ) -> dict[str, Any]:
     """Grant the Knowledge Map one folder on this machine, read where it is."""
     try:
-        return _service(request).grant_brain_source_folder(
+        return serialize_dto(_service(request).grant_brain_source_folder(
             body.path, owner_principal_id=auth_data[0].principal_id
-        )
+        ))
     except ValueError as exc:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
@@ -1116,9 +1116,9 @@ async def revoke_brain_source_folder(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     try:
-        return _service(request).revoke_brain_source_folder(
+        return serialize_dto(_service(request).revoke_brain_source_folder(
             root_id, owner_principal_id=auth_data[0].principal_id
-        )
+        ))
     except ValueError as exc:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
@@ -1136,12 +1136,12 @@ async def upload_brain_source_file(
     copies nothing.
     """
     try:
-        return _service(request).upload_brain_source_file(
+        return serialize_dto(_service(request).upload_brain_source_file(
             body.filename,
             body.content_base64,
             body.store_copy,
             owner_principal_id=auth_data[0].principal_id,
-        )
+        ))
     except ValueError as exc:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
@@ -1153,9 +1153,9 @@ async def review_brain_source(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     try:
-        return _service(request).review_brain_source(
+        return serialize_dto(_service(request).review_brain_source(
             body.path, owner_principal_id=auth_data[0].principal_id
-        )
+        ))
     except ValueError as exc:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
@@ -1165,7 +1165,7 @@ async def get_brain_preferences(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _service(request).get_brain_preferences(auth_data[0].principal_id)
+    return serialize_dto(_service(request).get_brain_preferences(auth_data[0].principal_id))
 
 
 @router.put("/api/brain/settings")
@@ -1178,9 +1178,9 @@ async def save_brain_preferences(
         settings = body.get("settings", {})
         if not isinstance(settings, dict):
             raise ValueError("invalid_brain_preferences")
-        return _service(request).save_brain_preferences(
+        return serialize_dto(_service(request).save_brain_preferences(
             settings, owner_principal_id=auth_data[0].principal_id
-        )
+        ))
     except ValueError as exc:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
@@ -1191,7 +1191,7 @@ async def remove_brain_source(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _service(request).remove_brain_source(path, owner_principal_id=auth_data[0].principal_id)
+    return serialize_dto(_service(request).remove_brain_source(path, owner_principal_id=auth_data[0].principal_id))
 
 
 @router.get("/api/execution-environments")

@@ -150,9 +150,100 @@ export type BootstrapStatusView = {
   can_register: boolean;
 };
 
+export type BrainEdgeView = {
+  source: string;
+  target: string;
+  relationship: string;
+  is_active: boolean;
+  relationship_id: string | null;
+  evidence_memory_id: string | null;
+  owner_can_reject: boolean;
+};
+
+export type BrainNodeView = {
+  node_id: string;
+  node_type: string;
+  label: string;
+  status: string;
+  detail: string | null;
+  progress_percent: number | null;
+  is_real: boolean;
+};
+
+export type BrainPreferences = {
+  settings: Record<string, unknown>;
+};
+
+export type BrainPreferencesSaved = {
+  ok: boolean;
+  settings: Record<string, unknown>;
+  updated_at: string;
+};
+
+/** One folder inside a root; an empty ``path`` answers with the roots themselves. */
+export type BrainSourceBrowse = {
+  path: string;
+  parent: string | null;
+  roots: BrainSourceRoot[];
+  children: BrainSourceChild[];
+  truncated: boolean;
+};
+
+export type BrainSourceChild = {
+  name: string;
+  path: string;
+  kind: "folder" | "file";
+  size_bytes: number | null;
+};
+
+export type BrainSourceGranted = {
+  ok: boolean;
+  root_id: string;
+  path: string;
+};
+
 /** One location inside the Knowledge Map's boundary. */
 export type BrainSourceRequest = {
   path: string;
+};
+
+export type BrainSourceResult = {
+  ok: boolean;
+  path: string;
+};
+
+/** What adding a source would read, before anything is read (NEW-MAP-03). */
+export type BrainSourceReview = {
+  path: string;
+  kind: "folder" | "file";
+  supported_files: number;
+  unsupported_files: number;
+  total_bytes: number;
+  examples: string[];
+  warnings: string[];
+  review_cap: number;
+  visited_entries: number;
+  truncated: boolean;
+  truncated_reason: string | null;
+};
+
+export type BrainSourceRevoked = {
+  ok: boolean;
+  root_id: string;
+};
+
+/** A place the Knowledge Map may look. ``path`` only for a folder the owner granted. */
+export type BrainSourceRoot = {
+  root_id: string;
+  label: string;
+  detail: string;
+  kind: "raiker" | "granted" | "database";
+  browsable: boolean;
+  path: string | null;
+};
+
+export type BrainSourceRoots = {
+  roots: BrainSourceRoot[];
 };
 
 /** A file the owner chose from their computer, to be *copied* into Raiker. */
@@ -160,6 +251,21 @@ export type BrainSourceUploadRequest = {
   filename: string;
   content_base64: string;
   store_copy: boolean;
+};
+
+/** A file copied into the workspace, with the owner's permission to keep the copy. */
+export type BrainSourceUploaded = {
+  ok: boolean;
+  path: string;
+  stored_copy: boolean;
+  byte_size: number;
+};
+
+export type BrainView = {
+  generated_at: string;
+  nodes: BrainNodeView[];
+  edges: BrainEdgeView[];
+  illustrative_motion_notice: string;
 };
 
 export type BreachCheckRequest = {
@@ -456,6 +562,11 @@ export type ConversationCompaction = {
   created_at?: string;
 };
 
+export type ConversationIndexRebuilt = {
+  ok: boolean;
+  indexed_rows: number;
+};
+
 export type CreateMcpServerRequest = {
   name: string;
   template: string;
@@ -547,6 +658,26 @@ export type ElevateRequest = {
 
 export type ElevatedTokenView = {
   token: string;
+};
+
+export type EmbeddingBackendSet = {
+  ok: boolean;
+  embedding_backend: string;
+};
+
+/** One governed embedding run (MEM-10), as the executor reported it. */
+export type EmbeddingIndexBuilt = {
+  ok: boolean;
+  operation: "index_memories";
+  embedding_model: string;
+  provider_models: string[];
+  indexed_count: number;
+  indexed_file_chunk_count: number;
+  skipped_count: number;
+  skipped: Record<string, string>[];
+  provider_backed: boolean;
+  local_only: boolean;
+  content_redacted: boolean;
 };
 
 /** An embedding model this install could call, and what is waiting to be embedded by it. */
@@ -644,6 +775,12 @@ export type GenerateImageRequest = {
   project_id?: string;
 };
 
+export type GistDiscarded = {
+  ok: boolean;
+  gist_id: string;
+  discarded: boolean;
+};
+
 export type GitGrantRequest = {
   scope?: string;
   session_id?: string | null;
@@ -705,6 +842,11 @@ export type InboundChannelMessage = {
   text?: string;
 };
 
+export type IncognitoSet = {
+  ok: boolean;
+  incognito: boolean;
+};
+
 /** Name and optional first account for a locally isolated Raiker instance. */
 export type InstanceCreateRequest = {
   name: string;
@@ -728,6 +870,31 @@ export type IssuedSessionView = {
   principal_id: string;
   expires_at: string | null;
   csrf_token: string | null;
+};
+
+/** One thing Raiker may read: a file it holds, or a folder the owner granted (BUG-305). */
+export type KnowledgeSource = {
+  source_id: string;
+  kind: "managed_file" | "granted_folder";
+  label: string;
+  location: string;
+  scope: string;
+  held: boolean;
+  index_state: string;
+  recall: boolean;
+  graph: boolean;
+  added_at: string;
+};
+
+export type KnowledgeSourceRevoked = {
+  ok: boolean;
+  source_id: string;
+};
+
+export type KnowledgeSources = {
+  sources: KnowledgeSource[];
+  held_count: number;
+  granted_count: number;
 };
 
 export type LanguageCheckRequest = {
@@ -856,6 +1023,12 @@ export type McpToolDeclaration = {
   required: string[];
 };
 
+export type MemoryArchived = {
+  ok: boolean;
+  memory_id: string;
+  archived: boolean;
+};
+
 /** User-facing view of one approved memory entry. */
 export type MemoryControlView = {
   memory_id: string;
@@ -885,6 +1058,145 @@ export type MemoryControlView = {
   last_used_at: string | null;
 };
 
+export type MemoryCorrected = {
+  ok: boolean;
+  memory_id: string;
+  supersedes_memory_id: string;
+};
+
+export type MemoryExport = {
+  ok: boolean;
+  memories: MemoryControlView[];
+};
+
+export type MemoryForgotten = {
+  ok: boolean;
+  memory_id: string;
+};
+
+export type MemoryHistory = {
+  ok: boolean;
+  memory_id: string;
+  events: MemoryHistoryEvent[];
+};
+
+export type MemoryHistoryEvent = {
+  audit_id: string;
+  action: string;
+  actor_id: string;
+  created_at: string;
+  details: Record<string, unknown>;
+};
+
+/** A record that is already stored, or that the file holds twice (``memory_id`` empty). */
+export type MemoryImportDuplicate = {
+  index: number;
+  text: string;
+  scope: string;
+  memory_id: string;
+};
+
+/** What an import would change, before it changes anything (BUG-244). */
+export type MemoryImportPreview = {
+  ok: boolean;
+  total: number;
+  new_count: number;
+  duplicate_count: number;
+  duplicates: MemoryImportDuplicate[];
+};
+
+export type MemoryImportResult = {
+  ok: boolean;
+  count: number;
+  reviewed: number;
+  imported: number;
+  skipped_duplicates: number;
+  relationship_proposals: number;
+};
+
+/** How far each projection of approved memory has drifted from it; nothing is repaired. */
+export type MemoryIntegrity = {
+  ok: boolean;
+  clean: boolean;
+  active_memory_count: number;
+  fts_count: number;
+  stale_fts_count: number;
+  missing_markdown_count: number;
+  stale_projection_count: number;
+  stale_graph_edge_count: number;
+  checksum_mismatch_count: number;
+  orphaned_markdown_count: number;
+  failed_purge_location_count: number;
+  project_path_inconsistency_count: number;
+  text_search_engine: string;
+  index_engine_mismatch_count: number;
+  conversation_index_count: number;
+  stale_conversation_index_count: number;
+};
+
+export type MemoryPinned = {
+  ok: boolean;
+  memory_id: string;
+  pinned: boolean;
+};
+
+/** A sentence the runtime proposed remembering, waiting on the owner. */
+export type MemoryProposal = {
+  candidate_id: string;
+  source_event_id: string;
+  memory_type: string;
+  scope: string;
+  text: string;
+  sensitivity: string;
+  confidence: number;
+  decision: string;
+  created_at: string;
+};
+
+/** What a purge removes, and the id the owner must send back to confirm it. */
+export type MemoryPurgePreview = {
+  ok: boolean;
+  memory_id: string;
+  artifacts: string[];
+  backup_disposition: string;
+  requires_confirmation: string;
+};
+
+export type MemoryPurged = {
+  ok: boolean;
+  memory_id: string;
+  purged: boolean;
+  backup_disposition: string;
+};
+
+export type MemoryReconciled = {
+  ok: boolean;
+  projection_rows_reconciled: number;
+};
+
+/** A relationship read out of an approved memory, waiting on the owner. */
+export type MemoryRelationshipProposal = {
+  candidate_id: string;
+  subject_name: string;
+  subject_type: string;
+  predicate: string;
+  object_name: string;
+  object_type: string;
+  evidence_memory_id: string;
+  evidence_text: string;
+  confidence: number;
+  extractor_version: string;
+  decision: "needs_user_review";
+  created_at: string;
+};
+
+export type MemoryScopeChanged = {
+  ok: boolean;
+  memory_id: string;
+  scope: string;
+  updated_at: string;
+};
+
 export type MemorySettingsView = {
   incognito: boolean;
   embedding_backend: string;
@@ -895,6 +1207,32 @@ export type MemorySettingsView = {
   unindexed_file_chunks: number;
   vector_search_strategy: "exact_then_approximate";
   vector_search_exact_limit: number;
+};
+
+/** The passage a memory was drawn from, or the stated reason it cannot be opened (BUG-27). */
+export type MemorySource = {
+  status: "resolved" | "no_provenance" | "source_deleted" | "source_changed" | "unsupported_source" | "not_authorized";
+  kind: string;
+  title: string;
+  excerpt: string;
+  highlight_start: number;
+  highlight_length: number;
+  session_id: string;
+  turn_id: string;
+  attachment_id: string;
+  truncated: boolean;
+  resolution_method: "stored_coordinates" | "matching_text" | "answer_quote" | "recorded_passage" | "whole_source" | "";
+  anchors?: SourceAnchorView[];
+  ok: boolean;
+  memory_id: string;
+};
+
+/** An edit, a search switch or an expiry, and the state the memory is in now. */
+export type MemoryUpdated = {
+  ok: boolean;
+  memory_id: string;
+  search_enabled: boolean;
+  expires_at: string | null;
 };
 
 export type MfaCodeRequest = {
@@ -998,6 +1336,45 @@ export type NotificationView = {
   subject_id: string | null;
   read: boolean;
   created_at: string;
+};
+
+/** MEM-04 — one eidetic observation, as the owner reads it. */
+export type ObservationView = {
+  observation_id: string;
+  session_id: string;
+  turn_id: string;
+  tool_name: string;
+  source_type: string;
+  summary: string;
+  sensitivity: string;
+  retention: string;
+  capture_status: string;
+  skip_reason: string;
+  promotable_to_memory: boolean;
+  content_sha256: string;
+  content_bytes: number;
+  artifact_ref: string | null;
+  source_event_id: string;
+  created_at: string;
+  expires_at: string;
+  gist_status: string;
+  gist_summary: string;
+  gist_id: string;
+};
+
+export type ObservationsDeleted = {
+  ok: boolean;
+  deleted_observation_ids: string[];
+};
+
+/** What the runtime captured while it worked, with the counts an empty list cannot give. */
+export type ObservationsView = {
+  ok: boolean;
+  observations: ObservationView[];
+  captured: number;
+  skipped: number;
+  gists_pending: number;
+  due_for_expiry: string[];
 };
 
 /** The acknowledgement a route gives when the change it was asked for is done. */
@@ -1265,6 +1642,15 @@ export type PromptRequest = {
   client_type?: string | null;
 };
 
+/** A decision on a proposal; an approval names the memory it became. */
+export type ProposalDecided = {
+  ok: boolean;
+  candidate_id: string;
+  decision: string;
+  memory_id?: string;
+  relationship_proposals?: number;
+};
+
 export type ProviderHealthView = {
   profile_id: string;
   provider: string;
@@ -1294,6 +1680,27 @@ export type RecordThreatModelAckRequest = {
 export type RegisterRequest = {
   username: string;
   password: string;
+};
+
+export type RelationshipDecided = {
+  ok: boolean;
+  candidate_id: string;
+  decision: string;
+  relationship_id: string | null;
+};
+
+export type RelationshipRejected = {
+  ok: boolean;
+  relationship_id: string;
+  active: boolean;
+};
+
+export type RelationshipScan = {
+  ok: boolean;
+  scanned: number;
+  proposed: number;
+  skipped: number;
+  already_present: number;
 };
 
 export type RenameMcpServerRequest = {
@@ -1919,6 +2326,28 @@ export const contract = {
     call<Ok>("POST", `/api/auth/sessions/${encodeURIComponent(sessionId)}/revoke`),
   whoami: () =>
     request<WhoamiView>("/api/auth/whoami"),
+  getBrain: () =>
+    request<BrainView>("/api/brain"),
+  getBrainPreferences: () =>
+    request<BrainPreferences>("/api/brain/settings"),
+  saveBrainPreferences: (body: Record<string, unknown>) =>
+    call<BrainPreferencesSaved>("PUT", "/api/brain/settings", { body }),
+  removeBrainSource: (query: { path: string }) =>
+    call<BrainSourceResult>("DELETE", withQuery("/api/brain/sources", query)),
+  addBrainSource: (body: BrainSourceRequest) =>
+    call<BrainSourceResult>("POST", "/api/brain/sources", { body }),
+  browseBrainSources: (query: { path?: string } = {}) =>
+    request<BrainSourceBrowse>(withQuery("/api/brain/sources/browse", query)),
+  revokeBrainSourceFolder: (query: { root_id: string }) =>
+    call<BrainSourceRevoked>("DELETE", withQuery("/api/brain/sources/grants", query)),
+  grantBrainSourceFolder: (body: BrainSourceRequest) =>
+    call<BrainSourceGranted>("POST", "/api/brain/sources/grants", { body }),
+  reviewBrainSource: (body: BrainSourceRequest) =>
+    call<BrainSourceReview>("POST", "/api/brain/sources/review", { body }),
+  listBrainSourceRoots: () =>
+    request<BrainSourceRoots>("/api/brain/sources/roots"),
+  uploadBrainSourceFile: (body: BrainSourceUploadRequest) =>
+    call<BrainSourceUploaded>("POST", "/api/brain/sources/upload", { body }),
   listCapabilityGates: () =>
     request<CapabilityGateView[]>("/api/capability-gates"),
   getCapabilityGate: (capability: string) =>
@@ -1947,6 +2376,10 @@ export const contract = {
     request<EventView[]>(withQuery("/api/events", query)),
   getExtensions: () =>
     request<ExtensionsOverviewView>("/api/extensions"),
+  revokeKnowledgeSource: (query: { kind: string; source_id: string }) =>
+    call<KnowledgeSourceRevoked>("DELETE", withQuery("/api/knowledge-sources", query)),
+  listKnowledgeSources: () =>
+    request<KnowledgeSources>("/api/knowledge-sources"),
   deleteManagedFile: (fileId: string) =>
     call<ManagedFileChanged>("DELETE", `/api/managed-files/${encodeURIComponent(fileId)}`),
   retryManagedFile: (fileId: string) =>
@@ -1959,12 +2392,80 @@ export const contract = {
     request<McpSessionView[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/sessions`),
   listMemories: (query: { scope?: string } = {}) =>
     request<MemoryControlView[]>(withQuery("/api/memory", query)),
+  rebuildConversationIndex: () =>
+    call<ConversationIndexRebuilt>("POST", "/api/memory/conversation-index/rebuild"),
+  cleanupExpiredObservations: (body: Record<string, unknown>) =>
+    call<ObservationsDeleted>("POST", "/api/memory/eidetic/cleanup", { body }),
+  setMemoryEmbeddingBackend: (body: Record<string, unknown>) =>
+    call<EmbeddingBackendSet>("PUT", "/api/memory/embedding-backend", { body }),
+  buildMemoryEmbeddingIndex: (body: Record<string, unknown>) =>
+    call<EmbeddingIndexBuilt>("POST", "/api/memory/embedding-index", { body }),
+  getMemoryEntityProposals: () =>
+    request<MemoryRelationshipProposal[]>("/api/memory/entity-proposals"),
+  postMemoryEntityProposalsScan: () =>
+    call<RelationshipScan>("POST", "/api/memory/entity-proposals/scan"),
+  postMemoryEntityProposalsCandidateIdDecision: (candidateId: string, body: Record<string, unknown>) =>
+    call<RelationshipDecided>("POST", `/api/memory/entity-proposals/${encodeURIComponent(candidateId)}/decision`, { body }),
+  rejectMemoryRelationship: (relationshipId: string, body: Record<string, unknown>) =>
+    call<RelationshipRejected>("POST", `/api/memory/entity-relationships/${encodeURIComponent(relationshipId)}/reject`, { body }),
+  exportMemories: () =>
+    request<MemoryExport>("/api/memory/export"),
   listMemoryFiles: () =>
     request<ManagedFileList>("/api/memory/files"),
   importMemoryFiles: (body: Record<string, unknown>) =>
     call<ManagedFileImport>("POST", "/api/memory/files", { body }),
+  discardGist: (gistId: string) =>
+    call<GistDiscarded>("POST", `/api/memory/gists/${encodeURIComponent(gistId)}/discard`),
+  importMemories: (body: Record<string, unknown>) =>
+    call<MemoryImportResult>("POST", "/api/memory/import", { body }),
+  previewMemoryImport: (body: Record<string, unknown>) =>
+    call<MemoryImportPreview>("POST", "/api/memory/import/preview", { body }),
+  setMemoryIncognito: (body: Record<string, unknown>) =>
+    call<IncognitoSet>("PUT", "/api/memory/incognito", { body }),
+  memoryIntegrity: () =>
+    request<MemoryIntegrity>("/api/memory/integrity"),
+  listObservations: () =>
+    request<ObservationsView>("/api/memory/observations"),
+  deleteObservations: (body: Record<string, unknown>) =>
+    call<ObservationsDeleted>("POST", "/api/memory/observations/delete", { body }),
+  listMemoryProposals: () =>
+    request<MemoryProposal[]>("/api/memory/proposals"),
+  decideMemoryProposal: (candidateId: string, body: Record<string, unknown>) =>
+    call<ProposalDecided>("POST", `/api/memory/proposals/${encodeURIComponent(candidateId)}/decision`, { body }),
+  reconcileMemoryIndexes: () =>
+    call<MemoryReconciled>("POST", "/api/memory/reconcile"),
+  getMemoryRelationshipProposals: () =>
+    request<MemoryRelationshipProposal[]>("/api/memory/relationship-proposals"),
+  postMemoryRelationshipProposalsScan: () =>
+    call<RelationshipScan>("POST", "/api/memory/relationship-proposals/scan"),
+  postMemoryRelationshipProposalsCandidateIdDecision: (candidateId: string, body: Record<string, unknown>) =>
+    call<RelationshipDecided>("POST", `/api/memory/relationship-proposals/${encodeURIComponent(candidateId)}/decision`, { body }),
   getMemorySettings: () =>
     request<MemorySettingsView>("/api/memory/settings"),
+  forgetMemory: (memoryId: string) =>
+    call<MemoryForgotten>("DELETE", `/api/memory/${encodeURIComponent(memoryId)}`),
+  editMemory: (memoryId: string, body: Record<string, unknown>) =>
+    call<MemoryUpdated>("PUT", `/api/memory/${encodeURIComponent(memoryId)}`, { body }),
+  setMemoryArchived: (memoryId: string, body: Record<string, unknown>) =>
+    call<MemoryArchived>("PUT", `/api/memory/${encodeURIComponent(memoryId)}/archive`, { body }),
+  correctMemory: (memoryId: string, body: Record<string, unknown>) =>
+    call<MemoryCorrected>("POST", `/api/memory/${encodeURIComponent(memoryId)}/correct`, { body }),
+  setMemoryExpiry: (memoryId: string, body: Record<string, unknown>) =>
+    call<MemoryUpdated>("PUT", `/api/memory/${encodeURIComponent(memoryId)}/expiry`, { body }),
+  getMemoryHistory: (memoryId: string) =>
+    request<MemoryHistory>(`/api/memory/${encodeURIComponent(memoryId)}/history`),
+  setMemoryPinned: (memoryId: string, body: Record<string, unknown>) =>
+    call<MemoryPinned>("PUT", `/api/memory/${encodeURIComponent(memoryId)}/pin`, { body }),
+  purgeMemory: (memoryId: string, xMemoryPurgeConfirm?: string) =>
+    call<MemoryPurged>("DELETE", `/api/memory/${encodeURIComponent(memoryId)}/purge`, { headers: { "x-memory-purge-confirm": xMemoryPurgeConfirm } }),
+  previewMemoryPurge: (memoryId: string) =>
+    request<MemoryPurgePreview>(`/api/memory/${encodeURIComponent(memoryId)}/purge-preview`),
+  changeMemoryScope: (memoryId: string, body: Record<string, unknown>) =>
+    call<MemoryScopeChanged>("PUT", `/api/memory/${encodeURIComponent(memoryId)}/scope`, { body }),
+  setMemorySearchEnabled: (memoryId: string, body: Record<string, unknown>) =>
+    call<MemoryUpdated>("PUT", `/api/memory/${encodeURIComponent(memoryId)}/search`, { body }),
+  getMemorySource: (memoryId: string) =>
+    request<MemorySource>(`/api/memory/${encodeURIComponent(memoryId)}/source`),
   listNotifications: (query: { unread_only?: boolean } = {}) =>
     request<NotificationView[]>(withQuery("/api/notifications", query)),
   listProjects: () =>

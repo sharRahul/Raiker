@@ -13,7 +13,7 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
   `to_dict`; it needs a dedicated response model first (Stage B).
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**350 operations: 102 verified, 1 eligible, 237 deferred, 10 special.**
+**350 operations: 149 verified, 1 eligible, 190 deferred, 10 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -48,17 +48,17 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/auth/sessions` |  | DeviceSessionView[] | verified | built as DeviceSessionView |
 | POST | `/api/auth/sessions/{session_id}/revoke` |  | Ok | verified | built as Ok |
 | GET | `/api/auth/whoami` |  | WhoamiView | verified | built as WhoamiView |
-| GET | `/api/brain` |  |  | deferred | brain_view returns BrainView, not a fields-only view |
-| GET | `/api/brain/settings` |  |  | deferred | body assembled in the route |
-| PUT | `/api/brain/settings` | dict |  | deferred | body assembled in the route |
-| DELETE | `/api/brain/sources` |  |  | deferred | body assembled in the route |
-| POST | `/api/brain/sources` | BrainSourceRequest |  | deferred | body assembled in the route |
-| GET | `/api/brain/sources/browse` |  |  | deferred | body assembled in the route |
-| DELETE | `/api/brain/sources/grants` |  |  | deferred | body assembled in the route |
-| POST | `/api/brain/sources/grants` | BrainSourceRequest |  | deferred | body assembled in the route |
-| POST | `/api/brain/sources/review` | BrainSourceRequest |  | deferred | body assembled in the route |
-| GET | `/api/brain/sources/roots` |  |  | deferred | body assembled in the route |
-| POST | `/api/brain/sources/upload` | BrainSourceUploadRequest |  | deferred | body assembled in the route |
+| GET | `/api/brain` |  | BrainView | verified | DashboardService.brain_view |
+| GET | `/api/brain/settings` |  | BrainPreferences | verified | DashboardService.get_brain_preferences |
+| PUT | `/api/brain/settings` | dict | BrainPreferencesSaved | verified | DashboardService.save_brain_preferences |
+| DELETE | `/api/brain/sources` |  | BrainSourceResult | verified | DashboardService.remove_brain_source |
+| POST | `/api/brain/sources` | BrainSourceRequest | BrainSourceResult | verified | DashboardService.add_brain_source |
+| GET | `/api/brain/sources/browse` |  | BrainSourceBrowse | verified | DashboardService.browse_brain_sources |
+| DELETE | `/api/brain/sources/grants` |  | BrainSourceRevoked | verified | DashboardService.revoke_brain_source_folder |
+| POST | `/api/brain/sources/grants` | BrainSourceRequest | BrainSourceGranted | verified | DashboardService.grant_brain_source_folder |
+| POST | `/api/brain/sources/review` | BrainSourceRequest | BrainSourceReview | verified | DashboardService.review_brain_source |
+| GET | `/api/brain/sources/roots` |  | BrainSourceRoots | verified | DashboardService.brain_source_roots |
+| POST | `/api/brain/sources/upload` | BrainSourceUploadRequest | BrainSourceUploaded | verified | DashboardService.upload_brain_source_file |
 | GET | `/api/capability-gates` |  | CapabilityGateView[] | verified | RuntimeControlService.list_capability_gates |
 | GET | `/api/capability-gates/{capability}` |  | CapabilityGateView | verified | RuntimeControlService.get_capability_gate |
 | POST | `/api/capability-gates/{capability}/disable` | DisableCapabilityRequest |  | deferred | body assembled in the route |
@@ -151,8 +151,8 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | GET | `/api/images/{generation_id}/bytes` |  |  | special | special |
 | POST | `/api/instances` | InstanceCreateRequest |  | deferred | body assembled in the route |
 | POST | `/api/interrupts` | InterruptRequest |  | deferred | body assembled in the route |
-| DELETE | `/api/knowledge-sources` |  |  | deferred | body assembled in the route |
-| GET | `/api/knowledge-sources` |  |  | deferred | body assembled in the route |
+| DELETE | `/api/knowledge-sources` |  | KnowledgeSourceRevoked | verified | DashboardService.revoke_knowledge_source |
+| GET | `/api/knowledge-sources` |  | KnowledgeSources | verified | DashboardService.knowledge_sources |
 | POST | `/api/language/check` | LanguageCheckRequest |  | deferred | body assembled in the route |
 | GET | `/api/local-runtimes` |  |  | deferred | body assembled in the route |
 | POST | `/api/local-runtimes/detect` |  |  | deferred | body assembled in the route |
@@ -172,43 +172,43 @@ asks for: what each `/api/` operation answers with, and whether OpenAPI describe
 | POST | `/api/mcp/servers/{server_id}/resume` |  |  | deferred | body assembled in the route |
 | GET | `/api/mcp/servers/{server_id}/sessions` |  | McpSessionView[] | verified | DashboardService.list_mcp_sessions |
 | GET | `/api/memory` |  | MemoryControlView[] | verified | DashboardService.list_memories |
-| POST | `/api/memory/conversation-index/rebuild` |  |  | deferred | body assembled in the route |
-| POST | `/api/memory/eidetic/cleanup` | dict |  | deferred | body assembled in the route |
-| PUT | `/api/memory/embedding-backend` | dict |  | deferred | body assembled in the route |
-| POST | `/api/memory/embedding-index` | dict |  | deferred | body assembled in the route |
-| GET | `/api/memory/entity-proposals` |  |  | deferred | body assembled in the route |
-| POST | `/api/memory/entity-proposals/scan` |  |  | deferred | body assembled in the route |
-| POST | `/api/memory/entity-proposals/{candidate_id}/decision` | dict |  | deferred | body assembled in the route |
-| POST | `/api/memory/entity-relationships/{relationship_id}/reject` | dict |  | deferred | body assembled in the route |
-| GET | `/api/memory/export` |  |  | deferred | body assembled in the route |
+| POST | `/api/memory/conversation-index/rebuild` |  | ConversationIndexRebuilt | verified | declared by cast |
+| POST | `/api/memory/eidetic/cleanup` | dict | ObservationsDeleted | verified | declared by cast |
+| PUT | `/api/memory/embedding-backend` | dict | EmbeddingBackendSet | verified | declared by cast |
+| POST | `/api/memory/embedding-index` | dict | EmbeddingIndexBuilt | verified | declared by cast |
+| GET | `/api/memory/entity-proposals` |  | MemoryRelationshipProposal[] | verified | declared MemoryRelationshipProposal[] |
+| POST | `/api/memory/entity-proposals/scan` |  | RelationshipScan | verified | declared by cast |
+| POST | `/api/memory/entity-proposals/{candidate_id}/decision` | dict | RelationshipDecided | verified | declared by cast |
+| POST | `/api/memory/entity-relationships/{relationship_id}/reject` | dict | RelationshipRejected | verified | declared by cast |
+| GET | `/api/memory/export` |  | MemoryExport | verified | declared by cast |
 | GET | `/api/memory/files` |  | ManagedFileList | verified | _list |
 | POST | `/api/memory/files` | dict | ManagedFileImport | verified | _import |
-| POST | `/api/memory/gists/{gist_id}/discard` |  |  | deferred | body assembled in the route |
-| POST | `/api/memory/import` | dict |  | deferred | body assembled in the route |
-| POST | `/api/memory/import/preview` | dict |  | deferred | body assembled in the route |
-| PUT | `/api/memory/incognito` | dict |  | deferred | body assembled in the route |
-| GET | `/api/memory/integrity` |  |  | deferred | body assembled in the route |
-| GET | `/api/memory/observations` |  |  | deferred | body assembled in the route |
-| POST | `/api/memory/observations/delete` | dict |  | deferred | body assembled in the route |
-| GET | `/api/memory/proposals` |  |  | deferred | body assembled in the route |
-| POST | `/api/memory/proposals/{candidate_id}/decision` | dict |  | deferred | body assembled in the route |
-| POST | `/api/memory/reconcile` |  |  | deferred | body assembled in the route |
-| GET | `/api/memory/relationship-proposals` |  |  | deferred | body assembled in the route |
-| POST | `/api/memory/relationship-proposals/scan` |  |  | deferred | body assembled in the route |
-| POST | `/api/memory/relationship-proposals/{candidate_id}/decision` | dict |  | deferred | body assembled in the route |
+| POST | `/api/memory/gists/{gist_id}/discard` |  | GistDiscarded | verified | declared by cast |
+| POST | `/api/memory/import` | dict | MemoryImportResult | verified | declared by cast |
+| POST | `/api/memory/import/preview` | dict | MemoryImportPreview | verified | declared by cast |
+| PUT | `/api/memory/incognito` | dict | IncognitoSet | verified | declared by cast |
+| GET | `/api/memory/integrity` |  | MemoryIntegrity | verified | declared by cast |
+| GET | `/api/memory/observations` |  | ObservationsView | verified | declared by cast |
+| POST | `/api/memory/observations/delete` | dict | ObservationsDeleted | verified | declared by cast |
+| GET | `/api/memory/proposals` |  | MemoryProposal[] | verified | declared MemoryProposal[] |
+| POST | `/api/memory/proposals/{candidate_id}/decision` | dict | ProposalDecided | verified | declared by cast |
+| POST | `/api/memory/reconcile` |  | MemoryReconciled | verified | declared by cast |
+| GET | `/api/memory/relationship-proposals` |  | MemoryRelationshipProposal[] | verified | declared MemoryRelationshipProposal[] |
+| POST | `/api/memory/relationship-proposals/scan` |  | RelationshipScan | verified | declared by cast |
+| POST | `/api/memory/relationship-proposals/{candidate_id}/decision` | dict | RelationshipDecided | verified | declared by cast |
 | GET | `/api/memory/settings` |  | MemorySettingsView | verified | DashboardService.get_memory_settings |
-| DELETE | `/api/memory/{memory_id}` |  |  | deferred | body assembled in the route |
-| PUT | `/api/memory/{memory_id}` | dict |  | deferred | body assembled in the route |
-| PUT | `/api/memory/{memory_id}/archive` | dict |  | deferred | body assembled in the route |
-| POST | `/api/memory/{memory_id}/correct` | dict |  | deferred | body assembled in the route |
-| PUT | `/api/memory/{memory_id}/expiry` | dict |  | deferred | body assembled in the route |
-| GET | `/api/memory/{memory_id}/history` |  |  | deferred | body assembled in the route |
-| PUT | `/api/memory/{memory_id}/pin` | dict |  | deferred | body assembled in the route |
-| DELETE | `/api/memory/{memory_id}/purge` |  |  | deferred | body assembled in the route |
-| GET | `/api/memory/{memory_id}/purge-preview` |  |  | deferred | body assembled in the route |
-| PUT | `/api/memory/{memory_id}/scope` | dict |  | deferred | body assembled in the route |
-| PUT | `/api/memory/{memory_id}/search` | dict |  | deferred | body assembled in the route |
-| GET | `/api/memory/{memory_id}/source` |  |  | deferred | body assembled in the route |
+| DELETE | `/api/memory/{memory_id}` |  | MemoryForgotten | verified | declared by cast |
+| PUT | `/api/memory/{memory_id}` | dict | MemoryUpdated | verified | declared by cast |
+| PUT | `/api/memory/{memory_id}/archive` | dict | MemoryArchived | verified | declared by cast |
+| POST | `/api/memory/{memory_id}/correct` | dict | MemoryCorrected | verified | declared by cast |
+| PUT | `/api/memory/{memory_id}/expiry` | dict | MemoryUpdated | verified | declared by cast |
+| GET | `/api/memory/{memory_id}/history` |  | MemoryHistory | verified | declared by cast |
+| PUT | `/api/memory/{memory_id}/pin` | dict | MemoryPinned | verified | declared by cast |
+| DELETE | `/api/memory/{memory_id}/purge` |  | MemoryPurged | verified | declared by cast |
+| GET | `/api/memory/{memory_id}/purge-preview` |  | MemoryPurgePreview | verified | declared by cast |
+| PUT | `/api/memory/{memory_id}/scope` | dict | MemoryScopeChanged | verified | declared by cast |
+| PUT | `/api/memory/{memory_id}/search` | dict | MemoryUpdated | verified | declared by cast |
+| GET | `/api/memory/{memory_id}/source` |  | MemorySource | verified | declared by cast |
 | PUT | `/api/model-advisor` | SetModelAdvisorRequest |  | deferred | body assembled in the route |
 | POST | `/api/model-conversion` | ModelConversionRequestBody |  | deferred | body assembled in the route |
 | POST | `/api/model-conversion/preview` | ModelConversionRequestBody |  | deferred | body assembled in the route |

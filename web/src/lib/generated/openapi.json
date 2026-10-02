@@ -752,6 +752,267 @@
         "title": "BootstrapStatusView",
         "type": "object"
       },
+      "BrainEdgeView": {
+        "properties": {
+          "evidence_memory_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Memory Id"
+          },
+          "is_active": {
+            "default": false,
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "owner_can_reject": {
+            "default": false,
+            "title": "Owner Can Reject",
+            "type": "boolean"
+          },
+          "relationship": {
+            "title": "Relationship",
+            "type": "string"
+          },
+          "relationship_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Relationship Id"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target",
+          "relationship"
+        ],
+        "title": "BrainEdgeView",
+        "type": "object"
+      },
+      "BrainNodeView": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail"
+          },
+          "is_real": {
+            "default": true,
+            "title": "Is Real",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "node_type": {
+            "title": "Node Type",
+            "type": "string"
+          },
+          "progress_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Progress Percent"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "node_type",
+          "label",
+          "status"
+        ],
+        "title": "BrainNodeView",
+        "type": "object"
+      },
+      "BrainPreferences": {
+        "properties": {
+          "settings": {
+            "additionalProperties": true,
+            "title": "Settings",
+            "type": "object"
+          }
+        },
+        "required": [
+          "settings"
+        ],
+        "title": "BrainPreferences",
+        "type": "object"
+      },
+      "BrainPreferencesSaved": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "title": "Settings",
+            "type": "object"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "settings",
+          "updated_at"
+        ],
+        "title": "BrainPreferencesSaved",
+        "type": "object"
+      },
+      "BrainSourceBrowse": {
+        "description": "One folder inside a root; an empty ``path`` answers with the roots themselves.",
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/BrainSourceChild"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "roots": {
+            "items": {
+              "$ref": "#/components/schemas/BrainSourceRoot"
+            },
+            "title": "Roots",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "parent",
+          "roots",
+          "children",
+          "truncated"
+        ],
+        "title": "BrainSourceBrowse",
+        "type": "object"
+      },
+      "BrainSourceChild": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "folder",
+              "file"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "kind",
+          "size_bytes"
+        ],
+        "title": "BrainSourceChild",
+        "type": "object"
+      },
+      "BrainSourceGranted": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "root_id": {
+            "title": "Root Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "root_id",
+          "path"
+        ],
+        "title": "BrainSourceGranted",
+        "type": "object"
+      },
       "BrainSourceRequest": {
         "additionalProperties": false,
         "description": "One location inside the Knowledge Map's boundary.\n\nEither a scoped source path (``<root_id>/<relative>``) for the source\nendpoints, or an absolute folder path for the grant endpoint.",
@@ -765,6 +1026,190 @@
           "path"
         ],
         "title": "BrainSourceRequest",
+        "type": "object"
+      },
+      "BrainSourceResult": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "path"
+        ],
+        "title": "BrainSourceResult",
+        "type": "object"
+      },
+      "BrainSourceReview": {
+        "description": "What adding a source would read, before anything is read (NEW-MAP-03).",
+        "properties": {
+          "examples": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Examples",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "folder",
+              "file"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "review_cap": {
+            "title": "Review Cap",
+            "type": "integer"
+          },
+          "supported_files": {
+            "title": "Supported Files",
+            "type": "integer"
+          },
+          "total_bytes": {
+            "title": "Total Bytes",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "truncated_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Truncated Reason"
+          },
+          "unsupported_files": {
+            "title": "Unsupported Files",
+            "type": "integer"
+          },
+          "visited_entries": {
+            "title": "Visited Entries",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "path",
+          "kind",
+          "supported_files",
+          "unsupported_files",
+          "total_bytes",
+          "examples",
+          "warnings",
+          "review_cap",
+          "visited_entries",
+          "truncated",
+          "truncated_reason"
+        ],
+        "title": "BrainSourceReview",
+        "type": "object"
+      },
+      "BrainSourceRevoked": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "root_id": {
+            "title": "Root Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "root_id"
+        ],
+        "title": "BrainSourceRevoked",
+        "type": "object"
+      },
+      "BrainSourceRoot": {
+        "description": "A place the Knowledge Map may look. ``path`` only for a folder the owner granted.",
+        "properties": {
+          "browsable": {
+            "title": "Browsable",
+            "type": "boolean"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "raiker",
+              "granted",
+              "database"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "root_id": {
+            "title": "Root Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "root_id",
+          "label",
+          "detail",
+          "kind",
+          "browsable",
+          "path"
+        ],
+        "title": "BrainSourceRoot",
+        "type": "object"
+      },
+      "BrainSourceRoots": {
+        "properties": {
+          "roots": {
+            "items": {
+              "$ref": "#/components/schemas/BrainSourceRoot"
+            },
+            "title": "Roots",
+            "type": "array"
+          }
+        },
+        "required": [
+          "roots"
+        ],
+        "title": "BrainSourceRoots",
         "type": "object"
       },
       "BrainSourceUploadRequest": {
@@ -790,6 +1235,69 @@
           "store_copy"
         ],
         "title": "BrainSourceUploadRequest",
+        "type": "object"
+      },
+      "BrainSourceUploaded": {
+        "description": "A file copied into the workspace, with the owner's permission to keep the copy.",
+        "properties": {
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "stored_copy": {
+            "title": "Stored Copy",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "path",
+          "stored_copy",
+          "byte_size"
+        ],
+        "title": "BrainSourceUploaded",
+        "type": "object"
+      },
+      "BrainView": {
+        "properties": {
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/BrainEdgeView"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "illustrative_motion_notice": {
+            "default": "Animated pulses indicate visual activity only; every node and connection is stored runtime data.",
+            "title": "Illustrative Motion Notice",
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/BrainNodeView"
+            },
+            "title": "Nodes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "generated_at",
+          "nodes",
+          "edges"
+        ],
+        "title": "BrainView",
         "type": "object"
       },
       "BreachCheckRequest": {
@@ -2306,6 +2814,24 @@
         "title": "ConversationCompaction",
         "type": "object"
       },
+      "ConversationIndexRebuilt": {
+        "properties": {
+          "indexed_rows": {
+            "title": "Indexed Rows",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "indexed_rows"
+        ],
+        "title": "ConversationIndexRebuilt",
+        "type": "object"
+      },
       "CreateMcpServerRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2794,6 +3320,98 @@
           "token"
         ],
         "title": "ElevatedTokenView",
+        "type": "object"
+      },
+      "EmbeddingBackendSet": {
+        "properties": {
+          "embedding_backend": {
+            "title": "Embedding Backend",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "embedding_backend"
+        ],
+        "title": "EmbeddingBackendSet",
+        "type": "object"
+      },
+      "EmbeddingIndexBuilt": {
+        "description": "One governed embedding run (MEM-10), as the executor reported it.",
+        "properties": {
+          "content_redacted": {
+            "title": "Content Redacted",
+            "type": "boolean"
+          },
+          "embedding_model": {
+            "title": "Embedding Model",
+            "type": "string"
+          },
+          "indexed_count": {
+            "title": "Indexed Count",
+            "type": "integer"
+          },
+          "indexed_file_chunk_count": {
+            "title": "Indexed File Chunk Count",
+            "type": "integer"
+          },
+          "local_only": {
+            "title": "Local Only",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "operation": {
+            "const": "index_memories",
+            "title": "Operation",
+            "type": "string"
+          },
+          "provider_backed": {
+            "title": "Provider Backed",
+            "type": "boolean"
+          },
+          "provider_models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Provider Models",
+            "type": "array"
+          },
+          "skipped": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Skipped",
+            "type": "array"
+          },
+          "skipped_count": {
+            "title": "Skipped Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "operation",
+          "embedding_model",
+          "provider_models",
+          "indexed_count",
+          "indexed_file_chunk_count",
+          "skipped_count",
+          "skipped",
+          "provider_backed",
+          "local_only",
+          "content_redacted"
+        ],
+        "title": "EmbeddingIndexBuilt",
         "type": "object"
       },
       "EmbeddingProviderView": {
@@ -3325,6 +3943,29 @@
         "title": "GenerateImageRequest",
         "type": "object"
       },
+      "GistDiscarded": {
+        "properties": {
+          "discarded": {
+            "title": "Discarded",
+            "type": "boolean"
+          },
+          "gist_id": {
+            "title": "Gist Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "gist_id",
+          "discarded"
+        ],
+        "title": "GistDiscarded",
+        "type": "object"
+      },
       "GitGrantRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3667,6 +4308,24 @@
         "title": "InboundChannelMessage",
         "type": "object"
       },
+      "IncognitoSet": {
+        "properties": {
+          "incognito": {
+            "title": "Incognito",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "incognito"
+        ],
+        "title": "IncognitoSet",
+        "type": "object"
+      },
       "InstanceCreateRequest": {
         "additionalProperties": false,
         "description": "Name and optional first account for a locally isolated Raiker instance.",
@@ -3800,6 +4459,113 @@
           "csrf_token"
         ],
         "title": "IssuedSessionView",
+        "type": "object"
+      },
+      "KnowledgeSource": {
+        "description": "One thing Raiker may read: a file it holds, or a folder the owner granted (BUG-305).",
+        "properties": {
+          "added_at": {
+            "title": "Added At",
+            "type": "string"
+          },
+          "graph": {
+            "title": "Graph",
+            "type": "boolean"
+          },
+          "held": {
+            "title": "Held",
+            "type": "boolean"
+          },
+          "index_state": {
+            "title": "Index State",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "managed_file",
+              "granted_folder"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "location": {
+            "title": "Location",
+            "type": "string"
+          },
+          "recall": {
+            "title": "Recall",
+            "type": "boolean"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "kind",
+          "label",
+          "location",
+          "scope",
+          "held",
+          "index_state",
+          "recall",
+          "graph",
+          "added_at"
+        ],
+        "title": "KnowledgeSource",
+        "type": "object"
+      },
+      "KnowledgeSourceRevoked": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "source_id"
+        ],
+        "title": "KnowledgeSourceRevoked",
+        "type": "object"
+      },
+      "KnowledgeSources": {
+        "properties": {
+          "granted_count": {
+            "title": "Granted Count",
+            "type": "integer"
+          },
+          "held_count": {
+            "title": "Held Count",
+            "type": "integer"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sources",
+          "held_count",
+          "granted_count"
+        ],
+        "title": "KnowledgeSources",
         "type": "object"
       },
       "LanguageCheckRequest": {
@@ -4514,6 +5280,29 @@
         "title": "McpToolDeclaration",
         "type": "object"
       },
+      "MemoryArchived": {
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "memory_id",
+          "archived"
+        ],
+        "title": "MemoryArchived",
+        "type": "object"
+      },
       "MemoryControlView": {
         "description": "User-facing view of one approved memory entry.\n\nCarries the governance metadata the user needs to trust, scope, and\ncontrol the memory: provenance, sensitivity, confidence, retention, and\nan organizing pin flag. The text is the stored memory text (the same\ndata the governed memory store already persists); no new authority is\ngranted by exposing it through this read.",
         "properties": {
@@ -4708,6 +5497,579 @@
         "title": "MemoryControlView",
         "type": "object"
       },
+      "MemoryCorrected": {
+        "properties": {
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "supersedes_memory_id": {
+            "title": "Supersedes Memory Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "memory_id",
+          "supersedes_memory_id"
+        ],
+        "title": "MemoryCorrected",
+        "type": "object"
+      },
+      "MemoryExport": {
+        "properties": {
+          "memories": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryControlView"
+            },
+            "title": "Memories",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "memories"
+        ],
+        "title": "MemoryExport",
+        "type": "object"
+      },
+      "MemoryForgotten": {
+        "properties": {
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "memory_id"
+        ],
+        "title": "MemoryForgotten",
+        "type": "object"
+      },
+      "MemoryHistory": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryHistoryEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "memory_id",
+          "events"
+        ],
+        "title": "MemoryHistory",
+        "type": "object"
+      },
+      "MemoryHistoryEvent": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_id": {
+            "title": "Actor Id",
+            "type": "string"
+          },
+          "audit_id": {
+            "title": "Audit Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          }
+        },
+        "required": [
+          "audit_id",
+          "action",
+          "actor_id",
+          "created_at",
+          "details"
+        ],
+        "title": "MemoryHistoryEvent",
+        "type": "object"
+      },
+      "MemoryImportDuplicate": {
+        "description": "A record that is already stored, or that the file holds twice (``memory_id`` empty).",
+        "properties": {
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "text",
+          "scope",
+          "memory_id"
+        ],
+        "title": "MemoryImportDuplicate",
+        "type": "object"
+      },
+      "MemoryImportPreview": {
+        "description": "What an import would change, before it changes anything (BUG-244).",
+        "properties": {
+          "duplicate_count": {
+            "title": "Duplicate Count",
+            "type": "integer"
+          },
+          "duplicates": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryImportDuplicate"
+            },
+            "title": "Duplicates",
+            "type": "array"
+          },
+          "new_count": {
+            "title": "New Count",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "total",
+          "new_count",
+          "duplicate_count",
+          "duplicates"
+        ],
+        "title": "MemoryImportPreview",
+        "type": "object"
+      },
+      "MemoryImportResult": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "imported": {
+            "title": "Imported",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "relationship_proposals": {
+            "title": "Relationship Proposals",
+            "type": "integer"
+          },
+          "reviewed": {
+            "title": "Reviewed",
+            "type": "integer"
+          },
+          "skipped_duplicates": {
+            "title": "Skipped Duplicates",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "count",
+          "reviewed",
+          "imported",
+          "skipped_duplicates",
+          "relationship_proposals"
+        ],
+        "title": "MemoryImportResult",
+        "type": "object"
+      },
+      "MemoryIntegrity": {
+        "description": "How far each projection of approved memory has drifted from it; nothing is repaired.",
+        "properties": {
+          "active_memory_count": {
+            "title": "Active Memory Count",
+            "type": "integer"
+          },
+          "checksum_mismatch_count": {
+            "title": "Checksum Mismatch Count",
+            "type": "integer"
+          },
+          "clean": {
+            "title": "Clean",
+            "type": "boolean"
+          },
+          "conversation_index_count": {
+            "title": "Conversation Index Count",
+            "type": "integer"
+          },
+          "failed_purge_location_count": {
+            "title": "Failed Purge Location Count",
+            "type": "integer"
+          },
+          "fts_count": {
+            "title": "Fts Count",
+            "type": "integer"
+          },
+          "index_engine_mismatch_count": {
+            "title": "Index Engine Mismatch Count",
+            "type": "integer"
+          },
+          "missing_markdown_count": {
+            "title": "Missing Markdown Count",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "orphaned_markdown_count": {
+            "title": "Orphaned Markdown Count",
+            "type": "integer"
+          },
+          "project_path_inconsistency_count": {
+            "title": "Project Path Inconsistency Count",
+            "type": "integer"
+          },
+          "stale_conversation_index_count": {
+            "title": "Stale Conversation Index Count",
+            "type": "integer"
+          },
+          "stale_fts_count": {
+            "title": "Stale Fts Count",
+            "type": "integer"
+          },
+          "stale_graph_edge_count": {
+            "title": "Stale Graph Edge Count",
+            "type": "integer"
+          },
+          "stale_projection_count": {
+            "title": "Stale Projection Count",
+            "type": "integer"
+          },
+          "text_search_engine": {
+            "title": "Text Search Engine",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "clean",
+          "active_memory_count",
+          "fts_count",
+          "stale_fts_count",
+          "missing_markdown_count",
+          "stale_projection_count",
+          "stale_graph_edge_count",
+          "checksum_mismatch_count",
+          "orphaned_markdown_count",
+          "failed_purge_location_count",
+          "project_path_inconsistency_count",
+          "text_search_engine",
+          "index_engine_mismatch_count",
+          "conversation_index_count",
+          "stale_conversation_index_count"
+        ],
+        "title": "MemoryIntegrity",
+        "type": "object"
+      },
+      "MemoryPinned": {
+        "properties": {
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pinned": {
+            "title": "Pinned",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "memory_id",
+          "pinned"
+        ],
+        "title": "MemoryPinned",
+        "type": "object"
+      },
+      "MemoryProposal": {
+        "description": "A sentence the runtime proposed remembering, waiting on the owner.",
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "memory_type": {
+            "title": "Memory Type",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "sensitivity": {
+            "title": "Sensitivity",
+            "type": "string"
+          },
+          "source_event_id": {
+            "title": "Source Event Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "candidate_id",
+          "source_event_id",
+          "memory_type",
+          "scope",
+          "text",
+          "sensitivity",
+          "confidence",
+          "decision",
+          "created_at"
+        ],
+        "title": "MemoryProposal",
+        "type": "object"
+      },
+      "MemoryPurgePreview": {
+        "description": "What a purge removes, and the id the owner must send back to confirm it.",
+        "properties": {
+          "artifacts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "backup_disposition": {
+            "title": "Backup Disposition",
+            "type": "string"
+          },
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "requires_confirmation": {
+            "title": "Requires Confirmation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "memory_id",
+          "artifacts",
+          "backup_disposition",
+          "requires_confirmation"
+        ],
+        "title": "MemoryPurgePreview",
+        "type": "object"
+      },
+      "MemoryPurged": {
+        "properties": {
+          "backup_disposition": {
+            "title": "Backup Disposition",
+            "type": "string"
+          },
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "purged": {
+            "title": "Purged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "memory_id",
+          "purged",
+          "backup_disposition"
+        ],
+        "title": "MemoryPurged",
+        "type": "object"
+      },
+      "MemoryReconciled": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "projection_rows_reconciled": {
+            "title": "Projection Rows Reconciled",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "projection_rows_reconciled"
+        ],
+        "title": "MemoryReconciled",
+        "type": "object"
+      },
+      "MemoryRelationshipProposal": {
+        "description": "A relationship read out of an approved memory, waiting on the owner.",
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "decision": {
+            "const": "needs_user_review",
+            "title": "Decision",
+            "type": "string"
+          },
+          "evidence_memory_id": {
+            "title": "Evidence Memory Id",
+            "type": "string"
+          },
+          "evidence_text": {
+            "title": "Evidence Text",
+            "type": "string"
+          },
+          "extractor_version": {
+            "title": "Extractor Version",
+            "type": "string"
+          },
+          "object_name": {
+            "title": "Object Name",
+            "type": "string"
+          },
+          "object_type": {
+            "title": "Object Type",
+            "type": "string"
+          },
+          "predicate": {
+            "title": "Predicate",
+            "type": "string"
+          },
+          "subject_name": {
+            "title": "Subject Name",
+            "type": "string"
+          },
+          "subject_type": {
+            "title": "Subject Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "candidate_id",
+          "subject_name",
+          "subject_type",
+          "predicate",
+          "object_name",
+          "object_type",
+          "evidence_memory_id",
+          "evidence_text",
+          "confidence",
+          "extractor_version",
+          "decision",
+          "created_at"
+        ],
+        "title": "MemoryRelationshipProposal",
+        "type": "object"
+      },
+      "MemoryScopeChanged": {
+        "properties": {
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "memory_id",
+          "scope",
+          "updated_at"
+        ],
+        "title": "MemoryScopeChanged",
+        "type": "object"
+      },
       "MemorySettingsView": {
         "properties": {
           "embedding_backend": {
@@ -4772,6 +6134,139 @@
           "incognito"
         ],
         "title": "MemorySettingsView",
+        "type": "object"
+      },
+      "MemorySource": {
+        "description": "The passage a memory was drawn from, or the stated reason it cannot be opened (BUG-27).",
+        "properties": {
+          "anchors": {
+            "items": {
+              "$ref": "#/components/schemas/SourceAnchorView"
+            },
+            "title": "Anchors",
+            "type": "array"
+          },
+          "attachment_id": {
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "excerpt": {
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "highlight_length": {
+            "title": "Highlight Length",
+            "type": "integer"
+          },
+          "highlight_start": {
+            "title": "Highlight Start",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "resolution_method": {
+            "enum": [
+              "stored_coordinates",
+              "matching_text",
+              "answer_quote",
+              "recorded_passage",
+              "whole_source",
+              ""
+            ],
+            "title": "Resolution Method",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "resolved",
+              "no_provenance",
+              "source_deleted",
+              "source_changed",
+              "unsupported_source",
+              "not_authorized"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "kind",
+          "title",
+          "excerpt",
+          "highlight_start",
+          "highlight_length",
+          "session_id",
+          "turn_id",
+          "attachment_id",
+          "truncated",
+          "resolution_method",
+          "ok",
+          "memory_id"
+        ],
+        "title": "MemorySource",
+        "type": "object"
+      },
+      "MemoryUpdated": {
+        "description": "An edit, a search switch or an expiry, and the state the memory is in now.",
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "search_enabled": {
+            "title": "Search Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "memory_id",
+          "search_enabled",
+          "expires_at"
+        ],
+        "title": "MemoryUpdated",
         "type": "object"
       },
       "MfaCodeRequest": {
@@ -5314,6 +6809,188 @@
           "created_at"
         ],
         "title": "NotificationView",
+        "type": "object"
+      },
+      "ObservationView": {
+        "description": "MEM-04 — one eidetic observation, as the owner reads it.\n\nEverything here is metadata *about* material the runtime saw. There is no\nfield carrying the material itself, and that is deliberate rather than\nincidental: the point of an observation is that it makes recall possible\nwithout making a second ungoverned copy of everything the agent has read.",
+        "properties": {
+          "artifact_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Ref"
+          },
+          "capture_status": {
+            "title": "Capture Status",
+            "type": "string"
+          },
+          "content_bytes": {
+            "title": "Content Bytes",
+            "type": "integer"
+          },
+          "content_sha256": {
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "gist_id": {
+            "default": "",
+            "title": "Gist Id",
+            "type": "string"
+          },
+          "gist_status": {
+            "default": "",
+            "title": "Gist Status",
+            "type": "string"
+          },
+          "gist_summary": {
+            "default": "",
+            "title": "Gist Summary",
+            "type": "string"
+          },
+          "observation_id": {
+            "title": "Observation Id",
+            "type": "string"
+          },
+          "promotable_to_memory": {
+            "title": "Promotable To Memory",
+            "type": "boolean"
+          },
+          "retention": {
+            "title": "Retention",
+            "type": "string"
+          },
+          "sensitivity": {
+            "title": "Sensitivity",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "skip_reason": {
+            "title": "Skip Reason",
+            "type": "string"
+          },
+          "source_event_id": {
+            "title": "Source Event Id",
+            "type": "string"
+          },
+          "source_type": {
+            "title": "Source Type",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "observation_id",
+          "session_id",
+          "turn_id",
+          "tool_name",
+          "source_type",
+          "summary",
+          "sensitivity",
+          "retention",
+          "capture_status",
+          "skip_reason",
+          "promotable_to_memory",
+          "content_sha256",
+          "content_bytes",
+          "artifact_ref",
+          "source_event_id",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "ObservationView",
+        "type": "object"
+      },
+      "ObservationsDeleted": {
+        "properties": {
+          "deleted_observation_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Deleted Observation Ids",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "deleted_observation_ids"
+        ],
+        "title": "ObservationsDeleted",
+        "type": "object"
+      },
+      "ObservationsView": {
+        "description": "What the runtime captured while it worked, with the counts an empty list cannot give.",
+        "properties": {
+          "captured": {
+            "title": "Captured",
+            "type": "integer"
+          },
+          "due_for_expiry": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Due For Expiry",
+            "type": "array"
+          },
+          "gists_pending": {
+            "title": "Gists Pending",
+            "type": "integer"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/ObservationView"
+            },
+            "title": "Observations",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "observations",
+          "captured",
+          "skipped",
+          "gists_pending",
+          "due_for_expiry"
+        ],
+        "title": "ObservationsView",
         "type": "object"
       },
       "Ok": {
@@ -6611,6 +8288,38 @@
         "title": "PromptRequest",
         "type": "object"
       },
+      "ProposalDecided": {
+        "description": "A decision on a proposal; an approval names the memory it became.",
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "relationship_proposals": {
+            "title": "Relationship Proposals",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "candidate_id",
+          "decision"
+        ],
+        "title": "ProposalDecided",
+        "type": "object"
+      },
       "ProviderHealthView": {
         "properties": {
           "detail": {
@@ -6737,6 +8446,97 @@
           "password"
         ],
         "title": "RegisterRequest",
+        "type": "object"
+      },
+      "RelationshipDecided": {
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "relationship_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship Id"
+          }
+        },
+        "required": [
+          "ok",
+          "candidate_id",
+          "decision",
+          "relationship_id"
+        ],
+        "title": "RelationshipDecided",
+        "type": "object"
+      },
+      "RelationshipRejected": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "relationship_id": {
+            "title": "Relationship Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "relationship_id",
+          "active"
+        ],
+        "title": "RelationshipRejected",
+        "type": "object"
+      },
+      "RelationshipScan": {
+        "properties": {
+          "already_present": {
+            "title": "Already Present",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "proposed": {
+            "title": "Proposed",
+            "type": "integer"
+          },
+          "scanned": {
+            "title": "Scanned",
+            "type": "integer"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "scanned",
+          "proposed",
+          "skipped",
+          "already_present"
+        ],
+        "title": "RelationshipScan",
         "type": "object"
       },
       "RenameMcpServerRequest": {
@@ -10857,9 +12657,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Brain Api Brain Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BrainView"
                 }
               }
             },
@@ -10877,9 +12675,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Brain Preferences Api Brain Settings Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BrainPreferences"
                 }
               }
             },
@@ -10907,9 +12703,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Save Brain Preferences Api Brain Settings Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BrainPreferencesSaved"
                 }
               }
             },
@@ -10948,9 +12742,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Remove Brain Source Api Brain Sources Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BrainSourceResult"
                 }
               }
             },
@@ -10987,9 +12779,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Add Brain Source Api Brain Sources Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BrainSourceResult"
                 }
               }
             },
@@ -11030,9 +12820,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Browse Brain Sources Api Brain Sources Browse Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BrainSourceBrowse"
                 }
               }
             },
@@ -11071,9 +12859,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Revoke Brain Source Folder Api Brain Sources Grants Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BrainSourceRevoked"
                 }
               }
             },
@@ -11110,9 +12896,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Grant Brain Source Folder Api Brain Sources Grants Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BrainSourceGranted"
                 }
               }
             },
@@ -11150,9 +12934,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Review Brain Source Api Brain Sources Review Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BrainSourceReview"
                 }
               }
             },
@@ -11180,9 +12962,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Brain Source Roots Api Brain Sources Roots Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BrainSourceRoots"
                 }
               }
             },
@@ -11211,9 +12991,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Upload Brain Source File Api Brain Sources Upload Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/BrainSourceUploaded"
                 }
               }
             },
@@ -14999,9 +16777,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Revoke Knowledge Source Api Knowledge Sources Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/KnowledgeSourceRevoked"
                 }
               }
             },
@@ -15028,9 +16804,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Knowledge Sources Api Knowledge Sources Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/KnowledgeSources"
                 }
               }
             },
@@ -15787,9 +17561,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Rebuild Conversation Index Api Memory Conversation Index Rebuild Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConversationIndexRebuilt"
                 }
               }
             },
@@ -15819,9 +17591,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Cleanup Expired Observations Api Memory Eidetic Cleanup Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ObservationsDeleted"
                 }
               }
             },
@@ -15862,9 +17632,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Memory Embedding Backend Api Memory Embedding Backend Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/EmbeddingBackendSet"
                 }
               }
             },
@@ -15905,9 +17673,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Build Memory Embedding Index Api Memory Embedding Index Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/EmbeddingIndexBuilt"
                 }
               }
             },
@@ -15936,10 +17702,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/MemoryRelationshipProposal"
                   },
-                  "title": "Response List Memory Relationship Proposals Api Memory Entity Proposals Get",
                   "type": "array"
                 }
               }
@@ -15958,9 +17722,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Scan Memory Relationships Api Memory Entity Proposals Scan Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RelationshipScan"
                 }
               }
             },
@@ -16001,9 +17763,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Decide Memory Relationship Proposal Api Memory Entity Proposals  Candidate Id  Decision Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RelationshipDecided"
                 }
               }
             },
@@ -16054,9 +17814,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Reject Memory Relationship Api Memory Entity Relationships  Relationship Id  Reject Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RelationshipRejected"
                 }
               }
             },
@@ -16084,9 +17842,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Export Memories Api Memory Export Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryExport"
                 }
               }
             },
@@ -16171,9 +17927,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Discard Gist Api Memory Gists  Gist Id  Discard Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/GistDiscarded"
                 }
               }
             },
@@ -16213,9 +17967,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Import Memories Api Memory Import Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryImportResult"
                 }
               }
             },
@@ -16256,9 +18008,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Preview Memory Import Api Memory Import Preview Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryImportPreview"
                 }
               }
             },
@@ -16299,9 +18049,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Memory Incognito Api Memory Incognito Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/IncognitoSet"
                 }
               }
             },
@@ -16330,9 +18078,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Memory Integrity Api Memory Integrity Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryIntegrity"
                 }
               }
             },
@@ -16351,9 +18097,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Observations Api Memory Observations Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ObservationsView"
                 }
               }
             },
@@ -16383,9 +18127,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Delete Observations Api Memory Observations Delete Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ObservationsDeleted"
                 }
               }
             },
@@ -16414,10 +18156,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/MemoryProposal"
                   },
-                  "title": "Response List Memory Proposals Api Memory Proposals Get",
                   "type": "array"
                 }
               }
@@ -16459,9 +18199,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Decide Memory Proposal Api Memory Proposals  Candidate Id  Decision Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProposalDecided"
                 }
               }
             },
@@ -16490,9 +18228,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Reconcile Memory Indexes Api Memory Reconcile Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryReconciled"
                 }
               }
             },
@@ -16511,10 +18247,8 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/MemoryRelationshipProposal"
                   },
-                  "title": "Response List Memory Relationship Proposals Api Memory Relationship Proposals Get",
                   "type": "array"
                 }
               }
@@ -16533,9 +18267,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Scan Memory Relationships Api Memory Relationship Proposals Scan Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RelationshipScan"
                 }
               }
             },
@@ -16576,9 +18308,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Decide Memory Relationship Proposal Api Memory Relationship Proposals  Candidate Id  Decision Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RelationshipDecided"
                 }
               }
             },
@@ -16636,9 +18366,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Forget Memory Api Memory  Memory Id  Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryForgotten"
                 }
               }
             },
@@ -16687,9 +18415,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Edit Memory Api Memory  Memory Id  Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryUpdated"
                 }
               }
             },
@@ -16740,9 +18466,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Memory Archived Api Memory  Memory Id  Archive Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryArchived"
                 }
               }
             },
@@ -16793,9 +18517,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Correct Memory Api Memory  Memory Id  Correct Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryCorrected"
                 }
               }
             },
@@ -16846,9 +18568,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Memory Expiry Api Memory  Memory Id  Expiry Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryUpdated"
                 }
               }
             },
@@ -16887,9 +18607,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Memory History Api Memory  Memory Id  History Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryHistory"
                 }
               }
             },
@@ -16941,9 +18659,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Memory Pinned Api Memory  Memory Id  Pin Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryPinned"
                 }
               }
             },
@@ -16998,9 +18714,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Purge Memory Api Memory  Memory Id  Purge Delete",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryPurged"
                 }
               }
             },
@@ -17039,9 +18753,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Preview Memory Purge Api Memory  Memory Id  Purge Preview Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryPurgePreview"
                 }
               }
             },
@@ -17092,9 +18804,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Change Memory Scope Api Memory  Memory Id  Scope Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryScopeChanged"
                 }
               }
             },
@@ -17145,9 +18855,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Set Memory Search Enabled Api Memory  Memory Id  Search Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemoryUpdated"
                 }
               }
             },
@@ -17187,9 +18895,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Memory Source Api Memory  Memory Id  Source Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MemorySource"
                 }
               }
             },

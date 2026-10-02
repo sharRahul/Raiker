@@ -46,6 +46,7 @@ import tempfile
 import textwrap
 import types
 import typing
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -70,6 +71,53 @@ INVENTORY_MD = REPO_ROOT / "docs" / "architecture" / "API_CONTRACT_INVENTORY.md"
 #: this set is where the evidence for each claim is recorded.
 VERIFIED: frozenset[tuple[str, str]] = frozenset(
     {
+        ("DELETE", "/api/brain/sources"),
+        ("DELETE", "/api/brain/sources/grants"),
+        ("DELETE", "/api/knowledge-sources"),
+        ("DELETE", "/api/memory/{memory_id}"),
+        ("DELETE", "/api/memory/{memory_id}/purge"),
+        ("GET", "/api/brain"),
+        ("GET", "/api/brain/settings"),
+        ("GET", "/api/brain/sources/browse"),
+        ("GET", "/api/brain/sources/roots"),
+        ("GET", "/api/knowledge-sources"),
+        ("GET", "/api/memory/entity-proposals"),
+        ("GET", "/api/memory/export"),
+        ("GET", "/api/memory/integrity"),
+        ("GET", "/api/memory/observations"),
+        ("GET", "/api/memory/proposals"),
+        ("GET", "/api/memory/relationship-proposals"),
+        ("GET", "/api/memory/{memory_id}/history"),
+        ("GET", "/api/memory/{memory_id}/purge-preview"),
+        ("GET", "/api/memory/{memory_id}/source"),
+        ("POST", "/api/brain/sources"),
+        ("POST", "/api/brain/sources/grants"),
+        ("POST", "/api/brain/sources/review"),
+        ("POST", "/api/brain/sources/upload"),
+        ("POST", "/api/memory/conversation-index/rebuild"),
+        ("POST", "/api/memory/eidetic/cleanup"),
+        ("POST", "/api/memory/embedding-index"),
+        ("POST", "/api/memory/entity-proposals/scan"),
+        ("POST", "/api/memory/entity-proposals/{candidate_id}/decision"),
+        ("POST", "/api/memory/entity-relationships/{relationship_id}/reject"),
+        ("POST", "/api/memory/gists/{gist_id}/discard"),
+        ("POST", "/api/memory/import"),
+        ("POST", "/api/memory/import/preview"),
+        ("POST", "/api/memory/observations/delete"),
+        ("POST", "/api/memory/proposals/{candidate_id}/decision"),
+        ("POST", "/api/memory/reconcile"),
+        ("POST", "/api/memory/relationship-proposals/scan"),
+        ("POST", "/api/memory/relationship-proposals/{candidate_id}/decision"),
+        ("POST", "/api/memory/{memory_id}/correct"),
+        ("PUT", "/api/brain/settings"),
+        ("PUT", "/api/memory/embedding-backend"),
+        ("PUT", "/api/memory/incognito"),
+        ("PUT", "/api/memory/{memory_id}"),
+        ("PUT", "/api/memory/{memory_id}/archive"),
+        ("PUT", "/api/memory/{memory_id}/expiry"),
+        ("PUT", "/api/memory/{memory_id}/pin"),
+        ("PUT", "/api/memory/{memory_id}/scope"),
+        ("PUT", "/api/memory/{memory_id}/search"),
         ("DELETE", "/api/managed-files/{file_id}"),
         ("DELETE", "/api/projects/{project_id}"),
         ("DELETE", "/api/projects/{project_id}/root"),
@@ -659,6 +707,9 @@ def render_typescript(document: dict[str, Any], app: FastAPI) -> str:
         "export const contract = {"
     )
     used: set[str] = set()
+    shared = Counter(
+        (item.method, item.name) for item in contracts(app) if item.status == "verified"
+    )
     for item in contracts(app):
         if item.status != "verified":
             continue
@@ -683,6 +734,10 @@ def render_typescript(document: dict[str, Any], app: FastAPI) -> str:
             target = f"withQuery({target}, query)"
             used.add("withQuery")
         key = _camel(item.name)
+        if shared[(item.method, item.name)] > 1:
+            # One handler serving two paths (an alias): each wrapper is named by
+            # its own path, so neither shadows the other.
+            key = _camel(item.method.lower() + "_" + re.sub(r"[{}]", "", item.path.removeprefix("/api/")))
         body = operation.get("requestBody", {}).get("content", {}).get("application/json", {})
         if body:
             args.append(f"body: {_ts(body.get('schema', {}))}")

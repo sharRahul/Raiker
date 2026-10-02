@@ -824,7 +824,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     await waitFor(() =>
       expect(screen.getByText("Model fallback sequence")).toBeTruthy(),
     );
-    const list = screen.getByRole("list");
+    const list = await screen.findByRole("list");
     expect(list.textContent).toContain("Anthropic");
     expect(list.textContent).toContain("GGUF");
     expect(list.textContent).not.toContain("anthropic-hosted");
@@ -1437,7 +1437,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     const select = screen.getByLabelText(
       "Advisor model profile",
     ) as HTMLSelectElement;
-    expect(select.value).toBe("anthropic-hosted");
+    await waitFor(() => expect(select.value).toBe("anthropic-hosted"));
     await fireEvent.change(select, { target: { value: "" } });
     await fireEvent.click(screen.getByText("Save advisor"));
 

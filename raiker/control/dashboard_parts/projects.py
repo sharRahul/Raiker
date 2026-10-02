@@ -552,7 +552,7 @@ class ProjectService:
             path=str(row.get("path", "/")),
             is_archived=bool(row.get("is_archived", 0)),
             archived_at=row.get("archived_at"),
-            root_kind=str(row.get("root_kind") or "managed"),
+            root_kind="attached" if row.get("root_kind") == "attached" else "managed",
             root_label=str(row.get("root_label") or "") or _default_root_label(row),
             last_activity_at=row.get("last_activity_at") or None,
         )

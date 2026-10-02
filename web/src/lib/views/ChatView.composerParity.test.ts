@@ -57,6 +57,7 @@ const projects = {
       archived_at: null,
       root_kind: "managed" as const,
       root_label: "composer",
+      last_activity_at: null,
     },
   ],
 };

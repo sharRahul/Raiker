@@ -95,6 +95,7 @@ pub fn probe(workspace: &Path) -> Value {
         .output();
     let _ = std::fs::remove_file(&masked);
     let _ = std::fs::remove_dir_all(&scratch);
+    selftest::remove_probe_writes(&test);
     let Ok(output) = output else {
         return unavailable("native_sandbox_launch_failed");
     };

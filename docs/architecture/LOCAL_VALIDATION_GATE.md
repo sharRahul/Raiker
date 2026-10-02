@@ -31,6 +31,14 @@ npx --prefix web playwright install --with-deps chromium
 npm --prefix web run test:e2e:mocked
 ```
 
+When a route, a request model or a read-model view changes, regenerate the API
+contract — the OpenAPI document, its TypeScript and the route inventory;
+`pytest` fails while they are stale:
+
+```powershell
+python -m scripts.api_contract
+```
+
 The mocked end-to-end suite runs against the build above and answers every API
 call from a fixture, so it needs no credential and no network. CI runs it too.
 The `live` suite is separate and deliberately not automated: it drives a running

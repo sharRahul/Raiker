@@ -34,6 +34,7 @@ function project(partial: Partial<ProjectView>): ProjectView {
     archived_at: null,
     root_kind: "managed",
     root_label: "alpha",
+    last_activity_at: null,
     ...partial,
   };
 }

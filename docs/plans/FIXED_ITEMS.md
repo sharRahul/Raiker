@@ -684,6 +684,13 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-660](#fixed-660--every-composer-said-no-model-is-set-up-for-the-first-second-after-a-load) | Low | Web UI / models | Fixed 2026-10-01 — found running the live specs for OPT-16 |
 | [FIXED-661](#fixed-661--an-approval-card-covered-send-until-its-next-measurement) | Medium | Web UI / approvals | Fixed 2026-10-01 — found by this run's live round |
 | [FIXED-662](#fixed-662--a-finished-command-run-still-held-its-supervisor-key-for-a-moment) | Low | Execution / commands | Fixed 2026-10-01 — found by this run's full suite |
+| [FIXED-663](#fixed-663--on-windows-a-registry-read-could-say-there-were-no-instances) | Medium | Instances / Windows | Fixed 2026-10-01 — the rest of BUG-310 |
+| [FIXED-664](#fixed-664--the-openapi-document-described-no-routes-response) | Low | API contract | Fixed 2026-10-01 — OPT-01 Stage A |
+| [FIXED-665](#fixed-665--the-clients-wrappers-were-all-hand-written-and-nothing-checked-the-paths-they-called) | Low | Web client | Fixed 2026-10-01 — OPT-02 Stage A |
+| [FIXED-666](#fixed-666--the-sandbox-probe-left-a-file-in-the-owners-workspace) | Medium | Execution / native sandbox | Fixed 2026-10-01 — found by the live round |
+| [FIXED-667](#fixed-667--choosing-chat-at-the-end-of-setup-opened-home) | Medium | First run / navigation | Fixed 2026-10-01 — found by the live round |
+| [FIXED-668](#fixed-668--chat-after-setup-opened-on-the-model-setup-had-just-replaced) | Medium | First run / Chat | Fixed 2026-10-01 — found by the live round |
+| [FIXED-669](#fixed-669--a-stale-cookie-cost-a-401-on-the-lock-screen) | Low | Web shell / sign-in | Fixed 2026-10-01 — found by the live round |
 
 ---
 
@@ -27958,3 +27965,168 @@ answers with an honest `lost` receipt.
 
 **Evidence.** The test, run twelve times concurrently, passes every time; the
 command and supervisor suites.
+
+---
+
+## FIXED-663 — On Windows a registry read could say there were no instances
+
+**Severity: Medium. Area: Instances / Windows. Status: Fixed 2026-10-01 — the
+part of [BUG-310](TO_BE_FIXED.md#bug-310--seven-python-tests-fail-on-windows-and-nowhere-else)
+that [FIXED-654](#fixed-654--seven-python-tests-failed-on-windows-and-nowhere-else) left: `test_the_registry_is_published_atomically`
+still failed on every run on a Windows host.**
+
+**Root cause.** Two. FIXED-654 retried the registry's *replace*; for a moment
+around each replace Windows also refuses *opening* the name, and
+`_stored_instance_names` read that refusal as no registry — the GCR-09 failure
+by another door. Separately, `ntpath.realpath` keeps the `\\?\` prefix while a
+directory on the path is being created by another thread, and
+`internal_io_path` read that answer as a UNC share and built
+`\\?\UNC\?\C:\…`.
+
+**Fixed.** The registry's reader waits out the same sharing refusal its writer
+does, and the test reads through it. `internal_io_path` accepts a `resolve()`
+that already answered in extended form.
+
+**Evidence.** `tests/test_instance_runtime_lifecycle.py` passing 28 consecutive
+runs on Windows; `test_a_resolve_that_answers_in_extended_form_is_not_read_as_unc`,
+failing against the previous code; live, a second instance created from the lock
+screen ([the round](LIVE_TEST_ROUNDS.md#2026-10-01-second--the-contract-is-derived-where-it-is-verified-and-setup-ends-where-it-was-asked)).
+
+---
+
+## FIXED-664 — The OpenAPI document described no route's response
+
+**Severity: Low. Area: API contract. Status: Fixed 2026-10-01 — Stage A of OPT-01
+under the [scope decision](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#scope-decision--opt-01-and-opt-02-2026-10-01).
+OPT-01 stays partial until Stage B.**
+
+**Observed.** Every route annotates `-> dict[str, Any]`, so the OpenAPI
+document named no response field and the web client kept its own copy of each.
+Deriving the copies found a field the client read and the backend no longer
+sends (`image_model`).
+
+**Fixed.** `scripts/api_contract.py`:
+
+* **inventories all 350 `/api/` operations** —
+  [`docs/architecture/API_CONTRACT_INVENTORY.md`](../architecture/API_CONTRACT_INVENTORY.md):
+  17 verified, 13 eligible, 312 deferred, 8 special;
+* **attaches a view to the OpenAPI document only for a verified route** — one
+  whose handler returns a fields-only view and whose real response
+  `tests/test_api_contract_responses.py` matched to it key for key and type for
+  type on a seeded workspace. It is documentation, not `response_model`: the
+  route's runtime serialisation does not change;
+* **exports the document and generates TypeScript** for its schemas and request
+  models into `web/src/lib/generated/` — deterministic, committed, and failing
+  `tests/test_api_contract_generation.py` when stale.
+
+Nineteen hand-written mirrors are aliases of the generated types.
+`ProjectView.root_kind` is a `Literal`. `TaskView` and `McpServer` keep their
+hand-written types, which are more precise than their Python fields — the
+decision forbids trading a precise type for a looser generated one.
+
+**Still open (Stage B).** The 312 deferred operations need dedicated response
+models before OpenAPI can describe them; the 13 eligible ones need a contract
+case each.
+
+---
+
+## FIXED-665 — The client's wrappers were all hand-written, and nothing checked the paths they called
+
+**Severity: Low. Area: Web client. Status: Fixed 2026-10-01 — Stage A of OPT-02
+under the [scope decision](CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#scope-decision--opt-01-and-opt-02-2026-10-01).**
+
+**Fixed.** The generated module carries a typed wrapper for each verified
+operation, with its query parameters, on the shared transport core; twelve
+catalogue entries delegate to them. The transport itself left the catalogue:
+`api/core.ts` holds the token, the CSRF echo, the instance prefix and the one
+path a failed response takes to an `ApiError` (`request` and `requestBlob` had
+a copy each), `api/auth.ts` sign-in and session restore, `api/streaming.ts` the
+turn streams; `api.ts` re-exports them, so no caller changed.
+`tests/test_web_api_routes.py` holds every path the client builds — template
+parts and `+` concatenation followed — to a route in the OpenAPI document.
+
+**Evidence.** The route test (about 290 client paths, all served); the web
+job's 1,963 unit tests, three of which had passed only on microtask order and
+now wait for their condition; live, every destination with no 4xx or 5xx.
+
+---
+
+## FIXED-666 — The sandbox probe left a file in the owner's workspace
+
+**Severity: Medium. Area: Execution / native sandbox. Status: Fixed 2026-10-01 —
+found by the live round.**
+
+**Observed.** On a reset workspace the first real turn listed
+`.raiker-probe-inside.tmp` beside `.raiker`, and the model described it as part
+of the owner's folder.
+
+**Root cause.** The probe's child writes a marker inside the boundary and
+deletes it; under the Windows restricted token the write is allowed and the
+delete refused, and the child ignored the refusal.
+
+**Fixed.** The runner, outside the boundary, removes what the probe wrote — the
+inside marker and any file an escaping write left — on Windows and POSIX alike.
+
+**Evidence.** `the_parent_removes_what_the_probe_wrote_in_the_workspace`; live,
+`raiker-command-runner --probe` reporting every observation `enforced` and the
+round's turn answering *I found only the `.raiker` directory*.
+
+---
+
+## FIXED-667 — Choosing Chat at the end of setup opened Home
+
+**Severity: Medium. Area: First run / navigation. Status: Fixed 2026-10-01 —
+found by the live round.**
+
+**Observed.** Setup's Ready step, **Chat** → the Work Dashboard, at `#/chat`.
+
+**Root cause.** The tile linked `#/chat`, which is not a route; an unknown route
+falls back to Home and says nothing.
+
+**Fixed.** The tile opens `#/new-chat`, and `nav.test.ts` reads every component
+and module for a hard-coded `#/route` and fails on one that resolves to no
+destination or alias.
+
+**Evidence.** The guard fails against the previous code, naming
+`ModelSetupView.svelte: #/chat`; live, Ready → **Chat** opening the composer.
+
+---
+
+## FIXED-668 — Chat after setup opened on the model setup had just replaced
+
+**Severity: Medium. Area: First run / Chat. Status: Fixed 2026-10-01 — found by
+the live round.**
+
+**Observed.** Setup, choosing `gpt-oss:20b-cloud`, then Ready → Chat: the
+composer offered **Gemma 4:31B Cloud** and *No readiness check exists for this
+exact model*, with Send disabled. A reload showed the right model.
+
+**Root cause.** Setup refreshed its own rows after the choice and its first
+check, but not the shared store every composer reads.
+
+**Fixed.** Setup mirrors its snapshot into the shared store, as Models already
+did. The dead `image_model` read and field are gone; the backend sends only
+`image_models`.
+
+**Evidence.** `ModelSetupView.test.ts` — the store holds setup's snapshot after
+a choice, failing against the previous code; live, Ready → Chat on
+**GPT oss:20B Cloud** with no readiness warning.
+
+---
+
+## FIXED-669 — A stale cookie cost a 401 on the lock screen
+
+**Severity: Low. Area: Web shell / sign-in. Status: Fixed 2026-10-01 — found by
+the live round.**
+
+**Observed.** On a reset workspace, the first load logged `401` for
+`/api/models` on the lock screen.
+
+**Root cause.** A readable CSRF cookie left by an earlier workspace on the same
+host reads as a session until the boot probe answers, and the background
+readiness check started at mount, before that answer.
+
+**Fixed.** The check starts when the shell is ready and stops when it locks.
+
+**Evidence.** `App.test.ts` — *asks nothing of a stale cookie but whether it
+still signs anyone in*, failing against the previous code.

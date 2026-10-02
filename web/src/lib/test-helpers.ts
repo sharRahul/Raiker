@@ -100,6 +100,17 @@ export function makeGate(partial: Partial<CapabilityGate>): CapabilityGate {
     blocked_reason_code: null,
     readiness: {},
     decision_mode: "ask",
+    requires_threat_model_ack: false,
+    requires_human_confirmation: false,
+    threat_model_ack_recorded: false,
+    gate_reality: "own_gate",
+    governance_note: "",
+    unset_resolution: "off",
+    enforced_enabled: false,
+    side_effect: "",
+    ungoverned_consequence: "",
+    authority_requirement: "",
+    network_boundary: "",
     ...partial,
   };
 }

@@ -47,6 +47,18 @@ def test_extended_and_unc_paths_are_idempotent(source: str, expected_display: st
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows path namespaces")
+def test_a_resolve_that_answers_in_extended_form_is_not_read_as_unc(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """BUG-310 — `realpath` keeps `\\\\?\\` while a directory on the path is
+    being created elsewhere; that answer was prefixed again as a UNC share."""
+    plain = tmp_path / ".raiker" / "instances" / "alex"
+    extended = Path("\\\\?\\" + str(plain))
+    monkeypatch.setattr(Path, "resolve", lambda self, strict=False: extended)
+    assert internal_io_path(plain) == extended
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows path namespaces")
 @pytest.mark.parametrize(
     "source",
     [

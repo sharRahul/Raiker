@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 import { SETTINGS_SECTIONS } from "./settingsSections";
 import {
@@ -342,5 +343,30 @@ describe("projectFromHash", () => {
 
   it("does not change which route the hash selects", () => {
     expect(routeFromHash("#/projects?project=proj_abc123")).toBe("projects");
+  });
+});
+
+describe("hard-coded destinations", () => {
+  // Setup's Ready step sent **Chat** to `#/chat`, which is not a route; an
+  // unknown route falls back to Home, so the owner who chose Chat landed on the
+  // dashboard and nothing said why. Every `#/route` literal in a component or a
+  // module must name a destination — or an alias for one — rather than fall
+  // through to the default.
+  const sources = import.meta.glob(["../**/*.svelte", "../**/*.ts", "!../**/*.test.ts"], {
+    query: "?raw",
+    import: "default",
+    eager: true,
+  }) as Record<string, string>;
+
+  it("every #/route the client links to is a real destination", () => {
+    const unknown: string[] = [];
+    for (const [file, text] of Object.entries(sources)) {
+      for (const match of text.matchAll(/["'`]#\/([a-z][a-z-]*)/g)) {
+        const route = match[1];
+        if (route === DEFAULT_ROUTE) continue;
+        if (routeFromHash(`#/${route}`) === DEFAULT_ROUTE) unknown.push(`${file}: #/${route}`);
+      }
+    }
+    expect(unknown).toEqual([]);
   });
 });

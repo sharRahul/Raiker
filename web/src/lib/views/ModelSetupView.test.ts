@@ -1,9 +1,13 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { allProfiles, resetModels } from "../models.svelte";
 import { stubFetch } from "../test-helpers";
 import ModelSetupView from "./ModelSetupView.svelte";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  resetModels();
+});
 
 const required = {
   owner_principal_id: "principal_owner",
@@ -250,6 +254,9 @@ describe("first-run setup", () => {
         ),
       ).toBe(true),
     );
+    // …and the composer's shared store holds what setup now knows, so Ready →
+    // Chat opens on the chosen, checked model rather than the earlier default.
+    await waitFor(() => expect(allProfiles().length).toBeGreaterThan(0));
   });
 
   // BUG-274 — an identity-linked key authenticates and then acts inside one

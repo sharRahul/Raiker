@@ -1,4 +1,25 @@
 import type { ApprovalMode } from "./approvalMode";
+import type {
+  ApprovalView,
+  CapabilityGateView,
+  CheckpointView,
+  CodeReposView,
+  CodeRepoView,
+  ConnectionsView,
+  ConnectorView,
+  ExtensionsOverviewView,
+  ExtensionView,
+  IdentityView,
+  McpSessionView,
+  MemoryControlView,
+  ProjectsListView,
+  ProjectView,
+  RuntimeModeView,
+  RuntimeReadinessView,
+  WorkThreadFacet,
+  WorkThreadPage,
+  WorkThreadView,
+} from "./generated/apiContract";
 
 // Response shapes from the governed read API (see raiker/control/dashboard.py and
 // raiker/control/dtos.py). These mirror the backend DTOs; the backend remains the source of truth.
@@ -61,74 +82,15 @@ export interface EnvironmentContext {
   timezone_error?: string;
 }
 
-export interface CapabilityGate {
-  capability: string;
-  phase: number;
-  state: string;
-  default_state: string;
-  source: string;
-  runtime_enabled: boolean;
-  allowed_transitions: string[];
-  can_current_principal_change: boolean;
-  blocked_reason_code: string | null;
-  readiness: Record<string, boolean>;
-  // Per-capability decision mode for AI-proposed actions (ask|allow|auto|deny).
-  decision_mode: string;
-  // Activation preconditions the enable step-up dialog must collect, driven by
-  // the backend's real requirements (not a hardcoded client list). Optional so
-  // older payloads / test fixtures without them remain valid.
-  requires_threat_model_ack?: boolean;
-  requires_human_confirmation?: boolean;
-  threat_model_ack_recorded?: boolean;
-  // GEP-04 — what this gate actually decides. "own_gate" means the switch
-  // governs the capability; "governed_elsewhere" means the work happens under a
-  // different named control; "no_path" means nothing in the product reaches the
-  // executor. Optional so older payloads and fixtures stay valid, and absent is
-  // read as "own_gate".
-  gate_reality?: "own_gate" | "governed_elsewhere" | "no_path";
-  // The sentence naming what really governs the work, for anything that is not
-  // "own_gate". Empty otherwise.
-  governance_note?: string;
-  // BUG-239 — how the *enforcing* path reads a gate table with nothing
-  // persisted in it, and what it would therefore answer right now. On a fresh
-  // account these disagree with `state` for `web_fetch`: nothing is stored, the
-  // per-principal reading is fail-closed, and the tool would nevertheless
-  // fetch. Optional so older payloads and fixtures stay valid.
-  unset_resolution?: "off" | "shipped_default" | "shipped_default_unscoped";
-  enforced_enabled?: boolean;
-  // BUG-293 — how far the side effect reaches, what it would cost if it ran
-  // without the owner, and what stands in the way. Read from the runtime's
-  // `CAPABILITY_AUTHORITY` table, which is asserted complete against the set of
-  // capabilities that have a real executor — so a switch on this page either
-  // answers both questions or governs something that cannot run. Empty for the
-  // latter, and optional so older payloads and fixtures stay valid.
-  side_effect?: "" | "read" | "reversible" | "external" | "destructive" | "critical";
-  ungoverned_consequence?: string;
-  authority_requirement?: string;
-  // BUG-308 — for a capability that runs code, where that code runs on this
-  // machine: inside the native sandbox, or with the host's network. Measured by
-  // the backend's sandbox probe; empty for capabilities that run no code.
-  network_boundary?: string;
-}
+export type CapabilityGate = CapabilityGateView;
 
 export interface ComposerApprovalModeSettings {
   approval_mode: ApprovalMode;
 }
 
-export interface RuntimeMode {
-  mode_name: string;
-  status: string;
-  activated_by: string;
-  activated_at: string;
-  reason: string;
-  allowed_modes: string[];
-}
+export type RuntimeMode = RuntimeModeView;
 
-export interface RuntimeReadiness {
-  mode: RuntimeMode;
-  gates: CapabilityGate[];
-  summary: Record<string, unknown>;
-}
+export type RuntimeReadiness = RuntimeReadinessView;
 
 // GET /api/mcp/servers — one owner-scoped local stdio or remote HTTP MCP profile
 // (see raiker/control/dashboard.py::McpServerView). `command` is argv for a
@@ -292,20 +254,7 @@ export interface SkillMutationResult {
   skill?: SkillView;
 }
 
-export interface McpSession {
-  session_row_id: string;
-  server_id: string;
-  transport: string;
-  operation: string;
-  hosts: string[];
-  tool_calls: number;
-  bytes_in: number;
-  bytes_out: number;
-  error_count: number;
-  outcome: string;
-  started_at: string;
-  ended_at: string | null;
-}
+export type McpSession = McpSessionView;
 
 export interface McpFinding {
   finding_id: string;
@@ -819,9 +768,6 @@ export interface ModelProfile {
   profile_id: string;
   provider: string;
   model: string;
-  /** The image model this provider answers with, when it has a governed image
-   *  endpoint. Absent means the Design surface does not offer this profile. */
-  image_model?: string | null;
   /** Image models this provider declares, default first. Empty for most. */
   image_models?: string[];
   default_state: string;
@@ -1165,25 +1111,9 @@ export interface ProviderWeeklyUsageView {
 /** Read-only status of one governed service connector (web-app task 4). Every
  * field derives from stored/config state — the view never reaches the network
  * and never exposes a credential value (only whether one is set). */
-export interface ConnectorView {
-  connector_id: string;
-  display_name: string;
-  capability: string;
-  gate_state: string;
-  capability_enabled: boolean;
-  decision_mode: string;
-  credential_env: string;
-  credential_configured: boolean;
-  egress_host: string;
-  egress_allowed: boolean;
-  actions: string[];
-  kind: string;
-}
+export type { ConnectorView };
 
-export interface ConnectionsView {
-  connectors: ConnectorView[];
-  connector_egress_allowlist_configured: boolean;
-}
+export type { ConnectionsView };
 
 export interface StoreConnector {
   connector_id: string;
@@ -1255,26 +1185,7 @@ export interface CodexSubscriptionStatus {
 
 /** A project is an organizing scope (workspace-contained subpath + its
  * sessions/checkpoints), never an authority — selecting one grants nothing. */
-export interface ProjectView {
-  project_id: string;
-  name: string;
-  root_subpath: string;
-  created_at: string;
-  session_count: number;
-  selected: boolean;
-  parent_id: string | null;
-  path: string;
-  is_archived: boolean;
-  archived_at: string | null;
-  /** Which kind of root, and what to call it. On the list rather than fetched
-   *  per card, because the delete confirmation must say whether a folder
-   *  survives before the owner opens anything. */
-  root_kind: "managed" | "attached";
-  root_label: string;
-  /** UX-PROJ-09 — the newest update among this project's sessions, or null
-   *  when nothing has run in it. "Recently active" is this, never a selection. */
-  last_activity_at?: string | null;
-}
+export type { ProjectView };
 
 /** UX-PROJ-04 — a file shared with every chat in a project, as a person names it. */
 export interface ProjectAttachment {
@@ -1306,10 +1217,7 @@ export interface ProjectDeletionPreview {
   requires_step_up: boolean;
 }
 
-export interface ProjectsList {
-  projects: ProjectView[];
-  active_project_id: string | null;
-}
+export type ProjectsList = ProjectsListView;
 
 /**
  * One repository the Build workspace can point a coding chat at. A reference
@@ -1317,29 +1225,9 @@ export interface ProjectsList {
  * is a workspace-contained subpath; a `github` repository is an `owner/repo`
  * coordinate read through the brokered `github_read` tool.
  */
-export interface CodeRepo {
-  repo_id: string;
-  kind: "local" | "github";
-  label: string;
-  selected: boolean;
-  created_at: string;
-  local_subpath: string | null;
-  local_exists: boolean;
-  github_owner: string | null;
-  github_repo: string | null;
-  branch: string | null;
-}
+export type CodeRepo = CodeRepoView;
 
-export interface CodeReposView {
-  repos: CodeRepo[];
-  selected_repo_id: string | null;
-  // What the connector_github_runtime gate currently permits, so the page can
-  // say whether a connected GitHub repository is actually readable.
-  github_gate_state: string;
-  github_decision_mode: string;
-  github_token_configured: boolean;
-  note: string;
-}
+export type { CodeReposView };
 
 // B9 — the repository code map's own state. Counts and governance only: this
 // shape deliberately carries no path and no symbol, so the status call cannot
@@ -1423,18 +1311,7 @@ export interface EventEntry {
   reminder_at: string | null;
 }
 
-export interface Checkpoint {
-  checkpoint_id: string;
-  session_id: string;
-  turn_id: string | null;
-  task_id: string | null;
-  checkpoint_type: string;
-  created_at: string;
-  summary: string | null;
-  last_event_id: string | null;
-  can_restore_state: boolean;
-  can_restore_files: boolean;
-}
+export type Checkpoint = CheckpointView;
 
 /**
  * What branching a conversation from one checkpoint would seed (GAP-CHAT C14).
@@ -1589,41 +1466,9 @@ export interface AuditExportResult {
  * is a conclusion, never a claim the browser makes on its own; `blocked_reason`
  * names the first unmet condition.
  */
-export interface ExtensionView {
-  extension_id: string;
-  kind: string;
-  display_name: string;
-  category: string;
-  installed: boolean;
-  connected: boolean;
-  enabled: boolean;
-  usable: boolean;
-  blocked_reason: string | null;
-  detail: string;
-  capability: string | null;
-  gate_state: string | null;
-  decision_mode: string | null;
-  egress_host: string | null;
-  egress_allowed: boolean | null;
-  transport: string | null;
-  monitor_state: string | null;
-  tool_count: number;
-  last_activity_at?: string | null;
-}
+export type { ExtensionView };
 
-export interface ExtensionsOverview {
-  extensions: ExtensionView[];
-  counts: {
-    total: number;
-    installed: number;
-    connected: number;
-    enabled: number;
-    usable: number;
-  };
-  vault_configured: boolean;
-  connector_egress_allowlist_configured: boolean;
-  deferred: Array<{ kind: string; status: string; detail: string }>;
-}
+export type ExtensionsOverview = ExtensionsOverviewView;
 
 export interface ProjectFile {
   workspace_path: string;
@@ -1690,64 +1535,11 @@ export interface DiagnosticsExport {
  * each facet's own filter lifted, so every choice stays reachable from every
  * page rather than only those in the rows a browser happened to receive.
  */
-export interface WorkThreadFacet {
-  value: string;
-  label: string;
-  count: number;
-}
+export type { WorkThreadFacet };
 
-export interface WorkThreadPage {
-  threads: WorkThread[];
-  /** Opaque, and bound to the owner and these filters. */
-  next_cursor: string | null;
-  /** How many threads matched the filters, within the scan bound. */
-  total: number;
-  projects: WorkThreadFacet[];
-  kinds: WorkThreadFacet[];
-  /**
-   * BUG-303 — how many threads each archive scope holds. Both come back in
-   * either scope, so archiving a thread from Threads leaves somewhere visible
-   * to get it back from; a control whose effect cannot be undone on the surface
-   * that applied it is worse than one that has not moved.
-   */
-  archived_count: number;
-  active_count: number;
-  /** True when the index considered its most recent rows rather than all of them. */
-  scan_truncated: boolean;
-}
+export type { WorkThreadPage };
 
-export interface WorkThread {
-  session_id: string;
-  title: string;
-  /** "chat" — the owner started it. "routine" — a task is advancing it. */
-  kind: "chat" | "routine";
-  updated_at: string;
-  turn_count: number;
-  /**
-   * REM-THREAD-03 — which surface owns this work: "chat", "build" or "design".
-   * It decides where the row resumes, because a Build conversation opened in
-   * Chat loses its repository, its diffs and the approvals over them.
-   */
-  origin?: string;
-  project_id: string | null;
-  project_name: string | null;
-  task_id?: string | null;
-  task_status?: string | null;
-  cadence?: string | null;
-  next_run_at?: string | null;
-  /** A blocker the runtime is actually holding, or null. Never a guess. */
-  waiting_on?: string | null;
-  /**
-   * BUG-303 — the conversation library's state, on the thread. A pin puts the
-   * thread first; archiving takes it out of the default scope without
-   * deleting anything; tags are organizing labels that grant nothing. All three
-   * are false/empty on a routine thread, which belongs to its task rather than
-   * to the owner's library.
-   */
-  pinned: boolean;
-  archived: boolean;
-  tags: string[];
-}
+export type WorkThread = WorkThreadView;
 
 export interface SessionSummary {
   session_id: string;
@@ -1847,44 +1639,9 @@ export interface AuthSession {
 }
 
 // Raiker/control/dashboard.py ApprovalView.to_dict()
-export interface IdentityView {
-  principal_id: string;
-  principal_type: string;
-  display_name: string;
-  subject: string | null;
-  turn_id: string | null;
-  key_id: string | null;
-  issued_at: string | null;
-  expires_at: string | null;
-  state: string;
-}
+export type { IdentityView };
 
-export interface ApprovalView {
-  approval_id: string;
-  action_id: string;
-  status: string;
-  tool_name: string;
-  capability: string;
-  risk_level: string;
-  session_id: string;
-  turn_id: string | null;
-  created_at: string;
-  age_seconds: number | null;
-  requires_approval: boolean;
-  expires_at: string | null;
-  is_expired: boolean; // server-calculated snapshot; resolution re-checks the TTL
-  executes_action: boolean; // true only for an approved, single-use connector write intent
-  critical: boolean; // server-supplied: needs elevated, human-only lifecycle
-  resolved_by: string | null;
-  proposed_by?: IdentityView;
-  approved_by?: IdentityView | null;
-  machine_identity?: IdentityView | null;
-  // ADD-02 — where this decision sits in the batch of tool calls its turn
-  // proposed. 1 / 1 for an ordinary approval; 2 / 3 means two more decisions are
-  // queued behind this one on the same turn.
-  queue_position: number;
-  queue_total: number;
-}
+export type { ApprovalView };
 
 // Raiker/control/dashboard.py ApprovalDetailView.to_dict()
 export interface ApprovalDetailView {
@@ -2501,32 +2258,7 @@ export interface MemoryImportResult {
   relationship_proposals: number;
 }
 
-export interface MemoryControlView {
-  memory_id: string;
-  text: string;
-  scope: string;
-  sensitivity: string;
-  memory_type: string;
-  created_at: string;
-  tags: string[];
-  source: string;
-  provenance: Record<string, unknown>;
-  confidence: number;
-  trust_score: number;
-  retention: string;
-  approval_state: string;
-  pinned: boolean;
-  search_enabled: boolean;
-  expires_at: string | null;
-  updated_at: string | null;
-  /**
-   * REM-MEM-02 — the most recent `recall` lifecycle event: when this record was
-   * last put into a model's context. It is **not** evidence that the model
-   * relied on it, quoted it, or read it at all; nothing records that. Present
-   * it as inclusion, never as use.
-   */
-  last_used_at: string | null;
-}
+export type { MemoryControlView };
 
 export interface MemoryProposal {
   candidate_id: string;

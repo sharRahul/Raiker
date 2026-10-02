@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dtos import ControlResult
+from raiker.control.views.execution import ExecutionEnvironmentsView, ExecutionEnvironmentView
 from raiker.control.views.models import _DISABLED_STATES
 from raiker.execution.profiles import (
     CONTAINER_PROFILE_TOOLS,
@@ -37,7 +38,9 @@ if TYPE_CHECKING:
 
 class ExecutionService:
 
-    def execution_environments(self: DashboardService, owner_principal_id: str) -> dict[str, Any]:
+    def execution_environments(
+        self: DashboardService, owner_principal_id: str
+    ) -> ExecutionEnvironmentsView:
         """List selectable execution targets without exposing credential values."""
         selected = self.store.selected_execution_environment(owner_principal_id)
         allowed_images = sorted(container_image_allowlist())
@@ -318,7 +321,7 @@ class ExecutionService:
             selected = "local_native"
         return {
             "selected_profile_id": selected,
-            "environments": environments,
+            "environments": cast(list[ExecutionEnvironmentView], environments),
             "container_options": {
                 "runtimes": ["docker", "podman"],
                 "images": allowed_images,

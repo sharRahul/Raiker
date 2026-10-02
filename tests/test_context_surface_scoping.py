@@ -289,3 +289,26 @@ def test_streaming_prompt_enforces_the_same_boundary(
 
     assert response.status_code == 422
     assert response.json()["detail"]["reason_code"] == "build_requires_project"
+
+
+def test_prompt_api_accepts_every_surface_the_runtime_has(
+    client: TestClient, headers: dict[str, str], offline_default_model: None
+) -> None:
+    """Design's Research asks through this route with `surface: "design"`.
+
+    The runtime has always known three surfaces; the request model knew two, so
+    every Research question was refused with a validation error before it reached
+    the turn. Each surface the contract names must be one the route accepts.
+    """
+    from typing import get_args, get_type_hints
+
+    from raiker.api.schemas import PromptRequest
+    from raiker.contracts.models import PROMPT_SURFACES
+
+    assert set(get_args(get_type_hints(PromptRequest)["surface"])) == PROMPT_SURFACES
+
+    response = client.post(
+        "/api/prompts", json={"text": "research bridges", "surface": "design"}, headers=headers
+    )
+
+    assert response.status_code == 200, response.text

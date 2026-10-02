@@ -1,7 +1,8 @@
-import type { ApprovalMode } from "./approvalMode";
 import type {
   AgentPlan,
   AgentPlanStep,
+  AgentResponse,
+  ApprovalInfo,
   ApprovalResolved,
   ApprovalView,
   AttachmentPreview,
@@ -9,6 +10,8 @@ import type {
   AuditExportView,
   BackgroundWorkerHealth,
   BlocklistProbe,
+  BrainEdgeView,
+  BrainNodeView,
   BrainSourceBrowse,
   BrainSourceResult,
   BrainSourceReview,
@@ -17,9 +20,11 @@ import type {
   CapabilityContainmentView,
   CapabilityDecisionMode,
   CapabilityGateView,
+  CatalogueRefreshed,
   ChannelEnvRequirement,
   ChannelProfile,
   ChannelsView,
+  ChannelUpdate,
   CheckpointCaptureHealth,
   CheckpointView,
   CodeMapStatus,
@@ -34,6 +39,7 @@ import type {
   CommandChunkView,
   CommandReceiptView,
   CommandRunView,
+  ComposerApprovalMode,
   ConformanceFindingView,
   ConnectionsView,
   ConnectorStoreView,
@@ -50,16 +56,22 @@ import type {
   CredentialLifecycleView,
   CriticalApprovalResolved,
   Diagnostic,
+  DiagnosticsExport,
   DiagnosticsView,
   EmbeddingProviderView,
   EmbeddingSpaceView,
   EnvironmentContextView,
   EventView,
+  ExecutionEnvironmentsView,
+  ExecutionEnvironmentView,
   ExtensionsOverviewView,
   ExtensionView,
   FileProvenanceEntryView,
   GitCredentialGrant,
   GitCredentialStatus,
+  GuideIndex,
+  GuideSection,
+  GuideSectionSummary,
   HfDownloadPreview,
   HfSearchResult,
   HfVariant,
@@ -69,18 +81,27 @@ import type {
   HookRuleView,
   HookSourceView,
   HooksView,
+  HostActionResult,
+  HostPathEntry,
+  HostPathListing,
+  HostView,
+  HostWaitingWork,
   HuggingFaceDownloadResult,
   IdentityView,
   ImageGallery,
   ImageGeneration,
   ImportedFile,
   ImportRefused,
+  InstallationView,
   InstalledPlugin,
   InstalledSkill,
   InstallPlan,
+  InstanceCreated,
+  InterruptResult,
   IssuedSessionView,
   KnowledgeSource,
   KnowledgeSources,
+  LimitWindow,
   LocalModelView,
   ManagedFile,
   ManagedFileImport,
@@ -114,7 +135,9 @@ import type {
   NativeUsageMetricView,
   NotificationView,
   ObservationsView,
+  ObservationView,
   OwnerQuestionAnswered,
+  PartialFiles,
   PasswordRecoveryBeginView,
   PathAttachment,
   PluginContributionKind,
@@ -141,6 +164,8 @@ import type {
   ProviderWeeklyUsage,
   ReadCapabilities,
   RecalledMemory,
+  RecoveryPointView,
+  ReleaseTargetView,
   RestorePlan,
   RestorePlanFile,
   RestoreRequested,
@@ -150,6 +175,7 @@ import type {
   RuntimeReadinessView,
   SecurityFindingView,
   SecurityHealthView,
+  ServiceRegistration,
   SessionAttachment,
   SessionAttachments,
   SessionDetail,
@@ -164,8 +190,12 @@ import type {
   SpeechRuntime,
   SpeechRuntimeView,
   StandingGrantView,
+  StopAllResult,
   StoreConnector,
+  SubscriptionLimitsView,
+  TaskAttemptView,
   TaskDetailView,
+  TaskEventView,
   TaskView,
   TelemetryDestinationView,
   ToolReadinessView,
@@ -177,7 +207,11 @@ import type {
   TurnSources,
   TurnSourceView,
   TurnView,
+  UpdateChannelView,
+  UpdateCheckResult,
+  UpdateStatusView,
   UploadAttachment,
+  UploadedAttachment,
   WebBlocklist,
   WebBlocklistRule,
   WeeklyUsage,
@@ -188,6 +222,10 @@ import type {
 } from "./generated/apiContract";
 import type { ApprovalDetailView as GeneratedApprovalDetailView } from "./generated/apiContract";
 import type { CodeMapFailure, CodeMapPaths as GeneratedCodeMapPaths } from "./generated/apiContract";
+import type {
+  UpdateApplyResult as GeneratedUpdateApplyResult,
+  UpdateDeferred,
+} from "./generated/apiContract";
 
 // Response shapes from the governed read API (see raiker/control/dashboard.py and
 // raiker/control/dtos.py). These mirror the backend DTOs; the backend remains the source of truth.
@@ -209,9 +247,7 @@ export type EnvironmentContext = EnvironmentContextView;
 
 export type CapabilityGate = CapabilityGateView;
 
-export interface ComposerApprovalModeSettings {
-  approval_mode: ApprovalMode;
-}
+export type ComposerApprovalModeSettings = ComposerApprovalMode;
 
 export type RuntimeMode = RuntimeModeView;
 
@@ -263,21 +299,7 @@ export type { SetupState };
 
 export type ModelOperation = ModelOperationView;
 
-/**
- * What a confirmed "Delete partial files" would remove — named exactly.
- *
- * GCR-19 — `paths` is the deletion set: only the files the operation can prove
- * it created, never the library directory it wrote them into. `path` is the
- * single-target convenience (a download's own snapshot directory) and is null
- * whenever the set has more than one member.
- */
-export interface PartialFiles {
-  path: string | null;
-  paths: string[];
-  exists: boolean;
-  bytes: number;
-  file_count: number;
-}
+export type { PartialFiles };
 
 export type { BackgroundWorkerHealth };
 
@@ -358,20 +380,9 @@ export type NativeUsageMetric = NativeUsageMetricView;
  * Never polled and never inferred: this is what the provider itself said, and a
  * provider that says nothing produces no window at all rather than a zero.
  */
-export interface SubscriptionLimitWindow {
-  label: string;
-  used_percent: number;
-  window_minutes: number | null;
-  resets_at: string | null;
-}
+export type SubscriptionLimitWindow = LimitWindow;
 
-export interface SubscriptionLimits {
-  windows: SubscriptionLimitWindow[];
-  observed_at: string;
-  /** The reading is old enough that it should not be read as current. */
-  stale: boolean;
-  source: "provider_turn";
-}
+export type SubscriptionLimits = SubscriptionLimitsView;
 
 export type { ProviderWeeklyUsage };
 
@@ -390,16 +401,7 @@ export type { ConnectorStoreView };
 
 export type ProviderModelList = ProviderModelListView;
 
-/** Outcome for one provider in an explicit connected-catalogue refresh. */
-export interface ProviderCatalogueRefresh {
-  providers: Array<{
-    profile_id: string;
-    provider: string;
-    status: "available" | "policy_denied" | "unsupported" | "unavailable";
-    reason_code: string | null;
-    model_count: number;
-  }>;
-}
+export type ProviderCatalogueRefresh = CatalogueRefreshed;
 
 export type CodexSubscriptionStatus = CodexStatus;
 
@@ -497,24 +499,7 @@ export type FileProvenanceEntry = FileProvenanceEntryView;
 
 export type { ProjectFilesView };
 
-/** Redacted, copyable support bundle. Shape is intentionally loose: the server
- *  owns which readiness facts it includes, and the UI renders it verbatim. */
-export interface DiagnosticsExport {
-  generated_at: string;
-  scope: string;
-  runtime_mode: string;
-  counts: Record<string, number>;
-  missing_config: string[];
-  disabled_capabilities: string[];
-  gates: Array<{
-    capability: string;
-    state: string;
-    decision_mode: string;
-    runtime_enabled: boolean;
-  }>;
-  note: string;
-  [key: string]: unknown;
-}
+export type { DiagnosticsExport };
 
 /**
  * C18 — one thread of the owner's work, whatever started it.
@@ -576,68 +561,21 @@ export type ResolveApprovalResult = ApprovalResolved;
 
 export type ResolveCriticalApprovalResult = CriticalApprovalResolved;
 
-// Approval proposal carried on an AgentResponse when status === "needs_approval".
-// Mirrors the `approval` dict built in raiker/runtime/orchestrator.py. Nothing has
-// been executed at this point; `expected_effect` states what approving will do.
-export interface ApprovalInfo {
-  action_id: string;
-  tool_name: string;
-  arguments: Record<string, unknown>;
-  risk_level: string;
-  reasons: string[];
-  message: string;
-  expected_effect?: string;
-  approval_id?: string;
-  // True when the turn's working state was parked, so resolving this approval
-  // continues the same turn rather than costing a re-prompt.
-  resumable?: boolean;
-  // ADD-02 — the batch this decision belongs to, and how many of its calls are
-  // still queued behind it.
-  queue_position?: number;
-  queue_total?: number;
-  queued_calls?: number;
-}
+export type { ApprovalInfo };
 
 export type ContentPart = ContentPartView;
 
-export interface AgentResponse {
-  request_id: string;
-  session_id: string;
-  turn_id: string;
-  status: string; // queued|running|completed|failed|denied|needs_approval (see RESPONSE_STATUSES)
-  message: string;
-  events_path?: string | null;
-  checkpoint_path?: string | null;
-  approval?: ApprovalInfo | null;
-  last_event_id?: string | null;
-  // BUG-288 — the answer as declared parts. Empty for every turn that declared
-  // nothing, which is most of them, so a client that ignores it sees what it
-  // always saw. Optional so older payloads and fixtures stay valid.
-  content_parts?: ContentPart[];
-}
+export type { AgentResponse };
 
 // Raiker.contracts.streaming.StreamEvent serialized over SSE (see routes_prompts._sse).
 export type StreamKind =
   "lifecycle" | "text_delta" | "reasoning_delta" | "tool" | "final" | "error";
 
-/** One page of the user guide, as the product lists it (BUG-208 slice A). */
-export interface GuideSectionSummary {
-  slug: string;
-  title: string;
-  summary: string;
-}
+export type { GuideSectionSummary };
 
-/** The sections this install carries. `available` is false when a build shipped none. */
-export interface GuideIndex {
-  available: boolean;
-  sections: GuideSectionSummary[];
-  reason_code: string;
-}
+export type { GuideIndex };
 
-/** One section's Markdown, rendered by the client with the shared component. */
-export interface GuideSection extends GuideSectionSummary {
-  markdown: string;
-}
+export type { GuideSection };
 
 export interface StreamEvent {
   kind: StreamKind;
@@ -655,49 +593,13 @@ export interface StreamEvent {
 
 export type { TaskView };
 
-// Raiker/tasks/history.py TaskEventView.to_dict() — one recorded transition.
-export interface TaskEventView {
-  event_id: string;
-  event_type: string;
-  timestamp: string;
-  actor: string;
-  /** What the runtime stated, never a bare code and never an empty row. */
-  detail: string;
-  /** The governed turn this belongs to, when it had one. */
-  turn_id: string | null;
-  session_id: string | null;
-}
+export type { TaskEventView };
 
-// Raiker/tasks/history.py TaskAttemptView.to_dict() — one run of a task.
-export interface TaskAttemptView {
-  /** 1-based across runs and continuations; 0 for a segment that is not a run. */
-  index: number;
-  /** "run", "continuation" or "record". */
-  kind: string;
-  started_at: string;
-  ended_at: string | null;
-  /**
-   * "completed" | "failed" | "waiting_for_approval" | "cancelled" |
-   * "waiting_for_children" | "in_progress" | "recorded".
-   */
-  outcome: string;
-  summary: string;
-  /** The decision this attempt waited on, when the runtime recorded which. */
-  approval_id: string | null;
-  events: TaskEventView[];
-}
+export type { TaskAttemptView };
 
 export type { TaskDetailView };
 
-// POST /api/interrupts response (raiker/api/routes_prompts.py).
-export interface InterruptResult {
-  applied: { task_id: string; result: string }[];
-  safe_boundary: boolean;
-  // B17/C13 — what the same request did to the *turn* streaming in this
-  // conversation, which is not one of the tasks in `applied`. Null when the
-  // request named a specific task, or when the action reaches tasks only.
-  turn_control?: { action: "stop" | "steer"; queued: number } | null;
-}
+export type { InterruptResult };
 
 // One prompt attachment: a workspace path, or an image/document previously
 // uploaded through POST /api/attachments (referenced by id; the bytes stay
@@ -743,17 +645,7 @@ export type { HookActivityView };
 
 export type { HooksView };
 
-// POST /api/attachments response (raiker/api/routes_attachments.py) —
-// metadata only; the stored bytes are never echoed back.
-export interface UploadedAttachment {
-  ok: boolean;
-  attachment_id: string;
-  kind: string;
-  filename: string;
-  media_type: string;
-  byte_size: number;
-  sha256: string;
-}
+export type { UploadedAttachment };
 
 export type { AttachmentPreview };
 
@@ -778,13 +670,7 @@ export type SessionAttachmentsView = SessionAttachments;
 
 export type { WorkInFlight };
 
-export interface StopAllResult {
-  tasks: { task_id: string; result: string }[];
-  turns: { session_id: string; turn_id: string }[];
-  commands: { run_id: string; state: string }[];
-  failed: { kind: string; reason_code: string; run_id?: string }[];
-  safe_boundary: boolean;
-}
+export type { StopAllResult };
 
 export interface InterruptRequestBody {
   session_id: string;
@@ -813,56 +699,13 @@ export type { MemorySettingsView };
 
 export type { EmbeddingProviderView };
 
-// Raiker/control/dashboard.py ObservationView.to_dict(). MEM-04 — metadata
-// about material the runtime saw while it worked. There is no field carrying
-// the material itself, and there is not meant to be one: an observation exists
-// so recall is possible without a second ungoverned copy of everything read.
-export interface ObservationView {
-  observation_id: string;
-  session_id: string;
-  turn_id: string;
-  tool_name: string;
-  source_type: string;
-  summary: string;
-  sensitivity: string;
-  retention: string;
-  capture_status: "captured" | "skipped";
-  skip_reason: string;
-  promotable_to_memory: boolean;
-  content_sha256: string;
-  content_bytes: number;
-  artifact_ref: string | null;
-  source_event_id: string;
-  created_at: string;
-  expires_at: string;
-  gist_status: string;
-  gist_summary: string;
-  gist_id: string;
-}
+export type { ObservationView };
 
 export type { ObservationsView };
 
-// Raiker/control/dashboard.py BrainView.to_dict(). Nodes and edges are stored
-// runtime relationships; the UI may add clearly labelled illustrative motion.
-export interface BrainNode {
-  node_id: string;
-  node_type: string;
-  label: string;
-  status: string;
-  detail: string | null;
-  progress_percent: number | null;
-  is_real: boolean;
-}
+export type BrainNode = BrainNodeView;
 
-export interface BrainEdge {
-  source: string;
-  target: string;
-  relationship: string;
-  is_active: boolean;
-  relationship_id?: string | null;
-  evidence_memory_id?: string | null;
-  owner_can_reject?: boolean;
-}
+export type BrainEdge = BrainEdgeView;
 
 export type { BrainView };
 
@@ -874,79 +717,11 @@ export type { BrainSourceBrowse };
 
 export type { BrainSourceReview };
 
-export interface ExecutionEnvironment {
-  profile_id: string;
-  kind: "local" | "native" | "container" | "ssh" | "daytona";
-  name: string;
-  enabled: boolean;
-  configured: boolean;
-  available: boolean;
-  status: string;
-  selected: boolean;
-  credential_configured: boolean;
-  budget: number | null;
-  cost: {
-    actual_cost: number;
-    provider_cost: number;
-    reserved_cost: number;
-    committed_cost: number;
-    remaining_cost: number | null;
-    reconciliation_status:
-      "not_started" | "reserved" | "reconciled" | "provider_unavailable";
-    history: Array<{
-      event_id: string;
-      action_id: string;
-      event_type:
-        | "reserved"
-        | "reconciled"
-        | "released"
-        | "provider_snapshot"
-        | "provider_unavailable";
-      amount: number;
-      provider_reference: string | null;
-      reason: string | null;
-      recorded_at: string;
-    }>;
-  } | null;
-  config?: Record<string, unknown>;
-  runtime?: "docker" | "podman";
-  image?: string | null;
-  repository_access?: "none" | "read_only";
-  writable_output?: boolean;
-  assigned_tool_count?: number;
-  /**
-   * What this boundary was measured or built to do — `raiker.execution.commands
-   * .models.CommandFeatures`, as a flat map. BUG-194: `persistent_environment`
-   * and `restart_recovery` are what decide whether the reset control and the
-   * "survives a restart" line appear, and both come from the backend rather
-   * than from configuration.
-   */
-  features?: Record<string, boolean>;
-  availability_reason?: string | null;
-  /** The boundary this host was measured to build, not the one it was configured with. */
-  boundary?: string;
-  /**
-   * Per-observation verdicts from the readiness probe. `indeterminate` means the
-   * control arm failed, so the observation proves nothing and must never be
-   * rendered as enforcement.
-   */
-  probe_observations?: Record<string, ProbeVerdict>;
-  probe_checked_at?: string;
-  /** Publisher trust for the exact command runner; never inferred from a sibling digest. */
-  runner_trust?: "publisher_verified" | "package_relative_integrity" | "development_unverified";
-}
+export type ExecutionEnvironment = ExecutionEnvironmentView;
 
 export type ProbeVerdict = "enforced" | "unenforced" | "indeterminate";
 
-export interface ExecutionEnvironmentsView {
-  selected_profile_id: string;
-  environments: ExecutionEnvironment[];
-  container_options?: {
-    runtimes: Array<"docker" | "podman">;
-    images: string[];
-    supported_tools: string[];
-  };
-}
+export type { ExecutionEnvironmentsView };
 
 export type CommandRunState =
   | "queued"
@@ -972,136 +747,34 @@ export type { ModelCapacityEntry };
 
 export type ModelCapacitiesView = ModelCapacities;
 
-export interface InstanceLaunchResult {
-  name: string;
-  url: string;
-}
+export type InstanceLaunchResult = InstanceCreated;
 
 export type PasswordRecoveryBeginResult = PasswordRecoveryBeginView;
 
-/** BUG-40 — the tray/menu-bar control's view of the host it is controlling.
- * `state` is one of running / paused / needs attention / stopped, and `waiting`
- * is what a quit would interrupt, stated before it happens. */
-export interface HostWaitingWork {
-  kind: string;
-  label: string;
-  detail: string;
-}
+export type { HostWaitingWork };
 
-export interface HostServiceRegistration {
-  supported: boolean;
-  registered: boolean;
-  mechanism: string;
-  label: string;
-  path: string | null;
-  note: string;
-}
+export type HostServiceRegistration = ServiceRegistration;
 
-export interface HostStatusView {
-  state: string;
-  detail: string;
-  pid: number | null;
-  port: number | null;
-  started_at: string | null;
-  paused: boolean;
-  paused_since: string | null;
-  paused_reason: string | null;
-  waiting: HostWaitingWork[];
-  service: HostServiceRegistration;
-  restartable: boolean;
-}
+export type HostStatusView = HostView;
 
-export interface HostActionResult extends HostStatusView {
-  ok: boolean;
-  reason_code?: string;
-  stopping?: boolean;
-  restarting?: boolean;
-}
+export type { HostActionResult };
 
-// BUG-44 — what this installation is, and whether it can update itself. Every
-// field here is read from the build that produced the installation rather than
-// configured afterwards, and all of them can honestly be "nothing": a source
-// checkout is `packaged: false, signed: false` and says so.
-export interface InstallationView {
-  version: string;
-  target: string | null;
-  packaged: boolean;
-  signed: boolean;
-  channel: string | null;
-  commit: string | null;
-  built_at: string | null;
-  installer_formats: string[];
-  install_root: string;
-  note: string;
-}
+export type { InstallationView };
 
-export interface UpdateChannelView {
-  url: string;
-  channel: string;
-  public_key_fingerprint: string;
-}
+export type { UpdateChannelView };
 
-export interface AvailableUpdateView {
-  channel: string;
-  version: string;
-  target: string;
-  artifact: string;
-  sha256: string;
-  signed: boolean;
-  released_at: string;
-}
+export type AvailableUpdateView = ChannelUpdate;
 
-export interface RecoveryPointView {
-  version: string;
-  path: string;
-  files: number;
-  bytes: number;
-}
+export type { RecoveryPointView };
 
-export interface ReleaseTargetView {
-  target_id: string;
-  os: string;
-  arch: string;
-  runner: string;
-  installer_formats: string[];
-  signing: { tool: string; secrets: string[]; note: string };
-}
+export type { ReleaseTargetView };
 
-export interface UpdateStatusView {
-  state:
-    | "source_checkout"
-    | "no_channel"
-    | "unsigned_build"
-    /** REM-SET-UPDATES — nothing has asked the channel; not an assurance. */
-    | "not_checked"
-    | "up_to_date"
-    | "available"
-    | "unreachable";
-  message: string;
-  installation: InstallationView;
-  channel: UpdateChannelView | null;
-  available: AvailableUpdateView | null;
-  recovery_points: RecoveryPointView[];
-  checked_at: string | null;
-  targets: ReleaseTargetView[];
-  last_check: {
-    state: string;
-    message: string;
-    available_version: string | null;
-    checked_at: string | null;
-  } | null;
-}
+export type { UpdateStatusView };
 
-export interface UpdateCheckResult extends UpdateStatusView {
-  ok: boolean;
-}
+export type { UpdateCheckResult };
 
-export interface UpdateApplyResult extends UpdateStatusView {
-  ok: boolean;
-  updating: boolean;
-  version?: string;
-  reason_code?: string;
-}
+/** The verified update handed to the helper, or the work it would interrupt. */
+export type UpdateApplyResult = GeneratedUpdateApplyResult | UpdateDeferred;
 
 
 export type { WebBlocklistRule };
@@ -1181,29 +854,9 @@ export type { ProjectRootStatus };
 
 export type { ProjectRootIndexResult };
 
-/** One entry the host path browser offers (BUG-251). */
-export interface HostPathEntry {
-  name: string;
-  /** The absolute path, which is the whole point: the browser cannot make one. */
-  path: string;
-  is_directory: boolean;
-}
+export type { HostPathEntry };
 
-/** One directory listing from the host, for the Browse… dialog (BUG-251). */
-export interface HostPathListing {
-  /** Empty means the top of the machine: drives, home, and the usual folders. */
-  path: string;
-  /** Null at the top, "" when the listing is already a root. */
-  parent: string | null;
-  /** "\\" or "/", so the dialog can show a path the way the host writes it. */
-  separator: string;
-  /** Where the workspace lives, so a field wanting a relative path can make one. */
-  workspace_root: string;
-  entries: HostPathEntry[];
-  truncated: boolean;
-  /** The location is gone or cannot be read — not the same as empty. */
-  missing: boolean;
-}
+export type { HostPathListing };
 
 export type { SpeechRuntimeView };
 

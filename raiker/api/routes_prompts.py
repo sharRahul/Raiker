@@ -17,7 +17,16 @@ from raiker.api.redaction import redact_response_body
 from raiker.api.routes_settings import load_composer_approval_mode
 from raiker.api.schemas import InterruptRequest, PromptRequest, serialize_dto
 from raiker.api.sessions import ApiSession
-from raiker.api.wire.sessions import WorkInFlight
+from raiker.api.wire.sessions import (
+    CommandStopRequested,
+    InterruptResult,
+    StopAllResult,
+    StopFailure,
+    TaskInterrupted,
+    TurnControl,
+    TurnStopped,
+    WorkInFlight,
+)
 from raiker.build_identity import version as raiker_version
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import (
@@ -462,10 +471,11 @@ async def submit_prompt(
     if isinstance(prepared, _TurnRefusal):
         if prepared.kind == "not_ready":
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=prepared.detail)
-        return prepared.response.to_dict()
-    response = await prepared.gateway.submit_prompt_async(prepared.envelope)
+        refused: AgentResponse = prepared.response
+        return serialize_dto(refused)
+    response: AgentResponse = await prepared.gateway.submit_prompt_async(prepared.envelope)
     _record_generated_file_attachments(prepared.workspace, prepared.envelope, prepared.principal_id)
-    return response.to_dict()
+    return serialize_dto(response)
 
 
 def _sse(event: StreamEvent, *, session_id: str | None = None, turn_id: str | None = None) -> str:
@@ -561,7 +571,7 @@ async def interrupts(
     if body.task_id and not targets:
         raise refusal(status.HTTP_404_NOT_FOUND, "interrupt_target_not_found")
     reason = body.reason or "user requested stop"
-    applied: list[dict[str, str]] = []
+    applied: list[TaskInterrupted] = []
     for task in targets:
         action = InterruptAction(
             action_id=new_id("act_"),
@@ -583,7 +593,7 @@ async def interrupts(
     # It stays on this endpoint rather than growing a second one because it is
     # the same decision under the same rules: human principals only, owner's own
     # session only, applied at a safe boundary and never as a force-kill.
-    turn_control: dict[str, Any] | None = None
+    turn_control: TurnControl | None = None
     if not body.task_id:
         if body.action_type == "steer" and (body.steer_text or "").strip():
             queued = store.queue_turn_steer(
@@ -611,7 +621,8 @@ async def interrupts(
                 )
             )
 
-    return {"applied": applied, "safe_boundary": True, "turn_control": turn_control}
+    answer: InterruptResult = {"applied": applied, "safe_boundary": True, "turn_control": turn_control}
+    return serialize_dto(answer)
 
 
 # ── Stop everything (GEP-02) ─────────────────────────────────────────────────
@@ -735,12 +746,14 @@ async def stop_all(
             )
         )
 
-    tasks = [{"task_id": task.task_id, "result": cancel(task)} for task in found["tasks"]]
+    tasks: list[TaskInterrupted] = [
+        {"task_id": task.task_id, "result": cancel(task)} for task in found["tasks"]
+    ]
 
     # A turn's own governance task is cancelled too — the stream checks it on
     # every event, so it is the quickest of the two stops to be seen — and it
     # is reported as the turn it belongs to, never as a second piece of work.
-    turns: list[dict[str, str]] = []
+    turns: list[TurnStopped] = []
     reached: set[str] = set()
     for task in found["turn_tasks"]:
         cancel(task)
@@ -760,8 +773,8 @@ async def stop_all(
         if turn.turn_id not in reached:
             turns.append({"session_id": turn.session_id, "turn_id": turn.turn_id})
 
-    commands: list[dict[str, str]] = []
-    failed: list[dict[str, str]] = []
+    commands: list[CommandStopRequested] = []
+    failed: list[StopFailure] = []
     if found["commands"] is None:
         failed.append({"kind": "commands", "reason_code": "command_store_unreadable"})
     else:
@@ -776,10 +789,11 @@ async def stop_all(
                 continue
             commands.append({"run_id": run.run_id, "state": str(stopped.state)})
 
-    return {
+    reached_all: StopAllResult = {
         "tasks": tasks,
         "turns": turns,
         "commands": commands,
         "failed": failed,
         "safe_boundary": True,
     }
+    return serialize_dto(reached_all)

@@ -9,8 +9,9 @@ from fastapi import APIRouter, Request, status
 from pydantic import Field
 
 from raiker.api.refusals import refusal
-from raiker.api.schemas import StrictRequest
+from raiker.api.schemas import StrictRequest, serialize_dto
 from raiker.api.sessions import ApiSessionStore
+from raiker.api.wire.settings import TraySession
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -44,4 +45,5 @@ def exchange_tray_session(body: TraySessionRequest, request: Request) -> dict[st
         scope="host_control",
         device_label="Raiker native tray",
     )
-    return {"token": token, "expires_at": session.expires_at, "scope": session.scope}
+    answer: TraySession = {"token": token, "expires_at": session.expires_at, "scope": session.scope}
+    return serialize_dto(answer)

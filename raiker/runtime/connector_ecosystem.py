@@ -261,6 +261,25 @@ class ConnectorOperation(TypedDict):
     compensation: NotRequired[ConnectorCompensation]
 
 
+class CompensationWindow(ConnectorCompensation):
+    """The undo a completed write offers, and until when."""
+
+    available_until: str
+    source_invocation_id: str
+
+
+class ConnectorInvocation(TypedDict):
+    """One completed connector call; ``data`` is the upstream answer, bounded and redacted."""
+
+    invocation_id: str
+    connector_id: str
+    operation_id: str
+    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"]
+    status_code: int
+    data: Any
+    compensation: NotRequired[CompensationWindow]
+
+
 class CompiledManifest(TypedDict):
     """A bounded operation index: OpenAPI operations, or an ai-plugin's API URL."""
 
@@ -423,7 +442,7 @@ class ConnectorInvoker:
         connector_id: str,
         operation_id: str,
         arguments: dict[str, Any],
-    ) -> dict[str, Any]:
+    ) -> ConnectorInvocation:
         self._require_enabled(principal_id, connector_id)
         definition = ConnectorCatalog().get(connector_id)
         operation, base_url = self._operation(connector_id, operation_id)
@@ -501,7 +520,7 @@ class ConnectorInvoker:
             self._finish_invocation(invocation_id, "failed")
             raise ValueError(f"connector_upstream_error:{status_code}")
         self._finish_invocation(invocation_id, "completed")
-        result: dict[str, Any] = {
+        result: ConnectorInvocation = {
             "invocation_id": invocation_id,
             "connector_id": connector_id,
             "operation_id": operation_id,

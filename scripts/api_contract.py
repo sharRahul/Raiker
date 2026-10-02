@@ -1,20 +1,23 @@
 # SPDX-License-Identifier: Apache-2.0
 """The API contract: which routes OpenAPI can describe, and the files derived from it.
 
-OPT-01/OPT-02 Stage A (see the scope decision in
-``docs/plans/CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md``). The routes
-annotate ``-> dict[str, Any]``, so FastAPI's OpenAPI document names no response
-fields. This module works out, per route, what the response actually is:
+OPT-01/OPT-02 (FIXED-664, FIXED-665, FIXED-678 and FIXED-679). The
+routes annotate ``-> dict[str, Any]``, so FastAPI's OpenAPI document would name
+no response field on its own. This module works out, per route, what the response actually is:
 
-* **verified** — the handler returns ``serialize_dto(...)`` of a service call
-  whose annotated return is a read-model view (or a list of one) that serialises
-  as exactly its fields, *and* ``tests/test_api_contract_responses.py`` has
-  called the route and matched the body to that schema key for key;
+* **verified** — the handler's answer has a declared type: ``serialize_dto`` of
+  an annotated local, a ``cast``, a typed helper or service return, or a
+  fields-only read-model view (or a list of one) — a ``TypedDict`` or a ``View``
+  — *and* ``tests/test_api_contract_responses.py`` has called the route and
+  matched the body to that schema key for key;
 * **eligible** — the same, not yet exercised by that test, so not attached;
-* **deferred** — the body is assembled in the route or projected by a custom
-  ``to_dict``; it needs a dedicated response model first (Stage B);
+* **deferred** — the body has no declared type yet;
 * **special** — a stream, a file, or another non-JSON transport, which stays
   hand-written.
+
+Every ordinary JSON operation is verified, and
+``tests/test_api_contract_generation.py`` keeps it that way: a new route
+declares its answer and gets a case in ``tests/contract_cases/``.
 
 For verified routes only, the view is attached to the OpenAPI document as the
 200 response — documentation, not ``response_model``: the route's runtime
@@ -132,12 +135,19 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/api/connector-store"),
         ("GET", "/api/credential-deltas"),
         ("GET", "/api/diagnostics"),
+        ("GET", "/api/diagnostics/export"),
         ("GET", "/api/environment"),
         ("GET", "/api/events"),
+        ("GET", "/api/execution-environments"),
         ("GET", "/api/extensions"),
         ("GET", "/api/git-credential"),
+        ("GET", "/api/guide"),
+        ("GET", "/api/guide/{slug}"),
         ("GET", "/api/health"),
         ("GET", "/api/hooks"),
+        ("GET", "/api/host"),
+        ("GET", "/api/host/paths"),
+        ("GET", "/api/host/update"),
         ("GET", "/api/hugging-face/search"),
         ("GET", "/api/hugging-face/trending"),
         ("GET", "/api/hugging-face/{owner}/{repository}/variants"),
@@ -203,6 +213,8 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/api/sessions/{session_id}/recall"),
         ("GET", "/api/sessions/{session_id}/sources"),
         ("GET", "/api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt"),
+        ("GET", "/api/settings"),
+        ("GET", "/api/settings/composer-approval-mode"),
         ("GET", "/api/setup"),
         ("GET", "/api/skills"),
         ("GET", "/api/speech/runtime"),
@@ -221,6 +233,8 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/approvals/{approval_id}/replace"),
         ("POST", "/api/approvals/{approval_id}/resolve"),
         ("POST", "/api/approvals/{approval_id}/resolve-critical"),
+        ("POST", "/api/approvals/{approval_id}/resume"),
+        ("POST", "/api/attachments"),
         ("POST", "/api/audit/export"),
         ("POST", "/api/auth/elevate"),
         ("POST", "/api/auth/login"),
@@ -256,13 +270,24 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/code/map/rebuild"),
         ("POST", "/api/code/repos"),
         ("POST", "/api/command-runs/{run_id}/stop"),
+        ("POST", "/api/connector-store/{connector_id}/actions"),
         ("POST", "/api/connector-store/{connector_id}/install"),
         ("POST", "/api/connector-store/{connector_id}/manifest"),
         ("POST", "/api/credential-deltas/{run_id}/discard"),
+        ("POST", "/api/execution-environments/{profile_id}/probe"),
+        ("POST", "/api/execution-environments/{profile_id}/reset"),
         ("POST", "/api/git-credential/grant"),
+        ("POST", "/api/host/pause"),
+        ("POST", "/api/host/quit"),
+        ("POST", "/api/host/restart"),
+        ("POST", "/api/host/resume"),
+        ("POST", "/api/host/update/apply"),
+        ("POST", "/api/host/update/check"),
         ("POST", "/api/hugging-face/download"),
         ("POST", "/api/hugging-face/download/preview"),
         ("POST", "/api/images"),
+        ("POST", "/api/instances"),
+        ("POST", "/api/interrupts"),
         ("POST", "/api/language/check"),
         ("POST", "/api/local-runtimes/detect"),
         ("POST", "/api/managed-files/{file_id}/retry"),
@@ -311,6 +336,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/projects/{project_id}/managed-files"),
         ("POST", "/api/projects/{project_id}/root/attach"),
         ("POST", "/api/projects/{project_id}/root/index"),
+        ("POST", "/api/prompts"),
         ("POST", "/api/runtime-mode/activate"),
         ("POST", "/api/runtime-mode/disable"),
         ("POST", "/api/security/breach-check"),
@@ -327,11 +353,13 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/speech/runtime/probe"),
         ("POST", "/api/standing-grants"),
         ("POST", "/api/standing-grants/{grant_id}/revoke"),
+        ("POST", "/api/stop-all"),
         ("POST", "/api/tasks"),
         ("POST", "/api/tasks/{task_id}/resume"),
         ("POST", "/api/tasks/{task_id}/run"),
         ("POST", "/api/telemetry/destinations"),
         ("POST", "/api/telemetry/destinations/{destination_id}/export"),
+        ("POST", "/api/tray/session"),
         ("POST", "/api/web-access/blocklist"),
         ("POST", "/api/web-access/blocklist/test"),
         ("PUT", "/api/brain/settings"),
@@ -341,6 +369,8 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("PUT", "/api/code/repos/selection"),
         ("PUT", "/api/connector-store/{connector_id}/credentials"),
         ("PUT", "/api/connector-store/{connector_id}/enabled"),
+        ("PUT", "/api/execution-environments/configure"),
+        ("PUT", "/api/execution-environments/selection"),
         ("PUT", "/api/git-credential"),
         ("PUT", "/api/hugging-face/credential"),
         ("PUT", "/api/mcp/servers/{server_id}"),
@@ -373,6 +403,8 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("PUT", "/api/sessions/{session_id}/rename"),
         ("PUT", "/api/sessions/{session_id}/tags"),
         ("PUT", "/api/sessions/{session_id}/unarchive"),
+        ("PUT", "/api/settings"),
+        ("PUT", "/api/settings/composer-approval-mode"),
         ("PUT", "/api/setup"),
         ("PUT", "/api/skills/{skill_id}"),
         ("PUT", "/api/skills/{skill_id}/active"),
@@ -977,17 +1009,16 @@ def render_inventory(app: FastAPI) -> str:
     lines = [
         "# API contract inventory",
         "",
-        "Generated by `python -m scripts.api_contract`; do not edit. It is the migration",
-        "boundary the OPT-01/OPT-02 scope decision in",
-        "[the optimisation review](../plans/CODEBASE_OPTIMIZATION_AND_LOC_REDUCTION_2026-09-05.md#scope-decision--opt-01-and-opt-02-2026-10-01)",
-        "asks for: what each `/api/` operation answers with, and whether OpenAPI describes it.",
+        "Generated by `python -m scripts.api_contract`; do not edit. What each `/api/`",
+        "operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —",
+        "[FIXED-678](../plans/FIXED_ITEMS.md#fixed-678--most-routes-answers-were-described-nowhere-but-the-clients-copy),",
+        "[FIXED-679](../plans/FIXED_ITEMS.md#fixed-679--the-client-still-hand-wrote-the-wrappers-for-routes-openapi-now-describes)).",
         "",
-        "* **verified** — the response is a fields-only read-model view, a contract test",
-        "  matched a real response to its schema key for key, and the OpenAPI document",
+        "* **verified** — the response has a declared type, a contract test matched a",
+        "  real response to its schema key for key, and the OpenAPI document",
         "  and `web/src/lib/generated/apiContract.ts` describe it.",
         "* **eligible** — the same view, not yet exercised by that test, so not described.",
-        "* **deferred** — the body is assembled in the route or projected by a custom",
-        "  `to_dict`; it needs a dedicated response model first (Stage B).",
+        "* **deferred** — the body has no declared type; a test fails while any is.",
         "* **special** — a stream, a file or another non-JSON transport; hand-written.",
         "",
         f"**{len(rows)} operations: {counts['verified']} verified, {counts['eligible']} eligible, "

@@ -8,7 +8,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
 
-from raiker.api.schemas import InstanceCreateRequest
+from raiker.api.schemas import InstanceCreateRequest, serialize_dto
+from raiker.api.wire.settings import InstanceCreated
 from raiker.auth.accounts import AccountService, AuthError
 
 router = APIRouter()
@@ -70,4 +71,5 @@ async def create_instance(body: InstanceCreateRequest, request: Request) -> dict
             detail={"reason_code": "account_creation_failed"},
         ) from exc
     # The absolute workspace path is intentionally never exposed to the browser.
-    return {"name": name, "url": f"/instances/{name}/"}
+    answer: InstanceCreated = {"name": name, "url": f"/instances/{name}/"}
+    return serialize_dto(answer)

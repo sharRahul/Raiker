@@ -66,7 +66,7 @@ class ObservationView(View):
     summary: str
     sensitivity: str
     retention: str
-    capture_status: str
+    capture_status: Literal["captured", "skipped"]
     skip_reason: str
     promotable_to_memory: bool
     content_sha256: str

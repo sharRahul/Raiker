@@ -249,7 +249,7 @@ class TaskCreateRequest(StrictModelRequest):
     # Backlog #23 — the working method this task's cycles run under. A `build`
     # task needs a project, and is refused with `build_task_requires_project`
     # rather than accepted and quietly run as Chat.
-    surface: Literal["chat", "build"] = "chat"
+    surface: Literal["chat", "build", "design"] = "chat"
     attachments: list[dict[str, Any]] | None = None
 
 
@@ -666,11 +666,13 @@ class PromptRequest:
     # label but cannot prove how a REST or web client produced the text.
     input_mode: Literal["typed", "dictated", "mixed"] = "typed"
     # Which composer sent this prompt. It selects the operating protocol the
-    # turn runs under — Build gets the engineering protocol, Chat does not — and
-    # grants nothing: capabilities, gates and approvals are identical either way.
+    # turn runs under — Build gets the engineering protocol, Design the research
+    # one, Chat neither — and grants nothing: capabilities, gates and approvals
+    # are identical whichever it is. It must name every surface in
+    # `PROMPT_SURFACES`; a stale list here refused every Design research turn.
     # Defaults to "chat" so an external REST client that has never heard of the
     # field gets the conservative surface rather than the coding one.
-    surface: Literal["chat", "build"] = "chat"
+    surface: Literal["chat", "build", "design"] = "chat"
     # The project this turn may retrieve inside. Required by "build" and
     # rejected for "chat", because the two surfaces have genuinely different
     # boundaries and a request that leaves it to the server to guess is a

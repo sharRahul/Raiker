@@ -16,6 +16,7 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import (
     PARKED_FOR_APPROVAL_NOTICE,
     AgentResponse,
+    ApprovalInfo,
     PolicyDecision,
     PromptEnvelope,
     ToolAction,
@@ -789,7 +790,7 @@ class RuntimeOrchestrator:
         pending_calls: list[ToolCallProposal],
         queue_position: int,
         queue_total: int,
-    ) -> dict[str, object]:
+    ) -> ApprovalInfo:
         """Park the turn and build the approval the client is shown (B2, ADD-02).
 
         One place, because a batch parks twice — once when the model's first
@@ -2633,7 +2634,7 @@ class RuntimeOrchestrator:
         started_action_ids: set[str] = set()
         status: str | None = None
         message = ""
-        approval: dict[str, object] | None = None
+        approval: ApprovalInfo | None = None
         final_text: str | None = None
         last_action: ToolAction | None = None
         last_result: ToolResult | None = None

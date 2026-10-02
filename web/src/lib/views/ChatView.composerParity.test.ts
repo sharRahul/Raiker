@@ -237,7 +237,7 @@ describe("ChatView composer parity", () => {
         response: {
           request_id: "req-voice", session_id: "sess-voice", turn_id: "turn-voice",
           status: "completed", message: "Ready", events_path: null,
-          checkpoint_path: null, approval: null, last_event_id: null,
+          checkpoint_path: null, approval: null, last_event_id: null, client: null, content_parts: [], schema_version: "1.0",
         } satisfies AgentResponse,
       });
     });
@@ -359,6 +359,9 @@ describe("ChatView composer parity", () => {
           checkpoint_path: null,
           approval: null,
           last_event_id: null,
+          client: null,
+          content_parts: [],
+          schema_version: "1.0",
         } satisfies AgentResponse,
       });
     });
@@ -501,7 +504,7 @@ describe("ChatView composer — commands, mentions and message actions", () => {
         response: {
           request_id: "request-1", session_id: "session-chat", turn_id: "turn-1",
           status: "completed", message: "Done", events_path: null,
-          checkpoint_path: null, approval: null, last_event_id: null,
+          checkpoint_path: null, approval: null, last_event_id: null, client: null, content_parts: [], schema_version: "1.0",
         } satisfies AgentResponse,
       });
     });

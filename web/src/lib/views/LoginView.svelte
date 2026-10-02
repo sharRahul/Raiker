@@ -27,6 +27,9 @@
   let recoveryCode = $state("");
   let bootstrapAllowed = $state(false);
   let error = $state<string | null>(null);
+  // Set once a recovery has changed the password, so the unlock form it returns
+  // to says so rather than looking like nothing happened.
+  let recovered = $state(false);
   let busy = $state(false);
   let showPassword = $state(false);
   let instanceSetup = $state(false);
@@ -177,6 +180,7 @@
     busy = true;
     try {
       await auth.completePasswordRecovery(ticket, recoveryCode, password);
+      recovered = true;
       mode = "login";
       password = "";
       recoveryCode = "";
@@ -417,6 +421,7 @@
           {/if}
 
           {#if error}<p class="error" role="alert">{error}</p>{/if}
+          {#if recovered && !error}<p class="recovered" role="status">Your password was changed. Unlock with the new one.</p>{/if}
           <button type="submit" class="btn btn-primary submit" disabled={formDisabled} aria-busy={busy}>
             {busy ? (registerIntent ? "Creating…" : "Unlocking…") : registerIntent ? "Create a User Account" : "Unlock Raiker"}
           </button>
@@ -810,6 +815,10 @@
   }
   .error {
     color: var(--danger);
+    margin: var(--space-2) 0 0;
+  }
+  .recovered {
+    color: var(--text-2);
     margin: var(--space-2) 0 0;
   }
   .verify {

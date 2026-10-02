@@ -1,6 +1,6 @@
 """The OpenAPI document, its TypeScript and the route inventory are current.
 
-OPT-01/OPT-02 Stage A. ``scripts/api_contract.py`` derives three committed files
+``scripts/api_contract.py`` derives three committed files
 from the running app; a route or view changed without regenerating them would
 leave the browser compiled against a contract the server no longer has.
 """
@@ -19,6 +19,20 @@ def test_the_inventory_accounts_for_every_api_operation() -> None:
     assert len(rows) > 300
     assert {row.status for row in rows} <= {"verified", "eligible", "deferred", "special"}
     assert sum(row.status == "verified" for row in rows) == len(VERIFIED)
+
+
+def test_every_ordinary_json_operation_is_described() -> None:
+    """A new route declares what it answers with and gets a contract case.
+
+    Stage B left no operation eligible or deferred; one that is would put a
+    hand-written client type back beside an undescribed route.
+    """
+    undescribed = [
+        f"{row.method} {row.path} ({row.status}: {row.reason})"
+        for row in contracts(build_app())
+        if row.status in {"eligible", "deferred"}
+    ]
+    assert not undescribed, "declare the response and add a contract case:\n" + "\n".join(undescribed)
 
 
 def test_a_streamed_answer_is_never_described_as_json() -> None:

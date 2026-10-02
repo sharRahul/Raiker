@@ -42,6 +42,10 @@
 
   // MFA enrollment
   let enrollUri = $state<string | null>(null);
+  // The one-time recovery codes enrollment issues. The server keeps only their
+  // hashes, so this is the one moment they can be read; recovering a password
+  // from the lock screen without the authenticator needs one of them.
+  let backupCodes = $state<string[]>([]);
   let activateCode = $state("");
 
   // Password reset
@@ -256,8 +260,9 @@
   async function startEnroll() {
     notice = null;
     try {
-      const { provisioning_uri } = await auth.enrollMfa();
+      const { provisioning_uri, backup_codes } = await auth.enrollMfa();
       enrollUri = provisioning_uri;
+      backupCodes = [...backup_codes];
     } catch (e) {
       notice = { kind: "error", text: message(e, "Could not start MFA enrollment.") };
     }
@@ -341,6 +346,16 @@
       {:else}
         <p class="sub">Add this to your authenticator app, then enter the current code:</p>
         <code class="uri">{enrollUri}</code>
+        {#if backupCodes.length > 0}
+          <p class="sub">
+            Save these recovery codes somewhere other than this computer. Each works once,
+            in place of an authenticator code — including to recover your password from
+            the lock screen — and they are not shown again.
+          </p>
+          <ul class="backup-codes" aria-label="Recovery codes">
+            {#each backupCodes as code (code)}<li><code>{code}</code></li>{/each}
+          </ul>
+        {/if}
         <label>
           Verification code
           <input bind:value={activateCode} inputmode="numeric" autocomplete="one-time-code" />
@@ -709,6 +724,16 @@
     background: var(--sunken);
     border-radius: var(--r-md);
     margin: var(--space-2) 0;
+  }
+  .backup-codes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    gap: var(--space-1) var(--space-3);
+    margin: var(--space-2) 0;
+    padding: var(--space-2) var(--space-3);
+    list-style: none;
+    background: var(--sunken);
+    border-radius: var(--r-md);
   }
   .link {
     background: none;

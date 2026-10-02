@@ -56,6 +56,12 @@ from raiker.api.wire.code import (
     GithubRepoConnected,
     LocalRepoConnected,
 )
+from raiker.api.wire.execution import (
+    ExecutionEnvironmentConfigured,
+    ExecutionEnvironmentProbed,
+    ExecutionEnvironmentReset,
+    ExecutionEnvironmentSelected,
+)
 from raiker.api.wire.mcp import (
     McpContainment,
     McpServerConnected,
@@ -1274,7 +1280,7 @@ async def get_execution_environments(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _service(request).execution_environments(auth_data[0].principal_id)
+    return serialize_dto(_service(request).execution_environments(auth_data[0].principal_id))
 
 
 @router.put("/api/execution-environments/configure")
@@ -1294,7 +1300,8 @@ async def configure_execution_environment(
     )
     if not result.ok:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(ExecutionEnvironmentConfigured, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/execution-environments/{profile_id}/probe")
@@ -1325,7 +1332,8 @@ async def probe_execution_environment(
     )
     if measured is None:
         raise refusal(status.HTTP_404_NOT_FOUND, "execution_environment_not_found")
-    return {"ok": True, "environment": measured}
+    probed: ExecutionEnvironmentProbed = {"ok": True, "environment": measured}
+    return serialize_dto(probed)
 
 
 @router.put("/api/execution-environments/selection")
@@ -1339,7 +1347,8 @@ async def select_execution_environment(
     )
     if not result.ok:
         raise refusal(status.HTTP_409_CONFLICT, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(ExecutionEnvironmentSelected, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.post("/api/execution-environments/{profile_id}/reset")
@@ -1363,7 +1372,8 @@ async def reset_execution_environment(
     )
     if not result.ok:
         raise refusal(status.HTTP_409_CONFLICT, result.reason_code)
-    return {"ok": True, **result.data}
+    answer = cast(ExecutionEnvironmentReset, {"ok": True, **result.data})
+    return serialize_dto(answer)
 
 
 @router.get("/api/code/repos")
@@ -2801,4 +2811,4 @@ async def get_diagnostics_export(
 ) -> dict[str, Any]:
     """A copyable, redacted support bundle of the runtime's readiness facts."""
     _session, principal = auth_data
-    return _read_models(request).diagnostics_export(acting_principal_id=principal.principal_id)
+    return serialize_dto(_read_models(request).diagnostics_export(acting_principal_id=principal.principal_id))

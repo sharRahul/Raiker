@@ -29,6 +29,7 @@ from raiker.checkpoints.service import CheckpointService
 from raiker.contracts.ids import utc_now
 from raiker.contracts.views import View
 from raiker.control.dashboard import DashboardService
+from raiker.control.views.security import DiagnosticsExport
 from raiker.runtime.connector_ecosystem import (
     ConnectorCatalog,
     ConnectorVault,
@@ -558,7 +559,7 @@ class WebReadModels:
         return provenance
 
     # ── Redacted support bundle ──────────────────────────────────────────
-    def diagnostics_export(self, *, acting_principal_id: str) -> dict[str, Any]:
+    def diagnostics_export(self, *, acting_principal_id: str) -> DiagnosticsExport:
         """A copyable support bundle of the runtime's own readiness facts.
 
         The bundle is assembled from existing read models and then passed through
@@ -596,7 +597,7 @@ class WebReadModels:
                 "file content, or workspace path outside the runtime's own state."
             ),
         }
-        redacted: dict[str, Any] = redact_response_body(bundle)
+        redacted: DiagnosticsExport = redact_response_body(bundle)
         return redacted
 
 

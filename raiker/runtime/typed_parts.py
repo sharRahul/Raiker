@@ -46,6 +46,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final, Literal
 
+from typing_extensions import TypedDict
+
 from raiker.contracts.views import View
 
 # ── Part types ──────────────────────────────────────────────────────────────
@@ -61,6 +63,15 @@ PART_REFUSED: Final = "refused"
 
 PART_TYPES = frozenset({PART_TEXT, PART_TABLE, PART_CHART, PART_REFUSED})
 PartType = Literal["text", "table", "chart", "refused"]
+
+
+class ContentPartView(TypedDict):
+    """One declared piece of a turn's answer, as ``raiker.runtime.typed_parts`` serialises it."""
+
+    type: PartType
+    text: str
+    data: dict[str, Any]
+    reason_code: str
 
 #: The chart shapes Raiker draws. Deliberately three: each is a different claim
 #: about the data, and a shape nobody can read is not a fourth feature.

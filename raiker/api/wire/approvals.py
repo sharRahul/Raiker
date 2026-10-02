@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, NotRequired
+from typing import Literal, NotRequired
 
 from typing_extensions import TypedDict
 
 from raiker.control.views.security import CheckpointCaptureHealth, IdentityView
+from raiker.runtime.connector_ecosystem import ConnectorInvocation
 
 
 class ResumeHandle(TypedDict):
@@ -115,7 +116,7 @@ class ApprovalResolved(TypedDict):
     approved_by: IdentityView | None
     machine_identity: IdentityView | None
     execution: NotRequired[ExecutionSummary]
-    connector_result: NotRequired[dict[str, Any]]
+    connector_result: NotRequired[ConnectorInvocation]
     resume: ResumeHandle
 
 

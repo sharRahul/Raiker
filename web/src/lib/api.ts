@@ -1,19 +1,8 @@
 import type {
   ConversionQuantization,
-  AgentResponse,
   ApprovalDetailView,
-  ComposerApprovalModeSettings,
-  DiagnosticsExport,
-  ExecutionEnvironment,
-  ExecutionEnvironmentsView,
-  GuideIndex,
-  GuideSection,
-  HostActionResult,
-  HostPathListing,
-  HostStatusView,
   HuggingFaceVariant,
   InterruptRequestBody,
-  InterruptResult,
   KnowledgeSourceKind,
   ManagedFileScope,
   ManagedFileUpload,
@@ -22,23 +11,19 @@ import type {
   ModelSetupState,
   ProjectContext,
   PromptRequestBody,
-  SessionSummary,
   SetupState,
   SpeechRuntimeChange,
-  StopAllResult,
-  UpdateApplyResult,
-  UpdateCheckResult,
-  UpdateStatusView,
-  UploadedAttachment,
 } from "./apiTypes";
 import type { ApprovalMode } from "./approvalMode";
 import { restoreSession } from "./api/auth";
-import { postJson, request, requestBlob, withQuery } from "./api/core";
-// OPT-02 Stage A — operations whose response a contract test verified are
-// generated (scripts/api_contract.py); the rest stay written here.
+import { request, requestBlob } from "./api/core";
+// OPT-02 — every ordinary JSON operation's wrapper is generated
+// (scripts/api_contract.py); streams, downloads and the few calls that shape a
+// body stay written here.
 import { contract } from "./generated/apiContract";
 import type {
   CreateStandingGrantRequest,
+  SettingsView,
   CreateTelemetryDestinationRequest,
   GenerateImageRequest,
   ModelPriceRequest,
@@ -52,22 +37,7 @@ export { connect, health, createInstance, restoreSession, auth } from "./api/aut
 export type { HealthView, LoginResult } from "./api/auth";
 export { streamPrompt, streamResumeAfterApproval } from "./api/streaming";
 
-export interface SettingsView {
-  settings: Record<string, unknown>;
-  status: {
-    vault: string;
-    mfa_enrolled: boolean;
-    /** The fixed sign-in handle. */
-    username: string;
-    /**
-     * What to call this owner — the name they chose, or "Owner". Resolved
-     * server-side (RR-IDENTITY-01) so the greeting, the Account page and the
-     * model's own identity block cannot disagree. Optional so an older host
-     * that does not send it still renders.
-     */
-    display_name?: string;
-  };
-}
+export type { SettingsView };
 
 /** One generated setter per decision mode; the route names the mode, not the body. */
 const SET_DECISION_MODE = {
@@ -80,31 +50,14 @@ const SET_DECISION_MODE = {
 export const api = {
   restoreSession,
   // ── The user guide, served from the install rather than a repository ──
-  guide: () => request<GuideIndex>("/api/guide"),
-  guideSection: (slug: string) =>
-    request<GuideSection>(`/api/guide/${encodeURIComponent(slug)}`),
-
+  guide: () => contract.guideIndex(),
+  guideSection: (slug: string) => contract.guideSection(slug),
   // ── Local-account settings, vault key, MFA status ──
-  settings: () => request<SettingsView>("/api/settings"),
-  composerApprovalMode: () =>
-    request<ComposerApprovalModeSettings>(
-      "/api/settings/composer-approval-mode",
-    ),
+  settings: () => contract.getSettings(),
+  composerApprovalMode: () => contract.getComposerApprovalMode(),
   setComposerApprovalMode: (mode: ApprovalMode) =>
-    request<ComposerApprovalModeSettings>(
-      "/api/settings/composer-approval-mode",
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approval_mode: mode }),
-      },
-    ),
-  putSettings: (settings: Record<string, unknown>) =>
-    request<{ settings: Record<string, unknown> }>("/api/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ settings }),
-    }),
+    contract.putComposerApprovalMode({ approval_mode: mode }),
+  putSettings: (settings: Record<string, unknown>) => contract.putSettings({ settings }),
   // ── Dictation's runtime (BUG-256) ──
   // Reading contacts nothing. Probing contacts only the address the owner
   // typed. Transcribing sends one clip and gets one transcript back; the audio
@@ -149,30 +102,23 @@ export const api = {
   // The menu-bar control's contract: what state the host is in, what background
   // work is in flight, and the four actions the distribution design requires.
   // Quit and Restart report waiting work first and only stop once confirmed.
-  host: () => request<HostStatusView>("/api/host"),
+  host: () => contract.getHost(),
   // BUG-251 — the host lists directory *names* so a field can offer Browse…
   // instead of asking the owner to spell an absolute path. Names only; nothing
   // here reads a file, and every approval path still governs what happens next.
   hostPaths: (path: string, files = false) =>
-    request<HostPathListing>(
-      `/api/host/paths?path=${encodeURIComponent(path)}${files ? "&files=true" : ""}`,
-    ),
-  pauseHost: (reason?: string) =>
-    postJson<HostActionResult>("/api/host/pause", { reason: reason ?? null }),
-  resumeHost: () => postJson<HostActionResult>("/api/host/resume", {}),
-  quitHost: (confirm = false) =>
-    postJson<HostActionResult>("/api/host/quit", { confirm }),
-  restartHost: (confirm = false) =>
-    postJson<HostActionResult>("/api/host/restart", { confirm }),
+    contract.browseHostPaths(files ? { path, files } : { path }),
+  pauseHost: (reason?: string) => contract.pauseHost({ reason: reason ?? null }),
+  resumeHost: () => contract.resumeHost(),
+  quitHost: (confirm = false) => contract.quitHost({ confirm }),
+  restartHost: (confirm = false) => contract.restartHost({ confirm }),
   // ── Install provenance and the signed update channel (BUG-44) ──
   // The read is local only: opening the panel must never be a way to cause an
   // outbound request. The check is the one that asks, and only when the owner
   // has pinned a channel.
-  hostUpdate: () => request<UpdateStatusView>("/api/host/update"),
-  checkHostUpdate: () =>
-    postJson<UpdateCheckResult>("/api/host/update/check", {}),
-  applyHostUpdate: (confirm = false) =>
-    postJson<UpdateApplyResult>("/api/host/update/apply", { confirm }),
+  hostUpdate: () => contract.getUpdateStatus(),
+  checkHostUpdate: () => contract.checkUpdate(),
+  applyHostUpdate: (confirm = false) => contract.applyUpdate({ confirm }),
   runtimeReadiness: () => contract.getRuntimeReadiness(),
   diagnostics: () => contract.getDiagnostics(),
   // MEM-09 — the memory integrity report, and its one stated repair. The scan
@@ -440,7 +386,7 @@ export const api = {
     filename: string;
     media_type: string;
     data_base64: string;
-  }) => postJson<UploadedAttachment>("/api/attachments", body),
+  }) => contract.uploadAttachment(body),
   // ── File inspector (view-only, session-scoped) ──
   // The preview is authorized by the session that carried the attachment, so
   // these paths 404 for a file this conversation never had. Nothing here
@@ -594,28 +540,15 @@ export const api = {
   saveBrainPreferences: (settings: Record<string, unknown>) =>
     contract.saveBrainPreferences({ settings }),
   removeBrainSource: (path: string) => contract.removeBrainSource({ path }),
-  executionEnvironments: () =>
-    request<ExecutionEnvironmentsView>("/api/execution-environments"),
+  executionEnvironments: () => contract.getExecutionEnvironments(),
   configureExecutionEnvironment: (body: {
     profile_id?: string;
     kind: "ssh" | "daytona" | "container";
     name: string;
     config: Record<string, unknown>;
     enabled: boolean;
-  }) =>
-    request<{ ok: boolean; profile_id: string }>(
-      "/api/execution-environments/configure",
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      },
-    ),
-  probeExecutionEnvironment: (profile_id: string) =>
-    postJson<{ ok: boolean; environment: ExecutionEnvironment }>(
-      `/api/execution-environments/${encodeURIComponent(profile_id)}/probe`,
-      {},
-    ),
+  }) => contract.configureExecutionEnvironment(body),
+  probeExecutionEnvironment: (profile_id: string) => contract.probeExecutionEnvironment(profile_id),
   // BUG-194 — a boundary that persists needs a way back to a known state, or
   // it is worse than one that never persisted. Refused by name on a profile
   // that rebuilds itself around every command.
@@ -623,20 +556,9 @@ export const api = {
     profile_id: string,
     session_id: string,
     recreate: boolean,
-  ) =>
-    postJson<{ ok: boolean; profile_id: string; session_id: string; recreated: boolean }>(
-      `/api/execution-environments/${encodeURIComponent(profile_id)}/reset`,
-      { session_id, recreate },
-    ),
+  ) => contract.resetExecutionEnvironment(profile_id, { session_id, recreate }),
   selectExecutionEnvironment: (profile_id: string) =>
-    request<{ ok: boolean; selected_profile_id: string }>(
-      "/api/execution-environments/selection",
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile_id }),
-      },
-    ),
+    contract.selectExecutionEnvironment({ profile_id }),
   commandRuns: (sessionId?: string) =>
     contract.listCommands(sessionId ? { session_id: sessionId } : {}),
   commandRun: (runId: string) => contract.getCommand(runId),
@@ -702,19 +624,16 @@ export const api = {
   deleteSkill: (id: string) => contract.deleteSkill(id),
   extensions: () => contract.getExtensions(),
   projectFiles: (id: string) => contract.getProjectFiles(id),
-  diagnosticsExport: () =>
-    request<DiagnosticsExport>("/api/diagnostics/export"),
+  diagnosticsExport: () => contract.getDiagnosticsExport(),
   // `origin: "chat"` narrows the list to conversations the owner typed. Task
   // runs live in a server-owned session that is still listed in Sessions; it is
   // only "recent chats" that must mean chats (BUG-10).
   sessions: (projectId?: string, includeArchived = false, origin?: string) =>
-    request<SessionSummary[]>(
-      withQuery("/api/sessions", {
-        project_id: projectId,
-        include_archived: includeArchived ? "true" : undefined,
-        origin,
-      }),
-    ),
+    contract.listSessions({
+      project_id: projectId,
+      include_archived: includeArchived ? true : undefined,
+      origin,
+    }),
   // C18 — what the owner is working on, across chats, projects and routines.
   // Chat search answers "where did I say that"; this answers the other question.
   workThreads: (limit = 100) => contract.listWorkThreads({ limit }),
@@ -978,16 +897,13 @@ export const api = {
   resumeTask: (taskId: string) => contract.resumeTask(taskId),
   // ── Prompts / interrupts ──
   // Non-streaming prompt submit; returns the final governed AgentResponse.
-  submitPrompt: (body: PromptRequestBody) =>
-    postJson<AgentResponse>("/api/prompts", body),
+  submitPrompt: (body: PromptRequestBody) => contract.submitPrompt(body),
   // Issue a governed safe-boundary interrupt for one task or all active tasks in a session.
-  interrupt: (body: InterruptRequestBody) =>
-    postJson<InterruptResult>("/api/interrupts", body),
+  interrupt: (body: InterruptRequestBody) => contract.interrupts(body),
   // GEP-02 — what the stop switch would reach beyond the task list: the turns
   // writing an answer right now and the commands still running.
   workInFlight: () => contract.workInFlight(),
-  stopAll: () => postJson<StopAllResult>("/api/stop-all", {}),
-
+  stopAll: () => contract.stopAll(),
   // ── Approvals (resolution is metadata-only: records a decision, never executes) ──
   approvals: (statusFilter = "pending") =>
     contract.listApprovals({ status_filter: statusFilter }),
@@ -1010,11 +926,7 @@ export const api = {
   replaceApproval: (id: string, body: { patch: string; reason?: string }) =>
     contract.replaceApprovalWithEdit(id, body),
   // B2 — non-streaming continuation of a turn that was parked for this approval.
-  resumeAfterApproval: (id: string) =>
-    postJson<AgentResponse>(
-      `/api/approvals/${encodeURIComponent(id)}/resume`,
-      {},
-    ),
+  resumeAfterApproval: (id: string) => contract.resumeAfterApproval(id),
   // BUG-24 — parked turns this account may continue right now, whoever resolved
   // the approval and wherever they resolved it. Ids only; polling changes
   // nothing, and the server still enforces exactly-once resumption.

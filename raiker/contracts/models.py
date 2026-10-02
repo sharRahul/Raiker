@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
+
+from typing_extensions import TypedDict
 
 from raiker.contracts.views import View
 from raiker.models.tool_registry import CONTRACT_TOOL_NAMES
+from raiker.runtime.typed_parts import ContentPartView
 
 SCHEMA_VERSION = "1.0"
 
@@ -652,7 +655,7 @@ def _schema(value: str) -> None:
 
 
 @dataclass(frozen=True)
-class ClientMetadata:
+class ClientMetadata(View):
     type: str
     name: str
     version: str
@@ -880,6 +883,25 @@ class ToolResult(View):
         _one_of(self.status, TOOL_STATUSES, "status")
 
 
+class ApprovalInfo(TypedDict):
+    """The proposal a turn parked on. Nothing has run; ``expected_effect`` says what will."""
+
+    action_id: str
+    approval_id: str
+    tool_name: str
+    arguments: dict[str, Any]
+    risk_level: str
+    reasons: list[str]
+    message: str
+    expected_effect: str
+    #: The turn's working state was parked, so resolving continues the same turn.
+    resumable: bool
+    #: ADD-02 — this decision's place in the batch, and the calls queued behind it.
+    queue_position: int
+    queue_total: int
+    queued_calls: int
+
+
 @dataclass(frozen=True)
 class AgentResponse(View):
     request_id: str
@@ -890,14 +912,14 @@ class AgentResponse(View):
     events_path: str | None = None
     checkpoint_path: str | None = None
     client: ClientMetadata | None = None
-    approval: dict[str, Any] | None = None
+    approval: ApprovalInfo | None = None
     last_event_id: str | None = None
     # BUG-288 — the answer as declared parts rather than as characters to guess
     # at. Empty for every turn that declared nothing, which is most of them, so
     # a client that ignores this field sees exactly what it saw before. Built by
     # `raiker.runtime.typed_parts.content_parts`; each entry is that module's
     # `ContentPart.to_dict()`.
-    content_parts: list[dict[str, Any]] = field(default_factory=list)
+    content_parts: list[ContentPartView] = field(default_factory=list)
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -916,7 +938,7 @@ class AgentResponse(View):
             object.__setattr__(
                 self,
                 "content_parts",
-                [part.to_dict() for part in content_parts(self.message)],
+                [cast(ContentPartView, part.to_dict()) for part in content_parts(self.message)],
             )
 
 

@@ -40,6 +40,7 @@ from raiker.api.wire.sessions import (
     TurnSourceExcerpt,
     TurnSources,
     TurnSourceView,
+    UploadedAttachment,
 )
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
@@ -96,7 +97,7 @@ def upload_attachment(
         )
     except AttachmentValidationError as exc:
         raise refusal(status.HTTP_400_BAD_REQUEST, exc.reason) from exc
-    return {
+    uploaded: UploadedAttachment = {
         "ok": True,
         "attachment_id": stored.attachment_id,
         "kind": stored.kind,
@@ -105,6 +106,7 @@ def upload_attachment(
         "byte_size": stored.byte_size,
         "sha256": stored.sha256,
     }
+    return serialize_dto(uploaded)
 
 
 # ── Session-scoped file previews (BUG-07: the chat file inspector) ──────────

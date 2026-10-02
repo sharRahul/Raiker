@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, cast
-
-from typing_extensions import TypedDict
+from typing import Any, cast
 
 from raiker.contracts.views import View
 from raiker.control.views.security import IdentityView
+from raiker.runtime.typed_parts import ContentPartView
 
 
 @dataclass(frozen=True)
@@ -47,15 +46,6 @@ class SessionView(View):
     # only — it grants nothing and hides nothing; a task session stays fully
     # readable here and from Tasks.
     origin: str = "chat"
-
-
-class ContentPartView(TypedDict):
-    """One declared piece of a turn's answer, as ``raiker.runtime.typed_parts`` serialises it."""
-
-    type: Literal["text", "table", "chart", "refused"]
-    text: str
-    data: dict[str, Any]
-    reason_code: str
 
 
 def _stored_content_parts(summary: Any) -> tuple[ContentPartView, ...]:

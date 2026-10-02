@@ -67,6 +67,8 @@ export function restoredTurnCore(
       message: turn.summary ?? "",
       events_path: null,
       checkpoint_path: null,
+      // A restored turn was answered by no client in this tab.
+      client: null,
       approval: parked
         ? {
             action_id: "",
@@ -78,6 +80,9 @@ export function restoredTurnCore(
             message: `${humanize(parked.tool_name)} is waiting for your approval.`,
             expected_effect: "The same parked turn continues after your decision.",
             resumable: true,
+            queue_position: 1,
+            queue_total: 1,
+            queued_calls: 0,
           }
         : null,
       last_event_id: null,
@@ -86,6 +91,7 @@ export function restoredTurnCore(
       // splitter the live response went through, so reloading a conversation
       // cannot produce a different reading of the same answer.
       content_parts: turn.content_parts ?? [],
+      schema_version: "1.0",
     },
     streaming: false,
     error: null,

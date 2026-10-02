@@ -104,7 +104,7 @@
     } catch { notice = { kind: "error", text: "The execution profile could not be saved." }; }
     finally { busy = false; }
   }
-  function runtimeName(runtime: string | undefined): string {
+  function runtimeName(runtime: string | null | undefined): string {
     return runtime ? runtime.charAt(0).toUpperCase() + runtime.slice(1) : "Container";
   }
   function containerReason(reason: string | null | undefined): string | null {

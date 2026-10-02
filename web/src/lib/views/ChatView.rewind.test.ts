@@ -58,6 +58,9 @@ const RESPONSE: AgentResponse = {
   checkpoint_path: null,
   approval: null,
   last_event_id: null,
+  client: null,
+  content_parts: [],
+  schema_version: "1.0",
 };
 
 function checkpoint(id: string, turnId: string) {

@@ -33,7 +33,7 @@
  * that do nothing, only tidier.
  */
 import type { CapabilityGate, ToolReadiness } from "./apiTypes";
-import { isDisabled, isDeferred } from "./capabilityModel";
+import { isAvailable, isDeferred } from "./capabilityModel";
 import type { IconName } from "./icons";
 
 /** The Work surfaces a composer capability can belong to. */
@@ -360,8 +360,10 @@ function blockFor(
   // A gate Raiker has not reported is not a gate that is off. Saying nothing is
   // the honest state: the runtime still judges the action when it is invoked.
   if (gate === undefined) return null;
+  // Available the way Permissions says it is — an untouched gate that ships on
+  // is on — so the menu and the page cannot disagree about one capability.
+  if (isAvailable(gate)) return null;
   if (isDeferred(gate)) return { reason: DEFERRED, href: null };
-  if (!isDisabled(gate)) return null;
   return {
     reason: "Turned off in Permissions",
     href: capability.enableHref ?? "#/capabilities",

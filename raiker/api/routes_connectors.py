@@ -12,6 +12,8 @@ from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.schemas import StrictRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.connectors import (
+    ConnectorActionCompleted,
+    ConnectorActionQueued,
     ConnectorCredentialsSet,
     ConnectorEnabledSet,
     ConnectorInstalled,
@@ -304,7 +306,7 @@ async def invoke_connector_action(
                     utc_now(),
                 ),
             )
-        return {
+        queued: ConnectorActionQueued = {
             "status": "approval_required",
             "approval_id": approval_id,
             "intent_id": intent_id,
@@ -312,10 +314,12 @@ async def invoke_connector_action(
             "operation_id": body.operation_id,
             "executes_action": False,
         }
+        return serialize_dto(queued)
     try:
         result = await invoker.invoke(
             session.principal_id, connector_id, body.operation_id, body.arguments
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail={"reason_code": str(exc)}) from exc
-    return {"status": "completed", **result}
+    completed = cast(ConnectorActionCompleted, {"status": "completed", **result})
+    return serialize_dto(completed)

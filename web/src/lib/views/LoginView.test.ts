@@ -228,6 +228,7 @@ describe("LoginView", () => {
     await fireEvent.input(screen.getByLabelText("New password"), { target: { value: "new-password" } });
     await fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
     await waitFor(() => expect(screen.getByRole("heading", { name: "Unlock Raiker" })).toBeInTheDocument());
+    expect(screen.getByText("Your password was changed. Unlock with the new one.")).toHaveAttribute("role", "status");
   });
 
   it("supports password visibility with an accessible toggle", async () => {

@@ -165,6 +165,109 @@
         "title": "AgentPlanStep",
         "type": "object"
       },
+      "AgentResponse": {
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "checkpoint_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Checkpoint Path"
+          },
+          "client": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClientMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "content_parts": {
+            "items": {
+              "$ref": "#/components/schemas/ContentPartView"
+            },
+            "title": "Content Parts",
+            "type": "array"
+          },
+          "events_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Events Path"
+          },
+          "last_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Event Id"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "session_id",
+          "turn_id",
+          "status",
+          "message"
+        ],
+        "title": "AgentResponse",
+        "type": "object"
+      },
       "AnswerOwnerQuestionRequest": {
         "additionalProperties": false,
         "description": "The owner's answer to a mid-turn question (ADD-22).\n\n`answers` is keyed by the exact question text and each value is the chosen\noption label, or a list of them for a multi-select. `response` is the owner\nreplying in their own words instead of picking; when it is set the answers\nmap is ignored, because they said something the options did not offer.",
@@ -270,6 +373,79 @@
           "preview_kind"
         ],
         "title": "ApprovalDetailView",
+        "type": "object"
+      },
+      "ApprovalInfo": {
+        "description": "The proposal a turn parked on. Nothing has run; ``expected_effect`` says what will.",
+        "properties": {
+          "action_id": {
+            "title": "Action Id",
+            "type": "string"
+          },
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "expected_effect": {
+            "title": "Expected Effect",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "queue_position": {
+            "title": "Queue Position",
+            "type": "integer"
+          },
+          "queue_total": {
+            "title": "Queue Total",
+            "type": "integer"
+          },
+          "queued_calls": {
+            "title": "Queued Calls",
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "resumable": {
+            "title": "Resumable",
+            "type": "boolean"
+          },
+          "risk_level": {
+            "title": "Risk Level",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action_id",
+          "approval_id",
+          "tool_name",
+          "arguments",
+          "risk_level",
+          "reasons",
+          "message",
+          "expected_effect",
+          "resumable",
+          "queue_position",
+          "queue_total",
+          "queued_calls"
+        ],
+        "title": "ApprovalInfo",
         "type": "object"
       },
       "ApprovalRelayAnswered": {
@@ -392,9 +568,7 @@
             ]
           },
           "connector_result": {
-            "additionalProperties": true,
-            "title": "Connector Result",
-            "type": "object"
+            "$ref": "#/components/schemas/ConnectorInvocation"
           },
           "executes_action": {
             "title": "Executes Action",
@@ -2901,6 +3075,60 @@
         "title": "ChannelUnpaired",
         "type": "object"
       },
+      "ChannelUpdate": {
+        "description": "One target's entry in a verified channel index.",
+        "properties": {
+          "artifact": {
+            "title": "Artifact",
+            "type": "string"
+          },
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "manifest": {
+            "title": "Manifest",
+            "type": "string"
+          },
+          "released_at": {
+            "title": "Released At",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "signature": {
+            "title": "Signature",
+            "type": "string"
+          },
+          "signed": {
+            "title": "Signed",
+            "type": "boolean"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel",
+          "version",
+          "target",
+          "artifact",
+          "sha256",
+          "manifest",
+          "signature",
+          "signed",
+          "released_at"
+        ],
+        "title": "ChannelUpdate",
+        "type": "object"
+      },
       "ChannelUpdateIgnored": {
         "description": "A transport update that is not a message: acknowledged so it is not retried.",
         "properties": {
@@ -3146,6 +3374,93 @@
           "can_restore_files"
         ],
         "title": "CheckpointView",
+        "type": "object"
+      },
+      "ClientMetadata": {
+        "properties": {
+          "interface_status": {
+            "default": "equal_primary_when_enabled",
+            "title": "Interface Status",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "name",
+          "version"
+        ],
+        "title": "ClientMetadata",
+        "type": "object"
+      },
+      "CloudCost": {
+        "properties": {
+          "actual_cost": {
+            "title": "Actual Cost",
+            "type": "number"
+          },
+          "committed_cost": {
+            "title": "Committed Cost",
+            "type": "number"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/CostEvent"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "provider_cost": {
+            "title": "Provider Cost",
+            "type": "number"
+          },
+          "reconciliation_status": {
+            "enum": [
+              "not_started",
+              "reserved",
+              "reconciled",
+              "provider_unavailable"
+            ],
+            "title": "Reconciliation Status",
+            "type": "string"
+          },
+          "remaining_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Cost"
+          },
+          "reserved_cost": {
+            "title": "Reserved Cost",
+            "type": "number"
+          }
+        },
+        "required": [
+          "actual_cost",
+          "provider_cost",
+          "reserved_cost",
+          "committed_cost",
+          "remaining_cost",
+          "reconciliation_status",
+          "history"
+        ],
+        "title": "CloudCost",
         "type": "object"
       },
       "CodeMapError": {
@@ -4408,6 +4723,24 @@
         "title": "CommandRunView",
         "type": "object"
       },
+      "CommandStopRequested": {
+        "properties": {
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "state"
+        ],
+        "title": "CommandStopRequested",
+        "type": "object"
+      },
       "CommandStopped": {
         "properties": {
           "ok": {
@@ -4437,6 +4770,62 @@
           "through_turn_id"
         ],
         "title": "CompactConversationRequest",
+        "type": "object"
+      },
+      "CompensationWindow": {
+        "description": "The undo a completed write offers, and until when.",
+        "properties": {
+          "argument_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Argument Map",
+            "type": "object"
+          },
+          "available_until": {
+            "title": "Available Until",
+            "type": "string"
+          },
+          "deadline_seconds": {
+            "title": "Deadline Seconds",
+            "type": "integer"
+          },
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "source_invocation_id": {
+            "title": "Source Invocation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation_id",
+          "argument_map",
+          "deadline_seconds",
+          "available_until",
+          "source_invocation_id"
+        ],
+        "title": "CompensationWindow",
+        "type": "object"
+      },
+      "ComposerApprovalMode": {
+        "properties": {
+          "approval_mode": {
+            "enum": [
+              "manual",
+              "auto",
+              "skip",
+              "dont_ask"
+            ],
+            "title": "Approval Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval_mode"
+        ],
+        "title": "ComposerApprovalMode",
         "type": "object"
       },
       "ComposerApprovalModeRequest": {
@@ -4588,6 +4977,100 @@
         "title": "ConnectionsView",
         "type": "object"
       },
+      "ConnectorActionCompleted": {
+        "description": "A read, carried out.",
+        "properties": {
+          "compensation": {
+            "$ref": "#/components/schemas/CompensationWindow"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data"
+          },
+          "invocation_id": {
+            "title": "Invocation Id",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "status": {
+            "const": "completed",
+            "title": "Status",
+            "type": "string"
+          },
+          "status_code": {
+            "title": "Status Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "invocation_id",
+          "connector_id",
+          "operation_id",
+          "method",
+          "status_code",
+          "data",
+          "status"
+        ],
+        "title": "ConnectorActionCompleted",
+        "type": "object"
+      },
+      "ConnectorActionQueued": {
+        "description": "A write: recorded as an intent and waiting for the owner's approval. Nothing ran.",
+        "properties": {
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "executes_action": {
+            "title": "Executes Action",
+            "type": "boolean"
+          },
+          "intent_id": {
+            "title": "Intent Id",
+            "type": "string"
+          },
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "status": {
+            "const": "approval_required",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "approval_id",
+          "intent_id",
+          "connector_id",
+          "operation_id",
+          "executes_action"
+        ],
+        "title": "ConnectorActionQueued",
+        "type": "object"
+      },
       "ConnectorActionRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4719,6 +5202,54 @@
           "enabled"
         ],
         "title": "ConnectorInstalled",
+        "type": "object"
+      },
+      "ConnectorInvocation": {
+        "description": "One completed connector call; ``data`` is the upstream answer, bounded and redacted.",
+        "properties": {
+          "compensation": {
+            "$ref": "#/components/schemas/CompensationWindow"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data"
+          },
+          "invocation_id": {
+            "title": "Invocation Id",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "operation_id": {
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "status_code": {
+            "title": "Status Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "invocation_id",
+          "connector_id",
+          "operation_id",
+          "method",
+          "status_code",
+          "data"
+        ],
+        "title": "ConnectorInvocation",
         "type": "object"
       },
       "ConnectorOperation": {
@@ -5001,6 +5532,42 @@
           "updated_at"
         ],
         "title": "ContainedSubject",
+        "type": "object"
+      },
+      "ContainerOptions": {
+        "properties": {
+          "images": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Images",
+            "type": "array"
+          },
+          "runtimes": {
+            "items": {
+              "enum": [
+                "docker",
+                "podman"
+              ],
+              "type": "string"
+            },
+            "title": "Runtimes",
+            "type": "array"
+          },
+          "supported_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Supported Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "runtimes",
+          "images",
+          "supported_tools"
+        ],
+        "title": "ContainerOptions",
         "type": "object"
       },
       "ContainmentCapability": {
@@ -5759,6 +6326,70 @@
         "title": "ConversionPreview",
         "type": "object"
       },
+      "CostEvent": {
+        "properties": {
+          "action_id": {
+            "title": "Action Id",
+            "type": "string"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_type": {
+            "enum": [
+              "reserved",
+              "reconciled",
+              "released",
+              "provider_snapshot",
+              "provider_unavailable"
+            ],
+            "title": "Event Type",
+            "type": "string"
+          },
+          "provider_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Reference"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "recorded_at": {
+            "title": "Recorded At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "action_id",
+          "event_type",
+          "amount",
+          "provider_reference",
+          "reason",
+          "recorded_at"
+        ],
+        "title": "CostEvent",
+        "type": "object"
+      },
       "CreateMcpServerRequest": {
         "additionalProperties": false,
         "properties": {
@@ -6343,6 +6974,123 @@
         "title": "Diagnostic",
         "type": "object"
       },
+      "DiagnosticGate": {
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "decision_mode": {
+            "title": "Decision Mode",
+            "type": "string"
+          },
+          "runtime_enabled": {
+            "title": "Runtime Enabled",
+            "type": "boolean"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability",
+          "state",
+          "decision_mode",
+          "runtime_enabled"
+        ],
+        "title": "DiagnosticGate",
+        "type": "object"
+      },
+      "DiagnosticsExport": {
+        "description": "A copyable, redacted support bundle of the runtime's own readiness facts.",
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "disabled_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Disabled Capabilities",
+            "type": "array"
+          },
+          "gates": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticGate"
+            },
+            "title": "Gates",
+            "type": "array"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "missing_config": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Config",
+            "type": "array"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "production_ready_local_single_user_runtime": {
+            "title": "Production Ready Local Single User Runtime",
+            "type": "boolean"
+          },
+          "provider_health": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderHealthSummary"
+            },
+            "title": "Provider Health",
+            "type": "array"
+          },
+          "readiness": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "$ref": "#/components/schemas/CheckpointCaptureHealth"
+                }
+              ]
+            },
+            "title": "Readiness",
+            "type": "object"
+          },
+          "runtime_mode": {
+            "title": "Runtime Mode",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "generated_at",
+          "scope",
+          "runtime_mode",
+          "production_ready_local_single_user_runtime",
+          "counts",
+          "missing_config",
+          "disabled_capabilities",
+          "readiness",
+          "provider_health",
+          "gates",
+          "note"
+        ],
+        "title": "DiagnosticsExport",
+        "type": "object"
+      },
       "DiagnosticsView": {
         "properties": {
           "background_workers": {
@@ -6887,6 +7635,313 @@
           "summary"
         ],
         "title": "EventView",
+        "type": "object"
+      },
+      "ExecutionEnvironmentConfigured": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "profile_id"
+        ],
+        "title": "ExecutionEnvironmentConfigured",
+        "type": "object"
+      },
+      "ExecutionEnvironmentProbed": {
+        "properties": {
+          "environment": {
+            "$ref": "#/components/schemas/ExecutionEnvironmentView"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "environment"
+        ],
+        "title": "ExecutionEnvironmentProbed",
+        "type": "object"
+      },
+      "ExecutionEnvironmentReset": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "recreated": {
+            "title": "Recreated",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "profile_id",
+          "session_id",
+          "recreated"
+        ],
+        "title": "ExecutionEnvironmentReset",
+        "type": "object"
+      },
+      "ExecutionEnvironmentSelected": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "selected_profile_id": {
+            "title": "Selected Profile Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "selected_profile_id"
+        ],
+        "title": "ExecutionEnvironmentSelected",
+        "type": "object"
+      },
+      "ExecutionEnvironmentView": {
+        "description": "One boundary a command could run in, as measured on this host.\n\nThe container keys are present for a container profile; ``boundary`` and\n``probe_observations`` for the boundaries a probe measures; ``config`` for\nan owner-configured profile, never with its secrets.",
+        "properties": {
+          "assigned_tool_count": {
+            "title": "Assigned Tool Count",
+            "type": "integer"
+          },
+          "assigned_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assigned Tools",
+            "type": "array"
+          },
+          "availability_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Availability Reason"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "boundary": {
+            "title": "Boundary",
+            "type": "string"
+          },
+          "budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget"
+          },
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CloudCost"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "credential_configured": {
+            "title": "Credential Configured",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "features": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Features",
+            "type": "object"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          },
+          "kind": {
+            "enum": [
+              "local",
+              "native",
+              "container",
+              "ssh",
+              "daytona"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "probe_checked_at": {
+            "title": "Probe Checked At",
+            "type": "string"
+          },
+          "probe_observations": {
+            "additionalProperties": {
+              "enum": [
+                "enforced",
+                "unenforced",
+                "indeterminate"
+              ],
+              "type": "string"
+            },
+            "title": "Probe Observations",
+            "type": "object"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "repository_access": {
+            "enum": [
+              "none",
+              "read_only"
+            ],
+            "title": "Repository Access",
+            "type": "string"
+          },
+          "runner_trust": {
+            "anyOf": [
+              {
+                "enum": [
+                  "publisher_verified",
+                  "package_relative_integrity",
+                  "development_unverified"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runner Trust"
+          },
+          "runtime": {
+            "anyOf": [
+              {
+                "enum": [
+                  "docker",
+                  "podman"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtime"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "boolean"
+          },
+          "selected_for_commands": {
+            "title": "Selected For Commands",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "writable_output": {
+            "title": "Writable Output",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profile_id",
+          "kind",
+          "name",
+          "enabled",
+          "configured",
+          "available",
+          "status",
+          "selected",
+          "credential_configured",
+          "budget",
+          "cost",
+          "selected_for_commands",
+          "assigned_tools",
+          "features",
+          "probe_checked_at",
+          "availability_reason"
+        ],
+        "title": "ExecutionEnvironmentView",
+        "type": "object"
+      },
+      "ExecutionEnvironmentsView": {
+        "properties": {
+          "container_options": {
+            "$ref": "#/components/schemas/ContainerOptions"
+          },
+          "environments": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionEnvironmentView"
+            },
+            "title": "Environments",
+            "type": "array"
+          },
+          "selected_profile_id": {
+            "title": "Selected Profile Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selected_profile_id",
+          "environments",
+          "container_options"
+        ],
+        "title": "ExecutionEnvironmentsView",
         "type": "object"
       },
       "ExecutionReceipt": {
@@ -7584,6 +8639,85 @@
         "title": "GithubRepoConnected",
         "type": "object"
       },
+      "GuideIndex": {
+        "description": "The sections this install carries; ``available`` is false when a build shipped none.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/GuideSectionSummary"
+            },
+            "title": "Sections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available",
+          "sections",
+          "reason_code"
+        ],
+        "title": "GuideIndex",
+        "type": "object"
+      },
+      "GuideSection": {
+        "description": "One section's Markdown, rendered by the client.",
+        "properties": {
+          "markdown": {
+            "title": "Markdown",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "summary",
+          "markdown"
+        ],
+        "title": "GuideSection",
+        "type": "object"
+      },
+      "GuideSectionSummary": {
+        "properties": {
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "summary"
+        ],
+        "title": "GuideSectionSummary",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -8191,6 +9325,326 @@
           "activity_counts"
         ],
         "title": "HooksView",
+        "type": "object"
+      },
+      "HostActionResult": {
+        "description": "A pause, resume, quit or restart. A quit or restart that would interrupt\nwork answers ``waiting_work`` and does nothing until confirmed.",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "paused": {
+            "title": "Paused",
+            "type": "boolean"
+          },
+          "paused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Reason"
+          },
+          "paused_since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Since"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "restartable": {
+            "title": "Restartable",
+            "type": "boolean"
+          },
+          "restarting": {
+            "title": "Restarting",
+            "type": "boolean"
+          },
+          "service": {
+            "$ref": "#/components/schemas/ServiceRegistration"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "stopping": {
+            "title": "Stopping",
+            "type": "boolean"
+          },
+          "waiting": {
+            "items": {
+              "$ref": "#/components/schemas/HostWaitingWork"
+            },
+            "title": "Waiting",
+            "type": "array"
+          }
+        },
+        "required": [
+          "state",
+          "detail",
+          "pid",
+          "port",
+          "started_at",
+          "paused",
+          "paused_since",
+          "paused_reason",
+          "waiting",
+          "service",
+          "restartable",
+          "ok"
+        ],
+        "title": "HostActionResult",
+        "type": "object"
+      },
+      "HostPathEntry": {
+        "properties": {
+          "is_directory": {
+            "title": "Is Directory",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "is_directory"
+        ],
+        "title": "HostPathEntry",
+        "type": "object"
+      },
+      "HostPathListing": {
+        "description": "BUG-251 — one directory listing from the host, for the Browse… dialog.",
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/HostPathEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "boolean"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "separator": {
+            "title": "Separator",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "workspace_root": {
+            "title": "Workspace Root",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "parent",
+          "separator",
+          "workspace_root",
+          "entries",
+          "truncated",
+          "missing"
+        ],
+        "title": "HostPathListing",
+        "type": "object"
+      },
+      "HostView": {
+        "description": "BUG-40 — state, in-flight work, and whether the host starts on its own.",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "paused": {
+            "title": "Paused",
+            "type": "boolean"
+          },
+          "paused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Reason"
+          },
+          "paused_since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Since"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "restartable": {
+            "title": "Restartable",
+            "type": "boolean"
+          },
+          "service": {
+            "$ref": "#/components/schemas/ServiceRegistration"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "waiting": {
+            "items": {
+              "$ref": "#/components/schemas/HostWaitingWork"
+            },
+            "title": "Waiting",
+            "type": "array"
+          }
+        },
+        "required": [
+          "state",
+          "detail",
+          "pid",
+          "port",
+          "started_at",
+          "paused",
+          "paused_since",
+          "paused_reason",
+          "waiting",
+          "service",
+          "restartable"
+        ],
+        "title": "HostView",
+        "type": "object"
+      },
+      "HostWaitingWork": {
+        "description": "One thing a quit would interrupt or leave undone, in the owner's terms.",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "detail"
+        ],
+        "title": "HostWaitingWork",
         "type": "object"
       },
       "HuggingFaceCredentialRequest": {
@@ -9017,6 +10471,96 @@
         "title": "InstallPlan",
         "type": "object"
       },
+      "InstallationView": {
+        "description": "BUG-44 — what this installation is, read from the build that produced it.",
+        "properties": {
+          "built_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Built At"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          },
+          "install_root": {
+            "title": "Install Root",
+            "type": "string"
+          },
+          "installer_formats": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Installer Formats",
+            "type": "array"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "packaged": {
+            "title": "Packaged",
+            "type": "boolean"
+          },
+          "signed": {
+            "title": "Signed",
+            "type": "boolean"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "target",
+          "packaged",
+          "signed",
+          "channel",
+          "commit",
+          "built_at",
+          "installer_formats",
+          "install_root",
+          "note"
+        ],
+        "title": "InstallationView",
+        "type": "object"
+      },
       "InstalledPlugin": {
         "properties": {
           "checksum_present": {
@@ -9240,6 +10784,25 @@
         "title": "InstanceCreateRequest",
         "type": "object"
       },
+      "InstanceCreated": {
+        "description": "The new instance's name and mount; the workspace path never reaches the browser.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "url"
+        ],
+        "title": "InstanceCreated",
+        "type": "object"
+      },
       "InterruptRequest": {
         "properties": {
           "action_type": {
@@ -9288,6 +10851,39 @@
           "session_id"
         ],
         "title": "InterruptRequest",
+        "type": "object"
+      },
+      "InterruptResult": {
+        "description": "Interrupts land at a safe boundary; ``turn_control`` is null when a task was named.",
+        "properties": {
+          "applied": {
+            "items": {
+              "$ref": "#/components/schemas/TaskInterrupted"
+            },
+            "title": "Applied",
+            "type": "array"
+          },
+          "safe_boundary": {
+            "title": "Safe Boundary",
+            "type": "boolean"
+          },
+          "turn_control": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TurnControl"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "applied",
+          "safe_boundary",
+          "turn_control"
+        ],
+        "title": "InterruptResult",
         "type": "object"
       },
       "IssuedSessionView": {
@@ -9535,6 +11131,48 @@
           "category"
         ],
         "title": "LanguageMatch",
+        "type": "object"
+      },
+      "LastUpdateCheck": {
+        "properties": {
+          "available_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Version"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message",
+          "available_version",
+          "checked_at"
+        ],
+        "title": "LastUpdateCheck",
         "type": "object"
       },
       "LibraryRescanned": {
@@ -13829,6 +15467,10 @@
             "title": "Artifact Ref"
           },
           "capture_status": {
+            "enum": [
+              "captured",
+              "skipped"
+            ],
             "title": "Capture Status",
             "type": "string"
           },
@@ -16082,7 +17724,8 @@
             "default": "chat",
             "enum": [
               "chat",
-              "build"
+              "build",
+              "design"
             ],
             "title": "Surface",
             "type": "string"
@@ -16157,6 +17800,12 @@
             "title": "Reason Code"
           },
           "status": {
+            "enum": [
+              "available",
+              "policy_denied",
+              "unsupported",
+              "unavailable"
+            ],
             "title": "Status",
             "type": "string"
           }
@@ -16169,6 +17818,55 @@
           "model_count"
         ],
         "title": "ProviderCatalogueRefreshView",
+        "type": "object"
+      },
+      "ProviderHealthSummary": {
+        "description": "A provider's configured state, without the detail line a support bundle omits.",
+        "properties": {
+          "endpoint_kind": {
+            "title": "Endpoint Kind",
+            "type": "string"
+          },
+          "local_only": {
+            "title": "Local Only",
+            "type": "boolean"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "requires_network": {
+            "title": "Requires Network",
+            "type": "boolean"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "provider",
+          "model",
+          "endpoint_kind",
+          "local_only",
+          "requires_network",
+          "selected",
+          "status"
+        ],
+        "title": "ProviderHealthSummary",
         "type": "object"
       },
       "ProviderHealthView": {
@@ -16459,6 +18157,34 @@
         "title": "RecordThreatModelAckRequest",
         "type": "object"
       },
+      "RecoveryPointView": {
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "files": {
+            "title": "Files",
+            "type": "integer"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "path",
+          "files",
+          "bytes"
+        ],
+        "title": "RecoveryPointView",
+        "type": "object"
+      },
       "RegisterRequest": {
         "additionalProperties": false,
         "properties": {
@@ -16567,6 +18293,73 @@
           "already_present"
         ],
         "title": "RelationshipScan",
+        "type": "object"
+      },
+      "ReleaseSigning": {
+        "description": "What signing a target's installers requires.\n\n``required_env`` names the CI variables that hold the signing material. On\nthe wire it is not called ``secrets``: the response redactor masks any key\ncontaining that word, which turned this list of names into a string.",
+        "properties": {
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "required_env": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Required Env",
+            "type": "array"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "required_env",
+          "note"
+        ],
+        "title": "ReleaseSigning",
+        "type": "object"
+      },
+      "ReleaseTargetView": {
+        "properties": {
+          "arch": {
+            "title": "Arch",
+            "type": "string"
+          },
+          "installer_formats": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Installer Formats",
+            "type": "array"
+          },
+          "os": {
+            "title": "Os",
+            "type": "string"
+          },
+          "runner": {
+            "title": "Runner",
+            "type": "string"
+          },
+          "signing": {
+            "$ref": "#/components/schemas/ReleaseSigning"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_id",
+          "os",
+          "arch",
+          "runner",
+          "installer_formats",
+          "signing"
+        ],
+        "title": "ReleaseTargetView",
         "type": "object"
       },
       "RemoteMcpServerCreated": {
@@ -17299,6 +19092,52 @@
         "title": "SelectedChoice",
         "type": "object"
       },
+      "ServiceRegistration": {
+        "description": "Whether the background host is registered, and what registered it.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "mechanism": {
+            "title": "Mechanism",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "registered": {
+            "title": "Registered",
+            "type": "boolean"
+          },
+          "supported": {
+            "title": "Supported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "supported",
+          "registered",
+          "mechanism",
+          "label",
+          "path",
+          "note"
+        ],
+        "title": "ServiceRegistration",
+        "type": "object"
+      },
       "SessionArchived": {
         "properties": {
           "archived": {
@@ -17989,6 +19828,72 @@
           "settings"
         ],
         "title": "SettingsRequest",
+        "type": "object"
+      },
+      "SettingsSaved": {
+        "properties": {
+          "settings": {
+            "additionalProperties": true,
+            "title": "Settings",
+            "type": "object"
+          }
+        },
+        "required": [
+          "settings"
+        ],
+        "title": "SettingsSaved",
+        "type": "object"
+      },
+      "SettingsStatus": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "mfa_enrolled": {
+            "title": "Mfa Enrolled",
+            "type": "boolean"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          },
+          "vault": {
+            "enum": [
+              "configured_valid",
+              "missing",
+              "invalid"
+            ],
+            "title": "Vault",
+            "type": "string"
+          }
+        },
+        "required": [
+          "vault",
+          "mfa_enrolled",
+          "username",
+          "display_name"
+        ],
+        "title": "SettingsStatus",
+        "type": "object"
+      },
+      "SettingsView": {
+        "description": "The owner's settings document — their own keys, stored as written — and status.",
+        "properties": {
+          "settings": {
+            "additionalProperties": true,
+            "title": "Settings",
+            "type": "object"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SettingsStatus"
+          }
+        },
+        "required": [
+          "settings",
+          "status"
+        ],
+        "title": "SettingsView",
         "type": "object"
       },
       "SetupBackupCreated": {
@@ -18850,6 +20755,74 @@
         "title": "StandingGrantView",
         "type": "object"
       },
+      "StopAllResult": {
+        "description": "GEP-02 — every task, turn and command the stop switch reached, and what would not stop.",
+        "properties": {
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/CommandStopRequested"
+            },
+            "title": "Commands",
+            "type": "array"
+          },
+          "failed": {
+            "items": {
+              "$ref": "#/components/schemas/StopFailure"
+            },
+            "title": "Failed",
+            "type": "array"
+          },
+          "safe_boundary": {
+            "title": "Safe Boundary",
+            "type": "boolean"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskInterrupted"
+            },
+            "title": "Tasks",
+            "type": "array"
+          },
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/TurnStopped"
+            },
+            "title": "Turns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tasks",
+          "turns",
+          "commands",
+          "failed",
+          "safe_boundary"
+        ],
+        "title": "StopAllResult",
+        "type": "object"
+      },
+      "StopFailure": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "reason_code"
+        ],
+        "title": "StopFailure",
+        "type": "object"
+      },
       "StopHostRequest": {
         "additionalProperties": false,
         "properties": {
@@ -19314,7 +21287,8 @@
             "default": "chat",
             "enum": [
               "chat",
-              "build"
+              "build",
+              "design"
             ],
             "title": "Surface",
             "type": "string"
@@ -19419,6 +21393,24 @@
           "detail"
         ],
         "title": "TaskEventView",
+        "type": "object"
+      },
+      "TaskInterrupted": {
+        "properties": {
+          "result": {
+            "title": "Result",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "result"
+        ],
+        "title": "TaskInterrupted",
         "type": "object"
       },
       "TaskResumed": {
@@ -20194,6 +22186,37 @@
         "title": "TranscriptSource",
         "type": "object"
       },
+      "TraySession": {
+        "description": "A host-control session for the native tray, exchanged once for its bootstrap secret.",
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "expires_at",
+          "scope"
+        ],
+        "title": "TraySession",
+        "type": "object"
+      },
       "TraySessionRequest": {
         "additionalProperties": false,
         "properties": {
@@ -20208,6 +22231,29 @@
           "secret"
         ],
         "title": "TraySessionRequest",
+        "type": "object"
+      },
+      "TurnControl": {
+        "description": "What an interrupt did to the turn streaming in the conversation.",
+        "properties": {
+          "action": {
+            "enum": [
+              "stop",
+              "steer"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "action",
+          "queued"
+        ],
+        "title": "TurnControl",
         "type": "object"
       },
       "TurnDetailView": {
@@ -20432,6 +22478,24 @@
         "title": "TurnSources",
         "type": "object"
       },
+      "TurnStopped": {
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "turn_id"
+        ],
+        "title": "TurnStopped",
+        "type": "object"
+      },
       "TurnView": {
         "properties": {
           "completed_at": {
@@ -20554,6 +22618,443 @@
         "title": "UnsupportedFeature",
         "type": "object"
       },
+      "UpdateApplyResult": {
+        "description": "The verified update handed to the helper, or why it was not.",
+        "properties": {
+          "available": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChannelUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateChannelView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "installation": {
+            "$ref": "#/components/schemas/InstallationView"
+          },
+          "last_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastUpdateCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "recovery_points": {
+            "items": {
+              "$ref": "#/components/schemas/RecoveryPointView"
+            },
+            "title": "Recovery Points",
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "source_checkout",
+              "no_channel",
+              "unsigned_build",
+              "not_checked",
+              "up_to_date",
+              "available",
+              "unreachable"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseTargetView"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "updating": {
+            "title": "Updating",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message",
+          "installation",
+          "channel",
+          "available",
+          "recovery_points",
+          "checked_at",
+          "targets",
+          "last_check",
+          "ok",
+          "updating"
+        ],
+        "title": "UpdateApplyResult",
+        "type": "object"
+      },
+      "UpdateChannelView": {
+        "properties": {
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "public_key_fingerprint": {
+            "title": "Public Key Fingerprint",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "channel",
+          "public_key_fingerprint"
+        ],
+        "title": "UpdateChannelView",
+        "type": "object"
+      },
+      "UpdateCheckResult": {
+        "properties": {
+          "available": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChannelUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateChannelView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "installation": {
+            "$ref": "#/components/schemas/InstallationView"
+          },
+          "last_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastUpdateCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "recovery_points": {
+            "items": {
+              "$ref": "#/components/schemas/RecoveryPointView"
+            },
+            "title": "Recovery Points",
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "source_checkout",
+              "no_channel",
+              "unsigned_build",
+              "not_checked",
+              "up_to_date",
+              "available",
+              "unreachable"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseTargetView"
+            },
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "state",
+          "message",
+          "installation",
+          "channel",
+          "available",
+          "recovery_points",
+          "checked_at",
+          "targets",
+          "last_check",
+          "ok"
+        ],
+        "title": "UpdateCheckResult",
+        "type": "object"
+      },
+      "UpdateDeferred": {
+        "description": "An update that would interrupt work: the host's own account of that work.",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "paused": {
+            "title": "Paused",
+            "type": "boolean"
+          },
+          "paused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Reason"
+          },
+          "paused_since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Since"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "reason_code": {
+            "const": "waiting_work",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "updating": {
+            "title": "Updating",
+            "type": "boolean"
+          },
+          "waiting": {
+            "items": {
+              "$ref": "#/components/schemas/HostWaitingWork"
+            },
+            "title": "Waiting",
+            "type": "array"
+          }
+        },
+        "required": [
+          "state",
+          "detail",
+          "pid",
+          "port",
+          "started_at",
+          "paused",
+          "paused_since",
+          "paused_reason",
+          "waiting",
+          "ok",
+          "updating",
+          "reason_code",
+          "message"
+        ],
+        "title": "UpdateDeferred",
+        "type": "object"
+      },
+      "UpdateStatusView": {
+        "description": "Provenance, channel and recovery points; ``not_checked`` is not an assurance.",
+        "properties": {
+          "available": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChannelUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateChannelView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "installation": {
+            "$ref": "#/components/schemas/InstallationView"
+          },
+          "last_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastUpdateCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "recovery_points": {
+            "items": {
+              "$ref": "#/components/schemas/RecoveryPointView"
+            },
+            "title": "Recovery Points",
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "source_checkout",
+              "no_channel",
+              "unsigned_build",
+              "not_checked",
+              "up_to_date",
+              "available",
+              "unreachable"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseTargetView"
+            },
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "state",
+          "message",
+          "installation",
+          "channel",
+          "available",
+          "recovery_points",
+          "checked_at",
+          "targets",
+          "last_check"
+        ],
+        "title": "UpdateStatusView",
+        "type": "object"
+      },
       "UploadAttachment": {
         "description": "An image or document uploaded through ``POST /api/attachments``.",
         "properties": {
@@ -20619,6 +23120,50 @@
           "data_base64"
         ],
         "title": "UploadSkillRequest",
+        "type": "object"
+      },
+      "UploadedAttachment": {
+        "description": "An image or document taken into the governed store: metadata only, never the bytes.",
+        "properties": {
+          "attachment_id": {
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "attachment_id",
+          "kind",
+          "filename",
+          "media_type",
+          "byte_size",
+          "sha256"
+        ],
+        "title": "UploadedAttachment",
         "type": "object"
       },
       "ValidationError": {
@@ -21491,9 +24036,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Resume After Approval Api Approvals  Approval Id  Resume Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AgentResponse"
                 }
               }
             },
@@ -21569,9 +24112,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Upload Attachment Api Attachments Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/UploadedAttachment"
                 }
               }
             },
@@ -24616,9 +27157,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Invoke Connector Action Api Connector Store  Connector Id  Actions Post",
-                  "type": "object"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ConnectorActionCompleted"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ConnectorActionQueued"
+                    }
+                  ]
                 }
               }
             },
@@ -24943,9 +27489,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Diagnostics Export Api Diagnostics Export Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DiagnosticsExport"
                 }
               }
             },
@@ -25073,9 +27617,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Execution Environments Api Execution Environments Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ExecutionEnvironmentsView"
                 }
               }
             },
@@ -25105,9 +27647,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Configure Execution Environment Api Execution Environments Configure Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ExecutionEnvironmentConfigured"
                 }
               }
             },
@@ -25147,9 +27687,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Select Execution Environment Api Execution Environments Selection Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ExecutionEnvironmentSelected"
                 }
               }
             },
@@ -25189,9 +27727,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Probe Execution Environment Api Execution Environments  Profile Id  Probe Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ExecutionEnvironmentProbed"
                 }
               }
             },
@@ -25243,9 +27779,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Reset Execution Environment Api Execution Environments  Profile Id  Reset Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ExecutionEnvironmentReset"
                 }
               }
             },
@@ -25450,9 +27984,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Guide Index Api Guide Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/GuideIndex"
                 }
               }
             },
@@ -25482,9 +28014,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Guide Section Api Guide  Slug  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/GuideSection"
                 }
               }
             },
@@ -25551,9 +28081,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Host Api Host Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HostView"
                 }
               }
             },
@@ -25594,9 +28122,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Browse Host Paths Api Host Paths Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HostPathListing"
                 }
               }
             },
@@ -25635,9 +28161,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Pause Host Api Host Pause Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HostActionResult"
                 }
               }
             },
@@ -25676,9 +28200,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Quit Host Api Host Quit Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HostActionResult"
                 }
               }
             },
@@ -25717,9 +28239,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Restart Host Api Host Restart Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HostActionResult"
                 }
               }
             },
@@ -25748,9 +28268,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Resume Host Api Host Resume Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HostActionResult"
                 }
               }
             },
@@ -25769,9 +28287,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Update Status Api Host Update Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/UpdateStatusView"
                 }
               }
             },
@@ -25800,9 +28316,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Apply Update Api Host Update Apply Post",
-                  "type": "object"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UpdateApplyResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UpdateDeferred"
+                    }
+                  ]
                 }
               }
             },
@@ -25831,9 +28352,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Check Update Api Host Update Check Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/UpdateCheckResult"
                 }
               }
             },
@@ -26191,9 +28710,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Instance Api Instances Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/InstanceCreated"
                 }
               }
             },
@@ -26231,9 +28748,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Interrupts Api Interrupts Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/InterruptResult"
                 }
               }
             },
@@ -30824,9 +33339,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Submit Prompt Api Prompts Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AgentResponse"
                 }
               }
             },
@@ -32572,9 +35085,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Settings Api Settings Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SettingsView"
                 }
               }
             },
@@ -32600,9 +35111,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Put Settings Api Settings Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SettingsSaved"
                 }
               }
             },
@@ -32630,11 +35139,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Get Composer Approval Mode Api Settings Composer Approval Mode Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ComposerApprovalMode"
                 }
               }
             },
@@ -32660,11 +35165,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Put Composer Approval Mode Api Settings Composer Approval Mode Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ComposerApprovalMode"
                 }
               }
             },
@@ -33419,9 +35920,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Stop All Api Stop All Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/StopAllResult"
                 }
               }
             },
@@ -33929,9 +36428,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Exchange Tray Session Api Tray Session Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/TraySession"
                 }
               }
             },

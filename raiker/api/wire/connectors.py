@@ -8,7 +8,7 @@ from typing import Literal, NotRequired
 
 from typing_extensions import TypedDict
 
-from raiker.runtime.connector_ecosystem import ConnectorOperation
+from raiker.runtime.connector_ecosystem import ConnectorInvocation, ConnectorOperation
 
 ConnectorAuthStatus = Literal["connected", "reauth_required", "not_connected"]
 
@@ -73,3 +73,20 @@ class ManifestRegistered(TypedDict):
     version: NotRequired[str]
     api_url: NotRequired[str]
     operations: list[ConnectorOperation]
+
+
+class ConnectorActionQueued(TypedDict):
+    """A write: recorded as an intent and waiting for the owner's approval. Nothing ran."""
+
+    status: Literal["approval_required"]
+    approval_id: str
+    intent_id: str
+    connector_id: str
+    operation_id: str
+    executes_action: bool
+
+
+class ConnectorActionCompleted(ConnectorInvocation):
+    """A read, carried out."""
+
+    status: Literal["completed"]

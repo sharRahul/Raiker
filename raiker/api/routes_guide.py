@@ -15,7 +15,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from raiker.api.dependencies import authenticate as _auth
+from raiker.api.schemas import serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.settings import GuideIndex, GuideSection
 from raiker.guide import list_sections, read_section
 from raiker.runtime.authority.models import Principal
 
@@ -34,7 +36,7 @@ def guide_index(
     missing and name why instead of looking broken.
     """
     sections = list_sections()
-    return {
+    answer: GuideIndex = {
         "available": len(sections) > 0,
         "sections": [
             {"slug": section.slug, "title": section.title, "summary": section.summary}
@@ -42,6 +44,7 @@ def guide_index(
         ],
         "reason_code": "" if sections else "guide_not_bundled",
     }
+    return serialize_dto(answer)
 
 
 @router.get("/api/guide/{slug}")
@@ -55,9 +58,10 @@ def guide_section(
     if found is None:
         raise HTTPException(status_code=404, detail={"reason_code": "unknown_guide_section"})
     section, markdown = found
-    return {
+    answer: GuideSection = {
         "slug": section.slug,
         "title": section.title,
         "summary": section.summary,
         "markdown": markdown,
     }
+    return serialize_dto(answer)

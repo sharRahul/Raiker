@@ -43,6 +43,21 @@ export type AgentPlanStep = {
   note?: string;
 };
 
+export type AgentResponse = {
+  request_id: string;
+  session_id: string;
+  turn_id: string;
+  status: string;
+  message: string;
+  events_path: string | null;
+  checkpoint_path: string | null;
+  client: ClientMetadata | null;
+  approval: ApprovalInfo | null;
+  last_event_id: string | null;
+  content_parts: ContentPartView[];
+  schema_version: string;
+};
+
 /** The owner's answer to a mid-turn question (ADD-22). */
 export type AnswerOwnerQuestionRequest = {
   answers?: Record<string, unknown>;
@@ -62,6 +77,22 @@ export type ApprovalDetailView = {
   metadata_only_notice: string;
   executes_on_approval: boolean;
   execution_evidence: Record<string, unknown>;
+};
+
+/** The proposal a turn parked on. Nothing has run; ``expected_effect`` says what will. */
+export type ApprovalInfo = {
+  action_id: string;
+  approval_id: string;
+  tool_name: string;
+  arguments: Record<string, unknown>;
+  risk_level: string;
+  reasons: string[];
+  message: string;
+  expected_effect: string;
+  resumable: boolean;
+  queue_position: number;
+  queue_total: number;
+  queued_calls: number;
 };
 
 export type ApprovalRelayAnswered = {
@@ -99,7 +130,7 @@ export type ApprovalResolved = {
   approved_by: IdentityView | null;
   machine_identity: IdentityView | null;
   execution?: ExecutionSummary;
-  connector_result?: Record<string, unknown>;
+  connector_result?: ConnectorInvocation;
   resume: ResumeHandle;
 };
 
@@ -614,6 +645,19 @@ export type ChannelUnpaired = {
   removed: boolean;
 };
 
+/** One target's entry in a verified channel index. */
+export type ChannelUpdate = {
+  channel: string;
+  version: string;
+  target: string;
+  artifact: string;
+  sha256: string;
+  manifest: string;
+  signature: string;
+  signed: boolean;
+  released_at: string;
+};
+
 /** A transport update that is not a message: acknowledged so it is not retried. */
 export type ChannelUpdateIgnored = {
   ok: boolean;
@@ -666,6 +710,23 @@ export type CheckpointView = {
   last_event_id: string | null;
   can_restore_state: boolean;
   can_restore_files: boolean;
+};
+
+export type ClientMetadata = {
+  type: string;
+  name: string;
+  version: string;
+  interface_status: string;
+};
+
+export type CloudCost = {
+  actual_cost: number;
+  provider_cost: number;
+  reserved_cost: number;
+  committed_cost: number;
+  remaining_cost: number | null;
+  reconciliation_status: "not_started" | "reserved" | "reconciled" | "provider_unavailable";
+  history: CostEvent[];
 };
 
 export type CodeMapError = {
@@ -919,6 +980,11 @@ export type CommandRunView = {
   updated_at: string;
 };
 
+export type CommandStopRequested = {
+  run_id: string;
+  state: string;
+};
+
 export type CommandStopped = {
   ok: boolean;
   run: CommandRunView;
@@ -926,6 +992,19 @@ export type CommandStopped = {
 
 export type CompactConversationRequest = {
   through_turn_id: string;
+};
+
+/** The undo a completed write offers, and until when. */
+export type CompensationWindow = {
+  operation_id: string;
+  argument_map: Record<string, string>;
+  deadline_seconds: number;
+  available_until: string;
+  source_invocation_id: string;
+};
+
+export type ComposerApprovalMode = {
+  approval_mode: "manual" | "auto" | "skip" | "dont_ask";
 };
 
 export type ComposerApprovalModeRequest = {
@@ -958,6 +1037,28 @@ export type ConnectionsView = {
   connector_egress_allowlist_configured: boolean;
 };
 
+/** A read, carried out. */
+export type ConnectorActionCompleted = {
+  invocation_id: string;
+  connector_id: string;
+  operation_id: string;
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  status_code: number;
+  data: unknown;
+  compensation?: CompensationWindow;
+  status: "completed";
+};
+
+/** A write: recorded as an intent and waiting for the owner's approval. Nothing ran. */
+export type ConnectorActionQueued = {
+  status: "approval_required";
+  approval_id: string;
+  intent_id: string;
+  connector_id: string;
+  operation_id: string;
+  executes_action: boolean;
+};
+
 export type ConnectorActionRequest = {
   operation_id: string;
   arguments?: Record<string, unknown>;
@@ -988,6 +1089,17 @@ export type ConnectorInstalled = {
   connector_id: string;
   installed: boolean;
   enabled: boolean;
+};
+
+/** One completed connector call; ``data`` is the upstream answer, bounded and redacted. */
+export type ConnectorInvocation = {
+  invocation_id: string;
+  connector_id: string;
+  operation_id: string;
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  status_code: number;
+  data: unknown;
+  compensation?: CompensationWindow;
 };
 
 export type ConnectorOperation = {
@@ -1046,6 +1158,12 @@ export type ContainedSubject = {
   contained_at: string | null;
   probe_after: string | null;
   updated_at: string;
+};
+
+export type ContainerOptions = {
+  runtimes: ("docker" | "podman")[];
+  images: string[];
+  supported_tools: string[];
 };
 
 export type ContainmentCapability = {
@@ -1190,6 +1308,16 @@ export type ConversionPreview = {
   isolation: ConversionIsolation;
 };
 
+export type CostEvent = {
+  event_id: string;
+  action_id: string;
+  event_type: "reserved" | "reconciled" | "released" | "provider_snapshot" | "provider_unavailable";
+  amount: number;
+  provider_reference: string | null;
+  reason: string | null;
+  recorded_at: string;
+};
+
 export type CreateMcpServerRequest = {
   name: string;
   template: string;
@@ -1312,6 +1440,28 @@ export type Diagnostic = {
   source: string;
 };
 
+export type DiagnosticGate = {
+  capability: string;
+  state: string;
+  decision_mode: string;
+  runtime_enabled: boolean;
+};
+
+/** A copyable, redacted support bundle of the runtime's own readiness facts. */
+export type DiagnosticsExport = {
+  generated_at: string;
+  scope: string;
+  runtime_mode: string;
+  production_ready_local_single_user_runtime: boolean;
+  counts: Record<string, number>;
+  missing_config: string[];
+  disabled_capabilities: string[];
+  readiness: Record<string, boolean | CheckpointCaptureHealth>;
+  provider_health: ProviderHealthSummary[];
+  gates: DiagnosticGate[];
+  note: string;
+};
+
 export type DiagnosticsView = {
   runtime_mode: string;
   production_ready_local_single_user_runtime: boolean;
@@ -1423,6 +1573,63 @@ export type EventView = {
   risk_level: string | null;
   summary: string | null;
   machine_identity: IdentityView | null;
+};
+
+export type ExecutionEnvironmentConfigured = {
+  ok: boolean;
+  profile_id: string;
+};
+
+export type ExecutionEnvironmentProbed = {
+  ok: boolean;
+  environment: ExecutionEnvironmentView;
+};
+
+export type ExecutionEnvironmentReset = {
+  ok: boolean;
+  profile_id: string;
+  session_id: string;
+  recreated: boolean;
+};
+
+export type ExecutionEnvironmentSelected = {
+  ok: boolean;
+  selected_profile_id: string;
+};
+
+/** One boundary a command could run in, as measured on this host. */
+export type ExecutionEnvironmentView = {
+  profile_id: string;
+  kind: "local" | "native" | "container" | "ssh" | "daytona";
+  name: string;
+  enabled: boolean;
+  configured: boolean;
+  available: boolean;
+  status: string;
+  selected: boolean;
+  credential_configured: boolean;
+  budget: number | null;
+  cost: CloudCost | null;
+  selected_for_commands: boolean;
+  assigned_tools: string[];
+  features: Record<string, boolean>;
+  probe_checked_at: string;
+  availability_reason: string | null;
+  boundary?: string;
+  probe_observations?: Record<string, "enforced" | "unenforced" | "indeterminate">;
+  runner_trust?: "publisher_verified" | "package_relative_integrity" | "development_unverified" | null;
+  runtime?: "docker" | "podman" | null;
+  image?: string | null;
+  repository_access?: "none" | "read_only";
+  writable_output?: boolean;
+  assigned_tool_count?: number;
+  config?: Record<string, unknown>;
+};
+
+export type ExecutionEnvironmentsView = {
+  selected_profile_id: string;
+  environments: ExecutionEnvironmentView[];
+  container_options: ContainerOptions;
 };
 
 /** BUG-62 — where an executed action's result now lives. */
@@ -1560,6 +1767,27 @@ export type GithubRepoConnected = {
   branch: string | null;
 };
 
+/** The sections this install carries; ``available`` is false when a build shipped none. */
+export type GuideIndex = {
+  available: boolean;
+  sections: GuideSectionSummary[];
+  reason_code: string;
+};
+
+/** One section's Markdown, rendered by the client. */
+export type GuideSection = {
+  slug: string;
+  title: string;
+  summary: string;
+  markdown: string;
+};
+
+export type GuideSectionSummary = {
+  slug: string;
+  title: string;
+  summary: string;
+};
+
 /** Liveness, and whether the encrypted store opens (BUG-86). */
 export type HealthView = {
   status: "ok" | "degraded";
@@ -1668,6 +1896,67 @@ export type HooksView = {
   builtins: string[];
   activity: HookActivityView[];
   activity_counts: Record<string, number>;
+};
+
+/**
+ * A pause, resume, quit or restart. A quit or restart that would interrupt work answers
+ * ``waiting_work`` and does nothing until confirmed.
+ */
+export type HostActionResult = {
+  state: string;
+  detail: string;
+  pid: number | null;
+  port: number | null;
+  started_at: string | null;
+  paused: boolean;
+  paused_since: string | null;
+  paused_reason: string | null;
+  waiting: HostWaitingWork[];
+  service: ServiceRegistration;
+  restartable: boolean;
+  ok: boolean;
+  reason_code?: string;
+  stopping?: boolean;
+  restarting?: boolean;
+};
+
+export type HostPathEntry = {
+  name: string;
+  path: string;
+  is_directory: boolean;
+};
+
+/** BUG-251 — one directory listing from the host, for the Browse… dialog. */
+export type HostPathListing = {
+  path: string;
+  parent: string | null;
+  separator: string;
+  workspace_root: string;
+  entries: HostPathEntry[];
+  truncated: boolean;
+  missing: boolean;
+};
+
+/** BUG-40 — state, in-flight work, and whether the host starts on its own. */
+export type HostView = {
+  state: string;
+  detail: string;
+  pid: number | null;
+  port: number | null;
+  started_at: string | null;
+  paused: boolean;
+  paused_since: string | null;
+  paused_reason: string | null;
+  waiting: HostWaitingWork[];
+  service: ServiceRegistration;
+  restartable: boolean;
+};
+
+/** One thing a quit would interrupt or leave undone, in the owner's terms. */
+export type HostWaitingWork = {
+  kind: string;
+  label: string;
+  detail: string;
 };
 
 export type HuggingFaceCredentialRequest = {
@@ -1820,6 +2109,20 @@ export type InstallPlan = {
   redistribution: boolean;
 };
 
+/** BUG-44 — what this installation is, read from the build that produced it. */
+export type InstallationView = {
+  version: string;
+  target: string | null;
+  packaged: boolean;
+  signed: boolean;
+  channel: string | null;
+  commit: string | null;
+  built_at: string | null;
+  installer_formats: string[];
+  install_root: string;
+  note: string;
+};
+
 export type InstalledPlugin = {
   record_id: string;
   plugin_id: string;
@@ -1861,6 +2164,12 @@ export type InstanceCreateRequest = {
   password?: string | null;
 };
 
+/** The new instance's name and mount; the workspace path never reaches the browser. */
+export type InstanceCreated = {
+  name: string;
+  url: string;
+};
+
 export type InterruptRequest = {
   session_id: string;
   task_id?: string | null;
@@ -1868,6 +2177,13 @@ export type InterruptRequest = {
   action_type?: string;
   reason?: string;
   steer_text?: string | null;
+};
+
+/** Interrupts land at a safe boundary; ``turn_control`` is null when a task was named. */
+export type InterruptResult = {
+  applied: TaskInterrupted[];
+  safe_boundary: boolean;
+  turn_control: TurnControl | null;
 };
 
 /** The first-run owner session, with the CSRF token for its cookie. */
@@ -1923,6 +2239,13 @@ export type LanguageMatch = {
   replacements: string[];
   rule_id: string;
   category: string;
+};
+
+export type LastUpdateCheck = {
+  state: string;
+  message: string;
+  available_version: string | null;
+  checked_at: string | null;
 };
 
 export type LibraryRescanned = {
@@ -2716,7 +3039,7 @@ export type ObservationView = {
   summary: string;
   sensitivity: string;
   retention: string;
-  capture_status: string;
+  capture_status: "captured" | "skipped";
   skip_reason: string;
   promotable_to_memory: boolean;
   content_sha256: string;
@@ -3158,7 +3481,7 @@ export type ProjectsListView = {
 export type PromptRequest = {
   text: string;
   input_mode?: "typed" | "dictated" | "mixed";
-  surface?: "chat" | "build";
+  surface?: "chat" | "build" | "design";
   project_id?: string | null;
   session_id?: string | null;
   planning_mode?: string | null;
@@ -3185,9 +3508,21 @@ export type ProposalDecided = {
 export type ProviderCatalogueRefreshView = {
   profile_id: string;
   provider: string;
-  status: string;
+  status: "available" | "policy_denied" | "unsupported" | "unavailable";
   reason_code: string | null;
   model_count: number;
+};
+
+/** A provider's configured state, without the detail line a support bundle omits. */
+export type ProviderHealthSummary = {
+  profile_id: string;
+  provider: string;
+  model: string;
+  endpoint_kind: string;
+  local_only: boolean;
+  requires_network: boolean;
+  selected: boolean;
+  status: string;
 };
 
 export type ProviderHealthView = {
@@ -3246,6 +3581,13 @@ export type RecordThreatModelAckRequest = {
   as_principal?: string | null;
 };
 
+export type RecoveryPointView = {
+  version: string;
+  path: string;
+  files: number;
+  bytes: number;
+};
+
 export type RegisterRequest = {
   username: string;
   password: string;
@@ -3270,6 +3612,22 @@ export type RelationshipScan = {
   proposed: number;
   skipped: number;
   already_present: number;
+};
+
+/** What signing a target's installers requires. */
+export type ReleaseSigning = {
+  tool: string;
+  required_env: string[];
+  note: string;
+};
+
+export type ReleaseTargetView = {
+  target_id: string;
+  os: string;
+  arch: string;
+  runner: string;
+  installer_formats: string[];
+  signing: ReleaseSigning;
 };
 
 export type RemoteMcpServerCreated = {
@@ -3440,6 +3798,16 @@ export type SelectedChoice = {
   source: "surface_default" | "global_default" | "native_default";
 };
 
+/** Whether the background host is registered, and what registered it. */
+export type ServiceRegistration = {
+  supported: boolean;
+  registered: boolean;
+  mechanism: string;
+  label: string;
+  path: string | null;
+  note: string;
+};
+
 export type SessionArchived = {
   ok: boolean;
   session_id: string;
@@ -3588,6 +3956,23 @@ export type SetSkillCommandRequest = {
 
 export type SettingsRequest = {
   settings: Record<string, unknown>;
+};
+
+export type SettingsSaved = {
+  settings: Record<string, unknown>;
+};
+
+export type SettingsStatus = {
+  vault: "configured_valid" | "missing" | "invalid";
+  mfa_enrolled: boolean;
+  username: string;
+  display_name: string;
+};
+
+/** The owner's settings document — their own keys, stored as written — and status. */
+export type SettingsView = {
+  settings: Record<string, unknown>;
+  status: SettingsStatus;
 };
 
 export type SetupBackupCreated = {
@@ -3760,6 +4145,21 @@ export type StandingGrantView = {
   last_used_at: string | null;
 };
 
+/** GEP-02 — every task, turn and command the stop switch reached, and what would not stop. */
+export type StopAllResult = {
+  tasks: TaskInterrupted[];
+  turns: TurnStopped[];
+  commands: CommandStopRequested[];
+  failed: StopFailure[];
+  safe_boundary: boolean;
+};
+
+export type StopFailure = {
+  kind: string;
+  reason_code: string;
+  run_id?: string;
+};
+
 export type StopHostRequest = {
   confirm?: boolean;
 };
@@ -3845,7 +4245,7 @@ export type TaskCreateRequest = {
   project_id?: string | null;
   model_profile?: string | null;
   model?: string | null;
-  surface?: "chat" | "build";
+  surface?: "chat" | "build" | "design";
   attachments?: Record<string, unknown>[] | null;
 };
 
@@ -3866,6 +4266,11 @@ export type TaskEventView = {
   detail: string;
   turn_id: string | null;
   session_id: string | null;
+};
+
+export type TaskInterrupted = {
+  task_id: string;
+  result: string;
 };
 
 /** The owner's retry of a parked run (BUG-25); ``task_status`` and ``summary`` once it ran. */
@@ -4008,8 +4413,21 @@ export type TranscriptSource = {
   tool_name: string;
 };
 
+/** A host-control session for the native tray, exchanged once for its bootstrap secret. */
+export type TraySession = {
+  token: string;
+  expires_at: string | null;
+  scope: string;
+};
+
 export type TraySessionRequest = {
   secret: string;
+};
+
+/** What an interrupt did to the turn streaming in the conversation. */
+export type TurnControl = {
+  action: "stop" | "steer";
+  queued: number;
 };
 
 export type TurnDetailView = {
@@ -4059,6 +4477,11 @@ export type TurnSources = {
   sources: TurnSourceView[];
 };
 
+export type TurnStopped = {
+  session_id: string;
+  turn_id: string;
+};
+
 export type TurnView = {
   turn_id: string;
   session_id: string;
@@ -4080,6 +4503,72 @@ export type UnsupportedFeature = {
   note: string;
 };
 
+/** The verified update handed to the helper, or why it was not. */
+export type UpdateApplyResult = {
+  state: "source_checkout" | "no_channel" | "unsigned_build" | "not_checked" | "up_to_date" | "available" | "unreachable";
+  message: string;
+  installation: InstallationView;
+  channel: UpdateChannelView | null;
+  available: ChannelUpdate | null;
+  recovery_points: RecoveryPointView[];
+  checked_at: string | null;
+  targets: ReleaseTargetView[];
+  last_check: LastUpdateCheck | null;
+  ok: boolean;
+  updating: boolean;
+  version?: string;
+  reason_code?: string;
+};
+
+export type UpdateChannelView = {
+  url: string;
+  channel: string;
+  public_key_fingerprint: string;
+};
+
+export type UpdateCheckResult = {
+  state: "source_checkout" | "no_channel" | "unsigned_build" | "not_checked" | "up_to_date" | "available" | "unreachable";
+  message: string;
+  installation: InstallationView;
+  channel: UpdateChannelView | null;
+  available: ChannelUpdate | null;
+  recovery_points: RecoveryPointView[];
+  checked_at: string | null;
+  targets: ReleaseTargetView[];
+  last_check: LastUpdateCheck | null;
+  ok: boolean;
+};
+
+/** An update that would interrupt work: the host's own account of that work. */
+export type UpdateDeferred = {
+  state: string;
+  detail: string;
+  pid: number | null;
+  port: number | null;
+  started_at: string | null;
+  paused: boolean;
+  paused_since: string | null;
+  paused_reason: string | null;
+  waiting: HostWaitingWork[];
+  ok: boolean;
+  updating: boolean;
+  reason_code: "waiting_work";
+  message: string;
+};
+
+/** Provenance, channel and recovery points; ``not_checked`` is not an assurance. */
+export type UpdateStatusView = {
+  state: "source_checkout" | "no_channel" | "unsigned_build" | "not_checked" | "up_to_date" | "available" | "unreachable";
+  message: string;
+  installation: InstallationView;
+  channel: UpdateChannelView | null;
+  available: ChannelUpdate | null;
+  recovery_points: RecoveryPointView[];
+  checked_at: string | null;
+  targets: ReleaseTargetView[];
+  last_check: LastUpdateCheck | null;
+};
+
 /** An image or document uploaded through ``POST /api/attachments``. */
 export type UploadAttachment = {
   type: "image" | "document";
@@ -4096,6 +4585,17 @@ export type UploadAttachmentRequest = {
 export type UploadSkillRequest = {
   filename: string;
   data_base64: string;
+};
+
+/** An image or document taken into the governed store: metadata only, never the bytes. */
+export type UploadedAttachment = {
+  ok: boolean;
+  attachment_id: string;
+  kind: string;
+  filename: string;
+  media_type: string;
+  byte_size: number;
+  sha256: string;
 };
 
 export type VaultKeyRequest = {
@@ -4207,6 +4707,10 @@ export const contract = {
     call<ApprovalResolved>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/resolve`, { body }),
   resolveCriticalApproval: (approvalId: string, body: ResolveApprovalRequest) =>
     call<CriticalApprovalResolved>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/resolve-critical`, { body }),
+  resumeAfterApproval: (approvalId: string) =>
+    call<AgentResponse>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/resume`),
+  uploadAttachment: (body: UploadAttachmentRequest) =>
+    call<UploadedAttachment>("POST", "/api/attachments", { body }),
   createAuditExport: (query: { session_id?: string; project_id?: string } = {}) =>
     call<AuditExportResult>("POST", withQuery("/api/audit/export", query)),
   listAuditExports: (query: { limit?: number } = {}) =>
@@ -4359,6 +4863,8 @@ export const contract = {
     request<ConnectorStoreView>("/api/connector-store"),
   uninstallConnector: (connectorId: string) =>
     call<ConnectorUninstalled>("DELETE", `/api/connector-store/${encodeURIComponent(connectorId)}`),
+  invokeConnectorAction: (connectorId: string, body: ConnectorActionRequest) =>
+    call<ConnectorActionCompleted | ConnectorActionQueued>("POST", `/api/connector-store/${encodeURIComponent(connectorId)}/actions`, { body }),
   setConnectorCredentials: (connectorId: string, body: CredentialRequest) =>
     call<ConnectorCredentialsSet>("PUT", `/api/connector-store/${encodeURIComponent(connectorId)}/credentials`, { body }),
   setConnectorEnabled: (connectorId: string, query: { enabled: boolean }) =>
@@ -4373,10 +4879,22 @@ export const contract = {
     call<CredentialDeltaDiscarded>("POST", `/api/credential-deltas/${encodeURIComponent(runId)}/discard`, { body }),
   getDiagnostics: () =>
     request<DiagnosticsView>("/api/diagnostics"),
+  getDiagnosticsExport: () =>
+    request<DiagnosticsExport>("/api/diagnostics/export"),
   getEnvironment: () =>
     request<EnvironmentContextView>("/api/environment"),
   listEvents: (query: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
     request<EventView[]>(withQuery("/api/events", query)),
+  getExecutionEnvironments: () =>
+    request<ExecutionEnvironmentsView>("/api/execution-environments"),
+  configureExecutionEnvironment: (body: Record<string, unknown>) =>
+    call<ExecutionEnvironmentConfigured>("PUT", "/api/execution-environments/configure", { body }),
+  selectExecutionEnvironment: (body: Record<string, unknown>) =>
+    call<ExecutionEnvironmentSelected>("PUT", "/api/execution-environments/selection", { body }),
+  probeExecutionEnvironment: (profileId: string) =>
+    call<ExecutionEnvironmentProbed>("POST", `/api/execution-environments/${encodeURIComponent(profileId)}/probe`),
+  resetExecutionEnvironment: (profileId: string, body: Record<string, unknown>) =>
+    call<ExecutionEnvironmentReset>("POST", `/api/execution-environments/${encodeURIComponent(profileId)}/reset`, { body }),
   getExtensions: () =>
     request<ExtensionsOverviewView>("/api/extensions"),
   deleteGitCredential: () =>
@@ -4389,10 +4907,32 @@ export const contract = {
     call<GitCredentialStatus>("DELETE", "/api/git-credential/grant"),
   grantGitCredential: (body: GitGrantRequest) =>
     call<GitCredentialStatus>("POST", "/api/git-credential/grant", { body }),
+  guideIndex: () =>
+    request<GuideIndex>("/api/guide"),
+  guideSection: (slug: string) =>
+    request<GuideSection>(`/api/guide/${encodeURIComponent(slug)}`),
   health: () =>
     request<HealthView>("/api/health"),
   listHooks: () =>
     request<HooksView>("/api/hooks"),
+  getHost: () =>
+    request<HostView>("/api/host"),
+  browseHostPaths: (query: { path?: string; files?: boolean } = {}) =>
+    request<HostPathListing>(withQuery("/api/host/paths", query)),
+  pauseHost: (body: PauseHostRequest) =>
+    call<HostActionResult>("POST", "/api/host/pause", { body }),
+  quitHost: (body: StopHostRequest) =>
+    call<HostActionResult>("POST", "/api/host/quit", { body }),
+  restartHost: (body: StopHostRequest) =>
+    call<HostActionResult>("POST", "/api/host/restart", { body }),
+  resumeHost: () =>
+    call<HostActionResult>("POST", "/api/host/resume"),
+  getUpdateStatus: () =>
+    request<UpdateStatusView>("/api/host/update"),
+  applyUpdate: (body: ApplyUpdateRequest) =>
+    call<UpdateApplyResult | UpdateDeferred>("POST", "/api/host/update/apply", { body }),
+  checkUpdate: () =>
+    call<UpdateCheckResult>("POST", "/api/host/update/check"),
   saveHuggingFaceCredential: (body: HuggingFaceCredentialRequest) =>
     call<HuggingFaceCredentialSaved>("PUT", "/api/hugging-face/credential", { body }),
   downloadHuggingFaceModel: (body: HuggingFaceSelectionRequest) =>
@@ -4409,6 +4949,10 @@ export const contract = {
     request<ImageGallery>("/api/images"),
   generateImage: (body: GenerateImageRequest) =>
     call<ImagesGenerated>("POST", "/api/images", { body }),
+  createInstance: (body: InstanceCreateRequest) =>
+    call<InstanceCreated>("POST", "/api/instances", { body }),
+  interrupts: (body: InterruptRequest) =>
+    call<InterruptResult>("POST", "/api/interrupts", { body }),
   revokeKnowledgeSource: (query: { kind: string; source_id: string }) =>
     call<KnowledgeSourceRevoked>("DELETE", withQuery("/api/knowledge-sources", query)),
   listKnowledgeSources: () =>
@@ -4655,6 +5199,8 @@ export const contract = {
     call<ProjectRootIndexResult>("POST", `/api/projects/${encodeURIComponent(projectId)}/root/index`),
   projectRootStatus: (projectId: string) =>
     request<ProjectRootStatus>(`/api/projects/${encodeURIComponent(projectId)}/root/status`),
+  submitPrompt: (body: PromptRequest) =>
+    call<AgentResponse>("POST", "/api/prompts", { body }),
   listReadCapabilities: () =>
     request<ReadCapabilities>("/api/read-capabilities"),
   getRuntimeMode: () =>
@@ -4729,6 +5275,14 @@ export const contract = {
     request<TurnSourceExcerpt>(withQuery(`/api/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}/sources/${encodeURIComponent(sourceId)}/excerpt`, query)),
   unarchiveSession: (sessionId: string) =>
     call<SessionArchived>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/unarchive`),
+  getSettings: () =>
+    request<SettingsView>("/api/settings"),
+  putSettings: (body: SettingsRequest) =>
+    call<SettingsSaved>("PUT", "/api/settings", { body }),
+  getComposerApprovalMode: () =>
+    request<ComposerApprovalMode>("/api/settings/composer-approval-mode"),
+  putComposerApprovalMode: (body: ComposerApprovalModeRequest) =>
+    call<ComposerApprovalMode>("PUT", "/api/settings/composer-approval-mode", { body }),
   getSetup: () =>
     request<SetupState>("/api/setup"),
   updateSetup: (body: SetupUpdateRequest) =>
@@ -4765,6 +5319,8 @@ export const contract = {
     call<StandingGrantCreated>("POST", "/api/standing-grants", { body }),
   revokeStandingGrant: (grantId: string) =>
     call<StandingGrantRevoked>("POST", `/api/standing-grants/${encodeURIComponent(grantId)}/revoke`),
+  stopAll: () =>
+    call<StopAllResult>("POST", "/api/stop-all"),
   getSurfaceModels: () =>
     request<SurfaceModels>("/api/surface-models"),
   setSurfaceModel: (body: SurfaceModelDefaultRequest) =>
@@ -4789,6 +5345,8 @@ export const contract = {
     call<TelemetryCadenceSet>("PUT", `/api/telemetry/destinations/${encodeURIComponent(destinationId)}/cadence`, { body }),
   runTelemetryExport: (destinationId: string) =>
     call<TelemetryExportRun>("POST", `/api/telemetry/destinations/${encodeURIComponent(destinationId)}/export`),
+  exchangeTraySession: (body: TraySessionRequest) =>
+    call<TraySession>("POST", "/api/tray/session", { body }),
   getTurn: (turnId: string) =>
     request<TurnDetailView>(`/api/turns/${encodeURIComponent(turnId)}`),
   deleteVaultKey: (xMfaCode?: string) =>

@@ -3,7 +3,7 @@
 import type { InstanceLaunchResult } from "../apiTypes";
 import { contract } from "../generated/apiContract";
 import type { HealthView, IssuedSessionView, LoginResultView } from "../generated/apiContract";
-import { csrfFromCookie, hasToken, postJson, setCsrfToken, setToken } from "./core";
+import { csrfFromCookie, hasToken, setCsrfToken, setToken } from "./core";
 
 /** Mint a bearer token for the local owner principal and hold it in memory. */
 export async function connect(): Promise<IssuedSessionView> {
@@ -34,11 +34,7 @@ export function createInstance(
   username: string,
   password: string,
 ): Promise<InstanceLaunchResult> {
-  return postJson<InstanceLaunchResult>("/api/instances", {
-    name,
-    username,
-    password,
-  });
+  return contract.createInstance({ name, username, password });
 }
 
 export type LoginResult = LoginResultView;

@@ -23,14 +23,21 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, Request
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import workspace_root as _ws
-from raiker.api.schemas import StrictRequest
+from raiker.api.schemas import StrictRequest, serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.host import (
+    UpdateApplyResult,
+    UpdateCheckResult,
+    UpdateDeferred,
+    UpdateStatusView,
+    release_target,
+)
 from raiker.app.installation import (
     detect_installation,
     read_last_check,
@@ -50,7 +57,7 @@ class ApplyUpdateRequest(StrictRequest):
 
 
 def _view(payload: dict[str, Any], workspace: str | Path) -> dict[str, Any]:
-    payload["targets"] = [target.to_dict() for target in TARGETS]
+    payload["targets"] = [release_target(target) for target in TARGETS]
     payload["last_check"] = read_last_check(workspace)
     return payload
 
@@ -63,7 +70,8 @@ async def get_update_status(
     """Provenance, channel, and recovery points. Local reads only."""
     workspace = _ws(request)
     status = update_status(workspace, installation=detect_installation())
-    return _view(status.to_dict(), workspace)
+    answer = cast(UpdateStatusView, _view(status.to_dict(), workspace))
+    return serialize_dto(answer)
 
 
 @router.post("/api/host/update/check")
@@ -82,7 +90,11 @@ async def check_update(
     status = check_for_update(workspace)
     if status.checked_at is not None:
         record_check(workspace, status)
-    return _view({"ok": status.state != "unreachable", **status.to_dict()}, workspace)
+    checked = cast(
+        UpdateCheckResult,
+        _view({"ok": status.state != "unreachable", **status.to_dict()}, workspace),
+    )
+    return serialize_dto(checked)
 
 
 @router.post("/api/host/update/apply")
@@ -104,18 +116,22 @@ async def apply_update(
     workspace = _ws(request)
     running = HostControl(workspace).status(running=True).to_dict()
     if running["waiting"] and not body.confirm:
-        return {
-            "ok": False,
-            "updating": False,
-            "reason_code": "waiting_work",
-            "message": "Update would interrupt work in progress. Confirm to continue.",
-            **running,
-        }
+        deferred = cast(
+            UpdateDeferred,
+            {
+                "ok": False,
+                "updating": False,
+                "reason_code": "waiting_work",
+                "message": "Update would interrupt work in progress. Confirm to continue.",
+                **running,
+            },
+        )
+        return serialize_dto(deferred)
     checked = check_for_update(workspace)
     if checked.checked_at is not None:
         record_check(workspace, checked)
     if checked.state != "available" or checked.available is None:
-        return _view(
+        not_available = cast(UpdateApplyResult, _view(
             {
                 "ok": False,
                 "updating": False,
@@ -123,11 +139,12 @@ async def apply_update(
                 **checked.to_dict(),
             },
             workspace,
-        )
+        ))
+        return serialize_dto(not_available)
     try:
         start_update_handoff(workspace, parent_pid=os.getpid())
     except OSError:
-        return _view(
+        no_helper = cast(UpdateApplyResult, _view(
             {
                 "ok": False,
                 "updating": False,
@@ -136,9 +153,10 @@ async def apply_update(
                 **checked.to_dict(),
             },
             workspace,
-        )
+        ))
+        return serialize_dto(no_helper)
     _schedule_stop(request, 0)
-    return _view(
+    updating = cast(UpdateApplyResult, _view(
         {
             "ok": True,
             "updating": True,
@@ -146,4 +164,5 @@ async def apply_update(
             **checked.to_dict(),
         },
         workspace,
-    )
+    ))
+    return serialize_dto(updating)

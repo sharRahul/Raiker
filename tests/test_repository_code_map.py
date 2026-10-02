@@ -22,12 +22,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 from raiker.context.gatherer import ContextGatherer
 from raiker.contracts.ids import utc_now
 from raiker.contracts.models import EVENT_TYPES, TOOLS
 from raiker.graph.codemap import CodeMapBuilder, CodeMapLimits
-from raiker.graph.codemap_service import CAPABILITY, CodeMapService
+from raiker.graph.codemap_service import CAPABILITY, CodeMapFailure, CodeMapPaths, CodeMapService
 from raiker.models.tool_call_validation import default_tool_specs
 from raiker.phase_gates import CapabilityState, default_capability_gates
 from raiker.policy.config import StaticPolicyConfig
@@ -182,7 +183,7 @@ def test_every_entry_point_fails_closed_when_the_owner_turns_the_gate_off(tmp_pa
 
     for result in (off.build(), off.search("Widget")):
         assert result["status"] == "denied"
-        assert result["error"]["type"] == "code_map_gate_disabled"
+        assert cast(CodeMapFailure, result)["error"]["type"] == "code_map_gate_disabled"
     # A stored map is not read either: the refusal is the whole answer, not a
     # cache served from behind a closed gate.
     assert off.context_slice("Widget") is None
@@ -431,7 +432,7 @@ def test_mention_completion_offers_everything_for_an_empty_fragment(tmp_path: Pa
     service = CodeMapService(tmp_path, store)
     service.build()
 
-    assert service.complete_paths("")["count"] > 0
+    assert cast(CodeMapPaths, service.complete_paths(""))["count"] > 0
 
 
 def test_mention_completion_is_bounded(tmp_path: Path) -> None:
@@ -440,7 +441,7 @@ def test_mention_completion_is_bounded(tmp_path: Path) -> None:
     service = CodeMapService(tmp_path, store)
     service.build()
 
-    assert service.complete_paths("", limit=1)["count"] == 1
+    assert cast(CodeMapPaths, service.complete_paths("", limit=1))["count"] == 1
 
 
 def test_mention_completion_says_the_map_was_never_built(tmp_path: Path) -> None:

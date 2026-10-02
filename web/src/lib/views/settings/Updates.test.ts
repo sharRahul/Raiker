@@ -58,6 +58,8 @@ const signedPackage = status({
     target: "windows-x86_64",
     artifact: "raiker-2.0.0.zip",
     sha256: "a".repeat(64),
+    manifest: "https://releases.example/raiker-2.0.0.json",
+    signature: "https://releases.example/raiker-2.0.0.json.sig",
     signed: true,
     released_at: "2026-09-01T00:00:00Z",
   },

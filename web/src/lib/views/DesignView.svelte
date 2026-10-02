@@ -27,6 +27,7 @@
   import DesignCanvasRegion from "../components/DesignCanvasRegion.svelte";
   // BUG-281 — the research turn already records every page it read; these are
   // what make those records openable here rather than only in the conversation.
+  import Markdown from "../components/Markdown.svelte";
   import SourceChips from "../components/SourceChips.svelte";
   import SourceExcerptPanel from "../components/SourceExcerptPanel.svelte";
   import { citedSourceIds, sentenceAround, sourcesForTurn } from "../citations";
@@ -631,7 +632,9 @@
       {:else if researchError}
         <p class="research-body error" role="alert">{researchError}</p>
       {:else if research !== null}
-        <p class="research-body">{research.answer}</p>
+        <!-- The answer is model prose, so it renders the way Chat renders one;
+             printed raw it showed the model's markdown as asterisks. -->
+        <div class="research-body research-answer"><Markdown text={research.answer} /></div>
         <!-- BUG-281 — what the turn read, openable at the passage it used,
              without leaving Design for the conversation it ran in. -->
         {#if researchSources.length > 0}
@@ -868,6 +871,7 @@
   }
   .research-body { margin: 0; color: var(--text-1); white-space: pre-wrap; }
   .research-body.error { color: var(--danger); }
+  .research-answer { white-space: normal; }
   .research-note { margin: 0.4rem 0 0; color: var(--text-3); font-size: var(--text-xs); }
   /* The same shape Chat's chooser uses, for the same reason: it opens in flow
      between the prompt and the bar rather than as a popover over the text. */

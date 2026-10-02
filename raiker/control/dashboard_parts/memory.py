@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import asdict
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dtos import ControlResult
@@ -870,7 +870,7 @@ class MemoryService:
                     summary=item.summary,
                     sensitivity=item.sensitivity,
                     retention=item.retention,
-                    capture_status=item.capture_status,
+                    capture_status=cast(Literal["captured", "skipped"], item.capture_status),
                     skip_reason=item.skip_reason,
                     promotable_to_memory=item.promotable_to_memory,
                     content_sha256=item.content_sha256,

@@ -57,6 +57,9 @@ const PARKED: AgentResponse = {
     expected_effect: "Writes one file in your workspace.",
   } as AgentResponse["approval"],
   last_event_id: null,
+  client: null,
+  content_parts: [],
+  schema_version: "1.0",
 };
 
 const RESUMABLE = {

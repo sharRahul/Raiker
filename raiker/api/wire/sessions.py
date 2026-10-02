@@ -315,3 +315,61 @@ class ConversationBranch(TypedDict):
     summary: str
     memory_candidate_count: int
     seed_manifest_path: str
+
+
+class TaskInterrupted(TypedDict):
+    task_id: str
+    result: str
+
+
+class TurnControl(TypedDict):
+    """What an interrupt did to the turn streaming in the conversation."""
+
+    action: Literal["stop", "steer"]
+    queued: int
+
+
+class InterruptResult(TypedDict):
+    """Interrupts land at a safe boundary; ``turn_control`` is null when a task was named."""
+
+    applied: list[TaskInterrupted]
+    safe_boundary: bool
+    turn_control: TurnControl | None
+
+
+class TurnStopped(TypedDict):
+    session_id: str
+    turn_id: str
+
+
+class CommandStopRequested(TypedDict):
+    run_id: str
+    state: str
+
+
+class StopFailure(TypedDict):
+    kind: str
+    reason_code: str
+    run_id: NotRequired[str]
+
+
+class StopAllResult(TypedDict):
+    """GEP-02 — every task, turn and command the stop switch reached, and what would not stop."""
+
+    tasks: list[TaskInterrupted]
+    turns: list[TurnStopped]
+    commands: list[CommandStopRequested]
+    failed: list[StopFailure]
+    safe_boundary: bool
+
+
+class UploadedAttachment(TypedDict):
+    """An image or document taken into the governed store: metadata only, never the bytes."""
+
+    ok: bool
+    attachment_id: str
+    kind: str
+    filename: str
+    media_type: str
+    byte_size: int
+    sha256: str

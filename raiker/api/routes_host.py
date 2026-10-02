@@ -30,7 +30,7 @@ import os
 import signal
 from contextlib import suppress
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import Field
@@ -38,8 +38,9 @@ from pydantic import Field
 from raiker.api.auth import AuthMiddleware
 from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.routes_instances import _require_loopback
-from raiker.api.schemas import StrictRequest
+from raiker.api.schemas import StrictRequest, serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.api.wire.host import HostActionResult, HostPathEntry, HostPathListing, HostView
 from raiker.app.host import HostControl
 from raiker.app.service import registration
 from raiker.runtime.authority.models import Principal
@@ -79,7 +80,7 @@ class StopHostRequest(StrictRequest):
     confirm: bool = False
 
 
-def _payload(request: Request) -> dict[str, Any]:
+def _payload(request: Request) -> HostView:
     control = _control(request)
     # The host answering this request *is* running, whatever the record says: a
     # workspace opened before background registration existed has no record file,
@@ -92,7 +93,7 @@ def _payload(request: Request) -> dict[str, Any]:
     service = registration(control.workspace_root, port=_port(request))
     view["service"] = service.to_dict()
     view["restartable"] = service.registered
-    return view
+    return cast(HostView, view)
 
 
 @router.get("/api/host")
@@ -101,7 +102,7 @@ async def get_host(
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """State, in-flight work, and whether the host starts on its own."""
-    return _payload(request)
+    return serialize_dto(_payload(request))
 
 
 @router.post("/api/host/pause")
@@ -112,7 +113,8 @@ async def pause_host(
 ) -> dict[str, Any]:
     """Stop starting new background work. Approved continuations still finish."""
     _control(request).pause(body.reason)
-    return {"ok": True, **_payload(request)}
+    answer = cast(HostActionResult, {"ok": True, **_payload(request)})
+    return serialize_dto(answer)
 
 
 @router.post("/api/host/resume")
@@ -122,7 +124,8 @@ async def resume_host(
 ) -> dict[str, Any]:
     """Start scheduled work again from the next tick."""
     _control(request).resume()
-    return {"ok": True, **_payload(request)}
+    answer = cast(HostActionResult, {"ok": True, **_payload(request)})
+    return serialize_dto(answer)
 
 
 @router.post("/api/host/quit")
@@ -134,9 +137,13 @@ async def quit_host(
     """Stop the host, reporting what that interrupts unless already confirmed."""
     view = _payload(request)
     if view["waiting"] and not body.confirm:
-        return {"ok": False, "reason_code": "waiting_work", "stopping": False, **view}
+        waiting = cast(
+            HostActionResult, {"ok": False, "reason_code": "waiting_work", "stopping": False, **view}
+        )
+        return serialize_dto(waiting)
     _schedule_stop(request, 0)
-    return {"ok": True, "stopping": True, **view}
+    stopping = cast(HostActionResult, {"ok": True, "stopping": True, **view})
+    return serialize_dto(stopping)
 
 
 @router.post("/api/host/restart")
@@ -161,9 +168,13 @@ async def restart_host(
             },
         )
     if view["waiting"] and not body.confirm:
-        return {"ok": False, "reason_code": "waiting_work", "restarting": False, **view}
+        waiting = cast(
+            HostActionResult, {"ok": False, "reason_code": "waiting_work", "restarting": False, **view}
+        )
+        return serialize_dto(waiting)
     _schedule_stop(request, RESTART_EXIT_CODE)
-    return {"ok": True, "restarting": True, **view}
+    restarting = cast(HostActionResult, {"ok": True, "restarting": True, **view})
+    return serialize_dto(restarting)
 
 
 def _schedule_stop(request: Request, exit_code: int) -> None:
@@ -221,10 +232,10 @@ MAX_PATH_ENTRIES = 500
 _HIDDEN_BY_CONVENTION = {"$RECYCLE.BIN", "System Volume Information", "__pycache__"}
 
 
-def _drive_roots() -> list[dict[str, Any]]:
+def _drive_roots() -> list[HostPathEntry]:
     """The top level of this machine: drive letters on Windows, ``/`` elsewhere."""
     if os.name == "nt":
-        roots: list[dict[str, Any]] = []
+        roots: list[HostPathEntry] = []
         for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
             drive = Path(f"{letter}:\\")
             # `exists()` on an empty optical drive can block; `is_dir()` on the
@@ -236,9 +247,9 @@ def _drive_roots() -> list[dict[str, Any]]:
     return [{"name": "/", "path": "/", "is_directory": True}]
 
 
-def _home_shortcuts() -> list[dict[str, Any]]:
+def _home_shortcuts() -> list[HostPathEntry]:
     """Where an owner actually keeps things, so the picker does not open at a drive root."""
-    shortcuts: list[dict[str, Any]] = []
+    shortcuts: list[HostPathEntry] = []
     with suppress(OSError, RuntimeError):
         home = Path.home()
         if home.is_dir():
@@ -282,8 +293,10 @@ async def browse_host_paths(
         # The workspace comes first because it is the answer to more of these
         # fields than anything else on the machine, and it is the one place the
         # owner should not have to go looking for.
-        top = [{"name": "Raiker workspace", "path": str(workspace), "is_directory": True}]
-        return {
+        top: list[HostPathEntry] = [
+            {"name": "Raiker workspace", "path": str(workspace), "is_directory": True}
+        ]
+        answer_0: HostPathListing = {
             "path": "",
             "parent": None,
             "separator": os.sep,
@@ -292,14 +305,15 @@ async def browse_host_paths(
             "truncated": False,
             "missing": False,
         }
+        return serialize_dto(answer_0)
     target = Path(path.strip()).expanduser()
     try:
         target = target.resolve()
     except OSError:
-        return _missing_path(path, workspace)
+        return serialize_dto(_missing_path(path, workspace))
     try:
         if not target.is_dir():
-            return _missing_path(str(target), workspace)
+            return serialize_dto(_missing_path(str(target), workspace))
         children = sorted(
             (child for child in target.iterdir() if _listable(child)),
             key=lambda item: (not _is_dir(item), item.name.lower()),
@@ -308,10 +322,10 @@ async def browse_host_paths(
         # Permission denied, a disconnected network share, a device that is not
         # ready. All of them mean "this cannot be listed", and saying which is
         # more use than a 500.
-        return _missing_path(str(target), workspace)
+        return serialize_dto(_missing_path(str(target), workspace))
     kept = [child for child in children if files or _is_dir(child)]
     parent = str(target.parent) if target.parent != target else ""
-    return {
+    answer_1: HostPathListing = {
         "path": str(target),
         "parent": parent,
         "separator": os.sep,
@@ -323,6 +337,7 @@ async def browse_host_paths(
         "truncated": len(kept) > MAX_PATH_ENTRIES,
         "missing": False,
     }
+    return serialize_dto(answer_1)
 
 
 def _is_dir(child: Path) -> bool:
@@ -334,8 +349,8 @@ def _is_dir(child: Path) -> bool:
         return False
 
 
-def _missing_path(path: str, workspace: Path) -> dict[str, Any]:
-    return {
+def _missing_path(path: str, workspace: Path) -> HostPathListing:
+    answer: HostPathListing = {
         "path": path,
         "parent": str(Path(path).parent) if path else "",
         "separator": os.sep,
@@ -344,3 +359,4 @@ def _missing_path(path: str, workspace: Path) -> dict[str, Any]:
         "truncated": False,
         "missing": True,
     }
+    return answer

@@ -304,6 +304,32 @@ describe("Design research sources", () => {
     expect(screen.queryByRole("button", { name: /Something else entirely/ })).not.toBeInTheDocument();
   });
 
+  it("renders the findings as prose, not as raw markdown", async () => {
+    stubFetch(
+      researchRoutes({
+        "POST /api/prompts": {
+          request_id: "req_1",
+          session_id: "sess_research",
+          turn_id: "turn_r1",
+          status: "completed",
+          message: "**Palmate** leaves:\n\n1. five lobes\n2. a long stalk",
+        },
+      }),
+    );
+    render(DesignView);
+    await screen.findByLabelText("Describe the image");
+    await fireEvent.input(screen.getByLabelText("Describe the image"), {
+      target: { value: "a maple leaf" },
+    });
+    await fireEvent.click(await screen.findByRole("button", { name: /Tools/ }));
+    await fireEvent.click(await screen.findByRole("menuitem", { name: /Search the web/i }));
+
+    const panel = await screen.findByTestId("design-research");
+    await waitFor(() => expect(panel.querySelector("strong")).toHaveTextContent("Palmate"));
+    expect(panel).not.toHaveTextContent("**");
+    expect(panel.querySelectorAll("ol li")).toHaveLength(2);
+  });
+
   it("keeps the findings when the ledger read fails", async () => {
     // Provenance for an answer that already arrived: losing it costs the chips
     // and must never cost the answer.

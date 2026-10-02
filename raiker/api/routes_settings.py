@@ -11,13 +11,14 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.dependencies import workspace_root as _ws
-from raiker.api.schemas import ComposerApprovalModeRequest, SettingsRequest
+from raiker.api.schemas import ComposerApprovalModeRequest, SettingsRequest, serialize_dto
+from raiker.api.wire.settings import ApprovalMode, ComposerApprovalMode, SettingsSaved, SettingsView
 from raiker.auth.accounts import AccountService
 from raiker.auth.vault_key_file import vault_status
 from raiker.context.redaction import redact_text
@@ -145,7 +146,7 @@ async def _check_config_change(
 async def get_settings(request: Request) -> dict[str, Any]:
     _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
     ws = _ws(request)
-    return {
+    answer: SettingsView = {
         "settings": _load(ws, principal.principal_id),
         "status": {
             "vault": vault_status(ws),
@@ -161,6 +162,7 @@ async def get_settings(request: Request) -> dict[str, Any]:
             ).addressable_name,
         },
     }
+    return serialize_dto(answer)
 
 
 @router.put("/api/settings")
@@ -190,13 +192,19 @@ async def put_settings(body: SettingsRequest, request: Request) -> dict[str, Any
     SQLiteStore(ws).put_user_settings(
         principal.principal_id, json.dumps(settings), utc_now()
     )
-    return {"settings": settings}
+    answer: SettingsSaved = {"settings": settings}
+    return serialize_dto(answer)
 
 
 @router.get("/api/settings/composer-approval-mode")
 async def get_composer_approval_mode(request: Request) -> dict[str, str]:
     _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
-    return {"approval_mode": load_composer_approval_mode(_ws(request), principal.principal_id)}
+    answer: ComposerApprovalMode = {
+        "approval_mode": cast(
+            ApprovalMode, load_composer_approval_mode(_ws(request), principal.principal_id)
+        )
+    }
+    return serialize_dto(answer)
 
 
 @router.put("/api/settings/composer-approval-mode")
@@ -218,4 +226,5 @@ async def put_composer_approval_mode(
     composer["approval_mode"] = approval_mode
     await _check_config_change(ws, principal.principal_id, _load(ws, principal.principal_id), settings)
     SQLiteStore(ws).put_user_settings(principal.principal_id, json.dumps(settings), utc_now())
-    return {"approval_mode": approval_mode}
+    answer: ComposerApprovalMode = {"approval_mode": cast(ApprovalMode, approval_mode)}
+    return serialize_dto(answer)

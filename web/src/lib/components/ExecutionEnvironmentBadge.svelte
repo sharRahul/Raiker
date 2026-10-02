@@ -15,7 +15,7 @@
   }
   onMount(load);
 
-  function runtimeName(runtime: string | undefined): string {
+  function runtimeName(runtime: string | null | undefined): string {
     return runtime ? runtime.charAt(0).toUpperCase() + runtime.slice(1) : "Container";
   }
 </script>

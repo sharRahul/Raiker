@@ -70,8 +70,10 @@
     busy = "applying"; notice = null;
     try {
       const result = await api.applyHostUpdate(confirm);
-      update = result;
-      if (result.ok) {
+      // A deferral answers with the host's waiting work, not an update status;
+      // the panel keeps the status it already shows.
+      if ("installation" in result) update = result;
+      if (result.ok && "installation" in result) {
         /*
          * REM-SET-UPDATES — what this response actually establishes is that a
          * detached helper was started. It said "Installing …", which is a claim
@@ -82,7 +84,7 @@
          * handover.
          */
         notice =
-          `The verified update helper for ${result.version} has started. Raiker will close, ` +
+          `The verified update helper for ${result.version ?? "this update"} has started. Raiker will close, ` +
           "and the helper verifies the signed bundle before it replaces anything. " +
           "Nothing on this installation has changed yet.";
       } else if (result.reason_code === "waiting_work") {

@@ -91,6 +91,27 @@ describe("Security & Login settings", () => {
     });
   });
 
+  it("shows the one-time recovery codes enrollment issues", async () => {
+    stub({
+      "GET /api/settings": () => ({ settings: {}, status: { vault: "configured_valid", mfa_enrolled: false, username: "alice" } }),
+      "GET /api/security/credentials": () => [],
+      "GET /api/security/findings": () => [],
+      "GET /api/security/health": () => [],
+      "POST /api/auth/mfa/enroll": () => ({
+        secret: "JBSWY3DPEHPK3PXP",
+        provisioning_uri: "otpauth://totp/Raiker:alice?secret=JBSWY3DPEHPK3PXP",
+        backup_codes: ["aaaa-1111", "bbbb-2222"],
+      }),
+    });
+    render(SecurityLogin);
+    await fireEvent.click(await screen.findByRole("button", { name: "Enroll in MFA" }));
+
+    const codes = await screen.findByRole("list", { name: "Recovery codes" });
+    expect(codes).toHaveTextContent("aaaa-1111");
+    expect(codes).toHaveTextContent("bbbb-2222");
+    expect(screen.getByText(/they are not shown again/)).toBeInTheDocument();
+  });
+
   it("lists and revokes a standing approval grant", async () => {
     let revoked = false;
     stub({

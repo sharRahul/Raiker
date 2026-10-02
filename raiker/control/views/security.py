@@ -180,3 +180,39 @@ class CapabilityContainmentView(TypedDict):
     subjects: list[ContainedSubject]
     contained: int
     capabilities: list[ContainmentCapability]
+
+
+class ProviderHealthSummary(TypedDict):
+    """A provider's configured state, without the detail line a support bundle omits."""
+
+    profile_id: str
+    provider: str
+    model: str
+    endpoint_kind: str
+    local_only: bool
+    requires_network: bool
+    selected: bool
+    status: str
+
+
+class DiagnosticGate(TypedDict):
+    capability: str
+    state: str
+    decision_mode: str
+    runtime_enabled: bool
+
+
+class DiagnosticsExport(TypedDict):
+    """A copyable, redacted support bundle of the runtime's own readiness facts."""
+
+    generated_at: str
+    scope: str
+    runtime_mode: str
+    production_ready_local_single_user_runtime: bool
+    counts: dict[str, int]
+    missing_config: list[str]
+    disabled_capabilities: list[str]
+    readiness: dict[str, bool | CheckpointCaptureHealth]
+    provider_health: list[ProviderHealthSummary]
+    gates: list[DiagnosticGate]
+    note: str

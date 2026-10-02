@@ -54,7 +54,11 @@ def test_status_reports_the_running_build_and_the_release_matrix(client: TestCli
     targets = {target["target_id"]: target for target in body["targets"]}
     assert set(targets) == {"macos-arm64", "windows-x86_64", "linux-x86_64", "linux-arm64"}
     for target in targets.values():
-        assert target["signing"]["secrets"], target["target_id"]
+        # The variable *names* a signed build needs — a list, never the
+        # redaction marker a `secrets` key used to be masked into.
+        required = target["signing"]["required_env"]
+        assert isinstance(required, list) and required, target["target_id"]
+        assert all(isinstance(name, str) and name.isupper() for name in required), required
         assert target["installer_formats"], target["target_id"]
 
 

@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -42,11 +43,11 @@ def owner(workspace: Path) -> str:
     return principal.principal_id
 
 
-def _profile(service: DashboardService, owner_id: str, connector_id: str = WEBHOOKS) -> dict:
+def _profile(service: DashboardService, owner_id: str, connector_id: str = WEBHOOKS) -> dict[str, Any]:
     view = service.list_channels(owner_id)
     match = [row for row in view["profiles"] if row["connector_id"] == connector_id]
     assert match, f"{connector_id} missing from the connector registry"
-    return match[0]
+    return dict(match[0])
 
 
 # ── The surface reports facts, not a single "ready" flag ─────────────────────

@@ -316,7 +316,7 @@ class ProviderCatalogueRefreshView(View):
 
     profile_id: str
     provider: str
-    status: str
+    status: Literal["available", "policy_denied", "unsupported", "unavailable"]
     reason_code: str | None
     model_count: int
 

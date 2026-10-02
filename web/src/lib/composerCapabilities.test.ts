@@ -103,6 +103,21 @@ describe("a capability the runtime has turned off", () => {
     expect(items.find((item) => item.id === "web-search")?.blocked).toBeNull();
   });
 
+  it("is offered when nothing is stored and the capability ships on", () => {
+    // Permissions reads this gate as "On by default"; a menu reading it as off
+    // sent the owner to a page that says it is already on.
+    const shipped = makeGate({
+      capability: "web_fetch",
+      state: "disabled",
+      source: "principal_fail_closed",
+      enforced_enabled: true,
+      unset_resolution: "shipped_default",
+      allowed_transitions: ["enabled_policy_gated", "enabled_runtime"],
+    });
+    const items = composerMenu("tools", "design", [shipped], ALL);
+    expect(items.find((item) => item.id === "web-search")?.blocked).toBeNull();
+  });
+
   it("is offered when no gate has been reported at all", () => {
     // A status read that did not answer is not evidence the capability is off,
     // and the runtime judges the action when it is actually invoked — on better

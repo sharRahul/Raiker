@@ -18,6 +18,16 @@
   import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
   import type { ChannelProfile, ChannelsView } from "../apiTypes";
+  import {
+    ROUTE_LABELS,
+    channelSteps,
+    receiptConversationHref,
+    receiptOutcome,
+    receiptStages,
+    receiptTitle,
+    routeScopeFacts,
+  } from "../channelSetup";
+  import { relativeTime } from "../format";
 
   let channels = $state<ChannelsView | null>(null);
   let channelsError = $state<string | null>(null);
@@ -25,8 +35,11 @@
   let channelNotice = $state<string | null>(null);
   let pairingFor = $state<string | null>(null);
   let pairSenders = $state("");
-  let testFor = $state<string | null>(null);
-  let testUrl = $state("");
+  let destinationFor = $state<string | null>(null);
+  let destinationUrl = $state("");
+  let sendersFor = $state<string | null>(null);
+  let sendersDraft = $state("");
+  let conversations = $state<{ session_id: string; title: string }[] | null>(null);
   let routingFor = $state<string | null>(null);
   let routeMode = $state<"record_only" | "new_turn" | "side_question" | "interrupt">("record_only");
   let routeTarget = $state("");
@@ -49,7 +62,12 @@
     telegram_bot_token_missing:
       "Telegram delivery needs RAIKER_TELEGRAM_BOT_TOKEN in the host environment. Raiker takes the variable name, never the token itself.",
     telegram_chat_id_missing:
-      "Bind an owner sender for this pairing, or give a chat id, before delivering to Telegram.",
+      "Choose which allowed sender is you before delivering to Telegram: a test goes to your chat.",
+    channel_destination_missing: "Set where this channel delivers before sending a test.",
+    channel_destination_invalid:
+      "Use an https:// address, or http:// only to this machine or your own network, with no username or password in it.",
+    channel_destination_not_configurable:
+      "This channel delivers to your own chat, so there is no address to set.",
   };
 
   function channelReason(error: unknown): string {
@@ -88,6 +106,10 @@
       await loadChannels();
     } catch (error) {
       channelsError = channelReason(error);
+      // FIXED-719 — a refused action can still change what the server holds:
+      // a refused test is recorded on the channel and as a receipt.
+      await loadChannels();
+      channelsError = channelReason(error);
     } finally {
       channelBusy = null;
     }
@@ -110,18 +132,93 @@
     });
   }
 
+  /**
+   * UX-MSG-04 — a test names no destination. It goes where the channel
+   * delivers: the webhook's bound URL, or your own chat on Telegram. The answer
+   * is kept on the channel, so the checklist can count it, and as a receipt.
+   */
   function sendTest(profile: ChannelProfile) {
-    const url = testUrl.trim();
-    if (!url) return;
     void runChannelAction(
       `test:${profile.connector_id}`,
-      () => api.deliverChannelTest(profile.connector_id, url, "Raiker test delivery."),
-      "Delivered. The destination accepted it.",
+      () => api.deliverChannelTest(profile.connector_id, "Raiker test delivery."),
+      `Delivered a test to ${profile.display_label ?? profile.display_name}.`,
     );
   }
 
-  function openRouting(profile: ChannelProfile) {
-    routingFor = routingFor === profile.connector_id ? null : profile.connector_id;
+  function openDestination(profile: ChannelProfile) {
+    destinationFor = destinationFor === profile.connector_id ? null : profile.connector_id;
+    destinationUrl = "";
+  }
+
+  function saveDestination(profile: ChannelProfile) {
+    void runChannelAction(
+      `destination:${profile.connector_id}`,
+      () => api.setChannelDestination(profile.pairing_id ?? "", destinationUrl.trim() || null),
+      destinationUrl.trim()
+        ? `${profile.display_name} delivers there now. Send a test to check it.`
+        : `${profile.display_name} has no delivery address now.`,
+    ).then(() => (destinationFor = null));
+  }
+
+  function openSenders(profile: ChannelProfile) {
+    sendersFor = sendersFor === profile.connector_id ? null : profile.connector_id;
+    sendersDraft = profile.senders.join(", ");
+  }
+
+  function saveSenders(profile: ChannelProfile) {
+    const senders = sendersDraft
+      .split(/[\n,]/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    void runChannelAction(
+      `senders:${profile.connector_id}`,
+      () => api.setChannelSenders(profile.pairing_id ?? "", senders),
+      `${profile.display_name} accepts ${senders.length} sender${senders.length === 1 ? "" : "s"}.`,
+    ).then(() => (sendersFor = null));
+  }
+
+  /** UX-MSG-01 — the routed conversation is chosen by name, not typed as an id. */
+  async function loadConversations() {
+    if (conversations !== null) return;
+    try {
+      const rows = await api.sessions(undefined, false, "chat");
+      conversations = rows.slice(0, 50).map((row) => ({
+        session_id: row.session_id,
+        title: row.title?.trim() || "Untitled conversation",
+      }));
+    } catch {
+      conversations = [];
+    }
+  }
+
+  /** The step the owner is on, so its control can open in place. */
+  function stepAction(profile: ChannelProfile, step: string) {
+    if (step === "owner" || step === "routing") openRouting(profile, true);
+    else if (step === "senders") openSenders(profile);
+    else if (step === "test") {
+      if (profile.destination.kind === "url" && !profile.destination.configured) {
+        openDestination(profile);
+      } else sendTest(profile);
+    }
+  }
+
+  function stepActionLabel(profile: ChannelProfile, step: string): string {
+    if (step === "owner") return "Choose who you are";
+    if (step === "senders") return "Edit senders";
+    if (step === "routing") return "Change routing";
+    if (step === "test") {
+      return profile.destination.kind === "url" && !profile.destination.configured
+        ? "Set delivery address"
+        : "Send a test";
+    }
+    if (step === "enabled") return "Turn on";
+    return "";
+  }
+
+  function openRouting(profile: ChannelProfile, keepOpen = false) {
+    routingFor =
+      routingFor === profile.connector_id && !keepOpen ? null : profile.connector_id;
+    void loadConversations();
     routeMode = profile.routing_mode ?? "record_only";
     routeTarget = profile.target_session_id ?? "";
     routeOwner = profile.owner_sender_id ?? "";
@@ -129,10 +226,7 @@
   }
 
   function routeLabel(mode: ChannelProfile["routing_mode"]): string {
-    if (mode === "new_turn") return "New turn";
-    if (mode === "side_question") return "Side question";
-    if (mode === "interrupt") return "Interrupt";
-    return "Record only";
+    return ROUTE_LABELS[mode] ?? ROUTE_LABELS.record_only;
   }
 
   function saveRouting(profile: ChannelProfile) {
@@ -148,31 +242,6 @@
         ? `${profile.display_name} records inbound messages without starting work.`
         : `${profile.display_name} now routes ${routeMode.replace("_", " ")}.`,
     ).then(() => (routingFor = null));
-  }
-
-  /**
-   * REM-MSG-01 — the one step that stands between this channel and a delivery.
-   *
-   * A linked channel offered Turn on, Send a test delivery, Routing and Unpair
-   * as four buttons of equal weight, and an owner connecting a messaging account
-   * for the first time had to know that the order matters: an allowlisted
-   * sender, then how inbound messages are routed, then a test through the real
-   * outbound path, then on. The buttons are unchanged — this names which of them
-   * comes next, and says nothing once the channel is delivering.
-   */
-  function nextStep(profile: ChannelProfile): string {
-    if (!profile.linked) {
-      return profile.requires_sender_allowlist
-        ? "Pair this channel with the senders it may accept messages from."
-        : "Pair this channel to connect the account.";
-    }
-    if (profile.requires_sender_allowlist && profile.sender_count === 0) {
-      return "No sender is allowed yet, so inbound messages are refused. Re-pair with a sender.";
-    }
-    if (!profile.enabled) {
-      return "Paired and off. Check its routing, send a test delivery, then turn it on.";
-    }
-    return "";
   }
 
   onMount(loadChannels);
@@ -226,8 +295,8 @@
               ? " · needs network"
               : " · local only"}
           </span>
-          {#if nextStep(profile)}
-            <p class="next-step">{nextStep(profile)}</p>
+          {#if !profile.linked}
+            <p class="next-step">{channelSteps(profile)[0].detail}</p>
           {/if}
 
           <!-- What this transport needs from the environment, declared on the
@@ -254,10 +323,47 @@
           {/if}
 
           {#if profile.linked}
+            <!-- UX-MSG-03 — the order is the contract. Connected → owner verified
+                 → allowed senders → routing → test → on, each a fact the server
+                 reports, the first unfinished one carrying its own control. -->
+            <ol class="setup-steps" aria-label={`${profile.display_name} setup`}>
+              {#each channelSteps(profile) as step (step.id)}
+                <li class={`step step-${step.state}`} aria-current={step.state === "current" ? "step" : undefined}>
+                  <span class="step-mark" aria-hidden="true">
+                    {step.state === "done" ? "✓" : step.state === "not_needed" ? "–" : ""}
+                  </span>
+                  <span class="step-body">
+                    <strong>{step.label}</strong>
+                    <span class="step-state">
+                      {step.state === "done"
+                        ? "Done"
+                        : step.state === "current"
+                          ? "Next"
+                          : step.state === "not_needed"
+                            ? "Not needed"
+                            : "To do"}
+                    </span>
+                    <span class="step-detail">{step.detail}</span>
+                    {#if step.state === "current" && step.id !== "enabled" && stepActionLabel(profile, step.id)}
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-primary step-action"
+                        disabled={channelBusy !== null}
+                        onclick={() => stepAction(profile, step.id)}
+                      >{channelBusy === `test:${profile.connector_id}` && step.id === "test"
+                          ? "Sending…"
+                          : stepActionLabel(profile, step.id)}</button>
+                    {/if}
+                  </span>
+                </li>
+              {/each}
+            </ol>
+
             <div class="channel-actions">
               <button
                 type="button"
                 class="btn btn-sm"
+                class:btn-primary={!profile.enabled && channelSteps(profile).find((step) => step.state === "current")?.id === "enabled"}
                 disabled={channelBusy !== null}
                 onclick={() =>
                   void runChannelAction(
@@ -268,15 +374,33 @@
                       : `${profile.display_name} is on.`,
                   )}
               >{profile.enabled ? "Turn off" : "Turn on"}</button>
-              <button
-                type="button"
-                class="btn btn-sm"
-                disabled={channelBusy !== null}
-                onclick={() => {
-                  testFor = testFor === profile.connector_id ? null : profile.connector_id;
-                  testUrl = "";
-                }}
-              >Send a test delivery</button>
+              {#if profile.destination.kind !== "none"}
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  disabled={channelBusy !== null ||
+                    (profile.destination.kind === "url" && !profile.destination.configured)}
+                  onclick={() => sendTest(profile)}
+                >Send a test delivery</button>
+              {/if}
+              {#if profile.destination.kind === "url"}
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  disabled={channelBusy !== null}
+                  onclick={() => openDestination(profile)}
+                  aria-expanded={destinationFor === profile.connector_id}
+                >Delivery address</button>
+              {/if}
+              {#if profile.requires_sender_allowlist}
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  disabled={channelBusy !== null}
+                  onclick={() => openSenders(profile)}
+                  aria-expanded={sendersFor === profile.connector_id}
+                >Senders</button>
+              {/if}
               <button
                 type="button"
                 class="btn btn-sm"
@@ -296,33 +420,78 @@
                   )}
               >Unpair</button>
             </div>
-            {#if testFor === profile.connector_id}
+            <p class="note">
+              {#if profile.destination.kind === "url"}
+                {#if profile.destination.configured}
+                  Delivers to <strong>{profile.destination.host}</strong>{profile.destination.allowlisted
+                    ? "."
+                    : " — not on the channel egress allowlist, so a delivery is refused before it leaves."}
+                {:else}
+                  No delivery address yet.
+                {/if}
+              {:else if profile.destination.kind === "owner_chat"}
+                Delivers to your own chat{profile.owner_sender_id ? "" : ", once you choose which sender is you"}.
+              {:else}
+                This build cannot deliver over this channel.
+              {/if}
+              A test runs the same governed path a real delivery takes: the capability gate, the
+              decision mode, the egress allowlist and the audit event all apply.
+            </p>
+
+            {#if destinationFor === profile.connector_id}
               <form
                 class="channel-form"
                 onsubmit={(event) => {
                   event.preventDefault();
-                  sendTest(profile);
+                  saveDestination(profile);
                 }}
               >
-                <label class="field-label" for={`test-${profile.connector_id}`}>
-                  Destination URL
+                <label class="field-label" for={`destination-${profile.connector_id}`}>
+                  Delivery address
                 </label>
                 <input
-                  id={`test-${profile.connector_id}`}
+                  id={`destination-${profile.connector_id}`}
                   class="input"
-                  bind:value={testUrl}
+                  bind:value={destinationUrl}
                   placeholder="https://hooks.example.com/…"
                   autocomplete="off"
                 />
-                <button
-                  class="btn btn-sm btn-primary"
-                  type="submit"
-                  disabled={channelBusy !== null || !testUrl.trim()}
-                >{channelBusy === `test:${profile.connector_id}` ? "Sending…" : "Send"}</button>
+                <div class="channel-actions">
+                  <button class="btn btn-sm btn-primary" type="submit" disabled={channelBusy !== null}>
+                    {destinationUrl.trim() ? "Save address" : "Clear address"}
+                  </button>
+                  <button class="btn btn-sm" type="button" onclick={() => (destinationFor = null)}>Cancel</button>
+                </div>
                 <p class="note">
-                  This runs the same governed path a real delivery takes: the capability gate,
-                  the decision mode, the egress allowlist and the audit event all apply.
+                  Every delivery on this channel goes here, tests included; nothing can name another
+                  address. Use https://, or http:// only to this machine or your own network. Changing
+                  it forgets the last test.
                 </p>
+              </form>
+            {/if}
+            {#if sendersFor === profile.connector_id}
+              <form
+                class="channel-form"
+                onsubmit={(event) => {
+                  event.preventDefault();
+                  saveSenders(profile);
+                }}
+              >
+                <label class="field-label" for={`edit-senders-${profile.connector_id}`}>
+                  Allowed senders
+                </label>
+                <input
+                  id={`edit-senders-${profile.connector_id}`}
+                  class="input"
+                  bind:value={sendersDraft}
+                  placeholder="one id per line, or comma-separated"
+                  autocomplete="off"
+                />
+                <div class="channel-actions">
+                  <button class="btn btn-sm btn-primary" type="submit" disabled={channelBusy !== null}>Save senders</button>
+                  <button class="btn btn-sm" type="button" onclick={() => (sendersFor = null)}>Cancel</button>
+                </div>
+                <p class="note">Anyone not listed is refused and recorded. Allowed is not trusted.</p>
               </form>
             {/if}
             {#if routingFor === profile.connector_id}
@@ -335,20 +504,32 @@
                     {#if profile.supports_side_questions}<option value="side_question">Side question</option>{/if}
                     {#if profile.supports_interrupts}<option value="interrupt">Interrupt or steer</option>{/if}
                   </select>
-                  <label class="field-label" for={`owner-${profile.connector_id}`}>Owner sender</label>
+                  <label class="field-label" for={`owner-${profile.connector_id}`}>You on this channel</label>
                   <select id={`owner-${profile.connector_id}`} class="input" bind:value={routeOwner}>
-                    <option value="">Not bound</option>
+                    <option value="">Not chosen</option>
                     {#each profile.senders as sender}<option value={sender}>{sender}</option>{/each}
                   </select>
-                  {#if routeMode === "side_question" || routeMode === "interrupt"}
-                    <label class="field-label" for={`target-${profile.connector_id}`}>Conversation ID</label>
-                    <input id={`target-${profile.connector_id}`} class="input" bind:value={routeTarget} placeholder="sess_…" autocomplete="off" />
+                  {#if routeMode !== "record_only"}
+                    <label class="field-label" for={`target-${profile.connector_id}`}>Conversation</label>
+                    <select id={`target-${profile.connector_id}`} class="input" bind:value={routeTarget}>
+                      {#if routeMode === "new_turn"}
+                        <option value="">A new conversation for each message</option>
+                      {:else}
+                        <option value="">Choose a conversation…</option>
+                      {/if}
+                      {#if routeTarget && !(conversations ?? []).some((row) => row.session_id === routeTarget)}
+                        <option value={routeTarget}>{profile.target_session_title ?? "The current conversation"}</option>
+                      {/if}
+                      {#each conversations ?? [] as row (row.session_id)}
+                        <option value={row.session_id}>{row.title}</option>
+                      {/each}
+                    </select>
                   {/if}
                 </div>
                 {#if profile.supports_approvals}
                   <label class="check-row">
                     <input type="checkbox" bind:checked={routeRelay} disabled={!routeOwner} />
-                    <span>Allow exact pending approval responses from the bound owner</span>
+                    <span>Allow exact pending approval responses from you on this channel</span>
                   </label>
                 {/if}
                 <div class="channel-actions">
@@ -363,6 +544,51 @@
                 </p>
               </form>
             {/if}
+
+            <!-- UX-MSG-05 — the stored route as what the receiver does with it,
+                 stated by the server so the page cannot claim a scope nothing
+                 enforces. -->
+            <details class="route-scope">
+              <summary>What this route does · {routeLabel(profile.routing_mode)}</summary>
+              <dl>
+                {#each routeScopeFacts(profile.route_scope) as fact (fact.label)}
+                  <dt>{fact.label}</dt>
+                  <dd>{fact.value}</dd>
+                {/each}
+              </dl>
+            </details>
+
+            <!-- UX-MSG-06 — received, accepted, queued, processed, reply queued,
+                 delivered and failed are separate facts, so a finished turn is
+                 never read as a delivered reply. -->
+            <section class="receipts" aria-label={`${profile.display_name} recent activity`}>
+              <h3>Recent activity</h3>
+              {#if profile.receipts.length === 0}
+                <p class="note">Nothing yet. Tests and messages appear here, each stage as it happens.</p>
+              {:else}
+                <ul>
+                  {#each profile.receipts as receipt (receipt.receipt_id)}
+                    <li>
+                      <span class="receipt-head">
+                        <strong>{receiptTitle(receipt)}</strong>
+                        <span class="note">{relativeTime(receipt.created_at)}</span>
+                      </span>
+                      <span class="receipt-stages">
+                        {#each receiptStages(receipt) as stage (stage)}
+                          <span class="hook-tag" class:hook-tag-failed={stage === "failed"}>{stage}</span>
+                        {/each}
+                      </span>
+                      <span class="note">
+                        {receiptOutcome(receipt)}
+                        {#if receiptConversationHref(receipt)}
+                          · <a href={receiptConversationHref(receipt)}>Open the conversation</a>
+                        {/if}
+                      </span>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </section>
           {:else}
             <div class="channel-actions">
               <button
@@ -501,8 +727,37 @@
   .env { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: var(--space-2); }
   .env li { display: grid; gap: 0.2rem; padding: var(--space-2); border-left: 2px solid var(--border); }
   .env li.env-missing { border-left-color: var(--warn); }
-  /* REM-MSG-01 — which of the four equal buttons comes next. */
+  /* The first step, for a channel that is not paired yet. */
   .next-step { margin: 0.2rem 0 0; color: var(--text-2); font-size: var(--text-sm); }
+  /* UX-MSG-03 — the setup checklist. */
+  .setup-steps { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: 0.35rem; }
+  .step { display: grid; grid-template-columns: 1.4rem minmax(0, 1fr); gap: var(--space-2); align-items: start; }
+  .step-mark { display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 50%; border: 1px solid var(--border); font-size: var(--text-2xs); font-weight: 700; color: var(--text-3); }
+  .step-done .step-mark { border-color: var(--ok-border); background: var(--ok-soft); color: var(--ok); }
+  .step-current .step-mark { border-color: var(--accent); background: var(--accent-soft); }
+  .step-body { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.5rem; min-width: 0; }
+  .step-state { font-size: var(--text-2xs); font-weight: 650; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; }
+  .step-current .step-state { color: var(--accent); }
+  .step-detail { flex-basis: 100%; color: var(--text-2); font-size: var(--text-sm); overflow-wrap: anywhere; }
+  .step-todo .step-detail, .step-not_needed .step-detail { color: var(--text-3); }
+  .step-action { margin-top: 0.15rem; }
+  /* UX-MSG-05 / UX-MSG-06 */
+  .route-scope { margin-top: var(--space-2); font-size: var(--text-sm); }
+  .route-scope summary { cursor: pointer; color: var(--text-2); font-weight: 650; }
+  .route-scope dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0.25rem var(--space-3); margin: var(--space-2) 0 0; }
+  .route-scope dt { color: var(--text-3); }
+  .route-scope dd { margin: 0; color: var(--text-2); }
+  .receipts { margin-top: var(--space-2); }
+  .receipts h3 { margin: 0 0 0.3rem; font-size: var(--text-sm); color: var(--text-2); }
+  .receipts ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+  .receipts li { display: grid; gap: 0.15rem; padding: 0.4rem 0; border-top: 1px solid var(--border); }
+  .receipt-head { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; }
+  .receipt-stages { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .hook-tag-failed { border-color: var(--danger-border); background: var(--danger-soft); color: var(--danger); }
+  @media (max-width: 560px) {
+    .route-scope dl { grid-template-columns: minmax(0, 1fr); }
+    .route-scope dd { margin-bottom: 0.3rem; }
+  }
   .advanced summary { cursor: pointer; color: var(--text-2); font-weight: 650; }
   .env code { font-size: var(--text-xs); }
 </style>

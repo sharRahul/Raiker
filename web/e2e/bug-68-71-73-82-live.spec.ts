@@ -86,7 +86,7 @@ async function ask(prompt: string) {
  * a snapshot of several capabilities navigates once and filters in place.
  */
 async function openCapability(label: string, fresh = true) {
-  const search = page.getByLabel("Search capabilities");
+  const search = page.getByLabel("Search capabilities", { exact: true });
   if (fresh || !(await search.isVisible().catch(() => false))) {
     await page.goto(`${BASE}/#/capabilities`);
     await expect(search).toBeVisible({ timeout: 30_000 });
@@ -144,7 +144,7 @@ async function disableCapability(label: string, reason: string) {
 async function standingWriteModes(): Promise<Record<string, string>> {
   const modes: Record<string, string> = {};
   await page.goto(`${BASE}/#/capabilities`);
-  await expect(page.getByLabel("Search capabilities")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByLabel("Search capabilities", { exact: true })).toBeVisible({ timeout: 30_000 });
   // `Processes` is not read here. GEP-04 classified `process_execution` as
   // **no route**: no tool names it and no approval relays it, so Permissions
   // lists it read-only rather than as a decision with a standing mode. Build

@@ -15,6 +15,7 @@ from raiker.api.dependencies import refusal
 from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.schemas import (
     ChannelApprovalResponse,
+    ChannelDestinationRequest,
     ChannelEnabledRequest,
     ChannelRoutingRequest,
     ChannelSendersRequest,
@@ -26,6 +27,7 @@ from raiker.api.schemas import (
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.channels import (
     ApprovalRelayAnswered,
+    ChannelDestinationSet,
     ChannelEnabledSet,
     ChannelInboundAccepted,
     ChannelPaired,
@@ -38,7 +40,7 @@ from raiker.api.wire.channels import (
 )
 from raiker.channels.adapters import adapter_for
 from raiker.context.redaction import redact_text
-from raiker.contracts.ids import new_id
+from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import (
     ClientMetadata,
     PromptEnvelope,
@@ -154,7 +156,13 @@ def _channel_result(result: Any) -> dict[str, Any]:
     if (
         reason.startswith("unknown_connector")
         or reason.startswith("unknown_channel_pairing")
-        or reason in {"channel_already_paired", "sender_allowlist_required"}
+        or reason
+        in {
+            "channel_already_paired",
+            "sender_allowlist_required",
+            "channel_destination_invalid",
+            "channel_destination_not_configurable",
+        }
     ):
         code = status.HTTP_422_UNPROCESSABLE_CONTENT
     else:
@@ -257,6 +265,25 @@ async def set_channel_routing(
     return serialize_dto(answer)
 
 
+@router.put("/api/channels/pairings/{pairing_id}/destination")
+async def set_channel_destination(
+    pairing_id: str,
+    body: ChannelDestinationRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """UX-MSG-04 — bind where a webhook channel delivers. Telegram has no URL."""
+    answer = cast(
+        ChannelDestinationSet,
+        _channel_result(
+            _service(request).set_channel_destination(
+                auth_data[0].principal_id, pairing_id, body.delivery_url
+            )
+        ),
+    )
+    return serialize_dto(answer)
+
+
 @router.delete("/api/channels/pairings/{pairing_id}")
 async def unpair_channel(
     pairing_id: str,
@@ -283,13 +310,14 @@ async def deliver_channel_test(
     Not a shortcut: this builds a governed action and routes it through the
     runtime authority, so a closed `external_channel_runtime` gate refuses it
     with `disabled_by_capability_gate` and an unallowlisted host refuses it at
-    the egress boundary — exactly as a real delivery would.
+    the egress boundary — exactly as a real delivery would. It names no
+    destination: it goes where the channel delivers (UX-MSG-04).
     """
     answer = cast(
         ChannelTestDelivered,
         _channel_result(
             _service(request).deliver_channel_test(
-                auth_data[0].principal_id, body.connector_id, body.url, body.text
+                auth_data[0].principal_id, body.connector_id, body.text
             )
         ),
     )
@@ -350,8 +378,31 @@ async def receive_telegram(
     if parsed is None:
         answer: ChannelUpdateIgnored = {"ok": True, "ignored": "unsupported_update"}
         return serialize_dto(answer)
+    if parsed.from_bot:
+        # UX-MSG-05 — another bot is never a party to a route. Acknowledged so
+        # Telegram does not retry it, and recorded so a quiet channel is
+        # answerable, but never routed: two automated parties answering each
+        # other is the loop the messaging contract names.
+        EventLogWriter(SQLiteStore(_ws(request))).append(make_event(
+            session_id="channels",
+            turn_id=None,
+            event_type="channel_message_rejected",
+            actor="channel_receiver",
+            payload={
+                "connector_id": connector_id,
+                "channel_type": "telegram",
+                "trust_level": "untrusted",
+                "reason": "bot_sender",
+            },
+        ))
+        ignored: ChannelUpdateIgnored = {"ok": True, "ignored": "bot_sender"}
+        return serialize_dto(ignored)
     return serialize_dto(await _handle_inbound(
-        connector_id, sender_id=parsed.sender_id, text=parsed.text, request=request
+        connector_id,
+        sender_id=parsed.sender_id,
+        text=parsed.text,
+        request=request,
+        conversation_scope=parsed.conversation_scope,
     ))
 
 
@@ -362,12 +413,14 @@ async def _handle_inbound(
     sender_id: str,
     text: str,
     request: Request,
+    conversation_scope: str = "endpoint",
 ) -> ChannelInboundAccepted:
     store = SQLiteStore(_ws(request))
     writer = EventLogWriter(store)
     pairing = _enabled_pairing(store, connector_id)
     if pairing is None:
         raise refusal(status.HTTP_404_NOT_FOUND, "channel_not_paired_or_disabled")
+    received_at = utc_now()
 
     try:
         allowlist = set(json.loads(pairing.get("sender_allowlist_json") or "[]"))
@@ -377,8 +430,26 @@ async def _handle_inbound(
     channel_message_id = new_id("chn_")
     channel_type = str(pairing.get("channel_type", "webhooks"))
     preview, _ = redact_text(text[:200])
+    owner_sender_id = str(pairing.get("owner_sender_id") or "")
+    is_owner = bool(owner_sender_id and hmac.compare_digest(sender_id, owner_sender_id))
+
+    def _receipt(stages: dict[str, str], *, role: str, reason: str | None = None) -> None:
+        # UX-MSG-06 — the receipt holds the sender's role, never the id.
+        store.insert_channel_receipt(
+            receipt_id=channel_message_id,
+            connector_id=connector_id,
+            pairing_id=str(pairing.get("pairing_id") or "") or None,
+            direction="inbound",
+            kind="message",
+            sender_role=role,
+            conversation_scope=conversation_scope,
+            routing_mode=str(pairing.get("routing_mode") or "record_only"),
+            stages={"received_at": received_at, **stages},
+            reason_code=reason,
+        )
 
     if sender_id not in allowlist:
+        _receipt({"failed_at": utc_now()}, role="not_allowed", reason="sender_not_allowlisted")
         writer.append(make_event(
             session_id="channels",
             turn_id=None,
@@ -403,6 +474,11 @@ async def _handle_inbound(
         )
 
     if not _within_inbound_budget(connector_id, sender_id):
+        _receipt(
+            {"failed_at": utc_now()},
+            role="owner" if is_owner else "allowed",
+            reason="rate_limited",
+        )
         writer.append(make_event(
             session_id="channels",
             turn_id=None,
@@ -430,8 +506,7 @@ async def _handle_inbound(
     # Allowlisted sender, within budget: content stays structurally untrusted.
     # The stored owner route — never a field in this request — decides whether
     # anything else happens.
-    owner_sender_id = str(pairing.get("owner_sender_id") or "")
-    is_owner = bool(owner_sender_id and hmac.compare_digest(sender_id, owner_sender_id))
+    _receipt({"accepted_at": utc_now()}, role="owner" if is_owner else "allowed")
     writer.append(make_event(
         session_id="channels",
         turn_id=None,
@@ -446,6 +521,7 @@ async def _handle_inbound(
             "quarantined": True,
             "instructions_inert": True,
             "preview": preview,
+            "conversation_scope": conversation_scope,
         },
     ))
     routed = await _route_inbound_message(
@@ -457,6 +533,7 @@ async def _handle_inbound(
         text=text,
         is_owner=is_owner,
     )
+    _settle_receipt(store, channel_message_id, routed, channel_type=channel_type)
     answer = cast(ChannelInboundAccepted, {
         "ok": True,
         "channel_message_id": channel_message_id,
@@ -465,6 +542,50 @@ async def _handle_inbound(
         **routed,
     })
     return answer
+
+
+def _settle_receipt(
+    store: SQLiteStore, receipt_id: str, routed: InboundRoute, *, channel_type: str
+) -> None:
+    """UX-MSG-06 — what became of an accepted message, stage by stage.
+
+    *Queued* is the route handing it to work; *processed* is that work
+    finishing; a failed turn is *failed*, not processed. The reply is its own
+    fact: the generic webhook returns it in the response to the caller, which
+    is a delivery; Telegram gets nothing back over the channel, so its receipt
+    says processed and no more — a finished turn is not a delivered reply.
+    """
+    now = utc_now()
+    if not routed.get("routed"):
+        reason = routed.get("reason_code")
+        if reason:
+            store.advance_channel_receipt(
+                receipt_id, stages={"failed_at": now}, reason_code=str(reason)
+            )
+        return
+    stages: dict[str, str] = {"queued_at": now}
+    status_value = str(routed.get("status") or "")
+    if routed.get("action") in {"stop", "steer"}:
+        stages["processed_at"] = now
+    elif status_value in {"error", "failed", "refused", "stopped", "cancelled", "resume_failed"}:
+        stages["failed_at"] = now
+    elif any(word in status_value for word in ("approval", "suspend", "waiting")):
+        # Paused for the owner: queued, and not yet processed.
+        pass
+    elif status_value:
+        stages["processed_at"] = now
+        if routed.get("reply") and channel_type != "telegram":
+            stages["reply_queued_at"] = now
+            stages["delivered_at"] = now
+    store.advance_channel_receipt(
+        receipt_id,
+        stages=stages,
+        session_id=str(routed.get("session_id") or "") or None,
+        # FIXED-720 — the turn's own status ("failed", "stopped") is not a
+        # reason an owner can act on; its conversation holds the reason, and
+        # the receipt links there.
+        reason_code=f"turn_{status_value}" if "failed_at" in stages else None,
+    )
 
 
 @router.post("/api/channels/{connector_id}/approval-response")

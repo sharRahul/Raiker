@@ -213,14 +213,13 @@ def test_a_test_delivery_is_refused_when_the_capability_is_off(
     service = DashboardService(workspace)
     pairing_id = service.pair_channel(owner, WEBHOOKS, "Webhooks", ["ops"]).data["pairing_id"]
     service.set_channel_enabled(owner, pairing_id, True)
+    assert service.set_channel_destination(owner, pairing_id, "https://hooks.example.com/x").ok
     turned_off = service.control.set_capability_state(
         "external_channel_runtime", "disabled", owner, "closing the gate for this test"
     )
     assert turned_off.ok, turned_off.reason_code
 
-    result = service.deliver_channel_test(
-        owner, WEBHOOKS, "https://hooks.example.com/x", "hello"
-    )
+    result = service.deliver_channel_test(owner, WEBHOOKS, "hello")
 
     # A REST endpoint that POSTed the webhook itself would have "worked" here,
     # and proved nothing about the path a real delivery takes. This one cannot:
@@ -236,10 +235,9 @@ def test_a_test_delivery_never_leaves_for_an_unallowlisted_host(
     service = DashboardService(workspace)
     pairing_id = service.pair_channel(owner, WEBHOOKS, "Webhooks", ["ops"]).data["pairing_id"]
     service.set_channel_enabled(owner, pairing_id, True)
+    assert service.set_channel_destination(owner, pairing_id, "https://somewhere.invalid/x").ok
 
-    result = service.deliver_channel_test(
-        owner, WEBHOOKS, "https://somewhere.invalid/x", "hello"
-    )
+    result = service.deliver_channel_test(owner, WEBHOOKS, "hello")
 
     # Refused at the egress boundary, before a socket is opened: the allowlist is
     # empty by default, and empty means deny rather than allow-all.
@@ -247,21 +245,144 @@ def test_a_test_delivery_never_leaves_for_an_unallowlisted_host(
     assert "egress_denied" in (result.reason_code or "")
 
 
-def test_a_disabled_pairing_delivers_nothing_even_with_egress_open(
+def test_the_owners_test_reaches_a_paired_channel_that_is_still_off(
     workspace: Path, owner: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("RAIKER_CHANNEL_EGRESS_ALLOWLIST", "somewhere.invalid")
+    """UX-MSG-03 — the checklist tests before it turns on, so the test must run.
+
+    The pairing step is the only one relaxed: the delivery still met the egress
+    boundary here, which is what the reason code proves, and the outcome is
+    kept on the pairing and as a receipt.
+    """
+    monkeypatch.delenv("RAIKER_CHANNEL_EGRESS_ALLOWLIST", raising=False)
     service = DashboardService(workspace)
-    service.pair_channel(owner, WEBHOOKS, "Webhooks", ["ops"])  # left off
+    pairing_id = service.pair_channel(owner, WEBHOOKS, "Webhooks", ["ops"]).data["pairing_id"]
+    assert service.set_channel_destination(owner, pairing_id, "https://somewhere.invalid/x").ok
 
-    result = service.deliver_channel_test(
-        owner, WEBHOOKS, "https://somewhere.invalid/x", "hello"
-    )
+    result = service.deliver_channel_test(owner, WEBHOOKS, "hello")
 
-    # Refused for the pairing, before egress is even consulted — so the order of
-    # the two boundaries is itself part of the contract.
     assert result.ok is False
-    assert result.reason_code == "channel_not_paired_or_disabled"
+    assert "egress_denied" in (result.reason_code or "")
+    profile = next(
+        row for row in service.list_channels(owner)["profiles"] if row["connector_id"] == WEBHOOKS
+    )
+    assert profile["enabled"] is False
+    assert profile["last_test"] is not None and profile["last_test"]["ok"] is False
+    receipt = profile["receipts"][0]
+    assert receipt["kind"] == "test_delivery"
+    assert receipt["queued_at"] and receipt["failed_at"] and receipt["delivered_at"] is None
+
+
+def test_a_test_needs_a_bound_destination_and_never_takes_one(
+    workspace: Path, owner: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """UX-MSG-04 — no destination bound is a named refusal, not a typed URL."""
+    monkeypatch.setenv("RAIKER_CHANNEL_EGRESS_ALLOWLIST", "*")
+    service = DashboardService(workspace)
+    service.pair_channel(owner, WEBHOOKS, "Webhooks", ["ops"])
+
+    result = service.deliver_channel_test(owner, WEBHOOKS, "hello")
+
+    assert result.ok is False
+    assert result.reason_code == "channel_destination_missing"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://hooks.example.com/x",  # public over plain http
+        "https://user:pw@hooks.example.com/x",  # a credential in the string
+        "ftp://hooks.example.com/x",
+        "not a url",
+    ],
+)
+def test_a_destination_must_be_one_raiker_would_send_a_token_to(
+    workspace: Path, owner: str, url: str
+) -> None:
+    service = DashboardService(workspace)
+    pairing_id = service.pair_channel(owner, WEBHOOKS, "Webhooks", ["ops"]).data["pairing_id"]
+
+    result = service.set_channel_destination(owner, pairing_id, url)
+
+    assert result.ok is False
+    assert result.reason_code == "channel_destination_invalid"
+
+
+def test_a_bound_destination_is_reported_by_host_and_a_new_one_forgets_the_old_test(
+    workspace: Path, owner: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RAIKER_CHANNEL_EGRESS_ALLOWLIST", "hooks.example.com")
+    service = DashboardService(workspace)
+    pairing_id = service.pair_channel(owner, WEBHOOKS, "Webhooks", ["ops"]).data["pairing_id"]
+    assert service.set_channel_destination(
+        owner, pairing_id, "https://hooks.example.com/t/SECRETPATH"
+    ).ok
+    service.control._store.record_channel_pairing_test(pairing_id, ok=True, reason_code=None)
+
+    profile = next(
+        row for row in service.list_channels(owner)["profiles"] if row["connector_id"] == WEBHOOKS
+    )
+    assert profile["destination"] == {
+        "kind": "url", "configured": True, "host": "hooks.example.com", "allowlisted": True,
+    }
+    assert "SECRETPATH" not in json.dumps(profile)
+    assert profile["last_test"] is not None and profile["last_test"]["ok"] is True
+
+    assert service.set_channel_destination(owner, pairing_id, "http://127.0.0.1:9/hook").ok
+    profile = next(
+        row for row in service.list_channels(owner)["profiles"] if row["connector_id"] == WEBHOOKS
+    )
+    assert profile["last_test"] is None
+    assert profile["destination"]["allowlisted"] is False
+
+
+def test_a_telegram_channel_has_no_url_to_bind(workspace: Path, owner: str) -> None:
+    service = DashboardService(workspace)
+    pairing_id = service.pair_channel(
+        owner, "channel.telegram", "Telegram", ["4242"]
+    ).data["pairing_id"]
+
+    result = service.set_channel_destination(owner, pairing_id, "https://hooks.example.com/x")
+
+    assert result.ok is False
+    assert result.reason_code == "channel_destination_not_configurable"
+
+
+def test_the_route_scope_says_what_the_receiver_does(workspace: Path, owner: str) -> None:
+    """UX-MSG-05 — DM/group, mention, thread, who starts work, bot loops, reply."""
+    service = DashboardService(workspace)
+    pairing_id = service.pair_channel(
+        owner, "channel.telegram", "Telegram", ["4242", "7"]
+    ).data["pairing_id"]
+
+    def scope() -> dict[str, object]:
+        profile = next(
+            row
+            for row in service.list_channels(owner)["profiles"]
+            if row["connector_id"] == "channel.telegram"
+        )
+        return dict(profile["route_scope"])
+
+    assert scope() == {
+        "conversation_scope": "direct_and_group",
+        "mention_required": False,
+        "thread_mapping": "none",
+        "starts_work": "nobody",
+        "bot_loop_protection": "bot_messages_ignored",
+        "reply_path": "none",
+    }
+    assert service.set_channel_routing(
+        owner,
+        pairing_id,
+        routing_mode="new_turn",
+        target_session_id=None,
+        owner_sender_id="4242",
+        approval_relay_enabled=False,
+    ).ok
+    assert scope()["thread_mapping"] == "new_conversation_each_message"
+    assert scope()["starts_work"] == "owner_only"
+    # Telegram gets nothing back over the channel: the answer stays in Raiker.
+    assert scope()["reply_path"] == "kept_in_raiker"
 
 
 def test_the_surface_reports_the_gate_the_owner_actually_set(

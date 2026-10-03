@@ -278,8 +278,11 @@ export const api = {
   setChannelSenders: (pairingId: string, senders: string[]) =>
     contract.setChannelSenders(pairingId, { senders }),
   unpairChannel: (pairingId: string) => contract.unpairChannel(pairingId),
-  deliverChannelTest: (connector_id: string, url: string, text: string) =>
-    contract.deliverChannelTest({ connector_id, url, text }),
+  // UX-MSG-04 — a test names no destination; it goes where the channel delivers.
+  deliverChannelTest: (connector_id: string, text: string) =>
+    contract.deliverChannelTest({ connector_id, text }),
+  setChannelDestination: (pairingId: string, delivery_url: string | null) =>
+    contract.setChannelDestination(pairingId, { delivery_url }),
   mcpServers: () => contract.listMcpServers(),
   // BUG-221 — servers installed plugins *offer*. An offer is a description, not
   // a connection: adding one posts to the ordinary create routes above, so the

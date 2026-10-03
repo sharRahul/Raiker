@@ -726,6 +726,142 @@ class ExtensionStore:
             )
             return cursor.rowcount > 0
 
+    def set_channel_pairing_destination(
+        self: SQLiteStore, pairing_id: str, delivery_url: str | None
+    ) -> bool:
+        """UX-MSG-04 — where this channel delivers, decided once by the owner.
+
+        Changing the destination forgets the last test: a test proved the old
+        destination, and the setup checklist must not count it for the new one.
+        """
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE channel_pairings
+                   SET delivery_url = ?, last_test_at = NULL, last_test_ok = NULL,
+                       last_test_reason = NULL
+                   WHERE pairing_id = ?""",
+                (delivery_url, pairing_id),
+            )
+            return cursor.rowcount > 0
+
+    def record_channel_pairing_test(
+        self: SQLiteStore, pairing_id: str, *, ok: bool, reason_code: str | None
+    ) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE channel_pairings
+                   SET last_test_at = ?, last_test_ok = ?, last_test_reason = ?
+                   WHERE pairing_id = ?""",
+                (utc_now(), 1 if ok else 0, None if ok else (reason_code or "failed"), pairing_id),
+            )
+            return cursor.rowcount > 0
+
+    # ── Channel receipts (UX-MSG-06) ─────────────────────────────────────────
+    #
+    # One row per channel message or test delivery, with each stage as its own
+    # timestamp. Stages are written forward only and never reset, so a row can
+    # say "processed" and "reply not delivered" at once — which is the case the
+    # review names: a completed task is not a delivered reply.
+
+    CHANNEL_RECEIPT_STAGES = (
+        "received_at",
+        "accepted_at",
+        "queued_at",
+        "processed_at",
+        "reply_queued_at",
+        "delivered_at",
+        "failed_at",
+    )
+    #: Rows kept per connector. Receipts are a recent-activity ledger; the
+    #: audit log is the permanent record.
+    CHANNEL_RECEIPTS_KEPT = 200
+
+    def insert_channel_receipt(
+        self: SQLiteStore,
+        *,
+        receipt_id: str,
+        connector_id: str,
+        pairing_id: str | None,
+        direction: str,
+        kind: str,
+        sender_role: str | None = None,
+        conversation_scope: str | None = None,
+        routing_mode: str | None = None,
+        stages: dict[str, str] | None = None,
+        reason_code: str | None = None,
+    ) -> None:
+        values: dict[str, Any] = {
+            "receipt_id": receipt_id,
+            "connector_id": connector_id,
+            "pairing_id": pairing_id,
+            "direction": direction,
+            "kind": kind,
+            "sender_role": sender_role,
+            "conversation_scope": conversation_scope,
+            "routing_mode": routing_mode,
+            "reason_code": reason_code,
+            "created_at": utc_now(),
+        }
+        for stage, at in (stages or {}).items():
+            if stage in self.CHANNEL_RECEIPT_STAGES:
+                values[stage] = at
+        columns = ", ".join(values)
+        marks = ", ".join("?" for _ in values)
+        with self.connect() as connection:
+            connection.execute(
+                f"INSERT INTO channel_receipts ({columns}) VALUES ({marks})",  # noqa: S608 - keys are fixed above
+                tuple(values.values()),
+            )
+            connection.execute(
+                """DELETE FROM channel_receipts
+                   WHERE connector_id = ? AND receipt_id NOT IN (
+                     SELECT receipt_id FROM channel_receipts WHERE connector_id = ?
+                     ORDER BY created_at DESC, rowid DESC LIMIT ?)""",
+                (connector_id, connector_id, self.CHANNEL_RECEIPTS_KEPT),
+            )
+
+    def advance_channel_receipt(
+        self: SQLiteStore,
+        receipt_id: str,
+        *,
+        stages: dict[str, str],
+        session_id: str | None = None,
+        reason_code: str | None = None,
+    ) -> bool:
+        """Record later stages. A stage already written keeps its first time."""
+        sets: list[str] = []
+        params: list[Any] = []
+        for stage, at in stages.items():
+            if stage not in self.CHANNEL_RECEIPT_STAGES:
+                continue
+            sets.append(f"{stage} = COALESCE({stage}, ?)")
+            params.append(at)
+        if session_id is not None:
+            sets.append("session_id = ?")
+            params.append(session_id)
+        if reason_code is not None:
+            sets.append("reason_code = ?")
+            params.append(reason_code)
+        if not sets:
+            return False
+        params.append(receipt_id)
+        with self.connect() as connection:
+            cursor = connection.execute(
+                f"UPDATE channel_receipts SET {', '.join(sets)} WHERE receipt_id = ?",  # noqa: S608 - columns are whitelisted
+                tuple(params),
+            )
+            return cursor.rowcount > 0
+
+    def list_channel_receipts(
+        self: SQLiteStore, connector_id: str, *, limit: int = 5
+    ) -> list[dict[str, Any]]:
+        rows = self._rows(
+            """SELECT * FROM channel_receipts WHERE connector_id = ?
+               ORDER BY created_at DESC, rowid DESC LIMIT ?""",
+            (connector_id, max(1, min(int(limit), 50))),
+        )
+        return [dict(row) for row in rows]
+
     def delete_channel_pairing(self: SQLiteStore, pairing_id: str) -> bool:
         """Unpair. Both executors and the inbound receiver read the pairing table,
         so deleting the row is what actually stops a channel — there is no state

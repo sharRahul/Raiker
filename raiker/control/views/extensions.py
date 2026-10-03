@@ -45,6 +45,43 @@ class UnsupportedFeature(TypedDict):
     note: str
 
 
+class McpScope(TypedDict):
+    """UX-MCP-02 — what adding or testing a server exposes, before it is done.
+
+    Read from the launcher and the endpoint policy rather than written as
+    copy, so the preview cannot claim a boundary the process does not have.
+    """
+
+    #: ``this_machine`` — a local process Raiker starts; ``remote`` — a URL.
+    runs_on: Literal["this_machine", "remote"]
+    #: For a local process: ``unrestricted`` — Raiker does not confine its
+    #: network. For a URL: the endpoint policy's class.
+    network: Literal["unrestricted", "loopback", "private_network", "public", "unknown"]
+    encrypted: bool | None
+    #: The environment variable *names* a local process is started with —
+    #: the constructed set plus any the owner granted. Never values.
+    environment: list[str]
+    #: Names the owner granted beyond the base set (RAIKER_MCP_ENV_ALLOWLIST).
+    granted_environment: list[str]
+    #: Where a remote server's token is read from; sent to that endpoint only.
+    token_reference: str | None
+    #: ``workspace`` — a local process starts in the workspace folder.
+    working_folder: Literal["workspace"] | None
+    #: ``account`` — whatever the account Raiker runs as may write;
+    #: ``none_on_this_machine`` for a remote server.
+    writable: Literal["account", "none_on_this_machine"]
+    #: Raiker advertises no roots and reads no resources or prompts, so the
+    #: server is told no folder and handed no file.
+    roots_shared: bool
+    resources_read: bool
+    #: Tools the last successful Test listed; ``None`` before one has run.
+    tool_count: int | None
+    #: Permissions a call needs, by capability key.
+    required_permissions: list[str]
+    #: UX-MCP-03 — the class of risk, in one word the page can word.
+    risk: Literal["local_process", "own_network", "remote_service"]
+
+
 def _declaration_summaries(stored: Any) -> tuple[McpToolDeclaration, ...]:
     """The owner-facing summary of what a server declared for each of its tools.
 
@@ -126,6 +163,15 @@ class McpServerView(View):
     # happened; nothing in the product said which revision Raiker speaks, which
     # made "why will this server not connect" unanswerable.
     protocol_version: str | None = None
+    # UX-MCP-02 — what this server can reach, read from the launcher and the
+    # endpoint policy. UX-MCP-03 — where it came from and what it says it is
+    # for: the offering plugin's description, or the server's own words about
+    # its first tool. Server-supplied text stays labelled as the server's.
+    scope: McpScope | None = None
+    source: Literal["raiker_sample", "plugin", "owner"] = "owner"
+    source_plugin: str | None = None
+    purpose: str | None = None
+    purpose_from: Literal["plugin", "server", "none"] = "none"
 
 
 @dataclass(frozen=True)
@@ -228,6 +274,8 @@ class McpOffer(TypedDict):
     auth_ref: NotRequired[str | None]
     template: NotRequired[str]
     already_added: bool
+    #: UX-MCP-02 — the scope adding it would give it, before it is added.
+    scope: McpScope
 
 
 class HookHandlerView(TypedDict):
@@ -372,6 +420,74 @@ class PluginsView(TypedDict):
 ChannelRoutingMode = Literal["record_only", "new_turn", "side_question", "interrupt"]
 
 
+class ChannelDestination(TypedDict):
+    """UX-MSG-04 — where this channel delivers, bound on the pairing.
+
+    ``url`` for the reference webhook (the owner sets it), ``owner_chat`` for
+    Telegram (the bound owner sender's chat), ``none`` for a transport this
+    build cannot deliver over. ``host`` is the bound URL's host only — a path
+    can carry a token and is never returned.
+    """
+
+    kind: Literal["url", "owner_chat", "none"]
+    configured: bool
+    host: str | None
+    #: The host is on RAIKER_CHANNEL_EGRESS_ALLOWLIST. ``None`` when there is
+    #: no host to check (Telegram's is fixed; nothing bound yet).
+    allowlisted: bool | None
+
+
+class ChannelLastTest(TypedDict):
+    """The last owner test delivery, for the setup checklist (UX-MSG-03)."""
+
+    at: str
+    ok: bool
+    reason_code: str | None
+
+
+class ChannelRouteScope(TypedDict):
+    """UX-MSG-05 — what the stored route actually does, stated by the server.
+
+    Codes rather than prose, so the page words them and cannot claim a scope
+    the receiver does not enforce.
+    """
+
+    #: ``direct_and_group`` — Telegram accepts an allowed sender in a private
+    #: chat or a group alike; ``endpoint`` — one caller, no chats.
+    conversation_scope: Literal["direct_and_group", "endpoint"]
+    #: Raiker does not look for an @mention; an allowed sender is heard anywhere.
+    mention_required: bool
+    thread_mapping: Literal["none", "one_conversation", "new_conversation_each_message"]
+    #: Who may make a message start or steer work under this route.
+    starts_work: Literal["nobody", "owner_only", "any_allowed_sender"]
+    bot_loop_protection: Literal["bot_messages_ignored", "rate_limit_only"]
+    #: Where an answer goes: back in the response to the caller, or nowhere —
+    #: it stays in Raiker's conversation.
+    reply_path: Literal["returned_to_caller", "kept_in_raiker", "none"]
+
+
+class ChannelReceipt(TypedDict):
+    """UX-MSG-06 — one message or test, each stage its own fact."""
+
+    receipt_id: str
+    direction: Literal["inbound", "outbound"]
+    kind: Literal["message", "test_delivery"]
+    #: ``owner``, ``allowed`` or ``not_allowed`` — never the sender's id.
+    sender_role: str | None
+    conversation_scope: str | None
+    routing_mode: str | None
+    session_id: str | None
+    received_at: str | None
+    accepted_at: str | None
+    queued_at: str | None
+    processed_at: str | None
+    reply_queued_at: str | None
+    delivered_at: str | None
+    failed_at: str | None
+    reason_code: str | None
+    created_at: str
+
+
 class ChannelProfile(TypedDict):
     """One connector profile, and each separate fact about it (BUG-225)."""
 
@@ -401,6 +517,13 @@ class ChannelProfile(TypedDict):
     supports_interrupts: bool
     supports_approvals: bool
     env_requirements: list[ChannelEnvRequirement]
+    #: The target conversation's title, so routing never shows a raw id.
+    target_session_title: str | None
+    destination: ChannelDestination
+    last_test: ChannelLastTest | None
+    route_scope: ChannelRouteScope
+    #: The most recent first; at most five.
+    receipts: list[ChannelReceipt]
 
 
 class ChannelsOutbound(TypedDict):

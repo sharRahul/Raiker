@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-03 (second) | Targeted | `2026-10-03-messaging-mcp-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a turn routed in from a webhook channel and a Chat turn, the key entered through the Connect dialog; a local receiver standing in for a webhook destination | Ten items from the release-readiness review: §3.10 Messaging (UX-MSG-03 to -06), §3.11 MCP (UX-MCP-02, -03), UX-CHAT-03 to -05 and UX-MODEL-03, with UX-CHAT-02 completed and UX-MSG-01/-02, SEC-MCP-01 to -03 and UX-MCP-01 recorded against earlier closures. Proved live: a channel set up step by step, its test refused at the gate and then **delivered while the channel was still off**, a real Anthropic answer to a routed message with each receipt stage separate, Telegram group scope and a bot's update ignored, an MCP sample stating its reach before Test and its trust after, Chat's filing line, labelled background work and grouped actions, and a model reset that holds across a reload, with no horizontal overflow at 390 wide. **Five defects found and fixed** — a refused channel action left the page stale, a failed routed turn read *Failed: failed*, every routed Telegram message failed validation, the MCP notice named a server that did not exist, and a searched model was shown as the default; BUG-314 and BUG-315 filed |
 | 2026-10-03 | Targeted | `2026-10-03-tasks-more-round/` | Anthropic (`claude-haiku-4-5-20251001`) running a real delegated task, the key entered through the Connect dialog | Ten items from the release-readiness review: §3.8 Tasks (UX-TASK-02, -03, -05, -06), §3.6 the More window (UX-SETPOP-02 to -04) and UX-PERM-01, with UX-TASK-01 and UX-SETPOP-01 re-verified against FIXED-584 and FIXED-528. Proved live: a weekday routine with an end and a skip policy composed in two groups and stating its terms on its card, Cancel rather than Stop on work that has not run, delegated work folded and counted under its parent, a real run settling and **Run again** filing new work, Permissions by task group, More by purpose with Recent and the palette, More as a full-height sheet at 390 wide, and every destination with **no 4xx, no 5xx and no console error**. **Three defects found and fixed** — Show on a parent revealed none of its settled work, a finished task said *Now: Starting scheduled run*, and filing a task forgot its model |
 | 2026-10-02 (second) | Targeted | `2026-10-02-memory-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that recalled an imported memory, the key entered through the Connect dialog | Ten items from the release-readiness review: §3.9 Memory (UX-MEM-01 to UX-MEM-08) and UX-PERM-02 to UX-PERM-05. Proved live: an import reviewed record by record with one left out and a receipt, a real turn given the imported memory and its record linking back to that turn, archive / retention / restore as one lifecycle, an undo that keeps the record the owner changed, Permissions by goal, and 390 wide with no horizontal overflow, with **no 4xx, no 5xx and no console error** in the Memory and Permissions steps. **Four defects found** — three fixed (the Expired filter could never show a record, *last included* ignored a turn's own recall, an imported record said *agent*) and one filed (BUG-313: an instruction in the prompt stops recall) |
 | 2026-10-02 | Targeted | `2026-10-02-contract-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn and a Design research turn, the key entered through the Connect dialog | OPT-01 and OPT-02 Stage B — every ordinary route described and called through the generated client — and what describing them found. Proved live: Design's Research reaching its turn (it had been refused with 422), Models calling Design **Research only** with the way to fix it, MFA's recovery codes shown once and one of them recovering the password from the lock screen (and refused the second time), and every destination with **no 4xx, no 5xx and no console error**. **Three defects found and fixed** — the recovery codes were never shown, every composer called Web fetch off while Permissions said on, and research answers printed raw markdown |
@@ -83,6 +84,89 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-10-03 (second) — A channel set up in order, an MCP server's reach before it runs, and a default that holds
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py` before
+every attempt, in a Linux container whose egress is limited to a proxy, with
+`RAIKER_CHANNEL_EGRESS_ALLOWLIST=127.0.0.1:8799` and an inbound secret set and a
+local HTTP receiver on 8799 standing in for a webhook destination. Provider:
+Anthropic `claude-haiku-4-5-20251001`, the key the owner supplied entered through
+the Connect dialog by the spec from the process environment — never written to a
+file — and chosen as the default on **My models**. Browser: the pre-installed
+Chromium, through `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. Spec:
+`web/e2e/round-2026-10-03-messaging-mcp-live.spec.ts` (9 of 9 on the final, fresh
+workspace). Captures: [`docs/screenshots/2026-10-03-messaging-mcp-round/`](../screenshots/2026-10-03-messaging-mcp-round).**
+
+§3.10, §3.11, §3.2 and §3.5 of the release-readiness review: FIXED-709 to
+FIXED-724.
+
+**What it proved.**
+
+1. **A channel is set up in order.** Webhooks paired with two senders showed six
+   steps with *Owner verified* next; choosing *You on this channel* and a *New
+   turn* route moved it to *Test delivery*, whose control was *Set delivery
+   address* while **Send a test delivery** stayed disabled (FIXED-709, FIXED-710,
+   [02](../screenshots/2026-10-03-messaging-mcp-round/02-checklist-owner-next.png)).
+2. **The test runs the real path, before the channel is on.** With the channel
+   capability off, the test was refused at the gate and the checklist and
+   receipt said so in words ([03](../screenshots/2026-10-03-messaging-mcp-round/03-test-refused-at-the-gate.png)); with it
+   on, the test arrived at the local receiver while the card still read
+   *Linked, off*, and *Turned on* became the next step
+   ([04](../screenshots/2026-10-03-messaging-mcp-round/04-test-delivered-while-off.png)).
+3. **A routed message's stages are separate facts.** A message from the owner
+   over the webhook ran a real Anthropic turn: *received, accepted, queued,
+   processed, reply queued, delivered — Answered and returned to the caller*,
+   beside a refused sender (*Failed: the sender is not on the allowlist*) and
+   both tests; *What this route does* read *Only you … Each message starts a new
+   conversation … Returned in the response* (FIXED-711, FIXED-712,
+   [05](../screenshots/2026-10-03-messaging-mcp-round/05-receipts-and-route-scope.png)).
+4. **Telegram** read *Direct messages and groups alike* and *Messages from bots
+   are ignored*; a group message was recorded as *An allowed sender in a group*,
+   and a bot-authored update was acknowledged as `bot_sender` and left no
+   receipt ([06](../screenshots/2026-10-03-messaging-mcp-round/06-telegram-scope.png)).
+5. **An MCP sample states its reach before Test** — unconfined network and
+   writes in the warning tone, *no provider key*, no folder or file shared,
+   tools unknown — and after a real Test folds that away and leads with *It
+   says: …*, *Runs code on this machine*, *Sample Raiker generated* and a *Last
+   used …* line counting its sessions' outcomes (FIXED-713, FIXED-714,
+   [07](../screenshots/2026-10-03-messaging-mcp-round/07-mcp-scope-before-test.png), [08](../screenshots/2026-10-03-messaging-mcp-round/08-mcp-trust-after-test.png)).
+6. **Chat** filed in a new project read *Filed in Launch notes* and *recall
+   still draws on all your memory*; a real answer arrived; the toggle read
+   **Background** with its counts in its name; and the conversation menu showed
+   **Conversation**, **Evidence** and **Continuity**, whose *Background work*
+   opened the rail (FIXED-715 to FIXED-717,
+   [09](../screenshots/2026-10-03-messaging-mcp-round/09-chat-filed-not-narrowed.png), [10](../screenshots/2026-10-03-messaging-mcp-round/10-chat-actions-grouped.png)).
+7. **The model menu** said *Default model Haiku 4.5*; a model chosen by search
+   showed *This work uses Sonnet 5.5 · Reset to default*; the reset returned the
+   composer to Haiku and **a reload kept it there** (FIXED-718, FIXED-723,
+   [11](../screenshots/2026-10-03-messaging-mcp-round/11-model-default-and-override.png)).
+8. **At 390 × 844** Messaging, MCP and Chat had no horizontal overflow
+   ([12](../screenshots/2026-10-03-messaging-mcp-round/12-messaging-390.png), [13](../screenshots/2026-10-03-messaging-mcp-round/13-mcp-390.png),
+   [14](../screenshots/2026-10-03-messaging-mcp-round/14-chat-390.png)).
+
+**What it found.** Five product defects, each fixed in the run and the round
+re-run from a fresh workspace: a refused channel action left the page showing
+the state before it (FIXED-719); a routed message whose turn failed read
+*Failed: failed* (FIXED-720); writing the test for it found every routed Telegram
+message failing with `invalid_client_type:telegram` (FIXED-721, High); the MCP
+sample's notice named *Protocol sample* while the server was stored as
+*Protocolsample* (FIXED-722); and a model chosen by search was shown as the
+default (FIXED-723). The first attempt's routed turn failed because the round
+had not chosen a default model — a channel's turn runs on the owner's default —
+so the spec now chooses one on **My models**, as an owner would. One harness
+defect: `enableCapability` matched *Search capabilities* inside FIXED-708's
+*Select all Web and research capabilities* checkbox; it and every spec that
+copied the selector now match exactly.
+
+**What it did not prove.** A reply delivered back over Telegram — there is none
+([BUG-315](TO_BE_FIXED.md#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram));
+a real Telegram bot (updates were posted to the receiver directly, with the
+inbound secret); a remote MCP server; and the evidence line's source and
+approval counts (FIXED-724), since no turn here used a tool.
 
 ---
 

@@ -19,7 +19,7 @@
    * surfaces the rest of the workspace uses.
    */
   import { onMount, tick, untrack } from "svelte";
-  import { modelDecision, rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
+  import { modelDecision, forgetSurfaceModel, rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import { setWorkProject, workProject } from "../workProject.svelte";
   import {
     clampExplorerWidth,
@@ -2677,6 +2677,7 @@
               {selectedProfile}
               {decision}
               onchosen={(profileId, chosen) => void rememberSurfaceModel("build", profileId, chosen)}
+            onreset={() => void forgetSurfaceModel("build")}
               disabled={streaming}
             />
             <button

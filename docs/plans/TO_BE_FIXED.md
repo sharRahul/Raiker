@@ -117,6 +117,8 @@ names.
 | [BUG-311](FIXED_ITEMS.md#fixed-676--models-called-design-ready-on-a-model-that-returns-no-images) | Low | Models / Design | **Closed 2026-10-02 ([FIXED-676](FIXED_ITEMS.md#fixed-676--models-called-design-ready-on-a-model-that-returns-no-images))** — the overview says *Research only* and offers an image provider, from the same fact setup reads |
 | [BUG-312](#bug-312--one-windows-test-run-ended-in-an-interpreter-crash-dump) | Low | Tests / Windows | Open — one of 28 runs of the instance-lifecycle and internal-path tests printed a crash dump; not reproduced since |
 | [BUG-313](#bug-313--an-instruction-in-the-prompt-stops-recall-finding-the-memory-it-asks-about) | Medium | Memory / recall | Open — a question carrying an instruction ("Answer in one sentence") recalls nothing, because the lexical leg needs every content word in the record |
+| [BUG-314](#bug-314--a-model-chosen-by-search-is-judged-by-the-defaults-readiness-and-window) | Low | Composers / models | Open — Chat, Build and Tasks look the chosen pair up among the quick list, so a model reached by search is judged by the default's readiness and context window until the server checks it |
+| [BUG-315](#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram) | Medium | Messaging / Telegram | Open — a routed Telegram message runs its turn and the answer stays in Raiker; the page now says so (FIXED-711, FIXED-712), but nothing delivers it |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2202,3 +2204,49 @@ two-word overlap, still recalls nothing.
 
 **Required user-interface outcome.** None new: the **Remembered** strip and the
 memory's *Turns it was given to* (FIXED-691) show it working once fixed.
+
+---
+
+## BUG-314 — A model chosen by search is judged by the default's readiness and window
+
+**Severity: Low. Area: Composers / models. Status: Open — raised 2026-10-03, found
+while fixing FIXED-723.**
+
+**Observed.** Chat, Build and Tasks each derive `activeProfile` as the quick-list
+profile whose id *and* model match the bound pair, falling back to the global
+default. A model reached through **Search all models** is not in that list, so
+the composer's readiness line, *Send* gating and context-window meter describe
+the default while the turn names the searched model. The server's readiness gate
+still judges the pair actually sent, so no turn runs on an unchecked model; what
+is wrong is what the composer says before Send.
+
+**Proposed fix.** Derive the active pair the way the picker now does (provider
+from the profile, model from the binding) in one shared helper, and read its
+readiness by `(profile_id, model)`; a pair with no observation reads as *checked
+when you send* rather than as the default's state.
+
+**Required user-interface outcome.** After choosing a searched model, the
+context line and readiness strip name that model, and Send's state is that
+model's.
+
+---
+
+## BUG-315 — A Telegram turn's answer never goes back over Telegram
+
+**Severity: Medium. Area: Messaging / Telegram. Status: Open — raised 2026-10-03.**
+
+**Observed.** A Telegram message on a *New turn* or *Side question* route runs a
+governed turn, and the answer is returned in the HTTP response to Telegram's
+webhook call, which Telegram ignores. The owner reads the answer only in Raiker.
+Since FIXED-711 and FIXED-712 the page says so — *Replies: kept in Raiker* and
+*Processed — no reply sent over the channel* — rather than implying a reply.
+
+**Why it is not fixed in passing.** Delivering it is a new outbound path:
+`external_channel_runtime` has one entry path today (the owner's control plane,
+`entry_paths.py`), and a reply sent on the router's initiative needs its own
+entry, its own receipt stage (*reply queued → delivered*), the DEC-14 retry
+ledger with deduplication, and a decision on whether a reply waits for the
+owner's approval mode.
+
+**Required user-interface outcome.** A routed Telegram message's receipt reaches
+*delivered*, and *What this route does* says replies go back to the chat.

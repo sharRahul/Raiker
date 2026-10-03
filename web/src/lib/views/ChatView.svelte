@@ -17,7 +17,7 @@
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
   import { densityGap, workSurface } from "../workSurface";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
-  import { modelDecision, rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
+  import { modelDecision, forgetSurfaceModel, rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import {
     classifyResumeFailure,
     watchForResumableTurns,
@@ -76,6 +76,7 @@
   import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
   import { collectText } from "../turnPhases";
   import { relativeTime } from "../format";
+  import { backgroundLabel, backgroundSummary, type BackgroundSummary } from "../backgroundWork";
   import {
     attachmentChipsByTurn,
     mergeRestoredChips,
@@ -84,7 +85,7 @@
     type ParkedApproval,
   } from "../conversationRestore";
   import { rememberSessionInRoute } from "../sessionRoute";
-  import { forgetTurnInRoute, revealTurn } from "../turnAnchor";
+  import { evidenceLink, forgetTurnInRoute, revealTurn } from "../turnAnchor";
   import { hasSteps, planFromEvent } from "../agentPlan";
   import { collectReasoning, hasRunningTool, toolActivity, type ToolCallRow } from "../chatPresentation";
   import { turnFailureMessage } from "../turnFailure";
@@ -235,6 +236,31 @@
     });
   });
   let backgroundWorkOpen = $state(false);
+  /*
+   * UX-CHAT-04 — the rail's toggle says what is in it before it is opened: a
+   * label, how much is running, and whether anything failed today. Read from
+   * the same `/api/tasks` filter the rail itself draws, every thirty seconds,
+   * and silently absent when the read fails (the rail says why when opened).
+   */
+  let background = $state<BackgroundSummary | null>(null);
+  $effect(() => {
+    const filter = projectId ? { project_id: projectId } : {};
+    let cancelled = false;
+    const read = async () => {
+      try {
+        const tasks = await api.tasks(filter);
+        if (!cancelled) background = backgroundSummary(tasks);
+      } catch {
+        if (!cancelled) background = null;
+      }
+    };
+    void read();
+    const timer = window.setInterval(read, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  });
 
   async function refreshContextUsage() {
     if (sessionId === null) {
@@ -498,10 +524,20 @@
            * has to find it again is the weak return path the review names; the
            * id is already here, so the link can carry it.
            */
+          /*
+           * UX-CHAT-03 — filing is organisation, not a narrower memory. A
+           * project's instructions and shared files ride each Chat turn, but
+           * Chat's recall stays owner-wide (`RetrievalScope("chat", None)` in
+           * the gatherer; only Build narrows to the project). A line that only
+           * named the project read as "this chat can see only this project".
+           */
           {
             label: "Project",
-            value: selectedProject.name,
-            short: selectedProject.name,
+            value:
+              `Filed in ${selectedProject.name}. Its instructions and shared files apply; ` +
+              "recall still draws on all your memory, not only this project's, unless " +
+              "Incognito is on in Memory.",
+            short: `Filed in ${selectedProject.name}`,
             href: `#/projects?project=${encodeURIComponent(selectedProject.project_id)}`,
             action: "Open project work",
           },
@@ -1635,7 +1671,10 @@
     const target = value === "" ? null : value;
     if (sessionId === null) {
       pendingProjectId = target;
-      projectNotice = target === null ? "This chat will stay outside every project." : "This chat will be filed there as soon as it starts.";
+      projectNotice =
+        target === null
+          ? "This chat will stay outside every project."
+          : "This chat will be filed there as soon as it starts. Filing organises it; recall still draws on all your memory.";
       return;
     }
     await moveSession(target);
@@ -1655,7 +1694,7 @@
       projectNotice =
         target === null
           ? "Moved out of every project."
-          : `Filed under ${projects?.projects.find((project) => project.project_id === target)?.name ?? "the project"}.`;
+          : `Filed under ${projects?.projects.find((project) => project.project_id === target)?.name ?? "the project"}. Recall still draws on all your memory.`;
       onProjectsChanged?.();
     } catch (error) {
       projectNotice = error instanceof ApiError ? `Could not move this chat (${error.status}).` : "Could not move this chat.";
@@ -1884,17 +1923,51 @@
           onclick={() => (conversationMenuOpen = !conversationMenuOpen)}
         >•••</button>
         {#if conversationMenuOpen}
-          <div class="menu" role="menu" aria-label="Conversation actions">
-            <button
-              type="button"
-              role="menuitem"
-              disabled={sessionId === null}
-              onclick={openExport}
-              onkeydown={openExportFromKeyboard}
-            >Export conversation…</button>
-            <button type="button" role="menuitem" onclick={printConversation}>
-              Print / Save as PDF
-            </button>
+          <!-- UX-CHAT-05 — one model for every conversation-level action:
+               **Conversation** (the record itself), **Evidence** (how it was
+               produced) and **Continuity** (where it goes next). The same
+               three words head the per-message More menu's Continuity group
+               and the turn's own Evidence disclosure, so an action is found
+               under the same name wherever it is reached. -->
+          <div class="menu grouped-menu" role="menu" aria-label="Conversation actions">
+            <div role="group" aria-label="Conversation">
+              <p class="menu-group" aria-hidden="true">Conversation</p>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={sessionId === null}
+                onclick={openExport}
+                onkeydown={openExportFromKeyboard}
+              >Export conversation…</button>
+              <button type="button" role="menuitem" onclick={printConversation}>
+                Print / Save as PDF
+              </button>
+            </div>
+            <div role="group" aria-label="Evidence">
+              <p class="menu-group" aria-hidden="true">Evidence</p>
+              {#if sessionId !== null}
+                <a
+                  role="menuitem"
+                  href={evidenceLink(sessionId)}
+                  onclick={() => (conversationMenuOpen = false)}
+                >Every governed step in this conversation</a>
+              {:else}
+                <button type="button" role="menuitem" disabled>Every governed step in this conversation</button>
+              {/if}
+              <p class="menu-hint">Each answer's own evidence is under it.</p>
+            </div>
+            <div role="group" aria-label="Continuity">
+              <p class="menu-group" aria-hidden="true">Continuity</p>
+              <button
+                type="button"
+                role="menuitem"
+                onclick={() => {
+                  conversationMenuOpen = false;
+                  backgroundWorkOpen = true;
+                }}
+              >Background work</button>
+              <p class="menu-hint">Branch, summarise and rewind are under each of your messages.</p>
+            </div>
           </div>
         {/if}
       </div>
@@ -1904,10 +1977,18 @@
         onclick={() => (backgroundWorkOpen = !backgroundWorkOpen)}
         aria-expanded={backgroundWorkOpen}
         aria-controls="chat-background-work"
-        aria-label="Background work"
-        title="Background work"
+        aria-label={backgroundLabel(background)}
+        title={backgroundLabel(background)}
+        class:rail-failed={(background?.failed ?? 0) > 0}
       >
         <Icon name="panel" size="sm" />
+        <span class="rail-label">Background</span>
+        {#if background && background.active > 0}
+          <span class="rail-count" aria-hidden="true">{background.active}</span>
+        {/if}
+        {#if background && background.failed > 0}
+          <span class="rail-alert" aria-hidden="true">!</span>
+        {/if}
       </button>
     </div>
   </header>
@@ -2186,6 +2267,8 @@
               sessionId={sessionId}
               turnId={turn.response.turn_id}
               rows={toolRows}
+              sources={turnSourceList.length}
+              approvals={turn.response?.approval ? 1 : 0}
             />
           {/if}
 
@@ -2398,6 +2481,7 @@
             {selectedProfile}
             {decision}
             onchosen={(profileId, chosen) => void rememberSurfaceModel("chat", profileId, chosen)}
+            onreset={() => void forgetSurfaceModel("chat")}
             disabled={streaming}
           />
           <button
@@ -2524,6 +2608,34 @@
       margin: 0;
       max-width: none;
     }
+  }
+  /* UX-CHAT-05 — three named groups in the conversation menu. */
+  .grouped-menu { min-width: 16rem; }
+  .grouped-menu [role="group"] + [role="group"] { border-top: 1px solid var(--border); margin-top: 0.25rem; padding-top: 0.25rem; }
+  .menu-group { margin: 0.2rem 0.6rem 0.15rem; color: var(--text-3); font-size: var(--text-2xs); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .menu-hint { margin: 0 0.6rem 0.3rem; color: var(--text-3); font-size: var(--text-2xs); }
+  .grouped-menu [role="group"] { display: grid; gap: var(--space-1); }
+  .conversation-menu .menu a[role="menuitem"] {
+    display: block; text-decoration: none; color: var(--text-1); font-size: var(--text-sm);
+    padding: var(--space-1) var(--space-2); border-radius: var(--r-sm);
+  }
+  .conversation-menu .menu a[role="menuitem"]:hover { background: var(--accent-soft); }
+  /* UX-CHAT-04 — a labelled toggle with a count, and a failure that shows. */
+  .rail-toggle { display: inline-flex; align-items: center; gap: 0.35rem; }
+  .rail-label { font-size: var(--text-xs); font-weight: 600; }
+  .rail-count {
+    min-width: 1.2rem; padding: 0 0.3rem; border-radius: var(--r-pill);
+    background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border);
+    font-size: var(--text-2xs); font-weight: 700; text-align: center;
+  }
+  .rail-alert {
+    display: inline-grid; place-items: center; width: 1.1rem; height: 1.1rem; border-radius: 50%;
+    background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-border);
+    font-size: var(--text-2xs); font-weight: 800;
+  }
+  .rail-failed { color: var(--danger); }
+  @media (max-width: 560px) {
+    .rail-label { display: none; }
   }
   .rail-slot {
     min-height: 0;

@@ -170,4 +170,12 @@ describe("TurnEvidence", () => {
 
     await waitFor(() => expect(screen.getByText("Asked the model")).toBeInTheDocument());
   });
+
+  // UX-CHAT-02 — the closed line says what the turn used, and fetches nothing.
+  it("summarises calls, sources and approvals while closed", () => {
+    const fetchMock = stubFetch({});
+    render(TurnEvidence, { sessionId: "sess_1", turnId: "turn_9", rows: ROWS, sources: 2, approvals: 1 });
+    expect(screen.getByText("1 call · 2 sources · 1 approval")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

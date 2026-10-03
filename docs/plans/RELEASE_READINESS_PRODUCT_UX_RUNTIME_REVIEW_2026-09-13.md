@@ -91,6 +91,15 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-03 (second round).** §3.10 Messaging and
+> §3.11 MCP are closed — UX-MSG-03 to -06 as FIXED-709 to FIXED-712, UX-MCP-02
+> and -03 as FIXED-713 and FIXED-714, with UX-MSG-01/-02, SEC-MCP-01 to -03 and
+> UX-MCP-01 recorded against the closures that had already met them. In §3.2,
+> UX-CHAT-02 to -05 closed (FIXED-724, FIXED-715 to FIXED-717) and UX-CHAT-01 is
+> the one row left; in §3.5, UX-MODEL-03 closed as FIXED-718. The live round that
+> proved them found five defects, fixed as FIXED-719 to FIXED-723, and filed
+> BUG-314 and BUG-315.
+>
 > **Implementation status, 2026-10-03.** §3.1 Permissions, §3.6 the Settings
 > popup and §3.8 Tasks are closed. UX-PERM-01 as FIXED-708; UX-SETPOP-02 to -04
 > as FIXED-705 to FIXED-707 with UX-SETPOP-01 recorded against FIXED-528; and
@@ -453,6 +462,16 @@ language and progressive disclosure, not the security model.
 
 ## 3.2 Chat
 
+> **Implementation status, 2026-10-03.** Four of the five rows are closed.
+> UX-CHAT-02 closed with [FIXED-724](FIXED_ITEMS.md#fixed-724--a-turns-evidence-counted-its-calls-and-not-its-sources-or-approvals): the per-turn evidence of
+> [FIXED-581](FIXED_ITEMS.md#fixed-581--a-turns-own-evidence-was-on-another-route) (REM-CHAT-01) now reads *3 calls · 2 sources · 1 approval*
+> while closed. UX-CHAT-03 to -05 closed as [FIXED-715](FIXED_ITEMS.md#fixed-715--a-chat-filed-in-a-project-read-as-a-chat-that-could-see-only-that-project) to
+> [FIXED-717](FIXED_ITEMS.md#fixed-717--conversation-actions-had-no-shared-model): the context line says **Filed in** a project and that recall
+> still spans all memory, the background toggle is labelled and counts what runs
+> and what failed, and conversation actions are grouped as Conversation, Evidence
+> and Continuity. **UX-CHAT-01 — splitting `ChatView.svelte` by state machine — is
+> the one row left**; it is a refactor with no owner-visible change.
+
 ### Current strengths
 
 - Mature streaming conversation with persistent sessions, branching, export,
@@ -466,10 +485,10 @@ language and progressive disclosure, not the security model.
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
 | UX-CHAT-01 | P1 | `ChatView.svelte` is about 2,825 lines and coordinates history, streaming, citations, approvals, memory, project filing, speech, attachment and menu state. | Split by state machine/domain: session controller, turn renderer, composer controller, citation/source panel and conversation actions. |
-| UX-CHAT-02 | P1 | Advanced governance/tool details can visually compete with the answer. | Default to a compact “Used 3 tools · 2 sources · 1 approval” disclosure; retain full evidence on expansion. |
-| UX-CHAT-03 | P1 | Project filing and owner-wide Chat retrieval are easy to misunderstand. | Label the distinction: “Filed in Project X; Chat can still use account-wide memory.” |
-| UX-CHAT-04 | P2 | Background work is an icon-only rail and may be undiscoverable. | Add a first-use label/badge and surface active count or failure state. |
-| UX-CHAT-05 | P2 | Conversation actions, branch/rewind, sources, memory corrections and background work lack a single mental model. | Group them as Conversation, Evidence and Continuity actions; use consistent placement. |
+| ~~UX-CHAT-02~~ **closed** — [FIXED-724](FIXED_ITEMS.md#fixed-724--a-turns-evidence-counted-its-calls-and-not-its-sources-or-approvals) | P1 | Advanced governance/tool details can visually compete with the answer. | Default to a compact “Used 3 tools · 2 sources · 1 approval” disclosure; retain full evidence on expansion. |
+| ~~UX-CHAT-03~~ **closed** — [FIXED-715](FIXED_ITEMS.md#fixed-715--a-chat-filed-in-a-project-read-as-a-chat-that-could-see-only-that-project) | P1 | Project filing and owner-wide Chat retrieval are easy to misunderstand. | Label the distinction: “Filed in Project X; Chat can still use account-wide memory.” |
+| ~~UX-CHAT-04~~ **closed** — [FIXED-716](FIXED_ITEMS.md#fixed-716--background-work-was-an-unlabelled-icon) | P2 | Background work is an icon-only rail and may be undiscoverable. | Add a first-use label/badge and surface active count or failure state. |
+| ~~UX-CHAT-05~~ **closed** — [FIXED-717](FIXED_ITEMS.md#fixed-717--conversation-actions-had-no-shared-model) | P2 | Conversation actions, branch/rewind, sources, memory corrections and background work lack a single mental model. | Group them as Conversation, Evidence and Continuity actions; use consistent placement. |
 
 ### Simplified happy path
 
@@ -538,6 +557,15 @@ client state.
 
 ## 3.5 Models
 
+> **Implementation status, 2026-10-03.** UX-MODEL-03 closed as
+> [FIXED-718](FIXED_ITEMS.md#fixed-718--the-picker-did-not-say-what-was-default-and-reset-to-default-did-not-hold): every composer's model menu says **Default model** and, when
+> the work is on something else, **This work uses … · Reset to default**, and the
+> reset now clears the surface's stored preference so it holds across a reload.
+> Proving it live found [FIXED-723](FIXED_ITEMS.md#fixed-723--a-model-chosen-by-search-was-shown-as-the-default)
+> (a searched model shown as the default) and filed
+> [BUG-314](TO_BE_FIXED.md#bug-314--a-model-chosen-by-search-is-judged-by-the-defaults-readiness-and-window).
+> UX-MODEL-01, -02, -04 and -05 remain as written.
+
 ### Current strengths
 
 - The five-task information architecture—Overview, My models, Add, Runtime and
@@ -553,7 +581,7 @@ client state.
 |---|---:|---|---|
 | UX-MODEL-01 | P1 | `ModelsView.svelte` is about 3,235 lines and owns discovery, credentials, catalogue, selection, pricing/usage, runtime setup and modal state. | Split by the existing five tabs; put connection lifecycle and global selection into shared stores/services. |
 | UX-MODEL-02 | P1 | “Provider connected”, “models discovered”, “model selected” and “runtime available” still demand expert interpretation. | Use a four-step readiness line and give one primary next action. |
-| UX-MODEL-03 | P1 | Users can choose globally and again inside composers without a clear override hierarchy. | State: “Default model” and “This work uses …”; offer Reset to default. |
+| ~~UX-MODEL-03~~ **closed** — [FIXED-718](FIXED_ITEMS.md#fixed-718--the-picker-did-not-say-what-was-default-and-reset-to-default-did-not-hold) | P1 | Users can choose globally and again inside composers without a clear override hierarchy. | State: “Default model” and “This work uses …”; offer Reset to default. |
 | UX-MODEL-04 | P1 | Cost, context, privacy and tool support are spread across tabs/cards. | Add a comparable decision table with Locality, Context, Tools, Vision, Estimated cost and Availability. |
 | UX-MODEL-05 | P2 | Raw profile/provider identifiers may leak into troubleshooting. | Keep stable IDs in Advanced diagnostics and exports, never as primary labels. |
 
@@ -741,6 +769,23 @@ Show counts and trends without exposing content to telemetry:
 
 ## 3.10 Messaging
 
+> **Implementation status, 2026-10-03. Every row in this table is closed.**
+> UX-MSG-01 and UX-MSG-02 had closed on 2026-09-14 under their §18.3 names,
+> REM-MSG-01 and REM-MSG-02 ([FIXED-522](FIXED_ITEMS.md#fixed-522--messaging-called-one-object-a-channel-and-a-connector-and-led-with-neither)), and this table had gone on
+> listing them as open; the raw conversation id the routing form still asked for
+> is now a choice of conversation by title (FIXED-711). UX-MSG-03 to -06 closed
+> as [FIXED-709](FIXED_ITEMS.md#fixed-709--a-channel-offered-four-equal-buttons-and-its-test-could-only-run-after-the-step-it-was-for) to [FIXED-712](FIXED_ITEMS.md#fixed-712--a-finished-turn-and-a-delivered-reply-were-one-unrecorded-fact) under DEC-14: a six-step setup
+> checklist whose test runs before the channel is turned on, a delivery
+> destination bound on the pairing rather than typed into the test, the route
+> stated as what the receiver does (with bot updates now ignored), and a receipt
+> ledger keeping received, accepted, queued, processed, reply queued, delivered
+> and failed apart. The live round found and fixed three more (FIXED-719 to
+> FIXED-721, the last a crash on every routed Telegram message) and filed
+> [BUG-315](TO_BE_FIXED.md#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram).
+> Of the security and reliability contract below, durable inbound idempotency,
+> attachment limits, the delivery retry ledger and one-click containment remain
+> DEC-14 work that no row of this table names.
+
 ### Current strengths
 
 - Inbound content is explicitly untrusted.
@@ -753,12 +798,12 @@ Show counts and trends without exposing content to telemetry:
 
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
-| UX-MSG-01 | P1 | The page asks normal users for environment variables, raw sender/conversation IDs and test destination URLs. | Provide a “Connect channel” wizard with account authorization, sender discovery, test exchange and readiness check. Keep raw fields in Advanced/operator setup. |
-| UX-MSG-02 | P1 | “Connectors” here conflicts with Extensions → Connectors. | Call these “Channels” or “Messaging accounts”; reserve Connector for the underlying integration. |
-| UX-MSG-03 | P1 | Pairing, enablement, routing and approval relay are separate controls without a clear sequence. | Render a checklist: Connected → owner verified → allowed conversations → routing → test → enabled. |
-| UX-MSG-04 | P1 | An arbitrary destination URL for test delivery weakens the channel mental model. | Test through the selected account/conversation and apply the same routing and egress policy as real delivery. |
-| UX-MSG-05 | P1 | Group, thread, bot and multi-user behavior is not sufficiently visible. | Show DM/group scope, mention requirement, thread mapping, sender role and bot-loop protection per route. |
-| UX-MSG-06 | P2 | Delivery and work outcomes can be conflated. | Track received, accepted, queued, processed, reply queued, delivered and failed separately. |
+| ~~UX-MSG-01~~ **closed** — [FIXED-522](FIXED_ITEMS.md#fixed-522--messaging-called-one-object-a-channel-and-a-connector-and-led-with-neither) | P1 | The page asks normal users for environment variables, raw sender/conversation IDs and test destination URLs. | Provide a “Connect channel” wizard with account authorization, sender discovery, test exchange and readiness check. Keep raw fields in Advanced/operator setup. |
+| ~~UX-MSG-02~~ **closed** — [FIXED-522](FIXED_ITEMS.md#fixed-522--messaging-called-one-object-a-channel-and-a-connector-and-led-with-neither) | P1 | “Connectors” here conflicts with Extensions → Connectors. | Call these “Channels” or “Messaging accounts”; reserve Connector for the underlying integration. |
+| ~~UX-MSG-03~~ **closed** — [FIXED-709](FIXED_ITEMS.md#fixed-709--a-channel-offered-four-equal-buttons-and-its-test-could-only-run-after-the-step-it-was-for) | P1 | Pairing, enablement, routing and approval relay are separate controls without a clear sequence. | Render a checklist: Connected → owner verified → allowed conversations → routing → test → enabled. |
+| ~~UX-MSG-04~~ **closed** — [FIXED-710](FIXED_ITEMS.md#fixed-710--a-test-delivery-went-wherever-the-test-form-said) | P1 | An arbitrary destination URL for test delivery weakens the channel mental model. | Test through the selected account/conversation and apply the same routing and egress policy as real delivery. |
+| ~~UX-MSG-05~~ **closed** — [FIXED-711](FIXED_ITEMS.md#fixed-711--nothing-said-what-a-route-did-with-a-group-a-thread-or-a-bot) | P1 | Group, thread, bot and multi-user behavior is not sufficiently visible. | Show DM/group scope, mention requirement, thread mapping, sender role and bot-loop protection per route. |
+| ~~UX-MSG-06~~ **closed** — [FIXED-712](FIXED_ITEMS.md#fixed-712--a-finished-turn-and-a-delivered-reply-were-one-unrecorded-fact) | P2 | Delivery and work outcomes can be conflated. | Track received, accepted, queued, processed, reply queued, delivered and failed separately. |
 
 ### Messaging security and reliability contract
 
@@ -776,6 +821,18 @@ Show counts and trends without exposing content to telemetry:
 
 ## 3.11 MCP servers
 
+> **Implementation status, 2026-10-03. Every row in this table is closed.**
+> SEC-MCP-01 and SEC-MCP-02 closed on 2026-09-13 as RR-MCP-01 and RR-MCP-02
+> ([FIXED-500](FIXED_ITEMS.md#fixed-500--every-local-mcp-server-was-handed-raikers-whole-environment), [FIXED-504](FIXED_ITEMS.md#fixed-504--five-destinations-one-label-and-the-owners-token-sent-to-all-of-them)); SEC-MCP-03 on 2026-09-28 as the
+> security review's CR-10 ([FIXED-605](FIXED_ITEMS.md#fixed-605--a-security-monitor-that-could-not-look-let-the-connection-carry-on)); UX-MCP-01 on 2026-09-14 as
+> REM-MCP-01 ([FIXED-516](FIXED_ITEMS.md#fixed-516--a-sample-server-was-called-safe-and-defined-what-normal-mcp-setup-looks-like)) — each was re-verified in source and this table
+> had gone on listing them as open. UX-MCP-02 and UX-MCP-03 closed as
+> [FIXED-713](FIXED_ITEMS.md#fixed-713--an-mcp-server-could-be-added-and-run-before-anything-said-what-it-could-reach) and [FIXED-714](FIXED_ITEMS.md#fixed-714--an-mcp-card-explained-itself-with-tool-names): every server and plugin offer states
+> what it can reach — read from the launcher and the endpoint policy — before it
+> is added or tested, and each card leads with purpose, risk, source and recent
+> outcomes. The live round found [FIXED-722](FIXED_ITEMS.md#fixed-722--creating-an-mcp-sample-named-a-server-that-did-not-exist).
+> The seven-part implementation contract below remains DEC-15 work beyond these rows.
+
 ### Current strengths
 
 - Server creation, plugin offers, discovery/test, rename, pause/stop and delete
@@ -788,12 +845,12 @@ Show counts and trends without exposing content to telemetry:
 
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
-| SEC-MCP-01 | P0 | Stdio subprocesses inherit ambient environment. | Launch through the common runtime with a minimal allowlisted environment and scoped secret references. |
-| SEC-MCP-02 | P1 | Remote endpoint authorization lacks a shared explicit trust class. | Classify public, loopback, private/LAN and owner-granted private endpoints; revalidate DNS and redirects. |
-| SEC-MCP-03 | P1 | Monitoring persistence is best-effort and exceptions do not stop the session. | Separate optional telemetry failure from containment-enforcement failure; the latter must fail closed. |
-| UX-MCP-01 | P1 | “Builder/template” is the first journey, which is developer-first. | Offer Add from verified catalogue, plugin, local command or remote URL; show raw template only in Advanced. |
-| UX-MCP-02 | P1 | Users cannot assess the blast radius before connecting. | Preview tools, roots/resources, network class, secrets, writable paths and required Permissions before activation. |
-| UX-MCP-03 | P1 | Tool names and JSON arguments are insufficient as a trust explanation. | Add plain-language purpose, risk category, source/publisher, last use and recent outcomes. |
+| ~~SEC-MCP-01~~ **closed** — [FIXED-500](FIXED_ITEMS.md#fixed-500--every-local-mcp-server-was-handed-raikers-whole-environment) | P0 | Stdio subprocesses inherit ambient environment. | Launch through the common runtime with a minimal allowlisted environment and scoped secret references. |
+| ~~SEC-MCP-02~~ **closed** — [FIXED-504](FIXED_ITEMS.md#fixed-504--five-destinations-one-label-and-the-owners-token-sent-to-all-of-them) | P1 | Remote endpoint authorization lacks a shared explicit trust class. | Classify public, loopback, private/LAN and owner-granted private endpoints; revalidate DNS and redirects. |
+| ~~SEC-MCP-03~~ **closed** — [FIXED-605](FIXED_ITEMS.md#fixed-605--a-security-monitor-that-could-not-look-let-the-connection-carry-on) | P1 | Monitoring persistence is best-effort and exceptions do not stop the session. | Separate optional telemetry failure from containment-enforcement failure; the latter must fail closed. |
+| ~~UX-MCP-01~~ **closed** — [FIXED-516](FIXED_ITEMS.md#fixed-516--a-sample-server-was-called-safe-and-defined-what-normal-mcp-setup-looks-like) | P1 | “Builder/template” is the first journey, which is developer-first. | Offer Add from verified catalogue, plugin, local command or remote URL; show raw template only in Advanced. |
+| ~~UX-MCP-02~~ **closed** — [FIXED-713](FIXED_ITEMS.md#fixed-713--an-mcp-server-could-be-added-and-run-before-anything-said-what-it-could-reach) | P1 | Users cannot assess the blast radius before connecting. | Preview tools, roots/resources, network class, secrets, writable paths and required Permissions before activation. |
+| ~~UX-MCP-03~~ **closed** — [FIXED-714](FIXED_ITEMS.md#fixed-714--an-mcp-card-explained-itself-with-tool-names) | P1 | Tool names and JSON arguments are insufficient as a trust explanation. | Add plain-language purpose, risk category, source/publisher, last use and recent outcomes. |
 
 ### Required MCP implementation contract
 
@@ -2387,10 +2444,10 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 | Finding | Decision | Explanation |
 | --- | --- | --- |
 | UX-CHAT-01 | Split by state machine/domain: session controller, turn renderer, composer controller, citation/source panel and conversation actions. | Domain controllers isolate streaming and navigation races; file splitting alone does not improve correctness. |
-| UX-CHAT-02 | Default to a compact “Used 3 tools · 2 sources · 1 approval” disclosure; retain full evidence on expansion. | Progressive disclosure preserves audit evidence while prioritizing the answer. |
-| UX-CHAT-03 | Label the distinction: “Filed in Project X; Chat can still use account-wide memory.” | Filing is organization, not authorization; project selection must not silently widen retrieval. |
-| UX-CHAT-04 | Add a first-use label/badge and surface active count or failure state. | Visible status makes failed background work discoverable without opening Tasks. |
-| UX-CHAT-05 | Group them as Conversation, Evidence and Continuity actions; use consistent placement. | Stable action groups reduce hunting and prevent destructive actions looking like ordinary navigation. |
+| ~~UX-CHAT-02~~ **closed** — [FIXED-724](FIXED_ITEMS.md#fixed-724--a-turns-evidence-counted-its-calls-and-not-its-sources-or-approvals) | Default to a compact “Used 3 tools · 2 sources · 1 approval” disclosure; retain full evidence on expansion. | Progressive disclosure preserves audit evidence while prioritizing the answer. |
+| ~~UX-CHAT-03~~ **closed** — [FIXED-715](FIXED_ITEMS.md#fixed-715--a-chat-filed-in-a-project-read-as-a-chat-that-could-see-only-that-project) | Label the distinction: “Filed in Project X; Chat can still use account-wide memory.” | Filing is organization, not authorization; project selection must not silently widen retrieval. |
+| ~~UX-CHAT-04~~ **closed** — [FIXED-716](FIXED_ITEMS.md#fixed-716--background-work-was-an-unlabelled-icon) | Add a first-use label/badge and surface active count or failure state. | Visible status makes failed background work discoverable without opening Tasks. |
+| ~~UX-CHAT-05~~ **closed** — [FIXED-717](FIXED_ITEMS.md#fixed-717--conversation-actions-had-no-shared-model) | Group them as Conversation, Evidence and Continuity actions; use consistent placement. | Stable action groups reduce hunting and prevent destructive actions looking like ordinary navigation. |
 
 ## 14.3 BUILD decisions
 
@@ -2417,7 +2474,7 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 | --- | --- | --- |
 | UX-MODEL-01 | Split by the existing five tabs; put connection lifecycle and global selection into shared stores/services. | Shared connection lifecycle prevents tabs from disagreeing about readiness. |
 | UX-MODEL-02 | Use a four-step readiness line and give one primary next action. | One next action makes missing credentials distinguishable from unavailable execution. |
-| UX-MODEL-03 | State: “Default model” and “This work uses …”; offer Reset to default. | Explicit inheritance avoids unexpected model and privacy changes. |
+| ~~UX-MODEL-03~~ **closed** — [FIXED-718](FIXED_ITEMS.md#fixed-718--the-picker-did-not-say-what-was-default-and-reset-to-default-did-not-hold) | State: “Default model” and “This work uses …”; offer Reset to default. | Explicit inheritance avoids unexpected model and privacy changes. |
 | UX-MODEL-04 | Add a comparable decision table with Locality, Context, Tools, Vision, Estimated cost and Availability. | Comparable verified fields support informed choice; unknown pricing must remain unknown. |
 | UX-MODEL-05 | Keep stable IDs in Advanced diagnostics and exports, never as primary labels. | Friendly labels improve comprehension without replacing stable internal keys. |
 
@@ -2458,20 +2515,20 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 
 | Finding | Decision | Explanation |
 | --- | --- | --- |
-| UX-MSG-01 | Provide a “Connect channel” wizard with account authorization, sender discovery, test exchange and readiness check. Keep raw fields in Advanced/operator setup. | A guided connection reduces misconfiguration; secret acquisition still uses supported authenticated flows. |
-| UX-MSG-02 | Call these “Channels” or “Messaging accounts”; reserve Connector for the underlying integration. | Channels describe user-visible accounts while Connector remains the implementation term. |
-| UX-MSG-03 | Render a checklist: Connected → owner verified → allowed conversations → routing → test → enabled. | Pairing authenticates a sender; each route still needs independently scoped authorization. |
-| UX-MSG-04 | Test through the selected account/conversation and apply the same routing and egress policy as real delivery. | A test must exercise the same destination and policy as production to provide meaningful assurance. |
-| UX-MSG-05 | Show DM/group scope, mention requirement, thread mapping, sender role and bot-loop protection per route. | Visible group and sender scope prevents another participant being treated as the owner. |
-| UX-MSG-06 | Track received, accepted, queued, processed, reply queued, delivered and failed separately. | A completed task is not a delivered reply; separate receipts enable safe retry. |
+| ~~UX-MSG-01~~ **closed** — [FIXED-522](FIXED_ITEMS.md#fixed-522--messaging-called-one-object-a-channel-and-a-connector-and-led-with-neither) | Provide a “Connect channel” wizard with account authorization, sender discovery, test exchange and readiness check. Keep raw fields in Advanced/operator setup. | A guided connection reduces misconfiguration; secret acquisition still uses supported authenticated flows. |
+| ~~UX-MSG-02~~ **closed** — [FIXED-522](FIXED_ITEMS.md#fixed-522--messaging-called-one-object-a-channel-and-a-connector-and-led-with-neither) | Call these “Channels” or “Messaging accounts”; reserve Connector for the underlying integration. | Channels describe user-visible accounts while Connector remains the implementation term. |
+| ~~UX-MSG-03~~ **closed** — [FIXED-709](FIXED_ITEMS.md#fixed-709--a-channel-offered-four-equal-buttons-and-its-test-could-only-run-after-the-step-it-was-for) | Render a checklist: Connected → owner verified → allowed conversations → routing → test → enabled. | Pairing authenticates a sender; each route still needs independently scoped authorization. |
+| ~~UX-MSG-04~~ **closed** — [FIXED-710](FIXED_ITEMS.md#fixed-710--a-test-delivery-went-wherever-the-test-form-said) | Test through the selected account/conversation and apply the same routing and egress policy as real delivery. | A test must exercise the same destination and policy as production to provide meaningful assurance. |
+| ~~UX-MSG-05~~ **closed** — [FIXED-711](FIXED_ITEMS.md#fixed-711--nothing-said-what-a-route-did-with-a-group-a-thread-or-a-bot) | Show DM/group scope, mention requirement, thread mapping, sender role and bot-loop protection per route. | Visible group and sender scope prevents another participant being treated as the owner. |
+| ~~UX-MSG-06~~ **closed** — [FIXED-712](FIXED_ITEMS.md#fixed-712--a-finished-turn-and-a-delivered-reply-were-one-unrecorded-fact) | Track received, accepted, queued, processed, reply queued, delivered and failed separately. | A completed task is not a delivered reply; separate receipts enable safe retry. |
 
 ## 14.10 MCP decisions
 
 | Finding | Decision | Explanation |
 | --- | --- | --- |
-| UX-MCP-01 | Offer Add from verified catalogue, plugin, local command or remote URL; show raw template only in Advanced. | Catalogue discovery reduces setup effort but publisher verification never grants execution authority. |
-| UX-MCP-02 | Preview tools, roots/resources, network class, secrets, writable paths and required Permissions before activation. | A concrete scope preview lets owners understand what enabling a server exposes. |
-| UX-MCP-03 | Add plain-language purpose, risk category, source/publisher, last use and recent outcomes. | Purpose and provenance aid review; server-supplied descriptions remain untrusted. |
+| ~~UX-MCP-01~~ **closed** — [FIXED-516](FIXED_ITEMS.md#fixed-516--a-sample-server-was-called-safe-and-defined-what-normal-mcp-setup-looks-like) | Offer Add from verified catalogue, plugin, local command or remote URL; show raw template only in Advanced. | Catalogue discovery reduces setup effort but publisher verification never grants execution authority. |
+| ~~UX-MCP-02~~ **closed** — [FIXED-713](FIXED_ITEMS.md#fixed-713--an-mcp-server-could-be-added-and-run-before-anything-said-what-it-could-reach) | Preview tools, roots/resources, network class, secrets, writable paths and required Permissions before activation. | A concrete scope preview lets owners understand what enabling a server exposes. |
+| ~~UX-MCP-03~~ **closed** — [FIXED-714](FIXED_ITEMS.md#fixed-714--an-mcp-card-explained-itself-with-tool-names) | Add plain-language purpose, risk category, source/publisher, last use and recent outcomes. | Purpose and provenance aid review; server-supplied descriptions remain untrusted. |
 
 ## 14.11 PROJ decisions
 
@@ -2495,7 +2552,7 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 | RR-AUTHORITY-01 | Require broker-issued authority for every side effect and isolate untrusted execution outside the control process. | Issuer/type checks prevent accidental bypass, not hostile same-process code. Inventory every route, worker, plugin and nested tool call and prove denial and revocation. |
 | RR-MCP-01 / SEC-MCP-01 | Launch MCP with an explicit minimal environment inside the selected runtime. | Ambient secrets are unnecessary authority. Test sentinel secret absence, explicit secret grants, child inheritance and revocation. |
 | RR-MCP-02 / SEC-MCP-02 | Use owner-authorized endpoint classes and enforce them across DNS, redirects and proxies. | Do not prohibit deliberate LAN use or infer authorization from a URL alone. Test allowed private services and rejected destination changes. |
-| SEC-MCP-03 | Separate best-effort telemetry from mandatory containment enforcement. | Optional metrics may fail without stopping work; unavailable required enforcement must prevent execution. Inject each failure independently. |
+| ~~SEC-MCP-03~~ **closed** — [FIXED-605](FIXED_ITEMS.md#fixed-605--a-security-monitor-that-could-not-look-let-the-connection-carry-on) | Separate best-effort telemetry from mandatory containment enforcement. | Optional metrics may fail without stopping work; unavailable required enforcement must prevent execution. Inject each failure independently. |
 | RR-INSTALL-01 | Supply an app-owned supported runtime and install only base execution dependencies. | No host development toolchain assumptions; optional tools/models install through separately consented flows. Verify clean machines without Python/Node and inventory shipped files. |
 | RR-PROJECT-01 | Implement UX-PROJ-01 with explicit session filing. | Project context must not accidentally redirect the next unrelated conversation. Verify cross-mode and cancelled navigation. |
 | RR-DESIGN-01 | Release durable asset support before claiming a persistent design workspace. | Optional canvas breadth is not a universal first-release blocker; either implement and verify the claim or narrow the published scope. |

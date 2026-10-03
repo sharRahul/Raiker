@@ -60,6 +60,13 @@ class InboundMessage:
 
     sender_id: str
     text: str
+    #: UX-MSG-05 — where the message was said: ``direct`` for a one-to-one
+    #: chat, ``group`` for a group or channel, ``endpoint`` for a transport
+    #: that has no notion of either (the reference webhook).
+    conversation_scope: str = "endpoint"
+    #: Authored by another bot. Never routed: two automated parties answering
+    #: each other is the loop the messaging contract names.
+    from_bot: bool = False
 
 
 class ChannelAdapter(Protocol):
@@ -131,7 +138,14 @@ class TelegramAdapter:
         text = message.get("text")
         if not sender_id or not isinstance(text, str) or not text.strip():
             return None
-        return InboundMessage(sender_id=sender_id, text=text)
+        chat = message.get("chat")
+        chat_type = str(chat.get("type") or "") if isinstance(chat, dict) else ""
+        return InboundMessage(
+            sender_id=sender_id,
+            text=text,
+            conversation_scope="direct" if chat_type == "private" else "group",
+            from_bot=bool(isinstance(sender, dict) and sender.get("is_bot")),
+        )
 
 
 # ── The reference webhook ─────────────────────────────────────────────────────
@@ -148,11 +162,15 @@ class WebhookAdapter:
     ) -> OutboundRequest | AdapterRefusal:
         from raiker.runtime.executors.channels import sign_delivery
 
-        url = str(arguments.get("url", "")).strip()
+        # UX-MSG-04 — the destination is part of the pairing, set by the owner
+        # out of band, and never an argument. A delivery that could name its own
+        # URL tested whatever was typed into a form rather than the channel, and
+        # is the same exfiltration shape the Telegram comment above refuses.
+        url = str(pairing.get("delivery_url") or "").strip()
         if not url:
             return AdapterRefusal(
-                "missing_argument:connector_id_or_url",
-                "Channel delivery denied: connector_id and url required.",
+                "channel_destination_missing",
+                "Channel delivery denied: this channel has no delivery destination.",
             )
         body = json.dumps(
             {"text": text, "connector_id": connector_id, "delivered_at": delivered_at},

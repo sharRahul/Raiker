@@ -35,6 +35,8 @@
     phases = [],
     initiallyOpen = false,
     label = "Evidence",
+    sources = 0,
+    approvals = 0,
   }: {
     sessionId: string | null;
     turnId: string | null;
@@ -48,7 +50,24 @@
     phases?: TurnPhaseRow[];
     initiallyOpen?: boolean;
     label?: string;
+    /**
+     * UX-CHAT-02 — the compact line says what the turn used, not only how many
+     * calls it made: *3 calls · 2 sources · 1 approval*. Counts the surface
+     * already holds; nothing is fetched to draw the closed disclosure.
+     */
+    sources?: number;
+    approvals?: number;
   } = $props();
+
+  const usage = $derived(
+    [
+      rows.length > 0 ? `${rows.length} ${rows.length === 1 ? "call" : "calls"}` : "",
+      sources > 0 ? `${sources} ${sources === 1 ? "source" : "sources"}` : "",
+      approvals > 0 ? `${approvals} ${approvals === 1 ? "approval" : "approvals"}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  );
 
   let events = $state<EventEntry[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -100,8 +119,8 @@
     <summary>
       <Icon name="eye" size="sm" />
       <span>{label}</span>
-      {#if rows.length > 0}
-        <span class="count">{rows.length} {rows.length === 1 ? "call" : "calls"}</span>
+      {#if usage}
+        <span class="count">{usage}</span>
       {/if}
     </summary>
 

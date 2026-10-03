@@ -42,7 +42,7 @@
   import { api, ApiError } from "../api";
   import { resumeRun, runAgain, startRunNow, stopRun } from "../taskLifecycle";
   import { taskActionLabel, taskActions, taskPhase, taskPhaseLabel, type TaskAction } from "../taskPhase";
-  import { rememberSurfaceModel, surfaceModel, type Surface } from "../surfaceModel.svelte";
+  import { forgetSurfaceModel, rememberSurfaceModel, surfaceModel, type Surface } from "../surfaceModel.svelte";
   import { takeScheduleRequest } from "../scheduleHandoff";
   import type {
     ApprovalView,
@@ -967,6 +967,7 @@
         bind:profileId={modelProfile}
         bind:model
         onchosen={(profileId, chosen) => void rememberSurfaceModel(surface, profileId, chosen)}
+        onreset={() => void forgetSurfaceModel(surface)}
       />
       <button
         type="submit"

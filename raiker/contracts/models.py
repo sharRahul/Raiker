@@ -25,6 +25,9 @@ CLIENT_TYPES = {
     "webhooks",
     "email",
     "slack",
+    # FIXED-721 — a routed Telegram message becomes a turn with this client
+    # type; without it every routed Telegram message failed validation.
+    "telegram",
     "teams",
     "discord",
     "signal",

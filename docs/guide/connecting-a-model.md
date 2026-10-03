@@ -366,8 +366,12 @@ another workspace, or the terminal client running elsewhere. **One ready
 provider is enough to work** — nothing requires you to connect more than one.
 
 **Default model** is what serves any surface that does not choose its own,
-including every scheduled run at the moment it begins. Chat and Build can pick
-per prompt; Tasks and Schedule cannot, so the default is what they use.
+including every scheduled run at the moment it begins and every turn a messaging
+channel routes in. Chat, Build and Tasks can pick their own; each composer's
+model menu then says both — **Default model *X*** and **This work uses *Y*** — with
+**Reset to default** beside the second. A surface remembers its own pick across
+reloads, and **Reset to default** forgets it, so the surface follows the default
+again after a reload too. Choose the default on **My models** with **Use**.
 
 **Every model a connected provider serves is reachable.** Connect once, discover
 once, use everywhere: the listing that follows a connection is recorded, so the

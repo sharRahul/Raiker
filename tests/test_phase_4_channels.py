@@ -47,9 +47,17 @@ def _enable(ws: Path, capability: str) -> None:
     assert result.ok is True, result.reason_code
 
 
-def _pairing(ws: Path, *, enabled: bool = True, senders: list[str] | None = None) -> None:
-    SQLiteStore(ws).insert_channel_pairing(ChannelPairing(
-        pairing_id=new_id("chn_"),
+def _pairing(
+    ws: Path,
+    *,
+    enabled: bool = True,
+    senders: list[str] | None = None,
+    delivery_url: str | None = None,
+) -> None:
+    pairing_id = new_id("chn_")
+    store = SQLiteStore(ws)
+    store.insert_channel_pairing(ChannelPairing(
+        pairing_id=pairing_id,
         connector_id="channel.webhook",
         channel_type="webhooks",
         display_name="Reference Webhook",
@@ -58,6 +66,9 @@ def _pairing(ws: Path, *, enabled: bool = True, senders: list[str] | None = None
         enabled=enabled,
         sender_allowlist_json=json.dumps(senders or ["alice"]),
     ))
+    if delivery_url is not None:
+        # UX-MSG-04 — the destination is the pairing's, never the action's.
+        store.set_channel_pairing_destination(pairing_id, delivery_url)
 
 
 def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
@@ -123,13 +134,13 @@ def test_outbound_delivers_when_enabled_and_allowlisted(
 ) -> None:
     ws = _ws(tmp_path)
     _enable(ws, "external_channel_runtime")
-    _pairing(ws)
     port = loopback_server.server_address[1]
+    _pairing(ws, delivery_url=f"http://127.0.0.1:{port}/hook")
     monkeypatch.setenv("RAIKER_CHANNEL_EGRESS_ALLOWLIST", f"127.0.0.1:{port}")
     authority, principal = _authority(ws)
     result = authority.route_action(
         _action("external_channel_runtime", principal.principal_id,
-                connector_id="channel.webhook", url=f"http://127.0.0.1:{port}/hook", text="hi there"),
+                connector_id="channel.webhook", text="hi there"),
         principal,
     )
     assert result.decision == "allow"
@@ -142,12 +153,12 @@ def test_outbound_egress_denied_without_allowlist(
 ) -> None:
     ws = _ws(tmp_path)
     _enable(ws, "external_channel_runtime")
-    _pairing(ws)
+    _pairing(ws, delivery_url="https://example.com/hook")
     monkeypatch.delenv("RAIKER_CHANNEL_EGRESS_ALLOWLIST", raising=False)
     authority, principal = _authority(ws)
     result = authority.route_action(
         _action("external_channel_runtime", principal.principal_id,
-                connector_id="channel.webhook", url="http://example.com/hook", text="hi"),
+                connector_id="channel.webhook", text="hi"),
         principal,
     )
     assert result.error is not None and result.error.startswith("egress_denied")
@@ -162,7 +173,7 @@ def test_outbound_fail_closed_when_gate_disabled(tmp_path: Path) -> None:
     authority, principal = _authority(ws)
     result = authority.route_action(
         _action("external_channel_runtime", principal.principal_id,
-                connector_id="channel.webhook", url="http://127.0.0.1:1/x", text="hi"),
+                connector_id="channel.webhook", text="hi"),
         principal,
     )
     assert result.decision == "disabled_by_capability_gate"
@@ -175,10 +186,48 @@ def test_outbound_fail_when_not_paired(tmp_path: Path, monkeypatch: pytest.Monke
     authority, principal = _authority(ws)
     result = authority.route_action(
         _action("external_channel_runtime", principal.principal_id,
-                connector_id="channel.webhook", url="http://127.0.0.1:1/x", text="hi"),
+                connector_id="channel.webhook", text="hi"),
         principal,
     )
     assert result.error == "channel_not_paired_or_disabled"
+
+
+def test_a_url_in_the_action_cannot_choose_the_destination(
+    tmp_path: Path, loopback_server: HTTPServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """UX-MSG-04 — the bound destination is the only one a delivery can reach."""
+    ws = _ws(tmp_path)
+    _enable(ws, "external_channel_runtime")
+    _pairing(ws)  # paired and on, but no destination bound
+    port = loopback_server.server_address[1]
+    monkeypatch.setenv("RAIKER_CHANNEL_EGRESS_ALLOWLIST", f"127.0.0.1:{port}")
+    authority, principal = _authority(ws)
+    result = authority.route_action(
+        _action("external_channel_runtime", principal.principal_id,
+                connector_id="channel.webhook", url=f"http://127.0.0.1:{port}/hook", text="hi"),
+        principal,
+    )
+    assert result.error == "channel_destination_missing"
+    assert not _Sink.received
+
+
+def test_an_off_channel_refuses_a_delivery_that_is_not_the_owners_test(
+    tmp_path: Path, loopback_server: HTTPServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """UX-MSG-03 relaxes the pairing for the owner's test stamp and nothing else."""
+    ws = _ws(tmp_path)
+    _enable(ws, "external_channel_runtime")
+    port = loopback_server.server_address[1]
+    _pairing(ws, enabled=False, delivery_url=f"http://127.0.0.1:{port}/hook")
+    monkeypatch.setenv("RAIKER_CHANNEL_EGRESS_ALLOWLIST", f"127.0.0.1:{port}")
+    authority, principal = _authority(ws)
+    forged = _action(
+        "external_channel_runtime", principal.principal_id,
+        connector_id="channel.webhook", text="hi", owner_channel_test=True,
+    )
+    result = authority.route_action(forged, principal)
+    assert result.error == "channel_not_paired_or_disabled"
+    assert not _Sink.received
 
 
 # ── Approval relay (metadata-only pending) ──
@@ -531,6 +580,106 @@ def test_telegram_inbound_refuses_a_sender_that_is_not_allowlisted(
     )
     assert response.status_code == 403
     assert response.json()["detail"]["reason_code"] == "sender_not_allowlisted"
+
+
+def test_an_inbound_message_leaves_a_receipt_with_each_stage_and_no_sender_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """UX-MSG-06 — received and accepted are separate facts; a refusal is failed."""
+    ws = _ws(tmp_path)
+    _enable(ws, "external_channel_runtime")
+    _telegram_pairing(ws, senders=["4242"])
+    monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_SECRET", "s3cret")
+    client = TestClient(create_app(ws))
+    headers = {"X-Telegram-Bot-Api-Secret-Token": "s3cret"}
+    accepted = client.post(
+        "/api/channels/channel.telegram/telegram",
+        headers=headers,
+        json={"message": {"from": {"id": 4242}, "chat": {"id": -5, "type": "group"}, "text": "hi"}},
+    )
+    refused = client.post(
+        "/api/channels/channel.telegram/telegram",
+        headers=headers,
+        json={"message": {"from": {"id": 9999}, "chat": {"id": 9999, "type": "private"}, "text": "hi"}},
+    )
+    assert accepted.status_code == 200 and refused.status_code == 403
+    receipts = SQLiteStore(ws).list_channel_receipts("channel.telegram")
+    by_role = {row["sender_role"]: row for row in receipts}
+    ok = by_role["allowed"]
+    assert ok["received_at"] and ok["accepted_at"]
+    assert ok["conversation_scope"] == "group"
+    # Record only: accepted, never queued, and certainly not delivered.
+    assert ok["queued_at"] is None and ok["delivered_at"] is None and ok["failed_at"] is None
+    bad = by_role["not_allowed"]
+    assert bad["received_at"] and bad["failed_at"] and bad["accepted_at"] is None
+    assert bad["reason_code"] == "sender_not_allowlisted"
+    assert "9999" not in json.dumps(receipts) and "4242" not in json.dumps(receipts)
+
+
+def test_every_channel_with_a_wire_format_is_a_client_a_turn_can_name() -> None:
+    """A routed message becomes a turn whose client is its channel type."""
+    from raiker.channels.adapters import adapter_channel_types
+    from raiker.contracts.models import CLIENT_TYPES
+
+    assert set(adapter_channel_types()) <= CLIENT_TYPES
+
+
+def test_a_routed_turn_that_could_not_run_is_failed_with_its_conversation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """UX-MSG-06 — queued and failed, never processed; the receipt links the turn.
+
+    No model is set up in this workspace, so the owner's routed turn is refused
+    by readiness — which is the case the 2026-10-03 live round met and read as
+    "Failed: failed".
+    """
+    ws = _ws(tmp_path)
+    _enable(ws, "external_channel_runtime")
+    _telegram_pairing(ws, senders=["4242"])
+    store = SQLiteStore(ws)
+    pairing = store.get_channel_pairing_by_connector("channel.telegram")
+    assert pairing is not None
+    store.set_channel_pairing_routing(
+        str(pairing["pairing_id"]),
+        routing_mode="new_turn",
+        target_session_id=None,
+        owner_sender_id="4242",
+        approval_relay_enabled=False,
+    )
+    monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_SECRET", "s3cret")
+    client = TestClient(create_app(ws))
+    response = client.post(
+        "/api/channels/channel.telegram/telegram",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "s3cret"},
+        json={"message": {"from": {"id": 4242}, "chat": {"id": 4242, "type": "private"}, "text": "hi"}},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "failed"
+    (receipt,) = store.list_channel_receipts("channel.telegram")
+    assert receipt["queued_at"] and receipt["failed_at"]
+    assert receipt["processed_at"] is None and receipt["delivered_at"] is None
+    assert receipt["reason_code"] == "turn_failed"
+    assert receipt["session_id"] == response.json()["session_id"]
+    assert receipt["conversation_scope"] == "direct"
+
+
+def test_a_bot_authored_telegram_update_is_never_routed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """UX-MSG-05 — bot-loop protection: an allowlisted id that is a bot is ignored."""
+    ws = _ws(tmp_path)
+    _enable(ws, "external_channel_runtime")
+    _telegram_pairing(ws, senders=["4242"])
+    monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_SECRET", "s3cret")
+    client = TestClient(create_app(ws))
+    response = client.post(
+        "/api/channels/channel.telegram/telegram",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "s3cret"},
+        json={"message": {"from": {"id": 4242, "is_bot": True}, "chat": {"id": 4242}, "text": "hi"}},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "ignored": "bot_sender"}
+    assert SQLiteStore(ws).list_channel_receipts("channel.telegram") == []
 
 
 def test_telegram_inbound_requires_the_secret(

@@ -23,12 +23,23 @@ separate facts, and the page shows them separately:
 - **Turn on** is a second decision.
 - **Send a test delivery** runs the *same governed path* a real delivery takes —
   the capability gate, the decision mode, the egress allowlist and the audit
-  event all apply. It is not a shortcut that proves nothing.
+  event all apply. It is not a shortcut that proves nothing. It asks for no
+  address: it goes where the channel delivers (below), and it runs on a paired
+  channel that is still off, because you test before you turn it on.
+- **Delivery address** (the webhook channel) is where every delivery on it goes,
+  tests included — set once on the channel, never typed into a test, and never
+  named by anything else. Use `https://`, or `http://` only to this machine or
+  your own network, with no username or password in it; the page shows its host
+  and whether that host is on the egress allowlist. Changing it forgets the last
+  test. Telegram has no address to set: it delivers to your own chat.
+- **Senders** edits the allowlist after pairing.
 - **Unpair** deletes the link. Both the outbound executor and the inbound
   receiver read that record, so unpairing is what actually stops the channel.
 - **Routing** chooses `record_only`, a normal owner turn, a tool-free side
-  question, or an interrupt/steer bound to one conversation. The pairing stores
-  this choice; message content cannot choose it.
+  question, or an interrupt/steer bound to one conversation — chosen by its
+  title from your recent chats. **You on this channel** names which allowed
+  sender is you. The pairing stores this choice; message content cannot choose
+  it.
 
 Four things are fail-closed or off by default, and each has its own remedy, so
 the page reports them one by one rather than as a single "ready":
@@ -57,14 +68,39 @@ owner and one exact pending relay/action pair, once. Critical and connector-writ
 approvals remain local-only.
 Full contract: [`docs/architecture/CHANNELS_SPEC.md`](../architecture/CHANNELS_SPEC.md).
 
-## What a channel needs from your environment
+## Setting a channel up, in order
 
-**Channels** leads the page, and each one carries a line naming the step that
-actually comes next — pair it, allow a sender before inbound messages stop being
-refused, or check its routing and send a test delivery before turning it on. The
-line disappears once the channel is delivering. **Turn on**, **Send a test
-delivery**, **Routing** and **Unpair** stay where they were; the sentence says
-which of them the channel is waiting for.
+**Channels** leads the page. A channel that is not paired says how to pair it.
+A paired channel shows its setup as six steps, each one a fact Raiker already
+holds, and the first unfinished one is marked **Next** and carries its own
+button:
+
+1. **Connected** — paired with Raiker.
+2. **Owner verified** — which allowed sender is you. Only you can start work or
+   answer an approval from the channel.
+3. **Allowed senders** — anyone not listed is refused and recorded; a side
+   question or interrupt route also needs its conversation.
+4. **Routing** — *Record only* until you change it.
+5. **Test delivery** — set where it delivers, then send a test. A refusal says
+   why (*the channel capability is off in Permissions*, *the host is not on the
+   channel egress allowlist*).
+6. **Turned on** — nothing is accepted or delivered until it is.
+
+**What this route does** states the stored route as what the receiver does with
+it: whether direct messages and groups are both heard (Telegram) or there is one
+caller (the webhook), that no @mention is needed, whether messages share one
+conversation or each starts a new one, who may start work, what stops a bot
+loop — Telegram updates written by a bot are ignored — and where an answer goes.
+A Telegram answer stays in Raiker; nothing is sent back over the channel yet.
+
+**Recent activity** lists each message and test with its stages as separate
+facts — *received, accepted, queued, processed, reply queued, delivered,
+failed* — so a finished turn is never read as a delivered reply. It names the
+sender by role (you, an allowed sender, a sender who is not allowed), never by
+id, holds no message text, and links to the conversation a routed message
+became. The last 200 per channel are kept, and unpairing keeps them.
+
+## What a channel needs from your environment
 
 Each channel declares the environment variables it needs, and the page shows
 them on the channel itself: the variable's name, what it is for, where to get

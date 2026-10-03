@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**352 operations: 341 verified, 0 eligible, 0 deferred, 11 special.**
+**353 operations: 342 verified, 0 eligible, 0 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -72,12 +72,13 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/channels/deliver-test` | ChannelTestDeliveryRequest | ChannelTestDelivered | verified | declared by cast |
 | POST | `/api/channels/pairings` | PairChannelRequest | ChannelPaired | verified | declared by cast |
 | DELETE | `/api/channels/pairings/{pairing_id}` |  | ChannelUnpaired | verified | declared by cast |
+| PUT | `/api/channels/pairings/{pairing_id}/destination` | ChannelDestinationRequest | ChannelDestinationSet | verified | declared by cast |
 | PUT | `/api/channels/pairings/{pairing_id}/enabled` | ChannelEnabledRequest | ChannelEnabledSet | verified | declared by cast |
 | PUT | `/api/channels/pairings/{pairing_id}/routing` | ChannelRoutingRequest | ChannelRoutingSet | verified | declared by cast |
 | PUT | `/api/channels/pairings/{pairing_id}/senders` | ChannelSendersRequest | ChannelSendersSet | verified | declared by cast |
 | POST | `/api/channels/{connector_id}/approval-response` | ChannelApprovalResponse | ApprovalRelayAnswered | verified | declared ApprovalRelayAnswered |
 | POST | `/api/channels/{connector_id}/inbound` | InboundChannelMessage | ChannelInboundAccepted | verified | _handle_inbound |
-| POST | `/api/channels/{connector_id}/telegram` | dict | ChannelInboundAccepted \| ChannelUpdateIgnored | verified | _handle_inbound \| declared ChannelUpdateIgnored |
+| POST | `/api/channels/{connector_id}/telegram` | dict | ChannelInboundAccepted \| ChannelUpdateIgnored | verified | _handle_inbound \| declared ChannelUpdateIgnored \| declared ChannelUpdateIgnored |
 | GET | `/api/chat-search` |  | SessionView[] | verified | DashboardService.search_sessions |
 | GET | `/api/checkpoints` |  | CheckpointView[] | verified | DashboardService.list_checkpoints |
 | GET | `/api/checkpoints/{checkpoint_id}` |  | CheckpointView | verified | DashboardService.get_checkpoint |

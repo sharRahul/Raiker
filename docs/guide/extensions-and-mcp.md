@@ -67,11 +67,32 @@ than how integration normally starts, which is why it reads after the list:
    whole reason the label states its scope instead of calling it safe.
 3. **Generate example server**. The generated file lands at
    `.raiker/mcp/servers/<name>.py`; writing it goes through the normal file-write
-   approval path.
+   approval path. A server name keeps only letters, digits, `.`, `-` and `_`, so
+   *Protocol sample* is stored as *Protocolsample* — the notice names the one
+   kept.
 4. **Test** connects and discovers tools. The example exposes `echo` and
    `workspace_ping`.
 
-Each server card shows its command, template, last connection, and recent
+Each server card leads with why you might trust it: **what it is for** — the
+offering plugin's description, or the server's own sentence about its first
+tool, shown as *It says: “…”* because it is the server's text, not Raiker's —
+then its **risk** (*Runs code on this machine*, *Reaches your own network* or
+*Sends data to a remote service*), its **source** (*Sample Raiker generated*,
+*Offered by the plugin …* or *Added by you*) and **last use** with how its recent
+sessions ended.
+
+**What it can reach** is open on a server until it has been tested, because
+**Test** is the step that lets it run, and an offer shows the same as **What
+adding it gives it** before you add it. Each line is read from the code that
+decides it, not written as reassurance: a local server runs as the account
+Raiker runs as, in the workspace folder, with this machine's network and
+anything that account may write — Raiker does not confine either, and the card
+says so in the warning tone; it is started with the few variables named below
+and no provider key; a remote one is classed by where its address points and
+receives only the token you named. Raiker tells a server no folder and hands it
+no file. The card lists the Permissions a call needs.
+
+The card also shows its command, template, last connection, and recent
 monitored sessions. If the monitor ever cannot evaluate a session — its own
 store unreadable, say — the connection is **paused** with that reason on the
 card and a notification, exactly as a serious anomaly would pause it; **Resume**

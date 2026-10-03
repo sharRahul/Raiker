@@ -109,7 +109,9 @@ export async function enableCapability(
   // permissions, actions or groups…" since the page's own vocabulary changed,
   // so this waited sixty seconds for a string the product no longer prints and
   // then walked on with the list unrendered. The label is the stable half.
-  await page.getByLabel("Search capabilities").waitFor({ timeout: 60_000 });
+  // Exact: since FIXED-708 a group checkbox reads "Select all Web and
+  // research capabilities", which contains this label as a substring.
+  await page.getByLabel("Search capabilities", { exact: true }).waitFor({ timeout: 60_000 });
   const card = page.locator(".cap.card").filter({ hasText: label }).first();
   await expect(card).toBeVisible({ timeout: 60_000 });
   await card.locator("button.cap-toggle").click();

@@ -4,6 +4,7 @@ import type { AgentResponse, StreamEvent } from "../apiTypes";
 import { stubFetch, openComposerProject, startComposerDictation } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 import { takeScheduleRequest } from "../scheduleHandoff";
+import { setWorkProject } from "../workProject.svelte";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
 vi.mock("../api", async (importOriginal) => {
@@ -112,6 +113,29 @@ describe("ChatView composer parity", () => {
 
     await screen.findByLabelText("Prompt");
     expect(screen.queryByRole("button", { name: /^Context for this turn/ })).toBeNull();
+  });
+
+  // UX-CHAT-03 — filing is organisation, not a narrower memory. A line that
+  // only named the project read as "this chat sees only this project".
+  it("says a project files the chat and does not narrow its recall", async () => {
+    setWorkProject("project-1");
+    try {
+      stubFetch(routes());
+      render(ChatView, { projects });
+
+      const line = await screen.findByRole("button", { name: /^Context for this turn/ });
+      expect(line).toHaveTextContent("Filed in Composer project");
+      await fireEvent.click(line);
+      expect(
+        await screen.findByText(/recall still draws on all your memory, not only this project's/),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Open project work" })).toHaveAttribute(
+        "href",
+        "#/projects?project=project-1",
+      );
+    } finally {
+      setWorkProject("");
+    }
   });
 
   it("names the window plainly once a model reports one", async () => {
@@ -255,7 +279,7 @@ describe("ChatView composer parity", () => {
 
     // The rail is collapsed by default; opening it places the panel beside the
     // chat column rather than below the composer.
-    await fireEvent.click(await screen.findByRole("button", { name: "Background work" }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^Background work/ }));
     const rail = await screen.findByRole("complementary", { name: "Background work" });
     expect(rail.closest(".rail-slot")).toBeInTheDocument();
     expect(rail.closest(".chat")).toBeNull();
@@ -265,6 +289,25 @@ describe("ChatView composer parity", () => {
     // this is still the surface that does it.
     await openComposerProject();
     expect(screen.getByLabelText("Project for this chat")).toBeInTheDocument();
+  });
+
+  // UX-CHAT-04 — the toggle was an unlabelled icon; work running on its own,
+  // and work that had failed, were invisible until it was opened.
+  it("labels the background toggle and counts what is running and what failed", async () => {
+    const now = new Date().toISOString();
+    const task = (status: string) => ({ status, updated_at: now, completed_at: status === "failed" ? now : null });
+    stubFetch({
+      ...routes(),
+      "GET /api/tasks": [task("running"), task("waiting_for_approval"), task("failed"), task("completed")],
+    });
+    render(ChatView, { projects });
+
+    const toggle = await screen.findByRole("button", {
+      name: "Background work: 2 running, 1 waiting for you, 1 failed today",
+    });
+    expect(toggle).toHaveTextContent("Background");
+    expect(toggle).toHaveTextContent("2");
+    expect(toggle).toHaveClass("rail-failed");
   });
 
   it("uses the persisted selected model and exposes only its supported thinking efforts", async () => {

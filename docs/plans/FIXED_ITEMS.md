@@ -730,6 +730,22 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-706](#fixed-706--two-search-boxes-for-one-question) | Low | Navigation | Fixed 2026-10-03 (closes UX-SETPOP-02) |
 | [FIXED-707](#fixed-707--more-was-a-desktop-dialog-on-a-phone) | Low | Navigation | Fixed 2026-10-03 (closes UX-SETPOP-03) |
 | [FIXED-708](#fixed-708--permissions-led-with-an-engineers-filing) | Low | Permissions | Fixed 2026-10-03 (closes UX-PERM-01) |
+| [FIXED-709](#fixed-709--a-channel-offered-four-equal-buttons-and-its-test-could-only-run-after-the-step-it-was-for) | Medium | Messaging | Fixed 2026-10-03 (closes UX-MSG-03) |
+| [FIXED-710](#fixed-710--a-test-delivery-went-wherever-the-test-form-said) | Medium | Messaging / egress | Fixed 2026-10-03 (closes UX-MSG-04) |
+| [FIXED-711](#fixed-711--nothing-said-what-a-route-did-with-a-group-a-thread-or-a-bot) | Medium | Messaging | Fixed 2026-10-03 (closes UX-MSG-05) |
+| [FIXED-712](#fixed-712--a-finished-turn-and-a-delivered-reply-were-one-unrecorded-fact) | Medium | Messaging | Fixed 2026-10-03 (closes UX-MSG-06) |
+| [FIXED-713](#fixed-713--an-mcp-server-could-be-added-and-run-before-anything-said-what-it-could-reach) | Medium | MCP | Fixed 2026-10-03 (closes UX-MCP-02) |
+| [FIXED-714](#fixed-714--an-mcp-card-explained-itself-with-tool-names) | Low | MCP | Fixed 2026-10-03 (closes UX-MCP-03) |
+| [FIXED-715](#fixed-715--a-chat-filed-in-a-project-read-as-a-chat-that-could-see-only-that-project) | Low | Chat / Projects | Fixed 2026-10-03 (closes UX-CHAT-03) |
+| [FIXED-716](#fixed-716--background-work-was-an-unlabelled-icon) | Low | Chat | Fixed 2026-10-03 (closes UX-CHAT-04) |
+| [FIXED-717](#fixed-717--conversation-actions-had-no-shared-model) | Low | Chat | Fixed 2026-10-03 (closes UX-CHAT-05) |
+| [FIXED-718](#fixed-718--the-picker-did-not-say-what-was-default-and-reset-to-default-did-not-hold) | Medium | Models / composers | Fixed 2026-10-03 (closes UX-MODEL-03) |
+| [FIXED-719](#fixed-719--a-refused-channel-action-left-the-page-showing-the-state-before-it) | Low | Messaging | Fixed 2026-10-03 — found by the live round |
+| [FIXED-720](#fixed-720--a-channel-message-whose-turn-failed-read-failed-failed) | Low | Messaging | Fixed 2026-10-03 — found by the live round |
+| [FIXED-721](#fixed-721--every-routed-telegram-message-failed-validation) | High | Messaging / Telegram | Fixed 2026-10-03 — found by this run's tests |
+| [FIXED-722](#fixed-722--creating-an-mcp-sample-named-a-server-that-did-not-exist) | Low | MCP | Fixed 2026-10-03 — found by the live round |
+| [FIXED-723](#fixed-723--a-model-chosen-by-search-was-shown-as-the-default) | Medium | Models / composers | Fixed 2026-10-03 — found by the live round |
+| [FIXED-724](#fixed-724--a-turns-evidence-counted-its-calls-and-not-its-sources-or-approvals) | Low | Chat | Fixed 2026-10-03 (closes UX-CHAT-02 with FIXED-581) |
 
 ---
 
@@ -29014,3 +29030,335 @@ Nothing about enforcement, the rows or the registry changes.
 
 **Evidence.** `capabilityModel.test.ts` — *task groups*;
 `CapabilitiesView.test.ts`; live capture `06-permissions-by-task.png`.
+
+---
+
+## FIXED-709 — A channel offered four equal buttons, and its test could only run after the step it was for
+
+**Severity: Medium. Area: Messaging. Status: Fixed 2026-10-03.
+Closes [UX-MSG-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#310-messaging).**
+
+**Observed.** A paired channel showed **Turn on**, **Send a test delivery**,
+**Routing** and **Unpair** at one weight and a single line naming the next of
+them. That line said *check its routing, send a test delivery, then turn it on* —
+and a test on a channel that was still off was refused with
+`channel_not_paired_or_disabled`, because the executor only delivered over an
+enabled pairing. The order the page recommended could not be followed.
+
+**Fixed.** Each linked channel carries the checklist DEC-14 names — **Connected →
+Owner verified → Allowed senders → Routing → Test delivery → Turned on** — read
+from facts the server already reports (`channelSetup.ts`), with the first
+unfinished step marked *Next* and carrying its own control (*Choose who you are*,
+*Edit senders*, *Set delivery address*, *Send a test*). Senders can now be edited
+after pairing (the route existed and had no control). The owner's test runs on a
+paired channel that is still off: the control service stamps it with the
+runtime-authored `authority_kind="owner_channel_test"`, which the executor
+accepts in place of *enabled* and nothing else — the capability gate, decision
+mode, egress allowlist and bound destination all apply, an inbound message to an
+off channel is still refused, and a forged argument cannot set the stamp.
+
+**Evidence.** `test_channel_owner_surface.py` — *the owner's test reaches a
+paired channel that is still off*; `test_phase_4_channels.py` — *an off channel
+refuses a delivery that is not the owner's test*; `channelSetup.test.ts`,
+`MessagingView.test.ts`; live captures 02–04 in [`2026-10-03-messaging-mcp-round/`](../screenshots/2026-10-03-messaging-mcp-round) (a test delivered to a
+local receiver while the channel read *Linked, off*).
+
+---
+
+## FIXED-710 — A test delivery went wherever the test form said
+
+**Severity: Medium. Area: Messaging / egress. Status: Fixed 2026-10-03.
+Closes [UX-MSG-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#310-messaging).**
+
+**Observed.** **Send a test delivery** asked for a *Destination URL* and sent the
+test there. It proved that URL was reachable, not that the channel worked; the
+webhook adapter took its URL from the action's arguments, so a delivery named
+its own destination; and Telegram, whose destination is fixed, was asked for a
+URL it never used.
+
+**Fixed.** The destination is part of the pairing. A webhook channel binds a
+**Delivery address** once (`PUT /api/channels/pairings/{id}/destination`;
+`https://` anywhere, `http://` only to this machine or the owner's network, never
+a URL carrying a username or password); the adapter reads it from the pairing and
+refuses with `channel_destination_missing` when there is none — an argument
+cannot choose it. Telegram delivers to the bound owner's chat. The test request
+carries no URL, the page reports the destination by host only (a path can carry
+a token) and whether that host is on the egress allowlist, and changing the
+address forgets the last test.
+
+**Evidence.** `test_channel_owner_surface.py` — *a test needs a bound
+destination and never takes one*, *a destination must be one Raiker would send a
+token to*, *a bound destination is reported by host*; `test_phase_4_channels.py`
+— *a URL in the action cannot choose the destination*; live capture 04 and the
+local receiver's log.
+
+---
+
+## FIXED-711 — Nothing said what a route did with a group, a thread or a bot
+
+**Severity: Medium. Area: Messaging. Status: Fixed 2026-10-03.
+Closes [UX-MSG-05](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#310-messaging).**
+
+**Observed.** A route was a mode name. Whether Telegram listened in groups,
+whether a mention was needed, whether messages shared a conversation, who could
+start work, and what stopped two bots answering each other were nowhere — and
+the last had no answer in code either.
+
+**Fixed.** Each channel reports `route_scope`, stated by the server from the
+code paths it describes: direct and group alike (Telegram) or one caller
+(webhook); no mention needed; no thread, one chosen conversation, or a new
+conversation per message; nobody, only the owner, or any allowed sender (side
+questions) starting work; and where a reply goes. **What this route does** words
+it on the card. Telegram updates authored by a bot are now acknowledged, recorded
+as `channel_message_rejected` with `reason: bot_sender`, and never routed, and
+the receiver records whether a message came from a direct chat or a group. The
+routing form chooses the target conversation by title from recent chats instead
+of a typed `sess_` id, and names the owner sender *You on this channel*.
+
+**Evidence.** `test_channel_owner_surface.py` — *the route scope says what the
+receiver does*; `test_phase_4_channels.py` — *a bot-authored Telegram update is
+never routed*; `channelSetup.test.ts`; live captures 05 and 06.
+
+---
+
+## FIXED-712 — A finished turn and a delivered reply were one unrecorded fact
+
+**Severity: Medium. Area: Messaging. Status: Fixed 2026-10-03.
+Closes [UX-MSG-06](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#310-messaging).**
+
+**Observed.** A channel message left events in the audit log and nothing an
+owner could read per channel: whether it was accepted, queued, processed,
+answered or delivered could only be reconstructed, and *processed* was easy to
+read as *answered*.
+
+**Fixed.** A `channel_receipts` ledger (migration `RAIKER-2083`) keeps one row
+per message or test with each stage as its own timestamp — received, accepted,
+queued, processed, reply queued, delivered, failed — written forward only, the
+sender's **role** (you, allowed, not allowed) rather than its id, and no message
+text. The last 200 per channel are kept; unpairing keeps them. Each channel shows
+**Recent activity**: the stages reached, what stopped it, and a link to the
+conversation a routed message became. A Telegram turn that finishes reads
+*Processed — no reply sent over the channel*, because none is.
+
+**Evidence.** `test_phase_4_channels.py` — *an inbound message leaves a receipt
+with each stage and no sender id*; `test_channel_owner_surface.py`;
+`channelSetup.test.ts`; live capture 05 (a real Anthropic turn routed from the
+webhook: received → accepted → queued → processed → reply queued → delivered,
+beside a refused sender and two tests).
+
+---
+
+## FIXED-713 — An MCP server could be added and run before anything said what it could reach
+
+**Severity: Medium. Area: MCP. Status: Fixed 2026-10-03.
+Closes [UX-MCP-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#311-mcp-servers).**
+
+**Observed.** An offer had an **Add server** button and a stored server a **Test**
+button; neither said that a local server runs as the owner's account with the
+machine's network and anything that account may write, or that a remote one
+receives a token.
+
+**Fixed.** Every server and every plugin offer carries `scope`, built from the
+code that decides each fact — `mcp_stdio_env()` for the environment names (and
+which the owner granted through `RAIKER_MCP_ENV_ALLOWLIST`), the endpoint policy
+for a URL's class, the client's empty `capabilities` for *no roots, no
+resources* — and the Permissions a call needs. **What it can reach** is open on a
+server until it has been tested and folded after; an offer shows **What adding
+it gives it** before it is added. The local process's unconfined network and
+writes are stated in the warning tone rather than softened.
+
+**Evidence.** `test_mcp_scope_preview.py`; `McpView.test.ts` — *states what an
+untested local server can reach*, *previews an offer's scope before it is added*;
+live capture 07.
+
+---
+
+## FIXED-714 — An MCP card explained itself with tool names
+
+**Severity: Low. Area: MCP. Status: Fixed 2026-10-03.
+Closes [UX-MCP-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#311-mcp-servers).**
+
+**Fixed.** Each card leads with a purpose — the offering plugin's description,
+or the server's own sentence about its first described tool, shown as *It says:
+“…”* because it is the server's text — then the risk class (*Runs code on this
+machine*, *Reaches your own network*, *Sends data to a remote service*), the
+source (*Sample Raiker generated*, *Offered by the plugin …*, *Added by you*) and
+**Last used … · last N: X ok, Y failed** from the monitored sessions.
+
+**Evidence.** `test_mcp_scope_preview.py` — *provenance names the sample, the
+plugin or the owner*; `McpView.test.ts`; live capture 08 (after a real Test).
+
+---
+
+## FIXED-715 — A chat filed in a project read as a chat that could see only that project
+
+**Severity: Low. Area: Chat / Projects. Status: Fixed 2026-10-03.
+Closes [UX-CHAT-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#32-chat).**
+
+**Observed.** The context line named the project and nothing else. Chat's recall
+is owner-wide whatever the project (`RetrievalScope("chat", None)`; only Build
+narrows to the project), so the line read as a narrowing that does not happen.
+
+**Fixed.** The line reads **Filed in *project***, and its inspector says the
+project's instructions and shared files apply while recall still draws on all
+the owner's memory unless Incognito is on; the filing notices say the same.
+
+**Evidence.** `ChatView.composerParity.test.ts` — *says a project files the chat
+and does not narrow its recall*; live capture 09.
+
+---
+
+## FIXED-716 — Background work was an unlabelled icon
+
+**Severity: Low. Area: Chat. Status: Fixed 2026-10-03.
+Closes [UX-CHAT-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#32-chat).**
+
+**Fixed.** The toggle reads **Background** with a count of unfinished work and a
+mark when work failed in the last day, and its accessible name says each count
+(*Background work: 2 running, 1 waiting for you, 1 failed today*). The counts are
+read every thirty seconds from the same `/api/tasks` filter the rail draws
+(`backgroundWork.ts`), so the two cannot disagree; under 560 px the word folds
+and the count stays.
+
+**Evidence.** `backgroundWork.test.ts`; `ChatView.composerParity.test.ts`; live
+captures 10 and 14.
+
+---
+
+## FIXED-717 — Conversation actions had no shared model
+
+**Severity: Low. Area: Chat. Status: Fixed 2026-10-03.
+Closes [UX-CHAT-05](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#32-chat).**
+
+**Fixed.** The conversation menu is three named groups — **Conversation**
+(export, print), **Evidence** (every governed step in the conversation; each
+answer's own evidence stays under it) and **Continuity** (background work; a
+pointer to branch, summarise and rewind) — and the per-message **More** menu is
+headed **Continuity**, so one word means one group wherever it is met.
+
+**Evidence.** `ChatView.continuation.test.ts` — *groups conversation actions as
+Conversation, Evidence and Continuity*; live capture 10.
+
+---
+
+## FIXED-718 — The picker did not say what was default, and Reset to default did not hold
+
+**Severity: Medium. Area: Models / composers. Status: Fixed 2026-10-03.
+Closes [UX-MODEL-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#35-models).**
+
+**Observed.** A composer's model menu listed models with no word for which was
+the global default or whether this surface had overridden it. Choosing the
+default row cleared the choice for the page and left the surface's remembered
+model in place, so the override came back on reload.
+
+**Fixed.** The menu opens with **Default model *X*** and, when this work is on
+something else, **This work uses *Y* · Reset to default**; the default row is
+tagged *Default*. Reset — or choosing the default row while overridden — calls
+`forgetSurfaceModel`, which clears the stored surface preference, on Chat, Build
+and Tasks.
+
+**Evidence.** `ModelPicker.test.ts`, `surfaceModel.test.ts`; live capture 11 and
+the spec's reload check.
+
+---
+
+## FIXED-719 — A refused channel action left the page showing the state before it
+
+**Severity: Low. Area: Messaging. Status: Fixed 2026-10-03. Found by the
+2026-10-03 live round.**
+
+**Observed.** A test refused at the capability gate is recorded on the channel
+and as a receipt, and the checklist still said *Send a test*: the page re-read
+channels only after a success.
+
+**Fixed.** A refused action re-reads the channels as well, then shows the reason.
+
+**Evidence.** `MessagingView.test.ts` — *re-reads the channel after a refused
+test*; live capture 03.
+
+---
+
+## FIXED-720 — A channel message whose turn failed read “Failed: failed”
+
+**Severity: Low. Area: Messaging. Status: Fixed 2026-10-03. Found by the
+2026-10-03 live round.**
+
+**Observed.** A routed message whose turn was refused (the round had not yet
+chosen a default model) left a receipt reading *Failed: failed* — the turn's
+status stored as the reason.
+
+**Fixed.** The reason is `turn_failed` / `turn_stopped`, worded *the turn did not
+complete — its conversation says why*, with **Open the conversation** beside it.
+
+**Evidence.** `test_phase_4_channels.py` — *a routed turn that could not run is
+failed with its conversation*; `channelSetup.test.ts`.
+
+---
+
+## FIXED-721 — Every routed Telegram message failed validation
+
+**Severity: High. Area: Messaging / Telegram. Status: Fixed 2026-10-03. Found by
+this run's tests.**
+
+**Observed.** A Telegram message on a *New turn* or *Side question* route raised
+`ContractValidationError: invalid_client_type:telegram` and answered 500: the
+router names the turn's client by channel type, and `telegram` was never added to
+`CLIENT_TYPES` when its adapter was.
+
+**Fixed.** `telegram` is a client type, and a test asserts every channel type
+with a wire format is one.
+
+**Evidence.** `test_phase_4_channels.py` — *every channel with a wire format is
+a client a turn can name*, and the routed-turn test above.
+
+---
+
+## FIXED-722 — Creating an MCP sample named a server that did not exist
+
+**Severity: Low. Area: MCP. Status: Fixed 2026-10-03. Found by the 2026-10-03
+live round.**
+
+**Observed.** *Protocol sample* is stored as *Protocolsample*; the notice said
+*Created “Protocol sample”*, a card the owner could not find.
+
+**Fixed.** The notice names the stored server and why it differs.
+
+**Evidence.** `McpView.test.ts` — *names the stored server*; live capture 07.
+
+---
+
+## FIXED-723 — A model chosen by search was shown as the default
+
+**Severity: Medium. Area: Models / composers. Status: Fixed 2026-10-03. Found by
+the 2026-10-03 live round.**
+
+**Observed.** Picking *Sonnet* through **Search all models** set the turn's model,
+and the picker went on reading *Haiku 4.5*: it looked the pair up among the
+quick list's profiles, found none, and fell back to the default.
+
+**Fixed.** The picker names the bound model, with the provider taken from its
+profile, and calls it this work's override. The surfaces' own readiness and
+context-window reads still use the quick-list lookup —
+[BUG-314](TO_BE_FIXED.md#bug-314--a-model-chosen-by-search-is-judged-by-the-defaults-readiness-and-window).
+
+**Evidence.** `ModelPicker.test.ts` — *names a model chosen by search*; live
+capture 11.
+
+---
+
+## FIXED-724 — A turn's evidence counted its calls and not its sources or approvals
+
+**Severity: Low. Area: Chat. Status: Fixed 2026-10-03.
+Closes [UX-CHAT-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#32-chat) together with
+[FIXED-581](#fixed-581--a-turns-own-evidence-was-on-another-route).**
+
+**Observed.** FIXED-581 put each turn's evidence under it, collapsed, which is
+most of what UX-CHAT-02 asks. Its closed line said *N calls* only, so a turn that
+cited sources or paused for an approval read the same as one that did neither.
+
+**Fixed.** The closed line is the compact disclosure the decision names —
+*3 calls · 2 sources · 1 approval* — from counts Chat already holds; opening it is
+still what fetches the record.
+
+**Evidence.** `TurnEvidence.test.ts` — *summarises calls, sources and approvals
+while closed*. Not exercised by the live round, whose turns used no tool.

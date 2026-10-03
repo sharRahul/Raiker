@@ -1004,8 +1004,66 @@ class RuntimeControlService:
         )
         return ControlResult(ok=True, data={"pairing_id": pairing_id, "removed": True})
 
+    def set_channel_destination(
+        self, acting_principal_id: str | None, pairing_id: str, delivery_url: str | None
+    ) -> ControlResult:
+        """UX-MSG-04 — bind where this channel delivers.
+
+        The reference webhook delivers to a URL the owner chooses, and that URL
+        is now part of the pairing rather than a field on the test form: a test
+        then exercises the destination real deliveries use, through the same
+        gate, decision mode and egress allowlist. Telegram needs none — it
+        delivers to the owner sender's chat — so this refuses a transport that
+        has no URL to bind.
+
+        Accepted: ``https`` anywhere, ``http`` only to this machine or the
+        owner's own network, never a URL carrying a username or password.
+        Clearing the value (``None`` or empty) unbinds it.
+        """
+        from urllib.parse import urlsplit
+
+        from raiker.runtime.mcp_endpoint_policy import PUBLIC, stated_network_class
+
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        pairing = self._store.get_channel_pairing(pairing_id)
+        if pairing is None:
+            return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        if str(pairing.get("channel_type") or "") != "webhooks":
+            return ControlResult(ok=False, reason_code="channel_destination_not_configurable")
+        url = (delivery_url or "").strip() or None
+        if url is not None:
+            parsed = urlsplit(url)
+            network_class = stated_network_class(url)
+            if (
+                len(url) > 2048
+                or network_class is None
+                or parsed.username is not None
+                or parsed.password is not None
+                or (network_class == PUBLIC and parsed.scheme != "https")
+            ):
+                return ControlResult(ok=False, reason_code="channel_destination_invalid")
+        if not self._store.set_channel_pairing_destination(pairing_id, url):
+            return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        self._writer.append(
+            make_event(
+                session_id="channels",
+                turn_id=None,
+                event_type="channel_routing_changed",
+                actor="control_service",
+                # Whether, never where: the URL can carry a path token.
+                payload={"pairing_id": pairing_id, "has_destination": url is not None},
+            )
+        )
+        return ControlResult(
+            ok=True, data={"pairing_id": pairing_id, "has_destination": url is not None}
+        )
+
     def deliver_channel_test(
-        self, acting_principal_id: str | None, connector_id: str, url: str, text: str
+        self, acting_principal_id: str | None, connector_id: str, text: str
     ) -> ControlResult:
         """Send one test delivery through the governed outbound path.
 
@@ -1015,25 +1073,57 @@ class RuntimeControlService:
         mode, the approval path and the audit event all apply. A REST endpoint
         that POSTed the webhook itself would answer the same question while
         proving nothing about the path a real delivery takes.
+
+        UX-MSG-04 — it takes no destination. It delivers where the channel
+        delivers: the webhook's bound URL, or the Telegram owner's chat. And
+        UX-MSG-03 — it runs on a paired channel that is still off, because the
+        setup checklist tests before it turns on; the stamp that allows that is
+        runtime-authored and relaxes the pairing only. Its outcome is kept on the
+        pairing and as a receipt.
         """
+        from raiker.runtime.executors.channels import OWNER_CHANNEL_TEST
+
         principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
         if principal is None:
             return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
+        pairing = self._store.get_channel_pairing_by_connector(connector_id)
+        pairing_id = str(pairing.get("pairing_id") or "") if pairing is not None else ""
         action = GovernedAction(
             action_id=new_id("act_"),
             principal_id=principal.principal_id,
             action_type="external_channel_runtime",
             tool_or_service_name="external_channel_runtime",
-            arguments={"connector_id": connector_id, "url": url, "text": text},
+            arguments={"connector_id": connector_id, "text": text},
             risk_level=RiskLevelValue.MEDIUM,
+            authority_kind=OWNER_CHANNEL_TEST if pairing_id else "",
+            authority_id=pairing_id,
         )
+        queued_at = utc_now()
         result = self._authority.route_action(action, principal)
         # The same mapping every other governed control uses, so a closed gate
         # reads as `disabled_by_capability_gate` here exactly as it does on the
         # MCP page — one reason code, one remedy, wherever the owner meets it.
         mapped = self._mcp_action_result(result)
+        if pairing_id:
+            settled_at = utc_now()
+            self._store.record_channel_pairing_test(
+                pairing_id, ok=mapped.ok, reason_code=mapped.reason_code
+            )
+            self._store.insert_channel_receipt(
+                receipt_id=action.action_id,
+                connector_id=connector_id,
+                pairing_id=pairing_id,
+                direction="outbound",
+                kind="test_delivery",
+                stages=(
+                    {"queued_at": queued_at, "delivered_at": settled_at}
+                    if mapped.ok
+                    else {"queued_at": queued_at, "failed_at": settled_at}
+                ),
+                reason_code=None if mapped.ok else mapped.reason_code,
+            )
         if not mapped.ok:
             return mapped
         return ControlResult(ok=True, data={"delivered": True, **dict(result.artifacts or {})})

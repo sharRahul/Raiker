@@ -158,7 +158,7 @@ test("B7 — a delegated read-only search returns findings without filling the t
 /** Turn one capability on at runtime level, exactly as a person would. */
 async function enableCapability(label: string) {
   await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities");
+  const search = page.getByLabel("Search capabilities", { exact: true });
   await expect(search).toBeVisible({ timeout: 30_000 });
   await search.fill(label);
   const card = page.locator(".cap.card").filter({ hasText: label }).first();
@@ -208,7 +208,7 @@ test("B8 — MCP: a connected server says whether the agent can call it, then do
 
   // Raise the decision mode, which is exactly what the banner told the owner to do.
   await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities");
+  const search = page.getByLabel("Search capabilities", { exact: true });
   await search.fill("MCP connector");
   const mcpCard = page.locator(".cap.card").filter({ hasText: "MCP connector" }).first();
   await mcpCard.getByRole("button", { name: "Allow", exact: true }).click();

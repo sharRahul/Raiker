@@ -269,6 +269,24 @@ describe("ChatView — conversation export (BUG-22)", () => {
     expect(screen.getByRole("menuitem", { name: "Print / Save as PDF" })).toBeInTheDocument();
   });
 
+  // UX-CHAT-05 — Conversation, Evidence and Continuity, in that order.
+  it("groups conversation actions as Conversation, Evidence and Continuity", async () => {
+    stubFetch(baseRoutes());
+    render(ChatView, {});
+    await parkATurn();
+    await fireEvent.click(screen.getByRole("button", { name: "Conversation actions" }));
+    const menu = screen.getByRole("menu", { name: "Conversation actions" });
+    const groups = Array.from(menu.querySelectorAll('[role="group"]')).map((group) =>
+      group.getAttribute("aria-label"),
+    );
+    expect(groups).toEqual(["Conversation", "Evidence", "Continuity"]);
+    expect(
+      screen.getByRole("menuitem", { name: "Every governed step in this conversation" }),
+    ).toHaveAttribute("href", "#/sessions?session=sess_1");
+    await fireEvent.click(screen.getByRole("menuitem", { name: "Background work" }));
+    expect(await screen.findByRole("complementary", { name: "Background work" })).toBeInTheDocument();
+  });
+
   it("cannot export a conversation that has not started yet", async () => {
     stubFetch(baseRoutes());
     render(ChatView, {});

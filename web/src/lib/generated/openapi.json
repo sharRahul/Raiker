@@ -2524,6 +2524,97 @@
         "title": "ChannelApprovalResponse",
         "type": "object"
       },
+      "ChannelDestination": {
+        "description": "UX-MSG-04 — where this channel delivers, bound on the pairing.\n\n``url`` for the reference webhook (the owner sets it), ``owner_chat`` for\nTelegram (the bound owner sender's chat), ``none`` for a transport this\nbuild cannot deliver over. ``host`` is the bound URL's host only — a path\ncan carry a token and is never returned.",
+        "properties": {
+          "allowlisted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowlisted"
+          },
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "kind": {
+            "enum": [
+              "url",
+              "owner_chat",
+              "none"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "configured",
+          "host",
+          "allowlisted"
+        ],
+        "title": "ChannelDestination",
+        "type": "object"
+      },
+      "ChannelDestinationRequest": {
+        "additionalProperties": false,
+        "description": "Bind, or with ``None`` clear, a webhook channel's delivery URL.",
+        "properties": {
+          "delivery_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Url"
+          }
+        },
+        "title": "ChannelDestinationRequest",
+        "type": "object"
+      },
+      "ChannelDestinationSet": {
+        "description": "A webhook channel's destination bound or cleared — whether, never where.",
+        "properties": {
+          "has_destination": {
+            "title": "Has Destination",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pairing_id": {
+            "title": "Pairing Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "pairing_id",
+          "has_destination"
+        ],
+        "title": "ChannelDestinationSet",
+        "type": "object"
+      },
       "ChannelEnabledRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2678,6 +2769,37 @@
         "title": "ChannelInboundAccepted",
         "type": "object"
       },
+      "ChannelLastTest": {
+        "description": "The last owner test delivery, for the setup checklist (UX-MSG-03).",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          }
+        },
+        "required": [
+          "at",
+          "ok",
+          "reason_code"
+        ],
+        "title": "ChannelLastTest",
+        "type": "object"
+      },
       "ChannelPaired": {
         "description": "Paired is not enabled: that is a second decision.",
         "properties": {
@@ -2725,6 +2847,9 @@
             "title": "Default State",
             "type": "string"
           },
+          "destination": {
+            "$ref": "#/components/schemas/ChannelDestination"
+          },
           "display_label": {
             "anyOf": [
               {
@@ -2750,6 +2875,16 @@
             },
             "title": "Env Requirements",
             "type": "array"
+          },
+          "last_test": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChannelLastTest"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "linked": {
             "title": "Linked",
@@ -2777,6 +2912,13 @@
             ],
             "title": "Pairing Id"
           },
+          "receipts": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelReceipt"
+            },
+            "title": "Receipts",
+            "type": "array"
+          },
           "requires_network": {
             "title": "Requires Network",
             "type": "boolean"
@@ -2788,6 +2930,9 @@
           "requires_sender_allowlist": {
             "title": "Requires Sender Allowlist",
             "type": "boolean"
+          },
+          "route_scope": {
+            "$ref": "#/components/schemas/ChannelRouteScope"
           },
           "routing_mode": {
             "enum": [
@@ -2833,6 +2978,17 @@
             ],
             "title": "Target Session Id"
           },
+          "target_session_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Session Title"
+          },
           "transport": {
             "title": "Transport",
             "type": "string"
@@ -2861,9 +3017,257 @@
           "supports_side_questions",
           "supports_interrupts",
           "supports_approvals",
-          "env_requirements"
+          "env_requirements",
+          "target_session_title",
+          "destination",
+          "last_test",
+          "route_scope",
+          "receipts"
         ],
         "title": "ChannelProfile",
+        "type": "object"
+      },
+      "ChannelReceipt": {
+        "description": "UX-MSG-06 — one message or test, each stage its own fact.",
+        "properties": {
+          "accepted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "conversation_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Scope"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
+          },
+          "direction": {
+            "enum": [
+              "inbound",
+              "outbound"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "failed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed At"
+          },
+          "kind": {
+            "enum": [
+              "message",
+              "test_delivery"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "processed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processed At"
+          },
+          "queued_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queued At"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "receipt_id": {
+            "title": "Receipt Id",
+            "type": "string"
+          },
+          "received_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Received At"
+          },
+          "reply_queued_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Queued At"
+          },
+          "routing_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Mode"
+          },
+          "sender_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sender Role"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          }
+        },
+        "required": [
+          "receipt_id",
+          "direction",
+          "kind",
+          "sender_role",
+          "conversation_scope",
+          "routing_mode",
+          "session_id",
+          "received_at",
+          "accepted_at",
+          "queued_at",
+          "processed_at",
+          "reply_queued_at",
+          "delivered_at",
+          "failed_at",
+          "reason_code",
+          "created_at"
+        ],
+        "title": "ChannelReceipt",
+        "type": "object"
+      },
+      "ChannelRouteScope": {
+        "description": "UX-MSG-05 — what the stored route actually does, stated by the server.\n\nCodes rather than prose, so the page words them and cannot claim a scope\nthe receiver does not enforce.",
+        "properties": {
+          "bot_loop_protection": {
+            "enum": [
+              "bot_messages_ignored",
+              "rate_limit_only"
+            ],
+            "title": "Bot Loop Protection",
+            "type": "string"
+          },
+          "conversation_scope": {
+            "enum": [
+              "direct_and_group",
+              "endpoint"
+            ],
+            "title": "Conversation Scope",
+            "type": "string"
+          },
+          "mention_required": {
+            "title": "Mention Required",
+            "type": "boolean"
+          },
+          "reply_path": {
+            "enum": [
+              "returned_to_caller",
+              "kept_in_raiker",
+              "none"
+            ],
+            "title": "Reply Path",
+            "type": "string"
+          },
+          "starts_work": {
+            "enum": [
+              "nobody",
+              "owner_only",
+              "any_allowed_sender"
+            ],
+            "title": "Starts Work",
+            "type": "string"
+          },
+          "thread_mapping": {
+            "enum": [
+              "none",
+              "one_conversation",
+              "new_conversation_each_message"
+            ],
+            "title": "Thread Mapping",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_scope",
+          "mention_required",
+          "thread_mapping",
+          "starts_work",
+          "bot_loop_protection",
+          "reply_path"
+        ],
+        "title": "ChannelRouteScope",
         "type": "object"
       },
       "ChannelRoutingRequest": {
@@ -3029,7 +3433,7 @@
       },
       "ChannelTestDeliveryRequest": {
         "additionalProperties": false,
-        "description": "One test delivery through the governed outbound path.",
+        "description": "One test delivery through the governed outbound path.\n\nNo destination: a test goes where the channel delivers (UX-MSG-04).",
         "properties": {
           "connector_id": {
             "title": "Connector Id",
@@ -3039,15 +3443,10 @@
             "default": "Raiker test delivery.",
             "title": "Text",
             "type": "string"
-          },
-          "url": {
-            "title": "Url",
-            "type": "string"
           }
         },
         "required": [
-          "connector_id",
-          "url"
+          "connector_id"
         ],
         "title": "ChannelTestDeliveryRequest",
         "type": "object"
@@ -11996,6 +12395,9 @@
             "title": "Plugin Id",
             "type": "string"
           },
+          "scope": {
+            "$ref": "#/components/schemas/McpScope"
+          },
           "template": {
             "title": "Template",
             "type": "string"
@@ -12014,9 +12416,142 @@
           "name",
           "transport",
           "description",
-          "already_added"
+          "already_added",
+          "scope"
         ],
         "title": "McpOffer",
+        "type": "object"
+      },
+      "McpScope": {
+        "description": "UX-MCP-02 — what adding or testing a server exposes, before it is done.\n\nRead from the launcher and the endpoint policy rather than written as\ncopy, so the preview cannot claim a boundary the process does not have.",
+        "properties": {
+          "encrypted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encrypted"
+          },
+          "environment": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Environment",
+            "type": "array"
+          },
+          "granted_environment": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Granted Environment",
+            "type": "array"
+          },
+          "network": {
+            "enum": [
+              "unrestricted",
+              "loopback",
+              "private_network",
+              "public",
+              "unknown"
+            ],
+            "title": "Network",
+            "type": "string"
+          },
+          "required_permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Required Permissions",
+            "type": "array"
+          },
+          "resources_read": {
+            "title": "Resources Read",
+            "type": "boolean"
+          },
+          "risk": {
+            "enum": [
+              "local_process",
+              "own_network",
+              "remote_service"
+            ],
+            "title": "Risk",
+            "type": "string"
+          },
+          "roots_shared": {
+            "title": "Roots Shared",
+            "type": "boolean"
+          },
+          "runs_on": {
+            "enum": [
+              "this_machine",
+              "remote"
+            ],
+            "title": "Runs On",
+            "type": "string"
+          },
+          "token_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Reference"
+          },
+          "tool_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Count"
+          },
+          "working_folder": {
+            "anyOf": [
+              {
+                "const": "workspace",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Working Folder"
+          },
+          "writable": {
+            "enum": [
+              "account",
+              "none_on_this_machine"
+            ],
+            "title": "Writable",
+            "type": "string"
+          }
+        },
+        "required": [
+          "runs_on",
+          "network",
+          "encrypted",
+          "environment",
+          "granted_environment",
+          "token_reference",
+          "working_folder",
+          "writable",
+          "roots_shared",
+          "resources_read",
+          "tool_count",
+          "required_permissions",
+          "risk"
+        ],
+        "title": "McpScope",
         "type": "object"
       },
       "McpServerConnected": {
@@ -12222,9 +12757,64 @@
             "default": null,
             "title": "Protocol Version"
           },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Purpose"
+          },
+          "purpose_from": {
+            "default": "none",
+            "enum": [
+              "plugin",
+              "server",
+              "none"
+            ],
+            "title": "Purpose From",
+            "type": "string"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/McpScope"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "server_id": {
             "title": "Server Id",
             "type": "string"
+          },
+          "source": {
+            "default": "owner",
+            "enum": [
+              "raiker_sample",
+              "plugin",
+              "owner"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "source_plugin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Plugin"
           },
           "status": {
             "title": "Status",
@@ -25926,7 +26516,7 @@
     },
     "/api/channels/deliver-test": {
       "post": {
-        "description": "Send one test delivery through the governed outbound path.\n\nNot a shortcut: this builds a governed action and routes it through the\nruntime authority, so a closed `external_channel_runtime` gate refuses it\nwith `disabled_by_capability_gate` and an unallowlisted host refuses it at\nthe egress boundary — exactly as a real delivery would.",
+        "description": "Send one test delivery through the governed outbound path.\n\nNot a shortcut: this builds a governed action and routes it through the\nruntime authority, so a closed `external_channel_runtime` gate refuses it\nwith `disabled_by_capability_gate` and an unallowlisted host refuses it at\nthe egress boundary — exactly as a real delivery would. It names no\ndestination: it goes where the channel delivers (UX-MSG-04).",
         "operationId": "deliver_channel_test_api_channels_deliver_test_post",
         "requestBody": {
           "content": {
@@ -26039,6 +26629,56 @@
           }
         },
         "summary": "Unpair Channel"
+      }
+    },
+    "/api/channels/pairings/{pairing_id}/destination": {
+      "put": {
+        "description": "UX-MSG-04 — bind where a webhook channel delivers. Telegram has no URL.",
+        "operationId": "set_channel_destination_api_channels_pairings__pairing_id__destination_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pairing_id",
+            "required": true,
+            "schema": {
+              "title": "Pairing Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelDestinationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelDestinationSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Channel Destination"
       }
     },
     "/api/channels/pairings/{pairing_id}/enabled": {

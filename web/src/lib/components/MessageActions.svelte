@@ -135,7 +135,11 @@
         <Icon name="more" size="sm" /><span class="sr-only">More</span>
       </button>
       {#if moreOpen}
-        <div class="more-menu" role="menu">
+        <!-- UX-CHAT-05 — these three are Continuity: where the conversation
+             goes from this point. Named the same here and in the header menu,
+             so a group means one thing wherever it is met. -->
+        <div class="more-menu" role="menu" aria-label="Continuity">
+          <p class="more-group" aria-hidden="true">Continuity</p>
           {#if onbranch}
             <button
               type="button"
@@ -286,4 +290,12 @@
     color: var(--text-3);
   }
   .copy-error { margin: 0.15rem 0 0; color: var(--danger); font-size: var(--text-2xs); }
+  .more-group {
+    margin: 0.15rem 0.6rem 0.25rem;
+    color: var(--text-3);
+    font-size: var(--text-2xs);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
 </style>

@@ -138,8 +138,8 @@ test("pairing links a channel without switching it on", async ({ page }) => {
   // Routing is pairing-owned state, not a field an inbound message can choose.
   await row.getByRole("button", { name: "Routing" }).click();
   await row.getByLabel("Inbound").selectOption("new_turn");
-  await row.getByLabel("Owner sender").selectOption("ops");
-  await row.getByText("Allow exact pending approval responses from the bound owner").click();
+  await row.getByLabel("You on this channel").selectOption("ops");
+  await row.getByText("Allow exact pending approval responses from you on this channel").click();
   await row.getByRole("button", { name: "Save routing" }).click();
   await expect(row.getByText("New turn", { exact: true })).toBeVisible();
   await expect(row.getByText("Approval relay", { exact: true })).toBeVisible();
@@ -157,9 +157,12 @@ test("turning it on is a second decision, and a test delivery runs the governed 
   await webhookRow(page).getByRole("button", { name: "Turn on" }).click();
   await expect(webhookRow(page)).toContainText("On", { timeout: 30_000 });
 
+  // UX-MSG-04 — the address is the channel's, set once; the test names none.
+  await webhookRow(page).getByRole("button", { name: "Delivery address" }).click();
+  await webhookRow(page).getByLabel("Delivery address").fill("https://hooks.example.invalid/x");
+  await webhookRow(page).getByRole("button", { name: "Save address" }).click();
+  await expect(webhookRow(page)).toContainText("hooks.example.invalid", { timeout: 30_000 });
   await webhookRow(page).getByRole("button", { name: "Send a test delivery" }).click();
-  await page.getByLabel("Destination URL").fill("https://hooks.example.invalid/x");
-  await page.getByRole("button", { name: "Send", exact: true }).click();
 
   // The egress allowlist is empty on this instance, so the refusal has to come
   // from the boundary and has to be readable — not a raw reason code.

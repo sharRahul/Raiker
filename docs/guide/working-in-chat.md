@@ -56,8 +56,8 @@ the runtime still judges each action when it is invoked.
 
 | Control | `aria-label` | What it does |
 |---|---|---|
-| **Context** | `Context for this turn: …` | One line — project, attachments, and how much of the model's window is in play. Opening it gives the token counts, the window and any compaction. It never compacts the conversation. |
-| **Model** | `Model for this turn: <name>` | Only *configured* profiles. No free-text model ids. The menu carries **Effort** when the model publishes thinking levels, names a model that is selected but cannot serve rather than hiding it, and ends in one link to **Manage models**. |
+| **Context** | `Context for this turn: …` | One line — **Filed in *project***, attachments, and how much of the model's window is in play. Opening it gives the token counts, the window and any compaction, and says what filing means: the project's instructions and shared files apply, while **recall still draws on all your memory**, not only that project's, unless Incognito is on in Memory. (Build is the surface whose recall narrows to its project.) It never compacts the conversation. |
+| **Model** | `Model for this turn: <name>` | Only *configured* profiles. No free-text model ids. The menu opens with **Default model** — the one chosen on Models — and, when this work is on another, **This work uses … · Reset to default**; the reset holds after a reload. It carries **Effort** when the model publishes thinking levels, names a model that is selected but cannot serve rather than hiding it, and ends in one link to **Manage models**. |
 | **Send** | `Send` | The one primary action. |
 
 Outside the composer, on the page itself:
@@ -65,8 +65,9 @@ Outside the composer, on the page itself:
 | Control | `aria-label` | What it does |
 |---|---|---|
 | **New chat** | — | Start a fresh conversation. Disabled while the current chat is still empty. |
-| **⋯** | `Conversation actions` | **Export conversation…** and **Print / Save as PDF**. Both are also in Build. |
-| **⋯ on your own message** | `More actions for this message` | **Branch**, **Summarise up to here**, and **Rewind to before this**. Copy, Edit and Retry stay on the row itself. |
+| **⋯** | `Conversation actions` | Three groups. **Conversation**: **Export conversation…** and **Print / Save as PDF** (both also in Build). **Evidence**: every governed step in this conversation; each answer's own evidence is under it. **Continuity**: **Background work**, and a pointer to the per-message actions below. |
+| **Background** | `Background work: 2 running, 1 failed today` | Opens the background-work rail. Its label counts what is running and marks work that failed in the last day, read from the same list the rail shows. |
+| **⋯ on your own message** | `More actions for this message` | The **Continuity** group: **Branch**, **Summarise up to here**, and **Rewind to before this**. Copy, Edit and Retry stay on the row itself. |
 
 **Retry sends the prompt again, and that means the turn runs again.** If the
 first attempt only answered, Retry just answers again. If it *did* something —
@@ -280,7 +281,8 @@ the answer rather than in a side pane — Build does not have one yet.
 
 ### Evidence, under the turn it belongs to
 
-Every settled turn carries an **Evidence** disclosure. It is closed: the answer,
+Every settled turn carries an **Evidence** disclosure. It is closed, and its
+line says what the turn used — *3 calls · 2 sources · 1 approval*: the answer,
 the calls Raiker made, the approval it asked for and the sources it read are
 what the transcript is for, and none of them moves. Open it when you want to
 check how a turn happened rather than what it said, and it holds:
@@ -477,7 +479,9 @@ race says **Continued in another tab** rather than reporting an error.
 
 ## Background work
 
-Chat shows the same inline **Background Work** panel as Build. It keeps active
+Chat shows the same inline **Background Work** panel as Build, behind the
+**Background** toggle in the header — whose label already says how much is
+running and whether anything failed today, so you know before opening it. It keeps active
 agent operations, background tasks, and approval-blocked work beside the
 conversation so you do not need to change surfaces to discover why work paused.
 An approval-blocked item includes **Review approval**, which opens the relevant

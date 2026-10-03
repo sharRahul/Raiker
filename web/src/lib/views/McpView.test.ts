@@ -4,6 +4,43 @@ import McpView from "./McpView.svelte";
 import { makeGate, stubFetch } from "../test-helpers";
 import type { McpAgentAccess, McpOffer, McpServer } from "../apiTypes";
 
+type Scope = NonNullable<McpServer["scope"]>;
+
+function localScope(partial: Partial<Scope> = {}): Scope {
+  return {
+    runs_on: "this_machine",
+    network: "unrestricted",
+    encrypted: null,
+    environment: ["HOME", "PATH", "PYTHONIOENCODING", "PYTHONUNBUFFERED"],
+    granted_environment: [],
+    token_reference: null,
+    working_folder: "workspace",
+    writable: "account",
+    roots_shared: false,
+    resources_read: false,
+    tool_count: 2,
+    required_permissions: ["mcp_connector_runtime", "mcp_builder_runtime"],
+    risk: "local_process",
+    ...partial,
+  };
+}
+
+function remoteScope(partial: Partial<Scope> = {}): Scope {
+  return localScope({
+    runs_on: "remote",
+    network: "public",
+    encrypted: true,
+    environment: [],
+    token_reference: "ACME_MCP_TOKEN",
+    working_folder: null,
+    writable: "none_on_this_machine",
+    tool_count: null,
+    required_permissions: ["mcp_connector_runtime"],
+    risk: "remote_service",
+    ...partial,
+  });
+}
+
 function server(partial: Partial<McpServer> = {}): McpServer {
   return {
     server_id: "mcp_1",
@@ -43,6 +80,11 @@ function server(partial: Partial<McpServer> = {}): McpServer {
     paused_reason: null,
     paused_at: null,
     protocol_version: "2026-07-28",
+    scope: localScope(),
+    source: "raiker_sample",
+    source_plugin: null,
+    purpose: "Return the text it was given.",
+    purpose_from: "server",
     ...partial,
   };
 }
@@ -371,6 +413,7 @@ describe("McpView — servers a plugin offers", () => {
     endpoint_url: "https://mcp.acme.example/v1",
     auth_ref: "ACME_MCP_TOKEN",
     already_added: false,
+    scope: remoteScope(),
     ...partial,
   });
 
@@ -439,5 +482,100 @@ describe("McpView — servers a plugin offers", () => {
     render(McpView);
     await screen.findByText(/No MCP servers yet/i);
     expect(screen.queryByText(/Offered by your plugins/i)).not.toBeInTheDocument();
+  });
+});
+
+// UX-MCP-02 and UX-MCP-03 — the blast radius before activation, and a trust
+// explanation rather than tool names.
+describe("McpView — scope and trust", () => {
+  it("states what an untested local server can reach, with the cautions first-class", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [
+        server({ status: "created", last_connected_at: null, tools: [], tool_count: 0, scope: localScope({ tool_count: null }) }),
+      ],
+      "GET /api/capability-gates": ENABLED_GATES,
+      "GET /api/mcp/agent-access": access(),
+      "GET /api/mcp/offers": [],
+      "GET /api/mcp/servers/mcp_1/sessions": [],
+      "GET /api/mcp/servers/mcp_1/findings": [],
+    });
+    render(McpView);
+    const reach = await screen.findByText("What it can reach");
+    const details = reach.closest("details")!;
+    // Open until it has been tested: Test is what lets it run.
+    expect(details.open).toBe(true);
+    expect(details).toHaveTextContent("Not confined — the process has this machine's network.");
+    expect(details).toHaveTextContent("Anything the account Raiker runs as may write");
+    expect(details).toHaveTextContent("no provider key");
+    expect(details).toHaveTextContent("Raiker tells it no folder and hands it no file");
+    expect(details).toHaveTextContent("Not known until Test lists them");
+    expect(details).toHaveTextContent("MCP connections and MCP server builder");
+  });
+
+  it("names purpose, risk, source and recent outcomes on the card", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [server()],
+      "GET /api/capability-gates": ENABLED_GATES,
+      "GET /api/mcp/agent-access": access(),
+      "GET /api/mcp/offers": [],
+      "GET /api/mcp/servers/mcp_1/sessions": [
+        { session_row_id: "a", server_id: "mcp_1", transport: "stdio", operation: "call", hosts: [], tool_calls: 1, bytes_in: 1, bytes_out: 1, error_count: 0, outcome: "ok", started_at: "2026-07-17T01:00:00Z", ended_at: null },
+        { session_row_id: "b", server_id: "mcp_1", transport: "stdio", operation: "call", hosts: [], tool_calls: 1, bytes_in: 1, bytes_out: 1, error_count: 1, outcome: "error", started_at: "2026-07-17T02:00:00Z", ended_at: null },
+      ],
+      "GET /api/mcp/servers/mcp_1/findings": [],
+    });
+    render(McpView);
+    // The server's own words are labelled as its own.
+    expect(await screen.findByText("It says: “Return the text it was given.”")).toBeInTheDocument();
+    expect(screen.getByText("Runs code on this machine")).toBeInTheDocument();
+    expect(screen.getByText("Sample Raiker generated")).toBeInTheDocument();
+    expect(await screen.findByText(/last 2: 1 ok, 1 failed/)).toBeInTheDocument();
+    // Tested already, so the scope folds away.
+    expect(screen.getByText("What it can reach").closest("details")!.open).toBe(false);
+  });
+
+  it("previews an offer's scope before it is added", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [],
+      "GET /api/capability-gates": ENABLED_GATES,
+      "GET /api/mcp/agent-access": access(),
+      "GET /api/mcp/offers": [
+        {
+          plugin_id: "acme-mcp",
+          name: "acme-docs",
+          transport: "http",
+          description: "Acme's internal documentation index.",
+          endpoint_url: "https://mcp.acme.example/v1",
+          auth_ref: "ACME_MCP_TOKEN",
+          already_added: false,
+          scope: remoteScope(),
+        },
+      ],
+    });
+    render(McpView);
+    const summary = await screen.findByText(/What adding it gives it · Sends data to a remote service/);
+    expect(summary.closest("details")).toHaveTextContent(
+      "The token in ACME_MCP_TOKEN, sent to this endpoint only.",
+    );
+    expect(summary.closest("details")).toHaveTextContent("None on this machine.");
+  });
+});
+
+// Found by the 2026-10-03 live round: the server stores a normalised name, and
+// the notice named the one typed — a card that did not exist.
+describe("McpView — the name the server kept", () => {
+  it("names the stored server, and says why it differs from what was typed", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [],
+      "GET /api/capability-gates": ENABLED_GATES,
+      "GET /api/mcp/agent-access": access(),
+      "GET /api/mcp/offers": [],
+      "POST /api/mcp/servers": { ok: true, server_id: "mcp_9", name: "Protocolsample" },
+    });
+    render(McpView);
+    await fireEvent.click(await screen.findByText("Developer example — generate a local sample server"));
+    await fireEvent.input(screen.getByLabelText("Server name"), { target: { value: "Protocol sample" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Generate example server" }));
+    expect(await screen.findByText(/Created “Protocolsample” \(a server name keeps only/)).toBeInTheDocument();
   });
 });

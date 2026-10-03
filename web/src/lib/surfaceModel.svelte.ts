@@ -72,6 +72,20 @@ export async function rememberSurfaceModel(
 }
 
 /**
+ * UX-MODEL-03 — **Reset to default**: forget this surface's own model, so it
+ * follows the global default again. Choosing the default in the picker cleared
+ * the choice for this page and left the remembered one in place, so the next
+ * reload brought the override back — a reset that did not hold.
+ */
+export async function forgetSurfaceModel(surface: Surface): Promise<void> {
+  try {
+    await api.setSurfaceModel(surface, "", "");
+  } catch {
+    // As above: the picker already shows the default for this page load.
+  }
+}
+
+/**
  * The authoritative decision for this surface.
  *
  * `surfaceModel()` above answers "where should the picker start", which is a

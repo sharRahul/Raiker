@@ -3990,6 +3990,46 @@ ALTER TABLE tasks ADD COLUMN missed_run_policy TEXT;
 """
 
 
+# UX-MSG-04 and UX-MSG-06 (release-readiness review §3.10). A test delivery went
+# to whatever URL the owner typed into the test form, so it proved a URL could be
+# reached and nothing about the channel; the destination is now part of the
+# pairing, set once and used by every delivery. The last test's outcome is kept
+# on the pairing because the setup checklist asks for it. The receipts table
+# keeps each stage of a channel message as its own timestamp — received,
+# accepted, queued, processed, reply queued, delivered, failed — so a finished
+# turn is never read as a delivered reply. It holds roles and states, never a
+# sender id or message text: the audit log already has the redacted record.
+CHANNEL_DESTINATION_AND_RECEIPTS_MIGRATION_ID = "RAIKER-2083-channel-destination-and-receipts"
+CHANNEL_DESTINATION_AND_RECEIPTS_SQL = """
+ALTER TABLE channel_pairings ADD COLUMN delivery_url TEXT;
+ALTER TABLE channel_pairings ADD COLUMN last_test_at TEXT;
+ALTER TABLE channel_pairings ADD COLUMN last_test_ok INTEGER;
+ALTER TABLE channel_pairings ADD COLUMN last_test_reason TEXT;
+CREATE TABLE IF NOT EXISTS channel_receipts (
+  receipt_id TEXT PRIMARY KEY,
+  connector_id TEXT NOT NULL,
+  pairing_id TEXT,
+  direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+  kind TEXT NOT NULL CHECK (kind IN ('message', 'test_delivery')),
+  sender_role TEXT,
+  conversation_scope TEXT,
+  routing_mode TEXT,
+  session_id TEXT,
+  received_at TEXT,
+  accepted_at TEXT,
+  queued_at TEXT,
+  processed_at TEXT,
+  reply_queued_at TEXT,
+  delivered_at TEXT,
+  failed_at TEXT,
+  reason_code TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_channel_receipts_connector
+  ON channel_receipts(connector_id, created_at);
+"""
+
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4216,6 +4256,9 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
         MEMORY_RECALL_USAGE_AND_IMPORT_BATCHES_SQL,
     ),
     Migration(TASK_SCHEDULE_TERMS_MIGRATION_ID, TASK_SCHEDULE_TERMS_SQL),
+    Migration(
+        CHANNEL_DESTINATION_AND_RECEIPTS_MIGRATION_ID, CHANNEL_DESTINATION_AND_RECEIPTS_SQL
+    ),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

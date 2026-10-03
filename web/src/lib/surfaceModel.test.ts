@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { stubFetch } from "./test-helpers";
 import {
   WORK_SURFACES,
+  forgetSurfaceModel,
   isModelDecision,
   modelDecision,
   modelDecisions,
@@ -142,5 +143,22 @@ describe("a surface's remembered model", () => {
       },
     });
     expect(await surfaceModel("design")).toBeNull();
+  });
+});
+
+// UX-MODEL-03 — Reset to default must outlive the page: it clears the
+// surface's stored preference rather than only the picker's local choice.
+describe("forgetSurfaceModel", () => {
+  it("clears the stored preference with an empty profile and model", async () => {
+    const fetchMock = stubFetch({
+      "PUT /api/surface-models": { ok: true, surface: "chat", profile_id: "", model: "" },
+    });
+    await forgetSurfaceModel("chat");
+    const call = fetchMock.mock.calls.find(([url]) => String(url).includes("/api/surface-models"));
+    expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({
+      surface: "chat",
+      profile_id: "",
+      model: "",
+    });
   });
 });

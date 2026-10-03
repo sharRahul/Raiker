@@ -42,7 +42,7 @@ function watchConsole(page: Page): string[] {
 
 async function openPermission(page: Page, label: RegExp): Promise<void> {
   await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities");
+  const search = page.getByLabel("Search capabilities", { exact: true });
   await expect(search).toBeVisible({ timeout: 60_000 });
   await search.fill(label.source.replace(/[\\^$]/g, ""));
   const row = page.getByRole("button", { name: label }).first();

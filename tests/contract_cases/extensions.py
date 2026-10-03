@@ -366,11 +366,14 @@ def _channel_gate_open(ws: Path) -> None:
 
 
 def _deliver_test(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    from raiker.storage.sqlite import SQLiteStore
+
     _channel_gate_open(ws)
-    _channel_pairing(ws)
-    return "/api/channels/deliver-test", {
-        "connector_id": "channel.webhook", "url": "http://127.0.0.1:9/hook", "text": "hello"
-    }
+    # UX-MSG-04 — the destination is bound on the pairing, never sent.
+    SQLiteStore(ws).set_channel_pairing_destination(
+        _channel_pairing(ws), "http://127.0.0.1:9/hook"
+    )
+    return "/api/channels/deliver-test", {"connector_id": "channel.webhook", "text": "hello"}
 
 
 def _fake_channel_host(monkeypatch: Any) -> None:
@@ -516,6 +519,9 @@ CASES: Cases = {
     ("PUT", "/api/channels/pairings/{pairing_id}/senders"): _on_pairing("/senders", {"senders": ["alice", "bob"]}),
     ("PUT", "/api/channels/pairings/{pairing_id}/routing"): _on_pairing(
         "/routing", {"routing_mode": "record_only", "owner_sender_id": "alice"}
+    ),
+    ("PUT", "/api/channels/pairings/{pairing_id}/destination"): _on_pairing(
+        "/destination", {"delivery_url": "https://hooks.example.com/raiker"}
     ),
     ("DELETE", "/api/channels/pairings/{pairing_id}"): _on_pairing(""),
     ("POST", "/api/channels/deliver-test"): patched(_deliver_test, _fake_channel_host),

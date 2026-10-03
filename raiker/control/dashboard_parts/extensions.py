@@ -15,7 +15,11 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 from raiker.control.dtos import ControlResult
 from raiker.control.views.extensions import (
+    ChannelDestination,
+    ChannelLastTest,
     ChannelProfile,
+    ChannelReceipt,
+    ChannelRouteScope,
     ChannelRoutingMode,
     ChannelsView,
     HookActivityView,
@@ -24,6 +28,7 @@ from raiker.control.views.extensions import (
     HooksView,
     InstalledPlugin,
     McpOffer,
+    McpScope,
     McpServerView,
     PluginSigning,
     PluginsView,
@@ -82,6 +87,12 @@ class ExtensionService:
         profiles. Building or connecting a server is a governed runtime action
         (through the authority/executor path), never a plain REST mutation, so
         this surface is read-only by design."""
+        from raiker.plugins.contributions import contributed_mcp_servers
+
+        offered = {
+            str(offer["name"]): (plugin_id, str(offer.get("description") or ""))
+            for plugin_id, offer in contributed_mcp_servers(self.workspace_root)
+        }
         return [
             McpServerView(
                 server_id=str(row["server_id"]),
@@ -107,6 +118,18 @@ class ExtensionService:
                 paused_reason=row.get("paused_reason"),
                 paused_at=row.get("paused_at"),
                 protocol_version=row.get("protocol_version"),
+                scope=mcp_scope(
+                    transport=str(row.get("transport", "stdio")),
+                    endpoint_url=row.get("endpoint_url"),
+                    auth_ref=row.get("auth_ref"),
+                    template=row.get("template"),
+                    tool_count=(
+                        int(row.get("tool_count", 0) or 0)
+                        if row.get("last_connected_at")
+                        else None
+                    ),
+                ),
+                **_mcp_provenance(row, offered),
             )
             for row in self.store.list_mcp_servers(principal_id)
         ]
@@ -129,7 +152,21 @@ class ExtensionService:
 
         taken = {str(row.get("name")) for row in self.store.list_mcp_servers(principal_id)}
         return [
-            cast(McpOffer, {**offer, "plugin_id": plugin_id, "already_added": offer["name"] in taken})
+            cast(
+                McpOffer,
+                {
+                    **offer,
+                    "plugin_id": plugin_id,
+                    "already_added": offer["name"] in taken,
+                    "scope": mcp_scope(
+                        transport=str(offer.get("transport") or "stdio"),
+                        endpoint_url=offer.get("endpoint_url"),
+                        auth_ref=offer.get("auth_ref"),
+                        template=offer.get("template"),
+                        tool_count=None,
+                    ),
+                },
+            )
             for plugin_id, offer in contributed_mcp_servers(self.workspace_root)
         ]
 
@@ -492,7 +529,9 @@ class ExtensionService:
           it the receiver refuses every message, which is the right default and a
           confusing one to meet without being told.
 
-        Never returns a secret or a host. Sender identifiers go back only to the
+        Never returns a secret or an allowlisted host; a bound webhook
+        destination comes back as its host alone, since a path can carry a token
+        (UX-MSG-04). Sender identifiers go back only to the
         owner who allowlisted them, so routing can name which of them is the
         owner; everything else this page asks is answered by a count or a boolean.
         """
@@ -559,6 +598,16 @@ class ExtensionService:
                     # Raiker takes variable names and never values, and that
                     # holds on the way out too.
                     "env_requirements": _env_requirements(profile.raw),
+                    "target_session_title": self._channel_target_title(pairing),
+                    "destination": _channel_destination(profile.channel_type, pairing, allowlist),
+                    "last_test": _channel_last_test(pairing),
+                    "route_scope": _channel_route_scope(profile.channel_type, pairing),
+                    "receipts": [
+                        _channel_receipt(row)
+                        for row in self.store.list_channel_receipts(profile.connector_id)
+                    ]
+                    if pairing is not None
+                    else [],
                 }
             )
         return {
@@ -625,7 +674,235 @@ class ExtensionService:
     def unpair_channel(self: DashboardService, acting_principal_id: str | None, pairing_id: str) -> ControlResult:
         return self.control.unpair_channel(acting_principal_id, pairing_id)
 
-    def deliver_channel_test(
-        self: DashboardService, acting_principal_id: str | None, connector_id: str, url: str, text: str
+    def set_channel_destination(
+        self: DashboardService, acting_principal_id: str | None, pairing_id: str, delivery_url: str | None
     ) -> ControlResult:
-        return self.control.deliver_channel_test(acting_principal_id, connector_id, url, text)
+        return self.control.set_channel_destination(acting_principal_id, pairing_id, delivery_url)
+
+    def deliver_channel_test(
+        self: DashboardService, acting_principal_id: str | None, connector_id: str, text: str
+    ) -> ControlResult:
+        return self.control.deliver_channel_test(acting_principal_id, connector_id, text)
+
+    def _channel_target_title(self: DashboardService, pairing: dict[str, Any] | None) -> str | None:
+        """The routed conversation by name. A raw ``sess_`` id was the only way
+        the routing form could say where messages went (UX-MSG-01)."""
+        target = str((pairing or {}).get("target_session_id") or "")
+        if not target:
+            return None
+        session = self.store.load_session(target)
+        if session is None:
+            return None
+        title = str(session.get("title") or "").strip()
+        return title or "Untitled conversation"
+
+
+# ── Channel facts (release-readiness review §3.10) ──────────────────────────
+
+
+def _channel_destination(
+    channel_type: str, pairing: dict[str, Any] | None, allowlist: frozenset[str]
+) -> ChannelDestination:
+    """UX-MSG-04 — where a delivery on this channel goes, without the path."""
+    import fnmatch
+    from urllib.parse import urlsplit
+
+    if channel_type == "telegram":
+        return {
+            "kind": "owner_chat",
+            "configured": bool(pairing and pairing.get("owner_sender_id")),
+            "host": None,
+            "allowlisted": any(
+                fnmatch.fnmatch("api.telegram.org", pattern) for pattern in allowlist
+            ),
+        }
+    if channel_type != "webhooks":
+        return {"kind": "none", "configured": False, "host": None, "allowlisted": None}
+    url = str((pairing or {}).get("delivery_url") or "")
+    if not url:
+        return {"kind": "url", "configured": False, "host": None, "allowlisted": None}
+    netloc = urlsplit(url).netloc
+    return {
+        "kind": "url",
+        "configured": True,
+        "host": urlsplit(url).hostname,
+        "allowlisted": any(fnmatch.fnmatch(netloc, pattern) for pattern in allowlist),
+    }
+
+
+def _channel_last_test(pairing: dict[str, Any] | None) -> ChannelLastTest | None:
+    if not pairing or not pairing.get("last_test_at"):
+        return None
+    return {
+        "at": str(pairing["last_test_at"]),
+        "ok": bool(pairing.get("last_test_ok")),
+        "reason_code": pairing.get("last_test_reason"),
+    }
+
+
+def _channel_route_scope(channel_type: str, pairing: dict[str, Any] | None) -> ChannelRouteScope:
+    """UX-MSG-05 — the route stated as what the receiver does with it.
+
+    Each value reads the same code path it describes: `_route_inbound_message`
+    for thread mapping and who may start work, the Telegram adapter for chat
+    scope and bot updates, and the inbound route's response for the reply.
+    """
+    mode = str((pairing or {}).get("routing_mode") or "record_only")
+    has_target = bool((pairing or {}).get("target_session_id"))
+    thread: Literal["none", "one_conversation", "new_conversation_each_message"]
+    if mode == "record_only":
+        thread = "none"
+    elif mode == "new_turn" and not has_target:
+        thread = "new_conversation_each_message"
+    else:
+        thread = "one_conversation"
+    starts: Literal["nobody", "owner_only", "any_allowed_sender"]
+    if mode == "record_only":
+        starts = "nobody"
+    elif mode == "side_question":
+        starts = "any_allowed_sender"
+    else:
+        starts = "owner_only"
+    telegram = channel_type == "telegram"
+    reply: Literal["returned_to_caller", "kept_in_raiker", "none"]
+    if mode in {"record_only", "interrupt"}:
+        reply = "none"
+    else:
+        reply = "kept_in_raiker" if telegram else "returned_to_caller"
+    return {
+        "conversation_scope": "direct_and_group" if telegram else "endpoint",
+        "mention_required": False,
+        "thread_mapping": thread,
+        "starts_work": starts,
+        "bot_loop_protection": "bot_messages_ignored" if telegram else "rate_limit_only",
+        "reply_path": reply,
+    }
+
+
+def _channel_receipt(row: dict[str, Any]) -> ChannelReceipt:
+    return {
+        "receipt_id": str(row["receipt_id"]),
+        "direction": cast(Literal["inbound", "outbound"], str(row["direction"])),
+        "kind": cast(Literal["message", "test_delivery"], str(row["kind"])),
+        "sender_role": row.get("sender_role"),
+        "conversation_scope": row.get("conversation_scope"),
+        "routing_mode": row.get("routing_mode"),
+        "session_id": row.get("session_id"),
+        "received_at": row.get("received_at"),
+        "accepted_at": row.get("accepted_at"),
+        "queued_at": row.get("queued_at"),
+        "processed_at": row.get("processed_at"),
+        "reply_queued_at": row.get("reply_queued_at"),
+        "delivered_at": row.get("delivered_at"),
+        "failed_at": row.get("failed_at"),
+        "reason_code": row.get("reason_code"),
+        "created_at": str(row["created_at"]),
+    }
+
+
+# ── MCP scope and provenance (release-readiness review §3.11) ───────────────
+
+
+def mcp_scope(
+    *,
+    transport: str,
+    endpoint_url: str | None,
+    auth_ref: str | None,
+    template: str | None,
+    tool_count: int | None,
+) -> McpScope:
+    """UX-MCP-02 — what a server can reach, from the code that decides it.
+
+    A local server is started by `_run_session` with `mcp_stdio_env()`, in the
+    workspace folder, as the account Raiker runs as, with nothing confining its
+    network or its writes — so the preview says exactly that rather than a
+    reassurance. A remote one is classified by the endpoint policy that guards
+    its connection. Raiker's client advertises no roots and reads no resources
+    (`unsupported_feature_notes` names them when a server offers them).
+    """
+    from raiker.runtime.executors.mcp import allowed_mcp_env_names, mcp_stdio_env
+    from raiker.runtime.mcp_endpoint_policy import (
+        LOOPBACK,
+        PRIVATE_NETWORK,
+        PUBLIC,
+        stated_network_class,
+    )
+
+    permissions = ["mcp_connector_runtime"]
+    if template:
+        permissions.append("mcp_builder_runtime")
+    if transport == "http":
+        network_class = stated_network_class(endpoint_url or "")
+        network: Literal["unrestricted", "loopback", "private_network", "public", "unknown"]
+        if network_class == LOOPBACK:
+            network = "loopback"
+        elif network_class == PRIVATE_NETWORK:
+            network = "private_network"
+        elif network_class == PUBLIC:
+            network = "public"
+        else:
+            network = "unknown"
+        return {
+            "runs_on": "remote",
+            "network": network,
+            "encrypted": (endpoint_url or "").strip().lower().startswith("https://"),
+            "environment": [],
+            "granted_environment": [],
+            "token_reference": auth_ref or None,
+            "working_folder": None,
+            "writable": "none_on_this_machine",
+            "roots_shared": False,
+            "resources_read": False,
+            "tool_count": tool_count,
+            "required_permissions": permissions,
+            "risk": "remote_service" if network == "public" else "own_network",
+        }
+    return {
+        "runs_on": "this_machine",
+        "network": "unrestricted",
+        "encrypted": None,
+        "environment": sorted(mcp_stdio_env()),
+        "granted_environment": list(allowed_mcp_env_names()),
+        "token_reference": None,
+        "working_folder": "workspace",
+        "writable": "account",
+        "roots_shared": False,
+        "resources_read": False,
+        "tool_count": tool_count,
+        "required_permissions": permissions,
+        "risk": "local_process",
+    }
+
+
+def _mcp_provenance(row: dict[str, Any], offered: dict[str, tuple[str, str]]) -> dict[str, Any]:
+    """UX-MCP-03 — where a server came from, and what it is said to be for.
+
+    The source is what Raiker knows: a sample it generated, a server a plugin
+    offered under this name, or one the owner added. The purpose prefers the
+    offering plugin's description and falls back to the server's own words
+    about its first described tool — untrusted text, and labelled so.
+    """
+    name = str(row.get("name") or "")
+    source: Literal["raiker_sample", "plugin", "owner"] = "owner"
+    plugin: str | None = None
+    purpose: str | None = None
+    purpose_from: Literal["plugin", "server", "none"] = "none"
+    if row.get("template"):
+        source = "raiker_sample"
+    elif name in offered:
+        source = "plugin"
+        plugin, description = offered[name]
+        if description:
+            purpose, purpose_from = description, "plugin"
+    if purpose is None:
+        for declaration in _declaration_summaries(row.get("tool_schemas")):
+            text = (declaration.get("description") or "").strip()
+            if text:
+                purpose, purpose_from = text[:240], "server"
+                break
+    return {
+        "source": source,
+        "source_plugin": plugin,
+        "purpose": purpose,
+        "purpose_from": purpose_from,
+    }

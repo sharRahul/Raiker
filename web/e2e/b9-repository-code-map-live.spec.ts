@@ -53,7 +53,7 @@ async function signIn(target: Page) {
 
 async function openCapability(label: string) {
   await page.goto(`${BASE}/#/capabilities`);
-  const search = page.getByLabel("Search capabilities");
+  const search = page.getByLabel("Search capabilities", { exact: true });
   await expect(search).toBeVisible({ timeout: 30_000 });
   await search.fill(label);
   // Exact match: "Code map" is a prefix of other capability labels, and toggling

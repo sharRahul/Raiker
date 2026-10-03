@@ -76,6 +76,14 @@ class ChannelInboundAccepted(InboundRoute):
     quarantined: bool
 
 
+class ChannelDestinationSet(TypedDict):
+    """A webhook channel's destination bound or cleared — whether, never where."""
+
+    ok: bool
+    pairing_id: str
+    has_destination: bool
+
+
 class ChannelUpdateIgnored(TypedDict):
     """A transport update that is not a message: acknowledged so it is not retried."""
 

@@ -214,4 +214,58 @@ describe("ModelPicker", () => {
       screen.getByRole("button", { name: /model for this turn: Haiku 4.5/i }),
     ).toBeInTheDocument();
   });
+
+  // UX-MODEL-03 — the default and this work's model are two facts, and the way
+  // back to the default is a control rather than knowing which row it is.
+  it("names the default, the model this work uses, and resets to the default", async () => {
+    const onreset = vi.fn();
+    const onchosen = vi.fn();
+    render(ModelPicker, {
+      profiles,
+      selectedProfile: profiles[0],
+      profileId: "openai-gpt",
+      model: "gpt-4o-mini",
+      onreset,
+      onchosen,
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /model for this turn/i }));
+    const menu = screen.getByRole("menu", { name: /model/i });
+    expect(menu).toHaveTextContent(/Default model\s*Haiku 4.5/);
+    expect(menu).toHaveTextContent(/This work uses\s*GPT-4o mini/i);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Reset to default" }));
+    expect(onreset).toHaveBeenCalledTimes(1);
+    expect(onchosen).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /model for this turn: Haiku 4.5/i })).toBeInTheDocument();
+  });
+
+  it("says only the default when this work is already on it", async () => {
+    const onreset = vi.fn();
+    render(ModelPicker, { profiles, selectedProfile: profiles[0], onreset });
+    await fireEvent.click(screen.getByRole("button", { name: /model for this turn/i }));
+    expect(screen.queryByText("This work uses")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reset to default" })).toBeNull();
+    // Picking the default row while already on it is not a reset.
+    await fireEvent.click(screen.getByRole("menuitemradio", { name: /Haiku 4.5/ }));
+    expect(onreset).not.toHaveBeenCalled();
+  });
+
+  // Found by the 2026-10-03 live round: a model reached by search is not a
+  // quick-list profile, so the picker went on naming the default.
+  it("names a model chosen by search, and calls it this work's override", async () => {
+    render(ModelPicker, {
+      profiles,
+      selectedProfile: profiles[0],
+      catalogues: {
+        "anthropic-haiku": ["claude-haiku-4-5-20251001", "claude-opus-4-1-20250805"],
+      },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /model for this turn/i }));
+    await fireEvent.input(screen.getByLabelText("Search models"), { target: { value: "opus" } });
+    await fireEvent.click(screen.getByRole("menuitemradio", { name: /Opus 4.1/i }));
+    const trigger = screen.getByRole("button", { name: /model for this turn/i });
+    expect(trigger).toHaveAccessibleName(/Opus 4.1/i);
+    await fireEvent.click(trigger);
+    expect(screen.getByRole("menu", { name: /model/i })).toHaveTextContent(/This work uses\s*Opus 4.1/i);
+  });
 });

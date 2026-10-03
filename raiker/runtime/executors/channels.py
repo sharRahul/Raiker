@@ -57,6 +57,32 @@ def _enabled_pairing(store: SQLiteStore, connector_id: str) -> dict | None:
     return None
 
 
+#: UX-MSG-03 — the authority the control service stamps on the owner's own test
+#: delivery. The setup checklist puts *test* before *turn on*, and a test that
+#: needed the channel switched on could only ever be run after the step it was
+#: meant to clear. Runtime-authored like every ``authority_kind``: no model
+#: argument can set it, and ``external_channel_runtime`` has no model entry path.
+OWNER_CHANNEL_TEST = "owner_channel_test"
+
+
+def _owner_test_pairing(
+    store: SQLiteStore, connector_id: str, action: GovernedAction
+) -> dict | None:
+    """The paired-but-off channel an owner test names, or ``None``.
+
+    Only the pairing itself is relaxed. The capability gate, the decision mode,
+    the egress allowlist and the bound destination apply exactly as they do to a
+    channel that is on, and an inbound message to an off channel is still
+    refused.
+    """
+    if action.authority_kind != OWNER_CHANNEL_TEST or not action.authority_id:
+        return None
+    pairing = store.get_channel_pairing(action.authority_id)
+    if pairing is None or pairing.get("connector_id") != connector_id:
+        return None
+    return pairing
+
+
 class ExternalChannelExecutor:
     """Real executor for ``external_channel_runtime`` — bounded outbound webhook delivery."""
 
@@ -76,6 +102,8 @@ class ExternalChannelExecutor:
                 summary="Channel delivery denied: connector_id and url required.",
             )
         pairing = _enabled_pairing(self._store, connector_id)
+        if pairing is None:
+            pairing = _owner_test_pairing(self._store, connector_id, action)
         if pairing is None:
             return ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,

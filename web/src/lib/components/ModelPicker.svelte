@@ -19,6 +19,7 @@
     model = $bindable(""),
     disabled = false,
     onchosen,
+    onreset,
     open = $bindable(false),
     efforts = [],
     effort = $bindable(""),
@@ -47,6 +48,12 @@
      * preference, not a new one.
      */
     onchosen?: (profileId: string, model: string) => void;
+    /**
+     * UX-MODEL-03 — the owner went back to the default, so the surface forgets
+     * its own remembered model. Fired by **Reset to default** and by picking
+     * the default row while another model is in use.
+     */
+    onreset?: () => void;
     /**
      * B19 — bindable so `/model` in the composer can open the same menu the
      * trigger opens. The slash command is a shortcut to this control, not a
@@ -193,23 +200,56 @@
   );
 
   const activeProfileId = $derived(profileId || value);
-  const active = $derived(
-    profiles.find(
-      (profile) =>
-        profile.profile_id === activeProfileId &&
-        (!model || profile.model === model),
-    ) ?? selectedProfile,
+  /*
+   * FIXED-723 — what this work will run, as the bound pair says it. A model
+   * reached by search is not one of the quick list's `profiles`, so the pair
+   * is not looked up there: the provider comes from the profile and the model
+   * from the binding, and the picker never names the default for it.
+   */
+  const activeProfile = $derived(
+    profiles.find((profile) => profile.profile_id === activeProfileId) ?? null,
   );
+  const active = $derived.by(() => {
+    if (activeProfileId && model && activeProfile !== null) {
+      return { ...activeProfile, model };
+    }
+    return (
+      profiles.find(
+        (profile) =>
+          profile.profile_id === activeProfileId &&
+          (!model || profile.model === model),
+      ) ?? selectedProfile
+    );
+  });
   const label = $derived(active ? modelName(active.model) : "Not selected");
 
   function select(profile: ModelProfile) {
     const selectsDefault =
       selectedProfile !== null && sameChoice(profile, selectedProfile);
+    const wasOverridden = overridden;
     value = selectsDefault ? "" : profile.profile_id;
     profileId = selectsDefault ? "" : profile.profile_id;
     model = selectsDefault ? "" : profile.model;
     open = false;
     if (!selectsDefault) onchosen?.(profile.profile_id, profile.model);
+    else if (wasOverridden) onreset?.();
+  }
+
+  /**
+   * UX-MODEL-03 — the override hierarchy, said once at the top of the menu.
+   * *Default model* is the global choice from Models; *This work uses* appears
+   * only when this surface is on something else, with the way back beside it.
+   */
+  const overridden = $derived(
+    selectedProfile !== null &&
+      active !== null &&
+      active !== undefined &&
+      !sameChoice(active, selectedProfile),
+  );
+
+  function resetToDefault() {
+    if (selectedProfile === null) return;
+    select(selectedProfile);
   }
 
   function repair(profile: ModelProfile) {
@@ -274,6 +314,22 @@
            indistinguishable from one that forgot the choice. Shown only when
            they differ or when the selection cannot serve, so the ordinary case
            stays a plain list. -->
+      <div class="default-note">
+        <p class="default-line">
+          <span>Default model</span>
+          <strong>{selectedProfile ? modelName(selectedProfile.model) : "None chosen"}</strong>
+        </p>
+        {#if overridden && active}
+          <p class="default-line">
+            <span>This work uses</span>
+            <strong>{modelName(active.model)}</strong>
+            <button type="button" class="reset-default" {disabled} onclick={resetToDefault}>
+              Reset to default
+            </button>
+          </p>
+        {/if}
+      </div>
+
       {#if selectedIsUnavailable || displacedBy !== null}
         <div class="decision-note" role="status">
           {#if selectedIsUnavailable}
@@ -356,7 +412,9 @@
               onclick={() => select(profile)}
             >
               <ProviderLogo provider={profile.provider} />
-              <span>{modelName(profile.model)}</span>
+              <!-- Inside the name's cell: the row is a three-column grid
+                   (logo, name, check), and a fourth item clipped at the menu edge. -->
+              <span class="model-name">{modelName(profile.model)}{#if selectedProfile !== null && sameChoice(profile, selectedProfile)}<span class="model-default-tag">Default</span>{/if}</span>
               {#if active?.profile_id === profile.profile_id && active?.model === profile.model}<Icon
                   name="check"
                   size="sm"
@@ -769,4 +827,40 @@
       transition: none;
     }
   }
+  /* UX-MODEL-03 — the default and this work's model, one line each. */
+  .model-name { min-width: 0; overflow-wrap: anywhere; }
+  .model-default-tag {
+    margin-left: 0.4rem;
+    color: var(--text-3);
+    font-size: var(--text-2xs);
+    white-space: nowrap;
+  }
+  .default-note {
+    display: grid;
+    gap: 0.2rem;
+    padding: 0.35rem 0.6rem 0.45rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.25rem;
+  }
+  .default-line {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem;
+    font-size: var(--text-xs);
+    color: var(--text-3);
+  }
+  .default-line strong { color: var(--text-1); font-weight: 650; }
+  .reset-default {
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+    padding: 0;
+  }
+  .reset-default:disabled { color: var(--text-3); cursor: default; }
 </style>

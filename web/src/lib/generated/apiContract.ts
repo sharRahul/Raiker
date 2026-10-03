@@ -527,6 +527,26 @@ export type ChannelApprovalResponse = {
   reason?: string;
 };
 
+/** UX-MSG-04 — where this channel delivers, bound on the pairing. */
+export type ChannelDestination = {
+  kind: "url" | "owner_chat" | "none";
+  configured: boolean;
+  host: string | null;
+  allowlisted: boolean | null;
+};
+
+/** Bind, or with ``None`` clear, a webhook channel's delivery URL. */
+export type ChannelDestinationRequest = {
+  delivery_url?: string | null;
+};
+
+/** A webhook channel's destination bound or cleared — whether, never where. */
+export type ChannelDestinationSet = {
+  ok: boolean;
+  pairing_id: string;
+  has_destination: boolean;
+};
+
 export type ChannelEnabledRequest = {
   enabled: boolean;
 };
@@ -563,6 +583,13 @@ export type ChannelInboundAccepted = {
   quarantined: boolean;
 };
 
+/** The last owner test delivery, for the setup checklist (UX-MSG-03). */
+export type ChannelLastTest = {
+  at: string;
+  ok: boolean;
+  reason_code: string | null;
+};
+
 /** Paired is not enabled: that is a second decision. */
 export type ChannelPaired = {
   ok: boolean;
@@ -595,6 +622,41 @@ export type ChannelProfile = {
   supports_interrupts: boolean;
   supports_approvals: boolean;
   env_requirements: ChannelEnvRequirement[];
+  target_session_title: string | null;
+  destination: ChannelDestination;
+  last_test: ChannelLastTest | null;
+  route_scope: ChannelRouteScope;
+  receipts: ChannelReceipt[];
+};
+
+/** UX-MSG-06 — one message or test, each stage its own fact. */
+export type ChannelReceipt = {
+  receipt_id: string;
+  direction: "inbound" | "outbound";
+  kind: "message" | "test_delivery";
+  sender_role: string | null;
+  conversation_scope: string | null;
+  routing_mode: string | null;
+  session_id: string | null;
+  received_at: string | null;
+  accepted_at: string | null;
+  queued_at: string | null;
+  processed_at: string | null;
+  reply_queued_at: string | null;
+  delivered_at: string | null;
+  failed_at: string | null;
+  reason_code: string | null;
+  created_at: string;
+};
+
+/** UX-MSG-05 — what the stored route actually does, stated by the server. */
+export type ChannelRouteScope = {
+  conversation_scope: "direct_and_group" | "endpoint";
+  mention_required: boolean;
+  thread_mapping: "none" | "one_conversation" | "new_conversation_each_message";
+  starts_work: "nobody" | "owner_only" | "any_allowed_sender";
+  bot_loop_protection: "bot_messages_ignored" | "rate_limit_only";
+  reply_path: "returned_to_caller" | "kept_in_raiker" | "none";
 };
 
 /** Owner-selected route. An inbound payload cannot override these fields. */
@@ -635,7 +697,6 @@ export type ChannelTestDelivered = {
 /** One test delivery through the governed outbound path. */
 export type ChannelTestDeliveryRequest = {
   connector_id: string;
-  url: string;
   text?: string;
 };
 
@@ -2413,6 +2474,24 @@ export type McpOffer = {
   auth_ref?: string | null;
   template?: string;
   already_added: boolean;
+  scope: McpScope;
+};
+
+/** UX-MCP-02 — what adding or testing a server exposes, before it is done. */
+export type McpScope = {
+  runs_on: "this_machine" | "remote";
+  network: "unrestricted" | "loopback" | "private_network" | "public" | "unknown";
+  encrypted: boolean | null;
+  environment: string[];
+  granted_environment: string[];
+  token_reference: string | null;
+  working_folder: "workspace" | null;
+  writable: "account" | "none_on_this_machine";
+  roots_shared: boolean;
+  resources_read: boolean;
+  tool_count: number | null;
+  required_permissions: string[];
+  risk: "local_process" | "own_network" | "remote_service";
 };
 
 /** The handshake's result: the status and the tool names it discovered. */
@@ -2465,6 +2544,11 @@ export type McpServerView = {
   paused_reason: string | null;
   paused_at: string | null;
   protocol_version: string | null;
+  scope: McpScope | null;
+  source: "raiker_sample" | "plugin" | "owner";
+  source_plugin: string | null;
+  purpose: string | null;
+  purpose_from: "plugin" | "server" | "none";
 };
 
 /** Owner-scoped, redacted monitor row for one MCP connection session. */
@@ -4850,6 +4934,8 @@ export const contract = {
     call<ChannelPaired>("POST", "/api/channels/pairings", { body }),
   unpairChannel: (pairingId: string) =>
     call<ChannelUnpaired>("DELETE", `/api/channels/pairings/${encodeURIComponent(pairingId)}`),
+  setChannelDestination: (pairingId: string, body: ChannelDestinationRequest) =>
+    call<ChannelDestinationSet>("PUT", `/api/channels/pairings/${encodeURIComponent(pairingId)}/destination`, { body }),
   setChannelEnabled: (pairingId: string, body: ChannelEnabledRequest) =>
     call<ChannelEnabledSet>("PUT", `/api/channels/pairings/${encodeURIComponent(pairingId)}/enabled`, { body }),
   setChannelRouting: (pairingId: string, body: ChannelRoutingRequest) =>

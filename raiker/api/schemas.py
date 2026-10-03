@@ -749,11 +749,19 @@ class ChannelRoutingRequest(StrictRequest):
 
 
 class ChannelTestDeliveryRequest(StrictRequest):
-    """One test delivery through the governed outbound path."""
+    """One test delivery through the governed outbound path.
+
+    No destination: a test goes where the channel delivers (UX-MSG-04).
+    """
 
     connector_id: str
-    url: str
     text: str = "Raiker test delivery."
+
+
+class ChannelDestinationRequest(StrictRequest):
+    """Bind, or with ``None`` clear, a webhook channel's delivery URL."""
+
+    delivery_url: str | None = None
 
 
 

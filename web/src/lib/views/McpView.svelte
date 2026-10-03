@@ -5,6 +5,7 @@
   import { api, ApiError } from "../api";
   import { runtimeBlock } from "../capabilityModel";
   import { endpointRefusal, networkClassLabel } from "../mcpEndpoint";
+  import { purposeLine, recentUse, riskLabel, scopeLines, sourceLabel } from "../mcpScope";
   import type {
     CapabilityGate,
     McpAgentAccess,
@@ -195,8 +196,14 @@
     error = null;
     notice = null;
     try {
-      await api.createMcpServer(newName.trim(), newTemplate);
-      notice = `Created “${newName.trim()}”.`;
+      const created = await api.createMcpServer(newName.trim(), newTemplate);
+      // FIXED-722 — name the server that was stored. Names are normalised
+      // ("Protocol sample" is kept as "Protocolsample"), and the notice must
+      // name the card the owner will find.
+      notice =
+        created.name && created.name !== newName.trim()
+          ? `Created “${created.name}” (a server name keeps only letters, digits, “.”, “-” and “_”).`
+          : `Created “${newName.trim()}”.`;
       newName = "";
       await load();
     } catch (e) {
@@ -389,6 +396,17 @@
                 Reads its token from <code>{offer.auth_ref}</code>. The token is never stored here.
               </span>
             {/if}
+            <!-- UX-MCP-02 — what adding it gives it, before it is added. -->
+            {#if offer.scope}
+              <details class="scope">
+                <summary>What adding it gives it · {riskLabel(offer.scope)}</summary>
+                <dl>
+                  {#each scopeLines(offer.scope) as line (line.label)}
+                    <div class:caution={line.caution}><dt>{line.label}</dt><dd>{line.value}</dd></div>
+                  {/each}
+                </dl>
+              </details>
+            {/if}
           </div>
           {#if offer.already_added}
             <span class="offer-added">Added</span>
@@ -451,6 +469,17 @@
             </div>
           {/if}
         </div>
+        <!-- UX-MCP-03 — a trust explanation rather than tool names: what it is
+             for, what class of risk it is, where it came from and how its
+             recent runs went. A server's own words are labelled as its own. -->
+        <div class="trust">
+          <p class="purpose">{purposeLine(s)}</p>
+          <p class="trust-facts">
+            {#if s.scope}<span class="risk risk-{s.scope.risk}">{riskLabel(s.scope)}</span>{/if}
+            <span>{sourceLabel(s)}</span>
+            <span>{recentUse(sessions[s.server_id])}</span>
+          </p>
+        </div>
         {#if s.monitor_state !== "active"}
           <div class="notice notice-warn monitor-banner">{s.monitor_state === "killed" ? "Stopped" : "Paused"}: {s.paused_reason ?? "Owner control"}</div>
         {/if}
@@ -472,6 +501,18 @@
             <dd>{s.protocol_version ?? "Not negotiated yet"}</dd>
           </div>
         </dl>
+        <!-- UX-MCP-02 — what this server can reach, open until it has been
+             tested: Test is the step that lets it run. -->
+        {#if s.scope}
+          <details class="scope" open={!s.last_connected_at}>
+            <summary>What it can reach</summary>
+            <dl>
+              {#each scopeLines(s.scope) as line (line.label)}
+                <div class:caution={line.caution}><dt>{line.label}</dt><dd>{line.value}</dd></div>
+              {/each}
+            </dl>
+          </details>
+        {/if}
         <div class="tools">
           <span class="tools-label">Tools ({s.tool_count})</span>
           {#if s.tools.length}
@@ -653,6 +694,22 @@
   .offer-copy { display: grid; gap: 0.15rem; min-width: 0; }
   .offer-meta { color: var(--text-2); font-size: var(--text-sm); overflow-wrap: anywhere; }
   .offer-added { color: var(--text-3); font-size: var(--text-sm); font-weight: 650; align-self: center; }
+  /* UX-MCP-02 / UX-MCP-03 */
+  .trust { margin-top: var(--space-2); display: grid; gap: 0.2rem; }
+  .purpose { margin: 0; color: var(--text-1); font-size: var(--text-sm); overflow-wrap: anywhere; }
+  .trust-facts { margin: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; color: var(--text-3); font-size: var(--text-xs); }
+  .risk { font-weight: 650; color: var(--text-2); }
+  .risk-local_process, .risk-remote_service { color: var(--warn); }
+  .scope { margin-top: var(--space-3); font-size: var(--text-sm); }
+  .scope summary { cursor: pointer; color: var(--text-2); font-weight: 650; }
+  .scope dl { margin: var(--space-2) 0 0; display: grid; gap: 0.3rem; }
+  .scope dl div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: var(--space-2); }
+  .scope dt { color: var(--text-3); }
+  .scope dd { margin: 0; color: var(--text-2); overflow-wrap: anywhere; }
+  .scope .caution dd { color: var(--warn); }
+  @media (max-width: 560px) {
+    .scope dl div { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  }
   @media (max-width: 40rem) {
     .offer-list > li { flex-direction: column; align-items: stretch; }
   }

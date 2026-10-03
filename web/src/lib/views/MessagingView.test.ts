@@ -7,7 +7,7 @@
 // enabling, allowlisting and reaching are four separate facts that must never
 // be allowed to imply one another.
 import { render, screen } from "@testing-library/svelte";
-import { fireEvent, within } from "@testing-library/dom";
+import { fireEvent, waitFor, within } from "@testing-library/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import MessagingView from "./MessagingView.svelte";
 import { stubFetch } from "../test-helpers";
@@ -38,6 +38,26 @@ describe("MessagingView", () => {
         display_label: null,
         sender_count: 0,
         senders: [],
+        routing_mode: "record_only",
+        target_session_id: null,
+        target_session_title: null,
+        owner_sender_id: null,
+        approval_relay_enabled: false,
+        supports_side_questions: true,
+        supports_interrupts: true,
+        supports_approvals: true,
+        env_requirements: [],
+        destination: { kind: "url", configured: false, host: null, allowlisted: null },
+        last_test: null,
+        route_scope: {
+          conversation_scope: "endpoint",
+          mention_required: false,
+          thread_mapping: "none",
+          starts_work: "nobody",
+          bot_loop_protection: "rate_limit_only",
+          reply_path: "none",
+        },
+        receipts: [],
       },
     ],
     error: null,
@@ -129,32 +149,166 @@ describe("MessagingView", () => {
     expect(within(profiles).getByRole("button", { name: "Unpair" })).toBeInTheDocument();
   });
 
-  it("a test delivery says it runs the governed path, not a shortcut", async () => {
+  it("a test delivery names no address: it goes where the channel delivers", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/channels": channelsView({
+        profiles: [
+          {
+            ...channelsView().profiles[0],
+            linked: true,
+            enabled: false,
+            pairing_id: "chp_1",
+            display_label: "Webhooks",
+            sender_count: 1,
+            senders: ["ops"],
+            owner_sender_id: "ops",
+            destination: { kind: "url", configured: true, host: "hooks.example.com", allowlisted: true },
+          },
+        ],
+      }),
+      "POST /api/channels/deliver-test": { ok: true, delivered: true, connector_id: "channel.webhooks", channel_type: "webhooks", sent_bytes: 10, status: 200, signed: false },
+    });
+    render(MessagingView);
+    await screen.findByText("Webhooks");
+    const profiles = screen.getByTestId("channel-profiles");
+    expect(within(profiles).getByText("hooks.example.com")).toBeInTheDocument();
+    expect(
+      within(profiles).getByText(/the capability gate, the decision mode, the egress allowlist and the audit event all apply/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Destination URL")).toBeNull();
+    await fireEvent.click(within(profiles).getByRole("button", { name: "Send a test delivery" }));
+    const call = fetchMock.mock.calls.find(([url]) => String(url).includes("/api/channels/deliver-test"));
+    expect(call).toBeDefined();
+    const body = JSON.parse(String((call![1] as RequestInit).body));
+    expect(body).toEqual({ connector_id: "channel.webhooks", text: "Raiker test delivery." });
+  });
+
+  // Found by the 2026-10-03 live round: a refused test is recorded on the
+  // channel, and the page went on showing the state from before it.
+  it("re-reads the channel after a refused test, so its recorded failure shows", async () => {
+    const linked = {
+      ...channelsView().profiles[0],
+      linked: true,
+      pairing_id: "chp_1",
+      display_label: "Webhooks",
+      sender_count: 1,
+      senders: ["ops"],
+      owner_sender_id: "ops",
+      destination: { kind: "url", configured: true, host: "127.0.0.1", allowlisted: true },
+    };
+    const fetchMock = stubFetch({
+      "GET /api/channels": channelsView({ profiles: [linked] }),
+      "POST /api/channels/deliver-test": {
+        __status: 403,
+        detail: { reason_code: "disabled_by_capability_gate" },
+      },
+    });
+    render(MessagingView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Send a test delivery" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(/The external channel capability is turned off/),
+    );
+    const reads = fetchMock.mock.calls.filter(
+      ([url, init]) => String(url).endsWith("/api/channels") && !(init as RequestInit | undefined)?.method,
+    );
+    expect(reads.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // UX-MSG-03 — the order is the contract, and the first unfinished step
+  // carries its own control.
+  it("walks a paired channel through its setup in order", async () => {
     stubFetch({
       "GET /api/channels": channelsView({
         profiles: [
           {
             ...channelsView().profiles[0],
             linked: true,
-            enabled: true,
             pairing_id: "chp_1",
             display_label: "Webhooks",
             sender_count: 1,
             senders: ["ops"],
+            owner_sender_id: "ops",
           },
         ],
       }),
     });
     render(MessagingView);
-    await screen.findByText("Webhooks");
-    const profiles = screen.getByTestId("channel-profiles");
-    await fireEvent.click(
-      within(profiles).getByRole("button", { name: "Send a test delivery" }),
-    );
-    expect(screen.getByLabelText("Destination URL")).toBeInTheDocument();
-    expect(
-      screen.getByText(/the capability gate, the decision mode, the egress allowlist and the audit event all apply/i),
-    ).toBeInTheDocument();
+    const steps = await screen.findByRole("list", { name: "Webhooks setup" });
+    const items = within(steps).getAllByRole("listitem");
+    expect(items.map((item) => item.querySelector("strong")?.textContent)).toEqual([
+      "Connected",
+      "Owner verified",
+      "Allowed senders",
+      "Routing",
+      "Test delivery",
+      "Turned on",
+    ]);
+    const current = items.find((item) => item.getAttribute("aria-current") === "step");
+    expect(current).toHaveTextContent("Test delivery");
+    expect(within(current!).getByRole("button", { name: "Set delivery address" })).toBeInTheDocument();
+    // No address yet, so the plain test button cannot be pressed either.
+    expect(screen.getByRole("button", { name: "Send a test delivery" })).toBeDisabled();
+  });
+
+  it("says what the route does and keeps each stage of a message separate", async () => {
+    stubFetch({
+      "GET /api/channels": channelsView({
+        profiles: [
+          {
+            ...channelsView().profiles[0],
+            channel_type: "telegram",
+            display_name: "Telegram",
+            linked: true,
+            enabled: true,
+            pairing_id: "chp_1",
+            display_label: "Telegram",
+            sender_count: 1,
+            senders: ["4242"],
+            owner_sender_id: "4242",
+            routing_mode: "new_turn",
+            destination: { kind: "owner_chat", configured: true, host: null, allowlisted: true },
+            last_test: { at: "2026-10-03T10:00:00Z", ok: true, reason_code: null },
+            route_scope: {
+              conversation_scope: "direct_and_group",
+              mention_required: false,
+              thread_mapping: "new_conversation_each_message",
+              starts_work: "owner_only",
+              bot_loop_protection: "bot_messages_ignored",
+              reply_path: "kept_in_raiker",
+            },
+            receipts: [
+              {
+                receipt_id: "chn_1",
+                direction: "inbound",
+                kind: "message",
+                sender_role: "owner",
+                conversation_scope: "group",
+                routing_mode: "new_turn",
+                session_id: "sess_1",
+                received_at: "2026-10-03T10:00:00Z",
+                accepted_at: "2026-10-03T10:00:00Z",
+                queued_at: "2026-10-03T10:00:01Z",
+                processed_at: "2026-10-03T10:00:05Z",
+                reply_queued_at: null,
+                delivered_at: null,
+                failed_at: null,
+                reason_code: null,
+                created_at: "2026-10-03T10:00:00Z",
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    render(MessagingView);
+    await screen.findByText(/Direct messages and groups alike/);
+    expect(screen.getByText(/Messages from bots are ignored/)).toBeInTheDocument();
+    expect(screen.getByText(/nothing is sent back over this channel/)).toBeInTheDocument();
+    const activity = screen.getByRole("region", { name: "Telegram recent activity" });
+    expect(within(activity).getByText("You in a group")).toBeInTheDocument();
+    expect(within(activity).getByText("processed")).toBeInTheDocument();
+    expect(within(activity).queryByText("delivered")).toBeNull();
+    expect(within(activity).getByText(/Processed — no reply sent over the channel/)).toBeInTheDocument();
   });
 
   // The contract used to be a standalone "Routing contract" card at the foot of
@@ -167,15 +321,7 @@ describe("MessagingView", () => {
       "GET /api/channels": channelsView({
         profiles: [
           {
-            connector_id: "channel.webhooks",
-            channel_type: "webhooks",
-            display_name: "Webhooks",
-            transport: "signed_http_callback",
-            auth_method: "shared_secret",
-            default_state: "disabled",
-            requires_pairing: true,
-            requires_sender_allowlist: true,
-            requires_network: true,
+            ...channelsView().profiles[0],
             linked: true,
             enabled: false,
             pairing_id: "chp_1",
